@@ -1541,17 +1541,15 @@ function ApiCollections(props) {
 
     const handleAnalyzeDashboard = () => {
         // Get all collections from current data, filter out deactivated and API_GROUP types
-        const allColl = (allCollections || []).filter(c => !c.deactivated && c.type !== "API_GROUP");
+        const allColl = (data['all'] || []).filter(c => !c.deactivated && c.type !== "API_GROUP" && c.urlsCount > 0 && c.displayName !== "juice_shop_demo" && c.displayName !== "vulnerable_apis" && c.displayName !== "Default");
 
-        // Prepare collections data excluding tagsList and userSetEnvType
         const preparedCollections = allColl.map(c => ({
             id: c.id,
             name: c.displayName,
             totalEndpoints: c.urlsCount || 0,
-            riskScore: lastFetchedResp?.riskScoreMap?.[c.id] || 0,
-            hostName: c.hostName,
-            startTs: c.startTs,
-            description: c.description
+            riskScore: c.riskScore,
+            sensitiveData: c.sensitiveSubTypesVal,
+            issues: c.issuesArrVal,
         }));
 
         // Sort by endpoints and risk score, get top 50 each
@@ -1586,7 +1584,7 @@ function ApiCollections(props) {
         setShowAnalysisModal(true);
 
         // Process initial query
-        const initialQuery = "Analyze the dashboard data provided above. Focus on risk distribution, endpoint coverage, and provide actionable recommendations, review and provide insight purely from the data provided above.";
+        const initialQuery = "Analyze the dashboard data provided above. Focus on risk distribution, endpoint coverage, sensitive data exposure, issues count data with severity, and provide actionable recommendations, review and provide insight purely from the data provided above.";
         processAnalysisQuery(initialQuery, metadata);
     }
 
@@ -1637,7 +1635,7 @@ function ApiCollections(props) {
                     />
                 </Popover.Pane>
             </Popover>
-            <Button onClick={handleAnalyzeDashboard}>Analyze Dashboard</Button>
+            <Button onClick={handleAnalyzeDashboard}>Analyze Inventory</Button>
             {!activeFilterType && <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
         </HorizontalStack>
     )
@@ -1889,7 +1887,7 @@ function ApiCollections(props) {
                                 <AgenticThinkingBox />
                             ) : (
                                 <VerticalStack gap="4">
-                                    <ConversationHistory conversations={analysisConversations} />
+                                    <ConversationHistory conversations={analysisConversations} isInventory={true}/>
                                     {analysisLoading && <AgenticThinkingBox />}
                                 </VerticalStack>
                             )}
