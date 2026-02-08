@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import RegistryBadge from "../../../components/shared/RegistryBadge";
 import api from "../api"
@@ -31,13 +31,16 @@ import { useNavigate } from "react-router-dom";
 import ReactFlow, {
     Background,  useNodesState,
     useEdgesState,
-  
+
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
-import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
 import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
+import { sendQuery } from "../../agentic/services/agenticService";
+import AgenticThinkingBox from "../../agentic/components/AgenticThinkingBox";
+import ConversationHistory from "../../testing/TestRunResultPage/components/ConversationHistory";
   
 const CenterViewType = {
     Table: 0,
@@ -510,6 +513,10 @@ function ApiCollections(props) {
     const [normalData, setNormalData] = useState([])
     const [centerView, setCenterView] = useState(CenterViewType.Table);
     const [moreActions, setMoreActions] = useState(false);
+    const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+    const [analysisConversations, setAnalysisConversations] = useState([]);
+    const [analysisLoading, setAnalysisLoading] = useState(false);
+    const [analysisConversationId, setAnalysisConversationId] = useState(null);
 
     // const dummyData = dummyJson;
 
@@ -1493,6 +1500,96 @@ function ApiCollections(props) {
         fetchSvcToSvcGraphData()
     }
 
+    const processAnalysisQuery = async (query, metadata) => {
+        try {
+            setAnalysisLoading(true);
+
+            // Add user message to conversation history
+            const userMessage = {
+                _id: 'user_' + Date.now(),
+                role: 'user',
+                message: query,
+                creationTimestamp: func.timeNow()
+            };
+            setAnalysisConversations(prev => [...prev, userMessage]);
+
+            // Call API
+            const res = await sendQuery(query, analysisConversationId, "ANALYZE_DASHBOARD_DATA", metadata);
+
+            if(res?.conversationId) {
+                setAnalysisConversationId(res.conversationId);
+            }
+
+            // Add AI response to conversation history
+            if(res?.response) {
+                const aiMessage = {
+                    _id: "assistant_" + Date.now(),
+                    role: 'assistant',
+                    message: res.response,
+                    creationTimestamp: func.timeNow()
+                };
+                setAnalysisConversations(prev => [...prev, aiMessage]);
+            }
+
+            setAnalysisLoading(false);
+
+        } catch (err) {
+            console.error('Error processing query:', err);
+            setAnalysisLoading(false);
+        }
+    };
+
+    const handleAnalyzeDashboard = () => {
+        // Get all collections from current data, filter out deactivated and API_GROUP types
+        const allColl = (allCollections || []).filter(c => !c.deactivated && c.type !== "API_GROUP");
+
+        // Prepare collections data excluding tagsList and userSetEnvType
+        const preparedCollections = allColl.map(c => ({
+            id: c.id,
+            name: c.displayName,
+            totalEndpoints: c.urlsCount || 0,
+            riskScore: lastFetchedResp?.riskScoreMap?.[c.id] || 0,
+            hostName: c.hostName,
+            startTs: c.startTs,
+            description: c.description
+        }));
+
+        // Sort by endpoints and risk score, get top 50 each
+        const topByEndpoints = [...preparedCollections]
+            .sort((a, b) => b.totalEndpoints - a.totalEndpoints)
+            .slice(0, 25);
+
+        const topByRiskScore = [...preparedCollections]
+            .sort((a, b) => b.riskScore - a.riskScore)
+            .slice(0, 25);
+
+        // Combine and deduplicate
+        const seenIds = new Set();
+        const combinedCollections = [];
+
+        [...topByEndpoints, ...topByRiskScore].forEach(col => {
+            if (!seenIds.has(col.id)) {
+                seenIds.add(col.id);
+                combinedCollections.push(col);
+            }
+        });
+
+        // Prepare metadata for API call
+        const metadata = {
+            type: "dashboard_collections",
+            data: combinedCollections
+        };
+
+        // Reset state and open modal
+        setAnalysisConversations([]);
+        setAnalysisConversationId(null);
+        setShowAnalysisModal(true);
+
+        // Process initial query
+        const initialQuery = "Analyze the dashboard data provided above. Focus on risk distribution, endpoint coverage, and provide actionable recommendations, review and provide insight purely from the data provided above.";
+        processAnalysisQuery(initialQuery, metadata);
+    }
+
     const secondaryActionsComp = (
         <HorizontalStack gap={2}>
             <Popover
@@ -1540,6 +1637,7 @@ function ApiCollections(props) {
                     />
                 </Popover.Pane>
             </Popover>
+            <Button onClick={handleAnalyzeDashboard}>Analyze Dashboard</Button>
             {!activeFilterType && <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
         </HorizontalStack>
     )
@@ -1761,22 +1859,45 @@ function ApiCollections(props) {
     const pageTitle = getFilteredPageTitle();
 
     return(
-        <PageWithMultipleCards
-            title={
-                <TitleWithInfo 
-                    tooltipContent={activeFilterTitle 
-                        ? `Viewing collections filtered by ${activeFilterTitle}`
-                        : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
-                    titleText={pageTitle} 
-                    docsUrl={"https://docs.akto.io/api-inventory/concepts"}
-                />
-            }
-            primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
-            isFirstPage={!isFromEndpoints}
-            backUrl={isFromEndpoints ? "/dashboard/observe/agentic-assets" : undefined}
-            components={components}
-            secondaryActions={secondaryActionsComp}
-        />
+        <>
+            <PageWithMultipleCards
+                title={
+                    <TitleWithInfo
+                        tooltipContent={activeFilterTitle
+                            ? `Viewing collections filtered by ${activeFilterTitle}`
+                            : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
+                        titleText={pageTitle}
+                        docsUrl={"https://docs.akto.io/api-inventory/concepts"}
+                    />
+                }
+                primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
+                isFirstPage={!isFromEndpoints}
+                backUrl={isFromEndpoints ? "/dashboard/observe/agentic-assets" : undefined}
+                components={components}
+                secondaryActions={secondaryActionsComp}
+            />
+            {showAnalysisModal && (
+                <Modal
+                    open={showAnalysisModal}
+                    onClose={() => setShowAnalysisModal(false)}
+                    title="Dashboard Analysis"
+                    large
+                >
+                    <Modal.Section>
+                        <Box style={{ minHeight: '400px', maxHeight: '60vh', overflowY: 'auto' }}>
+                            {analysisLoading && analysisConversations.length === 0 ? (
+                                <AgenticThinkingBox />
+                            ) : (
+                                <VerticalStack gap="4">
+                                    <ConversationHistory conversations={analysisConversations} />
+                                    {analysisLoading && <AgenticThinkingBox />}
+                                </VerticalStack>
+                            )}
+                        </Box>
+                    </Modal.Section>
+                </Modal>
+            )}
+        </>
     )
 }
 
