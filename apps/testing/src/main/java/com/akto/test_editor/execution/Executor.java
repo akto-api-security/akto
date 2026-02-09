@@ -657,7 +657,7 @@ public class Executor {
                             latestSample = thisSample;
                             latestTimestamp = thisTimestamp;
                         }
-                    }                
+                    }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "SAMPLE_DATA: Error parsing sample data for sample_data test auth mechanism " + testRole.getName() + ": " + e.getMessage());
                 }
@@ -705,25 +705,25 @@ public class Executor {
     }
 
 
-    public static ExecutorSingleOperationResp ensureAuthTokenWithRetry(
-        TestRoles testRole,
-        int maxRetries
-    ) throws Exception {
+    public static ExecutorSingleOperationResp ensureAuthTokenWithRetry(TestRoles testRole, int maxRetries, RawApi rawApi) {
+
         if (testRole == null) {
             return new ExecutorSingleOperationResp(false, "Test role is null");
         }
 
-        AuthMechanism authMechanism = testRole.findMatchingAuthMechanism(null);
+        AuthMechanism authMechanism = testRole.findMatchingAuthMechanism(rawApi);
         if (authMechanism == null) {
             return new ExecutorSingleOperationResp(true, "No auth mechanism found");
         }
 
-        boolean eligibleForCache = AuthMechanismTypes.LOGIN_REQUEST.toString()
-            .equalsIgnoreCase(authMechanism.getType())
-            || AuthMechanismTypes.SAMPLE_DATA.toString()
+        boolean isLoginRequest = AuthMechanismTypes.LOGIN_REQUEST.toString()
             .equalsIgnoreCase(authMechanism.getType());
 
-        if (eligibleForCache && !authMechanism.isCacheExpired()) {
+        if (!isLoginRequest) {
+            return new ExecutorSingleOperationResp(true, "Auth type " + authMechanism.getType() + " not supported for pre-fetch");
+        }
+
+        if (!authMechanism.isCacheExpired()) {
             return new ExecutorSingleOperationResp(true, "Using cached token");
         }
 
@@ -751,8 +751,13 @@ public class Executor {
                     }
 
                     if (attempt < maxRetries) {
-                        int waitMs = Math.min(2000 * attempt, 10000);
-                        Thread.sleep(waitMs);
+                        try {
+                            int waitMs = Math.min(2000 * attempt, 10000);
+                            Thread.sleep(waitMs);
+                        } catch (InterruptedException ie) {
+                            loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Sleep interrupted - " + ie.getMessage(), LogDb.TESTING);
+                            Thread.currentThread().interrupt();
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -765,8 +770,13 @@ public class Executor {
                 }
 
                 if (attempt < maxRetries) {
-                    int waitMs = Math.min(2000 * attempt, 10000);
-                    Thread.sleep(waitMs);
+                    try {
+                        int waitMs = Math.min(2000 * attempt, 10000);
+                        Thread.sleep(waitMs);
+                    } catch (InterruptedException ie) {
+                        loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Sleep interrupted - " + ie.getMessage(), LogDb.TESTING);
+                        Thread.currentThread().interrupt();
+                    }
                 }
             }
         }

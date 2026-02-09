@@ -1008,6 +1008,30 @@ public class TestExecutor {
         return false;
     }
 
+    private TestingRunResult createAuthFailedResult(String errorMessage, ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey,
+        TestConfig testConfig, RawApi rawApi, ObjectId testRunResultSummaryId, List<TestingRunResult.TestLog> testLogs) {
+        loggerMaker.errorAndAddToDb(errorMessage, LogDb.TESTING);
+        testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, errorMessage));
+
+        List<GenericTestResult> failedResults = new ArrayList<>();
+        failedResults.add(new TestResult(
+            null, rawApi.getOriginalMessage(),
+            Collections.singletonList(errorMessage),
+            0, false, TestResult.Confidence.HIGH, null
+        ));
+
+        String testSuperType = testConfig.getInfo().getCategory().getName();
+        String testSubType = testConfig.getInfo().getSubCategory();
+
+        totalTestsToBeExecuted.decrementAndGet();
+        return new TestingRunResult(
+            testRunId, apiInfoKey, testSuperType, testSubType,
+            failedResults, false, new ArrayList<>(), 100,
+            Context.now(), Context.now(), testRunResultSummaryId,
+            null, testLogs
+        );
+    }
+
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
         ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
             RawApi rawApi = TestingConfigurations.getInstance().getRawApi(apiInfoKey);
@@ -1025,37 +1049,15 @@ public class TestExecutor {
 
                 if (attackerAuthMechanism != null) {
                     try {
-                        synchronized (attackerTestRole) {
-                            ExecutorSingleOperationResp authResult = Executor.ensureAuthTokenWithRetry(
-                                attackerTestRole, 3
-                            );
+                        ExecutorSingleOperationResp authResult = Executor.ensureAuthTokenWithRetry(
+                            attackerTestRole, 3, rawApi
+                        );
 
-                            if (!authResult.getSuccess()) {
-                                String errorMessage = "Attacker role auth token fetch failed after 3 retries: "
-                                    + authResult.getErrMsg();
-                                loggerMaker.errorAndAddToDb(errorMessage, LogDb.TESTING);
-                                testLogs.add(new TestingRunResult.TestLog(
-                                    TestingRunResult.TestLogType.ERROR, errorMessage
-                                ));
-
-                                List<GenericTestResult> failedResults = new ArrayList<>();
-                                failedResults.add(new TestResult(
-                                    null, rawApi.getOriginalMessage(),
-                                    Collections.singletonList(errorMessage),
-                                    0, false, TestResult.Confidence.HIGH, null
-                                ));
-
-                                String testSuperType = testConfig.getInfo().getCategory().getName();
-                                String testSubType = testConfig.getInfo().getSubCategory();
-
-                                totalTestsToBeExecuted.decrementAndGet();
-                                return new TestingRunResult(
-                                    testRunId, apiInfoKey, testSuperType, testSubType,
-                                    failedResults, false, new ArrayList<>(), 100,
-                                    Context.now(), Context.now(), testRunResultSummaryId,
-                                    null, testLogs
-                                );
-                            }
+                        if (!authResult.getSuccess()) {
+                            String errorMessage = "Attacker role auth token fetch failed after 3 retries: "
+                                + authResult.getErrMsg();
+                            return createAuthFailedResult(errorMessage, testRunId, apiInfoKey, testConfig,
+                                rawApi, testRunResultSummaryId, testLogs);
                         }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Exception during attacker auth token fetch: "
@@ -1074,38 +1076,16 @@ public class TestExecutor {
                 );
 
                 if (testRole != null) {
-                    try {
-                        synchronized (testRole) {
-                            ExecutorSingleOperationResp authResult = Executor.ensureAuthTokenWithRetry(
-                                testRole, 3
-                            );
+                    try{
+                        ExecutorSingleOperationResp authResult = Executor.ensureAuthTokenWithRetry(
+                            testRole, 3, rawApi
+                        );
 
-                            if (!authResult.getSuccess()) {
-                                String errorMessage = "Test role auth token fetch failed after 3 retries: "
-                                    + authResult.getErrMsg();
-                                loggerMaker.errorAndAddToDb(errorMessage, LogDb.TESTING);
-                                testLogs.add(new TestingRunResult.TestLog(
-                                    TestingRunResult.TestLogType.ERROR, errorMessage
-                                ));
-
-                                List<GenericTestResult> failedResults = new ArrayList<>();
-                                failedResults.add(new TestResult(
-                                    null, rawApi.getOriginalMessage(),
-                                    Collections.singletonList(errorMessage),
-                                    0, false, TestResult.Confidence.HIGH, null
-                                ));
-
-                                String testSuperType = testConfig.getInfo().getCategory().getName();
-                                String testSubType = testConfig.getInfo().getSubCategory();
-
-                                totalTestsToBeExecuted.decrementAndGet();
-                                return new TestingRunResult(
-                                    testRunId, apiInfoKey, testSuperType, testSubType,
-                                    failedResults, false, new ArrayList<>(), 100,
-                                    Context.now(), Context.now(), testRunResultSummaryId,
-                                    null, testLogs
-                                );
-                            }
+                        if (!authResult.getSuccess()) {
+                            String errorMessage = "Test role auth token fetch failed after 3 retries: "
+                                + authResult.getErrMsg();
+                            return createAuthFailedResult(errorMessage, testRunId, apiInfoKey, testConfig,
+                                rawApi, testRunResultSummaryId, testLogs);
                         }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Exception during test role auth token fetch: "
