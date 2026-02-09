@@ -81,10 +81,15 @@ public class Kafka {
   }
 
   public Kafka(String brokerIP, int lingerMS, int batchSize, String username, String password, LogDb logDb) {
+    // Default to PLAIN mechanism for backward compatibility
+    this(brokerIP, lingerMS, batchSize, username, password, "PLAIN", logDb);
+  }
+
+  public Kafka(String brokerIP, int lingerMS, int batchSize, String username, String password, String saslMechanism, LogDb logDb) {
     producerReady = false;
     try {
       logger = new LoggerMaker(Kafka.class, logDb);
-      setProducer(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING, 5000, 0, username, password);
+      setProducer(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING, 5000, 0, username, password, saslMechanism);
     } catch (Exception e) {
       logger.errorAndAddToDb("Error while creating producer: " + e.getMessage());
       e.printStackTrace();
@@ -137,7 +142,7 @@ public class Kafka {
       int maxRequestTimeout,
       int retriesConfig
       ) {
-    setProducer(brokerIP, lingerMS, batchSize, keySerializer, valueSerializer, maxRequestTimeout, retriesConfig, null, null);
+    setProducer(brokerIP, lingerMS, batchSize, keySerializer, valueSerializer, maxRequestTimeout, retriesConfig, null, null, null);
   }
 
   private void setProducer(
@@ -149,7 +154,8 @@ public class Kafka {
       int maxRequestTimeout,
       int retriesConfig,
       String username,
-      String password
+      String password,
+      String saslMechanism
       ) {
     if (producer != null) close(); // close existing producer connection
 
@@ -168,7 +174,11 @@ public class Kafka {
 
     // Add SASL authentication if username and password are provided
     if (username != null && !username.isEmpty() && password != null && !password.isEmpty()) {
-      KafkaConfig.addAuthenticationProperties(kafkaProps, username, password);
+      if (saslMechanism != null && !saslMechanism.isEmpty()) {
+        KafkaConfig.addAuthenticationProperties(kafkaProps, username, password, saslMechanism);
+      } else {
+        KafkaConfig.addAuthenticationProperties(kafkaProps, username, password);
+      }
     }
 
     try {
