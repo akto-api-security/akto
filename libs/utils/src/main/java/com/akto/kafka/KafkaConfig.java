@@ -29,6 +29,16 @@ public class KafkaConfig {
     public static final String SECURITY_PROTOCOL_SASL_PLAINTEXT = "SASL_PLAINTEXT";
     public static final String SASL_MECHANISM_PLAIN = "PLAIN";
 
+    // New environment variable for SASL mechanism
+    public static final String ENV_KAFKA_SASL_MECHANISM = "KAFKA_SASL_MECHANISM";
+
+    // New SASL mechanism constants
+    public static final String SASL_MECHANISM_SCRAM_SHA_256 = "SCRAM-SHA-256";
+    public static final String SASL_MECHANISM_SCRAM_SHA_512 = "SCRAM-SHA-512";
+
+    // Default SASL mechanism (for backward compatibility)
+    public static final String DEFAULT_SASL_MECHANISM = SASL_MECHANISM_PLAIN;
+
     // Default Kafka broker URLs
     public static final String DEFAULT_KAFKA_BROKER_URL = "kafka1:19092";
     public static final String DEFAULT_KUBERNETES_KAFKA_BROKER_URL = "127.0.0.1:29092";
@@ -79,6 +89,25 @@ public class KafkaConfig {
     }
 
     /**
+     * Gets the configured SASL mechanism from environment variable with validation.
+     *
+     * @return SASL mechanism (PLAIN, SCRAM-SHA-256, or SCRAM-SHA-512)
+     */
+    public static String getKafkaSaslMechanism() {
+        String mechanism = System.getenv().getOrDefault(ENV_KAFKA_SASL_MECHANISM, DEFAULT_SASL_MECHANISM);
+
+        // Validate mechanism
+        if (!mechanism.equals(SASL_MECHANISM_PLAIN) &&
+            !mechanism.equals(SASL_MECHANISM_SCRAM_SHA_256) &&
+            !mechanism.equals(SASL_MECHANISM_SCRAM_SHA_512)) {
+            logger.error("Invalid SASL mechanism: {}. Using default: {}", mechanism, DEFAULT_SASL_MECHANISM);
+            return DEFAULT_SASL_MECHANISM;
+        }
+
+        return mechanism;
+    }
+
+    /**
      * Adds Kafka authentication properties to the given Properties object.
      *
      * @param properties The Properties object to add authentication to
@@ -87,11 +116,22 @@ public class KafkaConfig {
      */
     public static void addAuthenticationProperties(Properties properties, String username, String password) {
         properties.put(SECURITY_PROTOCOL, SECURITY_PROTOCOL_SASL_PLAINTEXT);
-        properties.put(SASL_MECHANISM, SASL_MECHANISM_PLAIN);
 
-        String jaasConfig = String.format(
-                "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
-                username, password);
+        String saslMechanism = getKafkaSaslMechanism();
+        properties.put(SASL_MECHANISM, saslMechanism);
+
+        String jaasConfig;
+        if (saslMechanism.equals(SASL_MECHANISM_PLAIN)) {
+            jaasConfig = String.format(
+                    "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
+                    username, password);
+        } else {
+            // SCRAM-SHA-256 or SCRAM-SHA-512 use the same ScramLoginModule
+            jaasConfig = String.format(
+                    "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";",
+                    username, password);
+        }
+
         properties.put(SASL_JAAS_CONFIG, jaasConfig);
     }
 
