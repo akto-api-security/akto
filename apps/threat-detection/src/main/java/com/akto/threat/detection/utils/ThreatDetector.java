@@ -273,38 +273,49 @@ public class ThreatDetector {
 
     private boolean hasEmptyOrMalformedBearer(Map<String, List<String>> headers) {
         for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
-            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(AuthPolicy.AUTHORIZATION_HEADER_NAME)) {
-                List<String> values = entry.getValue();
-                if (values != null) {
-                    for (String value : values) {
-                        if (value == null) continue;
-                        String trimmed = value.trim();
+            String headerName = entry.getKey();
+            if (headerName == null || !headerName.equalsIgnoreCase(AuthPolicy.AUTHORIZATION_HEADER_NAME)) {
+                continue;
+            }
 
-                        // Check if it starts with "Bearer" (case insensitive)
-                        if (trimmed.length() >= 6 && trimmed.substring(0, 6).equalsIgnoreCase("bearer")) {
-                            // Extract token part after "Bearer"
-                            String tokenPart = trimmed.length() > 6 ? trimmed.substring(6).trim() : "";
+            List<String> values = entry.getValue();
+            if (values == null) {
+                continue;
+            }
 
-                            // Empty bearer token (e.g., "Bearer" or "Bearer ")
-                            if (tokenPart.isEmpty()) {
-                                return true;
-                            }
+            for (String value : values) {
+                if (value == null) {
+                    continue;
+                }
 
-                            // Check if token looks like JWT but is malformed
-                            if (tokenPart.contains(".")) {
-                                String[] parts = tokenPart.split("\\.");
-                                // Valid JWT has exactly 3 parts
-                                if (parts.length != 3) {
-                                    return true;
-                                }
-                                // Check if any part is empty
-                                for (String part : parts) {
-                                    if (part.isEmpty()) {
-                                        return true;
-                                    }
-                                }
-                            }
-                        }
+                String trimmed = value.trim();
+                if (trimmed.length() < 6 || !trimmed.substring(0, 6).equalsIgnoreCase("bearer")) {
+                    continue;
+                }
+
+                // Extract token part after "Bearer"
+                String tokenPart = trimmed.length() > 6 ? trimmed.substring(6).trim() : "";
+
+                // Empty bearer token (e.g., "Bearer" or "Bearer ")
+                if (tokenPart.isEmpty()) {
+                    return true;
+                }
+
+                // Check if token looks like JWT but is malformed
+                if (!tokenPart.contains(".")) {
+                    continue;
+                }
+
+                String[] parts = tokenPart.split("\\.");
+                // Valid JWT has exactly 3 parts
+                if (parts.length != 3) {
+                    return true;
+                }
+
+                // Check if any part is empty
+                for (String part : parts) {
+                    if (part.isEmpty()) {
+                        return true;
                     }
                 }
             }
