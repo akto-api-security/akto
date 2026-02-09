@@ -267,8 +267,7 @@ function ApiEndpoints(props) {
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
     const [currentKey, setCurrentKey] = useState(Date.now()); // to force remount InlineEditableText component
-    // const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS')
-    const hasAccessToDiscoveryAgent = true
+    const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS');
 
 
     // the values used here are defined at the server.
@@ -1557,8 +1556,8 @@ function ApiEndpoints(props) {
         setShowDetails={setShowDetails}
         apiDetail={apiDetail}
         headers={transform.getDetailsHeaders()}
-        // isGptActive={isGptActive}
         collectionIssuesData={collectionIssuesData}
+        hasAccessToDiscoveryAgent={hasAccessToDiscoveryAgent}
     />,
     ]
 
