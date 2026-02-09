@@ -10102,6 +10102,29 @@
             </result>
         </action>
 
+        <action name="api/fetchSessionContext"
+            class="com.akto.action.threat_detection.SessionContextAction" method="fetchSessionContext">
+            <interceptor-ref name="json" />
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">THREAT_DETECTION</param>
+            </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json">
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">sessionData.*, errorMessage</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">404</param>
+                <param
+                    name="includeProperties">errorMessage</param>
+            </result>
+        </action>
+
         <action name="api/fetchFiltersForThreatActors"
             class="com.akto.action.threat_detection.ThreatActorAction" method="fetchThreatActorFilters">
             <interceptor-ref name="json" />

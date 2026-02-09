@@ -34,7 +34,7 @@ message ListMaliciousRequestsResponse {
       string jira_ticket_url = 22;  // URL of associated Jira ticket
       string severity = 23;  // Severity level: "CRITICAL", "HIGH", "MEDIUM", "LOW"
       string dest_country = 24;  // Destination country code (where the request is going to)
-      string session_context = 25;  // JSON string containing session-based detection data
+      string session_id = 25;  // Session identifier for tracking user sessions
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;

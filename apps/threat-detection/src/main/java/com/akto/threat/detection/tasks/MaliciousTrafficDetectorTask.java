@@ -680,7 +680,10 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (requestHeaders != null && requestHeaders.containsKey("host") && !requestHeaders.get("host").isEmpty()) {
       host = requestHeaders.get("host").get(0);
     }
-    
+
+    // TODO: Extract sessionId from cookies or headers when needed
+    String sessionId = "";
+
     String contextSourceValue = CONTEXT_SOURCE.API.name();
     
     MaliciousEventMessage maliciousEvent =
@@ -704,6 +707,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setStatus(maliciousReq.getStatus())
             .setHost(host != null ? host : "")
             .setContextSource(contextSourceValue)
+            .setSessionId(sessionId != null ? sessionId : "")
             .build();
     MaliciousEventKafkaEnvelope envelope =
         MaliciousEventKafkaEnvelope.newBuilder()
