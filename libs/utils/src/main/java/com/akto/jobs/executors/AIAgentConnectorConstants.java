@@ -16,6 +16,7 @@ public final class AIAgentConnectorConstants {
     public static final String CONNECTOR_TYPE_COPILOT_STUDIO = "COPILOT_STUDIO";
     public static final String CONNECTOR_TYPE_DATABRICKS = "DATABRICKS";
     public static final String CONNECTOR_TYPE_SNOWFLAKE = "SNOWFLAKE";
+    public static final String CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = "VERTEX_AI_CUSTOM_DEPLOYED_MODEL";
 
     // Binary Names
     public static final String BINARY_NAME_N8N = "n8n-shield";
@@ -62,6 +63,11 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_DATABRICKS_CATALOG = "DATABRICKS_CATALOG";
     public static final String CONFIG_DATABRICKS_SCHEMA = "DATABRICKS_SCHEMA";
     public static final String CONFIG_DATABRICKS_PREFIX = "DATABRICKS_PREFIX";
+
+    // Configuration Keys - Vertex AI Custom Deployed Model
+    public static final String CONFIG_VERTEX_AI_PROJECT_ID = "VERTEX_AI_PROJECT_ID";
+    public static final String CONFIG_VERTEX_AI_BIGQUERY_DATASET = "VERTEX_AI_BIGQUERY_DATASET";
+    public static final String CONFIG_VERTEX_AI_BIGQUERY_TABLE = "VERTEX_AI_BIGQUERY_TABLE";
 
     // Common Configuration Keys
     public static final String CONFIG_DATA_INGESTION_SERVICE_URL = "DATA_INGESTION_SERVICE_URL";

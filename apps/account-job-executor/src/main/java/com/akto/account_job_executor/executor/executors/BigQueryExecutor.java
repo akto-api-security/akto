@@ -62,17 +62,19 @@ public class BigQueryExecutor extends AccountJobExecutor {
         }
 
         String jobIdString = String.valueOf(job.getId());
-        int[] batchCounter = {0};
-        int[] totalRecordsIngested = {0};
+        int[] batchCounter = { 0 };
+        int[] totalRecordsIngested = { 0 };
 
         try (BigQueryConnector bigQueryConnector = new BigQueryConnector(bigQueryConfig, jobIdString, accountId);
-             BigQueryIngestionClient bigQueryIngestionClient = new BigQueryIngestionClient(
-                     bigQueryConfig.getIngestionServiceUrl(),
-                     bigQueryConfig.getAuthToken(),
-                     bigQueryConfig.getConnectTimeoutMs(),
-                     bigQueryConfig.getSocketTimeoutMs(),
-                     jobIdString,
-                     accountId)) {
+                BigQueryIngestionClient bigQueryIngestionClient = new BigQueryIngestionClient(
+                        bigQueryConfig.getIngestionServiceUrl(),
+                        bigQueryConfig.getAuthToken(),
+                        bigQueryConfig.getConnectTimeoutMs(),
+                        bigQueryConfig.getSocketTimeoutMs(),
+                        jobIdString,
+                        accountId,
+                        job.getJobType(),
+                        job.getSubType())) {
 
             logger.info("Connected to BigQuery project: {}", bigQueryConfig.getProjectId());
             logger.info("Sending data to ingestion service: {}", bigQueryConfig.getIngestionServiceUrl());
@@ -105,7 +107,6 @@ public class BigQueryExecutor extends AccountJobExecutor {
 
         logger.info("BigQuery job completed successfully: jobId={}", job.getId());
     }
-
 
     private static boolean isRetryableFailure(Throwable error) {
         Set<Throwable> seen = java.util.Collections.newSetFromMap(new IdentityHashMap<>());

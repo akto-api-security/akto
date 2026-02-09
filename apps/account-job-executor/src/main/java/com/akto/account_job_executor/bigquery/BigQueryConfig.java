@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import static com.akto.jobs.executors.AIAgentConnectorConstants.*;
+
 public class BigQueryConfig {
     private static final Pattern SAFE_IDENTIFIER_PATTERN = Pattern.compile("^[a-zA-Z0-9._-]+$");
 
@@ -50,24 +52,20 @@ public class BigQueryConfig {
      * @param toDate    End of time range to query
      */
     public static BigQueryConfig fromJobConfig(Map<String, Object> jobConfig, Instant fromDate, Instant toDate) {
-        String projectId = requireSafeIdentifier(jobConfig, "projectId");
-        String dataset = requireSafeIdentifier(jobConfig, "dataset");
-        String table = requireSafeIdentifier(jobConfig, "table");
+        String projectId = requireSafeIdentifier(jobConfig, CONFIG_VERTEX_AI_PROJECT_ID);
+        String dataset = requireSafeIdentifier(jobConfig, CONFIG_VERTEX_AI_BIGQUERY_DATASET);
+        String table = requireSafeIdentifier(jobConfig, CONFIG_VERTEX_AI_BIGQUERY_TABLE);
 
-        String ingestionServiceUrl = getOptionalString(jobConfig, "ingestionServiceUrl",
-                System.getenv("DATA_INGESTION_SERVICE_URL"));
-
-        String authToken = getOptionalString(jobConfig, "authToken",
-                System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN"));
-
+        String ingestionServiceUrl = getOptionalString(jobConfig, CONFIG_DATA_INGESTION_SERVICE_URL, null);
         if (ingestionServiceUrl == null || ingestionServiceUrl.isEmpty()) {
             throw new IllegalArgumentException(
-                    "ingestionServiceUrl not set. Provide in job config or set DATA_INGESTION_SERVICE_URL env var");
+                    "Ingestion service URL not set. Provide '" + CONFIG_DATA_INGESTION_SERVICE_URL + "' in job config");
         }
 
+        String authToken = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
         if (authToken == null || authToken.isEmpty()) {
             throw new IllegalArgumentException(
-                    "authToken not set. Provide in job config or set DATABASE_ABSTRACTOR_SERVICE_TOKEN env var");
+                    "DATABASE_ABSTRACTOR_SERVICE_TOKEN environment variable not set. Required for DIS authentication.");
         }
 
         return new BigQueryConfig(projectId, dataset, table, fromDate, toDate, ingestionServiceUrl, authToken);

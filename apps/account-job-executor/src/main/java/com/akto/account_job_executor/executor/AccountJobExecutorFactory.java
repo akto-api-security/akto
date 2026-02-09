@@ -25,7 +25,7 @@ public class AccountJobExecutorFactory {
 
         // Register all job executors here
         map.put("AI_AGENT_CONNECTOR", AIAgentConnectorExecutor.INSTANCE);
-        map.put("BIGQUERY", BigQueryExecutor.INSTANCE);
+        map.put("VERTEX_AI_CUSTOM_DEPLOYED_MODEL_CONNECTOR", BigQueryExecutor.INSTANCE);
 
         registry = Collections.unmodifiableMap(map);
     }

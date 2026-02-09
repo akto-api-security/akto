@@ -34,16 +34,21 @@ public class BigQueryIngestionClient implements AutoCloseable {
     private final PoolingHttpClientConnectionManager connectionManager;
     private final String accountJobId;
     private final int accountId;
+    private final String jobType;
+    private final String jobSubType;
 
     private final int maxRetries;
     private final long retryBaseDelayMs;
 
     public BigQueryIngestionClient(String ingestionServiceUrl, String authToken,
-            int connectTimeoutMs, int socketTimeoutMs, String jobId, int accountId) {
+            int connectTimeoutMs, int socketTimeoutMs, String jobId, int accountId,
+            String jobType, String jobSubType) {
         this.ingestionServiceBaseUrl = normalizeBaseUrl(ingestionServiceUrl);
         this.authToken = authToken;
         this.accountJobId = jobId;
         this.accountId = accountId;
+        this.jobType = jobType;
+        this.jobSubType = jobSubType;
         this.maxRetries = 3;
         this.retryBaseDelayMs = 500;
 
@@ -63,8 +68,8 @@ public class BigQueryIngestionClient implements AutoCloseable {
                 .evictIdleConnections(30, TimeUnit.SECONDS)
                 .build();
 
-        logger.info("Ingestion client initialized: jobId={}, accountId={}, url={}", jobId, accountId,
-                ingestionServiceUrl);
+        logger.info("Ingestion client initialized: jobId={}, accountId={}, jobType={}, jobSubType={}, url={}",
+                jobId, accountId, jobType, jobSubType, ingestionServiceUrl);
     }
 
     public int ingestRecordsBatch(
@@ -180,6 +185,8 @@ public class BigQueryIngestionClient implements AutoCloseable {
         ingestionRecord.put("ip", "");
         ingestionRecord.put("destIp", "");
         ingestionRecord.put("akto_account_id", String.valueOf(accountId));
+        ingestionRecord.put("akto_job_type", jobType != null ? jobType : "");
+        ingestionRecord.put("akto_job_sub_type", jobSubType != null ? jobSubType : "");
         ingestionRecord.put("akto_vxlan_id", "");
         ingestionRecord.put("is_pending", "false");
         ingestionRecord.put("direction", "");
