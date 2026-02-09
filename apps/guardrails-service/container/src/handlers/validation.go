@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/akto-api-security/guardrails-service/models"
+	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -94,7 +95,10 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		return
 	}
 
-	result, err := h.validatorService.ValidateRequest(c.Request.Context(), req.Payload, req.ContextSource)
+	// Extract session and Kong request IDs from headers
+	sessionID, kongRequestID := session.ExtractSessionIDsFromRequest(c.Request)
+
+	result, err := h.validatorService.ValidateRequest(c.Request.Context(), req.Payload, req.ContextSource, sessionID, kongRequestID)
 	if err != nil {
 		h.logger.Error("Failed to validate request", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -120,7 +124,10 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		return
 	}
 
-	result, err := h.validatorService.ValidateResponse(c.Request.Context(), req.Payload, req.ContextSource)
+	// Extract session and Kong request IDs from headers
+	sessionID, kongRequestID := session.ExtractSessionIDsFromRequest(c.Request)
+
+	result, err := h.validatorService.ValidateResponse(c.Request.Context(), req.Payload, req.ContextSource, sessionID, kongRequestID)
 	if err != nil {
 		h.logger.Error("Failed to validate response", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
