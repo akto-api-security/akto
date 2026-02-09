@@ -222,6 +222,8 @@ class RequestValidatorTest {
         responseParam.setRequestParams(new HttpRequestParams());
         responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus");
         responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
 
         List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
 
@@ -234,6 +236,8 @@ class RequestValidatorTest {
         responseParam.setRequestParams(new HttpRequestParams());
         responseParam.getRequestParams().setUrl("/api/v3/pet/{petId}");
         responseParam.getRequestParams().setMethod("DELETE");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
 
         List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
 
@@ -284,10 +288,11 @@ class RequestValidatorTest {
     void testValidate_ExtraHeaderNotInSchema() throws Exception {
         HttpResponseParams responseParam = new HttpResponseParams();
         responseParam.setRequestParams(new HttpRequestParams());
-        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus");
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available");
         responseParam.getRequestParams().setMethod("GET");
 
         Map<String, List<String>> headers = new HashMap<>();
+        headers.put("content-type", Collections.singletonList("application/json"));
         headers.put("x-custom-header", Collections.singletonList("custom-value"));
         responseParam.getRequestParams().setHeaders(headers);
 
@@ -311,6 +316,7 @@ class RequestValidatorTest {
         headers.put("accept-encoding", Collections.singletonList("gzip, deflate"));
         headers.put("x-forwarded-for", Collections.singletonList("192.168.1.1"));
         headers.put("content-length", Collections.singletonList("100"));
+        headers.put("content-type", Collections.singletonList("application/json"));
         responseParam.getRequestParams().setHeaders(headers);
 
         List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
@@ -328,6 +334,7 @@ class RequestValidatorTest {
 
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("x-akto-k8s-namespace", Collections.singletonList("default"));
+        headers.put("content-type", Collections.singletonList("application/json"));
         headers.put("x-akto-k8s-pod", Collections.singletonList("pod-123"));
         responseParam.getRequestParams().setHeaders(headers);
 
@@ -346,6 +353,7 @@ class RequestValidatorTest {
         responseParam.getRequestParams().setMethod("DELETE");
 
         Map<String, List<String>> headers = new HashMap<>();
+        headers.put("content-type", Collections.singletonList("application/json"));
         headers.put("api_key", Collections.singletonList("my-api-key"));
         responseParam.getRequestParams().setHeaders(headers);
 
@@ -364,6 +372,8 @@ class RequestValidatorTest {
         responseParam.setRequestParams(new HttpRequestParams());
         responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available&extraParam=value");
         responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
 
         List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
 
@@ -379,6 +389,8 @@ class RequestValidatorTest {
         responseParam.setRequestParams(new HttpRequestParams());
         responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available");
         responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
 
         List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
 
@@ -393,6 +405,8 @@ class RequestValidatorTest {
         responseParam.setRequestParams(new HttpRequestParams());
         responseParam.getRequestParams().setUrl("/api/v3/user/login?username=user1&password=pass123");
         responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
 
         List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
 
@@ -406,12 +420,85 @@ class RequestValidatorTest {
         responseParam.setRequestParams(new HttpRequestParams());
         responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=&undefinedParam=");
         responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
 
         List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
 
         boolean hasUndefinedParamError = errors.stream()
                 .anyMatch(e -> e.getAttribute().equals("query") && e.getMessage().contains("undefinedparam"));
         assertTrue(hasUndefinedParamError, "Extra query parameter with empty value should still be flagged");
+    }
+
+    @Test
+    void testValidate_MissingRequiredQueryParam() throws Exception {
+        // /user/login has required 'username' query parameter
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/user/login");
+        responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasMissingRequiredError = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("query")
+                        && e.getMessage().contains("Required query parameter")
+                        && e.getMessage().contains("username"));
+        assertTrue(hasMissingRequiredError, "Expected error for missing required query parameter 'username'");
+    }
+
+    @Test
+    void testValidate_RequiredQueryParamPresent_NoError() throws Exception {
+        // /user/login has required 'username' query parameter - providing it should not error
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/user/login?username=testuser");
+        responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasMissingRequiredError = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("query") && e.getMessage().contains("Required"));
+        assertFalse(hasMissingRequiredError, "Required query parameter is present, should not have missing required error");
+    }
+
+    @Test
+    void testValidate_MissingRequiredHeader() throws Exception {
+        // /pet/findByStatus has required 'Content-Type' header
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available");
+        responseParam.getRequestParams().setMethod("GET");
+        // Not setting any headers
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasMissingRequiredHeader = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("header")
+                        && e.getMessage().contains("Required header")
+                        && e.getMessage().contains("content-type"));
+        assertTrue(hasMissingRequiredHeader, "Expected error for missing required header 'Content-Type'");
+    }
+
+    @Test
+    void testValidate_RequiredHeaderPresent_NoError() throws Exception {
+        // /pet/findByStatus has required 'Content-Type' header - providing it should not error
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available");
+        responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("Content-Type", Collections.singletonList("application/json")));
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasMissingRequiredHeader = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("header") && e.getMessage().contains("Required"));
+        assertFalse(hasMissingRequiredHeader, "Required header is present, should not have missing required error");
     }
 
     // ==================== Extra Body Attributes Validation Tests ====================
@@ -564,10 +651,11 @@ class RequestValidatorTest {
     void testValidate_ErrorLocation_ExtraHeader() throws Exception {
         HttpResponseParams responseParam = new HttpResponseParams();
         responseParam.setRequestParams(new HttpRequestParams());
-        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus");
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available");
         responseParam.getRequestParams().setMethod("GET");
 
         Map<String, List<String>> headers = new HashMap<>();
+        headers.put("content-type", Collections.singletonList("application/json"));
         headers.put("x-custom-header", Collections.singletonList("value"));
         responseParam.getRequestParams().setHeaders(headers);
 
@@ -583,8 +671,10 @@ class RequestValidatorTest {
     void testValidate_ErrorLocation_ExtraQueryParam() throws Exception {
         HttpResponseParams responseParam = new HttpResponseParams();
         responseParam.setRequestParams(new HttpRequestParams());
-        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?extraParam=value");
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available&extraParam=value");
         responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
 
         List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
 

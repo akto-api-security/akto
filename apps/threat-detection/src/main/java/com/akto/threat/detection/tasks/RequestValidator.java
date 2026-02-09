@@ -19,6 +19,7 @@ import lombok.Setter;
 
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.ArrayList;
@@ -223,25 +224,33 @@ public class RequestValidator {
     addError(schemaPath, instancePath, attribute, message, SchemaConformanceError.Location.LOCATION_BODY);
   }
 
-  private static Set<String> getSchemaDefinedParameters(JsonNode methodNode, JsonNode pathNode, String paramLocation) {
-    Set<String> definedParams = new HashSet<>();
+  /**
+   * Returns a map of parameter names to their required status.
+   * Key: parameter name (lowercase), Value: true if required, false if optional
+   */
+  private static Map<String, Boolean> getSchemaDefinedParameters(JsonNode methodNode, JsonNode pathNode, String paramLocation) {
+    Map<String, Boolean> definedParams = new HashMap<>();
 
-    // Check parameters at method level
-    JsonNode methodParams = methodNode.path("parameters");
-    if (methodParams.isArray()) {
-      for (JsonNode param : methodParams) {
-        if (paramLocation.equals(param.path("in").asText())) {
-          definedParams.add(param.path("name").asText().toLowerCase());
-        }
-      }
-    }
-
-    // Check parameters at path level (inherited by all methods)
+    // Check parameters at path level first (can be overridden by method level)
     JsonNode pathParams = pathNode.path("parameters");
     if (pathParams.isArray()) {
       for (JsonNode param : pathParams) {
         if (paramLocation.equals(param.path("in").asText())) {
-          definedParams.add(param.path("name").asText().toLowerCase());
+          String paramName = param.path("name").asText().toLowerCase();
+          boolean isRequired = param.path("required").asBoolean(false);
+          definedParams.put(paramName, isRequired);
+        }
+      }
+    }
+
+    // Check parameters at method level (overrides path level)
+    JsonNode methodParams = methodNode.path("parameters");
+    if (methodParams.isArray()) {
+      for (JsonNode param : methodParams) {
+        if (paramLocation.equals(param.path("in").asText())) {
+          String paramName = param.path("name").asText().toLowerCase();
+          boolean isRequired = param.path("required").asBoolean(false);
+          definedParams.put(paramName, isRequired);
         }
       }
     }
@@ -276,13 +285,28 @@ public class RequestValidator {
 
   private static void validateHeaders(HttpResponseParams httpResponseParams, JsonNode methodNode,
       JsonNode pathNode, String schemaPath) {
-    Set<String> definedHeaders = getSchemaDefinedParameters(methodNode, pathNode, "header");
+    Map<String, Boolean> definedHeaders = getSchemaDefinedParameters(methodNode, pathNode, "header");
     Map<String, List<String>> actualHeaders = httpResponseParams.getRequestParams().getHeaders();
+
+    // Check for missing required headers
+    for (Map.Entry<String, Boolean> entry : definedHeaders.entrySet()) {
+      if (entry.getValue()) { // if required
+        String requiredHeader = entry.getKey();
+        boolean found = actualHeaders != null && actualHeaders.keySet().stream()
+            .anyMatch(h -> h.toLowerCase().equals(requiredHeader));
+        if (!found) {
+          addError(schemaPath + "/parameters", requiredHeader, "header",
+              String.format("Required header '%s' is missing", requiredHeader),
+              SchemaConformanceError.Location.LOCATION_HEADER);
+        }
+      }
+    }
 
     if (actualHeaders == null) {
       return;
     }
 
+    // Check for extra headers not defined in schema
     for (String headerName : actualHeaders.keySet()) {
       String lowerHeaderName = headerName.toLowerCase();
       // Skip common standard headers that are typically not defined in OpenAPI specs
@@ -290,7 +314,7 @@ public class RequestValidator {
         continue;
       }
 
-      if (!definedHeaders.contains(lowerHeaderName)) {
+      if (!definedHeaders.containsKey(lowerHeaderName)) {
         addError(schemaPath + "/parameters", headerName, "header",
             String.format("Extra header '%s' not defined in schema", headerName),
             SchemaConformanceError.Location.LOCATION_HEADER);
@@ -323,12 +347,25 @@ public class RequestValidator {
 
   private static void validateQueryParams(HttpResponseParams httpResponseParams, JsonNode methodNode,
       JsonNode pathNode, String schemaPath) {
-    Set<String> definedQueryParams = getSchemaDefinedParameters(methodNode, pathNode, "query");
+    Map<String, Boolean> definedQueryParams = getSchemaDefinedParameters(methodNode, pathNode, "query");
     String url = httpResponseParams.getRequestParams().getURL();
     Map<String, String> actualQueryParams = parseQueryParamsFromUrl(url);
 
+    // Check for missing required query parameters
+    for (Map.Entry<String, Boolean> entry : definedQueryParams.entrySet()) {
+      if (entry.getValue()) { // if required
+        String requiredParam = entry.getKey();
+        if (!actualQueryParams.containsKey(requiredParam)) {
+          addError(schemaPath + "/parameters", requiredParam, "query",
+              String.format("Required query parameter '%s' is missing", requiredParam),
+              SchemaConformanceError.Location.LOCATION_URL);
+        }
+      }
+    }
+
+    // Check for extra query parameters not defined in schema
     for (String paramName : actualQueryParams.keySet()) {
-      if (!definedQueryParams.contains(paramName)) {
+      if (!definedQueryParams.containsKey(paramName)) {
         addError(schemaPath + "/parameters", paramName, "query",
             String.format("Extra query parameter '%s' not defined in schema", paramName),
             SchemaConformanceError.Location.LOCATION_URL);
