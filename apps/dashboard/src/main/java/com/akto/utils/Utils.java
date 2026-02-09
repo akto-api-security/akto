@@ -534,7 +534,7 @@ public class Utils {
             }
 
             info.getHttpCallParser().syncFunction(responses, true, false, accountSettings, skipAdvancedFilters);
-            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, false, info.getHttpCallParser().apiCatalogSync.existingAPIsInDb, makeApisCaseInsensitive, mergeUrlsOnVersions);
+            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, false, info.getHttpCallParser().apiCatalogSync.existingAPIsInDb, makeApisCaseInsensitive, mergeUrlsOnVersions, skipMergingOnKnownStaticURLsForVersionedApis);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
 //            for (HttpResponseParams responseParams: responses)  {

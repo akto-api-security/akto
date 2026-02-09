@@ -10,7 +10,7 @@ import DateRangeFilter from "../../../components/layouts/DateRangeFilter.jsx";
 import { produce } from "immer";
 import "./style.css"
 import values from "@/util/values";
-import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
+import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import threatDetectionApi from "../../threat_detection/api.js"
 import SessionStore from "../../../../main/SessionStore"
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
@@ -156,6 +156,9 @@ function ThreatCompliancePage() {
         additionalFilters: currentAppliedFilters
     });
 
+    // Only show session context features for Agentic Security (Argus) and Endpoint Security (Atlas), not for API Security
+    const showSessionContext = isAgenticSecurityCategory() || isEndpointSecurityCategory();
+
     const headers = [
         {
             title: '',
@@ -171,6 +174,11 @@ function ThreatCompliancePage() {
             text: "Threat name",
             value: "issueName",
         },
+        ...(showSessionContext ? [{
+            title: "Detection Type",
+            text: "Detection Type",
+            value: "detectionType"
+        }] : []),
         {
             title: "Detection Type",
             text: "Detection Type",
@@ -327,11 +335,13 @@ function ThreatCompliancePage() {
                     <Badge size="small" key={idx}>{threat.severity}</Badge>
                 </div>,
                 issueName: threatFiltersMapWithTestName[threat.issueName]?.testName || threat.issueName,
-                detectionType: (
-                    <Badge status={isSessionBased ? 'info' : 'default'}>
-                        {isSessionBased ? 'Session' : 'Single Prompt'}
-                    </Badge>
-                ),
+                ...(showSessionContext && {
+                    detectionType: (
+                        <Badge status={isSessionBased ? 'info' : 'default'}>
+                            {isSessionBased ? 'Session' : 'Single Prompt'}
+                        </Badge>
+                    )
+                }),
                 numberOfEndpoints: threat.numberOfEndpoints,
                 domains: (
                     <ShowListInBadge
@@ -612,6 +622,15 @@ function ThreatCompliancePage() {
                     { label: 'Low', value: 'LOW' }
                 ]
             },
+            ...(showSessionContext ? [{
+                key: 'detectionType',
+                label: 'Detection Type',
+                title: 'Detection Type',
+                choices: [
+                    { label: 'Session Context', value: 'SESSION_CONTEXT' },
+                    { label: 'Single Prompt', value: 'SINGLE_PROMPT' },
+                ]
+            }] : []),
             {
                 key: 'detectionType',
                 label: 'Detection Type',
