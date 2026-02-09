@@ -267,7 +267,8 @@ function ApiEndpoints(props) {
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
     const [currentKey, setCurrentKey] = useState(Date.now()); // to force remount InlineEditableText component
-    const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS')
+    // const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS')
+    const hasAccessToDiscoveryAgent = true
 
 
     // the values used here are defined at the server.
