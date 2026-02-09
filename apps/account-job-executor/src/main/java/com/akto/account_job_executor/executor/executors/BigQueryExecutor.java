@@ -9,15 +9,17 @@ import com.akto.jobs.exception.RetryableJobException;
 import com.akto.log.LoggerMaker;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.util.IdentityHashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Set;
 
 public class BigQueryExecutor extends AccountJobExecutor {
 
     public static final BigQueryExecutor INSTANCE = new BigQueryExecutor();
 
     private static final LoggerMaker logger = new LoggerMaker(BigQueryExecutor.class);
-    private static final String SOURCE_TAG = "vertex-ai-custom-deployed-models";
+    private static final String INGESTION_SOURCE_TAG = "vertex-ai-custom-deployed-models";
 
     private BigQueryExecutor() {
     }
@@ -26,83 +28,101 @@ public class BigQueryExecutor extends AccountJobExecutor {
     protected void runJob(AccountJob job) throws Exception {
         logger.info("Executing BigQuery job: jobId={}, subType={}", job.getId(), job.getSubType());
 
-        Map<String, Object> config = job.getConfig();
-        if (config == null || config.isEmpty()) {
+        Map<String, Object> jobConfig = job.getConfig();
+        if (jobConfig == null || jobConfig.isEmpty()) {
             throw new IllegalArgumentException("Job config is null or empty for job: " + job.getId());
         }
-        BigQueryConfig bqConfig = BigQueryConfig.fromJobConfig(config);
-        logger.info("BigQuery config: {}", bqConfig);
+
+        Instant now = Instant.now();
+
+        Instant rangeStart;
+        Instant rangeEnd = now;
+        int lastFinishedAtEpochSeconds = job.getFinishedAt();
+        int recurringIntervalSeconds = job.getRecurringIntervalSeconds();
+
+        if (lastFinishedAtEpochSeconds > 0) {
+            rangeStart = Instant.ofEpochSecond(lastFinishedAtEpochSeconds);
+            if (recurringIntervalSeconds > 0) {
+                rangeEnd = rangeStart.plusSeconds(recurringIntervalSeconds);
+                if (rangeEnd.isAfter(now)) {
+                    rangeEnd = now;
+                }
+            }
+        } else {
+            int lookbackSeconds = recurringIntervalSeconds > 0 ? recurringIntervalSeconds : 3600;
+            rangeStart = rangeEnd.minusSeconds(lookbackSeconds);
+        }
+
+        BigQueryConfig bigQueryConfig = BigQueryConfig.fromJobConfig(jobConfig, rangeStart, rangeEnd);
+        logger.info("BigQuery config: {}", bigQueryConfig);
 
         int accountId = job.getAccountId();
         if (accountId <= 0) {
             throw new IllegalArgumentException("Invalid accountId: " + accountId + " for job: " + job.getId());
         }
 
-        BigQueryConnector connector = null;
-        BigQueryIngestionClient ingestionClient = null;
-        AtomicInteger batchNumber = new AtomicInteger(0);
-        AtomicInteger ingested = new AtomicInteger(0);
+        String jobIdString = String.valueOf(job.getId());
+        int[] batchCounter = {0};
+        int[] totalRecordsIngested = {0};
 
-        try {
-            logger.info("Connecting to BigQuery project: {}", bqConfig.getProjectId());
-            connector = new BigQueryConnector(bqConfig);
+        try (BigQueryConnector bigQueryConnector = new BigQueryConnector(bigQueryConfig, jobIdString, accountId);
+             BigQueryIngestionClient bigQueryIngestionClient = new BigQueryIngestionClient(
+                     bigQueryConfig.getIngestionServiceUrl(),
+                     bigQueryConfig.getAuthToken(),
+                     bigQueryConfig.getConnectTimeoutMs(),
+                     bigQueryConfig.getSocketTimeoutMs(),
+                     jobIdString,
+                     accountId)) {
 
-            logger.info("Sending data to ingestion service: {}", bqConfig.getIngestionServiceUrl());
-            ingestionClient = new BigQueryIngestionClient(
-                    bqConfig.getIngestionServiceUrl(),
-                    bqConfig.getAuthToken(),
-                    bqConfig.getIngestionBatchSize(),
-                    bqConfig.getConnectTimeoutMs(),
-                    bqConfig.getSocketTimeoutMs());
+            logger.info("Connected to BigQuery project: {}", bigQueryConfig.getProjectId());
+            logger.info("Sending data to ingestion service: {}", bigQueryConfig.getIngestionServiceUrl());
 
             updateJobHeartbeat(job);
 
             logger.info("Executing BigQuery query (streaming)...");
-            final BigQueryIngestionClient finalIngestionClient = ingestionClient;
-            final int finalAccountId = accountId;
 
-            connector.streamQueryResults(
-                    bqConfig.getIngestionBatchSize(),
+            bigQueryConnector.streamQueryResultsInBatches(
+                    bigQueryConfig.getIngestionBatchSize(),
                     () -> updateJobHeartbeat(job),
                     batch -> {
-                        int batchNum = batchNumber.incrementAndGet();
-                        int sent = finalIngestionClient.sendBatchToIngestionService(
+                        int batchNumber = ++batchCounter[0];
+                        int sent = bigQueryIngestionClient.ingestRecordsBatch(
                                 batch,
-                                SOURCE_TAG,
-                                finalAccountId,
-                                batchNum,
+                                INGESTION_SOURCE_TAG,
+                                batchNumber,
                                 () -> updateJobHeartbeat(job));
-                        ingested.addAndGet(sent);
+                        totalRecordsIngested[0] += sent;
                     });
 
-            logger.info("Successfully ingested {} records in {} batches", ingested.get(), batchNumber.get());
+            logger.info("Successfully ingested {} records in {} batches", totalRecordsIngested[0], batchCounter[0]);
         } catch (Exception e) {
-            if (isTransientFailure(e)) {
+            if (isRetryableFailure(e)) {
+                logger.warn("Retryable failure during BigQuery job: jobId={}, error={}", job.getId(), e.getMessage());
                 throw new RetryableJobException(e.getMessage() != null ? e.getMessage() : "Transient failure", e);
             }
             throw e;
-        } finally {
-            if (connector != null) {
-                connector.close();
-            }
-            if (ingestionClient != null) {
-                ingestionClient.close();
-            }
         }
 
         logger.info("BigQuery job completed successfully: jobId={}", job.getId());
     }
 
-    private static boolean isTransientFailure(Throwable e) {
-        if (e == null) {
-            return false;
+
+    private static boolean isRetryableFailure(Throwable error) {
+        Set<Throwable> seen = java.util.Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Throwable current = error; current != null && seen.add(current); current = current.getCause()) {
+            if (isRetryableException(current)) {
+                return true;
+            }
         }
-        if (e instanceof BigQueryIngestionClient.IngestionHttpException) {
-            int status = ((BigQueryIngestionClient.IngestionHttpException) e).getStatusCode();
-            return status == 408 || status == 429 || status == 500 || status == 502 || status == 503 || status == 504;
+        return false;
+    }
+
+    private static boolean isRetryableException(Throwable error) {
+        if (error instanceof BigQueryIngestionClient.IngestionHttpException) {
+            return ((BigQueryIngestionClient.IngestionHttpException) error).isRetryable();
         }
-        if (e instanceof IOException) {
-            String msg = e.getMessage();
+        if (error instanceof IOException) {
+            String msg = error.getMessage();
             if (msg != null) {
                 String lower = msg.toLowerCase();
                 if (lower.contains("interrupted")) {

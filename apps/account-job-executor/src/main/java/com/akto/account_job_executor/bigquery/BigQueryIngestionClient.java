@@ -13,6 +13,8 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -22,23 +24,28 @@ import java.util.concurrent.TimeUnit;
 public class BigQueryIngestionClient implements AutoCloseable {
 
     private static final LoggerMaker logger = new LoggerMaker(BigQueryIngestionClient.class);
-    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    private final String ingestionServiceUrl;
+    private static final int MAX_ERROR_RESPONSE_BYTES = 8192;
+
+    private final String ingestionServiceBaseUrl;
     private final String authToken;
-    private final int batchSize;
     private final CloseableHttpClient httpClient;
+    private final PoolingHttpClientConnectionManager connectionManager;
+    private final String accountJobId;
+    private final int accountId;
 
     private final int maxRetries;
-    private final long baseBackoffMs;
+    private final long retryBaseDelayMs;
 
-    public BigQueryIngestionClient(String ingestionServiceUrl, String authToken, int batchSize,
-            int connectTimeoutMs, int socketTimeoutMs) {
-        this.ingestionServiceUrl = normalizeBaseUrl(ingestionServiceUrl);
+    public BigQueryIngestionClient(String ingestionServiceUrl, String authToken,
+            int connectTimeoutMs, int socketTimeoutMs, String jobId, int accountId) {
+        this.ingestionServiceBaseUrl = normalizeBaseUrl(ingestionServiceUrl);
         this.authToken = authToken;
-        this.batchSize = batchSize;
+        this.accountJobId = jobId;
+        this.accountId = accountId;
         this.maxRetries = 3;
-        this.baseBackoffMs = 500;
+        this.retryBaseDelayMs = 500;
 
         RequestConfig requestConfig = RequestConfig.custom()
                 .setConnectTimeout(connectTimeoutMs)
@@ -46,27 +53,26 @@ public class BigQueryIngestionClient implements AutoCloseable {
                 .setSocketTimeout(socketTimeoutMs)
                 .build();
 
-        PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager();
-        cm.setMaxTotal(50);
-        cm.setDefaultMaxPerRoute(10);
+        this.connectionManager = new PoolingHttpClientConnectionManager();
+        this.connectionManager.setMaxTotal(50);
+        this.connectionManager.setDefaultMaxPerRoute(10);
 
         this.httpClient = HttpClients.custom()
-                .setConnectionManager(cm)
+                .setConnectionManager(this.connectionManager)
                 .setDefaultRequestConfig(requestConfig)
                 .evictIdleConnections(30, TimeUnit.SECONDS)
                 .build();
 
-        logger.info("Ingestion client initialized: url={}, batchSize={}, connectTimeoutMs={}, socketTimeoutMs={}",
-                ingestionServiceUrl, batchSize, connectTimeoutMs, socketTimeoutMs);
+        logger.info("Ingestion client initialized: jobId={}, accountId={}, url={}", jobId, accountId,
+                ingestionServiceUrl);
     }
 
-    public int sendBatchToIngestionService(
-            List<Map<String, Object>> batch,
+    public int ingestRecordsBatch(
+            List<Map<String, Object>> records,
             String source,
-            Integer accountId,
             int batchNumber,
             Runnable heartbeat) throws IOException {
-        if (batch == null || batch.isEmpty()) {
+        if (records == null || records.isEmpty()) {
             return 0;
         }
 
@@ -81,36 +87,36 @@ public class BigQueryIngestionClient implements AutoCloseable {
                 if (heartbeat != null) {
                     heartbeat.run();
                 }
-                sendBatchOnce(batch, source, accountId, batchNumber);
-                return batch.size();
-            } catch (IngestionHttpException ihe) {
-                if (!isRetryableStatus(ihe.statusCode) || attempt > maxRetries) {
-                    throw ihe;
+                postIngestionRequest(records, source, batchNumber);
+                return records.size();
+            } catch (IngestionHttpException httpException) {
+                if (!HttpRetryUtils.isRetryableHttpStatusCode(httpException.statusCode) || attempt > maxRetries) {
+                    throw httpException;
                 }
-                sleepBackoff(attempt, ihe.statusCode);
-            } catch (IOException ioe) {
+                sleepBeforeRetry(attempt, httpException.statusCode);
+            } catch (IOException ioException) {
                 if (attempt > maxRetries) {
-                    throw ioe;
+                    throw ioException;
                 }
-                sleepBackoff(attempt, null);
+                sleepBeforeRetry(attempt, null);
             }
         }
     }
 
-    private void sendBatchOnce(List<Map<String, Object>> batch, String source, Integer accountId, int batchNumber)
+    private void postIngestionRequest(List<Map<String, Object>> records, String source, int batchNumber)
             throws IOException {
-        List<Map<String, Object>> batchData = new ArrayList<>();
+        List<Map<String, Object>> formattedRecords = new ArrayList<>();
 
-        for (Map<String, Object> row : batch) {
-            batchData.add(transformToIngestFormat(row, source, accountId));
+        for (Map<String, Object> row : records) {
+            formattedRecords.add(toIngestionRecord(row, source));
         }
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("batchData", batchData);
+        payload.put("batchData", formattedRecords);
 
-        String jsonPayload = mapper.writeValueAsString(payload);
+        String jsonPayload = OBJECT_MAPPER.writeValueAsString(payload);
 
-        HttpPost httpPost = new HttpPost(ingestionServiceUrl + "/api/ingestData");
+        HttpPost httpPost = new HttpPost(ingestionServiceBaseUrl + "/api/ingestData");
         httpPost.setHeader("Content-Type", "application/json");
         if (authToken != null && !authToken.trim().isEmpty()) {
             httpPost.setHeader("Authorization", authToken.trim());
@@ -119,102 +125,115 @@ public class BigQueryIngestionClient implements AutoCloseable {
 
         try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
             int statusCode = response.getStatusLine().getStatusCode();
-            String responseBody = response.getEntity() != null ? EntityUtils.toString(response.getEntity()) : "";
 
             if (statusCode != 200) {
+                String responseBody = readResponseBodyBounded(response);
                 throw new IngestionHttpException(statusCode,
                         "Ingestion service returned " + statusCode + ": " + responseBody);
             }
+
+            EntityUtils.consumeQuietly(response.getEntity());
             logger.debug("Batch {} sent successfully, response: {}", batchNumber, statusCode);
         }
     }
 
-    private Map<String, Object> transformToIngestFormat(Map<String, Object> row, String source, Integer accountId)
+    private Map<String, Object> toIngestionRecord(Map<String, Object> row, String source)
             throws IOException {
-        Map<String, Object> ingestData = new HashMap<>();
+        Map<String, Object> ingestionRecord = new HashMap<>();
 
-        ingestData.put("path", getOrDefault(row, "endpoint", "/"));
+        ingestionRecord.put("path", getStringValueOrDefault(row, "endpoint", "/"));
 
-        String requestPayload = getOrDefault(row, "request_payload", "");
-        ingestData.put("requestPayload", requestPayload);
+        String requestPayload = getStringValueOrDefault(row, "request_payload", "");
+        ingestionRecord.put("requestPayload", requestPayload);
 
-        String responsePayload = getOrDefault(row, "response_payload", "");
-        ingestData.put("responsePayload", responsePayload);
+        String responsePayload = getStringValueOrDefault(row, "response_payload", "");
+        ingestionRecord.put("responsePayload", responsePayload);
 
         Map<String, String> requestHeaders = new HashMap<>();
-        requestHeaders.put("x-deployed-model-id", getOrDefault(row, "deployed_model_id", ""));
-        requestHeaders.put("x-request-id", getOrDefault(row, "request_id", ""));
+        requestHeaders.put("x-deployed-model-id", getStringValueOrDefault(row, "deployed_model_id", ""));
+        requestHeaders.put("x-request-id", getStringValueOrDefault(row, "request_id", ""));
         requestHeaders.put("x-source", source);
-        ingestData.put("requestHeaders", mapper.writeValueAsString(requestHeaders));
+        ingestionRecord.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(requestHeaders));
 
         Map<String, String> responseHeaders = new HashMap<>();
         responseHeaders.put("content-type", "application/json");
-        ingestData.put("responseHeaders", mapper.writeValueAsString(responseHeaders));
+        ingestionRecord.put("responseHeaders", OBJECT_MAPPER.writeValueAsString(responseHeaders));
 
-        ingestData.put("method", "POST");
-        ingestData.put("statusCode", "200");
-        ingestData.put("type", "HTTP/1.1");
-        ingestData.put("status", "");
+        ingestionRecord.put("method", "POST");
+        ingestionRecord.put("statusCode", "200");
+        ingestionRecord.put("type", "HTTP/1.1");
+        ingestionRecord.put("status", "");
 
-        Object loggingTimeObj = row.get("logging_time");
+        Object loggingTimeValue = row.get("logging_time");
         String loggingTime;
-        if (loggingTimeObj instanceof Number) {
-            loggingTime = String.valueOf(((Number) loggingTimeObj).longValue());
-        } else if (loggingTimeObj != null) {
-            loggingTime = loggingTimeObj.toString();
+        if (loggingTimeValue instanceof Number) {
+            loggingTime = String.valueOf(((Number) loggingTimeValue).longValue());
+        } else if (loggingTimeValue != null) {
+            loggingTime = loggingTimeValue.toString();
         } else {
             loggingTime = String.valueOf(System.currentTimeMillis());
         }
-        ingestData.put("time", loggingTime);
+        ingestionRecord.put("time", loggingTime);
 
-        ingestData.put("source", source);
-        ingestData.put("tag", "Gen-AI");
-        ingestData.put("ip", "");
-        ingestData.put("destIp", "");
-        ingestData.put("akto_account_id", accountId != null ? String.valueOf(accountId) : "");
-        ingestData.put("akto_vxlan_id", "");
-        ingestData.put("is_pending", "false");
-        ingestData.put("direction", "");
-        ingestData.put("process_id", "");
-        ingestData.put("socket_id", "");
-        ingestData.put("daemonset_id", "");
-        ingestData.put("enabled_graph", "false");
+        ingestionRecord.put("source", source);
+        ingestionRecord.put("tag", "Gen-AI");
+        ingestionRecord.put("ip", "");
+        ingestionRecord.put("destIp", "");
+        ingestionRecord.put("akto_account_id", String.valueOf(accountId));
+        ingestionRecord.put("akto_vxlan_id", "");
+        ingestionRecord.put("is_pending", "false");
+        ingestionRecord.put("direction", "");
+        ingestionRecord.put("process_id", "");
+        ingestionRecord.put("socket_id", "");
+        ingestionRecord.put("daemonset_id", "");
+        ingestionRecord.put("enabled_graph", "false");
 
-        return ingestData;
+        return ingestionRecord;
     }
 
-    private String getOrDefault(Map<String, Object> map, String key, String defaultValue) {
+    private String readResponseBodyBounded(CloseableHttpResponse response) {
+        if (response.getEntity() == null) {
+            return "";
+        }
+        try (InputStream inputStream = response.getEntity().getContent()) {
+            byte[] buffer = new byte[MAX_ERROR_RESPONSE_BYTES];
+            int totalRead = 0;
+            int bytesRead;
+            while (totalRead < buffer.length
+                    && (bytesRead = inputStream.read(buffer, totalRead, buffer.length - totalRead)) != -1) {
+                totalRead += bytesRead;
+            }
+            return new String(buffer, 0, totalRead, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return "(failed to read response body: " + e.getMessage() + ")";
+        }
+    }
+
+    private String getStringValueOrDefault(Map<String, Object> map, String key, String defaultValue) {
         Object value = map.get(key);
         return value != null ? value.toString() : defaultValue;
     }
 
-    private boolean isRetryableStatus(Integer statusCode) {
-        if (statusCode == null)
-            return true;
-        return statusCode == 408 || statusCode == 429 || statusCode == 500 || statusCode == 502 || statusCode == 503
-                || statusCode == 504;
-    }
-
-    private void sleepBackoff(int attempt, Integer statusCode) throws IOException {
-        long delay = baseBackoffMs * (1L << Math.min(6, attempt - 1));
+    private void sleepBeforeRetry(int attempt, Integer statusCode) throws IOException {
+        long delay = retryBaseDelayMs * (1L << Math.min(6, attempt - 1));
         long jitter = (long) (Math.random() * 200);
         long sleepMs = Math.min(10_000, delay + jitter);
 
-        logger.info("Retrying ingestion batch (attempt {}), statusCode={}, sleeping {}ms", attempt, statusCode,
-                sleepMs);
+        logger.info("Retrying ingestion: attempt={}, jobId={}, accountId={}, statusCode={}, delayMs={}",
+                attempt, accountJobId, accountId, statusCode, sleepMs);
         try {
             Thread.sleep(sleepMs);
-        } catch (InterruptedException ie) {
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IOException("Ingestion interrupted", ie);
+            throw new IOException("Ingestion interrupted", e);
         }
     }
 
-    private String normalizeBaseUrl(String baseUrl) {
-        if (baseUrl == null) {
+    private String normalizeBaseUrl(String url) {
+        if (url == null) {
             return null;
         }
-        String trimmed = baseUrl.trim();
+        String trimmed = url.trim();
         if (trimmed.endsWith("/")) {
             return trimmed.substring(0, trimmed.length() - 1);
         }
@@ -228,10 +247,17 @@ public class BigQueryIngestionClient implements AutoCloseable {
         } catch (IOException ignored) {
             // Ignore close errors
         }
+        try {
+            connectionManager.close();
+        } catch (Exception ignored) {
+            // Ignore close errors
+        }
         logger.debug("Ingestion client closed");
     }
 
     public static class IngestionHttpException extends IOException {
+        private static final long serialVersionUID = 1L;
+
         private final int statusCode;
 
         public IngestionHttpException(int statusCode, String message) {
@@ -241,6 +267,10 @@ public class BigQueryIngestionClient implements AutoCloseable {
 
         public int getStatusCode() {
             return statusCode;
+        }
+
+        public boolean isRetryable() {
+            return HttpRetryUtils.isRetryableHttpStatusCode(statusCode);
         }
     }
 }

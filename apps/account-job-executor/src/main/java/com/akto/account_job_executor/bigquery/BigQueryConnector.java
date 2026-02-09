@@ -2,35 +2,39 @@ package com.akto.account_job_executor.bigquery;
 
 import com.akto.log.LoggerMaker;
 import com.google.auth.oauth2.GoogleCredentials;
-import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.bigquery.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 
 public class BigQueryConnector implements AutoCloseable {
 
     private static final LoggerMaker logger = new LoggerMaker(BigQueryConnector.class);
+    private static final long POLL_INTERVAL_MS = 5000;
 
     private final BigQuery bigQueryClient;
-    private final BigQueryConfig config;
+    private final BigQueryConfig bigQueryConfig;
+    private final String accountJobId;
+    private final int accountId;
 
-    public BigQueryConnector(BigQueryConfig config) throws IOException {
-        this.config = config;
+    private Job activeQueryJob;
+
+    public BigQueryConnector(BigQueryConfig config, String jobId, int accountId) throws IOException {
+        this.bigQueryConfig = config;
+        this.accountJobId = jobId;
+        this.accountId = accountId;
         this.bigQueryClient = createBigQueryClient(config);
-        logger.info("BigQuery connector initialized for project: {}", config.getProjectId());
+        logger.info("BigQuery connector initialized: jobId={}, accountId={}, project={}", jobId, accountId,
+                config.getProjectId());
     }
 
     @FunctionalInterface
     public interface BatchHandler {
-        void handle(List<Map<String, Object>> batch) throws Exception;
+        void handleBatch(List<Map<String, Object>> recordsBatch) throws Exception;
     }
 
-    public void streamQueryResults(int batchSize, Runnable heartbeat, BatchHandler batchHandler) throws Exception {
+    public void streamQueryResultsInBatches(int batchSize, Runnable heartbeat, BatchHandler batchHandler) throws Exception {
         if (batchSize <= 0) {
             throw new IllegalArgumentException("batchSize must be > 0");
         }
@@ -40,81 +44,85 @@ public class BigQueryConnector implements AutoCloseable {
 
         TableResult result = executeQueryWithPolling(heartbeat);
         Schema schema = result.getSchema();
+        if (schema == null) {
+            throw new IOException("BigQuery query returned null schema");
+        }
 
-        List<Map<String, Object>> batch = new ArrayList<>(batchSize);
-        long rowCount = 0;
+        List<Field> schemaFields = schema.getFields();
+        List<Map<String, Object>> recordsBatch = new ArrayList<>(batchSize);
+        long totalRowsStreamed = 0;
 
         for (FieldValueList row : result.iterateAll()) {
-            Map<String, Object> rowMap = new LinkedHashMap<>();
-            List<Field> fields = schema.getFields();
+            Map<String, Object> rowData = new LinkedHashMap<>();
 
-            for (int i = 0; i < fields.size(); i++) {
-                Field field = fields.get(i);
-                FieldValue value = row.get(i);
-                rowMap.put(field.getName(), extractValue(value, field));
+            for (int i = 0; i < schemaFields.size(); i++) {
+                Field field = schemaFields.get(i);
+                FieldValue fieldValue = row.get(i);
+                rowData.put(field.getName(), extractValue(fieldValue, field));
             }
 
-            batch.add(rowMap);
-            rowCount++;
+            recordsBatch.add(rowData);
+            totalRowsStreamed++;
 
-            if (batch.size() >= batchSize) {
-                batchHandler.handle(batch);
-                batch = new ArrayList<>(batchSize);
+            if (recordsBatch.size() >= batchSize) {
+                batchHandler.handleBatch(recordsBatch);
+                recordsBatch = new ArrayList<>(batchSize);
                 if (heartbeat != null)
                     heartbeat.run();
             }
         }
 
-        if (!batch.isEmpty()) {
-            batchHandler.handle(batch);
+        if (!recordsBatch.isEmpty()) {
+            batchHandler.handleBatch(recordsBatch);
         }
 
-        logger.info("Streamed {} rows from BigQuery", rowCount);
+        logger.info("Streamed {} rows from BigQuery: jobId={}, accountId={}", totalRowsStreamed, accountJobId, accountId);
     }
 
     private TableResult executeQueryWithPolling(Runnable heartbeat) throws Exception {
-        logger.info("Executing BigQuery query: fromDate={}, toDate={}",
-                config.getFromDateFormatted(), config.getToDateFormatted());
+        logger.info("Executing BigQuery query: jobId={}, accountId={}, fromDate={}, toDate={}",
+                accountJobId, accountId, bigQueryConfig.getQueryStartTime(), bigQueryConfig.getQueryEndTime());
 
-        String query = config.getQuery();
+        String query = bigQueryConfig.buildQuery();
         logger.debug("Query: {}", query);
 
         QueryJobConfiguration.Builder queryConfigBuilder = QueryJobConfiguration.newBuilder(query)
                 .addNamedParameter("fromDate", QueryParameterValue.timestamp(
-                        config.getFromDate().toEpochMilli() * 1000))
+                        bigQueryConfig.getQueryStartTime().toEpochMilli() * 1000))
                 .addNamedParameter("toDate", QueryParameterValue.timestamp(
-                        config.getToDate().toEpochMilli() * 1000))
+                        bigQueryConfig.getQueryEndTime().toEpochMilli() * 1000))
                 .setUseLegacySql(false);
-
-        if (config.getMaximumBytesBilled() != null && config.getMaximumBytesBilled() > 0) {
-            queryConfigBuilder.setMaximumBytesBilled(config.getMaximumBytesBilled());
-        }
 
         QueryJobConfiguration queryConfig = queryConfigBuilder.build();
 
-        JobId jobId = JobId.newBuilder()
-                .setProject(config.getProjectId())
+        JobId bigQueryJobId = JobId.newBuilder()
+                .setProject(bigQueryConfig.getProjectId())
                 .setJob(UUID.randomUUID().toString())
                 .build();
-        JobInfo jobInfo = JobInfo.newBuilder(queryConfig).setJobId(jobId).build();
+        JobInfo jobInfo = JobInfo.newBuilder(queryConfig).setJobId(bigQueryJobId).build();
         Job queryJob = bigQueryClient.create(jobInfo);
 
         if (queryJob == null) {
             throw new IOException("Failed to create BigQuery job");
         }
 
-        JobId actualJobId = queryJob.getJobId();
-        logger.info("Created BigQuery job: project={}, job={}", actualJobId.getProject(), actualJobId.getJob());
+        activeQueryJob = queryJob;
+
+        JobId createdJobId = queryJob.getJobId();
+        logger.info("Created BigQuery job: jobId={}, accountId={}, bqProject={}, bqJob={}",
+                this.accountJobId, accountId, createdJobId.getProject(), createdJobId.getJob());
 
         long startMs = System.currentTimeMillis();
-        long timeoutMs = Duration.ofSeconds(config.getQueryTimeoutSeconds()).toMillis();
+        long timeoutMs = Duration.ofSeconds(bigQueryConfig.getQueryTimeoutSeconds()).toMillis();
 
         while (true) {
-            queryJob = bigQueryClient.getJob(actualJobId);
+            queryJob = bigQueryClient.getJob(createdJobId);
             if (queryJob == null) {
                 throw new IOException(
-                        "BigQuery job not found: " + actualJobId.getJob() + " in project " + actualJobId.getProject());
+                        "BigQuery job not found: " + createdJobId.getJob() + " in project " + createdJobId.getProject());
             }
+
+            activeQueryJob = queryJob;
 
             JobStatus status = queryJob.getStatus();
             if (status != null && status.getError() != null) {
@@ -132,13 +140,15 @@ public class BigQueryConnector implements AutoCloseable {
             if (heartbeat != null)
                 heartbeat.run();
             if (System.currentTimeMillis() - startMs > timeoutMs) {
-                throw new IOException("BigQuery query timed out after " + config.getQueryTimeoutSeconds() + " seconds");
+                cancelActiveQueryJob();
+                throw new IOException("BigQuery query timed out after " + bigQueryConfig.getQueryTimeoutSeconds() + " seconds");
             }
 
             try {
-                Thread.sleep(5000);
+                Thread.sleep(POLL_INTERVAL_MS);
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
+                cancelActiveQueryJob();
                 throw new IOException("BigQuery query polling interrupted", ie);
             }
         }
@@ -146,7 +156,19 @@ public class BigQueryConnector implements AutoCloseable {
         if (heartbeat != null)
             heartbeat.run();
 
-        return queryJob.getQueryResults(BigQuery.QueryResultsOption.pageSize(config.getQueryPageSize()));
+        return queryJob.getQueryResults(BigQuery.QueryResultsOption.pageSize(bigQueryConfig.getQueryPageSize()));
+    }
+
+    private void cancelActiveQueryJob() {
+        try {
+            Job job = activeQueryJob;
+            if (job != null) {
+                logger.info("Cancelling BigQuery job: bqJob={}", job.getJobId().getJob());
+                job.cancel();
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to cancel BigQuery job: {}", e.getMessage());
+        }
     }
 
     private Object extractValue(FieldValue fieldValue, Field field) {
@@ -156,7 +178,7 @@ public class BigQueryConnector implements AutoCloseable {
 
         switch (fieldValue.getAttribute()) {
             case PRIMITIVE:
-                return extractPrimitive(fieldValue, field);
+                return extractPrimitiveValue(fieldValue, field);
             case REPEATED:
                 List<Object> list = new ArrayList<>();
                 FieldList subFields = field != null ? field.getSubFields() : null;
@@ -187,7 +209,7 @@ public class BigQueryConnector implements AutoCloseable {
         }
     }
 
-    private Object extractPrimitive(FieldValue fieldValue, Field field) {
+    private Object extractPrimitiveValue(FieldValue fieldValue, Field field) {
         if (field == null || field.getType() == null) {
             return fieldValue.getStringValue();
         }
@@ -213,7 +235,7 @@ public class BigQueryConnector implements AutoCloseable {
     }
 
     private BigQuery createBigQueryClient(BigQueryConfig config) throws IOException {
-        GoogleCredentials credentials = loadCredentials(config);
+        GoogleCredentials credentials = loadCredentials();
 
         return BigQueryOptions.newBuilder()
                 .setProjectId(config.getProjectId())
@@ -222,25 +244,9 @@ public class BigQueryConnector implements AutoCloseable {
                 .getService();
     }
 
-    private GoogleCredentials loadCredentials(BigQueryConfig config) throws IOException {
-        GoogleCredentials credentials;
-        if (config.getCredentialsJson() != null && !config.getCredentialsJson().isEmpty()) {
-            logger.info("Loading credentials from JSON content");
-            credentials = ServiceAccountCredentials.fromStream(
-                    new ByteArrayInputStream(config.getCredentialsJson().getBytes(StandardCharsets.UTF_8)));
-        } else if (config.getCredentialsJsonBase64() != null && !config.getCredentialsJsonBase64().isEmpty()) {
-            logger.info("Loading credentials from base64 JSON content");
-            byte[] decoded = Base64.getDecoder().decode(config.getCredentialsJsonBase64());
-            credentials = ServiceAccountCredentials.fromStream(new ByteArrayInputStream(decoded));
-        } else if (config.getCredentialsPath() != null && !config.getCredentialsPath().isEmpty()) {
-            logger.info("Loading credentials from file-based service account key");
-            try (FileInputStream fis = new FileInputStream(config.getCredentialsPath())) {
-                credentials = ServiceAccountCredentials.fromStream(fis);
-            }
-        } else {
-            logger.info("Using Application Default Credentials (ADC) - running on GCP infrastructure");
-            credentials = GoogleCredentials.getApplicationDefault();
-        }
+    private GoogleCredentials loadCredentials() throws IOException {
+        logger.info("Using Application Default Credentials (ADC)");
+        GoogleCredentials credentials = GoogleCredentials.getApplicationDefault();
 
         // Scope credentials for BigQuery access
         if (credentials.createScopedRequired()) {
@@ -251,6 +257,7 @@ public class BigQueryConnector implements AutoCloseable {
 
     @Override
     public void close() {
+        cancelActiveQueryJob();
         logger.debug("BigQuery connector closed");
     }
 }
