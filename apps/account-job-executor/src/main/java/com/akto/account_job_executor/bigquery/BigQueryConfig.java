@@ -7,7 +7,8 @@ import java.util.regex.Pattern;
 import static com.akto.jobs.executors.AIAgentConnectorConstants.*;
 
 public class BigQueryConfig {
-    private static final Pattern SAFE_IDENTIFIER_PATTERN = Pattern.compile("^[a-zA-Z0-9._-]+$");
+    private static final Pattern PROJECT_ID_PATTERN = Pattern.compile("^[a-zA-Z0-9._-]+$");
+    private static final Pattern DATASET_TABLE_PATTERN = Pattern.compile("^[a-zA-Z0-9_]+$");
 
     private final String projectId;
     private final String dataset;
@@ -52,9 +53,9 @@ public class BigQueryConfig {
      * @param toDate    End of time range to query
      */
     public static BigQueryConfig fromJobConfig(Map<String, Object> jobConfig, Instant fromDate, Instant toDate) {
-        String projectId = requireSafeIdentifier(jobConfig, CONFIG_VERTEX_AI_PROJECT_ID);
-        String dataset = requireSafeIdentifier(jobConfig, CONFIG_VERTEX_AI_BIGQUERY_DATASET);
-        String table = requireSafeIdentifier(jobConfig, CONFIG_VERTEX_AI_BIGQUERY_TABLE);
+        String projectId = requireProjectId(jobConfig, CONFIG_VERTEX_AI_PROJECT_ID);
+        String dataset = requireDatasetOrTable(jobConfig, CONFIG_VERTEX_AI_BIGQUERY_DATASET);
+        String table = requireDatasetOrTable(jobConfig, CONFIG_VERTEX_AI_BIGQUERY_TABLE);
 
         String ingestionServiceUrl = getOptionalString(jobConfig, CONFIG_DATA_INGESTION_SERVICE_URL, null);
         if (ingestionServiceUrl == null || ingestionServiceUrl.isEmpty()) {
@@ -75,16 +76,30 @@ public class BigQueryConfig {
         return String.format(QUERY_TEMPLATE, projectId, dataset, table) + " LIMIT " + MAX_QUERY_ROWS;
     }
 
-    private static String requireSafeIdentifier(Map<String, Object> config, String key) {
+    private static String requireProjectId(Map<String, Object> config, String key) {
         Object value = config.get(key);
         if (value == null || value.toString().isEmpty()) {
             throw new IllegalArgumentException("Required config parameter missing: " + key);
         }
         String stringValue = value.toString();
-        if (!SAFE_IDENTIFIER_PATTERN.matcher(stringValue).matches()) {
+        if (!PROJECT_ID_PATTERN.matcher(stringValue).matches()) {
             throw new IllegalArgumentException(
-                    "Invalid characters in config parameter '" + key + "'. " +
+                    "Invalid project ID '" + key + "'. " +
                     "Only alphanumeric characters, dots, underscores, and hyphens are allowed. Got: " + stringValue);
+        }
+        return stringValue;
+    }
+
+    private static String requireDatasetOrTable(Map<String, Object> config, String key) {
+        Object value = config.get(key);
+        if (value == null || value.toString().isEmpty()) {
+            throw new IllegalArgumentException("Required config parameter missing: " + key);
+        }
+        String stringValue = value.toString();
+        if (!DATASET_TABLE_PATTERN.matcher(stringValue).matches()) {
+            throw new IllegalArgumentException(
+                    "Invalid dataset/table name '" + key + "'. " +
+                    "Only alphanumeric characters and underscores are allowed (no dots or hyphens). Got: " + stringValue);
         }
         return stringValue;
     }
@@ -141,6 +156,10 @@ public class BigQueryConfig {
 
     public int getSocketTimeoutMs() {
         return SOCKET_TIMEOUT_MS;
+    }
+
+    public int getMaxQueryRows() {
+        return MAX_QUERY_ROWS;
     }
 
     @Override

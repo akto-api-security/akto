@@ -77,6 +77,12 @@ public class BigQueryConnector implements AutoCloseable {
         }
 
         logger.info("Streamed {} rows from BigQuery: jobId={}, accountId={}", totalRowsStreamed, accountJobId, accountId);
+        
+        if (totalRowsStreamed >= bigQueryConfig.getMaxQueryRows()) {
+            logger.warn("Query result count ({}) reached MAX_QUERY_ROWS limit. Data may have been truncated. " +
+                    "Consider reducing the query time window. jobId={}, accountId={}", 
+                    totalRowsStreamed, accountJobId, accountId);
+        }
     }
 
     private TableResult executeQueryWithPolling(Runnable heartbeat) throws Exception {

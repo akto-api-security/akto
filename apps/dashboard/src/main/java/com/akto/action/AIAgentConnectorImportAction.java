@@ -142,6 +142,11 @@ public class AIAgentConnectorImportAction extends UserAction {
      * Builds configuration map based on connector type.
      */
     private Map<String, String> buildConfig() {
+        if (dataIngestionUrl == null || dataIngestionUrl.isEmpty()) {
+            loggerMaker.error("Missing required Data Ingestion Service URL", LogDb.DASHBOARD);
+            return null;
+        }
+        
         Map<String, String> config = new HashMap<>();
         config.put(CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
 

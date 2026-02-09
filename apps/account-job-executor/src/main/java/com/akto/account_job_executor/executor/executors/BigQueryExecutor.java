@@ -3,6 +3,7 @@ package com.akto.account_job_executor.executor.executors;
 import com.akto.account_job_executor.bigquery.BigQueryConfig;
 import com.akto.account_job_executor.bigquery.BigQueryConnector;
 import com.akto.account_job_executor.bigquery.BigQueryIngestionClient;
+import com.akto.account_job_executor.client.CyborgApiClient;
 import com.akto.account_job_executor.executor.AccountJobExecutor;
 import com.akto.dto.jobs.AccountJob;
 import com.akto.jobs.exception.RetryableJobException;
@@ -10,6 +11,7 @@ import com.akto.log.LoggerMaker;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -20,6 +22,7 @@ public class BigQueryExecutor extends AccountJobExecutor {
 
     private static final LoggerMaker logger = new LoggerMaker(BigQueryExecutor.class);
     private static final String INGESTION_SOURCE_TAG = "vertex-ai-custom-deployed-models";
+    private static final String CURSOR_KEY = "lastQueriedUntilEpochMs";
 
     private BigQueryExecutor() {
     }
@@ -34,14 +37,16 @@ public class BigQueryExecutor extends AccountJobExecutor {
         }
 
         Instant now = Instant.now();
-
-        Instant rangeStart;
-        Instant rangeEnd = now;
-        int lastFinishedAtEpochSeconds = job.getFinishedAt();
         int recurringIntervalSeconds = job.getRecurringIntervalSeconds();
 
-        if (lastFinishedAtEpochSeconds > 0) {
-            rangeStart = Instant.ofEpochSecond(lastFinishedAtEpochSeconds);
+        Object cursorVal = jobConfig.get(CURSOR_KEY);
+        Long lastCursorMs = cursorVal instanceof Number ? ((Number) cursorVal).longValue() : null;
+        
+        Instant rangeStart;
+        Instant rangeEnd = now;
+        
+        if (lastCursorMs != null && lastCursorMs > 0) {
+            rangeStart = Instant.ofEpochMilli(lastCursorMs);
             if (recurringIntervalSeconds > 0) {
                 rangeEnd = rangeStart.plusSeconds(recurringIntervalSeconds);
                 if (rangeEnd.isAfter(now)) {
@@ -49,8 +54,13 @@ public class BigQueryExecutor extends AccountJobExecutor {
                 }
             }
         } else {
-            int lookbackSeconds = recurringIntervalSeconds > 0 ? recurringIntervalSeconds : 3600;
-            rangeStart = rangeEnd.minusSeconds(lookbackSeconds);
+            int lookbackSeconds = recurringIntervalSeconds > 0 ? recurringIntervalSeconds : 300;
+            rangeStart = now.minusSeconds(lookbackSeconds);
+        }
+        
+        if (!rangeStart.isBefore(rangeEnd)) {
+            logger.info("No new time range to query: rangeStart={} >= rangeEnd={}. Skipping job.", rangeStart, rangeEnd);
+            return;
         }
 
         BigQueryConfig bigQueryConfig = BigQueryConfig.fromJobConfig(jobConfig, rangeStart, rangeEnd);
@@ -104,6 +114,12 @@ public class BigQueryExecutor extends AccountJobExecutor {
             }
             throw e;
         }
+
+        long newCursorMs = rangeEnd.toEpochMilli();
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("config." + CURSOR_KEY, newCursorMs);
+        CyborgApiClient.updateJob(job.getId(), updates);
+        logger.info("Updated cursor to {} (rangeEnd={})", newCursorMs, rangeEnd);
 
         logger.info("BigQuery job completed successfully: jobId={}", job.getId());
     }
