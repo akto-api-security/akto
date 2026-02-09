@@ -333,7 +333,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 author: x.author,
                 nature: x?.attributes?.nature?._name || "",
                 severity: x?.superCategory?.severity?._name || "",
-                duration: x?.attributes?.duration?._name || ""
+                duration: x?.attributes?.duration?._name || "",
+                estimatedTokens: x.estimatedTokens || 0
             }
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)
@@ -664,6 +665,22 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         return count;
     }
 
+    function computeTokenEstimation() {
+        let totalTokens = 0;
+        let aiTestCount = 0;
+        const tests = { ...testRun.tests };
+        Object.keys(tests).forEach(category => {
+            tests[category].filter(t => t.selected && t.estimatedTokens > 0).forEach(t => {
+                totalTokens += t.estimatedTokens;
+                aiTestCount++;
+            });
+        });
+        const totalApis = endpoints ? endpoints.length : 0;
+        return { totalTokens: totalTokens * totalApis, totalApis, aiTestCount };
+    }
+
+    const tokenEstimation = computeTokenEstimation();
+
     function toggleTestsSelection(val) {
         let copyTestRun = testRun
         copyTestRun.tests[testRun.selectedCategory].forEach((test) => {
@@ -947,6 +964,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         </div>
                                     </div>
                                 </div>
+                                {tokenEstimation.totalTokens > 0 && (
+                                    <Banner status="info">
+                                        Estimated LLM token usage: {tokenEstimation.totalTokens.toLocaleString()} tokens ({tokenEstimation.totalApis} APIs x {tokenEstimation.aiTestCount} AI-powered tests)
+                                    </Banner>
+                                )}
                                 {RunTestConfigurationComponent}
                             </VerticalStack>
                             <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
