@@ -166,6 +166,13 @@ public class ThreatDetector {
             return true;
         }
 
+        // Step 1.5: Check for Bearer with empty/malformed token directly
+        // This catches cases that AuthPolicy might not classify as BEARER type
+        if (hasEmptyOrMalformedBearer(headers)) {
+            logger.debug("Weak authentication: Empty or malformed Bearer token detected");
+            return true;
+        }
+
         // Step 2: Use AuthPolicy to find auth types
         Set<ApiInfo.AuthType> authTypes = AuthPolicy.findAuthTypes(headers);
 
@@ -197,7 +204,7 @@ public class ThreatDetector {
                 }
             } else {
                 // Not a valid JWT - check if it's a fake/suspicious token
-                if (token.length() < 20) {
+                if (token.length() < 10) {
                     logger.debug("Weak authentication: Fake/invalid bearer token detected");
                     return true;
                 }
@@ -256,6 +263,47 @@ public class ThreatDetector {
                     for (String value : values) {
                         if (value != null && value.length() > 2048) {
                             return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean hasEmptyOrMalformedBearer(Map<String, List<String>> headers) {
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(AuthPolicy.AUTHORIZATION_HEADER_NAME)) {
+                List<String> values = entry.getValue();
+                if (values != null) {
+                    for (String value : values) {
+                        if (value == null) continue;
+                        String trimmed = value.trim();
+
+                        // Check if it starts with "Bearer" (case insensitive)
+                        if (trimmed.length() >= 6 && trimmed.substring(0, 6).equalsIgnoreCase("bearer")) {
+                            // Extract token part after "Bearer"
+                            String tokenPart = trimmed.length() > 6 ? trimmed.substring(6).trim() : "";
+
+                            // Empty bearer token (e.g., "Bearer" or "Bearer ")
+                            if (tokenPart.isEmpty()) {
+                                return true;
+                            }
+
+                            // Check if token looks like JWT but is malformed
+                            if (tokenPart.contains(".")) {
+                                String[] parts = tokenPart.split("\\.");
+                                // Valid JWT has exactly 3 parts
+                                if (parts.length != 3) {
+                                    return true;
+                                }
+                                // Check if any part is empty
+                                for (String part : parts) {
+                                    if (part.isEmpty()) {
+                                        return true;
+                                    }
+                                }
+                            }
                         }
                     }
                 }

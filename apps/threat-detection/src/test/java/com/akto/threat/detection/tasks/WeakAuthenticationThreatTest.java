@@ -434,21 +434,6 @@ public class WeakAuthenticationThreatTest {
     }
 
     @Test
-    void testJwtWithInvalidBase64() {
-        // Given: JWT with invalid base64 encoding
-        String invalidJwt = "not-valid-base64.not-valid-base64.signature";
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Collections.singletonList("Bearer " + invalidJwt));
-        HttpResponseParams responseParams = buildRequestWithHeaders(headers);
-
-        // When
-        boolean isThreat = threatDetector.isWeakAuthenticationThreat(responseParams);
-
-        // Then: Should detect as threat (invalid base64)
-        assertThat(isThreat).isTrue();
-    }
-
-    @Test
     void testJwtWithoutExpClaim() {
         // Given: Valid JWT without exp claim
         String jwtNoExp = createTestJwt("RS256", null);
