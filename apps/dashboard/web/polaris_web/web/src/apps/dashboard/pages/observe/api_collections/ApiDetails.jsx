@@ -8,9 +8,10 @@ import SampleData from "../../../components/shared/SampleData";
 import { useEffect, useState, useRef } from "react";
 import api from "../api";
 import ApiSchema from "./ApiSchema";
-import func from "@/util/func" 
+import func from "@/util/func"
 import transform from "../transform";
 import ApiDependency from "./ApiDependency";
+import SwaggerDependenciesFlow from "./SwaggerDependenciesFlow";
 import ApiTraces from "./ApiTraces";
 import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
@@ -72,6 +73,7 @@ function ApiDetails(props) {
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
     const allCollections = PersistStore(state => state.allCollections)
     const [disabledTabs, setDisabledTabs] = useState([])
+    const [hasEndpointDependencies, setHasEndpointDependencies] = useState(false)
     const [description, setDescription] = useState("")
     const [headersWithData, setHeadersWithData] = useState([])
     const [isEditingDescription, setIsEditingDescription] = useState(false)
@@ -293,14 +295,30 @@ function ApiDetails(props) {
             }
             
             try {
-                await api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method).then((resp) => {
-                    if (!resp.dependencyGraphExists) {
-                        setDisabledTabs(["dependency"])
-                    } else {
-                        setDisabledTabs([])
+                // Check endpoint-level dependencies
+                const endpointDepCheck = await api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method);
+                setHasEndpointDependencies(endpointDepCheck.dependencyGraphExists);
+
+                // Check collection-level swagger dependencies as fallback
+                let collectionDepExists = false;
+                if (!endpointDepCheck.dependencyGraphExists) {
+                    try {
+                        const collectionDepCheck = await api.getSwaggerDependencies(apiCollectionId);
+                        const data = Array.isArray(collectionDepCheck) ? collectionDepCheck : (collectionDepCheck?.data || collectionDepCheck?.apiDependenciesList || []);
+                        collectionDepExists = Array.isArray(data) && data.length > 0;
+                    } catch (err) {
+                        collectionDepExists = false;
                     }
-                })
+                }
+
+                // Enable tab if either exists
+                if (!endpointDepCheck.dependencyGraphExists && !collectionDepExists) {
+                    setDisabledTabs(["dependency"])
+                } else {
+                    setDisabledTabs([])
+                }
             } catch (error) {
+                setHasEndpointDependencies(false);
             }
 
             setTimeout(() => {
@@ -611,11 +629,21 @@ function ApiDetails(props) {
         id: 'dependency',
         content: "Dependency Graph",
         component: <Box paddingBlockStart={"2"}>
-            <ApiDependency
-                apiCollectionId={apiDetail['apiCollectionId']}
-                endpoint={apiDetail['endpoint']}
-                method={apiDetail['method']}
-            />
+            {hasEndpointDependencies ? (
+                <ApiDependency
+                    apiCollectionId={apiDetail['apiCollectionId']}
+                    endpoint={apiDetail['endpoint']}
+                    method={apiDetail['method']}
+                />
+            ) : (
+                <SwaggerDependenciesFlow
+                    apiCollectionId={apiDetail['apiCollectionId']}
+                    preSelectedApi={{
+                        method: apiDetail['method'],
+                        url: apiDetail['endpoint']
+                    }}
+                />
+            )}
         </Box>,
     }
 
