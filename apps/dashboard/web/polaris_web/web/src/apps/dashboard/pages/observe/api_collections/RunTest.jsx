@@ -326,7 +326,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             if (!ret[x.superCategory.name]) {
                 ret[x.superCategory.name] = { selected: [], all: [] }
             }
-
+            
             let obj = {
                 label: x.testName,
                 value: x.name,
@@ -667,19 +667,17 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     function computeTokenEstimation() {
         let totalTokens = 0;
-        let aiTestCount = 0;
         const tests = { ...testRun.tests };
         Object.keys(tests).forEach(category => {
-            tests[category].filter(t => t.selected && t.estimatedTokens > 0).forEach(t => {
+            (tests[category] || []).filter(t => t.selected && t.estimatedTokens > 0).forEach(t => {
                 totalTokens += t.estimatedTokens;
-                aiTestCount++;
             });
         });
         const totalApis = endpoints ? endpoints.length : 0;
-        return { totalTokens: totalTokens * totalApis, totalApis, aiTestCount };
+        return totalTokens * totalApis;
     }
 
-    const tokenEstimation = computeTokenEstimation();
+    const estimatedTotalTokens = computeTokenEstimation();
 
     function toggleTestsSelection(val) {
         let copyTestRun = testRun
@@ -964,10 +962,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         </div>
                                     </div>
                                 </div>
-                                {tokenEstimation.totalTokens > 0 && (
-                                    <Banner status="info">
-                                        Estimated LLM token usage: {tokenEstimation.totalTokens.toLocaleString()} tokens ({tokenEstimation.totalApis} APIs x {tokenEstimation.aiTestCount} AI-powered tests)
-                                    </Banner>
+                                {estimatedTotalTokens > 0 && (
+                                    <div style={{textAlign: "right"}}>
+                                        <Text variant="bodySm" color="subdued">Estimated Usage: <Text variant="bodySm" fontWeight="semibold" as="span">{estimatedTotalTokens.toLocaleString()} tokens</Text></Text>
+                                    </div>
                                 )}
                                 {RunTestConfigurationComponent}
                             </VerticalStack>
