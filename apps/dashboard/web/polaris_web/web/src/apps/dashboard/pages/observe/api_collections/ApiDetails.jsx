@@ -58,7 +58,7 @@ function TechCard(props){
 }
 
 function ApiDetails(props) {
-    const { showDetails, setShowDetails, apiDetail, headers, getStatus, /* isGptActive, */ collectionIssuesData } = props
+    const { showDetails, setShowDetails, apiDetail, headers, getStatus, collectionIssuesData, hasAccessToDiscoveryAgent } = props
 
     const localCategoryMap = LocalStore.getState().categoryMap
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
@@ -301,7 +301,7 @@ function ApiDetails(props) {
 
                 // Check collection-level swagger dependencies as fallback
                 let collectionDepExists = false;
-                if (!endpointDepCheck.dependencyGraphExists) {
+                if (!endpointDepCheck.dependencyGraphExists && hasAccessToDiscoveryAgent) {
                     try {
                         const collectionDepCheck = await api.getSwaggerDependencies(apiCollectionId);
                         const data = Array.isArray(collectionDepCheck) ? collectionDepCheck : (collectionDepCheck?.data || collectionDepCheck?.apiDependenciesList || []);
@@ -635,7 +635,7 @@ function ApiDetails(props) {
                     endpoint={apiDetail['endpoint']}
                     method={apiDetail['method']}
                 />
-            ) : (
+            ) : hasAccessToDiscoveryAgent && (
                 <SwaggerDependenciesFlow
                     apiCollectionId={apiDetail['apiCollectionId']}
                     preSelectedApi={{
