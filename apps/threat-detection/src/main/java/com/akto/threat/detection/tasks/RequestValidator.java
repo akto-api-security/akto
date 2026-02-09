@@ -18,7 +18,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -71,6 +73,15 @@ public class RequestValidator {
       return url;
     }
 
+    // Strip query string for path matching
+    String urlPath = stripQueryString(url);
+
+    // First: check for exact path match (preferred over parameterized)
+    if (pathsNode.has(urlPath)) {
+      return urlPath;
+    }
+
+    // Second: check for parameterized path match
     Iterator<String> pathKeys = pathsNode.fieldNames();
 
     while (pathKeys.hasNext()) {
@@ -83,13 +94,18 @@ public class RequestValidator {
     return url;
   }
 
+  private static String stripQueryString(String url) {
+    int queryIndex = url.indexOf('?');
+    return queryIndex != -1 ? url.substring(0, queryIndex) : url;
+  }
+
   private static boolean matchesParameterizedPath(String pathKey, String url) {
 
-    // TODO: handle cases like
-    // /pets/{petId} and /pets/mine both are present in schema
+    // Strip query string before matching
+    String urlPath = stripQueryString(url);
 
     String[] pathSegments = pathKey.split("/");
-    String[] urlSegments = url.split("/");
+    String[] urlSegments = urlPath.split("/");
 
     if (pathSegments.length != urlSegments.length) {
       return false;
@@ -112,26 +128,16 @@ public class RequestValidator {
     return true;
   }
 
-  public static JsonNode getRequestBodySchemaNode(JsonNode rootSchemaNode, HttpResponseParams responseParam) {
-    String url = transformTrafficUrlToSchemaUrl(rootSchemaNode, responseParam.getRequestParams().getURL());
-
-    JsonNode pathNode = getPathNode(rootSchemaNode, url, responseParam);
-    if (pathNode == null) {
-      return null;
-    }
-
-    JsonNode methodNode = getMethodNode(pathNode, url, responseParam);
-    if (methodNode == null) {
-      return null;
-    }
+  public static JsonNode getRequestBodySchemaNode(JsonNode methodNode, HttpResponseParams responseParam,
+      String normalizedUrl) {
 
     // Skip request body validation for GET/DELETE requests
     String method = responseParam.getRequestParams().getMethod().toLowerCase();
-    if(method.equals("get") || method.equals("delete")){
+    if (method.equals("get") || method.equals("delete")) {
       return null;
     }
 
-    JsonNode requestBodyNode = getRequestBodyNode(methodNode, url, responseParam);
+    JsonNode requestBodyNode = getRequestBodyNode(methodNode, normalizedUrl, responseParam);
     if (requestBodyNode == null) {
       return null;
     }
@@ -181,7 +187,7 @@ public class RequestValidator {
   private static JsonNode getContentSchemaNode(JsonNode requestBodyNode, HttpResponseParams responseParam) {
     String contentType = responseParam.getRequestParams().getHeaders().get("content-type").get(0);
 
-    if(!contentType.equalsIgnoreCase("application/json")) {
+    if (!contentType.equalsIgnoreCase("application/json")) {
       // validate only json content type
       return null;
     }
@@ -200,54 +206,202 @@ public class RequestValidator {
     return schemaNode;
   }
 
-  public static void addError(String schemaPath, String instancePath, String attribute, String message) {
-    errors.clear();
+  public static void addError(String schemaPath, String instancePath, String attribute, String message,
+      SchemaConformanceError.Location location) {
     errorBuilder.clear();
     errorBuilder.setSchemaPath(schemaPath);
     errorBuilder.setInstancePath(instancePath);
     errorBuilder.setAttribute(attribute);
     errorBuilder.setMessage(message);
-    errorBuilder.setLocation(SchemaConformanceError.Location.LOCATION_BODY);
+    errorBuilder.setLocation(location);
     errorBuilder.setStart(-1);
     errorBuilder.setEnd(-1);
     errors.add(errorBuilder.build());
   }
 
-  private static List<SchemaConformanceError> validateRequestBody(HttpResponseParams httpResponseParams,
-      JsonNode rootSchemaNode) throws Exception {
+  public static void addError(String schemaPath, String instancePath, String attribute, String message) {
+    addError(schemaPath, instancePath, attribute, message, SchemaConformanceError.Location.LOCATION_BODY);
+  }
 
-    JsonNode schemaNode = getRequestBodySchemaNode(rootSchemaNode, httpResponseParams);
+  private static Set<String> getSchemaDefinedParameters(JsonNode methodNode, JsonNode pathNode, String paramLocation) {
+    Set<String> definedParams = new HashSet<>();
 
+    // Check parameters at method level
+    JsonNode methodParams = methodNode.path("parameters");
+    if (methodParams.isArray()) {
+      for (JsonNode param : methodParams) {
+        if (paramLocation.equals(param.path("in").asText())) {
+          definedParams.add(param.path("name").asText().toLowerCase());
+        }
+      }
+    }
+
+    // Check parameters at path level (inherited by all methods)
+    JsonNode pathParams = pathNode.path("parameters");
+    if (pathParams.isArray()) {
+      for (JsonNode param : pathParams) {
+        if (paramLocation.equals(param.path("in").asText())) {
+          definedParams.add(param.path("name").asText().toLowerCase());
+        }
+      }
+    }
+
+    return definedParams;
+  }
+
+  private static Map<String, String> parseQueryParamsFromUrl(String url) {
+    Map<String, String> queryParams = new java.util.HashMap<>();
+
+    int queryStart = url.indexOf('?');
+    if (queryStart == -1) {
+      return queryParams;
+    }
+
+    String queryString = url.substring(queryStart + 1);
+    String[] pairs = queryString.split("&");
+
+    for (String pair : pairs) {
+      int eqIndex = pair.indexOf('=');
+      if (eqIndex > 0) {
+        String key = pair.substring(0, eqIndex).toLowerCase();
+        String value = eqIndex < pair.length() - 1 ? pair.substring(eqIndex + 1) : "";
+        queryParams.put(key, value);
+      } else if (!pair.isEmpty()) {
+        queryParams.put(pair.toLowerCase(), "");
+      }
+    }
+
+    return queryParams;
+  }
+
+  private static void validateHeaders(HttpResponseParams httpResponseParams, JsonNode methodNode,
+      JsonNode pathNode, String schemaPath) {
+    Set<String> definedHeaders = getSchemaDefinedParameters(methodNode, pathNode, "header");
+    Map<String, List<String>> actualHeaders = httpResponseParams.getRequestParams().getHeaders();
+
+    if (actualHeaders == null) {
+      return;
+    }
+
+    for (String headerName : actualHeaders.keySet()) {
+      String lowerHeaderName = headerName.toLowerCase();
+      // Skip common standard headers that are typically not defined in OpenAPI specs
+      if (isStandardHeader(lowerHeaderName)) {
+        continue;
+      }
+
+      if (!definedHeaders.contains(lowerHeaderName)) {
+        addError(schemaPath + "/parameters", headerName, "header",
+            String.format("Extra header '%s' not defined in schema", headerName),
+            SchemaConformanceError.Location.LOCATION_HEADER);
+      }
+    }
+  }
+
+  private static final Set<String> STANDARD_HEADERS = new HashSet<>(java.util.Arrays.asList(
+      // Proxy/Infrastructure headers (14)
+      "x-forwarded-for", "x-forwarded-host", "x-forwarded-port", "x-forwarded-proto",
+      "x-forwarded-scheme", "x-forwarded-client-cert", "x-original-forwarded-for",
+      "x-real-ip", "x-envoy-attempt-count", "x-envoy-external-address",
+      "x-request-id", "x-scheme", "via", "host",
+      // Browser/Client metadata headers (10)
+      "user-agent", "accept-encoding", "accept-language", "sec-ch-ua",
+      "sec-ch-ua-mobile", "sec-ch-ua-platform", "sec-fetch-dest",
+      "sec-fetch-mode", "sec-fetch-site", "dnt",
+      // CORS/Browser security headers (3)
+      "origin", "referer", "upgrade-insecure-requests",
+      // Auto-calculated headers (1)
+      "content-length",
+      // Misplaced response headers in request
+      "access-control-allow-origin"));
+
+  private static final String AKTO_K8S_PREFIX = "x-akto-k8s";
+
+  private static boolean isStandardHeader(String headerName) {
+    return STANDARD_HEADERS.contains(headerName) || headerName.startsWith(AKTO_K8S_PREFIX);
+  }
+
+  private static void validateQueryParams(HttpResponseParams httpResponseParams, JsonNode methodNode,
+      JsonNode pathNode, String schemaPath) {
+    Set<String> definedQueryParams = getSchemaDefinedParameters(methodNode, pathNode, "query");
+    String url = httpResponseParams.getRequestParams().getURL();
+    Map<String, String> actualQueryParams = parseQueryParamsFromUrl(url);
+
+    for (String paramName : actualQueryParams.keySet()) {
+      if (!definedQueryParams.contains(paramName)) {
+        addError(schemaPath + "/parameters", paramName, "query",
+            String.format("Extra query parameter '%s' not defined in schema", paramName),
+            SchemaConformanceError.Location.LOCATION_URL);
+      }
+    }
+  }
+
+  private static void validateExtraBodyAttributes(JsonNode dataNode, JsonNode schemaNode, String schemaPath,
+      String instancePath) {
+    if (dataNode == null || schemaNode == null) {
+      return;
+    }
+
+    // Only validate objects for extra properties
+    if (!dataNode.isObject()) {
+      return;
+    }
+
+    JsonNode propertiesNode = schemaNode.path("properties");
+    if (propertiesNode.isMissingNode()) {
+      return;
+    }
+
+    Set<String> definedProperties = new HashSet<>();
+    propertiesNode.fieldNames().forEachRemaining(definedProperties::add);
+
+    // Check for extra properties in the request body
+    Iterator<String> fieldNames = dataNode.fieldNames();
+    while (fieldNames.hasNext()) {
+      String fieldName = fieldNames.next();
+      if (!definedProperties.contains(fieldName)) {
+        addError(schemaPath + "/properties", instancePath + "/" + fieldName, "requestBody",
+            String.format("Extra property '%s' not defined in schema", fieldName),
+            SchemaConformanceError.Location.LOCATION_BODY);
+      } else {
+        // Recursively validate nested objects
+        JsonNode nestedSchema = propertiesNode.path(fieldName);
+        JsonNode nestedData = dataNode.path(fieldName);
+        validateExtraBodyAttributes(nestedData, nestedSchema,
+            schemaPath + "/properties/" + fieldName, instancePath + "/" + fieldName);
+      }
+    }
+  }
+
+  private static void validateRequestBodyWithExtras(HttpResponseParams httpResponseParams,
+      JsonNode methodNode, String schemaPath, String normalizedUrl) throws Exception {
+
+    // Reuse existing method to get schema node (handles GET/DELETE skip,
+    // content-type check, etc.)
+    JsonNode schemaNode = getRequestBodySchemaNode(methodNode, httpResponseParams, normalizedUrl);
+
+    // If there were errors from getRequestBodySchemaNode, they're already added
     if (!errors.isEmpty()) {
-      return errors;
+      return;
     }
 
+    // schemaNode can be null for GET/DELETE or non-JSON content types (not an
+    // error)
     if (schemaNode == null || schemaNode.isMissingNode()) {
-      logger.warn("No request body schema found for api collection id {}, path {}, method {}",
-          httpResponseParams.getRequestParams().getApiCollectionId(),
-          httpResponseParams.getRequestParams().getURL(),
-          httpResponseParams.getRequestParams().getMethod());
-
-      // TODO: Case of shadow API vs body not found due to incorrect schema/parsing?
-      // For shadow API we should mark it as a threat ??
-      return errors;
+      return;
     }
 
-    JsonNode dataNode = objectMapper.readTree(httpResponseParams.getRequestParams().getPayload());
+    String payload = httpResponseParams.getRequestParams().getPayload();
+    if (payload == null || payload.isEmpty()) {
+      return;
+    }
 
+    JsonNode dataNode = objectMapper.readTree(payload);
+
+    // Validate using JSON Schema library
     JsonSchema schema = factory.getSchema(schemaNode);
-
     Set<ValidationMessage> validationMessages = schema.validate(dataNode);
 
-    if (validationMessages.isEmpty()) {
-
-      return errors;
-    }
-
-    logger.debug("Request not conforming to schema for api collection id {}",
-        httpResponseParams.getRequestParams().getApiCollectionId());
-
-    errors.clear();
     for (ValidationMessage message : validationMessages) {
       errorBuilder.clear();
       errorBuilder.setSchemaPath(message.getSchemaLocation().toString());
@@ -261,7 +415,10 @@ public class RequestValidator {
       errors.add(errorBuilder.build());
     }
 
-    return errors;
+    // Additionally check for extra properties not in schema
+    String contentType = httpResponseParams.getRequestParams().getHeaders().get("content-type").get(0);
+    validateExtraBodyAttributes(dataNode, schemaNode, schemaPath + "/requestBody/content/" + contentType + "/schema",
+        "");
   }
 
   public static List<SchemaConformanceError> validate(HttpResponseParams responseParam, String apiSchema,
@@ -279,7 +436,42 @@ public class RequestValidator {
         return errors;
       }
 
-      return validateRequestBody(responseParam, rootSchemaNode);
+      String url = transformTrafficUrlToSchemaUrl(rootSchemaNode, responseParam.getRequestParams().getURL());
+
+      // Reuse existing helper methods
+      JsonNode pathNode = getPathNode(rootSchemaNode, url, responseParam);
+      if (pathNode == null) {
+        return errors;
+      }
+
+      JsonNode methodNode = getMethodNode(pathNode, url, responseParam);
+      if (methodNode == null) {
+        return errors;
+      }
+
+      String method = responseParam.getRequestParams().getMethod().toLowerCase();
+      String schemaPath = "#/paths" + url + "/" + method;
+
+      // Validate headers for extra undefined headers
+      validateHeaders(responseParam, methodNode, pathNode, schemaPath);
+      
+      // If there were errors from validateHeaders, they're already added
+      if (!errors.isEmpty()) {
+        return errors;
+      }
+
+      // Validate query params for extra undefined params
+      validateQueryParams(responseParam, methodNode, pathNode, schemaPath);
+
+      // If there were errors from validateQueryParams, they're already added
+      if (!errors.isEmpty()) {
+        return errors;
+      }
+
+      // Validate request body (including extra attributes check)
+      validateRequestBodyWithExtras(responseParam, methodNode, schemaPath, url);
+
+      return errors;
     } catch (Exception e) {
       logger.errorAndAddToDb(e, "Error conforming to schema for api info key" + apiInfoKey);
       return errors;
