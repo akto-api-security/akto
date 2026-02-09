@@ -368,7 +368,7 @@ public class N8nTraceParser implements TraceParser {
 
         return Span.builder()
             .id(spanId)
-            .traceId(spanId)
+            .traceId(traceId)
             .parentSpanId(parentSpanId)
             .spanKind(determineSpanKind(nodeType, nodeName))
             .name(nodeName)
