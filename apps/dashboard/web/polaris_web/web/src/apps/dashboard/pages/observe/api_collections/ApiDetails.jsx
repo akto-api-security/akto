@@ -301,7 +301,7 @@ function ApiDetails(props) {
 
                 // Check collection-level swagger dependencies as fallback
                 let collectionDepExists = false;
-                if (!endpointDepCheck.dependencyGraphExists) {
+                if (!endpointDepCheck.dependencyGraphExists && hasAccessToDiscoveryAgent) {
                     try {
                         const collectionDepCheck = await api.getSwaggerDependencies(apiCollectionId);
                         const data = Array.isArray(collectionDepCheck) ? collectionDepCheck : (collectionDepCheck?.data || collectionDepCheck?.apiDependenciesList || []);
