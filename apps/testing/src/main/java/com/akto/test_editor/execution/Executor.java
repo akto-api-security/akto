@@ -633,7 +633,9 @@ public class Executor {
         if (shouldCalculateNewToken) {
             try {
                 LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
-                loggerMaker.infoAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName() + " at time: " + Context.now() , LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("WARNING: Cache expired during test execution for role "
+                    + testRole.getName() + " at time: " + Context.now()
+                    + ". This should rarely happen if auth was pre-fetched correctly.", LogDb.TESTING);
                 loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
                 if (!loginFlowResponse.getSuccess())
                     throw new Exception(loginFlowResponse.getError());
@@ -700,6 +702,77 @@ public class Executor {
         ExecutorSingleOperationResp ret = authMechanismForRole.addAuthToRequest(rawApi.getRequest(), eligibleForCachedToken);
 
         return ret;
+    }
+
+
+    public static ExecutorSingleOperationResp ensureAuthTokenWithRetry(
+        TestRoles testRole,
+        int maxRetries
+    ) throws Exception {
+        if (testRole == null) {
+            return new ExecutorSingleOperationResp(false, "Test role is null");
+        }
+
+        AuthMechanism authMechanism = testRole.findMatchingAuthMechanism(null);
+        if (authMechanism == null) {
+            return new ExecutorSingleOperationResp(true, "No auth mechanism found");
+        }
+
+        boolean eligibleForCache = AuthMechanismTypes.LOGIN_REQUEST.toString()
+            .equalsIgnoreCase(authMechanism.getType())
+            || AuthMechanismTypes.SAMPLE_DATA.toString()
+            .equalsIgnoreCase(authMechanism.getType());
+
+        if (eligibleForCache && !authMechanism.isCacheExpired()) {
+            return new ExecutorSingleOperationResp(true, "Using cached token");
+        }
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                loggerMaker.infoAndAddToDb("Attempt " + attempt + ": Fetching auth for role "
+                    + testRole.getName(), LogDb.TESTING);
+
+                LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(
+                    authMechanism, null, testRole.getName()
+                );
+
+                if (loginFlowResponse.getSuccess()) {
+                    loggerMaker.infoAndAddToDb("Attempt " + attempt + ": Successfully fetched auth for role "
+                        + testRole.getName(), LogDb.TESTING);
+                    return new ExecutorSingleOperationResp(true, "Auth token fetched");
+                } else {
+                    String error = loginFlowResponse.getError();
+                    loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Failed - " + error, LogDb.TESTING);
+
+                    if (attempt == maxRetries) {
+                        return new ExecutorSingleOperationResp(false,
+                            "Failed to fetch auth token after " + maxRetries
+                            + " retries. Last error: " + error);
+                    }
+
+                    if (attempt < maxRetries) {
+                        int waitMs = Math.min(2000 * attempt, 10000);
+                        Thread.sleep(waitMs);
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Exception - " + e.getMessage(), LogDb.TESTING);
+
+                if (attempt == maxRetries) {
+                    return new ExecutorSingleOperationResp(false,
+                        "Failed to fetch auth token after " + maxRetries
+                        + " retries. Exception: " + e.getMessage());
+                }
+
+                if (attempt < maxRetries) {
+                    int waitMs = Math.min(2000 * attempt, 10000);
+                    Thread.sleep(waitMs);
+                }
+            }
+        }
+
+        return new ExecutorSingleOperationResp(false,
+            "Failed to fetch auth token after " + maxRetries + " retries");
     }
 
     private static ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
