@@ -1,6 +1,7 @@
 package com.akto.dao.agentic_sessions;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.MCollection;
 import com.akto.dto.agentic_sessions.SessionDocument;
 
 public class SessionDocumentDao extends AccountsContextDao<SessionDocument> {
@@ -13,6 +14,11 @@ public class SessionDocumentDao extends AccountsContextDao<SessionDocument> {
     public static final SessionDocumentDao instance = new SessionDocumentDao();
 
     private SessionDocumentDao() {
+    }
+
+    public void createIndicesIfAbsent() {
+        String[] fieldNames = {SessionDocument.SESSION_IDENTIFIER};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     }
 
     @Override

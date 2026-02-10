@@ -1,6 +1,7 @@
 package com.akto;
 
 import com.akto.dao.*;
+import com.akto.dao.agentic_sessions.SessionDocumentDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.loaders.LoadersDao;
@@ -407,6 +408,7 @@ public class DaoInit {
         DependencyFlowNodesDao.instance.createIndicesIfAbsent();
         CodeAnalysisCollectionDao.instance.createIndicesIfAbsent();
         CodeAnalysisApiInfoDao.instance.createIndicesIfAbsent();
+        SessionDocumentDao.instance.createIndicesIfAbsent();
         RBACDao.instance.createIndicesIfAbsent();
         RuntimeMetricsDao.instance.createIndicesIfAbsent();
         JobsDao.instance.createIndicesIfAbsent();
