@@ -30,6 +30,7 @@ import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
@@ -158,6 +159,9 @@ public class DbAction extends ActionSupport {
 
     @Getter @Setter
     private String miniRuntimeName;
+
+    @Getter @Setter
+    private List<SessionDocument> sessionDocuments;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
@@ -460,6 +464,16 @@ public class DbAction extends ActionSupport {
             moduleInfoList = DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchAndUpdateModuleForReboot " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String bulkUpdateAgenticSessionContext() {
+        try {
+            DbLayer.bulkUpsertAgenticSessionContext(sessionDocuments);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in bulkUpdateAgenticSessionContext " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
