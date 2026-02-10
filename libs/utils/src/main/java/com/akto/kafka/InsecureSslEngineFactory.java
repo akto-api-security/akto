@@ -8,6 +8,7 @@ import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
@@ -58,7 +59,7 @@ public class InsecureSslEngineFactory implements SslEngineFactory {
 
     @Override
     public Set<String> reconfigurableConfigs() {
-        return Set.of();
+        return Collections.emptySet();
     }
 
     @Override
