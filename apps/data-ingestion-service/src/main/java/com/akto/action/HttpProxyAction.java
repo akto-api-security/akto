@@ -226,6 +226,10 @@ public class HttpProxyAction extends ActionSupport {
                         String reason = (String) guardrailsResult.get("Reason");
                         loggerMaker.warn("TrueFoundry sync request blocked by guardrails: " + reason);
 
+                        // Ingest data on separate thread even though request is blocked
+                        loggerMaker.info("TrueFoundry: Spawning async ingestion for blocked request");
+                        executeAsync(aktoFormat, false, true);
+
                         success = false;
                         message = reason != null ? reason : "Request blocked by guardrails";
                         data = new HashMap<>();
@@ -270,6 +274,8 @@ public class HttpProxyAction extends ActionSupport {
                 proxyData.put("path", aktoFormat.get("path"));
                 proxyData.put("request", aktoFormat.get("request"));
                 proxyData.put("response", aktoFormat.get("response"));
+
+                proxyData.put("akto_connector", "truefoundry"); 
 
                 // Set URL query params based on flags
                 Map<String, Object> urlQueryParams = new HashMap<>();
