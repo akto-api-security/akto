@@ -98,11 +98,7 @@ public class AIAgentConnectorImportAction extends UserAction {
                 ? recurringIntervalSeconds
                 : DEFAULT_RECURRING_INTERVAL_SECONDS;
 
-            // Determine the appropriate job type based on connector
-            // Vertex AI Custom Deployed Model uses BigQuery to fetch prediction logs
-            String jobType = CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL.equals(connectorType)
-                ? "VERTEX_AI_CUSTOM_DEPLOYED_MODEL_CONNECTOR"
-                : "AI_AGENT_CONNECTOR";
+            String jobType = getJobTypeForConnector(connectorType);
 
             // Create entry in per-account jobs collection
             // Convert Map<String, String> config to Map<String, Object> for generic storage
