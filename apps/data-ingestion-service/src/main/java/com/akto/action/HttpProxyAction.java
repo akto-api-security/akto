@@ -290,7 +290,8 @@ public class HttpProxyAction extends ActionSupport {
                 proxyData.put("path", aktoFormat.get("path"));
                 proxyData.put("request", aktoFormat.get("request"));
                 proxyData.put("response", aktoFormat.get("response"));
-                
+                proxyData.put("akto_connector", "truefoundry"); 
+
                 // Set URL query params based on flags
                 Map<String, Object> urlQueryParams = new HashMap<>();
                 if (enableGuardrails) {
@@ -303,7 +304,7 @@ public class HttpProxyAction extends ActionSupport {
                 proxyData.put("urlQueryParams", urlQueryParams);
 
                 // Process guardrails and/or ingestion
-                Map<String, Object> output = gateway.processHttpProxy(proxyData);
+                gateway.processHttpProxy(proxyData);
 
                 loggerMaker.info("TrueFoundry: " + threadName + " completed");
 
