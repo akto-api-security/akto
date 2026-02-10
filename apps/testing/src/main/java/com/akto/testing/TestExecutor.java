@@ -563,7 +563,21 @@ public class TestExecutor {
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
         options.returnDocument(ReturnDocument.AFTER);
 
-        State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
+        // Check current state - don't overwrite FAILED (auth failure) with COMPLETED
+        TestingRunResultSummary currentSummary = TestingRunResultSummariesDao.instance.findOne(
+            Filters.eq(Constants.ID, summaryId),
+            Projections.include(TestingRunResultSummary.STATE)
+        );
+
+        State updatedState;
+        if (currentSummary != null && currentSummary.getState() == State.FAILED) {
+            // Keep FAILED state (auth failed)
+            updatedState = State.FAILED;
+            loggerMaker.infoAndAddToDb("Preserving FAILED state for test run", LogDb.TESTING);
+        } else {
+            updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
+        }
+
         Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(summaryId);
         loggerMaker.debugAndAddToDb("Final count map calculated is " + finalCountMap.toString());
         TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
@@ -1013,6 +1027,19 @@ public class TestExecutor {
         loggerMaker.errorAndAddToDb(errorMessage, LogDb.TESTING);
         testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, errorMessage));
 
+        // Mark test run summary as FAILED when auth fails (shows RED CROSS in UI)
+        if (testRunResultSummaryId != null) {
+            try {
+                TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                    Filters.eq(Constants.ID, testRunResultSummaryId),
+                    Updates.set(TestingRunResultSummary.STATE, State.FAILED)
+                );
+                loggerMaker.infoAndAddToDb("Test run summary marked as FAILED due to auth failure", LogDb.TESTING);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Failed to update summary state: " + e.getMessage(), LogDb.TESTING);
+            }
+        }
+
         List<GenericTestResult> failedResults = new ArrayList<>();
         failedResults.add(new TestResult(
             null, rawApi.getOriginalMessage(),
@@ -1032,6 +1059,9 @@ public class TestExecutor {
         );
     }
 
+    // Track auth fetch status per test run to ensure it only happens once
+    private static final ConcurrentHashMap<String, ExecutorSingleOperationResp> authFetchCache = new ConcurrentHashMap<>();
+
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
         ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
             RawApi rawApi = TestingConfigurations.getInstance().getRawApi(apiInfoKey);
@@ -1047,54 +1077,79 @@ public class TestExecutor {
             } else {
                 attackerAuthMechanism = attackerTestRole.findMatchingAuthMechanism(rawApi);
 
-                if (attackerAuthMechanism != null) {
-                    try {
-                        ExecutorSingleOperationResp authResult = Executor.ensureAuthTokenWithRetry(
-                            attackerTestRole, 3, rawApi
-                        );
+                // Pre-fetch attacker role auth ONCE per test run
+                if (attackerAuthMechanism != null && testRunResultSummaryId != null) {
+                    String cacheKey = testRunResultSummaryId.toHexString() + "_ATTACKER";
+                    ExecutorSingleOperationResp cachedResult = authFetchCache.get(cacheKey);
 
-                        if (!authResult.getSuccess()) {
-                            String errorMessage = "Attacker role auth token fetch failed after 3 retries: "
-                                + authResult.getErrMsg();
+                    if (cachedResult == null) {
+                        try {
+                            ExecutorSingleOperationResp authResult = Executor.ensureAuthTokenWithRetry(
+                                attackerTestRole, 3, rawApi
+                            );
+                            authFetchCache.put(cacheKey, authResult);
+
+                            if (!authResult.getSuccess()) {
+                                String errorMessage = "Failed to fetch auth token after 3 retries";
+                                return createAuthFailedResult(errorMessage, testRunId, apiInfoKey, testConfig,
+                                    rawApi, testRunResultSummaryId, testLogs);
+                            }
+                        } catch (Exception e) {
+                            ExecutorSingleOperationResp errorResult = new ExecutorSingleOperationResp(false,
+                                "Exception during attacker auth fetch: " + e.getMessage());
+                            authFetchCache.put(cacheKey, errorResult);
+
+                            String errorMessage = "Failed to fetch auth token after 3 retries";
                             return createAuthFailedResult(errorMessage, testRunId, apiInfoKey, testConfig,
                                 rawApi, testRunResultSummaryId, testLogs);
                         }
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Exception during attacker auth token fetch: "
-                            + e.getMessage(), LogDb.TESTING);
-                        testLogs.add(new TestingRunResult.TestLog(
-                            TestingRunResult.TestLogType.ERROR,
-                            "Exception during auth fetch: " + e.getMessage()
-                        ));
+                    } else if (!cachedResult.getSuccess()) {
+                        // Previous test already failed auth - fail this test too
+                        String errorMessage = "Failed to fetch auth token after 3 retries";
+                        return createAuthFailedResult(errorMessage, testRunId, apiInfoKey, testConfig,
+                            rawApi, testRunResultSummaryId, testLogs);
                     }
                 }
             }
 
-            if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
-                TestRoles testRole = Executor.fetchOrFindTestRole(
-                    testingRunConfig.getTestRoleId(), true
-                );
+            // Pre-fetch test role auth ONCE per test run
+            if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())
+                && testRunResultSummaryId != null) {
+                String cacheKey = testRunResultSummaryId.toHexString() + "_" + testingRunConfig.getTestRoleId();
+                ExecutorSingleOperationResp cachedResult = authFetchCache.get(cacheKey);
 
-                if (testRole != null) {
-                    try{
-                        ExecutorSingleOperationResp authResult = Executor.ensureAuthTokenWithRetry(
-                            testRole, 3, rawApi
-                        );
+                if (cachedResult == null) {
+                    TestRoles testRole = Executor.fetchOrFindTestRole(
+                        testingRunConfig.getTestRoleId(), true
+                    );
 
-                        if (!authResult.getSuccess()) {
-                            String errorMessage = "Test role auth token fetch failed after 3 retries: "
-                                + authResult.getErrMsg();
+                    if (testRole != null) {
+                        try {
+                            ExecutorSingleOperationResp authResult = Executor.ensureAuthTokenWithRetry(
+                                testRole, 3, rawApi
+                            );
+                            authFetchCache.put(cacheKey, authResult);
+
+                            if (!authResult.getSuccess()) {
+                                String errorMessage = "Failed to fetch auth token after 3 retries";
+                                return createAuthFailedResult(errorMessage, testRunId, apiInfoKey, testConfig,
+                                    rawApi, testRunResultSummaryId, testLogs);
+                            }
+                        } catch (Exception e) {
+                            ExecutorSingleOperationResp errorResult = new ExecutorSingleOperationResp(false,
+                                "Exception during test role auth fetch: " + e.getMessage());
+                            authFetchCache.put(cacheKey, errorResult);
+
+                            String errorMessage = "Failed to fetch auth token after 3 retries";
                             return createAuthFailedResult(errorMessage, testRunId, apiInfoKey, testConfig,
                                 rawApi, testRunResultSummaryId, testLogs);
                         }
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Exception during test role auth token fetch: "
-                            + e.getMessage(), LogDb.TESTING);
-                        testLogs.add(new TestingRunResult.TestLog(
-                            TestingRunResult.TestLogType.ERROR,
-                            "Exception during test role auth fetch: " + e.getMessage()
-                        ));
                     }
+                } else if (!cachedResult.getSuccess()) {
+                    // Previous test already failed auth - fail this test too
+                    String errorMessage = "Failed to fetch auth token after 3 retries";
+                    return createAuthFailedResult(errorMessage, testRunId, apiInfoKey, testConfig,
+                        rawApi, testRunResultSummaryId, testLogs);
                 }
             }
 

@@ -752,7 +752,8 @@ public class Executor {
 
                     if (attempt < maxRetries) {
                         try {
-                            int waitMs = Math.min(2000 * attempt, 10000);
+                            int waitMs = 10000;
+                            loggerMaker.infoAndAddToDb("Waiting 10 seconds before next retry", LogDb.TESTING);
                             Thread.sleep(waitMs);
                         } catch (InterruptedException ie) {
                             loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Sleep interrupted - " + ie.getMessage(), LogDb.TESTING);
@@ -771,7 +772,8 @@ public class Executor {
 
                 if (attempt < maxRetries) {
                     try {
-                        int waitMs = Math.min(2000 * attempt, 10000);
+                        int waitMs = 10000;
+                        loggerMaker.infoAndAddToDb("Waiting 10 seconds before next retry", LogDb.TESTING);
                         Thread.sleep(waitMs);
                     } catch (InterruptedException ie) {
                         loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Sleep interrupted - " + ie.getMessage(), LogDb.TESTING);
