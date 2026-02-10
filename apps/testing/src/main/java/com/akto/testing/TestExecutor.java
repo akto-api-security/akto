@@ -1076,40 +1076,6 @@ public class TestExecutor {
                 loggerMaker.debugAndAddToDb("ATTACKER_TOKEN_ALL test role not found", LogDb.TESTING);
             } else {
                 attackerAuthMechanism = attackerTestRole.findMatchingAuthMechanism(rawApi);
-
-                // Pre-fetch attacker role auth ONCE per test run
-                if (attackerAuthMechanism != null && testRunResultSummaryId != null) {
-                    String cacheKey = testRunResultSummaryId.toHexString() + "_ATTACKER";
-                    ExecutorSingleOperationResp cachedResult = authFetchCache.get(cacheKey);
-
-                    if (cachedResult == null) {
-                        try {
-                            ExecutorSingleOperationResp authResult = Executor.ensureAuthTokenWithRetry(
-                                attackerTestRole, 3, rawApi
-                            );
-                            authFetchCache.put(cacheKey, authResult);
-
-                            if (!authResult.getSuccess()) {
-                                String errorMessage = "Failed to fetch auth token after 3 retries";
-                                return createAuthFailedResult(errorMessage, testRunId, apiInfoKey, testConfig,
-                                    rawApi, testRunResultSummaryId, testLogs);
-                            }
-                        } catch (Exception e) {
-                            ExecutorSingleOperationResp errorResult = new ExecutorSingleOperationResp(false,
-                                "Exception during attacker auth fetch: " + e.getMessage());
-                            authFetchCache.put(cacheKey, errorResult);
-
-                            String errorMessage = "Failed to fetch auth token after 3 retries";
-                            return createAuthFailedResult(errorMessage, testRunId, apiInfoKey, testConfig,
-                                rawApi, testRunResultSummaryId, testLogs);
-                        }
-                    } else if (!cachedResult.getSuccess()) {
-                        // Previous test already failed auth - fail this test too
-                        String errorMessage = "Failed to fetch auth token after 3 retries";
-                        return createAuthFailedResult(errorMessage, testRunId, apiInfoKey, testConfig,
-                            rawApi, testRunResultSummaryId, testLogs);
-                    }
-                }
             }
 
             // Pre-fetch test role auth ONCE per test run

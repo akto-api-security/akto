@@ -633,9 +633,7 @@ public class Executor {
         if (shouldCalculateNewToken) {
             try {
                 LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
-                loggerMaker.infoAndAddToDb("WARNING: Cache expired during test execution for role "
-                    + testRole.getName() + " at time: " + Context.now()
-                    + ". This should rarely happen if auth was pre-fetched correctly.", LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName() + " at time: " + Context.now() , LogDb.TESTING);
                 loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
                 if (!loginFlowResponse.getSuccess())
                     throw new Exception(loginFlowResponse.getError());
@@ -742,7 +740,7 @@ public class Executor {
                     return new ExecutorSingleOperationResp(true, "Auth token fetched");
                 } else {
                     String error = loginFlowResponse.getError();
-                    loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Failed - " + error, LogDb.TESTING);
+                        loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Failed - " + error, LogDb.TESTING);
 
                     if (attempt == maxRetries) {
                         return new ExecutorSingleOperationResp(false,
