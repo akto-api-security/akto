@@ -143,7 +143,7 @@ public class HttpProxyAction extends ActionSupport {
 
             // Validate that at least requestBody is present
             if (requestBody == null || requestBody.isEmpty()) {
-                loggerMaker.warn("TrueFoundry: Missing requestBody");
+                loggerMaker.error("TrueFoundry: Missing requestBody");
                 success = false;
                 message = "Missing requestBody";
                 data = new HashMap<>();
@@ -226,9 +226,25 @@ public class HttpProxyAction extends ActionSupport {
                         String reason = (String) guardrailsResult.get("Reason");
                         loggerMaker.warn("TrueFoundry sync request blocked by guardrails: " + reason);
 
-                        // Ingest data on separate thread even though request is blocked
+                        // Create blocked response for ingestion
+                        Map<String, Object> blockedResponse = new HashMap<>();
+                        Map<String, Object> blockedBody = new HashMap<>();
+                        blockedBody.put("x-blocked-by", "Akto Proxy");
+                        blockedResponse.put("body", blockedBody);
+                        blockedResponse.put("statusCode", 400);
+                        blockedResponse.put("status", "forbidden");
+                        
+                        Map<String, Object> responseHeaders = new HashMap<>();
+                        responseHeaders.put("content-type", "application/json");
+                        blockedResponse.put("headers", responseHeaders);
+                        
+                        // Create modified aktoFormat with blocked response
+                        Map<String, Object> aktoFormatWithResponse = new HashMap<>(aktoFormat);
+                        aktoFormatWithResponse.put("response", blockedResponse);
+
+                        // Ingest data on separate thread with blocked response
                         loggerMaker.info("TrueFoundry: Spawning async ingestion for blocked request");
-                        executeAsync(aktoFormat, false, true);
+                        executeAsync(aktoFormatWithResponse, false, true);
 
                         success = false;
                         message = reason != null ? reason : "Request blocked by guardrails";
@@ -274,9 +290,7 @@ public class HttpProxyAction extends ActionSupport {
                 proxyData.put("path", aktoFormat.get("path"));
                 proxyData.put("request", aktoFormat.get("request"));
                 proxyData.put("response", aktoFormat.get("response"));
-
-                proxyData.put("akto_connector", "truefoundry"); 
-
+                
                 // Set URL query params based on flags
                 Map<String, Object> urlQueryParams = new HashMap<>();
                 if (enableGuardrails) {
@@ -289,7 +303,7 @@ public class HttpProxyAction extends ActionSupport {
                 proxyData.put("urlQueryParams", urlQueryParams);
 
                 // Process guardrails and/or ingestion
-                gateway.processHttpProxy(proxyData);
+                Map<String, Object> output = gateway.processHttpProxy(proxyData);
 
                 loggerMaker.info("TrueFoundry: " + threadName + " completed");
 
@@ -352,6 +366,21 @@ public class HttpProxyAction extends ActionSupport {
         aktoFormat.put("url", "https://app.truefoundry.com");
         aktoFormat.put("path", "/api/llm/chat/completions");
 
+        // Extract IP address from TrueFoundry context for later use
+        String extractedIp = null;
+        if (tfInput.containsKey("context")) {
+            Map<String, Object> context = (Map<String, Object>) tfInput.get("context");
+            if (context != null && context.containsKey("metadata")) {
+                Map<String, Object> contextMetadata = (Map<String, Object>) context.get("metadata");
+                if (contextMetadata != null && contextMetadata.containsKey("ip_address")) {
+                    extractedIp = (String) contextMetadata.get("ip_address");
+                    if (extractedIp != null && !extractedIp.isEmpty()) {
+                        loggerMaker.info("Extracted IP address from TrueFoundry context: " + extractedIp);
+                    }
+                }
+            }
+        }
+
         // Build request object
         Map<String, Object> aktoRequest = new HashMap<>();
         aktoRequest.put("method", "POST");
@@ -378,7 +407,12 @@ public class HttpProxyAction extends ActionSupport {
         tags.put("gen-ai", "Gen AI");
         metadata.put("tag", tags);
 
-        // Add TrueFoundry context to metadata if available
+        // Add IP address to metadata if extracted
+        if (extractedIp != null && !extractedIp.isEmpty()) {
+            metadata.put("ip", extractedIp);
+        }
+
+        // Add TrueFoundry context to metadata
         if (tfInput.containsKey("context")) {
             Map<String, Object> context = (Map<String, Object>) tfInput.get("context");
             if (context != null) {
