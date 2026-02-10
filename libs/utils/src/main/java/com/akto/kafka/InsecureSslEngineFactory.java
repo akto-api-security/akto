@@ -4,6 +4,7 @@ import org.apache.kafka.common.security.auth.SslEngineFactory;
 
 import javax.net.ssl.*;
 import java.security.KeyManagementException;
+import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
