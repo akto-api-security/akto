@@ -27,6 +27,7 @@ public class KafkaConfig {
     public static final String SASL_JAAS_CONFIG = "sasl.jaas.config";
 
     public static final String SECURITY_PROTOCOL_SASL_PLAINTEXT = "SASL_PLAINTEXT";
+    public static final String SECURITY_PROTOCOL_SASL_SSL = "SASL_SSL";
     public static final String SASL_MECHANISM_PLAIN = "PLAIN";
 
     // New environment variable for SASL mechanism
@@ -115,7 +116,19 @@ public class KafkaConfig {
      * @param password   Kafka password
      */
     public static void addAuthenticationProperties(Properties properties, String username, String password) {
-        properties.put(SECURITY_PROTOCOL, SECURITY_PROTOCOL_SASL_PLAINTEXT);
+        addAuthenticationProperties(properties, username, password, SECURITY_PROTOCOL_SASL_PLAINTEXT);
+    }
+
+    /**
+     * Adds Kafka authentication properties to the given Properties object with specified security protocol.
+     *
+     * @param properties       The Properties object to add authentication to
+     * @param username         Kafka username
+     * @param password         Kafka password
+     * @param securityProtocol Security protocol (SASL_PLAINTEXT, SASL_SSL)
+     */
+    public static void addAuthenticationProperties(Properties properties, String username, String password, String securityProtocol) {
+        properties.put(SECURITY_PROTOCOL, securityProtocol);
 
         String saslMechanism = getKafkaSaslMechanism();
         properties.put(SASL_MECHANISM, saslMechanism);
@@ -155,7 +168,9 @@ public class KafkaConfig {
                 logger.error("Kafka authentication enabled but credentials not provided");
                 return null;
             }
-            addAuthenticationProperties(adminProps, username, password);
+            // Read security protocol from environment, default to SASL_PLAINTEXT
+            String securityProtocol = System.getenv().getOrDefault("KAFKA_SECURITY_PROTOCOL", SECURITY_PROTOCOL_SASL_PLAINTEXT);
+            addAuthenticationProperties(adminProps, username, password, securityProtocol);
         }
 
         return adminProps;
@@ -210,7 +225,9 @@ public class KafkaConfig {
         }
 
         if (isAuthEnabled) {
-            addAuthenticationProperties(kafkaProps, username, password);
+            // Read security protocol from environment, default to SASL_PLAINTEXT
+            String securityProtocol = System.getenv().getOrDefault("KAFKA_SECURITY_PROTOCOL", SECURITY_PROTOCOL_SASL_PLAINTEXT);
+            addAuthenticationProperties(kafkaProps, username, password, securityProtocol);
         }
 
         return kafkaProps;

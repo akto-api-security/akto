@@ -1208,7 +1208,9 @@ public class Main {
                 loggerMaker.errorAndAddToDb("Kafka authentication credentials not provided");
                 return null;
             }
-            KafkaConfig.addAuthenticationProperties(properties, kafkaUsername, kafkaPassword);
+            // Read security protocol from environment, default to SASL_PLAINTEXT
+            String securityProtocol = System.getenv().getOrDefault("KAFKA_SECURITY_PROTOCOL", KafkaConfig.SECURITY_PROTOCOL_SASL_PLAINTEXT);
+            KafkaConfig.addAuthenticationProperties(properties, kafkaUsername, kafkaPassword, securityProtocol);
         }
 
         return properties;
