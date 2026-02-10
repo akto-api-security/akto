@@ -21,7 +21,7 @@ public class BigQueryExecutor extends AccountJobExecutor {
     public static final BigQueryExecutor INSTANCE = new BigQueryExecutor();
 
     private static final LoggerMaker logger = new LoggerMaker(BigQueryExecutor.class);
-    private static final String INGESTION_SOURCE_TAG = "vertex-ai-custom-deployed-models";
+    private static final String INGESTION_SOURCE_TAG = "MIRRORING";
     private static final String CURSOR_KEY = "lastQueriedUntilEpochMs";
 
     private BigQueryExecutor() {
