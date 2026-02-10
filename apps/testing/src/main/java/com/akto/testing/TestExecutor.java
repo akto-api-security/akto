@@ -1027,7 +1027,7 @@ public class TestExecutor {
         loggerMaker.errorAndAddToDb(errorMessage, LogDb.TESTING);
         testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, errorMessage));
         
-        // Mark test run summary as FAILED when auth fails (shows RED CROSS in UI)
+        // Mark test run summary as FAILED when auth fails
         if (testRunResultSummaryId != null) {
             try {
                 TestingRunResultSummariesDao.instance.updateOneNoUpsert(
