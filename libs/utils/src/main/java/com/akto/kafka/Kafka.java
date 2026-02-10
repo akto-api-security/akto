@@ -174,10 +174,13 @@ public class Kafka {
 
     // Add SASL authentication if username and password are provided
     if (username != null && !username.isEmpty() && password != null && !password.isEmpty()) {
+      // Read security protocol from environment, default to SASL_PLAINTEXT
+      String securityProtocol = System.getenv().getOrDefault("AKTO_KAFKA_SECURITY_PROTOCOL", KafkaConfig.SECURITY_PROTOCOL_SASL_PLAINTEXT);
+
       if (saslMechanism != null && !saslMechanism.isEmpty()) {
-        KafkaConfig.addAuthenticationProperties(kafkaProps, username, password, saslMechanism);
+        KafkaConfig.addAuthenticationProperties(kafkaProps, username, password, saslMechanism, securityProtocol);
       } else {
-        KafkaConfig.addAuthenticationProperties(kafkaProps, username, password);
+        KafkaConfig.addAuthenticationProperties(kafkaProps, username, password, "PLAIN", securityProtocol);
       }
     }
 

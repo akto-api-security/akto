@@ -8,6 +8,7 @@ public class KafkaConfig {
   public static final String SASL_MECHANISM = "sasl.mechanism";
   public static final String SASL_JAAS_CONFIG = "sasl.jaas.config";
   public static final String SECURITY_PROTOCOL_SASL_PLAINTEXT = "SASL_PLAINTEXT";
+  public static final String SECURITY_PROTOCOL_SASL_SSL = "SASL_SSL";
   public static final String SASL_MECHANISM_PLAIN = "PLAIN";
   public static final String SASL_MECHANISM_SCRAM_SHA_256 = "SCRAM-SHA-256";
   public static final String SASL_MECHANISM_SCRAM_SHA_512 = "SCRAM-SHA-512";
@@ -112,7 +113,7 @@ public class KafkaConfig {
    */
   public static void addAuthenticationProperties(Properties properties, String username, String password) {
     // Default to PLAIN for backward compatibility
-    addAuthenticationProperties(properties, username, password, SASL_MECHANISM_PLAIN);
+    addAuthenticationProperties(properties, username, password, SASL_MECHANISM_PLAIN, SECURITY_PROTOCOL_SASL_PLAINTEXT);
   }
 
   /**
@@ -124,7 +125,20 @@ public class KafkaConfig {
    * @param saslMechanism SASL mechanism (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512)
    */
   public static void addAuthenticationProperties(Properties properties, String username, String password, String saslMechanism) {
-    properties.put(SECURITY_PROTOCOL, SECURITY_PROTOCOL_SASL_PLAINTEXT);
+    addAuthenticationProperties(properties, username, password, saslMechanism, SECURITY_PROTOCOL_SASL_PLAINTEXT);
+  }
+
+  /**
+   * Adds Kafka SASL authentication properties to the given Properties object with specified mechanism and security protocol.
+   *
+   * @param properties       The Properties object to add authentication to
+   * @param username         Kafka username
+   * @param password         Kafka password
+   * @param saslMechanism    SASL mechanism (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512)
+   * @param securityProtocol Security protocol (SASL_PLAINTEXT, SASL_SSL)
+   */
+  public static void addAuthenticationProperties(Properties properties, String username, String password, String saslMechanism, String securityProtocol) {
+    properties.put(SECURITY_PROTOCOL, securityProtocol);
     properties.put(SASL_MECHANISM, saslMechanism);
 
     // Select login module based on mechanism
