@@ -10109,19 +10109,27 @@
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">THREAT_DETECTION</param>
             </interceptor-ref>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">THREAT_PROTECTION</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
-            <result name="SUCCESS" type="json">
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param
-                    name="includeProperties">sessionData.*, errorMessage</param>
+                    name="includeProperties">^actionErrors.*</param>
             </result>
+            <result name="SUCCESS" type="json"> </result>
             <result name="ERROR" type="json">
-                <param name="statusCode">404</param>
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
                 <param
-                    name="includeProperties">errorMessage</param>
+                    name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
