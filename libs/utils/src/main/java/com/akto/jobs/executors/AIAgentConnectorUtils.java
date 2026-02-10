@@ -23,6 +23,7 @@ public final class AIAgentConnectorUtils {
                CONNECTOR_TYPE_LANGCHAIN.equals(connectorType) ||
                CONNECTOR_TYPE_COPILOT_STUDIO.equals(connectorType) ||
                CONNECTOR_TYPE_DATABRICKS.equals(connectorType) ||
-               CONNECTOR_TYPE_SNOWFLAKE.equals(connectorType);
+               CONNECTOR_TYPE_SNOWFLAKE.equals(connectorType) ||
+               CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL.equals(connectorType);
     }
 }
