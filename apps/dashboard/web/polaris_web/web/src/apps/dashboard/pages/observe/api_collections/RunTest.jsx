@@ -452,10 +452,18 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         testRows = filteredTests.map(test => {
             const isCustom = test?.author !== "AKTO"
             const label = (
-                <span style={{ display: 'flex', gap: '4px', alignItems: 'flex-start' }}>
-                    <Text variant="bodyMd">{test.label}</Text>
-                    {isCustom ? <Box paddingBlockStart={"050"}><Badge status="warning" size="small">Custom</Badge></Box> : null}
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span style={{ display: 'flex', gap: '4px', alignItems: 'flex-start' }}>
+                        <Text variant="bodyMd">{test.label}</Text>
+                        {isCustom ? <Box paddingBlockStart={"050"}><Badge status="warning" size="small">Custom</Badge></Box> : null}
+                    </span>
+                    {test.estimatedTokens > 0 ? (
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', paddingLeft: '2px' }}>
+                            <span style={{ fontSize: '12px', color: '#8C9196', fontWeight: 500 }}>~</span>
+                            <Text variant="bodySm" color="subdued">{test.estimatedTokens.toLocaleString()} tokens</Text>
+                        </span>
+                    ) : null}
+                </div>
             )
             return ([(
                 <Checkbox
@@ -674,7 +682,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             });
         });
         const totalApis = endpoints ? endpoints.length : 0;
-        return totalTokens * totalApis;
+        return 2 * totalTokens * totalApis;
     }
 
     const estimatedTotalTokens = computeTokenEstimation();
@@ -964,7 +972,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 </div>
                                 {estimatedTotalTokens > 0 && (
                                     <div style={{textAlign: "right"}}>
-                                        <Text variant="bodySm" color="subdued">Estimated Usage: <Text variant="bodySm" fontWeight="semibold" as="span">{estimatedTotalTokens.toLocaleString()} tokens</Text></Text>
+                                        <Text variant="bodySm" color="subdued">Estimated Usage: <span style={{ color: '#202223', fontWeight: 600 }}>~ {estimatedTotalTokens.toLocaleString()} tokens</span></Text>
                                     </div>
                                 )}
                                 {RunTestConfigurationComponent}
