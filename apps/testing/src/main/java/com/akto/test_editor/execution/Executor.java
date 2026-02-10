@@ -612,7 +612,7 @@ public class Executor {
         return removed;
     }
 
-    // Add support to also update the URL ID 
+    // Add support to also update the URL ID
     // use case for an ai agent.
     public synchronized static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
         AuthMechanism authMechanismForRole = testRole.findMatchingAuthMechanism(rawApi);
@@ -700,89 +700,6 @@ public class Executor {
         ExecutorSingleOperationResp ret = authMechanismForRole.addAuthToRequest(rawApi.getRequest(), eligibleForCachedToken);
 
         return ret;
-    }
-
-
-    public static ExecutorSingleOperationResp ensureAuthTokenWithRetry(TestRoles testRole, int maxRetries, RawApi rawApi) {
-
-        if (testRole == null) {
-            return new ExecutorSingleOperationResp(false, "Test role is null");
-        }
-
-        AuthMechanism authMechanism = testRole.findMatchingAuthMechanism(rawApi);
-        if (authMechanism == null) {
-            return new ExecutorSingleOperationResp(true, "No auth mechanism found");
-        }
-
-        boolean isLoginRequest = AuthMechanismTypes.LOGIN_REQUEST.toString()
-            .equalsIgnoreCase(authMechanism.getType());
-
-        if (!isLoginRequest) {
-            return new ExecutorSingleOperationResp(true, "Auth type " + authMechanism.getType() + " not supported for pre-fetch");
-        }
-
-        if (!authMechanism.isCacheExpired()) {
-            return new ExecutorSingleOperationResp(true, "Using cached token");
-        }
-
-        for (int attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                loggerMaker.infoAndAddToDb("Attempt " + attempt + ": Fetching auth for role "
-                    + testRole.getName(), LogDb.TESTING);
-
-                LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(
-                    authMechanism, null, testRole.getName()
-                );
-
-                if (loginFlowResponse.getSuccess()) {
-                    loggerMaker.infoAndAddToDb("Attempt " + attempt + ": Successfully fetched auth for role "
-                        + testRole.getName(), LogDb.TESTING);
-                    return new ExecutorSingleOperationResp(true, "Auth token fetched");
-                } else {
-                    String error = loginFlowResponse.getError();
-                        loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Failed - " + error, LogDb.TESTING);
-
-                    if (attempt == maxRetries) {
-                        return new ExecutorSingleOperationResp(false,
-                            "Failed to fetch auth token after " + maxRetries
-                            + " retries. Last error: " + error);
-                    }
-
-                    if (attempt < maxRetries) {
-                        try {
-                            int waitMs = 10000;
-                            loggerMaker.infoAndAddToDb("Waiting 10 seconds before next retry", LogDb.TESTING);
-                            Thread.sleep(waitMs);
-                        } catch (InterruptedException ie) {
-                            loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Sleep interrupted - " + ie.getMessage(), LogDb.TESTING);
-                            Thread.currentThread().interrupt();
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Exception - " + e.getMessage(), LogDb.TESTING);
-
-                if (attempt == maxRetries) {
-                    return new ExecutorSingleOperationResp(false,
-                        "Failed to fetch auth token after " + maxRetries
-                        + " retries. Exception: " + e.getMessage());
-                }
-
-                if (attempt < maxRetries) {
-                    try {
-                        int waitMs = 10000;
-                        loggerMaker.infoAndAddToDb("Waiting 10 seconds before next retry", LogDb.TESTING);
-                        Thread.sleep(waitMs);
-                    } catch (InterruptedException ie) {
-                        loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Sleep interrupted - " + ie.getMessage(), LogDb.TESTING);
-                        Thread.currentThread().interrupt();
-                    }
-                }
-            }
-        }
-
-        return new ExecutorSingleOperationResp(false,
-            "Failed to fetch auth token after " + maxRetries + " retries");
     }
 
     private static ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
