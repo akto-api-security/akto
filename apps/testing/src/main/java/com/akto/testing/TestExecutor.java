@@ -1086,7 +1086,7 @@ public class TestExecutor {
                     
                     if (testRole != null && !prefetchAuthWithRetry(testRole, rawApi, 3)) {
                         authStatus.put(summaryKey, false);
-                        return createAuthFailedResult("Failed to fetch auth token after 3 retries",
+                        return createAuthFailedResult("Failed to fetch auth token after three retries",
                                 testRunId, apiInfoKey, testConfig, rawApi, testRunResultSummaryId, testLogs);
                     }
                     
