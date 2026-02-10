@@ -156,5 +156,10 @@ public class KafkaConfig {
         "%s required username=\"%s\" password=\"%s\";",
         loginModule, username, password);
     properties.put(SASL_JAAS_CONFIG, jaasConfig);
+
+    // If using SSL, disable hostname verification for self-signed certificates
+    if (SECURITY_PROTOCOL_SASL_SSL.equals(securityProtocol)) {
+      properties.put("ssl.endpoint.identification.algorithm", "");
+    }
   }
 }
