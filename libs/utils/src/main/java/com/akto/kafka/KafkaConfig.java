@@ -147,9 +147,10 @@ public class KafkaConfig {
 
         properties.put(SASL_JAAS_CONFIG, jaasConfig);
 
-        // If using SSL, disable hostname verification for self-signed certificates
+        // If using SSL, configure to trust all certificates (for NLB with SSL termination)
         if (SECURITY_PROTOCOL_SASL_SSL.equals(securityProtocol)) {
             properties.put("ssl.endpoint.identification.algorithm", "");
+            properties.put("ssl.engine.factory.class", "com.akto.kafka.InsecureSslEngineFactory");
         }
     }
 
