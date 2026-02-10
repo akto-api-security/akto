@@ -305,21 +305,17 @@ public class N8nTraceParser implements TraceParser {
                         JsonNode sources = execution.get(FIELD_SOURCE);
                         if (sources.isArray() && sources.size() > 0) {
                             String previousNodeName = sources.get(0).get(FIELD_PREVIOUS_NODE).asText();
-                            String previousNodeType = workflowMetadata.nodeTypeMap.get(previousNodeName);
+                            Map<String, Object> metadata = new HashMap<>();
+                            metadata.put("type", nodeType != null ? nodeType : "unknown");
 
-                            // Determine if source is agent node
-                            boolean isAgentSource = previousNodeName.endsWith(AGENT_SUFFIX) ||
-                                                   (previousNodeType != null && previousNodeType.toLowerCase().contains("agent"));
-
-                            if (isAgentSource) {
-                                // Create edge: agent -> target service
-                                String edgeKey = nodeName;
-                                Map<String, Object> metadata = new HashMap<>();
-                                metadata.put("type", nodeType != null ? nodeType : "unknown");
-
-                                ServiceGraphEdgeInfo edge = new ServiceGraphEdgeInfo(previousNodeName, nodeName, metadata);
-                                edges.put(edgeKey, edge);
+                            // Extract edgeParam from execution data
+                            Map<String, Object> edgeParamData = extractEdgeParam(execution, nodeType);
+                            if (edgeParamData != null && !edgeParamData.isEmpty()) {
+                                metadata.put("edgeParam", edgeParamData);
                             }
+
+                            ServiceGraphEdgeInfo edge = new ServiceGraphEdgeInfo(previousNodeName, nodeName, metadata);
+                            edges.put(nodeName, edge);
                         }
                     }
                 }
@@ -335,6 +331,130 @@ public class N8nTraceParser implements TraceParser {
     @Override
     public String getSourceType() {
         return SOURCE_TYPE;
+    }
+
+    /**
+     * Extracts edge parameter (data exchanged between services) from execution data.
+     * Handles different data structures based on node type and categorizes the data.
+     */
+    private Map<String, Object> extractEdgeParam(JsonNode execution, String nodeType) {
+        try {
+            if (!execution.has(FIELD_DATA)) {
+                return null;
+            }
+
+            JsonNode dataNode = execution.get(FIELD_DATA);
+            Map<String, Object> result = new HashMap<>();
+
+            // Iterate through all fields in data node to find the actual data
+            Iterator<String> fieldNames = dataNode.fieldNames();
+            while (fieldNames.hasNext()) {
+                String fieldName = fieldNames.next();
+                JsonNode fieldValue = dataNode.get(fieldName);
+
+                if (fieldValue.isArray() && fieldValue.size() > 0) {
+                    JsonNode innerArray = fieldValue.get(0);
+                    if (innerArray.isArray() && innerArray.size() > 0) {
+                        JsonNode firstItem = innerArray.get(0);
+
+                        // Determine the type and extract relevant data
+                        String paramType = determineEdgeParamType(firstItem, fieldName, nodeType);
+                        String paramData = extractRelevantData(firstItem, fieldName);
+
+                        if (paramData != null) {
+                            result.put("type", paramType);
+                            result.put("data", paramData);
+                            return result;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // If extraction fails, return null
+            return null;
+        }
+        return null;
+    }
+
+    /**
+     * Determines the type of edge parameter based on the data structure and node type.
+     */
+    private String determineEdgeParamType(JsonNode dataItem, String fieldName, String nodeType) {
+        try {
+            // Check for LLM response patterns
+            if (fieldName.contains("languageModel") || fieldName.contains("ai_")) {
+                if (dataItem.has("json")) {
+                    JsonNode json = dataItem.get("json");
+                    if (json.has("response") && json.path("response").has("generations")) {
+                        return TracingConstants.EdgeParamType.LLM_RESPONSE;
+                    }
+                    if (json.has("prompt") || json.has("messages")) {
+                        return TracingConstants.EdgeParamType.LLM_PROMPT;
+                    }
+                }
+                return TracingConstants.EdgeParamType.LLM_RESPONSE;
+            }
+
+            // Check node type for classification
+            if (nodeType != null) {
+                String lowerType = nodeType.toLowerCase();
+                if (lowerType.contains("webhook") || lowerType.contains("trigger")) {
+                    return TracingConstants.EdgeParamType.USER_INPUT;
+                }
+                if (lowerType.contains("http") || lowerType.contains("request")) {
+                    return TracingConstants.EdgeParamType.HTTP_REQUEST;
+                }
+                if (lowerType.contains("tool")) {
+                    return TracingConstants.EdgeParamType.TOOL_OUTPUT;
+                }
+            }
+
+            // Check field name patterns
+            if (fieldName.equals("main")) {
+                return TracingConstants.EdgeParamType.INTERMEDIATE_DATA;
+            }
+
+            return TracingConstants.EdgeParamType.UNKNOWN;
+        } catch (Exception e) {
+            return TracingConstants.EdgeParamType.UNKNOWN;
+        }
+    }
+
+    /**
+     * Extracts the most relevant data from the data item.
+     * For LLM responses, extracts the generated text.
+     * For other types, extracts the json field or the entire item.
+     */
+    private String extractRelevantData(JsonNode dataItem, String fieldName) {
+        try {
+            if (!dataItem.has("json")) {
+                return OBJECT_MAPPER.writeValueAsString(dataItem);
+            }
+
+            JsonNode json = dataItem.get("json");
+
+            // Extract LLM response text if present
+            if (fieldName.contains("languageModel") || fieldName.contains("ai_")) {
+                // Look for response.generations[0][0].text pattern
+                if (json.has("response")) {
+                    JsonNode response = json.get("response");
+                    if (response.has("generations") && response.get("generations").isArray()) {
+                        JsonNode generations = response.get("generations");
+                        if (generations.size() > 0 && generations.get(0).isArray()) {
+                            JsonNode innerGen = generations.get(0);
+                            if (innerGen.size() > 0 && innerGen.get(0).has("text")) {
+                                return innerGen.get(0).get("text").asText();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Default: return the entire json object
+            return OBJECT_MAPPER.writeValueAsString(json);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private String stripN8nPrefixes(String type) {
@@ -367,7 +487,7 @@ public class N8nTraceParser implements TraceParser {
 
         return Span.builder()
             .id(spanId)
-            .traceId(spanId)
+            .traceId(traceId)
             .parentSpanId(parentSpanId)
             .spanKind(determineSpanKind(nodeType, nodeName))
             .name(nodeName)
