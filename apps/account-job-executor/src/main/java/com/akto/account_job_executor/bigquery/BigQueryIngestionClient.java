@@ -173,7 +173,6 @@ public class BigQueryIngestionClient implements AutoCloseable {
         requestHeaders.put("content-type", "application/json");
         requestHeaders.put("x-deployed-model-id", getStringValueOrDefault(row, "deployed_model_id", ""));
         requestHeaders.put("x-request-id", getStringValueOrDefault(row, "request_id", ""));
-        requestHeaders.put("x-source", source);
         ingestionRecord.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(requestHeaders));
 
         Map<String, String> responseHeaders = new HashMap<>();
