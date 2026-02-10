@@ -9,6 +9,7 @@ const MODEL_TYPES = {
   ANTHROPIC: "ANTHROPIC",
   OPENAI: "OPENAI",
   AZURE_OPENAI: "AZURE_OPENAI",
+  OLLAMA: "OLLAMA"
 }
 
 const OPENAI_MODELS = [
@@ -23,7 +24,14 @@ const ANTHROPIC_MODELS = [
   { label: "Claude 3.5 Sonnet", value: "claude-3-5-sonnet-20241022" }
 ]
 
-function getModelSections(type, data, setData) {
+
+const OLLAMA_MODELS = [
+  { label: "Qwen small-qwen2.5:0.5b", value: "qwen2.5:0.5b" },
+  { label: "Qwen latest-qwen3:8b", value: "qwen3:8b" },
+  { label: "Qwen 3 latest-qwen3:latest", value: "qwen3:latest" }
+]
+
+function getModelSections(type, data, setData, isEdit=false) {
   let sections = []
 
   sections.push({
@@ -32,10 +40,10 @@ function getModelSections(type, data, setData) {
     id: "name",
     placeholder: "Model name",
   }, {
-    title: "API Key",
+    title: type === MODEL_TYPES.OLLAMA ? "API Key (Optional)" : "API Key",
     type: "text",
     id: "apiKey",
-    placeholder: "API Key for the model",
+    placeholder: type === MODEL_TYPES.OLLAMA ? "API Key for the model (optional)" : "API Key for the model",
   },{
     title: "Model",
     type: "dropdown",
@@ -53,6 +61,14 @@ function getModelSections(type, data, setData) {
         placeholder: "The base URL for your Azure OpenAI resource",
       })
       break;
+    case MODEL_TYPES.OLLAMA:
+        sections.push({
+          title: "OLLAMA Server Endpoint",
+          type: "text",
+          id: "ollamaAIEndpoint",
+          placeholder: "The base URL for your OLLAMA server",
+        })
+        break;
     default:
       break;
   }
@@ -78,6 +94,8 @@ function getModelSections(type, data, setData) {
         items = OPENAI_MODELS
       } else if (type === MODEL_TYPES.ANTHROPIC) {
         items = ANTHROPIC_MODELS
+      } else if (type === MODEL_TYPES.OLLAMA) {
+        items = OLLAMA_MODELS
       }
       section.component = (
         <VerticalStack gap="1">
@@ -208,6 +226,10 @@ function AgentConfig() {
             {
               label: 'Azure OpenAI',
               value: MODEL_TYPES.AZURE_OPENAI
+            },
+            {
+              label: 'OLLAMA',
+              value: MODEL_TYPES.OLLAMA
             }
             ]}
             initial={modelType}
