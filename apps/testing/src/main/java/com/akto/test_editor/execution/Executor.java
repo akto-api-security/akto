@@ -612,7 +612,7 @@ public class Executor {
         return removed;
     }
 
-    // Add support to also update the URL ID
+    // Add support to also update the URL ID 
     // use case for an ai agent.
     public synchronized static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
         AuthMechanism authMechanismForRole = testRole.findMatchingAuthMechanism(rawApi);
@@ -655,7 +655,7 @@ public class Executor {
                             latestSample = thisSample;
                             latestTimestamp = thisTimestamp;
                         }
-                    }
+                    }                
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "SAMPLE_DATA: Error parsing sample data for sample_data test auth mechanism " + testRole.getName() + ": " + e.getMessage());
                 }
