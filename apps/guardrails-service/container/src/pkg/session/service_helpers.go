@@ -50,20 +50,41 @@ func TrackBlockedResponse(sessionMgr *SessionManager, logger *zap.Logger, sessio
 		return
 	}
 
-	blockedResponseMsg := "Request blocked by guardrail policy"
+	blockedResponseMsg := "Request violated guardrail policy rules. The payload was identified as potentially malicious or harmful based on configured security policies."
+	blockReason := "Request blocked by guardrail policy"
+
 	if len(processResult.BlockedResponse) > 0 {
-		// Try to extract message from BlockedResponse map
-		if msg, exists := processResult.BlockedResponse["message"]; exists {
-			if msgStr, ok := msg.(string); ok {
-				blockedResponseMsg = msgStr
+		if errorObj, exists := processResult.BlockedResponse["error"]; exists {
+			if errorMap, ok := errorObj.(map[string]interface{}); ok {
+				// Extract message from error.message
+				if msg, exists := errorMap["message"]; exists {
+					if msgStr, ok := msg.(string); ok {
+						blockedResponseMsg = msgStr
+					}
+				}
+
+				if dataObj, exists := errorMap["data"]; exists {
+					if dataMap, ok := dataObj.(map[string]interface{}); ok {
+						if reason, exists := dataMap["reason"]; exists {
+							if reasonStr, ok := reason.(string); ok {
+								blockReason = reasonStr
+							}
+						}
+					}
+				}
 			}
 		}
 	}
 
 	sessionMgr.TrackResponse(sessionID, kongRequestID, blockedResponseMsg, true)
+	if blockReason != "" {
+		sessionMgr.UpdateBlockedReason(sessionID, blockReason)
+	}
+
 	logger.Info("Tracked blocked response for session",
 		zap.String("sessionID", sessionID),
-		zap.String("kongRequestID", kongRequestID))
+		zap.String("kongRequestID", kongRequestID),
+		zap.String("blockReason", blockReason))
 }
 
 // TrackRequestAndGenerateSummary tracks request and generates summary asynchronously

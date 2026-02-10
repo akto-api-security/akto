@@ -27,6 +27,7 @@ type SessionData struct {
 	SessionID       string
 	Conversations   []ConversationEntry
 	LastSummary     string
+	BlockedReason   string // Stores the most recent blocked request reason
 	IsMalicious     bool
 	LastUpdated     int64
 	LastSyncedAt    int64 // Track when this session was last synced to cyborg
@@ -54,6 +55,7 @@ type SessionDocument struct {
 	SessionIdentifier string              `json:"sessionIdentifier"`
 	SessionSummary    string              `json:"sessionSummary"`
 	ConversationInfo  []ConversationEntry `json:"conversationInfo"`
+	BlockedReason     string              `json:"blockedReason,omitempty"` // Stores the most recent blocked request reason
 	IsMalicious       bool                `json:"isMalicious"`
 	UpdatedAt         int64               `json:"updatedAt"`
 	CreatedAt         int64               `json:"createdAt"`
@@ -177,6 +179,7 @@ func (sm *SessionManager) syncToCyborg(ctx context.Context) {
 			SessionIdentifier: sessionID,
 			SessionSummary:    session.LastSummary,
 			ConversationInfo:  truncatedConvs,
+			BlockedReason:     session.BlockedReason,
 			IsMalicious:       session.IsMalicious,
 			UpdatedAt:         session.LastUpdated,
 			CreatedAt:         session.CreatedAt,
@@ -483,6 +486,7 @@ func (sm *SessionManager) IsSessionMalicious(sessionID string) bool {
 		SessionID:       sessionID,
 		Conversations:   doc.ConversationInfo,
 		LastSummary:     doc.SessionSummary,
+		BlockedReason:   doc.BlockedReason,
 		IsMalicious:     doc.IsMalicious,
 		LastUpdated:     doc.UpdatedAt,
 		CreatedAt:       doc.CreatedAt,
@@ -525,6 +529,7 @@ func (sm *SessionManager) GetSessionSummary(sessionID string) (string, error) {
 		SessionID:       sessionID,
 		Conversations:   doc.ConversationInfo,
 		LastSummary:     doc.SessionSummary,
+		BlockedReason:   doc.BlockedReason,
 		IsMalicious:     doc.IsMalicious,
 		LastUpdated:     doc.UpdatedAt,
 		CreatedAt:       doc.CreatedAt,
@@ -548,6 +553,20 @@ func (sm *SessionManager) UpdateSessionSummary(sessionID, summary string) {
 	if exists {
 		session.mu.Lock()
 		session.LastSummary = summary
+		session.LastUpdated = time.Now().Unix()
+		session.mu.Unlock()
+	}
+}
+
+// UpdateBlockedReason updates the blocked reason for a session
+func (sm *SessionManager) UpdateBlockedReason(sessionID, reason string) {
+	sm.mu.RLock()
+	session, exists := sm.sessions[sessionID]
+	sm.mu.RUnlock()
+
+	if exists {
+		session.mu.Lock()
+		session.BlockedReason = reason
 		session.LastUpdated = time.Now().Unix()
 		session.mu.Unlock()
 	}
