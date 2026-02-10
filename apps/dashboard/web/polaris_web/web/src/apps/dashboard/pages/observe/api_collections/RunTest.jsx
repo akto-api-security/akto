@@ -334,7 +334,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 nature: x?.attributes?.nature?._name || "",
                 severity: x?.superCategory?.severity?._name || "",
                 duration: x?.attributes?.duration?._name || "",
-                estimatedTokens: x.estimatedTokens || 0
+                estimatedTokens: 2 * x.estimatedTokens || 0
             }
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)
@@ -682,7 +682,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             });
         });
         const totalApis = endpoints ? endpoints.length : 0;
-        return 2 * totalTokens * totalApis;
+        return totalTokens * totalApis;
     }
 
     const estimatedTotalTokens = computeTokenEstimation();
