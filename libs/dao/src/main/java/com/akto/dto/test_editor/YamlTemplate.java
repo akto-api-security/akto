@@ -26,6 +26,7 @@ public class YamlTemplate {
     public static final String SETTINGS = "attributes";
     private TemplateSettings attributes;
     private int estimatedTokens;
+    public static final String ESTIMATED_TOKENS = "estimatedTokens";
 
     public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info, TemplateSettings attributes) {
         this.id = id;
