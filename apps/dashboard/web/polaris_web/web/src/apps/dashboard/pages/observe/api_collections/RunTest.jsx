@@ -452,18 +452,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         testRows = filteredTests.map(test => {
             const isCustom = test?.author !== "AKTO"
             const label = (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span style={{ display: 'flex', gap: '4px', alignItems: 'flex-start' }}>
+                <VerticalStack gap="1">
+                    <HorizontalStack gap="1" blockAlign="start" wrap>
                         <Text variant="bodyMd">{test.label}</Text>
-                        {isCustom ? <Box paddingBlockStart={"050"}><Badge status="warning" size="small">Custom</Badge></Box> : null}
-                    </span>
-                    {test.estimatedTokens > 0 ? (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', paddingLeft: '2px' }}>
-                            <span style={{ fontSize: '12px', color: '#8C9196', fontWeight: 500 }}>~</span>
-                            <Text variant="bodySm" color="subdued">{test.estimatedTokens.toLocaleString()} tokens</Text>
-                        </span>
-                    ) : null}
-                </div>
+                        {isCustom ? <Badge status="warning" size="small">Custom</Badge> : null}
+                        {test.estimatedTokens > 0 ? <Badge status="info" size="small">~{test.estimatedTokens.toLocaleString()} tokens</Badge> : null}
+                    </HorizontalStack>
+                </VerticalStack>
             )
             return ([(
                 <Checkbox
@@ -971,9 +966,12 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     </div>
                                 </div>
                                 {estimatedTotalTokens > 0 && (
-                                    <div style={{textAlign: "right"}}>
-                                        <Text variant="bodySm" color="subdued">Estimated Usage: <span style={{ color: '#202223', fontWeight: 600 }}>~ {estimatedTotalTokens.toLocaleString()} tokens</span></Text>
-                                    </div>
+                                    <Box paddingBlockStart="2">
+                                        <HorizontalStack align="end" gap="1">
+                                            <Text variant="bodySm" color="subdued">Estimated Usage:</Text>
+                                            <Text variant="bodySm" fontWeight="semibold">~{estimatedTotalTokens.toLocaleString()} tokens</Text>
+                                        </HorizontalStack>
+                                    </Box>
                                 )}
                                 {RunTestConfigurationComponent}
                             </VerticalStack>
