@@ -308,18 +308,18 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 }
 
 // ValidateRequest validates a request payload against guardrail policies with session tracking
-func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSource string, sessionID string, kongRequestID string) (*mcp.ValidationResult, error) {
+func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSource string, sessionID string, requestID string) (*mcp.ValidationResult, error) {
 	s.logger.Info("Validating request payload",
 		zap.String("sessionID", sessionID),
-		zap.String("kongRequestID", kongRequestID))
+		zap.String("requestID", requestID))
 
 	// Check if session is already malicious
-	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, kongRequestID, payload); isMalicious {
+	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
 		return result, nil
 	}
 
 	// Track request and generate summary asynchronously
-	session.TrackRequestAndGenerateSummary(s.sessionMgr, s.logger, sessionID, kongRequestID, payload)
+	session.TrackRequestAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload)
 
 	// Inject session summary into payload if available
 	payloadToValidate := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID)
@@ -357,7 +357,7 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSo
 		zap.Any("parsedData", processResult.ParsedData))
 
 	// Track blocked response if request was blocked
-	session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, kongRequestID, processResult)
+	session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, requestID, processResult)
 
 	// Convert ProcessResult to ValidationResult
 	result := &mcp.ValidationResult{
@@ -377,10 +377,10 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSo
 }
 
 // ValidateResponse validates a response payload against guardrail policies with session tracking
-func (s *Service) ValidateResponse(ctx context.Context, payload string, contextSource string, sessionID string, kongRequestID string) (*mcp.ValidationResult, error) {
+func (s *Service) ValidateResponse(ctx context.Context, payload string, contextSource string, sessionID string, requestID string) (*mcp.ValidationResult, error) {
 	s.logger.Info("Validating response payload",
 		zap.String("sessionID", sessionID),
-		zap.String("kongRequestID", kongRequestID))
+		zap.String("requestID", requestID))
 
 	// Get cached policies (refreshes if stale)
 	policies, _, _, _, err := s.getCachedPolicies(contextSource)
@@ -401,7 +401,7 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 
 	// Track response and generate summary
 	isMalicious := processResult.IsBlocked
-	session.TrackResponseAndGenerateSummary(s.sessionMgr, s.logger, sessionID, kongRequestID, payload, isMalicious)
+	session.TrackResponseAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload, isMalicious)
 
 	// Convert ProcessResult to ValidationResult for backward compatibility
 	result := &mcp.ValidationResult{

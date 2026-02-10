@@ -12,7 +12,7 @@ import (
 )
 
 // CheckAndHandleMaliciousSession checks if session is malicious and returns blocked response
-func CheckAndHandleMaliciousSession(sessionMgr *SessionManager, logger *zap.Logger, sessionID, kongRequestID, payload string) (*mcp.ValidationResult, bool) {
+func CheckAndHandleMaliciousSession(sessionMgr *SessionManager, logger *zap.Logger, sessionID, requestID, payload string) (*mcp.ValidationResult, bool) {
 	if sessionMgr == nil || sessionID == "" {
 		return nil, false
 	}
@@ -23,17 +23,17 @@ func CheckAndHandleMaliciousSession(sessionMgr *SessionManager, logger *zap.Logg
 
 	// Track request for audit trail
 	if payload != "" {
-		sessionMgr.TrackRequest(sessionID, kongRequestID, payload)
+		sessionMgr.TrackRequest(sessionID, requestID, payload)
 	}
 
 	logger.Warn("Blocking request from malicious session",
 		zap.String("sessionID", sessionID),
-		zap.String("kongRequestID", kongRequestID))
+		zap.String("requestID", requestID))
 
 	blockedResponse := "Session blocked due to previous malicious activity"
 
 	// Track blocked response
-	sessionMgr.TrackResponse(sessionID, kongRequestID, blockedResponse, true)
+	sessionMgr.TrackResponse(sessionID, requestID, blockedResponse, true)
 
 	return &mcp.ValidationResult{
 		Allowed:         false,
@@ -45,7 +45,7 @@ func CheckAndHandleMaliciousSession(sessionMgr *SessionManager, logger *zap.Logg
 }
 
 // TrackBlockedResponse tracks blocked response in session manager
-func TrackBlockedResponse(sessionMgr *SessionManager, logger *zap.Logger, sessionID, kongRequestID string, processResult *mcp.ProcessResult) {
+func TrackBlockedResponse(sessionMgr *SessionManager, logger *zap.Logger, sessionID, requestID string, processResult *mcp.ProcessResult) {
 	if sessionMgr == nil || sessionID == "" || !processResult.IsBlocked {
 		return
 	}
@@ -76,24 +76,24 @@ func TrackBlockedResponse(sessionMgr *SessionManager, logger *zap.Logger, sessio
 		}
 	}
 
-	sessionMgr.TrackResponse(sessionID, kongRequestID, blockedResponseMsg, true)
+	sessionMgr.TrackResponse(sessionID, requestID, blockedResponseMsg, true)
 	if blockReason != "" {
 		sessionMgr.UpdateBlockedReason(sessionID, blockReason)
 	}
 
 	logger.Info("Tracked blocked response for session",
 		zap.String("sessionID", sessionID),
-		zap.String("kongRequestID", kongRequestID),
+		zap.String("requestID", requestID),
 		zap.String("blockReason", blockReason))
 }
 
 // TrackRequestAndGenerateSummary tracks request and generates summary asynchronously
-func TrackRequestAndGenerateSummary(sessionMgr *SessionManager, logger *zap.Logger, sessionID, kongRequestID, payload string) {
+func TrackRequestAndGenerateSummary(sessionMgr *SessionManager, logger *zap.Logger, sessionID, requestID, payload string) {
 	if sessionMgr == nil || sessionID == "" || payload == "" {
 		return
 	}
 
-	sessionMgr.TrackRequest(sessionID, kongRequestID, payload)
+	sessionMgr.TrackRequest(sessionID, requestID, payload)
 
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -110,12 +110,12 @@ func TrackRequestAndGenerateSummary(sessionMgr *SessionManager, logger *zap.Logg
 }
 
 // TrackResponseAndGenerateSummary tracks response and generates summary asynchronously
-func TrackResponseAndGenerateSummary(sessionMgr *SessionManager, logger *zap.Logger, sessionID, kongRequestID, payload string, isMalicious bool) {
+func TrackResponseAndGenerateSummary(sessionMgr *SessionManager, logger *zap.Logger, sessionID, requestID, payload string, isMalicious bool) {
 	if sessionMgr == nil || sessionID == "" || payload == "" {
 		return
 	}
 
-	sessionMgr.TrackResponse(sessionID, kongRequestID, payload, isMalicious)
+	sessionMgr.TrackResponse(sessionID, requestID, payload, isMalicious)
 
 	// Only generate summary for non-blocked responses
 	if !isMalicious {

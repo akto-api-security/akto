@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 )
 
@@ -24,12 +26,13 @@ func ExtractSessionID(headers map[string]string) string {
 	return ""
 }
 
-// ExtractKongRequestID extracts Kong request ID with fallback
-func ExtractKongRequestID(headers map[string]string) string {
+// ExtractRequestID extracts request ID from various headers with fallback
+// Supports Kong (x-kong-request-id) and standard request ID headers
+func ExtractRequestID(headers map[string]string) string {
 	candidates := []string{
-		"x-kong-request-id", "X-Kong-Request-Id",
-		"x-request-id", "X-Request-Id",
-		"request-id", "Request-Id",
+		"x-kong-request-id", "X-Kong-Request-Id", // Kong gateway
+		"x-request-id", "X-Request-Id",           // Standard
+		"request-id", "Request-Id",               // Alternative
 	}
 
 	for _, key := range candidates {
@@ -57,8 +60,28 @@ func sanitizeSessionID(headerName, value string) string {
 	return value
 }
 
-// ExtractSessionIDsFromRequest extracts headers and session/Kong IDs from HTTP request
-func ExtractSessionIDsFromRequest(r *http.Request) (sessionID, kongRequestID string) {
+func isSessionEnabled() bool {
+	sessionEnabled := os.Getenv("SESSION_ENABLED")
+	if sessionEnabled == "" {
+		// Default to true if not set (backward compatibility)
+		return true
+	}
+	enabled, err := strconv.ParseBool(sessionEnabled)
+	if err != nil {
+		// If parsing fails, default to true
+		return true
+	}
+	return enabled
+}
+
+// ExtractSessionIDsFromRequest extracts session ID and request ID from HTTP request headers
+// Returns empty strings if SESSION_ENABLED environment variable is set to false
+func ExtractSessionIDsFromRequest(r *http.Request) (sessionID, requestID string) {
+	// Check if session functionality is enabled
+	if !isSessionEnabled() {
+		return "", ""
+	}
+
 	headers := make(map[string]string)
 	for key, values := range r.Header {
 		if len(values) > 0 {
@@ -67,6 +90,6 @@ func ExtractSessionIDsFromRequest(r *http.Request) (sessionID, kongRequestID str
 	}
 
 	sessionID = ExtractSessionID(headers)
-	kongRequestID = ExtractKongRequestID(headers)
-	return sessionID, kongRequestID
+	requestID = ExtractRequestID(headers)
+	return sessionID, requestID
 }

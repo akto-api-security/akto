@@ -14,6 +14,10 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	maxSyncBatchSize = 1000
+)
+
 // ConversationEntry represents a single conversation turn (request + response)
 type ConversationEntry struct {
 	RequestPayload  string `json:"requestPayload"`
@@ -149,10 +153,12 @@ func (sm *SessionManager) syncToCyborg(ctx context.Context) {
 	}
 
 	skippedCount := 0
+	syncCount := 0
+	errorCount := 0
 
-	// Second pass: collect sessions that need syncing
-	docsToSync := make([]SessionDocument, 0)
-	sessionsToUpdate := make([]*SessionData, 0)
+	// Collect and sync sessions in batches
+	docsToSync := make([]SessionDocument, 0, maxSyncBatchSize)
+	sessionsToUpdate := make([]*SessionData, 0, maxSyncBatchSize)
 
 	for sessionID, session := range sessionsCopy {
 		session.mu.RLock()
@@ -188,23 +194,41 @@ func (sm *SessionManager) syncToCyborg(ctx context.Context) {
 
 		docsToSync = append(docsToSync, doc)
 		sessionsToUpdate = append(sessionsToUpdate, session)
+
+		if len(docsToSync) >= maxSyncBatchSize {
+			sm.logger.Info("Syncing session batch to cyborg", zap.Int("batchSize", len(docsToSync)))
+
+			if err := sm.bulkUpsertSessionContexts(ctx, docsToSync); err != nil {
+				sm.logger.Error("Failed to sync session batch to cyborg API", zap.Error(err))
+				errorCount += len(docsToSync)
+			} else {
+				for _, sess := range sessionsToUpdate {
+					sess.mu.Lock()
+					sess.LastSyncedAt = now
+					sess.mu.Unlock()
+				}
+				syncCount += len(docsToSync)
+			}
+
+			docsToSync = make([]SessionDocument, 0, maxSyncBatchSize)
+			sessionsToUpdate = make([]*SessionData, 0, maxSyncBatchSize)
+		}
 	}
 
-	// Bulk sync to cyborg API
-	syncCount := 0
-	errorCount := 0
 	if len(docsToSync) > 0 {
+		sm.logger.Info("Syncing remaining sessions to cyborg", zap.Int("batchSize", len(docsToSync)))
+
 		if err := sm.bulkUpsertSessionContexts(ctx, docsToSync); err != nil {
-			sm.logger.Error("Failed to bulk sync sessions to cyborg API", zap.Error(err))
-			errorCount = len(docsToSync)
+			sm.logger.Error("Failed to sync remaining sessions to cyborg API", zap.Error(err))
+			errorCount += len(docsToSync)
 		} else {
-			// Update LastSyncedAt for all successfully synced sessions
-			for _, session := range sessionsToUpdate {
-				session.mu.Lock()
-				session.LastSyncedAt = now
-				session.mu.Unlock()
+			// Update LastSyncedAt for successfully synced sessions
+			for _, sess := range sessionsToUpdate {
+				sess.mu.Lock()
+				sess.LastSyncedAt = now
+				sess.mu.Unlock()
 			}
-			syncCount = len(docsToSync)
+			syncCount += len(docsToSync)
 		}
 	}
 
@@ -372,8 +396,8 @@ func ExtractResponseFromResponsePayload(payload string) string {
 }
 
 // TrackRequest stores a pending request for later correlation with response
-func (sm *SessionManager) TrackRequest(sessionID, kongRequestID, requestPayload string) {
-	if sessionID == "" || kongRequestID == "" {
+func (sm *SessionManager) TrackRequest(sessionID, requestID, requestPayload string) {
+	if sessionID == "" || requestID == "" {
 		return
 	}
 
@@ -396,17 +420,17 @@ func (sm *SessionManager) TrackRequest(sessionID, kongRequestID, requestPayload 
 	sm.mu.Unlock()
 
 	session.mu.Lock()
-	session.PendingRequests[kongRequestID] = &ConversationEntry{
+	session.PendingRequests[requestID] = &ConversationEntry{
 		RequestPayload: prompt, // Store only the prompt
 		Timestamp:      time.Now().Unix(),
-		RequestID:      kongRequestID,
+		RequestID:      requestID,
 	}
 	session.mu.Unlock()
 }
 
 // TrackResponse correlates a response with its request and adds to conversation history
-func (sm *SessionManager) TrackResponse(sessionID, kongRequestID, responsePayload string, isMalicious bool) {
-	if sessionID == "" || kongRequestID == "" {
+func (sm *SessionManager) TrackResponse(sessionID, requestID, responsePayload string, isMalicious bool) {
+	if sessionID == "" || requestID == "" {
 		return
 	}
 
@@ -426,14 +450,14 @@ func (sm *SessionManager) TrackResponse(sessionID, kongRequestID, responsePayloa
 	defer session.mu.Unlock()
 
 	// Find matching pending request
-	pendingReq, found := session.PendingRequests[kongRequestID]
+	pendingReq, found := session.PendingRequests[requestID]
 	if !found {
 		sm.logger.Warn("No pending request found for response",
 			zap.String("sessionID", sessionID),
-			zap.String("kongRequestID", kongRequestID))
+			zap.String("requestID", requestID))
 		// Create incomplete conversation entry with just response
 		pendingReq = &ConversationEntry{
-			RequestID: kongRequestID,
+			RequestID: requestID,
 			Timestamp: time.Now().Unix(),
 		}
 	}
@@ -453,7 +477,7 @@ func (sm *SessionManager) TrackResponse(sessionID, kongRequestID, responsePayloa
 	}
 
 	// Remove from pending
-	delete(session.PendingRequests, kongRequestID)
+	delete(session.PendingRequests, requestID)
 
 	session.LastUpdated = time.Now().Unix()
 }
