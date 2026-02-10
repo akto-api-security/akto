@@ -146,7 +146,21 @@ public class BigQueryIngestionClient implements AutoCloseable {
             throws IOException {
         Map<String, Object> ingestionRecord = new HashMap<>();
 
-        ingestionRecord.put("path", getStringValueOrDefault(row, "endpoint", "/"));
+        String endpointValue = getStringValueOrDefault(row, "endpoint", "/");
+        String path = "/";
+        String host = "";
+
+        // Vertex AI endpoint format: projects/{PROJECT}/locations/{LOCATION}/endpoints/{ENDPOINT_ID}
+        // Host URL = {LOCATION}-aiplatform.googleapis.com, path = /v1/{endpoint}:predict
+        String[] endpointParts = endpointValue.split("/");
+        if (endpointParts.length >= 4 && "locations".equals(endpointParts[2])) {
+            String location = endpointParts[3];
+            host = location + "-aiplatform.googleapis.com";
+            path = "/v1/" + endpointValue + ":predict";
+        } else {
+            path = endpointValue.startsWith("/") ? endpointValue : "/" + endpointValue;
+        }
+        ingestionRecord.put("path", path);
 
         String requestPayload = getStringValueOrDefault(row, "request_payload", "");
         ingestionRecord.put("requestPayload", requestPayload);
@@ -155,6 +169,8 @@ public class BigQueryIngestionClient implements AutoCloseable {
         ingestionRecord.put("responsePayload", responsePayload);
 
         Map<String, String> requestHeaders = new HashMap<>();
+        requestHeaders.put("host", host);
+        requestHeaders.put("content-type", "application/json");
         requestHeaders.put("x-deployed-model-id", getStringValueOrDefault(row, "deployed_model_id", ""));
         requestHeaders.put("x-request-id", getStringValueOrDefault(row, "request_id", ""));
         requestHeaders.put("x-source", source);
@@ -167,7 +183,7 @@ public class BigQueryIngestionClient implements AutoCloseable {
         ingestionRecord.put("method", "POST");
         ingestionRecord.put("statusCode", "200");
         ingestionRecord.put("type", "HTTP/1.1");
-        ingestionRecord.put("status", "");
+        ingestionRecord.put("status", "OK");
 
         Object loggingTimeValue = row.get("logging_time");
         String loggingTime;
@@ -181,7 +197,9 @@ public class BigQueryIngestionClient implements AutoCloseable {
         ingestionRecord.put("time", loggingTime);
 
         ingestionRecord.put("source", source);
-        ingestionRecord.put("tag", "Gen-AI");
+        Map<String, String> tagMap = new HashMap<>();
+        tagMap.put("gen-ai", "Gen AI");
+        ingestionRecord.put("tag", OBJECT_MAPPER.writeValueAsString(tagMap));
         ingestionRecord.put("ip", "");
         ingestionRecord.put("destIp", "");
         ingestionRecord.put("akto_account_id", String.valueOf(accountId));

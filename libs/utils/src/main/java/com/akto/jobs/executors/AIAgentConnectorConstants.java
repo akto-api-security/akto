@@ -68,6 +68,7 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_VERTEX_AI_PROJECT_ID = "VERTEX_AI_PROJECT_ID";
     public static final String CONFIG_VERTEX_AI_BIGQUERY_DATASET = "VERTEX_AI_BIGQUERY_DATASET";
     public static final String CONFIG_VERTEX_AI_BIGQUERY_TABLE = "VERTEX_AI_BIGQUERY_TABLE";
+    public static final String CONFIG_VERTEX_AI_JSON_AUTH_FILE_PATH = "VERTEX_AI_JSON_AUTH_FILE_PATH";
 
     // Common Configuration Keys
     public static final String CONFIG_DATA_INGESTION_SERVICE_URL = "DATA_INGESTION_SERVICE_URL";

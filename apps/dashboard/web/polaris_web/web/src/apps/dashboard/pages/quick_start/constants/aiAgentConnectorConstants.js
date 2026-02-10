@@ -68,6 +68,7 @@ export const FIELD_DATA_INGESTION_URL = 'dataIngestionUrl';
 export const FIELD_VERTEX_AI_PROJECT_ID = 'vertexAIProjectId';
 export const FIELD_VERTEX_AI_BIGQUERY_DATASET = 'vertexAIBigQueryDataset';
 export const FIELD_VERTEX_AI_BIGQUERY_TABLE = 'vertexAIBigQueryTable';
+export const FIELD_VERTEX_AI_JSON_AUTH_FILE_PATH = 'vertexAIJsonAuthFilePath';
 
 // Field Types
 export const FIELD_TYPE_TEXT = 'text';
@@ -372,6 +373,15 @@ export const VERTEX_AI_CUSTOM_DEPLOYED_MODEL_FIELDS = [
         configKey: FIELD_VERTEX_AI_BIGQUERY_TABLE,
         helpText: 'BigQuery table with Vertex AI Custom Deployed Model logs',
         required: true
+    },
+    {
+        name: FIELD_VERTEX_AI_JSON_AUTH_FILE_PATH,
+        label: 'JSON Authentication File Path (Optional)',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'path/to/service-account-key.json',
+        configKey: FIELD_VERTEX_AI_JSON_AUTH_FILE_PATH,
+        helpText: 'Optional: Specify the path to the JSON authentication file for BigQuery. If not provided, defaults to Application Default Credentials (ADC)',
+        required: false
     },
     {
         name: FIELD_DATA_INGESTION_URL,

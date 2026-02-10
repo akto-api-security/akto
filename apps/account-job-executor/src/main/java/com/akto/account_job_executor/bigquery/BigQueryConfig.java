@@ -19,6 +19,7 @@ public class BigQueryConfig {
 
     private final String ingestionServiceUrl;
     private final String authToken;
+    private final String jsonAuthFilePath;
 
     private static final int INGESTION_BATCH_SIZE = 100;
     private static final int QUERY_PAGE_SIZE = 1000;
@@ -35,7 +36,8 @@ public class BigQueryConfig {
 
     private BigQueryConfig(String projectId, String dataset, String table,
                            Instant queryStartTime, Instant queryEndTime,
-                           String ingestionServiceUrl, String authToken) {
+                           String ingestionServiceUrl, String authToken,
+                           String jsonAuthFilePath) {
         this.projectId = projectId;
         this.dataset = dataset;
         this.table = table;
@@ -43,6 +45,7 @@ public class BigQueryConfig {
         this.queryEndTime = queryEndTime;
         this.ingestionServiceUrl = ingestionServiceUrl;
         this.authToken = authToken;
+        this.jsonAuthFilePath = jsonAuthFilePath;
     }
 
     /**
@@ -69,7 +72,12 @@ public class BigQueryConfig {
                     "DATABASE_ABSTRACTOR_SERVICE_TOKEN environment variable not set. Required for DIS authentication.");
         }
 
-        return new BigQueryConfig(projectId, dataset, table, fromDate, toDate, ingestionServiceUrl, authToken);
+        String jsonAuthFilePath = getOptionalString(jobConfig, CONFIG_VERTEX_AI_JSON_AUTH_FILE_PATH, null);
+        if (jsonAuthFilePath == null || jsonAuthFilePath.isEmpty()) {
+            jsonAuthFilePath = System.getenv(CONFIG_VERTEX_AI_JSON_AUTH_FILE_PATH);
+        }
+
+        return new BigQueryConfig(projectId, dataset, table, fromDate, toDate, ingestionServiceUrl, authToken, jsonAuthFilePath);
     }
 
     public String buildQuery() {
@@ -160,6 +168,10 @@ public class BigQueryConfig {
 
     public int getMaxQueryRows() {
         return MAX_QUERY_ROWS;
+    }
+
+    public String getJsonAuthFilePath() {
+        return jsonAuthFilePath;
     }
 
     @Override

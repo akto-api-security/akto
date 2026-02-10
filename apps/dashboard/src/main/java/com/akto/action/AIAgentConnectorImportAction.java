@@ -71,6 +71,7 @@ public class AIAgentConnectorImportAction extends UserAction {
     private String vertexAIProjectId;
     private String vertexAIBigQueryDataset;
     private String vertexAIBigQueryTable;
+    private String vertexAIJsonAuthFilePath;
 
     /**
      * Unified method to initiate import for any AI Agent Connector.
@@ -264,6 +265,11 @@ public class AIAgentConnectorImportAction extends UserAction {
                 config.put(CONFIG_VERTEX_AI_PROJECT_ID, vertexAIProjectId);
                 config.put(CONFIG_VERTEX_AI_BIGQUERY_DATASET, vertexAIBigQueryDataset);
                 config.put(CONFIG_VERTEX_AI_BIGQUERY_TABLE, vertexAIBigQueryTable);
+
+                // Optional field
+                if (vertexAIJsonAuthFilePath != null && !vertexAIJsonAuthFilePath.isEmpty()) {
+                    config.put(CONFIG_VERTEX_AI_JSON_AUTH_FILE_PATH, vertexAIJsonAuthFilePath);
+                }
                 break;
 
             default:

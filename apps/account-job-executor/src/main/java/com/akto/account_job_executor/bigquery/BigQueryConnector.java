@@ -2,8 +2,10 @@ package com.akto.account_job_executor.bigquery;
 
 import com.akto.log.LoggerMaker;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.google.cloud.bigquery.*;
 
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.*;
@@ -241,7 +243,7 @@ public class BigQueryConnector implements AutoCloseable {
     }
 
     private BigQuery createBigQueryClient(BigQueryConfig config) throws IOException {
-        GoogleCredentials credentials = loadCredentials();
+        GoogleCredentials credentials = loadCredentials(config);
 
         return BigQueryOptions.newBuilder()
                 .setProjectId(config.getProjectId())
@@ -250,9 +252,19 @@ public class BigQueryConnector implements AutoCloseable {
                 .getService();
     }
 
-    private GoogleCredentials loadCredentials() throws IOException {
-        logger.info("Using Application Default Credentials (ADC)");
-        GoogleCredentials credentials = GoogleCredentials.getApplicationDefault();
+    private GoogleCredentials loadCredentials(BigQueryConfig config) throws IOException {
+        GoogleCredentials credentials;
+        String jsonAuthFilePath = config.getJsonAuthFilePath();
+
+        if (jsonAuthFilePath != null && !jsonAuthFilePath.isEmpty()) {
+            logger.info("Loading credentials from JSON auth file: {}", jsonAuthFilePath);
+            try (FileInputStream fis = new FileInputStream(jsonAuthFilePath)) {
+                credentials = ServiceAccountCredentials.fromStream(fis);
+            }
+        } else {
+            logger.info("Using Application Default Credentials (ADC)");
+            credentials = GoogleCredentials.getApplicationDefault();
+        }
 
         // Scope credentials for BigQuery access
         if (credentials.createScopedRequired()) {
