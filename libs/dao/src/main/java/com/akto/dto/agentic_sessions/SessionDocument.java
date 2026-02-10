@@ -13,6 +13,7 @@ public class SessionDocument {
     public static final String CREATED_AT = "createdAt";
     public static final String IS_MALICIOUS = "isMalicious";
     public static final String SESSION_SUMMARY = "sessionSummary";
+    public static final String BLOCKED_REASON = "blockedReason";
     public static final String UPDATED_AT = "updatedAt";
 
     @JsonIgnore
@@ -22,6 +23,7 @@ public class SessionDocument {
     private long createdAt;
     private boolean isMalicious;
     private String sessionSummary;
+    private String blockedReason;
     private long updatedAt;
 
     public static class ConversationInfo {
@@ -113,6 +115,14 @@ public class SessionDocument {
 
     public void setSessionSummary(String sessionSummary) {
         this.sessionSummary = sessionSummary;
+    }
+
+    public String getBlockedReason() {
+        return blockedReason;
+    }
+
+    public void setBlockedReason(String blockedReason) {
+        this.blockedReason = blockedReason;
     }
 
     public long getUpdatedAt() {

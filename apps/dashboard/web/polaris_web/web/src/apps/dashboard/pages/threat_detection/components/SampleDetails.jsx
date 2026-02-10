@@ -263,9 +263,11 @@ function SampleDetails(props) {
         // Parse conversation info from session data
         let sessionPrompts = [];
         let sessionSummary = null;
+        let blockedReason = null;
 
         if (sessionData) {
             sessionSummary = sessionData.sessionSummary;
+            blockedReason = sessionData.blockedReason;
 
             // Map conversationInfo to the format expected by the display logic
             if (sessionData.conversationInfo && Array.isArray(sessionData.conversationInfo)) {
@@ -364,6 +366,20 @@ function SampleDetails(props) {
                                         <Box padding={"4"} background="bg-surface-caution" borderRadius="200">
                                             <Text variant="bodyMd">
                                                 {sessionSummary}
+                                            </Text>
+                                        </Box>
+                                    </VerticalStack>
+                                </>
+                            )}
+
+                            {!sessionLoading && !sessionError && blockedReason && (
+                                <>
+                                    <Divider />
+                                    <VerticalStack gap={"2"}>
+                                        <Text variant="headingMd">Reason</Text>
+                                        <Box padding={"3"} background="bg-surface-critical" borderRadius="200">
+                                            <Text variant="bodyMd" color="critical">
+                                                {blockedReason}
                                             </Text>
                                         </Box>
                                     </VerticalStack>
