@@ -10,6 +10,10 @@ public final class AIAgentConnectorConstants {
         // Prevent instantiation
     }
 
+    // Job Types (for AccountJob.jobType)
+    public static final String JOB_TYPE_AI_AGENT_CONNECTOR = "AI_AGENT_CONNECTOR";
+    public static final String JOB_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL_CONNECTOR = "VERTEX_AI_CUSTOM_DEPLOYED_MODEL_CONNECTOR";
+
     // Connector Types
     public static final String CONNECTOR_TYPE_N8N = "N8N";
     public static final String CONNECTOR_TYPE_LANGCHAIN = "LANGCHAIN";
