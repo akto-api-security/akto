@@ -244,6 +244,10 @@ public class TestExecutor {
     }
 
     public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs, SyncLimit syncLimit, boolean shouldInitOnly) {
+
+        // Clear authStatus hashmap for new test runs (different accounts)
+        authStatus.clear();
+
         // write producer running here as producer has been initiated now
         int accountId = Context.accountId.get();
 
@@ -373,6 +377,43 @@ public class TestExecutor {
         totalTestsCount.set(
             testingRunSubCategories.size() * apiInfoKeyList.size()
         );
+
+        // Pre-fetch auth token before inserting records in Kafka
+        if (testingRun.getTestingRunConfig() != null && testingRun.getTestingRunConfig().getTestRoleId() != null && !testingRun.getTestingRunConfig().getTestRoleId().isEmpty()) {
+            try {
+                TestRoles testRole = Executor.fetchOrFindTestRole(testingRun.getTestingRunConfig().getTestRoleId(), true);
+                if (testRole != null) {
+                    loggerMaker.infoAndAddToDb("Pre-fetching auth token for test role: " + testRole.getName(), LogDb.TESTING);
+                    // Use first API to prefetch auth
+                    RawApi rawApiForAuth = null;
+                    if (apiInfoKeyList != null && !apiInfoKeyList.isEmpty()) {
+                        ApiInfo.ApiInfoKey firstApiKey = apiInfoKeyList.get(0);
+                        List<String> messages = testingUtil.getSampleMessages().get(firstApiKey);
+                        if (messages != null && !messages.isEmpty()) {
+                            try {
+                                rawApiForAuth = RawApi.buildFromMessage(messages.get(messages.size() - 1), true);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb("Error building RawApi for auth prefetch: " + e.getMessage(), LogDb.TESTING);
+                            }
+                        }
+                    }
+                    
+                    if (rawApiForAuth != null && !prefetchAuthWithRetry(testRole, rawApiForAuth, 3)) {
+                        String errorMessage = "Failed to fetch auth token after three retries";
+                        loggerMaker.errorAndAddToDb(errorMessage, LogDb.TESTING);
+                        testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, errorMessage));
+                        
+                        // Mark test run summary as FAILED when auth fails
+                        dataActor.updateIssueCountAndStateInSummary(summaryId.toHexString(), new HashMap<>(), State.FAILED.toString());
+                        loggerMaker.infoAndAddToDb("Test run marked as FAILED due to auth failure", LogDb.TESTING);
+                        return; // Exit early if auth fails
+                    }
+                    loggerMaker.infoAndAddToDb("Successfully pre-fetched auth token", LogDb.TESTING);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error during auth prefetch: " + e.getMessage(), LogDb.TESTING);
+            }
+        }
 
         if(!shouldInitOnly){
             int maxThreads = Math.min(yamlTemplates.size(), 1000);
@@ -546,8 +587,7 @@ public class TestExecutor {
     public static void updateTestSummary(ObjectId summaryId){
         loggerMaker.infoAndAddToDb("Finished updating results count");
 
-        //Check current state - Dont overwrite FAILED with COMPLETED
-        TestingRunResultSummary currentSummary = dataActor.fetchTestingRunResultSummary(summaryId.toHexString());
+         TestingRunResultSummary currentSummary = dataActor.fetchTestingRunResultSummary(summaryId.toHexString());
 
         State updatedState;
         if (currentSummary != null && currentSummary.getState() == State.FAILED) {
@@ -557,6 +597,7 @@ public class TestExecutor {
         } else {
             updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
         }
+        
 
         int skip = 0;
         int limit = 1000;
@@ -1011,40 +1052,6 @@ public class TestExecutor {
         return false;
     }
 
-    private TestingRunResult createAuthFailedResult(String errorMessage, ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey,
-                                                    TestConfig testConfig, RawApi rawApi, ObjectId testRunResultSummaryId, List<TestingRunResult.TestLog> testLogs) {
-        loggerMaker.errorAndAddToDb(errorMessage, LogDb.TESTING);
-        testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, errorMessage));
-        
-        // Mark test run summary as FAILED when auth fails
-        if (testRunResultSummaryId != null) {
-            try {
-                dataActor.markTestRunResultSummaryFailed(testRunResultSummaryId.toHexString());
-                loggerMaker.infoAndAddToDb("Test run summary marked as FAILED due to auth failure", LogDb.TESTING);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Failed to update summary state: " + e.getMessage(), LogDb.TESTING);
-            }
-        }
-        
-        List<GenericTestResult> failedResults = new ArrayList<>();
-        failedResults.add(new TestResult(
-                null, rawApi.getOriginalMessage(),
-                Collections.singletonList(errorMessage),
-                0, false, TestResult.Confidence.HIGH, null
-        ));
-        
-        String testSuperType = testConfig.getInfo().getCategory().getName();
-        String testSubType = testConfig.getInfo().getSubCategory();
-        
-        totalTestsCount.decrementAndGet();
-        return new TestingRunResult(
-                testRunId, apiInfoKey, testSuperType, testSubType,
-                failedResults, false, new ArrayList<>(), 100,
-                Context.now(), Context.now(), testRunResultSummaryId,
-                null, testLogs
-        );
-    }
-
     //Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
@@ -1054,31 +1061,7 @@ public class TestExecutor {
                 rawApi = RawApi.buildFromMessage(message, true);
                 TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
             }
-            
-            // If auth failed for this test run, fail immediately
-            if (testRunResultSummaryId != null && authStatus.getOrDefault(testRunResultSummaryId.toHexString(), true) == false) {
-                return createAuthFailedResult("Failed to fetch token after three retries",
-                        testRunId, apiInfoKey, testConfig, rawApi, testRunResultSummaryId, testLogs);
-            }
-            
-            // Pre-fetch auth token ONCE per test run
-            if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId()) && testRunResultSummaryId != null) {
-                String summaryKey = testRunResultSummaryId.toHexString();
-                
-                // Only prefetch if not already done
-                if (!authStatus.containsKey(summaryKey)) {
-                    TestRoles testRole = Executor.fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
-                    
-                    if (testRole != null && !prefetchAuthWithRetry(testRole, rawApi, 3)) {
-                        authStatus.put(summaryKey, false);
-                        return createAuthFailedResult("Failed to fetch auth token after three retries",
-                                testRunId, apiInfoKey, testConfig, rawApi, testRunResultSummaryId, testLogs);
-                    }
-                    
-                    authStatus.put(summaryKey, true);
-                }
-            }
-            
+                     
             TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
             AuthMechanism attackerAuthMechanism = null;
             if (attackerTestRole == null) {
