@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "BeforeModel": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "akto-validate-prompt",
+            "type": "command",
+            "command": "python3 $GEMINI_PROJECT_DIR/.gemini/hooks/validate-prompt.py",
+            "timeout": 10000, #time is in ms
+            "description": "Validates prompts against Akto Guardrails before sending to Gemini"
+          }
+        ]
+      }
+    ],
+    "AfterModel": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "akto-validate-response",
+            "type": "command",
+            "command": "python3 $GEMINI_PROJECT_DIR/.gemini/hooks/validate-response.py",
+            "timeout": 10000, #time is in ms
+            "description": "Sends prompt/response pairs to Akto for ingestion"
+          }
+        ]
+      }
+    ]
+  }
+}
