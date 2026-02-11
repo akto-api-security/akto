@@ -496,12 +496,6 @@ public class HttpRequestResponseUtils {
                 }
             }
 
-            // If no parts were found, return empty JSON
-            if (partCount == 0) {
-                logger.warn("Apache Commons FileUpload found 0 parts in multipart request");
-                return "{}";
-            }
-
             return mapper.writeValueAsString(result);
         } catch (Exception e) {
             logger.error("Error converting multipart to JSON using Apache Commons FileUpload: " + e.getMessage(), e);
