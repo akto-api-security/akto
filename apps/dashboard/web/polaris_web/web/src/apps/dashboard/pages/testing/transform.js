@@ -1463,8 +1463,13 @@ const transform = {
           }
         }
   
-        if (conversation?.validationMessage !== null && conversation?.validationMessage !== undefined && conversation?.validationMessage?.length > 0) {
-          systemMessage += ("\n\n### VALIDATION MESSAGE ###\n" + conversation?.validationMessage);
+        const validationMessage = conversation?.validationMessage;
+        const hasValidValidationMessage = validationMessage &&
+          typeof validationMessage === 'string' &&
+          validationMessage.trim().length > 0 &&
+          validationMessage.toLowerCase() !== 'null';
+        if (hasValidValidationMessage) {
+          systemMessage += ("\n\n### VALIDATION MESSAGE ###\n" + validationMessage);
         }
       }
       
