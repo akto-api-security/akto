@@ -11,6 +11,7 @@ import (
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
+	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
 	"github.com/akto-api-security/mcp-endpoint-shield/mcp/types"
 	"go.uber.org/zap"
@@ -32,11 +33,12 @@ type policyCache struct {
 
 // Service handles payload validation using akto-gateway library
 type Service struct {
-	config    *config.Config
-	dbClient  *dbabstractor.Client
-	processor mcp.RequestProcessor
-	logger    *zap.Logger
-	cache     *policyCache
+	config     *config.Config
+	dbClient   *dbabstractor.Client
+	processor  mcp.RequestProcessor
+	logger     *zap.Logger
+	cache      *policyCache
+	sessionMgr *session.SessionManager
 }
 
 // NewService creates a new validator service
@@ -63,12 +65,35 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		false, // skipThreat - false to enable threat reporting
 	)
 
+	// Initialize session manager if enabled
+	var sessionManager *session.SessionManager
+	if cfg.SessionEnabled && cfg.DatabaseAbstractorURL != "" {
+		syncInterval := time.Duration(cfg.SessionSyncIntervalMin) * time.Minute
+		var err error
+		sessionManager, err = session.NewSessionManager(
+			cfg.DatabaseAbstractorURL,
+			cfg.DatabaseAbstractorToken,
+			syncInterval,
+			logger,
+		)
+		if err != nil {
+			logger.Warn("Failed to initialize session manager", zap.Error(err))
+			sessionManager = nil
+		} else {
+			sessionManager.Start()
+			logger.Info("Session manager started",
+				zap.Duration("syncInterval", syncInterval),
+				zap.String("cyborgURL", cfg.DatabaseAbstractorURL))
+		}
+	}
+
 	return &Service{
-		config:    cfg,
-		dbClient:  dbClient,
-		processor: processor,
-		logger:    logger,
-		cache:     &policyCache{},
+		config:     cfg,
+		dbClient:   dbClient,
+		processor:  processor,
+		logger:     logger,
+		cache:      &policyCache{},
+		sessionMgr: sessionManager,
 	}, nil
 }
 
@@ -282,9 +307,22 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
-// ValidateRequest validates a request payload against guardrail policies
-func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSource string) (*mcp.ValidationResult, error) {
-	s.logger.Info("Validating request payload")
+// ValidateRequest validates a request payload against guardrail policies with session tracking
+func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSource string, sessionID string, requestID string) (*mcp.ValidationResult, error) {
+	s.logger.Info("Validating request payload",
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
+
+	// Check if session is already malicious
+	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
+		return result, nil
+	}
+
+	// Track request and generate summary asynchronously
+	session.TrackRequestAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload)
+
+	// Inject session summary into payload if available
+	payloadToValidate := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID)
 
 	// Get cached policies (refreshes if stale)
 	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(contextSource)
@@ -302,10 +340,10 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSo
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
 		zap.Int("compiledRulesCount", len(compiledRules)),
 		zap.Bool("hasAuditRules", hasAuditRules),
-		zap.String("payload", payload))
+		zap.String("payload", payloadToValidate))
 
-	// Use processor's ProcessRequest method with external policies
-	processResult, err := s.processor.ProcessRequest(ctx, payload, valCtx, policies, auditPolicies, hasAuditRules)
+	// Use processor's ProcessRequest method with external policies (using modified payload)
+	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
 	if err != nil {
 		s.logger.Error("ProcessRequest failed", zap.Error(err))
 		return nil, fmt.Errorf("failed to process request: %w", err)
@@ -318,7 +356,10 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSo
 		zap.Any("blockedResponse", processResult.BlockedResponse),
 		zap.Any("parsedData", processResult.ParsedData))
 
-	// Convert ProcessResult to ValidationResult for backward compatibility
+	// Track blocked response if request was blocked
+	session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, requestID, processResult)
+
+	// Convert ProcessResult to ValidationResult
 	result := &mcp.ValidationResult{
 		Allowed:         !processResult.IsBlocked,
 		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
@@ -330,14 +371,16 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSo
 	s.logger.Info("Request validation completed",
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
-		zap.String("reason", result.Reason))
+		zap.String("sessionID", sessionID))
 
 	return result, nil
 }
 
-// ValidateResponse validates a response payload against guardrail policies
-func (s *Service) ValidateResponse(ctx context.Context, payload string, contextSource string) (*mcp.ValidationResult, error) {
-	s.logger.Info("Validating response payload")
+// ValidateResponse validates a response payload against guardrail policies with session tracking
+func (s *Service) ValidateResponse(ctx context.Context, payload string, contextSource string, sessionID string, requestID string) (*mcp.ValidationResult, error) {
+	s.logger.Info("Validating response payload",
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
 
 	// Get cached policies (refreshes if stale)
 	policies, _, _, _, err := s.getCachedPolicies(contextSource)
@@ -356,6 +399,10 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 		return nil, fmt.Errorf("failed to process response: %w", err)
 	}
 
+	// Track response and generate summary
+	isMalicious := processResult.IsBlocked
+	session.TrackResponseAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload, isMalicious)
+
 	// Convert ProcessResult to ValidationResult for backward compatibility
 	result := &mcp.ValidationResult{
 		Allowed:         !processResult.IsBlocked,
@@ -368,7 +415,7 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 	s.logger.Info("Response validation completed",
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
-		zap.String("reason", result.Reason))
+		zap.String("sessionID", sessionID))
 
 	return result, nil
 }
