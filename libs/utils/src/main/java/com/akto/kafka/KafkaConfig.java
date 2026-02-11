@@ -31,7 +31,10 @@ public class KafkaConfig {
     public static final String SASL_MECHANISM_PLAIN = "PLAIN";
 
     // New environment variable for SASL mechanism
-    public static final String ENV_KAFKA_SASL_MECHANISM = "KAFKA_SASL_MECHANISM";
+    public static final String ENV_KAFKA_SASL_MECHANISM = "AKTO_KAFKA_SASL_MECHANISM";
+
+    // Environment variable for security protocol
+    public static final String ENV_KAFKA_SECURITY_PROTOCOL = "AKTO_KAFKA_SECURITY_PROTOCOL";
 
     // New SASL mechanism constants
     public static final String SASL_MECHANISM_SCRAM_SHA_256 = "SCRAM-SHA-256";
@@ -174,7 +177,7 @@ public class KafkaConfig {
                 return null;
             }
             // Read security protocol from environment, default to SASL_PLAINTEXT
-            String securityProtocol = System.getenv().getOrDefault("KAFKA_SECURITY_PROTOCOL", SECURITY_PROTOCOL_SASL_PLAINTEXT);
+            String securityProtocol = System.getenv().getOrDefault(ENV_KAFKA_SECURITY_PROTOCOL, SECURITY_PROTOCOL_SASL_PLAINTEXT);
             addAuthenticationProperties(adminProps, username, password, securityProtocol);
         }
 
@@ -231,7 +234,7 @@ public class KafkaConfig {
 
         if (isAuthEnabled) {
             // Read security protocol from environment, default to SASL_PLAINTEXT
-            String securityProtocol = System.getenv().getOrDefault("KAFKA_SECURITY_PROTOCOL", SECURITY_PROTOCOL_SASL_PLAINTEXT);
+            String securityProtocol = System.getenv().getOrDefault(ENV_KAFKA_SECURITY_PROTOCOL, SECURITY_PROTOCOL_SASL_PLAINTEXT);
             addAuthenticationProperties(kafkaProps, username, password, securityProtocol);
         }
 
