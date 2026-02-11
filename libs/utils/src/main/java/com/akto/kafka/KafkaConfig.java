@@ -157,6 +157,9 @@ public class KafkaConfig {
         loginModule, username, password);
     properties.put(SASL_JAAS_CONFIG, jaasConfig);
 
-    // SSL properties are handled by Java's default SSL context with NLB's trusted certificate
+    // If using SSL, disable hostname verification for NLB with SSL termination
+    if (SECURITY_PROTOCOL_SASL_SSL.equals(securityProtocol)) {
+      properties.put("ssl.endpoint.identification.algorithm", "");
+    }
   }
 }
