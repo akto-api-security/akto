@@ -4,6 +4,8 @@ import com.akto.PayloadEncodeUtil;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
@@ -47,6 +49,10 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.Projections;
+
 import static com.akto.test_editor.execution.Build.modifyRequest;
 import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.testing.kafka_utils.Producer;
@@ -541,7 +547,20 @@ public class TestExecutor {
     public static void updateTestSummary(ObjectId summaryId){
         loggerMaker.infoAndAddToDb("Finished updating results count");
 
-        State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
+        //Check current state - Dont overwrite FAILED with COMPLETED
+        TestingRunResultSummary currentSummary = TestingRunResultSummariesDao.instance.findOne(
+            Filters.eq(Constants.ID, summaryId),
+            Projections.include(TestingRunResultSummary.STATE)
+        );
+
+        State updatedState;
+        if (currentSummary != null && currentSummary.getState() == State.FAILED) {
+            // Keep FAILED state (auth failed)
+            updatedState = State.FAILED;
+            loggerMaker.infoAndAddToDb("Preserving FAILED state for test run", LogDb.TESTING);
+        } else {
+            updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
+        }
 
         int skip = 0;
         int limit = 1000;
@@ -686,7 +705,6 @@ public class TestExecutor {
         for (int i=0; i< requestData.size(); i++) {
 
             RequestData data = requestData.get(i);
-
             source = (i==0)? "1" : "x"+ (edgeNumber - 2);
             target = "x"+ edgeNumber;
             edgeNumber += 2;
@@ -980,6 +998,9 @@ public class TestExecutor {
         return null;
     }
 
+    // Track auth status per test run: if auth fails, kill all remaining tests
+    private static final ConcurrentHashMap<String, Boolean> authStatus = new ConcurrentHashMap<>();
+
     public boolean applyRunOnceCheck(ApiInfoKey apiInfoKey, TestConfig testConfig, ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<ApiInfoKey, String> apiInfoKeyToHostMap, String testSubCategory) {
 
         if (testConfig.getStrategy() == null || testConfig.getStrategy().getRunOnce() == null) {
@@ -994,6 +1015,43 @@ public class TestExecutor {
         return false;
     }
 
+    private TestingRunResult createAuthFailedResult(String errorMessage, ObjectId testRunId, ApiInfo.ApiInfoKey apiInfoKey,
+                                                    TestConfig testConfig, RawApi rawApi, ObjectId testRunResultSummaryId, List<TestingRunResult.TestLog> testLogs) {
+        loggerMaker.errorAndAddToDb(errorMessage, LogDb.TESTING);
+        testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, errorMessage));
+        
+        // Mark test run summary as FAILED when auth fails
+        if (testRunResultSummaryId != null) {
+            try {
+                TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                        Filters.eq(Constants.ID, testRunResultSummaryId),
+                        Updates.set(TestingRunResultSummary.STATE, State.FAILED)
+                );
+                loggerMaker.infoAndAddToDb("Test run summary marked as FAILED due to auth failure", LogDb.TESTING);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Failed to update summary state: " + e.getMessage(), LogDb.TESTING);
+            }
+        }
+        
+        List<GenericTestResult> failedResults = new ArrayList<>();
+        failedResults.add(new TestResult(
+                null, rawApi.getOriginalMessage(),
+                Collections.singletonList(errorMessage),
+                0, false, TestResult.Confidence.HIGH, null
+        ));
+        
+        String testSuperType = testConfig.getInfo().getCategory().getName();
+        String testSubType = testConfig.getInfo().getSubCategory();
+        
+        totalTestsCount.decrementAndGet();
+        return new TestingRunResult(
+                testRunId, apiInfoKey, testSuperType, testSubType,
+                failedResults, false, new ArrayList<>(), 100,
+                Context.now(), Context.now(), testRunResultSummaryId,
+                null, testLogs
+        );
+    }
+
     //Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
@@ -1003,6 +1061,31 @@ public class TestExecutor {
                 rawApi = RawApi.buildFromMessage(message, true);
                 TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
             }
+            
+            // If auth failed for this test run, fail immediately
+            if (testRunResultSummaryId != null && authStatus.getOrDefault(testRunResultSummaryId.toHexString(), true) == false) {
+                return createAuthFailedResult("Failed to fetch token after three retries",
+                        testRunId, apiInfoKey, testConfig, rawApi, testRunResultSummaryId, testLogs);
+            }
+            
+            // Pre-fetch auth token ONCE per test run
+            if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId()) && testRunResultSummaryId != null) {
+                String summaryKey = testRunResultSummaryId.toHexString();
+                
+                // Only prefetch if not already done
+                if (!authStatus.containsKey(summaryKey)) {
+                    TestRoles testRole = Executor.fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
+                    
+                    if (testRole != null && !prefetchAuthWithRetry(testRole, rawApi, 3)) {
+                        authStatus.put(summaryKey, false);
+                        return createAuthFailedResult("Failed to fetch auth token after three retries",
+                                testRunId, apiInfoKey, testConfig, rawApi, testRunResultSummaryId, testLogs);
+                    }
+                    
+                    authStatus.put(summaryKey, true);
+                }
+            }
+            
             TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
             AuthMechanism attackerAuthMechanism = null;
             if (attackerTestRole == null) {
@@ -1286,6 +1369,43 @@ public class TestExecutor {
             }
         }
         return someConfidence;
+    }
+
+    private boolean prefetchAuthWithRetry(TestRoles testRole, RawApi rawApi, int maxAttempts) {
+        AuthMechanism authMechanism = testRole.findMatchingAuthMechanism(rawApi);
+        
+        if (authMechanism == null || !LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanism.getType())) {
+            return true; // Not a login request type, no prefetch needed
+        }
+        
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                loggerMaker.infoAndAddToDb("Attempt " + attempt + ": Prefetching auth for role " + testRole.getName(), LogDb.TESTING);
+                
+                LoginFlowResponse response = executeLoginFlow(authMechanism, null);
+                
+                if (response.getSuccess()) {
+                    loggerMaker.infoAndAddToDb("Attempt " + attempt + ": Auth prefetch succeeded", LogDb.TESTING);
+                    return true;
+                }
+                
+                loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Auth prefetch failed - " + response.getError(), LogDb.TESTING);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Exception during auth prefetch - " + e.getMessage(), LogDb.TESTING);
+            }
+            
+            // Wait 10s before retry (unless last attempt)
+            if (attempt < maxAttempts) {
+                try {
+                    loggerMaker.infoAndAddToDb("Waiting 10 seconds before retry...", LogDb.TESTING);
+                    Thread.sleep(10000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+        
+        return false;
     }
 
     public boolean filterGraphQlPayload(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) throws Exception {
