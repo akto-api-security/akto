@@ -67,12 +67,14 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 
 	// Initialize session manager if enabled
 	var sessionManager *session.SessionManager
-	if cfg.SessionEnabled && cfg.DatabaseAbstractorURL != "" {
+	if cfg.SessionEnabled && cfg.DatabaseAbstractorURL != "" && cfg.ThreatBackendURL != "" {
 		syncInterval := time.Duration(cfg.SessionSyncIntervalMin) * time.Minute
 		var err error
 		sessionManager, err = session.NewSessionManager(
 			cfg.DatabaseAbstractorURL,
 			cfg.DatabaseAbstractorToken,
+			cfg.ThreatBackendURL,
+			cfg.ThreatBackendToken,
 			syncInterval,
 			logger,
 		)
@@ -83,7 +85,8 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 			sessionManager.Start()
 			logger.Info("Session manager started",
 				zap.Duration("syncInterval", syncInterval),
-				zap.String("cyborgURL", cfg.DatabaseAbstractorURL))
+				zap.String("cyborgURL", cfg.DatabaseAbstractorURL),
+				zap.String("tbsURL", cfg.ThreatBackendURL))
 		}
 	}
 
@@ -333,6 +336,7 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSo
 	// Create validation context
 	valCtx := &mcp.ValidationContext{
 		ContextSource: types.ContextSource(contextSource),
+		SessionID:     sessionID,
 	}
 
 	s.logger.Debug("Calling ProcessRequest",
@@ -391,6 +395,7 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 	// Create validation context
 	valCtx := &mcp.ValidationContext{
 		ContextSource: types.ContextSource(contextSource),
+		SessionID:     sessionID,
 	}
 
 	// Use processor's ProcessResponse method with external policies
