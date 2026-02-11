@@ -1,17 +1,25 @@
 {
   "hooks": {
-    "beforeSubmitPrompt": [
+    "UserPromptSubmit": [
       {
-        "command": "bash ~/.claude/hooks/akto-validate-prompt-wrapper.sh",
-        "type": "command",
-        "timeout": 10
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-validate-prompt-wrapper.sh",
+            "timeout": 10
+          }
+        ]
       }
     ],
-    "afterAgentResponse": [
+    "Stop": [
       {
-        "command": "bash ~/.claude/hooks/akto-validate-response-wrapper.sh",
-        "type": "command",
-        "timeout": 10
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-validate-response-wrapper.sh",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }
