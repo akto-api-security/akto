@@ -24,6 +24,7 @@ import com.akto.dao.graph.SvcToSvcGraphEdgesDao;
 import com.akto.dao.graph.SvcToSvcGraphNodesDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
+import com.akto.dao.agentic_sessions.SessionDocumentDao;
 import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
@@ -34,6 +35,7 @@ import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.notifications.SlackWebhook;
+import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
@@ -2537,5 +2539,40 @@ public class DbLayer {
 
     public static void storeSpans(List<Span> spans) {
         SpanDao.instance.insertMany(spans);
+    }
+
+    public static void bulkUpsertAgenticSessionContext(List<SessionDocument> sessionDocuments) {
+        if (sessionDocuments == null || sessionDocuments.isEmpty()) {
+            return;
+        }
+
+        List<WriteModel<SessionDocument>> bulkUpdates = new ArrayList<>();
+        UpdateOptions updateOptions = new UpdateOptions().upsert(true);
+        long currentTime = Context.now();
+
+        for (SessionDocument sessionDocument : sessionDocuments) {
+            if (sessionDocument == null || sessionDocument.getSessionIdentifier() == null || sessionDocument.getSessionIdentifier().isEmpty()) {
+                continue;
+            }
+
+            Bson filter = Filters.eq(SessionDocument.SESSION_IDENTIFIER, sessionDocument.getSessionIdentifier());
+            sessionDocument.setUpdatedAt(currentTime);
+
+            Bson updates = Updates.combine(
+                Updates.setOnInsert(SessionDocument.SESSION_IDENTIFIER, sessionDocument.getSessionIdentifier()),
+                Updates.setOnInsert(SessionDocument.CREATED_AT, currentTime),
+                Updates.set(SessionDocument.SESSION_SUMMARY, sessionDocument.getSessionSummary()),
+                Updates.set(SessionDocument.CONVERSATION_INFO, sessionDocument.getConversationInfo()),
+                Updates.set(SessionDocument.IS_MALICIOUS, sessionDocument.isMalicious()),
+                Updates.set(SessionDocument.BLOCKED_REASON, sessionDocument.getBlockedReason()),
+                Updates.set(SessionDocument.UPDATED_AT, sessionDocument.getUpdatedAt())
+            );
+
+            bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
+        }
+
+        if (!bulkUpdates.isEmpty()) {
+            SessionDocumentDao.instance.getMCollection().bulkWrite(bulkUpdates);
+        }
     }
 }

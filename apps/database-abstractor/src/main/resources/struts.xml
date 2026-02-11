@@ -103,6 +103,17 @@
             </result>
         </action>
 
+        <action name="api/agenticSessionContext/bulkUpdate" class="com.akto.action.DbAction" method="bulkUpdateAgenticSessionContext">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/updateModuleInfoForHeartbeatV2" class="com.akto.action.DbAction" method="updateModuleInfoForHeartbeatV2">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
