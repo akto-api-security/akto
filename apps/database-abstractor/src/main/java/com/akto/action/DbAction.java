@@ -1511,7 +1511,7 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String getUnsavedSensitiveParamInfos() {
+    public String fetchUnsavedSensitiveParamInfos() {
         try {
             sensitiveParamInfos = DbLayer.getUnsavedSensitiveParamInfos();
         } catch (Exception e) {
@@ -3077,7 +3077,7 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String getCurrentTestingRunDetailsFromEditor(){
+    public String fetchCurrentTestingRunDetailsFromEditor(){
         try {
             testingRunPlayground = DbLayer.getCurrentTestingRunDetailsFromEditor(this.ts);
         } catch (Exception e) {

@@ -415,7 +415,7 @@
             </result>
         </action>
 
-        <action name="api/getUnsavedSensitiveParamInfos" class="com.akto.action.DbAction" method="getUnsavedSensitiveParamInfos">
+        <action name="api/getUnsavedSensitiveParamInfos" class="com.akto.action.DbAction" method="fetchUnsavedSensitiveParamInfos">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -1737,7 +1737,7 @@
             </result>
         </action>
 
-        <action name="api/fetchEditorTest" class="com.akto.action.DbAction" method="getCurrentTestingRunDetailsFromEditor">
+        <action name="api/fetchEditorTest" class="com.akto.action.DbAction" method="fetchCurrentTestingRunDetailsFromEditor">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
