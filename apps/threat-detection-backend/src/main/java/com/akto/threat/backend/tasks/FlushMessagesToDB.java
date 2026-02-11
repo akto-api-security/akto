@@ -8,6 +8,7 @@ import com.akto.threat.backend.cache.IgnoredEventCache;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.threat.backend.dao.ActorInfoDao;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.service.MaliciousEventService;
@@ -19,6 +20,8 @@ import com.google.gson.Gson;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.UpdateOptions;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -42,6 +45,10 @@ public class FlushMessagesToDB {
   private static int lastSplunkConfigFetched = 0;
   SplunkIntegrationModel splunkConfig = null;
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
+
+  private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
+      System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
+  );
 
   public FlushMessagesToDB(KafkaConfig kafkaConfig, MongoClient mongoClient) {
     String kafkaBrokerUrl = kafkaConfig.getBootstrapServers();
@@ -134,6 +141,9 @@ public class FlushMessagesToDB {
         } else {
             // No ignored event exists, safe to insert
             MaliciousEventDao.instance.insertOne(accountId, event);
+
+            // Upsert actor_info table for optimized listThreatActors queries
+            upsertActorInfo(accountId, event);
         }
         break;
       default:
@@ -161,5 +171,51 @@ public class FlushMessagesToDB {
     }
     SplunkEvent.sendEvent(event, splunkConfig);
 
+  }
+
+  private void upsertActorInfo(String accountId, MaliciousEventDto event) {
+    if (!USE_ACTOR_INFO_TABLE) {
+      return;
+    }
+
+    try {
+      String actor = event.getActor();
+      if (actor == null || actor.isEmpty()) {
+        return;
+      }
+
+      // Use actorId as the filter
+      Bson filter = Filters.eq("actorId", actor);
+
+      // Build update document - update latest attack details
+      // Use $max for lastAttackTs to only update if new event is newer
+      // Use $min for discoveredAt to keep the earliest timestamp
+      Bson updates = Updates.combine(
+          Updates.set("filterId", event.getFilterId()),
+          Updates.set("category", event.getCategory()),
+          Updates.set("apiCollectionId", event.getLatestApiCollectionId()),
+          Updates.set("url", event.getLatestApiEndpoint()),
+          Updates.set("method", event.getLatestApiMethod() != null ? event.getLatestApiMethod().name() : ""),
+          Updates.set("country", event.getCountry() != null ? event.getCountry() : ""),
+          Updates.set("severity", event.getSeverity() != null ? event.getSeverity() : ""),
+          Updates.set("host", event.getHost() != null ? event.getHost() : ""),
+          Updates.set("contextSource", event.getContextSource() != null ? event.getContextSource() : ""),
+          Updates.max("lastAttackTs", event.getDetectedAt()),
+          Updates.min("discoveredAt", event.getDetectedAt()),
+          Updates.set("updatedAt", Context.now()),
+          Updates.setOnInsert("actorId", actor),
+          Updates.setOnInsert("status", "ACTIVE"),
+          Updates.inc("totalAttacks", 1)
+      );
+
+      UpdateOptions options = new UpdateOptions().upsert(true);
+
+      ActorInfoDao.instance.getCollection(accountId).updateOne(filter, updates, options);
+
+      logger.debug("Upserted actor_info for actor: " + actor);
+    } catch (Exception e) {
+      logger.error("Error upserting actor_info: " + e.getMessage(), e);
+      // Don't throw - actor_info is supplementary, shouldn't block malicious event insertion
+    }
   }
 }

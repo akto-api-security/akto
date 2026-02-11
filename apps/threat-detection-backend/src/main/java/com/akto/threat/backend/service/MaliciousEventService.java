@@ -24,13 +24,13 @@ import com.akto.util.ThreatDetectionConstants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.DistinctIterable;
 import com.mongodb.client.MongoCursor;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 import com.mongodb.client.model.Updates;
-import org.bson.Document;
 
 public class MaliciousEventService {
 
@@ -40,6 +40,10 @@ public class MaliciousEventService {
 
   private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
   private static final List<String> IGNORED_POLICIES_FOR_ACCOUNT = Arrays.asList("WeakOrMissingAuth", "PIIDataLeak");
+
+  private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
+      System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
+  );
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MaliciousEventDao maliciousEventDao) {
@@ -206,6 +210,78 @@ public class MaliciousEventService {
   public  ThreatActorFilterResponse fetchThreatActorFilters(
       String accountId, ThreatActorFilterRequest request) {
 
+    // Use optimized actor_info table if feature flag is enabled
+    if (USE_ACTOR_INFO_TABLE) {
+      return fetchThreatActorFiltersFromActorInfo(accountId, request);
+    } else {
+      return fetchThreatActorFiltersFromMaliciousEvents(accountId, request);
+    }
+  }
+
+  private ThreatActorFilterResponse fetchThreatActorFiltersFromActorInfo(
+      String accountId, ThreatActorFilterRequest request) {
+
+    com.akto.threat.backend.dao.ActorInfoDao actorInfoDao =
+        com.akto.threat.backend.dao.ActorInfoDao.instance;
+
+    Set<String> latestAttack = new HashSet<>();
+    Set<String> countries = new HashSet<>();
+    Set<String> actorIds = new HashSet<>();
+    Set<String> hosts = new HashSet<>();
+
+    // Use MongoDB distinct() for efficient field-level queries
+    try {
+      // Get distinct filterIds
+      actorInfoDao.getCollection(accountId)
+          .distinct("filterId", String.class)
+          .forEach(value -> {
+            if (value != null && !value.isEmpty()) {
+              latestAttack.add(value);
+            }
+          });
+
+      // Get distinct countries
+      actorInfoDao.getCollection(accountId)
+          .distinct("country", String.class)
+          .forEach(value -> {
+            if (value != null && !value.isEmpty()) {
+              countries.add(value);
+            }
+          });
+
+      // Get distinct actorIds
+      actorInfoDao.getCollection(accountId)
+          .distinct("actorId", String.class)
+          .forEach(value -> {
+            if (value != null && !value.isEmpty()) {
+              actorIds.add(value);
+            }
+          });
+
+      // Get distinct hosts
+      actorInfoDao.getCollection(accountId)
+          .distinct("host", String.class)
+          .forEach(value -> {
+            if (value != null && !value.isEmpty()) {
+              hosts.add(value);
+            }
+          });
+    } catch (Exception e) {
+      // Log but return empty sets
+      System.err.println("Error fetching filters from actor_info: " + e.getMessage());
+    }
+
+    return ThreatActorFilterResponse.newBuilder()
+        .addAllSubCategories(latestAttack)
+        .addAllCountries(countries)
+        .addAllActorId(actorIds)
+        .addAllHost(hosts)
+        .build();
+  }
+
+  private ThreatActorFilterResponse fetchThreatActorFiltersFromMaliciousEvents(
+      String accountId, ThreatActorFilterRequest request) {
+
     Set<String> latestAttack =
         this.findDistinctFields(accountId, "filterId", String.class, Filters.empty());
 
@@ -218,7 +294,12 @@ public class MaliciousEventService {
     Set<String> hosts =
         this.findDistinctFields(accountId, "host", String.class, Filters.empty());
 
-    return ThreatActorFilterResponse.newBuilder().addAllSubCategories(latestAttack).addAllCountries(countries).addAllActorId(actorIds).addAllHost(hosts).build();
+    return ThreatActorFilterResponse.newBuilder()
+        .addAllSubCategories(latestAttack)
+        .addAllCountries(countries)
+        .addAllActorId(actorIds)
+        .addAllHost(hosts)
+        .build();
   }
 
   public FetchAlertFiltersResponse fetchAlertFilters(

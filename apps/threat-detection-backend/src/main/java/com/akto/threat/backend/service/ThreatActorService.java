@@ -55,6 +55,10 @@ public class ThreatActorService {
   private final com.akto.threat.backend.dao.ActorInfoDao actorInfoDao = com.akto.threat.backend.dao.ActorInfoDao.instance;
   private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatActorService.class, LoggerMaker.LogDb.THREAT_DETECTION);
 
+  private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
+      System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
+  );
+
   public ThreatActorService(MongoClient mongoClient, MaliciousEventDao maliciousEventDao) {
     this.mongoClient = mongoClient;
     this.maliciousEventDao = maliciousEventDao;
@@ -227,6 +231,244 @@ public class ThreatActorService {
 
 
     public ListThreatActorResponse listThreatActors(String accountId, ListThreatActorsRequest request, String contextSource) {
+        if (USE_ACTOR_INFO_TABLE) {
+            return listThreatActorsFromActorInfo(accountId, request, contextSource);
+        } else {
+            return listThreatActorsFromAggregation(accountId, request, contextSource);
+        }
+    }
+
+    private ListThreatActorResponse listThreatActorsFromActorInfo(
+            String accountId,
+            ListThreatActorsRequest request,
+            String contextSource) {
+
+        long startTime = System.currentTimeMillis();
+
+        // Extract pagination and sort parameters
+        int skip = request.hasSkip() ? request.getSkip() : 0;
+        int limit = request.getLimit();
+        Map<String, Integer> sort = request.getSortMap();
+        ListThreatActorsRequest.Filter filter = request.getFilter();
+
+        // Build query filter document
+        Document match = buildActorInfoQueryFilter(filter, request, contextSource);
+        long total = countActors(accountId, match);
+        Bson sortBson = determineSortOrder(sort);
+
+        List<ListThreatActorResponse.ThreatActor> actors = fetchPaginatedActors(
+            accountId, match, sortBson, skip, limit
+        );
+
+        long duration = System.currentTimeMillis() - startTime;
+        loggerMaker.infoAndAddToDb(
+            String.format("listThreatActorsFromActorInfo completed in %dms (total=%d, returned=%d)",
+                duration, total, actors.size()),
+            LoggerMaker.LogDb.THREAT_DETECTION
+        );
+
+        return ListThreatActorResponse.newBuilder()
+            .addAllActors(actors)
+            .setTotal(total)
+            .build();
+    }
+
+    /**
+     * Builds the MongoDB query filter for actor_info collection.
+     * Applies filters in order: timestamp (first for index efficiency), then other filters.
+     *
+     * Filter order matters for MongoDB query performance:
+     * 1. Timestamp range filter (FIRST - helps narrow dataset immediately)
+     * 2. Equality filters (country, filterId, host)
+     * 3. IP filter (usually less selective)
+     * 4. Context filter (additional filtering)
+     */
+    private Document buildActorInfoQueryFilter(
+            ListThreatActorsRequest.Filter filter,
+            ListThreatActorsRequest request,
+            String contextSource) {
+
+        Document match = new Document();
+
+        // 1. Timestamp Range Filter - ALWAYS FIRST for optimal index usage
+        addTimestampFilter(match, filter, request);
+
+        // 2. Attack Type Filter (filterId)
+        if (!filter.getLatestAttackList().isEmpty()) {
+            match.append("filterId", new Document("$in", filter.getLatestAttackList()));
+        }
+
+        // 3. Country Filter
+        if (!filter.getCountryList().isEmpty()) {
+            match.append("country", new Document("$in", filter.getCountryList()));
+        }
+
+        // 4. Host Filter
+        if (!filter.getHostsList().isEmpty()) {
+            match.append("host", new Document("$in", filter.getHostsList()));
+        }
+
+        // 5. IP Filter - deduplicate actors and latestIps lists
+        addIpFilter(match, filter);
+
+        // 6. Context Filter
+        Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+        if (!contextFilter.isEmpty()) {
+            match.putAll(contextFilter);
+            loggerMaker.infoAndAddToDb(
+                "Applied context filter: " + contextSource,
+                LoggerMaker.LogDb.THREAT_DETECTION
+            );
+        }
+
+        return match;
+    }
+
+    /**
+     * Adds actor ID filter to query, merging and deduplicating actors and latestIps lists.
+     */
+    private void addIpFilter(Document match, ListThreatActorsRequest.Filter filter) {
+        // Use HashSet for automatic deduplication
+        java.util.Set<String> uniqueIps = new java.util.HashSet<>();
+
+        if (!filter.getActorsList().isEmpty()) {
+            uniqueIps.addAll(filter.getActorsList());
+        }
+        if (!filter.getLatestIpsList().isEmpty()) {
+            uniqueIps.addAll(filter.getLatestIpsList());
+        }
+
+        if (!uniqueIps.isEmpty()) {
+            match.append("actorId", new Document("$in", new ArrayList<>(uniqueIps)));
+        }
+    }
+
+    /**
+     * Adds timestamp range filter, handling both filter-level and request-level timestamps.
+     * Request-level timestamps take precedence if present.
+     */
+    private void addTimestampFilter(
+            Document match,
+            ListThreatActorsRequest.Filter filter,
+            ListThreatActorsRequest request) {
+
+        Long startTs = null;
+        Long endTs = null;
+
+        // First, check filter-level timestamps
+        if (filter.hasDetectedAtTimeRange()) {
+            startTs = filter.getDetectedAtTimeRange().getStart();
+            endTs = filter.getDetectedAtTimeRange().getEnd();
+        }
+
+        if (request.getStartTs() != 0) {
+            startTs = (long) request.getStartTs();
+        }
+        if (request.getEndTs() != 0) {
+            endTs = (long) request.getEndTs();
+        }
+        // Apply timestamp filter
+        if (startTs != null || endTs != null) {
+            Document tsFilter = new Document();
+            if (startTs != null) {
+                tsFilter.append("$gte", startTs);
+            }
+            if (endTs != null) {
+                tsFilter.append("$lte", endTs);
+            }
+            match.append("lastAttackTs", tsFilter);
+        }
+    }
+
+    /**
+     * Determines sort order from request parameters.
+     * Supports sorting by discoveredAt, defaults to discoveredAt descending for consistency with old implementation.
+     */
+    private Bson determineSortOrder(Map<String, Integer> sort) {
+        // Use discoveredAt with provided order, or default to descending
+        int order = sort.getOrDefault("discoveredAt", -1);
+        return order == 1 ? Sorts.ascending("discoveredAt") : Sorts.descending("discoveredAt");
+    }
+
+    /**
+     * Counts matching actors with proper error handling.
+     * Throws exception on failure to ensure data consistency.
+     */
+    private long countActors(String accountId, Document match) {
+        try {
+            return actorInfoDao.getCollection(accountId).countDocuments(match);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(
+                "Error counting actor_info documents: " + e.getMessage() +
+                " | Filter: " + match.toJson(),
+                LoggerMaker.LogDb.THREAT_DETECTION
+            );
+            // Throw exception to fail fast - don't return incorrect count
+            throw new RuntimeException("Failed to count threat actors from actor_info", e);
+        }
+    }
+
+    /**
+     * Fetches paginated actor results with proper error handling.
+     * Throws exception if query fails to avoid returning incomplete data silently.
+     */
+    private List<ListThreatActorResponse.ThreatActor> fetchPaginatedActors(
+            String accountId,
+            Document match,
+            Bson sortBson,
+            int skip,
+            int limit) {
+
+        List<ListThreatActorResponse.ThreatActor> actors = new ArrayList<>();
+
+        try (MongoCursor<ActorInfoModel> cursor = actorInfoDao.getCollection(accountId)
+                .find(match)
+                .sort(sortBson)
+                .skip(skip)
+                .limit(limit)
+                .cursor()) {
+
+            while (cursor.hasNext()) {
+                ActorInfoModel actorInfo = cursor.next();
+                actors.add(buildThreatActorResponse(actorInfo));
+            }
+
+            return actors;
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(
+                "Error fetching actor_info: " + e.getMessage() +
+                " | Filter: " + match.toJson() +
+                " | Partial results: " + actors.size(),
+                LoggerMaker.LogDb.THREAT_DETECTION
+            );
+
+            // Throw exception to indicate incomplete data rather than silently returning partial results
+            throw new RuntimeException("Failed to fetch threat actors from actor_info", e);
+        }
+    }
+
+    /**
+     * Builds ThreatActor response from ActorInfoModel with proper null handling.
+     */
+    private ListThreatActorResponse.ThreatActor buildThreatActorResponse(ActorInfoModel actorInfo) {
+        String actorId = actorInfo.getActorId() != null ? actorInfo.getActorId() : "";
+        return ListThreatActorResponse.ThreatActor.newBuilder()
+            .setId(actorId)
+            .setLatestApiEndpoint(actorInfo.getUrl() != null ? actorInfo.getUrl() : "")
+            .setLatestApiMethod(actorInfo.getMethod() != null ? actorInfo.getMethod() : "")
+            .setLatestApiIp(actorId)
+            .setLatestApiHost(actorInfo.getHost() != null ? actorInfo.getHost() : "")
+            .setDiscoveredAt(actorInfo.getDiscoveredAt())
+            .setCountry(actorInfo.getCountry() != null ? actorInfo.getCountry() : "")
+            .setLatestSubcategory(actorInfo.getFilterId() != null ? actorInfo.getFilterId() : "")
+            .build();
+    }
+
+    /**
+     * OLD METHOD - Uses aggregation on malicious_events (slower but stable)
+     */
+    private ListThreatActorResponse listThreatActorsFromAggregation(String accountId, ListThreatActorsRequest request, String contextSource) {
         int skip = request.hasSkip() ? request.getSkip() : 0;
         int limit = request.getLimit();
         Map<String, Integer> sort = request.getSortMap();
@@ -672,7 +914,7 @@ public class ThreatActorService {
         MongoCollection<ActorInfoModel> coll = this.actorInfoDao.getCollection(accountId);
         String actorIp = request.getIp();
 
-        Bson filters = Filters.eq("ip", actorIp);
+        Bson filters = Filters.eq("actorId", actorIp);
         long cnt = coll.countDocuments(filters);
         if (cnt > 0) {
             Bson updates = Updates.combine(
@@ -684,7 +926,7 @@ public class ThreatActorService {
             .getCollection(MongoDBCollection.ThreatDetection.ACTOR_INFO, Document.class)
             .updateOne(filters, updates);
         } else {
-            ActorInfoModel actorInfoModel = ActorInfoModel.newBuilder().setIp(actorIp).
+            ActorInfoModel actorInfoModel = ActorInfoModel.newBuilder().setActorId(actorIp).
               setStatus(request.getStatus()).setUpdatedTs(request.getUpdatedTs()).build();
             this.actorInfoDao.getCollection(accountId).insertOne(actorInfoModel);
         }
