@@ -113,8 +113,19 @@ public class SyncCron {
                                 update = Updates.combine(update,  
                                         Updates.set((AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_INFO_RESETTED), endTs)
                                     );
+
+                                if (t.getId() == 1763355072) {
+                                    String message = String.format("Full risk score recalculation completed for all APIs (endTs: %d, resetTs: %d, timeSinceReset: %d hours)",
+                                        endTs, resetTs, (endTs - resetTs) / 3600);
+                                    ActivitiesDao.instance.insertActivity("Risk score reset", message);
+                                }
                             }else{
                                 updateRiskScore.updateSeverityScoreInApiInfo(startTsSeverity);
+                                if (t.getId() == 1763355072) {
+                                    String message = String.format("Incremental severity score update completed (startTs: %d, endTs: %d, duration: %d seconds)",
+                                        startTsSeverity, endTs, (endTs - startTsSeverity));
+                                    ActivitiesDao.instance.insertActivity("Severity score update", message);
+                                }
                             }
 
 
