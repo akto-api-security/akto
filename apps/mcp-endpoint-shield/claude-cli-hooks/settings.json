@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "bash ~/.claude/hooks/akto-validate-prompt-wrapper.sh",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "command": "bash ~/.claude/hooks/akto-validate-response-wrapper.sh",
+        "type": "command",
+        "timeout": 10
+      }
+    ]
+  }
+}
