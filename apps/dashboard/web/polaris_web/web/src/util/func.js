@@ -398,19 +398,17 @@ prettifyEpoch(epoch) {
   getRunResultSubCategory(runResult, subCategoryFromSourceConfigMap, subCategoryMap, fieldName) {
     if (subCategoryMap[runResult.testSubType] === undefined) {
       let a = subCategoryFromSourceConfigMap[runResult.testSubType]
-      return a ? a.subcategory : null
-    } else {
-      return subCategoryMap[runResult.testSubType][fieldName]
+      return a ? a.subcategory : (runResult.testSubType ?? null)
     }
+    return subCategoryMap[runResult.testSubType][fieldName]
   },
 
   getRunResultCategory(runResult, subCategoryMap, subCategoryFromSourceConfigMap, fieldName) {
     if (subCategoryMap[runResult.testSubType] === undefined) {
       let a = subCategoryFromSourceConfigMap[runResult.testSubType]
-      return a ? a.category.shortName : null
-    } else {
-      return subCategoryMap[runResult.testSubType].superCategory[fieldName]
+      return a ? a.category.shortName : (runResult.testSuperType ?? null)
     }
+    return subCategoryMap[runResult.testSubType].superCategory[fieldName]
   },
 
   getRunResultSeverity(runResult, subCategoryMap) {
