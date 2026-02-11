@@ -800,19 +800,17 @@ export default {
     getRunResultSubCategory (runResult, subCategoryFromSourceConfigMap, subCatogoryMap, fieldName) {
         if (subCatogoryMap[runResult.testSubType] === undefined) {
             let a = subCategoryFromSourceConfigMap[runResult.testSubType]
-            return a ? a.subcategory : null
-        } else {
-            return subCatogoryMap[runResult.testSubType][fieldName]
+            return a ? a.subcategory : (runResult.testSubType ?? null)
         }
+        return subCatogoryMap[runResult.testSubType][fieldName]
     },
 
     getRunResultCategory (runResult, subCatogoryMap, subCategoryFromSourceConfigMap, fieldName) {
         if (subCatogoryMap[runResult.testSubType] === undefined) {
             let a = subCategoryFromSourceConfigMap[runResult.testSubType]
-            return a ? a.category.shortName : null
-        } else {
-            return subCatogoryMap[runResult.testSubType].superCategory[fieldName]
+            return a ? a.category.shortName : (runResult.testSuperType ?? null)
         }
+        return subCatogoryMap[runResult.testSubType].superCategory[fieldName]
     },
 
     prettifyArray(arr) {
