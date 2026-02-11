@@ -34,19 +34,21 @@ type SessionData struct {
 	BlockedReason   string // Stores the most recent blocked request reason
 	IsMalicious     bool
 	LastUpdated     int64
-	LastSyncedAt    int64 // Track when this session was last synced to cyborg
+	LastSyncedAt    int64 // Track when this session was last synced to TBS
 	CreatedAt       int64
 	PendingRequests map[string]*ConversationEntry
 	mu              sync.RWMutex
 }
 
-// SessionManager manages session state with in-memory cache and periodic sync to cyborg API
+// SessionManager manages session state with in-memory cache and periodic sync to TBS API
 type SessionManager struct {
 	sessions      map[string]*SessionData
 	mu            sync.RWMutex
 	httpClient    *http.Client
-	cyborgURL     string
-	authToken     string
+	cyborgURL     string // Cyborg URL for LLM calls and session retrieval
+	authToken     string // Cyborg auth token
+	tbsURL        string // Threat Backend Service URL for bulkUpdate
+	tbsToken      string // Threat Backend Service token
 	syncInterval  time.Duration
 	inactiveAfter time.Duration // Remove sessions from memory after this duration of inactivity
 	logger        *zap.Logger
@@ -65,8 +67,8 @@ type SessionDocument struct {
 	CreatedAt         int64               `json:"createdAt"`
 }
 
-// NewSessionManager creates a new session manager with cyborg API client
-func NewSessionManager(cyborgURL, authToken string, syncInterval time.Duration, logger *zap.Logger) (*SessionManager, error) {
+// NewSessionManager creates a new session manager with cyborg (for LLM) and TBS (for session storage)
+func NewSessionManager(cyborgURL, authToken, tbsURL, tbsToken string, syncInterval time.Duration, logger *zap.Logger) (*SessionManager, error) {
 	return &SessionManager{
 		sessions: make(map[string]*SessionData),
 		httpClient: &http.Client{
@@ -74,6 +76,8 @@ func NewSessionManager(cyborgURL, authToken string, syncInterval time.Duration, 
 		},
 		cyborgURL:     strings.TrimSuffix(cyborgURL, "/"),
 		authToken:     authToken,
+		tbsURL:        strings.TrimSuffix(tbsURL, "/"),
+		tbsToken:      tbsToken,
 		syncInterval:  syncInterval,
 		inactiveAfter: 10 * time.Minute, // Remove sessions inactive for 10 minutes
 		logger:        logger,
@@ -96,7 +100,7 @@ func (sm *SessionManager) Stop() {
 	// Final sync to cyborg API
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	sm.syncToCyborg(ctx)
+	sm.syncSessions(ctx)
 
 	sm.logger.Info("Session manager stopped")
 }
@@ -111,7 +115,7 @@ func (sm *SessionManager) syncLoop() {
 		select {
 		case <-ticker.C:
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-			sm.syncToCyborg(ctx)
+			sm.syncSessions(ctx)
 			cancel()
 		case <-sm.stopChan:
 			return
@@ -119,8 +123,8 @@ func (sm *SessionManager) syncLoop() {
 	}
 }
 
-// syncToCyborg persists modified sessions to cyborg API and cleans up inactive sessions
-func (sm *SessionManager) syncToCyborg(ctx context.Context) {
+// syncSessions persists modified sessions to TBS and cleans up inactive sessions
+func (sm *SessionManager) syncSessions(ctx context.Context) {
 	now := time.Now().Unix()
 	inactiveThreshold := now - int64(sm.inactiveAfter.Seconds())
 
@@ -196,10 +200,10 @@ func (sm *SessionManager) syncToCyborg(ctx context.Context) {
 		sessionsToUpdate = append(sessionsToUpdate, session)
 
 		if len(docsToSync) >= maxSyncBatchSize {
-			sm.logger.Info("Syncing session batch to cyborg", zap.Int("batchSize", len(docsToSync)))
+			sm.logger.Info("Syncing session batch to TBS", zap.Int("batchSize", len(docsToSync)))
 
 			if err := sm.bulkUpsertSessionContexts(ctx, docsToSync); err != nil {
-				sm.logger.Error("Failed to sync session batch to cyborg API", zap.Error(err))
+				sm.logger.Error("Failed to sync session batch to TBS", zap.Error(err))
 				errorCount += len(docsToSync)
 			} else {
 				for _, sess := range sessionsToUpdate {
@@ -216,10 +220,10 @@ func (sm *SessionManager) syncToCyborg(ctx context.Context) {
 	}
 
 	if len(docsToSync) > 0 {
-		sm.logger.Info("Syncing remaining sessions to cyborg", zap.Int("batchSize", len(docsToSync)))
+		sm.logger.Info("Syncing remaining sessions to TBS", zap.Int("batchSize", len(docsToSync)))
 
 		if err := sm.bulkUpsertSessionContexts(ctx, docsToSync); err != nil {
-			sm.logger.Error("Failed to sync remaining sessions to cyborg API", zap.Error(err))
+			sm.logger.Error("Failed to sync remaining sessions to TBS", zap.Error(err))
 			errorCount += len(docsToSync)
 		} else {
 			// Update LastSyncedAt for successfully synced sessions
@@ -232,7 +236,7 @@ func (sm *SessionManager) syncToCyborg(ctx context.Context) {
 		}
 	}
 
-	sm.logger.Info("Synced sessions to cyborg API",
+	sm.logger.Info("Synced sessions to TBS",
 		zap.Int("totalSessions", len(sessionsCopy)),
 		zap.Int("synced", syncCount),
 		zap.Int("skipped", skippedCount),
@@ -256,30 +260,26 @@ func (sm *SessionManager) bulkUpsertSessionContexts(ctx context.Context, docs []
 		return fmt.Errorf("failed to marshal session documents: %w", err)
 	}
 
-	sm.logger.Info("Bulk update request body",
-		zap.String("requestBody", string(jsonData)),
-		zap.Int("sessionCount", len(docs)))
-
-	endpoint := sm.cyborgURL + "/api/agenticSessionContext/bulkUpdate"
+	endpoint := sm.tbsURL + "/api/threat_detection/bulk_update_agentic_session_context"
 	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	if sm.authToken != "" {
-		req.Header.Set("Authorization", sm.authToken)
+	if sm.tbsToken != "" {
+		req.Header.Set("Authorization", "Bearer "+sm.tbsToken)
 	}
 
 	resp, err := sm.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to call cyborg API: %w", err)
+		return fmt.Errorf("failed to call TBS API: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("cyborg API returned status %d: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("TBS API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	return nil
