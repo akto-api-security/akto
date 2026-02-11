@@ -4,10 +4,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.bson.conversions.Bson;
 
 import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.ActivitiesDao;
 import com.akto.dao.AktoDataTypeDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomDataTypeDao;
@@ -142,26 +144,37 @@ public class RiskScoreOfCollections {
         return isSensitive;
     }
     
-    public void updateSeverityScoreInApiInfo(int timeStampFilter){ 
+    public void updateSeverityScoreInApiInfo(int timeStampFilter){
+        int startTime = Context.now();
 
         RiskScoreTestingEndpointsUtils riskScoreTestingEndpointsUtils = new RiskScoreTestingEndpointsUtils();
         ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
 
         Map<ApiInfoKey, Float> severityScoreMap = getUpdatedApiInfosMap(timeStampFilter);
+        int severityScoreMapSize = severityScoreMap != null ? severityScoreMap.size() : 0;
+        AtomicInteger riskScoreGroupUpdateCount = new AtomicInteger(0);
+        AtomicInteger apiInfoNotFoundCount = new AtomicInteger(0);
+
         // after getting the severityScoreMap, we write that in DB
         if(severityScoreMap != null){
             severityScoreMap.forEach((apiInfoKey, severityScore)->{
                 Bson filter = ApiInfoDao.getFilter(apiInfoKey);
                 ApiInfo apiInfo = ApiInfoDao.instance.getMCollection().find(filter).first();
+
+                if (apiInfo == null) {
+                    apiInfoNotFoundCount.incrementAndGet();
+                }
+
                 boolean isSensitive = apiInfo != null ? apiInfo.getIsSensitive() : false;
                 float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, getRiskScoreValueFromSeverityScore(severityScore));
 
                 if (apiInfo != null) {
                     if (apiInfo.getRiskScore() != riskScore) {
                         riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore);
+                        riskScoreGroupUpdateCount.incrementAndGet();
                     }
                 }
-                
+
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.SEVERITY_SCORE, severityScore),
                     Updates.set(ApiInfo.RISK_SCORE, riskScore)
@@ -170,11 +183,22 @@ public class RiskScoreOfCollections {
             });
         }
 
+        int bulkUpdatesSize = bulkUpdatesForApiInfo.size();
+        int bulkWriteModifiedCount = 0;
         if (bulkUpdatesForApiInfo.size() > 0) {
-            ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
+            bulkWriteModifiedCount = ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false)).getModifiedCount();
         }
 
-        riskScoreTestingEndpointsUtils.syncRiskScoreGroupApis();  
+        riskScoreTestingEndpointsUtils.syncRiskScoreGroupApis();
+
+        // Log activity for account 1763355072
+        if (Context.accountId.get() == 1763355072) {
+            int endTime = Context.now();
+            int duration = endTime - startTime;
+            String message = String.format("Incremental update | severityScoreMap size: %d | riskScoreGroup updates: %d | apiInfo not found: %d | bulkUpdates prepared: %d | bulkWrite modified: %d | timeStampFilter: %d (window: %d sec) | duration: %d sec",
+                severityScoreMapSize, riskScoreGroupUpdateCount.get(), apiInfoNotFoundCount.get(), bulkUpdatesSize, bulkWriteModifiedCount, timeStampFilter, (startTime - timeStampFilter), duration);
+            ActivitiesDao.instance.insertActivity("Severity score incremental update", message);
+        }
     }
 
     private static void writeUpdatesForSensitiveInfoInApiInfo(List<String> updatedDataTypes, int timeStampFilter){
@@ -262,7 +286,8 @@ public class RiskScoreOfCollections {
     }
 
     public void calculateRiskScoreForAllApis() {
-        int timeStamp = Context.now() - 24*60*60;
+        int startTime = Context.now();
+        int timeStamp = startTime - 24*60*60;
         int limit = 1000;
         int count = 0; 
 
@@ -277,6 +302,12 @@ public class RiskScoreOfCollections {
 
         // create a set for severityScore
         Map<ApiInfoKey, Float> initialSeverityScoreMap = getUpdatedApiInfosMap(0);
+        int initialSeverityScoreMapSize = initialSeverityScoreMap != null ? initialSeverityScoreMap.size() : 0;
+        int totalApisProcessed = 0;
+        int riskScoreGroupUpdates = 0;
+        int totalBulkWrites = 0;
+        int totalModifiedCount = 0;
+
         while(count < 100){
             List<ApiInfo> apiInfos = ApiInfoDao.instance.getMCollection().find(filter).sort(Sorts.descending(ApiInfo.LAST_CALCULATED_TIME)).limit(limit).projection(projection).into(new ArrayList<>());
             for(ApiInfo apiInfo: apiInfos){
@@ -297,19 +328,32 @@ public class RiskScoreOfCollections {
                 if (!collectionIds.contains(oldRiskScoreGroupCollectionId)) {
                     // Add API to risk score API group if it is not already added
                     riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore);
+                    riskScoreGroupUpdates++;
                 } else if (oldRiskScore != riskScore) {
                     // Update API in risk score API group if risk score has changed
                     riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore);
+                    riskScoreGroupUpdates++;
                 }
+                totalApisProcessed++;
             }
             if(bulkUpdates.size() > 0){
-                ApiInfoDao.instance.bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
+                totalBulkWrites++;
+                totalModifiedCount += ApiInfoDao.instance.bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false)).getModifiedCount();
             }
             bulkUpdates.clear();
             count++;
             if(apiInfos.size() < limit){
                 break;
             }
+        }
+
+        // Log activity for account 1763355072
+        if (Context.accountId.get() == 1763355072) {
+            int endTime = Context.now();
+            int duration = endTime - startTime;
+            String message = String.format("Full reset | initialSeverityScoreMap size: %d | APIs processed: %d | riskScoreGroup updates: %d | bulkWrites executed: %d | total modified: %d | batches: %d | timeStamp filter: %d | duration: %d sec",
+                initialSeverityScoreMapSize, totalApisProcessed, riskScoreGroupUpdates, totalBulkWrites, totalModifiedCount, count, timeStamp, duration);
+            ActivitiesDao.instance.insertActivity("Risk score calculation", message);
         }
 
         riskScoreTestingEndpointsUtils.syncRiskScoreGroupApis();
