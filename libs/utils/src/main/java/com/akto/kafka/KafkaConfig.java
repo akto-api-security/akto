@@ -157,10 +157,6 @@ public class KafkaConfig {
         loginModule, username, password);
     properties.put(SASL_JAAS_CONFIG, jaasConfig);
 
-    // If using SSL, configure to trust all certificates (for NLB with SSL termination)
-    if (SECURITY_PROTOCOL_SASL_SSL.equals(securityProtocol)) {
-      properties.put("ssl.endpoint.identification.algorithm", "");
-      properties.put("ssl.engine.factory.class", "com.akto.kafka.InsecureSslEngineFactory");
-    }
+    // SSL properties are handled by Java's default SSL context with NLB's trusted certificate
   }
 }
