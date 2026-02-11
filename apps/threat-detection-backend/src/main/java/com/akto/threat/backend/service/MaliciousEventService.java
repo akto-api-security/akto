@@ -18,12 +18,18 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.TimeRangeFilter;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
+import com.akto.proto.generated.threat_detection.service.agentic_session_service.v1.BulkUpdateAgenticSessionContextRequest;
+import com.akto.proto.generated.threat_detection.message.agentic_session.v1.SessionDocumentMessage;
+import com.akto.proto.generated.threat_detection.message.agentic_session.v1.ConversationEntry;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.util.ThreatDetectionConstants;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.WriteModel;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.DistinctIterable;
 import com.mongodb.client.MongoCursor;
 import org.bson.conversions.Bson;
@@ -625,5 +631,73 @@ public class MaliciousEventService {
       logger.error("Error fetching session context", e);
       return null;
     }
+  }
+
+  public void bulkUpdateAgenticSessionContext(String accountId, BulkUpdateAgenticSessionContextRequest req) {
+    if (req == null || req.getSessionDocumentsCount() == 0) {
+      return;
+    }
+
+    // Convert protobuf messages to SessionDocument objects
+    List<SessionDocument> sessionDocuments = new ArrayList<>();
+    for (SessionDocumentMessage msg : req.getSessionDocumentsList()) {
+      sessionDocuments.add(convertToSessionDocument(msg));
+    }
+
+    // Perform bulk upsert
+    List<WriteModel<SessionDocument>> bulkUpdates = new ArrayList<>();
+    UpdateOptions updateOptions = new UpdateOptions().upsert(true);
+    long currentTime = com.akto.dao.context.Context.now();
+
+    for (SessionDocument sessionDocument : sessionDocuments) {
+      if (sessionDocument == null || sessionDocument.getSessionIdentifier() == null || sessionDocument.getSessionIdentifier().isEmpty()) {
+        continue;
+      }
+
+      Bson filter = Filters.eq(SessionDocument.SESSION_IDENTIFIER, sessionDocument.getSessionIdentifier());
+      sessionDocument.setUpdatedAt(currentTime);
+
+      Bson updates = Updates.combine(
+          Updates.setOnInsert(SessionDocument.SESSION_IDENTIFIER, sessionDocument.getSessionIdentifier()),
+          Updates.setOnInsert(SessionDocument.CREATED_AT, currentTime),
+          Updates.set(SessionDocument.SESSION_SUMMARY, sessionDocument.getSessionSummary()),
+          Updates.set(SessionDocument.CONVERSATION_INFO, sessionDocument.getConversationInfo()),
+          Updates.set(SessionDocument.IS_MALICIOUS, sessionDocument.isMalicious()),
+          Updates.set(SessionDocument.BLOCKED_REASON, sessionDocument.getBlockedReason()),
+          Updates.set(SessionDocument.UPDATED_AT, sessionDocument.getUpdatedAt())
+      );
+
+      bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
+    }
+
+    if (!bulkUpdates.isEmpty()) {
+      try {
+        AgenticSessionContextDao.instance.getCollection(accountId).bulkWrite(bulkUpdates);
+      } catch (Exception e) {
+        logger.error("Error bulk updating session context", e);
+      }
+    }
+  }
+
+  private SessionDocument convertToSessionDocument(SessionDocumentMessage msg) {
+    SessionDocument doc = new SessionDocument();
+    doc.setSessionIdentifier(msg.getSessionIdentifier());
+    doc.setSessionSummary(msg.getSessionSummary());
+    doc.setMalicious(msg.getIsMalicious());
+    doc.setBlockedReason(msg.getBlockedReason());
+
+    // Convert conversation entries
+    List<SessionDocument.ConversationInfo> convInfo = new ArrayList<>();
+    for (ConversationEntry entry : msg.getConversationInfoList()) {
+      SessionDocument.ConversationInfo conv = new SessionDocument.ConversationInfo();
+      conv.setRequestId(entry.getRequestId());
+      conv.setRequestPayload(entry.getRequestPayload());
+      conv.setResponsePayload(entry.getResponsePayload());
+      conv.setTimestamp(entry.getTimestamp());
+      convInfo.add(conv);
+    }
+    doc.setConversationInfo(convInfo);
+
+    return doc;
   }
 }
