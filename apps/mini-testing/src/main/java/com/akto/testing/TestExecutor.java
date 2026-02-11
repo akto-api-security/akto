@@ -5,7 +5,6 @@ import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
@@ -548,10 +547,7 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("Finished updating results count");
 
         //Check current state - Dont overwrite FAILED with COMPLETED
-        TestingRunResultSummary currentSummary = TestingRunResultSummariesDao.instance.findOne(
-            Filters.eq(Constants.ID, summaryId),
-            Projections.include(TestingRunResultSummary.STATE)
-        );
+        TestingRunResultSummary currentSummary = dataActor.fetchTestingRunResultSummary(summaryId.toHexString());
 
         State updatedState;
         if (currentSummary != null && currentSummary.getState() == State.FAILED) {
@@ -1023,10 +1019,7 @@ public class TestExecutor {
         // Mark test run summary as FAILED when auth fails
         if (testRunResultSummaryId != null) {
             try {
-                TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-                        Filters.eq(Constants.ID, testRunResultSummaryId),
-                        Updates.set(TestingRunResultSummary.STATE, State.FAILED)
-                );
+                dataActor.markTestRunResultSummaryFailed(testRunResultSummaryId.toHexString());
                 loggerMaker.infoAndAddToDb("Test run summary marked as FAILED due to auth failure", LogDb.TESTING);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Failed to update summary state: " + e.getMessage(), LogDb.TESTING);
