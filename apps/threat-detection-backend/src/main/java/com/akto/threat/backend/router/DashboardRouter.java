@@ -637,6 +637,38 @@ public class DashboardRouter implements ARouter {
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
+        router
+            .get("/fetch_session_context")
+            .blockingHandler(ctx -> {
+                String sessionId = ctx.request().getParam("sessionId");
+
+                if (sessionId == null || sessionId.isEmpty()) {
+                    ctx.response().setStatusCode(400).end("{\"errorMessage\": \"Session ID is required\"}");
+                    return;
+                }
+
+                try {
+                    com.akto.dto.agentic_sessions.SessionDocument sessionData =
+                        dsService.fetchSessionContext(ctx.get("accountId"), sessionId);
+
+                    if (sessionData == null) {
+                        ctx.response().setStatusCode(404).end("{\"errorMessage\": \"Session not found\"}");
+                        return;
+                    }
+
+                    // Convert to JSON and return
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    String responseJson = mapper.writeValueAsString(
+                        new java.util.HashMap<String, Object>() {{
+                            put("sessionData", sessionData);
+                        }}
+                    );
+                    ctx.response().setStatusCode(200).end(responseJson);
+                } catch (Exception e) {
+                    ctx.response().setStatusCode(500).end("{\"errorMessage\": \"Failed to fetch session context\"}");
+                }
+            });
+
         return router;
     }
 }

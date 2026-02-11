@@ -294,6 +294,13 @@ const threatDetectionRequests = {
             method: 'post',
             data: { actor, limit }
         })
+    },
+    fetchSessionContext(sessionId) {
+        return request({
+            url: '/api/fetchSessionContext',
+            method: 'post',
+            data: { sessionId }
+        })
     }
 }
 export default threatDetectionRequests
