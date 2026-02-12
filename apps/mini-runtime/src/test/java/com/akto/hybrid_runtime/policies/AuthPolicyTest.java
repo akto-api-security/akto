@@ -28,7 +28,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertTrue(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.UNAUTHENTICATED);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -41,7 +41,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BEARER);
         Assertions.assertEquals(1, apiInfo.getAllAuthTypesFound().size());
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -55,7 +55,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.BASIC);
         Assertions.assertEquals(1, apiInfo.getAllAuthTypesFound().size());
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -69,7 +69,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.JWT);
         Assertions.assertEquals(1, apiInfo.getAllAuthTypesFound().size());
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -84,7 +84,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.API_KEY);
         Assertions.assertEquals(1, apiInfo.getAllAuthTypesFound().size());
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -98,7 +98,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.API_KEY);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -111,7 +111,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.API_KEY);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -124,7 +124,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.API_KEY);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -137,7 +137,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.API_KEY);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -150,7 +150,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.API_KEY);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -163,7 +163,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.API_KEY);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -177,7 +177,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.MTLS);
         Assertions.assertEquals(1, apiInfo.getAllAuthTypesFound().size());
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -191,7 +191,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.MTLS);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -204,7 +204,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.MTLS);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -217,7 +217,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.MTLS);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -230,7 +230,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.MTLS);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -243,7 +243,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.MTLS);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -256,7 +256,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.MTLS);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -269,7 +269,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertTrue(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.UNAUTHENTICATED);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -282,7 +282,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.MTLS);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -298,7 +298,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.API_KEY);
         s.add(ApiInfo.AuthType.MTLS);
         s.add(ApiInfo.AuthType.BEARER);
@@ -315,7 +315,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.API_KEY);
         s.add(ApiInfo.AuthType.JWT);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -330,7 +330,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.SESSION_TOKEN);
         Assertions.assertEquals(1, apiInfo.getAllAuthTypesFound().size());
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
@@ -344,7 +344,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.SESSION_TOKEN);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -357,7 +357,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.SESSION_TOKEN);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -370,7 +370,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.SESSION_TOKEN);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -383,7 +383,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.SESSION_TOKEN);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -396,7 +396,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.SESSION_TOKEN);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -409,7 +409,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.SESSION_TOKEN);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -422,7 +422,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.SESSION_TOKEN);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -435,7 +435,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.SESSION_TOKEN);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -448,7 +448,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertTrue(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.UNAUTHENTICATED);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
@@ -461,7 +461,7 @@ public class AuthPolicyTest {
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
-        Set<ApiInfo.AuthType> s = new HashSet<>();
+        Set<String> s = new HashSet<>();
         s.add(ApiInfo.AuthType.SESSION_TOKEN);
         Assertions.assertTrue(apiInfo.getAllAuthTypesFound().contains(s));
     }
