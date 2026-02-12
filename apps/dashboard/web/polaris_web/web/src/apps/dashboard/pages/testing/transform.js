@@ -311,7 +311,15 @@ const transform = {
     obj['summaryState'] = testingRunResultSummary.state
     obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
     obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
-    obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
+    
+    // Extract auth error for clean display at the top, filter it from metadata section
+    const authError = testingRunResultSummary?.metadata?.error;
+    const filteredMetadata = testingRunResultSummary?.metadata ? Object.fromEntries(
+      Object.entries(testingRunResultSummary.metadata).filter(([key]) => key !== 'error')
+    ) : testingRunResultSummary?.metadata;
+    
+    obj['authError'] = authError; // For clean display near title/created by
+    obj['metadata'] = func.flattenObject(filteredMetadata)
     obj['apiCollectionId'] = apiCollectionId
     obj['userEmail'] = data.userEmail
     obj['scan_frequency'] = getScanFrequency(data.periodInSeconds)

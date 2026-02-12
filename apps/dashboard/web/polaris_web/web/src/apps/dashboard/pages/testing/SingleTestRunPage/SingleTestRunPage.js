@@ -27,7 +27,8 @@ import {
   CustomersMinor,
   PlusMinor,
   SettingsMinor,
-  ViewMajor
+  ViewMajor,
+  CircleAlertMajor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import observeApi from "../../observe/api";
@@ -1031,6 +1032,15 @@ function SingleTestRunPage() {
             <Box><Icon color="subdued" source={PriceLookupMinor} /></Box>
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
           </HorizontalStack>
+          {selectedTestRun?.authError && (
+            <>
+              <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
+              <HorizontalStack gap={"1"}>
+                <Box><Icon color="critical" source={CircleAlertMajor} /></Box>
+                <Text color="critical" variant="bodyMd" fontWeight="semibold">{selectedTestRun.authError}</Text>
+              </HorizontalStack>
+            </>
+          )}
           {allTestResultsStats.totalCount > 0 && (
             <>
               <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
