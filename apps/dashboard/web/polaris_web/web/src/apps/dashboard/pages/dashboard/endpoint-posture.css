@@ -8,6 +8,16 @@
 
 .react-grid-item {
     box-sizing: border-box;
+    cursor: grab;
+}
+
+.react-grid-item:active {
+    cursor: grabbing;
+}
+
+.react-grid-item.react-draggable-dragging {
+    cursor: grabbing;
+    opacity: 0.9;
 }
 
 .react-grid-item > div {
