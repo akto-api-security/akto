@@ -26,6 +26,8 @@ public class KafkaConfig {
     public static final String SASL_MECHANISM = "sasl.mechanism";
     public static final String SASL_JAAS_CONFIG = "sasl.jaas.config";
 
+    public static final String SECURITY_PROTOCOL_PLAINTEXT = "PLAINTEXT";
+    public static final String SECURITY_PROTOCOL_SSL = "SSL";
     public static final String SECURITY_PROTOCOL_SASL_PLAINTEXT = "SASL_PLAINTEXT";
     public static final String SECURITY_PROTOCOL_SASL_SSL = "SASL_SSL";
     public static final String SASL_MECHANISM_PLAIN = "PLAIN";
@@ -109,6 +111,42 @@ public class KafkaConfig {
         }
 
         return mechanism;
+    }
+
+    /**
+     * Gets the configured security protocol from environment variable with validation.
+     *
+     * @param hasCredentials Whether SASL credentials (username/password) are provided
+     * @return Security protocol (PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL)
+     */
+    public static String getKafkaSecurityProtocol(boolean hasCredentials) {
+        String protocol = System.getenv(ENV_KAFKA_SECURITY_PROTOCOL);
+
+        // If explicitly set, validate it
+        if (protocol != null && !protocol.isEmpty()) {
+            // Validate: SASL protocols require credentials
+            if ((protocol.equals(SECURITY_PROTOCOL_SASL_PLAINTEXT) ||
+                 protocol.equals(SECURITY_PROTOCOL_SASL_SSL)) && !hasCredentials) {
+                logger.warn("SASL security protocol '{}' set but no credentials provided. Falling back to PLAINTEXT.", protocol);
+                return SECURITY_PROTOCOL_PLAINTEXT;
+            }
+            return protocol;
+        }
+
+        // Auto-detect based on credentials
+        return hasCredentials ? SECURITY_PROTOCOL_SASL_PLAINTEXT : SECURITY_PROTOCOL_PLAINTEXT;
+    }
+
+    /**
+     * Gets the configured security protocol from environment variable.
+     * Assumes credentials are provided (backward compatibility).
+     *
+     * @return Security protocol (defaults to SASL_PLAINTEXT)
+     * @deprecated Use {@link #getKafkaSecurityProtocol(boolean)} instead
+     */
+    @Deprecated
+    public static String getKafkaSecurityProtocol() {
+        return getKafkaSecurityProtocol(true);
     }
 
     /**
