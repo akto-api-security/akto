@@ -208,6 +208,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             smr.getApiCollectionId(),
                             smr.getIp(),
                             smr.getCountry(),
+                            smr.getDestCountry(),
                             smr.getDetectedAt(),
                             smr.getType(),
                             smr.getRefId(),

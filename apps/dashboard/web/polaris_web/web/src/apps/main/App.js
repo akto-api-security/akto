@@ -120,7 +120,7 @@ import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastP
 import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
-import EndpointDashboard from "../dashboard/pages/dashboard/EndpointDashboard.jsx";
+import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -143,7 +143,7 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "endpoint-dashboard",
-                        element: <EndpointDashboard/>,
+                        element: <EndpointPosture/>,
                     },
                     {
                         path: "view",
