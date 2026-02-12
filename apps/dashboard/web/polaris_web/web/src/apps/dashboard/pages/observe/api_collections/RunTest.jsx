@@ -676,7 +676,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 totalTokens += t.estimatedTokens;
             });
         });
-        const totalApis = endpoints ? endpoints.length : 0;
+
+        const totalApis = (selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0)
+            ? selectedResourcesForPrimaryAction.length
+            : (endpoints ? endpoints.length : 0);
+            
         return totalTokens * totalApis;
     }
 
