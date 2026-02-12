@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -18,25 +19,23 @@ import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
-import com.akto.dao.AccountsContextDao;
-import com.akto.dao.AgentTrafficLogDao;
-import com.akto.dao.CyborgLogsDao;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.graph.SvcToSvcGraphEdgesDao;
 import com.akto.dao.graph.SvcToSvcGraphNodesDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
+import com.akto.dao.agentic_sessions.SessionDocumentDao;
 import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
 import com.akto.dto.*;
-import com.akto.dto.AgentTrafficLog;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.notifications.SlackWebhook;
+import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
@@ -69,6 +68,8 @@ import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
+import com.akto.dao.tracing.SpanDao;
+import com.akto.dao.tracing.TraceDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.upload.FileUploadsDao;
@@ -100,6 +101,8 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
+import com.akto.dto.tracing.Span;
+import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
@@ -214,7 +217,10 @@ public class DbLayer {
         UpdateOptions updateOptions = new UpdateOptions().upsert(true);
 
         for (ModuleInfo moduleInfo : moduleInfoList) {
-            Bson filter = Filters.eq(ModuleInfoDao.ID, moduleInfo.getId());
+            Bson filter = Filters.and(
+                Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
+                Filters.eq(ModuleInfo._REBOOT, false)
+            );
             Bson updates = Updates.combine(
                     //putting class name because findOneAndUpdate doesn't put class name by default
                     Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
@@ -223,14 +229,86 @@ public class DbLayer {
                     Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
                     Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
                     Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+                    Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
                     Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
-                    Updates.set(ModuleInfo._REBOOT, moduleInfo.isReboot()),
                     Updates.set(ModuleInfo.DELETE_TOPIC_AND_REBOOT, moduleInfo.isDeleteTopicAndReboot())
             );
             bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
         }
 
         ModuleInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
+    }
+
+    public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
+        if (moduleType == null) {
+            return new ArrayList<>();
+        }
+
+        if (moduleType != ModuleInfo.ModuleType.THREAT_DETECTION &&
+                moduleType != ModuleInfo.ModuleType.AKTO_AGENT_GATEWAY &&
+                (miniRuntimeName == null || miniRuntimeName.isEmpty())) {
+            return new ArrayList<>();
+        }
+
+        List<Bson> filterConditions = new ArrayList<>();
+        filterConditions.add(Filters.eq(ModuleInfo._REBOOT, true));
+        filterConditions.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()));
+        
+        // Only add miniRuntimeName filter if it's not null
+        if (miniRuntimeName != null && !miniRuntimeName.isEmpty()) {
+            filterConditions.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
+        }
+
+        Bson filter = Filters.and(filterConditions);
+
+        List<ModuleInfo> moduleInfoList = ModuleInfoDao.instance.findAll(filter);
+
+        if (moduleInfoList != null && !moduleInfoList.isEmpty()) {
+            List<String> ids = new ArrayList<>();
+            for (ModuleInfo moduleInfo : moduleInfoList) {
+                ids.add(moduleInfo.getId());
+            }
+
+            Bson updateFilter = Filters.in("_id", ids);
+            Bson updates = Updates.set(ModuleInfo._REBOOT, false);
+            ModuleInfoDao.instance.updateMany(updateFilter, updates);
+        }
+
+        return moduleInfoList != null ? moduleInfoList : new ArrayList<>();
+    }
+    
+    public static ModuleInfo updateModuleInfoForHeartbeatV2(ModuleInfo moduleInfo) {
+        try {
+            // Clean up expired heartbeats (older than 6 minutes)
+            int sixMinutesAgo = (int) (System.currentTimeMillis() / 1000) - 360;
+            ModuleInfoDao.instance.getMCollection().deleteMany(
+                Filters.lt(ModuleInfo.LAST_HEARTBEAT_RECEIVED, sixMinutesAgo)
+            );
+        } catch (Exception e) {
+            System.err.println("Failed to clean up expired heartbeats: " + e.getMessage());
+        }
+
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+        updateOptions.returnDocument(ReturnDocument.AFTER);
+
+        Bson filter = Filters.and(
+            Filters.eq(ModuleInfo.NAME, moduleInfo.getName()),
+            Filters.eq(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType())
+        );
+
+        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(filter,
+                Updates.combine(
+                        //putting class name because findOneAndUpdate doesn't put class name by default
+                        Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
+                        Updates.setOnInsert(ID, moduleInfo.getId()),
+                        Updates.set(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
+                        Updates.set(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
+                        Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                        Updates.set(ModuleInfo.NAME, moduleInfo.getName()),
+                        Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
+                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
+                ), updateOptions);
     }
 
     public static void updateCidrList(List<String> cidrList) {
@@ -253,53 +331,168 @@ public class DbLayer {
         return ApiInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(ApiInfo.RATELIMITS));
     }
 
+    /**
+     * Page size for cursor-based pagination (used by fetchApiRateLimits and fetchAllApiInfoKeys).
+     */
+    private static final int API_INFO_PAGE_SIZE = 1000;
+
+    /**
+     * Build the standard sort order for ApiInfo cursor-based pagination.
+     * Sorts by compound _id key: apiCollectionId, method, url (all ascending).
+     *
+     * @return Bson sort specification
+     */
+    private static Bson buildApiInfoSortOrder() {
+        return Sorts.orderBy(
+            Sorts.ascending("_id.apiCollectionId"),
+            Sorts.ascending("_id.method"),
+            Sorts.ascending("_id.url")
+        );
+    }
+
+    /**
+     * Build cursor-based pagination filter for ApiInfo compound key (_id).
+     * This is the common pagination logic used by fetchApiRateLimits and fetchAllApiInfoKeys.
+     *
+     * @param lastApiInfoKey The cursor (last record from previous page), null for first page
+     * @return Bson filter for cursor-based pagination
+     */
+    private static Bson buildApiInfoCursorFilter(ApiInfo.ApiInfoKey lastApiInfoKey) {
+        if (lastApiInfoKey == null) {
+            return null;  // No cursor filter needed for first page
+        }
+
+        // Cursor-based pagination using compound key comparison
+        // Returns records where: apiCollectionId > cursor.apiCollectionId
+        //                     OR (apiCollectionId = cursor.apiCollectionId AND method > cursor.method)
+        //                     OR (apiCollectionId = cursor.apiCollectionId AND method = cursor.method AND url > cursor.url)
+        return Filters.or(
+            Filters.gt("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+            Filters.and(
+                Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+                Filters.gt("_id.method", lastApiInfoKey.getMethod())
+            ),
+            Filters.and(
+                Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+                Filters.eq("_id.method", lastApiInfoKey.getMethod()),
+                Filters.gt("_id.url", lastApiInfoKey.getUrl())
+            )
+        );
+    }
+
+    /**
+     * Fetch all API IDs (lightweight projection) for Bloom filter initialization.
+     * Returns only apiCollectionId, url, and method fields.
+     *
+     * This is a backward-compatible wrapper that calls the paginated version with null cursor.
+     */
+    public static List<Map<String, Object>> fetchAllApiInfoKeys() {
+        return fetchAllApiInfoKeys(null);
+    }
+
+    /**
+     * Fetch API info keys with cursor-based pagination (keyset pagination).
+     * Uses the same pattern as fetchApiRateLimits for consistency.
+     *
+     * @param lastApiInfoKey The last API info key from previous page (null for first page)
+     * @return List of API info keys (max 1000 records)
+     */
+    public static List<Map<String, Object>> fetchAllApiInfoKeys(ApiInfo.ApiInfoKey lastApiInfoKey) {
+        // Build filter based on cursor position using common helper
+        Bson cursorFilter = buildApiInfoCursorFilter(lastApiInfoKey);
+        Bson filters = (cursorFilter != null) ? cursorFilter : Filters.exists("_id");
+
+        // Use common sort order
+        Bson sort = buildApiInfoSortOrder();
+
+        // Projection: only fetch _id field
+        Bson projection = Projections.include("_id");
+
+        // Execute query with common page size
+        com.mongodb.client.FindIterable<ApiInfo> cursor = ApiInfoDao.instance
+            .getMCollection()
+            .find(filters)
+            .projection(projection)
+            .sort(sort)
+            .limit(API_INFO_PAGE_SIZE)
+            .batchSize(API_INFO_PAGE_SIZE);
+
+        // Convert to list of maps
+        List<Map<String, Object>> apiIdsList = new ArrayList<>();
+        for (ApiInfo apiInfo : cursor) {
+            if (apiInfo != null && apiInfo.getId() != null) {
+                ApiInfo.ApiInfoKey key = apiInfo.getId();
+                Map<String, Object> apiId = new HashMap<>();
+                apiId.put("apiCollectionId", key.getApiCollectionId());
+                apiId.put("url", key.getUrl());
+                apiId.put("method", key.getMethod().name());
+                apiIdsList.add(apiId);
+            }
+        }
+
+        return apiIdsList;
+    }
+
+    /**
+     * Fetch all sample data keys (lightweight projection) for Bloom filter initialization.
+     * Returns only _id fields: apiCollectionId, url, method, responseCode, isHeader, ts.
+     * Limited to 10,000 records.
+     */
+    public static List<Map<String, Object>> fetchAllSampleDataKeysAsMaps() {
+        com.mongodb.client.FindIterable<SampleData> cursor = SampleDataDao.instance
+            .getMCollection()
+            .find()
+            .projection(Projections.include("_id"))
+            .limit(10000)
+            .batchSize(10000);
+
+        List<Map<String, Object>> keysList = new ArrayList<>();
+        for (SampleData sampleData : cursor) {
+            if (sampleData != null && sampleData.getId() != null) {
+                com.akto.dto.traffic.Key keyObj = sampleData.getId();
+                Map<String, Object> key = new HashMap<>();
+                key.put("apiCollectionId", keyObj.getApiCollectionId());
+                key.put("url", keyObj.getUrl());
+                key.put("method", keyObj.getMethod().name());
+                key.put("responseCode", keyObj.getResponseCode());
+                key.put("isHeader", keyObj.getBucketStartEpoch());
+                key.put("ts", keyObj.getBucketEndEpoch());
+                keysList.add(key);
+            }
+        }
+        return keysList;
+    }
+
     public static List<ApiInfo> fetchApiRateLimits(ApiInfo.ApiInfoKey lastApiInfoKey) {
 
         Bson existsFilter = Filters.empty();
         Bson filters = Filters.empty();
-        if(Context.accountId.get() == 1758179941){
-            loggerMaker.info("Fetch all api infos for Dil");
-        }else {
-            existsFilter = Filters.and(
-                Filters.ne("rateLimits", null),
-                Filters.ne("rateLimitConfidence", null)
-            );
-        }
+        // if(Context.accountId.get() == 1758179941){
+        //     loggerMaker.info("Fetch all api infos for Dil");
+        // }else {
+        //     existsFilter = Filters.and(
+        //         Filters.ne("rateLimits", null),
+        //         Filters.ne("rateLimitConfidence", null)
+        //     );
+        // }
         // Filter for documents that have both rateLimits and rateLimitConfidence fields
-        
-        // Add pagination filter if lastApiInfoKey is provided
-        if (lastApiInfoKey != null) {
-            // Create proper compound key comparison for pagination
-            // This handles the compound _id structure properly
-            Bson paginationFilter = Filters.or(
-                Filters.gt("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
-                Filters.and(
-                    Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
-                    Filters.gt("_id.method", lastApiInfoKey.getMethod())
-                ),
-                Filters.and(
-                    Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
-                    Filters.eq("_id.method", lastApiInfoKey.getMethod()),
-                    Filters.gt("_id.url", lastApiInfoKey.getUrl())
-                )
-            );
+
+        // Add pagination filter using common helper
+        Bson paginationFilter = buildApiInfoCursorFilter(lastApiInfoKey);
+        if (paginationFilter != null) {
             filters = Filters.and(existsFilter, paginationFilter);
+        } else {
+            filters = existsFilter;
         }
 
-        int limit = 1000;
-        
         Bson projection = Projections.fields(
             Projections.include("_id", "rateLimits", "rateLimitConfidence")
         );
-        
-        // Ensure consistent ordering with compound _id sorting
-        Bson sort = Sorts.orderBy(
-            Sorts.ascending("_id.apiCollectionId"),
-            Sorts.ascending("_id.method"), 
-            Sorts.ascending("_id.url")
-        );
-        
-        return ApiInfoDao.instance.findAll(filters, 0 , limit, sort, projection);
+
+        // Use common sort order
+        Bson sort = buildApiInfoSortOrder();
+
+        return ApiInfoDao.instance.findAll(filters, 0, API_INFO_PAGE_SIZE, sort, projection);
     }
     
     public static List<ApiInfo> fetchNonTrafficApiInfos() {
@@ -782,6 +975,7 @@ public class DbLayer {
 
         Bson updates = Updates.combine(
             Updates.setOnInsert("_id", id),
+            Updates.setOnInsert(ApiCollection.HOST_NAME, host),
             Updates.setOnInsert("startTs", Context.now()),
             Updates.setOnInsert("urls", new HashSet<>())
         );
@@ -795,6 +989,58 @@ public class DbLayer {
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
+    }
+
+    // Atomic operation to add hostname to service tag collection
+    // Uses $addToSet to prevent duplicates and handle concurrent updates from multiple mini-runtime instances
+    public static void addHostNameToServiceTagCollection(int collectionId, String hostName) {
+        if (hostName == null || hostName.isEmpty()) {
+            return;
+        }
+        ApiCollectionsDao.instance.updateOne(
+            Filters.eq(Constants.ID, collectionId),
+            Updates.addToSet(ApiCollection.HOST_NAMES, hostName)
+        );
+    }
+
+    // Atomic operation to update tags for service tag collection
+    // Uses $set to replace the entire tagsList
+    public static void updateServiceTagCollectionTags(int collectionId, List<CollectionTags> tagsList) {
+        if (tagsList == null || tagsList.isEmpty()) {
+            return;
+        }
+        ApiCollectionsDao.instance.updateOne(
+            Filters.eq(Constants.ID, collectionId),
+            Updates.set(ApiCollection.TAGS_STRING, tagsList)
+        );
+    }
+
+    // Similar to createCollectionForHostAndVpc but for service-tag based collections
+    public static void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName) {
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+
+        Bson updates = Updates.combine(
+            Updates.setOnInsert(Constants.ID, id),
+            Updates.setOnInsert(ApiCollection.NAME, serviceTagValue),
+            Updates.setOnInsert(ApiCollection.START_TS, Context.now()),
+            Updates.setOnInsert(ApiCollection.URLS_STRING, new HashSet<>()),
+            Updates.setOnInsert(ApiCollection.SERVICE_TAG, serviceTagValue),
+            Updates.setOnInsert(ApiCollection.HOST_NAMES, hostNames),
+            Updates.setOnInsert(ApiCollection.REDACT, false),
+            Updates.setOnInsert(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, true),
+            Updates.setOnInsert(ApiCollection.HOST_NAME, hostName)
+        );
+
+        if(tags != null && !tags.isEmpty()) {
+            updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, tags));
+        }
+
+        ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(
+            Filters.eq(Constants.ID, id),
+            updates,
+            updateOptions
+        );
     }
 
     public static void insertRuntimeLog(Log log) {
@@ -2285,5 +2531,48 @@ public class DbLayer {
         }
         
         AgentTrafficLogDao.instance.insertMany(agentTrafficLogs);
+    }
+
+    public static void storeTrace(Trace trace) {
+        TraceDao.instance.insertOne(trace);
+    }
+
+    public static void storeSpans(List<Span> spans) {
+        SpanDao.instance.insertMany(spans);
+    }
+
+    public static void bulkUpsertAgenticSessionContext(List<SessionDocument> sessionDocuments) {
+        if (sessionDocuments == null || sessionDocuments.isEmpty()) {
+            return;
+        }
+
+        List<WriteModel<SessionDocument>> bulkUpdates = new ArrayList<>();
+        UpdateOptions updateOptions = new UpdateOptions().upsert(true);
+        long currentTime = Context.now();
+
+        for (SessionDocument sessionDocument : sessionDocuments) {
+            if (sessionDocument == null || sessionDocument.getSessionIdentifier() == null || sessionDocument.getSessionIdentifier().isEmpty()) {
+                continue;
+            }
+
+            Bson filter = Filters.eq(SessionDocument.SESSION_IDENTIFIER, sessionDocument.getSessionIdentifier());
+            sessionDocument.setUpdatedAt(currentTime);
+
+            Bson updates = Updates.combine(
+                Updates.setOnInsert(SessionDocument.SESSION_IDENTIFIER, sessionDocument.getSessionIdentifier()),
+                Updates.setOnInsert(SessionDocument.CREATED_AT, currentTime),
+                Updates.set(SessionDocument.SESSION_SUMMARY, sessionDocument.getSessionSummary()),
+                Updates.set(SessionDocument.CONVERSATION_INFO, sessionDocument.getConversationInfo()),
+                Updates.set(SessionDocument.IS_MALICIOUS, sessionDocument.isMalicious()),
+                Updates.set(SessionDocument.BLOCKED_REASON, sessionDocument.getBlockedReason()),
+                Updates.set(SessionDocument.UPDATED_AT, sessionDocument.getUpdatedAt())
+            );
+
+            bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
+        }
+
+        if (!bulkUpdates.isEmpty()) {
+            SessionDocumentDao.instance.getMCollection().bulkWrite(bulkUpdates);
+        }
     }
 }

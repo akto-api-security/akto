@@ -21,6 +21,9 @@ public class ModuleInfo {
     private String name;
     public static final String ADDITIONAL_DATA = "additionalData";
     private Map<String, Object> additionalData;
+    public static final String MINI_RUNTIME_NAME = "miniRuntimeName";
+    @Getter @Setter
+    private String miniRuntimeName;
 
     @Getter @Setter
     private boolean reboot;
@@ -97,7 +100,9 @@ public class ModuleInfo {
         THREAT_DETECTION,
         MCP_ENDPOINT_SHIELD,
         DATA_INGESTION,
-        TRAFFIC_COLLECTOR
+        TRAFFIC_COLLECTOR,
+        AKTO_AGENT_GATEWAY,
+        DAST
     }
 
 }

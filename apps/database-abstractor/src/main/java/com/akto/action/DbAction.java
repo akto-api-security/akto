@@ -1,9 +1,19 @@
 package com.akto.action;
 
+import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
+
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.CommonTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.TestRolesDao;
+import com.akto.dao.testing.TestingRunConfigDao;
+import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
 import com.akto.data_actor.DbLayer;
@@ -20,6 +30,7 @@ import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
@@ -31,56 +42,51 @@ import com.akto.dto.testing.*;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
+import com.akto.dto.tracing.Span;
+import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_collector.TrafficCollectorMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.APICatalog;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.usage.MetricTypes;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
-import com.akto.util.enums.GlobalEnums;
-import com.akto.utils.CustomAuthUtil;
-import com.akto.utils.KafkaUtils;
-import com.akto.utils.RedactAlert;
-import com.akto.utils.SampleDataLogs;
-import com.akto.dto.type.URLMethods;
-import com.akto.dto.type.URLMethods.Method;
-import java.util.concurrent.atomic.AtomicInteger;
 import com.akto.testing.TestExecutor;
 import com.akto.trafficFilter.HostFilter;
 import com.akto.trafficFilter.ParamFilter;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.DataInsertionPreChecks;
-import com.akto.dto.usage.MetricTypes;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
+import com.akto.utils.CustomAuthUtil;
+import com.akto.utils.KafkaUtils;
+import com.akto.utils.RedactAlert;
+import com.akto.utils.SampleDataLogs;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.opensymphony.xwork2.Action;
-import com.opensymphony.xwork2.ActionSupport;
-
-import lombok.Getter;
-
+import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
-import lombok.Setter;
+import com.opensymphony.xwork2.Action;
+import com.opensymphony.xwork2.ActionSupport;
+
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import com.google.gson.Gson;
 
-import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
+import lombok.Getter;
+import lombok.Setter;
 
 public class DbAction extends ActionSupport {
     static final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
@@ -96,6 +102,7 @@ public class DbAction extends ActionSupport {
     APIConfig apiConfig;
     List<SingleTypeInfo> stis;
     List<Integer> apiCollectionIds;
+    List<Map<String, Object>> collections;
     List<RuntimeFilter> runtimeFilters;
     List<SensitiveParamInfo> sensitiveParamInfos;
     Account account;
@@ -146,6 +153,15 @@ public class DbAction extends ActionSupport {
 
     @Getter @Setter
     private List<ModuleInfo> moduleInfoList;
+
+    @Getter @Setter
+    private ModuleInfo.ModuleType moduleType;
+
+    @Getter @Setter
+    private String miniRuntimeName;
+
+    @Getter @Setter
+    private List<SessionDocument> sessionDocuments;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
@@ -198,6 +214,9 @@ public class DbAction extends ActionSupport {
     String host;
     int colId;
     int accountId;
+    String serviceTagValue;
+    List<String> hostNames;
+    String hostName;
     BasicDBObject log;
     boolean isHybridSaas;
     Setup setup;
@@ -440,6 +459,36 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchAndUpdateModuleForReboot() {
+        try {
+            moduleInfoList = DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchAndUpdateModuleForReboot " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String bulkUpdateAgenticSessionContext() {
+        try {
+            DbLayer.bulkUpsertAgenticSessionContext(sessionDocuments);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in bulkUpdateAgenticSessionContext " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+    
+    public String updateModuleInfoForHeartbeatV2() {
+        try {
+            moduleInfo = DbLayer.updateModuleInfoForHeartbeatV2(moduleInfo);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in updateModuleInfoForHeartbeat " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String updateCidrList() {
         try {
             DbLayer.updateCidrList(cidrList);
@@ -532,7 +581,10 @@ public class DbAction extends ActionSupport {
         try {
             List<ApiInfo> apiInfos = new ArrayList<>();
             for (BasicDBObject obj: apiInfoList) {
-                ApiInfo apiInfo = objectMapper.readValue(obj.toJson(), ApiInfo.class);
+                String json = obj.toJson();
+                loggerMaker.infoAndAddToDb("Fast-discovery: Converting JSON to ApiInfo: " + json);
+                ApiInfo apiInfo = objectMapper.readValue(json, ApiInfo.class);
+                loggerMaker.infoAndAddToDb("Fast-discovery: ApiInfo after conversion - id=" + apiInfo.getId());
                 ApiInfoKey id = apiInfo.getId();
                 
                 // Skip URLs based on validation rules (use 0 for response code as it's not available in ApiInfo)
@@ -1384,6 +1436,32 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    /**
+     * Fetch all API collections (id and hostName only).
+     * Used by fast-discovery to pre-populate collection cache on startup.
+     */
+    public String fetchAllCollections() {
+        try {
+            List<ApiCollection> allCollections = ApiCollectionsDao.instance.findAll(
+                new BasicDBObject(),
+                Projections.include("_id", "hostName")
+            );
+            collections = new ArrayList<>();
+
+            for (ApiCollection col : allCollections) {
+                Map<String, Object> colData = new HashMap<>();
+                colData.put("id", col.getId());
+                colData.put("hostName", col.getHostName());
+                collections.add(colData);
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchAllCollections");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
     private static final List<Integer> HIGHER_STI_LIMIT_ACCOUNT_IDS = Arrays.asList(1736798101, 1718042191);
     private static final int STI_LIMIT = 20_000_000;
     private static final int higherStiLimit = Integer.parseInt(System.getenv().getOrDefault("HIGHER_STI_LIMIT", String.valueOf(5_000_000)));
@@ -1433,7 +1511,7 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String getUnsavedSensitiveParamInfos() {
+    public String fetchUnsavedSensitiveParamInfos() {
         try {
             sensitiveParamInfos = DbLayer.getUnsavedSensitiveParamInfos();
         } catch (Exception e) {
@@ -1541,6 +1619,93 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Fast-discovery endpoint to ensure api_collection entries exist for given collection IDs.
+     * Creates missing collections with auto-generated names.
+     * Called by fast-discovery flow to ensure collections exist before APIs are written.
+     */
+    private List<Integer> collectionIdsToEnsure;
+
+    public String ensureApiCollections() {
+        int accountId = Context.accountId.get();
+        try {
+            if (collectionIdsToEnsure == null || collectionIdsToEnsure.isEmpty()) {
+                loggerMaker.infoAndAddToDb("ensureApiCollections: No collection IDs provided", LogDb.DB_ABS);
+                return Action.SUCCESS.toUpperCase();
+            }
+
+            int ensuredCount = 0;
+            for (Integer collectionId : collectionIdsToEnsure) {
+                if (collectionId == null || collectionId == 0) {
+                    continue;
+                }
+
+                // Check if collection already exists
+                ApiCollection existing = ApiCollectionsDao.instance.findOne(Filters.eq("_id", collectionId));
+
+                if (existing == null) {
+                    // Create new collection using findOneAndUpdate with upsert (same pattern as DbLayer)
+                    int now = Context.now();
+                    String name = "Collection " + collectionId;
+
+                    FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+                    updateOptions.upsert(true);
+                    updateOptions.returnDocument(ReturnDocument.AFTER);
+
+                    Bson updates = Updates.combine(
+                        Updates.setOnInsert("_id", collectionId),
+                        Updates.setOnInsert("name", name),
+                        Updates.setOnInsert("displayName", name),
+                        Updates.setOnInsert("startTs", now),
+                        Updates.setOnInsert("urls", new HashSet<>()),
+                        Updates.setOnInsert("vxlanId", collectionId),
+                        Updates.setOnInsert("deactivated", false),
+                        Updates.setOnInsert("redact", false),
+                        Updates.setOnInsert("automated", false),
+                        Updates.setOnInsert("dastCollection", false),
+                        Updates.setOnInsert("genAICollection", false),
+                        Updates.setOnInsert("guardRailCollection", false),
+                        Updates.setOnInsert("isOutOfTestingScope", false),
+                        Updates.setOnInsert("matchDependencyWithOtherCollections", false),
+                        Updates.setOnInsert("mcpCollection", false),
+                        Updates.setOnInsert("runDependencyAnalyser", false),
+                        Updates.setOnInsert("sampleCollectionsDropped", true)
+                    );
+
+                    try {
+                        ApiCollection result = ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(
+                            Filters.eq("_id", collectionId),
+                            updates,
+                            updateOptions
+                        );
+                        ensuredCount++;
+                        loggerMaker.infoAndAddToDb("Fast-discovery: Created api_collection ID=" + collectionId +
+                            ", name=" + name, LogDb.DB_ABS);
+                    } catch (Exception insertEx) {
+                        loggerMaker.errorAndAddToDb(insertEx, "Fast-discovery: Failed to create collection ID=" +
+                            collectionId + ": " + insertEx.toString(), LogDb.DB_ABS);
+                    }
+                }
+            }
+
+            loggerMaker.infoAndAddToDb("ensureApiCollections: checked=" +
+                collectionIdsToEnsure.size() + ", created=" + ensuredCount, LogDb.DB_ABS);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in ensureApiCollections: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public void setCollectionIdsToEnsure(List<Integer> collectionIdsToEnsure) {
+        this.collectionIdsToEnsure = collectionIdsToEnsure;
+    }
+
+    public List<Integer> getCollectionIdsToEnsure() {
+        return collectionIdsToEnsure;
     }
 
     // Added to stop ingestion of unwanted logs
@@ -2719,6 +2884,36 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String createCollectionForServiceTag() {
+        try {
+            DbLayer.createCollectionForServiceTag(colId, serviceTagValue, hostNames, tagsList, hostName);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in createCollectionForServiceTag " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String addHostNameToServiceTagCollection() {
+        try {
+            DbLayer.addHostNameToServiceTagCollection(colId, hostName);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in addHostNameToServiceTagCollection " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateServiceTagCollectionTags() {
+        try {
+            DbLayer.updateServiceTagCollectionTags(colId, checkTagsNeedUpdates(tagsList, colId));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateServiceTagCollectionTags " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchEndpointsInCollectionUsingHost() {
         try {
             apiInfoList = DbLayer.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip, deltaPeriodValue);
@@ -2882,7 +3077,7 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String getCurrentTestingRunDetailsFromEditor(){
+    public String fetchCurrentTestingRunDetailsFromEditor(){
         try {
             testingRunPlayground = DbLayer.getCurrentTestingRunDetailsFromEditor(this.ts);
         } catch (Exception e) {
@@ -3093,6 +3288,264 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String insertDastLog() {
+        try {
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            PupeteerLogsDao.instance.insertOne(dbLog);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertDastLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
+    private List<CrawlerRun> crawlerRuns;
+    private List<CrawlerRunDTO> crawlerRunsData;
+    private String moduleName;
+    private String crawlId;
+    private String status;
+    private String errorMessage;
+
+    public String fetchPendingDastJobsV2() {
+        try {
+            crawlerRuns = CrawlerRunDao.instance.findAll(
+                    Filters.and(
+                            Filters.eq(CrawlerRun.MODULE_NAME, moduleName),
+                            Filters.eq(CrawlerRun.STATUS, CrawlerRun.CrawlerRunStatus.PENDING.name())
+                    ),
+                    0, 1,
+                    Sorts.ascending(CrawlerRun.START_TIMESTAMP)
+            );
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchPendingDastJobsV2");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchPendingDastJobs() {
+        try {
+            crawlerRuns = CrawlerRunDao.instance.findAll(
+                    Filters.and(
+                            Filters.eq(CrawlerRun.MODULE_NAME, moduleName),
+                            Filters.eq(CrawlerRun.STATUS, CrawlerRun.CrawlerRunStatus.PENDING.name())
+                    ),
+                    0, 1,
+                    Sorts.ascending(CrawlerRun.START_TIMESTAMP)
+            );
+
+            // Convert CrawlerRun objects to CrawlerRunDTO with only required fields
+            crawlerRunsData = new ArrayList<>();
+            for (CrawlerRun crawlerRun : crawlerRuns) {
+                CrawlerRunDTO dto = CrawlerRunDTO.fromCrawlerRun(crawlerRun);
+                crawlerRunsData.add(dto);
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchPendingDastJobs");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String updateDastJobStatus() {
+        try {
+            Bson updates = null;
+            if (status.equals(CrawlerRun.CrawlerRunStatus.RUNNING.name())) {
+                updates = Updates.combine(
+                        Updates.set(CrawlerRun.STATUS, status),
+                        Updates.set(CrawlerRun.START_TIMESTAMP, Context.now())
+                );
+            } else if (status.equals(CrawlerRun.CrawlerRunStatus.COMPLETED.name())) {
+                updates = Updates.combine(
+                        Updates.set(CrawlerRun.STATUS, status),
+                        Updates.set(CrawlerRun.END_TIMESTAMP, Context.now())
+                );
+            } else if (status.equals(CrawlerRun.CrawlerRunStatus.FAILED.name())) {
+                updates = Updates.combine(
+                        Updates.set(CrawlerRun.STATUS, status),
+                        Updates.set(CrawlerRun.END_TIMESTAMP, Context.now()),
+                        Updates.set(CrawlerRun.ERROR_MESSAGE, errorMessage)
+                );
+            }
+
+            CrawlerRunDao.instance.updateOne(
+                    Filters.eq(CrawlerRun.CRAWL_ID, crawlId),
+                    updates
+            );
+
+            // Trigger tests after successful crawling completion
+            if (status.equals(CrawlerRun.CrawlerRunStatus.COMPLETED.name())) {
+                CrawlerRun crawlerRun = CrawlerRunDao.instance.findOne(
+                        Filters.eq(CrawlerRun.CRAWL_ID, crawlId)
+                );
+                triggerTestsAfterCrawling(crawlerRun);
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in updateDastJobStatus");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    private Trace trace;
+    private List<Span> spans;
+    private Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges;
+
+    public String storeTrace() {
+
+        try {
+            DbLayer.storeTrace(trace);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in storeTrace " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String storeSpans() {
+        try {
+            DbLayer.storeSpans(spans);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in storeSpans " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateServiceGraphEdges() {
+        try {
+            if (apiCollectionId == -1) {
+                loggerMaker.errorAndAddToDb("Invalid API collection ID: " + apiCollectionId);
+                return Action.ERROR.toUpperCase();
+            }
+
+            if (serviceGraphEdges == null) {
+                loggerMaker.errorAndAddToDb("Service graph edges cannot be null");
+                return Action.ERROR.toUpperCase();
+            }
+
+            org.bson.conversions.Bson filter = com.mongodb.client.model.Filters.eq(ApiCollection.ID, apiCollectionId);
+            org.bson.conversions.Bson update = com.mongodb.client.model.Updates.set(ApiCollection.SERVICE_GRAPH_EDGES, serviceGraphEdges);
+            com.mongodb.client.result.UpdateResult result = ApiCollectionsDao.instance.getMCollection().updateOne(filter, update);
+
+            if (result.getMatchedCount() == 0) {
+                loggerMaker.errorAndAddToDb("API Collection not found: " + apiCollectionId);
+                return Action.ERROR.toUpperCase();
+            }
+
+            return Action.SUCCESS.toUpperCase();
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateServiceGraphEdges: " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    private TestingRun triggerTestsAfterCrawling(CrawlerRun crawlerRun) {
+        // Validate input
+        if (crawlerRun == null || !crawlerRun.isRunTestAfterCrawling()) {
+            return null;
+        }
+
+        try {
+            // Validate collection ID
+            Integer collectionId = crawlerRun.getCollectionId();
+            if (collectionId == null || collectionId == 0) {
+                loggerMaker.errorAndAddToDb("Cannot trigger tests: No collection ID found in crawler run");
+                return null;
+            }
+
+            // Fetch authentication mechanism
+            AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
+            if (authMechanism == null) {
+                loggerMaker.errorAndAddToDb("Cannot trigger tests: No authentication mechanism found");
+                return null;
+            }
+
+            // Fetch only active test template IDs (efficient - no YAML parsing)
+            Bson filter = Filters.or(
+                Filters.exists(YamlTemplate.INACTIVE, false),
+                Filters.eq(YamlTemplate.INACTIVE, false)
+            );
+            List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(
+                filter,
+                Projections.include("_id")
+            );
+
+            if (yamlTemplates == null || yamlTemplates.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Cannot trigger tests: No test templates found");
+                return null;
+            }
+
+            // Extract test IDs
+            List<String> selectedTests = new ArrayList<>();
+            for (YamlTemplate template : yamlTemplates) {
+                selectedTests.add(template.getId());
+            }
+
+            // Create TestingRunConfig with all available tests
+            int testConfigId = UUID.randomUUID().hashCode() & 0xfffffff;
+            TestingRunConfig testingRunConfig = new TestingRunConfig(
+                testConfigId,                   // id
+                null,                           // collectionWiseApiInfoKey (null for collection-wise)
+                selectedTests,                  // testSubCategoryList (all active tests)
+                authMechanism.getId(),          // authMechanismId
+                null,                           // overriddenTestAppUrl
+                "",                             // testRoleId
+                false                           // cleanUp
+            );
+            testingRunConfig.setTestSuiteIds(new ArrayList<>());
+            TestingRunConfigDao.instance.insertOne(testingRunConfig);
+
+            // Create testing endpoints for the crawled collection
+            CollectionWiseTestingEndpoints testingEndpoints = new CollectionWiseTestingEndpoints(collectionId);
+
+            // Handle optional mini testing service
+            String miniTestingServiceName = null;
+            if (crawlerRun.getSelectedMiniTestingService() != null
+                && !crawlerRun.getSelectedMiniTestingService().isEmpty()) {
+                miniTestingServiceName = crawlerRun.getSelectedMiniTestingService();
+            }
+
+            // Create testing run
+            String testName = "Auto-test after crawl: " + crawlerRun.getHostname();
+            TestingRun testingRun = new TestingRun(
+                Context.now(),                  // scheduleTimestamp
+                crawlerRun.getStartedBy(),      // userEmail
+                testingEndpoints,               // testingEndpoints
+                testConfigId,                   // testIdConfig (links to TestingRunConfig)
+                TestingRun.State.SCHEDULED,     // state
+                0,                              // periodInSeconds (0 = one-time run)
+                testName,                       // name
+                -1,                             // testRunTime (-1 = use default)
+                -1,                             // maxConcurrentRequests (-1 = use default)
+                false,                          // sendSlackAlert
+                miniTestingServiceName          // miniTestingServiceName (can be null)
+            );
+
+            testingRun.setTriggeredBy("DAST_CRAWLER_AUTO_TEST");
+            TestingRunDao.instance.insertOne(testingRun);
+
+            loggerMaker.infoAndAddToDb(
+                "Successfully triggered tests after crawling. " +
+                "CrawlId: " + crawlerRun.getCrawlId() +
+                ", CollectionId: " + collectionId +
+                ", TestingRunId: " + testingRun.getId().toHexString() +
+                ", TestCount: " + selectedTests.size() +
+                (miniTestingServiceName != null ? ", MiniTestingService: " + miniTestingServiceName : "")
+            );
+
+            return testingRun;
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error triggering tests after crawling for crawlId: " + crawlerRun.getCrawlId());
+            return null;
+        }
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -3163,6 +3616,14 @@ public class DbAction extends ActionSupport {
 
     public void setApiCollectionIds(List<Integer> apiCollectionIds) {
         this.apiCollectionIds = apiCollectionIds;
+    }
+
+    public List<Map<String, Object>> getCollections() {
+        return collections;
+    }
+
+    public void setCollections(List<Map<String, Object>> collections) {
+        this.collections = collections;
     }
 
     public List<RuntimeFilter> getRuntimeFilters() {
@@ -3364,6 +3825,30 @@ public class DbAction extends ActionSupport {
 
     public void setColId(int colId) {
         this.colId = colId;
+    }
+
+    public String getServiceTagValue() {
+        return serviceTagValue;
+    }
+
+    public void setServiceTagValue(String serviceTagValue) {
+        this.serviceTagValue = serviceTagValue;
+    }
+
+    public List<String> getHostNames() {
+        return hostNames;
+    }
+
+    public void setHostNames(List<String> hostNames) {
+        this.hostNames = hostNames;
+    }
+
+    public String getHostName() {
+        return hostName;
+    }
+
+    public void setHostName(String hostName) {
+        this.hostName = hostName;
     }
 
     public int getAccountId() {
@@ -4389,5 +4874,281 @@ public class DbAction extends ActionSupport {
 
     public void setTestedApisMap(Map<String, Integer> testedApisMap) {
         this.testedApisMap = testedApisMap;
+    }
+
+    public List<CrawlerRun> getCrawlerRuns() {
+        return crawlerRuns;
+    }
+
+    public List<CrawlerRunDTO> getCrawlerRunsData() {
+        return crawlerRunsData;
+    }
+
+    public void setCrawlerRuns(List<CrawlerRun> crawlerRuns) {
+        this.crawlerRuns = crawlerRuns;
+    }
+
+    public String getModuleName() {
+        return moduleName;
+    }
+
+    public void setModuleName(String moduleName) {
+        this.moduleName = moduleName;
+    }
+
+    public String getCrawlId() {
+        return crawlId;
+    }
+
+    public void setCrawlId(String crawlId) {
+        this.crawlId = crawlId;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
+    // Fields for fetchApiIds API (Fast-Discovery Consumer)
+    private List<Map<String, Object>> apiIds;
+
+    public List<Map<String, Object>> getApiIds() {
+        return apiIds;
+    }
+
+    public void setApiIds(List<Map<String, Object>> apiIds) {
+        this.apiIds = apiIds;
+    }
+
+    // Fields for fetchSampleDataKeys API (Mini-Runtime Consumer)
+    private List<Map<String, Object>> sampleDataKeys;
+
+    public List<Map<String, Object>> getSampleDataKeys() {
+        return sampleDataKeys;
+    }
+
+    public void setSampleDataKeys(List<Map<String, Object>> sampleDataKeys) {
+        this.sampleDataKeys = sampleDataKeys;
+    }
+
+    /**
+     * Fetch API IDs with cursor-based pagination for Bloom filter initialization in fast-discovery consumer.
+     * Returns lightweight projection: apiCollectionId, url, method only.
+     * Uses same pagination pattern as fetchApiRateLimits.
+     * Endpoint: POST /api/fetchApiIds
+     *
+     * @return List of API IDs (max 1000 records per page)
+     */
+    public String fetchApiIds() {
+        try {
+            // Fetch paginated results using cursor
+            this.apiIds = DbLayer.fetchAllApiInfoKeys(lastApiInfoKey);
+
+            // Update lastApiInfoKey to the last record in the result for next page cursor
+            if (apiIds != null && !apiIds.isEmpty()) {
+                Map<String, Object> lastApiId = apiIds.get(apiIds.size() - 1);
+                int apiCollectionId = (int) lastApiId.get("apiCollectionId");
+                String url = (String) lastApiId.get("url");
+                String methodStr = (String) lastApiId.get("method");
+                URLMethods.Method method = URLMethods.Method.fromString(methodStr);
+                this.lastApiInfoKey = new ApiInfoKey(apiCollectionId, url, method);
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchApiIds: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    // Field for fetchSampleDataKeys pagination
+    private String lastKeyId;
+
+    public String getLastKeyId() {
+        return lastKeyId;
+    }
+
+    public void setLastKeyId(String lastKeyId) {
+        this.lastKeyId = lastKeyId;
+    }
+
+    /**
+     * Fetch sample data keys for Bloom filter initialization in mini-runtime.
+     * Returns lightweight projection: _id fields only (apiCollectionId, url, method, responseCode, isHeader, ts).
+     * Endpoint: POST /api/fetchSampleDataKeys
+     *
+     * Supports pagination with lastKeyId parameter to handle large datasets.
+     */
+    public String fetchSampleDataKeys() {
+        try {
+            loggerMaker.infoAndAddToDb("Fetching sample data keys for Bloom filter initialization (lastKeyId: " + lastKeyId + ")", LogDb.DB_ABS);
+            this.sampleDataKeys = DbLayer.fetchAllSampleDataKeysAsMaps();
+            loggerMaker.infoAndAddToDb("Fetched " + sampleDataKeys.size() + " sample data keys", LogDb.DB_ABS);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchSampleDataKeys: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Fast-discovery bulk write to single_type_info collection.
+     * Writes to dedicated fast-discovery Kafka topic: akto.fast-discovery.writes
+     * Endpoint: POST /api/fastDiscoveryBulkWriteSti
+     *
+     * This endpoint is optimized for fast-discovery consumer which only sends
+     * minimal data (host header entries) for quick API discovery.
+     */
+    public String fastDiscoveryBulkWriteSti() {
+        try {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb("Fast-discovery bulkWriteSti: " + writesForSti.size() +
+                " writes for account " + accountId, LogDb.DB_ABS);
+
+            KafkaUtils kafkaUtils = new KafkaUtils();
+
+            if (kafkaUtils.isWriteEnabled() && kafkaUtils.isFastDiscoveryEnabled()) {
+                // Write to fast-discovery Kafka topic
+                kafkaUtils.insertFastDiscoveryData(writesForSti, "bulkWriteSti", accountId);
+                loggerMaker.infoAndAddToDb("Sent fast-discovery STI writes to Kafka topic: " +
+                    KafkaUtils.getFastDiscoveryTopicName(), LogDb.DB_ABS);
+            } else {
+                // Direct DB write (fallback when Kafka disabled)
+                loggerMaker.infoAndAddToDb("Kafka disabled, writing directly to DB", LogDb.DB_ABS);
+                bulkWriteSti();  // Reuse existing logic
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fastDiscoveryBulkWriteSti: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Fast-discovery bulk write to api_info collection.
+     * Writes to dedicated fast-discovery Kafka topic: akto.fast-discovery.writes
+     * Endpoint: POST /api/fastDiscoveryBulkWriteApiInfo
+     *
+     * This endpoint is optimized for fast-discovery consumer which only sends
+     * minimal API info data for quick API discovery.
+     */
+    public String fastDiscoveryBulkWriteApiInfo() {
+        try {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb("Fast-discovery bulkWriteApiInfo: " + apiInfoList.size() +
+                " writes for account " + accountId, LogDb.DB_ABS);
+
+            KafkaUtils kafkaUtils = new KafkaUtils();
+
+            if (kafkaUtils.isWriteEnabled() && kafkaUtils.isFastDiscoveryEnabled()) {
+                // Convert apiInfoList to BulkUpdates format for Kafka message
+                List<BulkUpdates> bulkWrites = convertApiInfoToBulkUpdates(apiInfoList);
+
+                // Write to fast-discovery Kafka topic
+                kafkaUtils.insertFastDiscoveryData(bulkWrites, "bulkWriteApiInfo", accountId);
+                loggerMaker.infoAndAddToDb("Sent fast-discovery API info writes to Kafka topic: " +
+                    KafkaUtils.getFastDiscoveryTopicName(), LogDb.DB_ABS);
+            } else {
+                // Direct DB write (fallback when Kafka disabled)
+                loggerMaker.infoAndAddToDb("Kafka disabled, writing directly to DB", LogDb.DB_ABS);
+                bulkWriteApiInfo();  // Reuse existing logic
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fastDiscoveryBulkWriteApiInfo: " + e.toString(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Convert apiInfoList (BasicDBObject format) back to BulkUpdates format
+     * for transmission via Kafka. This is needed because the fast-discovery
+     * consumer expects BulkUpdates format in Kafka messages.
+     *
+     * Only converts specific fields needed by fast-discovery to avoid sending
+     * unnecessary default values and ensure correct data types.
+     */
+    private List<BulkUpdates> convertApiInfoToBulkUpdates(List<BasicDBObject> apiInfoList) {
+        List<BulkUpdates> bulkWrites = new ArrayList<>();
+
+        for (BasicDBObject apiInfo : apiInfoList) {
+            // Extract _id for filters
+            Map<String, Object> filters = new HashMap<>();
+            Object id = apiInfo.get("id");
+            if (id != null) {
+                filters.put("_id", id);
+            }
+
+            // Convert only specific fields to updates for fast-discovery
+            ArrayList<String> updates = new ArrayList<>();
+
+            // lastSeen: always set to current value
+            if (apiInfo.containsKey("lastSeen")) {
+                Map<String, Object> update = new HashMap<>();
+                update.put("field", "lastSeen");
+                update.put("val", apiInfo.get("lastSeen"));
+                update.put("op", "set");
+                updates.add(new Gson().toJson(update));
+            }
+
+            // discoveredTimestamp: only set on insert (if provided)
+            if (apiInfo.containsKey("discoveredTimestamp")) {
+                Map<String, Object> update = new HashMap<>();
+                update.put("field", "discoveredTimestamp");
+                update.put("val", apiInfo.get("discoveredTimestamp"));
+                update.put("op", "setOnInsert");
+                updates.add(new Gson().toJson(update));
+            }
+
+            // collectionIds: keep as array to match mini-runtime format
+            if (apiInfo.containsKey("collectionIds")) {
+                Map<String, Object> update = new HashMap<>();
+                update.put("field", "collectionIds");
+                update.put("val", apiInfo.get("collectionIds"));  // Send as array
+                update.put("op", "setOnInsert");
+                updates.add(new Gson().toJson(update));
+            }
+
+            bulkWrites.add(new BulkUpdates(filters, updates));
+        }
+
+        return bulkWrites;
+    }
+
+    public Trace getTrace() {
+        return trace;
+    }
+
+    public void setTrace(Trace trace) {
+        this.trace = trace;
+    }
+
+    public List<Span> getSpans() {
+        return spans;
+    }
+
+    public void setSpans(List<Span> spans) {
+        this.spans = spans;
+    }
+
+    public Map<String, ApiCollection.ServiceGraphEdgeInfo> getServiceGraphEdges() {
+        return serviceGraphEdges;
+    }
+
+    public void setServiceGraphEdges(Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges) {
+        this.serviceGraphEdges = serviceGraphEdges;
     }
 }

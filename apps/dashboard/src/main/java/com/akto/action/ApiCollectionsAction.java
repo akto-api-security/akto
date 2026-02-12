@@ -5,11 +5,8 @@ import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 
-import com.akto.DaoInit;
-import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dto.ApiCollection;
@@ -24,20 +21,13 @@ import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
-import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.usage.MetricTypes;
-import com.akto.dto.usage.UsageMetric;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.ApiCollection.ENV_TYPE;
-import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.URLMethods;
-import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
 import com.mongodb.client.model.Accumulators;
@@ -46,8 +36,6 @@ import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import com.mongodb.client.model.Sorts;
@@ -55,7 +43,6 @@ import com.mongodb.client.model.UnwindOptions;
 import com.opensymphony.xwork2.Action;
 import org.apache.commons.lang3.tuple.Pair;
 import org.bson.Document;
-import com.mongodb.client.result.UpdateResult;
 
 public class ApiCollectionsAction extends UserAction {
 

@@ -261,7 +261,7 @@ public class MergingLogic {
         }
 
         // Check once at collection level whether STRING merging is allowed
-        boolean allowStringMerging = !ApiCollectionsDao.shouldSkipMerging(apiCollection);
+        boolean allowStringMerging = !ApiCollectionsDao.shouldSkipMerging(apiCollection) || !(Context.accountId.get() == 1758525547);
 
         loggerMaker.infoAndAddToDb("allowStringMerging value for collection " + apiCollectionId + " is " + allowStringMerging, LogDb.DB_ABS);
 
@@ -478,8 +478,8 @@ public class MergingLogic {
                     continue;
                 }
 
-                boolean compareKeys = doBodyMatch && RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate);
-                if (areBothMatchingUrls(newStatic,aStatic,mergedTemplate) || areBothUuidUrls(newStatic,aStatic,mergedTemplate) || RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate) || compareKeys || (allowMergingOnVersions && areBothVersionUrls(newStatic, aStatic, mergedTemplate)) || areBothLocaleUrls(newStatic, aStatic, mergedTemplate)) {
+                boolean compareKeys = doBodyMatch && Context.accountId.get() != 1758525547 && RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate);
+                if (areBothMatchingUrls(newStatic,aStatic,mergedTemplate) || areBothUuidUrls(newStatic,aStatic,mergedTemplate) || compareKeys || (allowMergingOnVersions && areBothVersionUrls(newStatic, aStatic, mergedTemplate)) || areBothLocaleUrls(newStatic, aStatic, mergedTemplate)) {
                     Map<String, Set<String>> similarTemplates = potentialMerges.get(mergedTemplate);
                     if (similarTemplates == null) {
                         similarTemplates = new HashMap<>();

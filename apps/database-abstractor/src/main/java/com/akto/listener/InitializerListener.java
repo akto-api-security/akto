@@ -77,6 +77,12 @@ public class InitializerListener implements ServletContextListener {
             logger.info("init kafka consumer");
             kafkaUtils.initKafkaConsumer();
         }
+
+        // Start fast-discovery consumer in background thread (if enabled)
+        if (kafkaUtils.isFastDiscoveryEnabled()) {
+            logger.info("Starting fast-discovery consumer in background thread");
+            kafkaUtils.startFastDiscoveryConsumer();
+        }
     }
 
     private static void checkMongoConnection() throws Exception {

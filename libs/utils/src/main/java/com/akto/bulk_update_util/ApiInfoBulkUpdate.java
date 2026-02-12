@@ -52,6 +52,21 @@ public class ApiInfoBulkUpdate {
             // last seen
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));
 
+            // discoveredTimestamp (only set on insert, not update)
+            if (apiInfo.getDiscoveredTimestamp() > 0) {
+                subUpdates.add(Updates.setOnInsert(ApiInfo.DISCOVERED_TIMESTAMP, apiInfo.getDiscoveredTimestamp()));
+            }
+
+            // apiType
+            if (apiInfo.getApiType() != null && !apiInfo.getApiType().isEmpty()) {
+                subUpdates.add(Updates.setOnInsert(ApiInfo.API_TYPE, apiInfo.getApiType()));
+            }
+
+            // responseCodes
+            if (apiInfo.getResponseCodes() != null && !apiInfo.getResponseCodes().isEmpty()) {
+                subUpdates.add(Updates.addEachToSet(ApiInfo.RESPONSE_CODES, apiInfo.getResponseCodes()));
+            }
+
             subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
 
             List<String> parentMcpToolNames = apiInfo.getParentMcpToolNames();

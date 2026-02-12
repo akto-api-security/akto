@@ -33,6 +33,15 @@ public class ApiInfo {
     public static final String LAST_TESTED = "lastTested";
     private int lastSeen;
     private int lastTested;
+
+    public static final String DISCOVERED_TIMESTAMP = "discoveredTimestamp";
+    private int discoveredTimestamp;
+
+    public static final String API_TYPE = "apiType";
+    private String apiType;
+
+    public static final String RESPONSE_CODES = "responseCodes";
+    private List<Integer> responseCodes;
     public static final String IS_SENSITIVE = "isSensitive";
     private boolean isSensitive;
     public static final String SEVERITY_SCORE = "severityScore";
@@ -400,6 +409,30 @@ public class ApiInfo {
 
     public void setLastTested(int lastTested) {
         this.lastTested = lastTested;
+    }
+
+    public int getDiscoveredTimestamp() {
+        return discoveredTimestamp;
+    }
+
+    public void setDiscoveredTimestamp(int discoveredTimestamp) {
+        this.discoveredTimestamp = discoveredTimestamp;
+    }
+
+    public String getApiType() {
+        return apiType;
+    }
+
+    public void setApiType(String apiType) {
+        this.apiType = apiType;
+    }
+
+    public List<Integer> getResponseCodes() {
+        return responseCodes;
+    }
+
+    public void setResponseCodes(List<Integer> responseCodes) {
+        this.responseCodes = responseCodes;
     }
 
     public boolean getIsSensitive() {
