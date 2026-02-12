@@ -42,7 +42,7 @@ public class CustomAuthUtil {
                 Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiInfo.getId().getApiCollectionId()));
     }
 
-    private static Set<ApiInfo.AuthType> unauthenticatedTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED));
+    private static Set<String> unauthenticatedTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED));
 
     final static Gson gson = new Gson();
 
@@ -87,6 +87,7 @@ public class CustomAuthUtil {
                 loggerMaker.infoAndAddToDb("initial auth types " + apiInfo.getId().getUrl() + " authtypes: " + apiInfo.getAllAuthTypesFound(), LogDb.DASHBOARD);
             }
 
+            Set<Set<String>> authTypes = apiInfo.getAllAuthTypesFound();
             // Initialize collections if null (can happen with fast-discovery or deserialized objects)
             Set<Set<ApiInfo.AuthType>> authTypes = apiInfo.getAllAuthTypesFound();
             if (authTypes == null) {
@@ -196,6 +197,6 @@ public class CustomAuthUtil {
          */
         ApiInfoDao.instance.updateMany(new BasicDBObject(),
                 Updates.pull(ALL_AUTH_TYPES_FOUND + ".$[]", new BasicDBObject().append("$in",
-                        new String[] { ApiInfo.AuthType.CUSTOM.name(), ApiInfo.AuthType.UNAUTHENTICATED.name() })));
+                        new String[] { ApiInfo.AuthType.CUSTOM, ApiInfo.AuthType.UNAUTHENTICATED })));
     }
 }
