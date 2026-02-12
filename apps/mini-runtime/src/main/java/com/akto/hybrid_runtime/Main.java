@@ -1204,13 +1204,10 @@ public class Main {
         }
         
         if (isKafkaAuthenticationEnabled) {
-            if(StringUtils.isEmpty(kafkaPassword) || StringUtils.isEmpty(kafkaUsername)){
+            if (!KafkaConfig.addValidatedAuthenticationProperties(properties, kafkaUsername, kafkaPassword)) {
                 loggerMaker.errorAndAddToDb("Kafka authentication credentials not provided");
                 return null;
             }
-            // Read security protocol from environment, default to SASL_PLAINTEXT
-            String securityProtocol = System.getenv().getOrDefault(KafkaConfig.ENV_KAFKA_SECURITY_PROTOCOL, KafkaConfig.SECURITY_PROTOCOL_SASL_PLAINTEXT);
-            KafkaConfig.addAuthenticationProperties(properties, kafkaUsername, kafkaPassword, securityProtocol);
         }
 
         return properties;

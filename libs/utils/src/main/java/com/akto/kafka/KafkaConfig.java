@@ -138,29 +138,6 @@ public class KafkaConfig {
     }
 
     /**
-     * Gets the configured security protocol from environment variable.
-     * Assumes credentials are provided (backward compatibility).
-     *
-     * @return Security protocol (defaults to SASL_PLAINTEXT)
-     * @deprecated Use {@link #getKafkaSecurityProtocol(boolean)} instead
-     */
-    @Deprecated
-    public static String getKafkaSecurityProtocol() {
-        return getKafkaSecurityProtocol(true);
-    }
-
-    /**
-     * Adds Kafka authentication properties to the given Properties object.
-     *
-     * @param properties The Properties object to add authentication to
-     * @param username   Kafka username
-     * @param password   Kafka password
-     */
-    public static void addAuthenticationProperties(Properties properties, String username, String password) {
-        addAuthenticationProperties(properties, username, password, SECURITY_PROTOCOL_SASL_PLAINTEXT);
-    }
-
-    /**
      * Adds Kafka authentication properties to the given Properties object with specified security protocol.
      *
      * @param properties       The Properties object to add authentication to
@@ -195,6 +172,29 @@ public class KafkaConfig {
     }
 
     /**
+     * Validates credentials and adds authentication properties with proper security protocol.
+     * This is a convenience method that combines credential validation, security protocol detection,
+     * and authentication property configuration.
+     *
+     * @param properties Properties object to configure
+     * @param username Kafka username
+     * @param password Kafka password
+     * @return true if authentication was added successfully, false if credentials are missing
+     */
+    public static boolean addValidatedAuthenticationProperties(Properties properties, String username, String password) {
+        boolean hasCredentials = !StringUtils.isEmpty(username) && !StringUtils.isEmpty(password);
+
+        if (!hasCredentials) {
+            logger.error("Kafka authentication credentials not provided");
+            return false;
+        }
+
+        String securityProtocol = getKafkaSecurityProtocol(hasCredentials);
+        addAuthenticationProperties(properties, username, password, securityProtocol);
+        return true;
+    }
+
+    /**
      * Creates Kafka AdminClient properties with authentication support.
      *
      * @param brokerUrl     The Kafka broker URL
@@ -210,13 +210,9 @@ public class KafkaConfig {
         adminProps.put("bootstrap.servers", brokerUrl);
 
         if (isAuthEnabled) {
-            if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password)) {
-                logger.error("Kafka authentication enabled but credentials not provided");
+            if (!addValidatedAuthenticationProperties(adminProps, username, password)) {
                 return null;
             }
-            // Read security protocol from environment, default to SASL_PLAINTEXT
-            String securityProtocol = System.getenv().getOrDefault(ENV_KAFKA_SECURITY_PROTOCOL, SECURITY_PROTOCOL_SASL_PLAINTEXT);
-            addAuthenticationProperties(adminProps, username, password, securityProtocol);
         }
 
         return adminProps;
@@ -253,11 +249,6 @@ public class KafkaConfig {
     public static Properties createProducerProperties(String brokerUrl, int lingerMS, int batchSize,
             int maxRequestTimeout, int maxRetries,
             boolean isAuthEnabled, String username, String password) {
-        if (isAuthEnabled && (StringUtils.isEmpty(username) || StringUtils.isEmpty(password))) {
-            logger.error("Kafka authentication credentials not provided");
-            return null;
-        }
-
         Properties kafkaProps = new Properties();
         kafkaProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerUrl);
         kafkaProps.put(ProducerConfig.BATCH_SIZE_CONFIG, batchSize);
@@ -271,9 +262,9 @@ public class KafkaConfig {
         }
 
         if (isAuthEnabled) {
-            // Read security protocol from environment, default to SASL_PLAINTEXT
-            String securityProtocol = System.getenv().getOrDefault(ENV_KAFKA_SECURITY_PROTOCOL, SECURITY_PROTOCOL_SASL_PLAINTEXT);
-            addAuthenticationProperties(kafkaProps, username, password, securityProtocol);
+            if (!addValidatedAuthenticationProperties(kafkaProps, username, password)) {
+                return null;
+            }
         }
 
         return kafkaProps;
