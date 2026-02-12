@@ -1780,7 +1780,7 @@ public class DbLayer {
             ,options);
     }
 
-    public static TestingRunResultSummary updateMetadataInSummary(String summaryId, String metadata) {
+    public static TestingRunResultSummary updateMetadataInSummary(String summaryId, Map<String, String> metadata) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
         return TestingRunResultSummariesDao.instance.updateOneNoUpsert(
                 Filters.eq(Constants.ID, summaryObjectId),

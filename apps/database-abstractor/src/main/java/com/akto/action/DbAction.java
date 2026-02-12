@@ -283,7 +283,7 @@ public class DbAction extends ActionSupport {
     Map<String, Integer> totalCountIssues;
     int testInitiatedCount;
     int testResultsCount;
-    String metadata;
+    Map<String, String> metadata;
     Bson completedUpdate;
     int totalApiCount;
     boolean hybridTestingEnabled;
@@ -4522,11 +4522,11 @@ public class DbAction extends ActionSupport {
         this.state = state;
     }
 
-    public String getMetadata() {
+    public Map<String, String> getMetadata() {
         return metadata;
     }
 
-    public void setMetadata(String metadata) {
+    public void setMetadata(Map<String, String> metadata) {
         this.metadata = metadata;
     }
 
