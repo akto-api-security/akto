@@ -1,7 +1,6 @@
 package com.akto.threat.backend.service;
 
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.billing.Organization;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse;
@@ -33,6 +32,7 @@ import com.akto.threat.backend.dto.RateLimitConfigDTO;
 import com.akto.util.ThreatDetectionConstants;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.mongodb.client.*;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.Sorts;
@@ -238,6 +238,11 @@ public class ThreatActorService {
         }
     }
 
+    /**
+     * ObjectId-based cursor pagination.
+     * - First page: skip=0, returns first 'limit' results
+     * - Subsequent pages: skip=last_seen_ObjectId (as uint32 timestamp), filter by _id > ObjectId(timestamp, 0, 0)
+     */
     private ListThreatActorResponse listThreatActorsFromActorInfo(
             String accountId,
             ListThreatActorsRequest request,
@@ -245,25 +250,48 @@ public class ThreatActorService {
 
         long startTime = System.currentTimeMillis();
 
-        // Extract pagination and sort parameters
-        int skip = request.hasSkip() ? request.getSkip() : 0;
         int limit = request.getLimit();
         Map<String, Integer> sort = request.getSortMap();
         ListThreatActorsRequest.Filter filter = request.getFilter();
 
-        // Build query filter document
+        // Sort by _id first (primary) for efficient cursor pagination, discoveredAt is embedded in _id timestamp
+        // MongoDB ObjectId has timestamp in first 4 bytes, so sorting by _id gives us time-based ordering
+        int sortOrder = sort.getOrDefault("discoveredAt", -1);
+        Bson sortBson = sortOrder == 1 ? Sorts.ascending("_id") : Sorts.descending("_id");
+
+        // Build base query filter
         Document match = buildActorInfoQueryFilter(filter, request, contextSource);
+
+        // Always count total BEFORE applying cursor filter (to get consistent total across pages)
         long total = countActors(accountId, match);
-        Bson sortBson = determineSortOrder(sort);
+
+        // Cursor-based pagination: use _id > cursor for efficient navigation
+        String cursor = request.hasCursor() ? request.getCursor() : null;
+        int skipValue = request.hasSkip() ? request.getSkip() : 0;
+        boolean useCursor = (cursor != null && !cursor.isEmpty());
+        boolean useSkip = (!useCursor && skipValue > 0);
+
+        if (useCursor) {
+            // Apply cursor filter AFTER counting to maintain consistent total
+            try {
+                org.bson.types.ObjectId lastSeenId = new org.bson.types.ObjectId(cursor);
+                // For descending sort: _id < cursor, for ascending: _id > cursor
+                String operator = sortOrder == 1 ? "$gt" : "$lt";
+                match.append("_id", new Document(operator, lastSeenId));
+            } catch (IllegalArgumentException e) {
+                loggerMaker.errorAndAddToDb("Invalid cursor ObjectId: " + cursor, LoggerMaker.LogDb.THREAT_DETECTION);
+                throw new RuntimeException("Invalid cursor format: " + cursor, e);
+            }
+        }
 
         List<ListThreatActorResponse.ThreatActor> actors = fetchPaginatedActors(
-            accountId, match, sortBson, skip, limit
+            accountId, match, sortBson, useSkip ? skipValue : 0, limit
         );
 
         long duration = System.currentTimeMillis() - startTime;
         loggerMaker.infoAndAddToDb(
-            String.format("listThreatActorsFromActorInfo completed in %dms (total=%d, returned=%d)",
-                duration, total, actors.size()),
+            String.format("listThreatActorsFromActorInfo completed in %dms (cursor=%d, total=%d, returned=%d)",
+                duration, skipValue, total, actors.size()),
             LoggerMaker.LogDb.THREAT_DETECTION
         );
 
@@ -344,30 +372,18 @@ public class ThreatActorService {
     }
 
     /**
-     * Adds timestamp range filter, handling both filter-level and request-level timestamps.
-     * Request-level timestamps take precedence if present.
+     * Adds timestamp range filter using request-level timestamps.
+     * Note: filter.detected_at_time_range is never used by UI/dashboard.
      */
     private void addTimestampFilter(
             Document match,
             ListThreatActorsRequest.Filter filter,
             ListThreatActorsRequest request) {
 
-        Long startTs = null;
-        Long endTs = null;
+        // UI always sends timestamps at request level (not filter level)
+        Long startTs = request.getStartTs() != 0 ? (long) request.getStartTs() : null;
+        Long endTs = request.getEndTs() != 0 ? (long) request.getEndTs() : null;
 
-        // First, check filter-level timestamps
-        if (filter.hasDetectedAtTimeRange()) {
-            startTs = filter.getDetectedAtTimeRange().getStart();
-            endTs = filter.getDetectedAtTimeRange().getEnd();
-        }
-
-        if (request.getStartTs() != 0) {
-            startTs = (long) request.getStartTs();
-        }
-        if (request.getEndTs() != 0) {
-            endTs = (long) request.getEndTs();
-        }
-        // Apply timestamp filter
         if (startTs != null || endTs != null) {
             Document tsFilter = new Document();
             if (startTs != null) {
@@ -380,15 +396,6 @@ public class ThreatActorService {
         }
     }
 
-    /**
-     * Determines sort order from request parameters.
-     * Supports sorting by discoveredAt, defaults to discoveredAt descending for consistency with old implementation.
-     */
-    private Bson determineSortOrder(Map<String, Integer> sort) {
-        // Use discoveredAt with provided order, or default to descending
-        int order = sort.getOrDefault("discoveredAt", -1);
-        return order == 1 ? Sorts.ascending("discoveredAt") : Sorts.descending("discoveredAt");
-    }
 
     /**
      * Counts matching actors with proper error handling.
@@ -409,8 +416,9 @@ public class ThreatActorService {
     }
 
     /**
-     * Fetches paginated actor results with proper error handling.
-     * Throws exception if query fails to avoid returning incomplete data silently.
+     * Fetches paginated actor results.
+     * NEW FLOW (cursor): skip=0, filtering via _id in match Document
+     * OLD FLOW (skip): skip>0, uses .skip() for backward compatibility
      */
     private List<ListThreatActorResponse.ThreatActor> fetchPaginatedActors(
             String accountId,
@@ -419,12 +427,13 @@ public class ThreatActorService {
             int skip,
             int limit) {
 
+        long queryStartTime = System.currentTimeMillis();
         List<ListThreatActorResponse.ThreatActor> actors = new ArrayList<>();
 
         try (MongoCursor<ActorInfoModel> cursor = actorInfoDao.getCollection(accountId)
                 .find(match)
                 .sort(sortBson)
-                .skip(skip)
+                .skip(skip)  // 0 for cursor-based, >0 for old skip-based
                 .limit(limit)
                 .cursor()) {
 
@@ -433,17 +442,24 @@ public class ThreatActorService {
                 actors.add(buildThreatActorResponse(actorInfo));
             }
 
+            long queryTime = System.currentTimeMillis() - queryStartTime;
+            loggerMaker.infoAndAddToDb(
+                String.format("fetchPaginatedActors completed - Fetched: %d docs | Query+Iteration: %dms | skip: %d, limit: %d",
+                    actors.size(), queryTime, skip, limit),
+                LoggerMaker.LogDb.THREAT_DETECTION
+            );
+
             return actors;
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(
                 "Error fetching actor_info: " + e.getMessage() +
                 " | Filter: " + match.toJson() +
+                " | skip: " + skip +
                 " | Partial results: " + actors.size(),
                 LoggerMaker.LogDb.THREAT_DETECTION
             );
 
-            // Throw exception to indicate incomplete data rather than silently returning partial results
             throw new RuntimeException("Failed to fetch threat actors from actor_info", e);
         }
     }
@@ -453,8 +469,10 @@ public class ThreatActorService {
      */
     private ListThreatActorResponse.ThreatActor buildThreatActorResponse(ActorInfoModel actorInfo) {
         String actorId = actorInfo.getActorId() != null ? actorInfo.getActorId() : "";
+        String objectId = actorInfo.getId() != null ? actorInfo.getId().toHexString() : "";
         return ListThreatActorResponse.ThreatActor.newBuilder()
             .setId(actorId)
+            .setObjectId(objectId)
             .setLatestApiEndpoint(actorInfo.getUrl() != null ? actorInfo.getUrl() : "")
             .setLatestApiMethod(actorInfo.getMethod() != null ? actorInfo.getMethod() : "")
             .setLatestApiIp(actorId)
@@ -462,6 +480,7 @@ public class ThreatActorService {
             .setDiscoveredAt(actorInfo.getDiscoveredAt())
             .setCountry(actorInfo.getCountry() != null ? actorInfo.getCountry() : "")
             .setLatestSubcategory(actorInfo.getFilterId() != null ? actorInfo.getFilterId() : "")
+            .setLatestMetadata(actorInfo.getLatestMetadata() != null ? actorInfo.getLatestMetadata() : "")
             .build();
     }
 
@@ -565,6 +584,11 @@ public class ThreatActorService {
     }
 
   public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource) {
+
+    // Use optimized actor_info table if feature flag is enabled
+    if (USE_ACTOR_INFO_TABLE) {
+      return getDailyActorCountsFromActorInfo(accountId, startTs, endTs, latestAttackList, contextSource);
+    }
 
     List<DailyActorsCountResponse.ActorsCount> actors = new ArrayList<>();
         List<Document> pipeline = new ArrayList<>();
@@ -700,6 +724,100 @@ public class ThreatActorService {
             .build();
   }
 
+  /**
+   * NEW METHOD - Get actor counts from actor_info table (much more efficient)
+   * Returns Critical Actors (isCritical=true) and Active Actors (status=ACTIVE)
+   */
+  private DailyActorsCountResponse getDailyActorCountsFromActorInfo(
+      String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource) {
+
+    long methodStartTime = System.currentTimeMillis();
+
+    Document match = new Document();
+
+    // Filter by time range using lastAttackTs
+    if (startTs > 0 || endTs > 0) {
+      Document tsFilter = new Document();
+      if (startTs > 0) {
+        tsFilter.append("$gte", startTs);
+      }
+      if (endTs > 0) {
+        tsFilter.append("$lte", endTs);
+      }
+      match.append("lastAttackTs", tsFilter);
+    }
+
+    // Filter by filterId if provided
+    if (latestAttackList != null && !latestAttackList.isEmpty()) {
+      match.append("filterId", new Document("$in", latestAttackList));
+    }
+
+    // Apply context filter
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+      match.putAll(contextFilter);
+    }
+
+    // Count Critical Actors (isCritical = true)
+    long criticalQueryStart = System.currentTimeMillis();
+    Document criticalMatch = new Document(match);
+    criticalMatch.append("isCritical", true);
+    // Use aggregation for index-only count (no document fetch)
+    List<Bson> criticalPipeline = Arrays.asList(
+        Aggregates.match(criticalMatch),
+        Aggregates.count("total")
+    );
+    MongoCollection<Document> rawCollection = actorInfoDao.getCollection(accountId)
+        .withDocumentClass(Document.class);
+    Document criticalCountResult = rawCollection
+        .aggregate(criticalPipeline)
+        .hint(new Document("lastAttackTs", 1).append("contextSource", 1).append("isCritical", 1))
+        .first();
+    long criticalActorsCount = criticalCountResult != null ? criticalCountResult.getInteger("total", 0) : 0;
+    long criticalQueryTime = System.currentTimeMillis() - criticalQueryStart;
+
+    // Count Active Actors (status = ACTIVE)
+    long activeQueryStart = System.currentTimeMillis();
+    Document activeMatch = new Document(match);
+    activeMatch.append("status", "ACTIVE");
+    // Use aggregation for index-only count (no document fetch)
+    List<Bson> activePipeline = Arrays.asList(
+        Aggregates.match(activeMatch),
+        Aggregates.count("total")
+    );
+    Document activeCountResult = rawCollection
+        .aggregate(activePipeline)
+        .hint(new Document("lastAttackTs", 1).append("contextSource", 1).append("status", 1))
+        .first();
+    long activeActorsCount = activeCountResult != null ? activeCountResult.getInteger("total", 0) : 0;
+    long activeQueryTime = System.currentTimeMillis() - activeQueryStart;
+
+    long totalMethodTime = System.currentTimeMillis() - methodStartTime;
+
+    loggerMaker.infoAndAddToDb(
+        String.format("getDailyActorCountsFromActorInfo completed - Critical: %d (%dms), Active: %d (%dms) | Total: %dms | Filter: %s",
+            criticalActorsCount, criticalQueryTime, activeActorsCount, activeQueryTime, totalMethodTime, match.toJson()),
+        LoggerMaker.LogDb.THREAT_DETECTION
+    );
+
+    // UI expects actorsCounts array - return single element with aggregated totals
+    DailyActorsCountResponse.ActorsCount actorsCount = DailyActorsCountResponse.ActorsCount.newBuilder()
+        .setTs((int) endTs)  // Use endTs as timestamp
+        .setTotalActors((int) activeActorsCount)
+        .setCriticalActors((int) criticalActorsCount)
+        .build();
+
+    return DailyActorsCountResponse.newBuilder()
+        .addActorsCounts(actorsCount)  // Add single element to array
+        .setTotalActive((int) activeActorsCount)
+        .setCriticalActorsCount((int) criticalActorsCount)
+        .setTotalAnalysed(0)  // Not calculated from actor_info
+        .setTotalAttacks(0)   // Not calculated from actor_info
+        .setTotalIgnored(0)
+        .setTotalUnderReview(0)
+        .build();
+  }
+
   public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource) {
 
         List<ThreatActivityTimelineResponse.ActivityTimeline> timeline = new ArrayList<>();
@@ -829,6 +947,97 @@ public class ThreatActorService {
   public ThreatActorByCountryResponse getThreatActorByCountry(
       String accountId, ThreatActorByCountryRequest request, String contextSource) {
 
+    // Use optimized actor_info table if feature flag is enabled
+    if (USE_ACTOR_INFO_TABLE) {
+      return getThreatActorByCountryFromActorInfo(accountId, request, contextSource);
+    } else {
+      return getThreatActorByCountryFromMaliciousEvents(accountId, request, contextSource);
+    }
+  }
+
+  /**
+   * NEW METHOD - Uses actor_info table (much more efficient)
+   */
+  private ThreatActorByCountryResponse getThreatActorByCountryFromActorInfo(
+      String accountId, ThreatActorByCountryRequest request, String contextSource) {
+
+    long methodStartTime = System.currentTimeMillis();
+
+    Document match = new Document();
+
+    // Filter by time range using lastAttackTs (most recent attack timestamp)
+    if (request.getStartTs() != 0 || request.getEndTs() != 0) {
+      Document tsFilter = new Document();
+      if (request.getStartTs() != 0) {
+        tsFilter.append("$gte", request.getStartTs());
+      }
+      if (request.getEndTs() != 0) {
+        tsFilter.append("$lte", request.getEndTs());
+      }
+      match.append("lastAttackTs", tsFilter);
+    }
+
+    // Filter by filterId (latest attack subcategory)
+    if (!request.getLatestAttackList().isEmpty()) {
+      match.append("filterId", new Document("$in", request.getLatestAttackList()));
+    }
+
+    // Apply context filter (for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+      match.putAll(contextFilter);
+    }
+
+    // Build aggregation pipeline - single query to group by country and count
+    List<Document> pipeline = new ArrayList<>();
+    pipeline.add(new Document("$match", match));
+
+    // Group by country and count actors (each doc is one actor, so just sum 1)
+    pipeline.add(new Document("$group",
+        new Document("_id", "$country")
+            .append("count", new Document("$sum", 1))));
+
+    // Execute aggregation and build response
+    long aggregationStart = System.currentTimeMillis();
+    List<ThreatActorByCountryResponse.CountryCount> actorsByCountryCount = new ArrayList<>();
+
+    MongoCollection<Document> rawCollection = actorInfoDao.getCollection(accountId)
+        .withDocumentClass(Document.class);
+
+    // Force MongoDB to use the optimal compound index (prevents choosing pagination index)
+    com.mongodb.client.AggregateIterable<Document> aggregateResult = rawCollection.aggregate(pipeline)
+        .hint(new Document("lastAttackTs", 1).append("contextSource", 1).append("country", 1))
+        .allowDiskUse(true);
+
+    for (Document doc : aggregateResult) {
+      String country = doc.getString("_id");
+      if (country != null && !country.isEmpty()) {
+        actorsByCountryCount.add(
+            ThreatActorByCountryResponse.CountryCount.newBuilder()
+                .setCode(country)
+                .setCount(doc.getInteger("count", 0))
+                .build());
+      }
+    }
+
+    long aggregationTime = System.currentTimeMillis() - aggregationStart;
+    long totalMethodTime = System.currentTimeMillis() - methodStartTime;
+
+    loggerMaker.infoAndAddToDb(
+        String.format("getThreatActorByCountryFromActorInfo completed - Countries: %d | Aggregation: %dms, Total: %dms | Filter: %s",
+            actorsByCountryCount.size(), aggregationTime, totalMethodTime, match.toJson()),
+        LoggerMaker.LogDb.THREAT_DETECTION
+    );
+
+    return ThreatActorByCountryResponse.newBuilder().addAllCountries(actorsByCountryCount).build();
+  }
+
+  /**
+   * OLD METHOD - Uses malicious_events aggregation (slower but stable)
+   */
+  private ThreatActorByCountryResponse getThreatActorByCountryFromMaliciousEvents(
+      String accountId, ThreatActorByCountryRequest request, String contextSource) {
+
       List<Document> pipeline = new ArrayList<>();
 
       Document match = new Document();
@@ -926,8 +1135,11 @@ public class ThreatActorService {
             .getCollection(MongoDBCollection.ThreatDetection.ACTOR_INFO, Document.class)
             .updateOne(filters, updates);
         } else {
-            ActorInfoModel actorInfoModel = ActorInfoModel.newBuilder().setActorId(actorIp).
-              setStatus(request.getStatus()).setUpdatedTs(request.getUpdatedTs()).build();
+            ActorInfoModel actorInfoModel = ActorInfoModel.builder()
+                .actorId(actorIp)
+                .status(request.getStatus())
+                .updatedAt(request.getUpdatedTs())
+                .build();
             this.actorInfoDao.getCollection(accountId).insertOne(actorInfoModel);
         }
 

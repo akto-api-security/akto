@@ -18,6 +18,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Ti
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
+import com.akto.threat.backend.dao.ActorInfoDao;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.util.ThreatDetectionConstants;
@@ -221,8 +222,7 @@ public class MaliciousEventService {
   private ThreatActorFilterResponse fetchThreatActorFiltersFromActorInfo(
       String accountId, ThreatActorFilterRequest request) {
 
-    com.akto.threat.backend.dao.ActorInfoDao actorInfoDao =
-        com.akto.threat.backend.dao.ActorInfoDao.instance;
+    ActorInfoDao actorInfoDao = ActorInfoDao.instance;
 
     Set<String> latestAttack = new HashSet<>();
     Set<String> countries = new HashSet<>();

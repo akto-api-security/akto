@@ -3,10 +3,10 @@ package com.akto.threat.backend.dao;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.ActorInfoModel;
 import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
 import org.bson.Document;
-import org.bson.conversions.Bson;
 
 public class ActorInfoDao extends AccountBasedDao<ActorInfoModel> {
 
@@ -28,44 +28,53 @@ public class ActorInfoDao extends AccountBasedDao<ActorInfoModel> {
         return super.getCollection(accountId);
     }
 
-    /**
-     * Creates required indexes for actor_info collection.
-     * Simple indexes on discoveredAt and lastAttackTs for sorting and filtering.
-     */
     public void createIndicesIfAbsent(String accountId) {
-        MongoCollection<Document> collection = getDatabase(accountId)
-            .getCollection(getCollectionName(), Document.class);
+        MongoCollection<ActorInfoModel> coll = getCollection(accountId);
 
-        // Index for sorting by discoveredAt
-        createIndexIfAbsent(collection, "idx_discoveredAt",
-            Indexes.descending("discoveredAt"));
-
-        // Index for filtering/sorting by lastAttackTs
-        createIndexIfAbsent(collection, "idx_lastAttackTs",
-            Indexes.descending("lastAttackTs"));
-    }
-
-    /**
-     * Helper method to create index if it doesn't already exist.
-     */
-    private void createIndexIfAbsent(MongoCollection<Document> collection, String indexName, Bson keys) {
-        try {
-            // Check if index already exists
-            boolean indexExists = false;
-            for (Document index : collection.listIndexes()) {
-                if (indexName.equals(index.getString("name"))) {
-                    indexExists = true;
-                    break;
-                }
+        java.util.Set<String> existing = new java.util.HashSet<>();
+        try (MongoCursor<Document> it = coll.listIndexes().iterator()) {
+            while (it.hasNext()) {
+                Document idx = it.next();
+                existing.add(idx.getString("name"));
             }
+        }
 
-            if (!indexExists) {
-                IndexOptions options = new IndexOptions().name(indexName);
-                collection.createIndex(keys, options);
+        java.util.Map<String, org.bson.conversions.Bson> required = new java.util.LinkedHashMap<>();
+        required.put("idx_discoveredAt", Indexes.descending("discoveredAt"));
+        // Note: idx_lastAttackTs removed - redundant with compound indexes and confuses query planner
+
+        // Compound indexes for optimized queries
+        // For listThreatActorsFromActorInfo - cursor pagination with descending sort
+        required.put("idx_lastAttackTs_id_desc", Indexes.compoundIndex(
+            Indexes.descending("lastAttackTs"),
+            Indexes.descending("_id")
+        ));
+
+        // For getDailyActorCountsFromActorInfo - Critical actors count
+        required.put("idx_lastAttackTs_contextSource_isCritical", Indexes.compoundIndex(
+            Indexes.ascending("lastAttackTs"),
+            Indexes.ascending("contextSource"),
+            Indexes.ascending("isCritical")
+        ));
+
+        // For getDailyActorCountsFromActorInfo - Active actors count
+        required.put("idx_lastAttackTs_contextSource_status", Indexes.compoundIndex(
+            Indexes.ascending("lastAttackTs"),
+            Indexes.ascending("contextSource"),
+            Indexes.ascending("status")
+        ));
+
+        // For getThreatActorByCountryFromActorInfo - Country grouping
+        required.put("idx_lastAttackTs_contextSource_country", Indexes.compoundIndex(
+            Indexes.ascending("lastAttackTs"),
+            Indexes.ascending("contextSource"),
+            Indexes.ascending("country")
+        ));
+
+        for (java.util.Map.Entry<String, org.bson.conversions.Bson> e : required.entrySet()) {
+            if (!existing.contains(e.getKey())) {
+                coll.createIndex(e.getValue(), new IndexOptions().name(e.getKey()));
             }
-        } catch (Exception e) {
-            // Log but don't fail - indexes are supplementary
-            System.err.println("Error creating index " + indexName + ": " + e.getMessage());
         }
     }
 }

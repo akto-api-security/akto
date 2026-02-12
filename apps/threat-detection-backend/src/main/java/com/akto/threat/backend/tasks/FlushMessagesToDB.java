@@ -187,26 +187,38 @@ public class FlushMessagesToDB {
       // Use actorId as the filter
       Bson filter = Filters.eq("actorId", actor);
 
+      // Check if this event is critical (HIGH or CRITICAL severity)
+      String severity = event.getSeverity();
+      boolean isCriticalEvent = "CRITICAL".equalsIgnoreCase(severity) || "HIGH".equalsIgnoreCase(severity);
+
       // Build update document - update latest attack details
       // Use $max for lastAttackTs to only update if new event is newer
       // Use $min for discoveredAt to keep the earliest timestamp
-      Bson updates = Updates.combine(
-          Updates.set("filterId", event.getFilterId()),
-          Updates.set("category", event.getCategory()),
-          Updates.set("apiCollectionId", event.getLatestApiCollectionId()),
-          Updates.set("url", event.getLatestApiEndpoint()),
-          Updates.set("method", event.getLatestApiMethod() != null ? event.getLatestApiMethod().name() : ""),
-          Updates.set("country", event.getCountry() != null ? event.getCountry() : ""),
-          Updates.set("severity", event.getSeverity() != null ? event.getSeverity() : ""),
-          Updates.set("host", event.getHost() != null ? event.getHost() : ""),
-          Updates.set("contextSource", event.getContextSource() != null ? event.getContextSource() : ""),
-          Updates.max("lastAttackTs", event.getDetectedAt()),
-          Updates.min("discoveredAt", event.getDetectedAt()),
-          Updates.set("updatedAt", Context.now()),
-          Updates.setOnInsert("actorId", actor),
-          Updates.setOnInsert("status", "ACTIVE"),
-          Updates.inc("totalAttacks", 1)
-      );
+      java.util.List<Bson> updatesList = new java.util.ArrayList<>();
+      updatesList.add(Updates.set("filterId", event.getFilterId()));
+      updatesList.add(Updates.set("category", event.getCategory()));
+      updatesList.add(Updates.set("apiCollectionId", event.getLatestApiCollectionId()));
+      updatesList.add(Updates.set("url", event.getLatestApiEndpoint()));
+      updatesList.add(Updates.set("method", event.getLatestApiMethod() != null ? event.getLatestApiMethod().name() : ""));
+      updatesList.add(Updates.set("country", event.getCountry() != null ? event.getCountry() : ""));
+      updatesList.add(Updates.set("severity", severity != null ? severity : ""));
+      updatesList.add(Updates.set("host", event.getHost() != null ? event.getHost() : ""));
+      updatesList.add(Updates.set("contextSource", event.getContextSource() != null ? event.getContextSource() : ""));
+      updatesList.add(Updates.set("latestMetadata", event.getMetadata() != null ? event.getMetadata() : ""));
+      updatesList.add(Updates.max("lastAttackTs", event.getDetectedAt()));
+      updatesList.add(Updates.min("discoveredAt", event.getDetectedAt()));
+      updatesList.add(Updates.set("updatedAt", Context.now()));
+      updatesList.add(Updates.setOnInsert("actorId", actor));
+      updatesList.add(Updates.setOnInsert("status", "ACTIVE"));
+      updatesList.add(Updates.setOnInsert("isCritical", false));  // Initialize to false on insert
+      updatesList.add(Updates.inc("totalAttacks", 1));
+
+      // ONLY set isCritical to true if this event is HIGH/CRITICAL, never set back to false
+      if (isCriticalEvent) {
+        updatesList.add(Updates.set("isCritical", true));
+      }
+
+      Bson updates = Updates.combine(updatesList);
 
       UpdateOptions options = new UpdateOptions().upsert(true);
 
