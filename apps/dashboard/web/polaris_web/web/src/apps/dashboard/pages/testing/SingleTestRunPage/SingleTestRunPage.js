@@ -872,25 +872,28 @@ function SingleTestRunPage() {
   )
 
   const metadataComponent = () => {
-
-    if (!selectedTestRun.metadata) {
-      return undefined
-    }
-
-    return (
-      <LegacyCard title="Metadata" sectioned key="metadata">
-        {
-          selectedTestRun.metadata ? Object.keys(selectedTestRun.metadata).map((key) => {
-            return (
-              <HorizontalStack key={key} spacing="tight">
-                <Text>{key} : {selectedTestRun.metadata[key]}</Text>
-              </HorizontalStack>
-            )
-          }) : ""
-        }
-      </LegacyCard>
-    )
+  if (!selectedTestRun.metadata) {
+    return undefined;
   }
+
+  // Filter out keys with empty string values and the 'error' key
+  const filteredMetadata = Object.keys(selectedTestRun.metadata)
+    .filter(key => key !== 'error' && selectedTestRun.metadata[key] !== '');
+
+  if (filteredMetadata.length === 0) {
+    return undefined;
+  }
+
+  return (
+    <LegacyCard title="Metadata" sectioned key="metadata">
+      {filteredMetadata.map((key) => (
+        <HorizontalStack key={key} spacing="tight">
+          <Text>{key} : {selectedTestRun.metadata[key]}</Text>
+        </HorizontalStack>
+      ))}
+    </LegacyCard>
+  );
+};
 
   const progress = useMemo(() => {
     return currentTestObj.testsInitiated === 0 ? 0 : Math.floor((currentTestObj.testsInsertedInDb * 100) / currentTestObj.testsInitiated);
