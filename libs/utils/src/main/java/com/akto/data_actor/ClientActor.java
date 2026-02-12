@@ -2448,6 +2448,27 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public TestingRunResultSummary updateMetadataInSummary(String summaryId, Map<String, String> metadata) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("summaryId", summaryId);
+        obj.put("metadata", metadata);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateMetadataInSummary", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateMetadataInSummary", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+            return gson.fromJson(payloadObj.get("trrs").toString(), TestingRunResultSummary.class);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateMetadataInSummary" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
     public void insertActivity(int count) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
