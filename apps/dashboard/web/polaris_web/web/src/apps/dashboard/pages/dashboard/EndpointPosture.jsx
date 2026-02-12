@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { HorizontalStack, Box, Text, Spinner, Button } from '@shopify/polaris'
 import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCards'
-import { HorizontalGrid, HorizontalStack, Box, Text, Spinner } from '@shopify/polaris'
 import TitleWithInfo from '../../components/shared/TitleWithInfo'
 import SummaryCard from './new_components/SummaryCard'
 import InfoCard from './new_components/InfoCard'
@@ -15,6 +15,10 @@ import api from '../observe/api'
 import func from '@/util/func'
 import { getTypeFromTags, CLIENT_TYPES, getDomainForFavicon } from '../observe/agentic/mcpClientHelper'
 import { extractEndpointId } from '../observe/agentic/constants'
+import { GridLayout } from 'react-grid-layout'
+import 'react-grid-layout/css/styles.css'
+import 'react-resizable/css/styles.css'
+import './endpoint-posture.css'
 
 const cleanHostname = (hostname) => {
     if (!hostname) return hostname
@@ -100,6 +104,19 @@ const processAgenticCollections = (collections, topN = 4) => {
     }
 }
 
+// Default layout configuration - each component is independently draggable/resizable
+const defaultLayout = [
+    { i: 'summary', x: 0, y: 0, w: 12, h: 3, minW: 6, minH: 2, maxH: 6 },
+    { i: 'mcpServers', x: 0, y: 3, w: 4, h: 5, minW: 3, minH: 3, maxH: 10 },
+    { i: 'llms', x: 4, y: 3, w: 4, h: 5, minW: 3, minH: 3, maxH: 10 },
+    { i: 'aiAgents', x: 8, y: 3, w: 4, h: 5, minW: 3, minH: 3, maxH: 10 },
+    { i: 'attackFlowMap', x: 0, y: 8, w: 6, h: 9, minW: 4, minH: 4, maxH: 18 },
+    { i: 'complianceAtRisks', x: 6, y: 8, w: 6, h: 9, minW: 4, minH: 4, maxH: 18 },
+    { i: 'threatCategory', x: 0, y: 17, w: 12, h: 9, minW: 6, minH: 4, maxH: 18 },
+    { i: 'dataProtectionTrends', x: 0, y: 26, w: 6, h: 9, minW: 4, minH: 4, maxH: 18 },
+    { i: 'guardrailPolicies', x: 6, y: 26, w: 6, h: 9, minW: 4, minH: 4, maxH: 18 }
+]
+
 function EndpointPosture() {
     const [summaryInfoData, setSummaryInfoData] = useState([])
     const [commonMcpServers, setCommonMcpServers] = useState([])
@@ -110,6 +127,45 @@ function EndpointPosture() {
     const [complianceData, setComplianceData] = useState([])
     const [attackRequests, setAttackRequests] = useState([])
     const [loading, setLoading] = useState(true)
+
+    const containerRef = useRef(null)
+    const [gridWidth, setGridWidth] = useState(1200)
+
+    // Load layout from localStorage or use default
+    const [layout, setLayout] = useState(() => {
+        const savedLayout = localStorage.getItem('endpointDashboardLayout')
+        return savedLayout ? JSON.parse(savedLayout) : defaultLayout
+    })
+
+    // Dynamic width calculation
+    useEffect(() => {
+        let rafId = null
+        let resizeObserver = null
+
+        const updateWidth = () => {
+            if (rafId) cancelAnimationFrame(rafId)
+            rafId = requestAnimationFrame(() => {
+                if (containerRef.current) {
+                    setGridWidth(containerRef.current.clientWidth)
+                }
+            })
+        }
+
+        updateWidth()
+
+        if (containerRef.current) {
+            resizeObserver = new ResizeObserver(updateWidth)
+            resizeObserver.observe(containerRef.current)
+        }
+
+        window.addEventListener('resize', updateWidth)
+
+        return () => {
+            if (rafId) cancelAnimationFrame(rafId)
+            if (resizeObserver) resizeObserver.disconnect()
+            window.removeEventListener('resize', updateWidth)
+        }
+    }, [])
 
     useEffect(() => {
 
@@ -245,6 +301,26 @@ function EndpointPosture() {
         )
     }
 
+    // Handler for layout changes (drag/resize)
+    const onLayoutChange = (newLayout) => {
+        setLayout(newLayout)
+        localStorage.setItem('endpointDashboardLayout', JSON.stringify(newLayout))
+    }
+
+    // Reset layout to default
+    const resetLayout = () => {
+        // Create a deep copy to force re-render
+        const resetLayoutCopy = JSON.parse(JSON.stringify(defaultLayout))
+        setLayout(resetLayoutCopy)
+        localStorage.removeItem('endpointDashboardLayout')
+    }
+
+    const resetButton = (
+        <Button onClick={resetLayout}>
+            Reset Layout
+        </Button>
+    )
+
     const summaryHeader = (
         <SummaryCard 
             summaryItems={summaryInfoData}
@@ -255,54 +331,58 @@ function EndpointPosture() {
     const hasLlms = commonLlmsInBrowsers && commonLlmsInBrowsers.length > 0
     const hasAiAgents = commonAiAgents && commonAiAgents.length > 0
 
-    const coverageComponent = (
-        <HorizontalGrid columns={3} gap={4}>
-            <InfoCard
-                title="Common MCP Servers"
-                component={
-                    <div style={{ marginTop: "20px" }}>
-                        {hasMcpServers ? (
-                            <ServersLayout items={commonMcpServers} boxHeight="200px" />
-                        ) : (
-                            <Box minHeight="200px">
-                                <Text alignment='center' color='subdued'>No MCP servers detected</Text>
-                            </Box>
-                        )}
-                    </div>
-                }
-                tooltipContent="The most common MCP servers detected in your environment."
-            />
-            <InfoCard
-                title="Common LLMs in browsers"
-                component={
-                    <div style={{ marginTop: "20px" }}>
-                        {hasLlms ? (
-                            <ServersLayout items={commonLlmsInBrowsers} boxHeight="200px" />
-                        ) : (
-                            <Box minHeight="200px">
-                                <Text alignment='center' color='subdued'>No LLMs detected</Text>
-                            </Box>
-                        )}
-                    </div>
-                }
-                tooltipContent="The most common LLMs agents detected in your environment."
-            />
-            <InfoCard
-                title="Common AI Agents"
-                component={
-                    <div style={{ marginTop: "20px" }}>
-                        {hasAiAgents ? (
-                            <ServersLayout items={commonAiAgents} boxHeight="200px" />
-                        ) : (
-                            <Box minHeight="200px">
-                                <Text alignment='center' color='subdued'>No AI agents detected</Text>
-                            </Box>
-                        )}
-                    </div>
-                }
-                tooltipContent="The most common AI agents detected in your environment."
-            />
-        </HorizontalGrid>
+    const mcpServersComponent = (
+        <InfoCard
+            title="Common MCP Servers"
+            component={
+                <div style={{ marginTop: "20px" }}>
+                    {hasMcpServers ? (
+                        <ServersLayout items={commonMcpServers} boxHeight="200px" />
+                    ) : (
+                        <Box minHeight="200px">
+                            <Text alignment='center' color='subdued'>No MCP servers detected</Text>
+                        </Box>
+                    )}
+                </div>
+            }
+            tooltipContent="The most common MCP servers detected in your environment."
+        />
+    )
+
+    const llmsComponent = (
+        <InfoCard
+            title="Common LLMs in browsers"
+            component={
+                <div style={{ marginTop: "20px" }}>
+                    {hasLlms ? (
+                        <ServersLayout items={commonLlmsInBrowsers} boxHeight="200px" />
+                    ) : (
+                        <Box minHeight="200px">
+                            <Text alignment='center' color='subdued'>No LLMs detected</Text>
+                        </Box>
+                    )}
+                </div>
+            }
+            tooltipContent="The most common LLMs agents detected in your environment."
+        />
+    )
+
+    const aiAgentsComponent = (
+        <InfoCard
+            title="Common AI Agents"
+            component={
+                <div style={{ marginTop: "20px" }}>
+                    {hasAiAgents ? (
+                        <ServersLayout items={commonAiAgents} boxHeight="200px" />
+                    ) : (
+                        <Box minHeight="200px">
+                            <Text alignment='center' color='subdued'>No AI agents detected</Text>
+                        </Box>
+                    )}
+                </div>
+            }
+            tooltipContent="The most common AI agents detected in your environment."
+        />
     )
 
     const threatCategoryStackedChartComponent = (
@@ -312,49 +392,50 @@ function EndpointPosture() {
     const hasAttackFlowData = attackRequests && attackRequests.length > 0
     const hasComplianceData = complianceData && complianceData.length > 0
 
-    const attackWorldMapComponent = (
-        <HorizontalGrid columns={2} gap={4}>
-            <InfoCard
-                title="Attack Flow Map"
-                component={
-                    <div style={{ marginTop: "20px" }}>
-                        {hasAttackFlowData ? (
-                            <AttackWorldMap
-                                attackRequests={attackRequests}
-                                style={{
-                                    width: "100%",
-                                    height: "300px",
-                                    marginRight: "auto",
-                                }}
-                            />
-                        ) : (
-                            <Box minHeight="300px">
-                                <Text alignment='center' color='subdued'>No attack flow data in the selected period</Text>
-                            </Box>
-                        )}
-                    </div>
-                }
-                titleToolTip="Visualization of attack sources and destinations"
-            />
-            <InfoCard
-                title="Compliance At Risks"
-                component={
-                    <div style={{ marginTop: "20px" }}>
-                        {hasComplianceData ? (
-                            <ComplianceAtRisksCard
-                                complianceData={complianceData}
-                                tooltipContent="Overview of compliance risks across different security standards"
-                            />
-                        ) : (
-                            <Box minHeight="300px">
-                                <Text alignment='center' color='subdued'>No compliance risk data available</Text>
-                            </Box>
-                        )}
-                    </div>
-                }
-                titleToolTip="Overview of compliance risks across different security standards"
-            />
-        </HorizontalGrid>
+    const attackFlowMapComponent = (
+        <InfoCard
+            title="Attack Flow Map"
+            component={
+                <div style={{ marginTop: "20px" }}>
+                    {hasAttackFlowData ? (
+                        <AttackWorldMap
+                            attackRequests={attackRequests}
+                            style={{
+                                width: "100%",
+                                height: "300px",
+                                marginRight: "auto",
+                            }}
+                        />
+                    ) : (
+                        <Box minHeight="300px">
+                            <Text alignment='center' color='subdued'>No attack flow data in the selected period</Text>
+                        </Box>
+                    )}
+                </div>
+            }
+            titleToolTip="Visualization of attack sources and destinations"
+        />
+    )
+
+    const complianceAtRisksComponent = (
+        <InfoCard
+            title="Compliance At Risks"
+            component={
+                <div style={{ marginTop: "20px" }}>
+                    {hasComplianceData ? (
+                        <ComplianceAtRisksCard
+                            complianceData={complianceData}
+                            tooltipContent="Overview of compliance risks across different security standards"
+                        />
+                    ) : (
+                        <Box minHeight="300px">
+                            <Text alignment='center' color='subdued'>No compliance risk data available</Text>
+                        </Box>
+                    )}
+                </div>
+            }
+            titleToolTip="Overview of compliance risks across different security standards"
+        />
     )
 
     const hasGuardrailData = guardrailPoliciesData && typeof guardrailPoliciesData === 'object' && Object.keys(guardrailPoliciesData).length > 0 && Object.values(guardrailPoliciesData).some(item => item?.text > 0);
@@ -367,68 +448,125 @@ function EndpointPosture() {
     const hasDataProtectionTrends = dataProtectionTrendsData && dataProtectionTrendsData.length > 0 &&
                                      dataProtectionTrendsData.some(item => item.data && item.data.length > 0)
 
-    const chartsComponent = (
-        <HorizontalGrid columns={2} gap={4}>
-            <InfoCard
-                title="Data Protection Trends"
-                titleToolTip="Trends showing how data protection mechanisms are being triggered over time"
-                component={
-                    <div style={{ marginTop: "20px" }}>
-                        {hasDataProtectionTrends ? (
-                            <CustomLineChart
-                                title="Data Protection Trends"
-                                chartData={dataProtectionTrendsData}
-                                labels={dataProtectionTrendsLabels}
-                                chartHeight={290}
-                                tooltipContent="Trends showing how data protection mechanisms are being triggered over time"
-                            />
-                        ) : (
-                            <Box minHeight="250px">
-                                <Text alignment='center' color='subdued'>No data protection trend data in the selected period</Text>
-                            </Box>
-                        )}
-                    </div>
-                }
-            />
-            <InfoCard
-                component={
-                    <div style={{ marginTop: "20px" }}>
-                        {hasGuardrailData ? (
-                            <ChartypeComponent
-                                data={guardrailPoliciesData}
-                                title="Top Triggered Guardrail Policies"
-                                isNormal={true}
-                                boxHeight={'250px'}
-                                chartOnLeft={true}
-                                dataTableWidth="250px"
-                                pieInnerSize="50%"
-                            />
-                        ) : (
-                            <Box minHeight="250px">
-                                <Text alignment='center' color='subdued'>No guardrail policy data available</Text>
-                            </Box>
-                        )}
-                    </div>
-                }
-                title="Top Triggered Guardrail Policies"
-                titleToolTip="Distribution of the most frequently triggered guardrail policies"
-            />
-        </HorizontalGrid>
+    const dataProtectionTrendsComponent = (
+        <InfoCard
+            title="Data Protection Trends"
+            titleToolTip="Trends showing how data protection mechanisms are being triggered over time"
+            component={
+                <div style={{ marginTop: "20px" }}>
+                    {hasDataProtectionTrends ? (
+                        <CustomLineChart
+                            title="Data Protection Trends"
+                            chartData={dataProtectionTrendsData}
+                            labels={dataProtectionTrendsLabels}
+                            chartHeight={290}
+                            tooltipContent="Trends showing how data protection mechanisms are being triggered over time"
+                        />
+                    ) : (
+                        <Box minHeight="250px">
+                            <Text alignment='center' color='subdued'>No data protection trend data in the selected period</Text>
+                        </Box>
+                    )}
+                </div>
+            }
+        />
+    )
+
+    const guardrailPoliciesComponent = (
+        <InfoCard
+            component={
+                <div style={{ marginTop: "20px" }}>
+                    {hasGuardrailData ? (
+                        <ChartypeComponent
+                            data={guardrailPoliciesData}
+                            title="Top Triggered Guardrail Policies"
+                            isNormal={true}
+                            boxHeight={'250px'}
+                            chartOnLeft={true}
+                            dataTableWidth="250px"
+                            pieInnerSize="50%"
+                        />
+                    ) : (
+                        <Box minHeight="250px">
+                            <Text alignment='center' color='subdued'>No guardrail policy data available</Text>
+                        </Box>
+                    )}
+                </div>
+            }
+            title="Top Triggered Guardrail Policies"
+            titleToolTip="Distribution of the most frequently triggered guardrail policies"
+        />
     )
 
     return (
         <PageWithMultipleCards
             isFirstPage={true}
             title={
-                <HorizontalStack gap={3}>
-                    <TitleWithInfo
-                        titleText="Endpoint Security Dashboard"
-                        tooltipContent="Monitor and manage your endpoint security from this centralized dashboard."
-                        docsUrl="https://docs.akto.io/endpoint-security"
-                    />
-                </HorizontalStack>
+                <TitleWithInfo
+                    titleText="Endpoint Security Dashboard"
+                    tooltipContent="Monitor and manage your endpoint security from this centralized dashboard. Drag cards to reposition and hover over corners to resize."
+                    docsUrl="https://docs.akto.io/endpoint-security"
+                />
             }
-            components={[summaryHeader, coverageComponent, attackWorldMapComponent, threatCategoryStackedChartComponent, chartsComponent]}
+            primaryAction={resetButton}
+            components={[
+                <div key="grid-container" ref={containerRef} style={{ width: '100%' }}>
+                    <GridLayout
+                        width={gridWidth}
+                        layout={layout}
+                        gridConfig={{
+                            cols: 12,
+                            rowHeight: 50,
+                            margin: [16, 16],
+                            containerPadding: [0, 0]
+                        }}
+                        dragConfig={{
+                            enabled: true
+                        }}
+                        resizeConfig={{
+                            enabled: true
+                        }}
+                        compactor={null}
+                        onLayoutChange={onLayoutChange}
+                    >
+                        <div key="summary">
+                            {summaryHeader}
+                        </div>
+
+                        <div key="mcpServers">
+                            {mcpServersComponent}
+                        </div>
+
+                        <div key="llms">
+                            {llmsComponent}
+                        </div>
+
+                        <div key="aiAgents">
+                            {aiAgentsComponent}
+                        </div>
+
+                        <div key="attackFlowMap">
+                            {attackFlowMapComponent}
+                        </div>
+
+                        <div key="complianceAtRisks">
+                            {complianceAtRisksComponent}
+                        </div>
+
+                        <div key="threatCategory">
+                            {threatCategoryStackedChartComponent}
+                        </div>
+
+                        <div key="dataProtectionTrends">
+                            {dataProtectionTrendsComponent}
+                        </div>
+
+                        <div key="guardrailPolicies">
+                            {guardrailPoliciesComponent}
+                        </div>
+                    </GridLayout>
+                </div>
+            ]}
         />
     )
 }
