@@ -66,6 +66,7 @@ public class ApiInfo {
         private AuthType() {} // Prevent instantiation
     }
 
+    @BsonIgnore
     /**
          * Returns all standard auth type constants.
          * Used for testing and demo data generation.
