@@ -29,6 +29,8 @@ import {
     CustomGuardrailsConfig,
     UsageGuardrailsStep,
     UsageGuardrailsConfig,
+    AnomalyDetectionStep,
+    AnomalyDetectionConfig,
     ServerSettingsStep,
     ServerSettingsConfig
 } from './steps';
@@ -101,7 +103,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [enableTokenLimit, setEnableTokenLimit] = useState(false);
     const [tokenLimitConfidenceScore, setTokenLimitConfidenceScore] = useState(0.7);
 
-    // Step 8: Server settings
+    // Step 8: Anomaly Detection (coming soon)
+
+    // Step 9: Server settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
@@ -160,7 +164,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // Step 7
         enableTokenLimit,
         tokenLimitConfidenceScore,
-        // Step 8
+        // Step 9
         selectedMcpServers,
         selectedAgentServers,
         mcpServers,
@@ -214,6 +218,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 title: UsageGuardrailsConfig.title,
                 summary: UsageGuardrailsConfig.getSummary(storedStateData),
                 ...UsageGuardrailsConfig.validate(storedStateData)
+            },
+            {
+                number: AnomalyDetectionConfig.number,
+                title: AnomalyDetectionConfig.title,
+                summary: AnomalyDetectionConfig.getSummary(storedStateData),
+                ...AnomalyDetectionConfig.validate(storedStateData)
             },
             {
                 number: ServerSettingsConfig.number,
@@ -828,6 +838,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     />
                 );
             case 8:
+                return (
+                    <AnomalyDetectionStep />
+                );
+            case 9:
                 return (
                     <ServerSettingsStep
                         selectedMcpServers={selectedMcpServers}

@@ -327,12 +327,12 @@ public class APICatalogSync {
                 String key = sti.getMethod() + " " + sti.getUrl();
                 fillExistingAPIsInDb(sti, existingAPIsInDb);
 
-                if (APICatalog.isTemplateUrl(sti.getUrl())) {
+                if (APICatalog.isTemplateUrl(sti.getUrl()) && !skipMergingOnKnownStaticURLsForVersionedApis) {
                     templateUrlSet.add(key);
                     continue;
                 };
 
-                if (sti.getIsUrlParam()) continue;
+                if (sti.getIsUrlParam() || !skipMergingOnKnownStaticURLsForVersionedApis) continue;
                 if (sti.getIsHeader()) {
                     staticUrlToSti.putIfAbsent(key, new HashSet<>());
                     continue;
@@ -356,36 +356,38 @@ public class APICatalogSync {
             Set<String> seenStaticUrls = new HashSet<>();
 
             Iterator<String> iterator = staticUrlToSti.keySet().iterator();
-            while (iterator.hasNext()) {
-                String staticURL = iterator.next();
-                Method staticMethod = Method.fromString(staticURL.split(" ")[0]);
-                String staticEndpoint = staticURL.split(" ")[1];
-                String tempEndpoint = staticEndpoint.toLowerCase();
-
-                if(ignoreCaseInsensitiveApis){
-                    if(!seenStaticUrls.isEmpty() && seenStaticUrls.contains(tempEndpoint)){
-                        finalResult.deleteStaticUrls.add(staticURL);
-                        iterator.remove();
-                        continue;
+            if(!skipMergingOnKnownStaticURLsForVersionedApis){
+                while (iterator.hasNext()) {
+                    String staticURL = iterator.next();
+                    Method staticMethod = Method.fromString(staticURL.split(" ")[0]);
+                    String staticEndpoint = staticURL.split(" ")[1];
+                    String tempEndpoint = staticEndpoint.toLowerCase();
+    
+                    if(ignoreCaseInsensitiveApis){
+                        if(!seenStaticUrls.isEmpty() && seenStaticUrls.contains(tempEndpoint)){
+                            finalResult.deleteStaticUrls.add(staticURL);
+                            iterator.remove();
+                            continue;
+                        }
                     }
-                }
-
-                for (String templateURL: templateUrls) {
-                    Method templateMethod = Method.fromString(templateURL.split(" ")[0]);
-                    String templateEndpoint = templateURL.split(" ")[1];
-
-                    URLTemplate urlTemplate = createUrlTemplate(templateEndpoint, templateMethod);
-                    if (urlTemplate.match(staticEndpoint, staticMethod)) {
-                        finalResult.deleteStaticUrls.add(staticURL);
-                        iterator.remove();
-                        break;
+    
+                    for (String templateURL: templateUrls) {
+                        Method templateMethod = Method.fromString(templateURL.split(" ")[0]);
+                        String templateEndpoint = templateURL.split(" ")[1];
+    
+                        URLTemplate urlTemplate = createUrlTemplate(templateEndpoint, templateMethod);
+                        if (urlTemplate.match(staticEndpoint, staticMethod)) {
+                            finalResult.deleteStaticUrls.add(staticURL);
+                            iterator.remove();
+                            break;
+                        }
                     }
-                }
-                if(ignoreCaseInsensitiveApis){
-                    seenStaticUrls.add(tempEndpoint);
-                }
+                    if(ignoreCaseInsensitiveApis){
+                        seenStaticUrls.add(tempEndpoint);
+                    }
+                }    
             }
-
+            
             Map<Integer, Map<String, Set<String>>> sizeToUrlToSti = groupByTokenSize(staticUrlToSti);
 
             sizeToUrlToSti.remove(1);
@@ -1490,6 +1492,10 @@ public class APICatalogSync {
     }
 
     public static URLTemplate createUrlTemplate(String url, Method method) {
+        return createUrlTemplate(url, method, false);
+    }
+
+    public static URLTemplate createUrlTemplate(String url, Method method,  boolean allowedMergingOnVersions) {
         String[] tokens = trimAndSplit(url);
         SuperType[] types = new SuperType[tokens.length];
         for(int i = 0; i < tokens.length; i ++ ) {
@@ -1507,7 +1513,10 @@ public class APICatalogSync {
             } else if (token.equals(SuperType.FLOAT.name())) {
                 tokens[i] = null;
                 types[i] = SuperType.FLOAT;
-            } else {
+            } else if(allowedMergingOnVersions && isValidVersionToken(token) ){
+                tokens[i] = null;
+                types[i] = SuperType.VERSIONED;
+            }else {
                 types[i] = null;
             }
 
