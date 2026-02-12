@@ -380,7 +380,7 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 
                 // No-Auth: actualAuthType is null/empty OR contains UNAUTHENTICATED
                 // Matches frontend: obj.auth_type === undefined || obj.auth_type.toLowerCase() === "unauthenticated"
-                List<ApiInfo.AuthType> authTypes = api.getActualAuthType();
+                List<String> authTypes = api.getActualAuthType();
                 boolean isNoAuth = (authTypes == null || authTypes.isEmpty()) || 
                                   (authTypes.contains(ApiInfo.AuthType.UNAUTHENTICATED));
 
