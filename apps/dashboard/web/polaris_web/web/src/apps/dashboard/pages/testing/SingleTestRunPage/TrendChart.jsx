@@ -203,6 +203,19 @@ function TrendChart(props) {
         setFilterData();
     }, [])
 
+    // Refetch data when refreshTrigger prop changes
+    useEffect(() => {
+        if (props.refreshTrigger > 0) {
+            fetchData(currDateRange.period, false);
+        }
+    }, [props.refreshTrigger])
+
+    useEffect(() => {
+        if (props.totalVulnerabilities !== undefined) {
+            setTotalVulnerabilites(props.totalVulnerabilities);
+        }
+    }, [props.totalVulnerabilities])
+
 
     const defaultChartOptions = {
         "legend": {

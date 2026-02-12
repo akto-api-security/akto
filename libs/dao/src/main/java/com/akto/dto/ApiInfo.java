@@ -483,6 +483,15 @@ public class ApiInfo {
         return url;
     }
 
+
+    public static String getForwardNormalizedUrl(String url){
+        url = getNormalizedUrl(url);
+        if (url.startsWith("/")) {
+            url = url.substring(1);
+        }
+        return url;
+    }
+
     public Set<Set<String>> getAllAuthTypesFound() {
         return allAuthTypesFound;
     }

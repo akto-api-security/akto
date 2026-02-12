@@ -34,6 +34,8 @@ public class TestConfig {
     public static final String SETTINGS = "attributes";
     private TemplateSettings attributes;
 
+    private int estimatedTokens;
+
     public TestConfig(String id, Info info, Auth auth, ConfigParserResult apiSelectionFilters, Map<String, List<String>> wordlists, ExecutorConfigParserResult execute, 
         ConfigParserResult validation, Strategy strategy, TemplateSettings attributes) {
         
@@ -186,5 +188,13 @@ public class TestConfig {
 
     public void setAttributes(TemplateSettings attributes) {
         this.attributes = attributes;
+    }
+
+    public int getEstimatedTokens() {
+        return estimatedTokens;
+    }
+
+    public void setEstimatedTokens(int estimatedTokens) {
+        this.estimatedTokens = estimatedTokens;
     }
 }

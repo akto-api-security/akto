@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList, Avatar } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -14,28 +14,31 @@ import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
-import { GUARDRAIL_SECTIONS } from "../constants/guardrailDescriptions";
-import { isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN } from "../constants/guardrailDescriptions";
+import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
     const resolvedThreatFiltersMap = threatFiltersMap || {};
 
-    const useGuardrailDescription = isEndpointSecurityCategory();
+    // Determine if we should use hardcoded guardrail descriptions
+    const useGuardrailDescription = isAgenticSecurityCategory() || isEndpointSecurityCategory();
 
+    // Get template object - either from hardcoded data or YAML templates
     let currentTemplateObj;
     if (useGuardrailDescription) {
-        // For Atlas guardrails, use structured content
+        // For Argus/Atlas guardrails, use structured content
         currentTemplateObj = {
             guardrailSections: GUARDRAIL_SECTIONS,
             testName: moreInfoData?.templateId || "Guardrail Policy",
             name: moreInfoData?.templateId || "Guardrail Policy"
         };
     } else {
+        // Normal threat detection - use YAML templates
         currentTemplateObj = moreInfoData?.templateId ? resolvedThreatFiltersMap[moreInfoData?.templateId] : undefined;
     }
 
-    let severity = currentTemplateObj?.severity || "HIGH"
+    let severity = moreInfoData?.severity || currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
     const [latestActivity, setLatestActivity] = useState([])
     const [showModal, setShowModal] = useState(false);  
@@ -214,10 +217,300 @@ function SampleDetails(props) {
             </Box>)
     }
 
-    const remediationTab = remediationText.length > 0 && {
+    const remediationTab = useGuardrailDescription ? {
+        id: "remediation",
+        content: "Remediation",
+        component: (<MarkdownViewer markdown={GUARDRAIL_REMEDIATION_MARKDOWN}></MarkdownViewer>)
+    } : (remediationText.length > 0 && {
         id: "remediation",
         content: "Remediation",
         component: (<MarkdownViewer markdown={remediationText}></MarkdownViewer>)
+    })
+
+    // Session Context Tab - shows prompts involved in session-based detection
+    const SessionContextComponent = () => {
+        // Determine if this is session-based by checking if sessionId is present and not empty
+        const sessionId = moreInfoData?.sessionId;
+        const isSessionBased = sessionId && sessionId !== '';
+
+        const [sessionData, setSessionData] = useState(null);
+        const [sessionLoading, setSessionLoading] = useState(false);
+        const [sessionError, setSessionError] = useState(null);
+
+        // Fetch session data from agentic_session_context table API using sessionId
+        useEffect(() => {
+            if (isSessionBased) {
+                setSessionLoading(true);
+                setSessionError(null);
+
+                threatDetectionApi.fetchSessionContext(sessionId)
+                    .then((resp) => {
+                        if (resp && resp.sessionData) {
+                            setSessionData(resp.sessionData);
+                        } else {
+                            setSessionError(resp?.errorMessage || "Session data not found");
+                        }
+                    })
+                    .catch((err) => {
+                        setSessionError("Failed to fetch session data");
+                    })
+                    .finally(() => {
+                        setSessionLoading(false);
+                    });
+            }
+        }, [sessionId, isSessionBased]);
+
+        // Parse conversation info from session data
+        let sessionPrompts = [];
+        let sessionSummary = null;
+        let blockedReason = null;
+
+        if (sessionData) {
+            sessionSummary = sessionData.sessionSummary;
+            blockedReason = sessionData.blockedReason;
+
+            // Map conversationInfo to the format expected by the display logic
+            if (sessionData.conversationInfo && Array.isArray(sessionData.conversationInfo)) {
+                sessionPrompts = sessionData.conversationInfo.map((conv) => {
+                    // Parse request and response payloads if they're JSON strings
+                    let requestContent = conv.requestPayload;
+                    let responseContent = conv.responsePayload;
+
+                    try {
+                        if (typeof requestContent === 'string') {
+                            const parsed = JSON.parse(requestContent);
+                            requestContent = parsed.prompt || parsed.content || requestContent;
+                        }
+                    } catch (e) {
+                        // Keep as is if not valid JSON
+                    }
+
+                    try {
+                        if (typeof responseContent === 'string') {
+                            const parsed = JSON.parse(responseContent);
+                            responseContent = parsed.response || parsed.content || responseContent;
+                        }
+                    } catch (e) {
+                        // Keep as is if not valid JSON
+                    }
+
+                    return {
+                        content: requestContent,
+                        response: responseContent,
+                        timestamp: conv.timestamp,
+                        requestId: conv.requestId
+                    };
+                });
+            }
+        }
+
+        // Format timestamp to show full date and time (not just date)
+        const formatTimestamp = (timestamp) => {
+            if (!timestamp) return '';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+        };
+
+        return (
+            <Box padding={"4"}>
+                <VerticalStack gap={"5"}>
+                    <VerticalStack gap={"2"}>
+                        <Text variant="headingMd">Detection Type</Text>
+                        <HorizontalStack gap={"2"}>
+                            <Badge status={isSessionBased ? 'info' : 'default'}>
+                                {isSessionBased ? 'Session-based' : 'Single Prompt'}
+                            </Badge>
+                            {sessionId && (
+                                <Text variant="bodySm" color="subdued">Session ID: {sessionId}</Text>
+                            )}
+                        </HorizontalStack>
+                    </VerticalStack>
+
+                    {isSessionBased && (
+                        <>
+                            {sessionLoading && (
+                                <>
+                                    <Divider />
+                                    <Box padding={"4"}>
+                                        <HorizontalStack gap={"2"} align="center">
+                                            <Spinner size="small" />
+                                            <Text variant="bodyMd" color="subdued">Loading session data...</Text>
+                                        </HorizontalStack>
+                                    </Box>
+                                </>
+                            )}
+
+                            {sessionError && !sessionLoading && (
+                                <>
+                                    <Divider />
+                                    <Box padding={"3"} background="bg-surface-critical" borderRadius="200">
+                                        <Text variant="bodyMd" color="critical">
+                                            {sessionError}
+                                        </Text>
+                                    </Box>
+                                </>
+                            )}
+
+                            {!sessionLoading && !sessionError && sessionSummary && (
+                                <>
+                                    <Divider />
+                                    <VerticalStack gap={"2"}>
+                                        <Text variant="headingMd">Session Summary</Text>
+                                        <Box padding={"4"} background="bg-surface-caution" borderRadius="200">
+                                            <Text variant="bodyMd">
+                                                {sessionSummary}
+                                            </Text>
+                                        </Box>
+                                    </VerticalStack>
+                                </>
+                            )}
+
+                            {!sessionLoading && !sessionError && blockedReason && (
+                                <>
+                                    <Divider />
+                                    <VerticalStack gap={"2"}>
+                                        <Text variant="headingMd">Reason</Text>
+                                        <Box padding={"3"} background="bg-surface-critical" borderRadius="200">
+                                            <Text variant="bodyMd" color="critical">
+                                                {blockedReason}
+                                            </Text>
+                                        </Box>
+                                    </VerticalStack>
+                                </>
+                            )}
+
+                            {/* Detection Reason - show all reasons from blocked prompts */}
+                            {!sessionLoading && !sessionError && sessionPrompts.some(p => p.detectionReason) && (
+                                <>
+                                    <Divider />
+                                    <VerticalStack gap={"2"}>
+                                        <Box padding={"3"} background="bg-surface-critical" borderRadius="200">
+                                            <VerticalStack gap={"2"}>
+                                                {sessionPrompts
+                                                    .filter(p => p.detectionReason)
+                                                    .map((prompt, idx) => (
+                                                        <HorizontalStack key={idx} gap={"1"}>
+                                                            <Text variant="bodyMd" fontWeight="semibold" color="critical">
+                                                                Reason:
+                                                            </Text>
+                                                            <Text variant="bodyMd" color="critical">
+                                                                {prompt.detectionReason}
+                                                            </Text>
+                                                        </HorizontalStack>
+                                                    ))}
+                                            </VerticalStack>
+                                        </Box>
+                                    </VerticalStack>
+                                </>
+                            )}
+
+                            {!sessionLoading && !sessionError && sessionPrompts.length > 0 && (
+                                <>
+                                    <Divider />
+                                    <VerticalStack gap={"4"}>
+                                        <Text variant="headingMd">Conversation Timeline ({sessionPrompts.length} exchanges)</Text>
+
+                                        <VerticalStack gap={"4"}>
+                                            {sessionPrompts.map((prompt, idx) => (
+                                                <Box key={idx} padding={"4"} background="bg-surface-secondary" borderRadius="200">
+                                                    <VerticalStack gap={"4"}>
+                                                        {/* Prompt section */}
+                                                        <VerticalStack gap={"2"}>
+                                                            <HorizontalStack align="space-between" blockAlign="center">
+                                                                <Badge size="small" tone="info">
+                                                                    Prompt {idx + 1}
+                                                                </Badge>
+                                                                {prompt.timestamp && (
+                                                                    <Text variant="bodySm" color="subdued">
+                                                                        {formatTimestamp(prompt.timestamp)}
+                                                                    </Text>
+                                                                )}
+                                                            </HorizontalStack>
+                                                            <Box
+                                                                padding={"3"}
+                                                                background="bg-surface"
+                                                                borderRadius="200"
+                                                                style={{
+                                                                    maxHeight: '200px',
+                                                                    overflowY: 'auto',
+                                                                    fontSize: '14px',
+                                                                    lineHeight: '1.6',
+                                                                    wordBreak: 'break-word',
+                                                                    whiteSpace: 'pre-wrap'
+                                                                }}
+                                                            >
+                                                                <Text variant="bodyMd">
+                                                                    {prompt.content || prompt.snippet || prompt}
+                                                                </Text>
+                                                            </Box>
+                                                        </VerticalStack>
+
+                                                        {/* Agent Response section */}
+                                                        {prompt.response && (
+                                                            <VerticalStack gap={"2"}>
+                                                                <HorizontalStack gap={"2"}>
+                                                                    <Text variant="headingSm" fontWeight="medium">
+                                                                        Agent Response
+                                                                    </Text>
+                                                                    {prompt.flagged && (
+                                                                        <Badge tone="critical" size="small">🚫 Blocked</Badge>
+                                                                    )}
+                                                                </HorizontalStack>
+                                                                <Box
+                                                                    padding={"3"}
+                                                                    background="bg-surface"
+                                                                    borderRadius="200"
+                                                                    style={{
+                                                                        maxHeight: '200px',
+                                                                        overflowY: 'auto',
+                                                                        fontSize: '14px',
+                                                                        lineHeight: '1.6',
+                                                                        wordBreak: 'break-word',
+                                                                        whiteSpace: 'pre-wrap'
+                                                                    }}
+                                                                >
+                                                                    <Text variant="bodyMd">
+                                                                        {prompt.response}
+                                                                    </Text>
+                                                                </Box>
+                                                            </VerticalStack>
+                                                        )}
+                                                    </VerticalStack>
+                                                </Box>
+                                            ))}
+                                        </VerticalStack>
+                                    </VerticalStack>
+                                </>
+                            )}
+                        </>
+                    )}
+
+                    {!isSessionBased && (
+                        <>
+                            <Divider />
+                            <Box padding={"3"} background="bg-surface-secondary" borderRadius="200">
+                                <Text variant="bodyMd" color="subdued">
+                                    This threat was detected based on a single prompt analysis without session context.
+                                </Text>
+                            </Box>
+                        </>
+                    )}
+                </VerticalStack>
+            </Box>
+        );
+    };
+
+    const sessionContextTab = data.length > 0 && {
+        id: "session-context",
+        content: "Session Context",
+        component: <SessionContextComponent />
     }
 
     useEffect(() => {
@@ -648,10 +941,15 @@ Reference URL: ${window.location.href}`.trim();
         )
     }
 
+    // Only show session context tab for Agentic Security (Argus) and Endpoint Security (Atlas), not for API Security
+    const showSessionContext = isAgenticSecurityCategory() || isEndpointSecurityCategory();
+
     const tabsComponent = (
         <LayoutWithTabs
             key={`tabs-comp-${eventId || 'default'}`}
-            tabs={ window.location.href.indexOf("guardrails") > -1 ? [ValuesTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]}
+            tabs={ window.location.href.indexOf("guardrails") > -1
+                ? (showSessionContext ? [overviewTab, ValuesTab, sessionContextTab] : [overviewTab, ValuesTab])
+                : (showSessionContext ? [overviewTab, timelineTab, ValuesTab, sessionContextTab, remediationTab] : [overviewTab, timelineTab, ValuesTab, remediationTab])}
             currTab = {() => {}}
         />
     )

@@ -151,11 +151,14 @@ const settingRequests = {
             data: {groupBy, startTimestamp, endTimestamp, names, host}
         })
     },
-    fetchMetrics(startTimestamp, endTimestamp) {
+    fetchMetrics(startTimestamp, endTimestamp, metricIdPrefix, instanceId) {
+        const data = {startTime:startTimestamp, endTime:endTimestamp}
+        if (metricIdPrefix) data.metricIdPrefix = metricIdPrefix
+        if (instanceId) data.instanceId = instanceId
         return request({
             url: '/api/metrics',
             method: 'post',
-            data: {startTime:startTimestamp, endTime:endTimestamp}
+            data
         })
     },
 
@@ -308,19 +311,36 @@ const settingRequests = {
         })
     },
 
-    saveSeverityMapping(severityToPriorityMap) {
+    // Project-level priority field mapping APIs
+    fetchAvailableFieldsForMapping(projectKey) {
         return request({
-            url: '/api/jira/saveSeverityMapping',
+            url: '/api/jira/fetchAvailableFieldsForMapping',
             method: 'post',
-            data: {severityToPriorityMap}
+            data: {projectKey}
         })
     },
 
-    fetchSeverityMapping() {
+    fetchFieldValues(projectKey, fieldId) {
         return request({
-            url: '/api/jira/fetchSeverityMapping',
+            url: '/api/jira/fetchFieldValues',
             method: 'post',
-            data: {}
+            data: {projectKey, fieldId}
+        })
+    },
+
+    savePriorityFieldMapping(projectKey, priorityFieldMapping) {
+        return request({
+            url: '/api/jira/savePriorityFieldMapping',
+            method: 'post',
+            data: {projectKey, priorityFieldMapping}
+        })
+    },
+
+    fetchPriorityFieldMapping(projectKey) {
+        return request({
+            url: '/api/jira/fetchPriorityFieldMapping',
+            method: 'post',
+            data: {projectKey}
         })
     },
 
@@ -861,6 +881,13 @@ const settingRequests = {
             url: '/api/rebootModules',
             method: 'post',
             data: {moduleIds, deleteTopicAndReboot}
+        })
+    },
+    updateModuleEnvAndReboot(moduleId, moduleName, envData) {
+        return request({
+            url: '/api/updateModuleEnvAndReboot',
+            method: 'post',
+            data: {moduleId, moduleName, envData}
         })
     }
 }

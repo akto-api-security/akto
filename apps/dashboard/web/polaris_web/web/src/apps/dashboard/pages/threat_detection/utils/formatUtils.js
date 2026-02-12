@@ -7,9 +7,9 @@ const IPV6_REGEX = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/;
 
 export const formatActorId = (actorId) => {
   if (!actorId) return "-";
-  
+
   const isValidIP = IPV4_REGEX.test(actorId) || IPV6_REGEX.test(actorId);
-  
+
   if (isValidIP) {
     return (
       <Text variant="bodyMd" fontWeight="medium">
@@ -22,5 +22,16 @@ export const formatActorId = (actorId) => {
         Non IP Value
       </Text>
     );
+  }
+};
+
+export const extractRuleViolated = (metadata) => {
+  if (!metadata) return "-";
+
+  try {
+    const metadataObj = JSON.parse(metadata);
+    return metadataObj.rule_violated || metadataObj.ruleViolated || "-";
+  } catch (e) {
+    return "-";
   }
 };

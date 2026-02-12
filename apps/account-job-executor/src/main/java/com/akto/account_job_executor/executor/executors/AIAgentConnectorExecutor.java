@@ -69,6 +69,14 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
                 executeCopilotStudioConnector(job, config);
                 break;
 
+            case "SNOWFLAKE":
+                executeSnowflakeConnector(job, config);
+                break;
+
+            case "DATABRICKS":
+                executeDatabricksConnector(job, config);
+                break;
+
             default:
                 logger.warn("Unknown AI Agent Connector subType: {}. Skipping job execution.", subType);
                 throw new IllegalArgumentException("Unsupported AI Agent Connector subType: " + subType);
@@ -114,6 +122,32 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
         executeBinaryConnector(job, config, BINARY_NAME_COPILOT_STUDIO);
 
         logger.info("Copilot Studio connector execution completed: jobId={}", job.getId());
+    }
+
+    /**
+     * Execute Snowflake connector logic.
+     * Downloads the Snowflake shield binary from Azure Storage and executes it with config as env vars.
+     */
+    private void executeSnowflakeConnector(AccountJob job, Map<String, Object> config) throws Exception {
+        logger.info("Executing Snowflake connector: jobId={}", job.getId());
+
+        // Execute connector binary with config
+        executeBinaryConnector(job, config, BINARY_NAME_SNOWFLAKE);
+
+        logger.info("Snowflake connector execution completed: jobId={}", job.getId());
+    }
+
+    /**
+     * Execute Databricks connector logic.
+     * Downloads the Databricks shield binary from Azure Storage and executes it with config as env vars.
+     */
+    private void executeDatabricksConnector(AccountJob job, Map<String, Object> config) throws Exception {
+        logger.info("Executing Databricks connector: jobId={}", job.getId());
+
+        // Execute connector binary with config
+        executeBinaryConnector(job, config, BINARY_NAME_DATABRICKS);
+
+        logger.info("Databricks connector execution completed: jobId={}", job.getId());
     }
 
     /**

@@ -14,6 +14,8 @@ public class MetricsAction extends UserAction {
     private long endTime;
     private Map<String, Object> result = new HashMap<>();
     private List<MetricData.Name> names;
+    private String metricIdPrefix; // Optional: e.g. "TC_" for Traffic Collector metrics
+    private String instanceId; // Optional: specific instance ID
 
     public String fetchAllMetricsDesciptions(){
         names = Arrays.asList(MetricData.Name.values());
@@ -24,7 +26,12 @@ public class MetricsAction extends UserAction {
     public String getMetrics() {
         try {
             List<MetricData> metrics;
-            metrics = MetricDataDao.instance.getMetricsForTimeRange(startTime, endTime);
+            if (metricIdPrefix != null || instanceId != null) {
+                metrics = MetricDataDao.instance.getMetricsForTimeRange(startTime, endTime, metricIdPrefix, instanceId);
+            } else {
+                metrics = MetricDataDao.instance.getMetricsForTimeRange(startTime, endTime);
+            }
+
             if (metrics == null) {
                 result.put("metrics", new ArrayList<>());
                 return SUCCESS.toUpperCase();
@@ -78,5 +85,21 @@ public class MetricsAction extends UserAction {
 
     public void setNames(List<MetricData.Name> names) {
         this.names = names;
+    }
+
+    public String getMetricIdPrefix() {
+        return metricIdPrefix;
+    }
+
+    public void setMetricIdPrefix(String metricIdPrefix) {
+        this.metricIdPrefix = metricIdPrefix;
+    }
+
+    public String getInstanceId() {
+        return instanceId;
+    }
+
+    public void setInstanceId(String instanceId) {
+        this.instanceId = instanceId;
     }
 }

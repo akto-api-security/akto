@@ -1,7 +1,7 @@
 import { Navigation } from "@shopify/polaris"
 import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ComposeMajor, ProfileMajor} from "@shopify/polaris-icons"
 import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
-import { VariantMajor, VocabularyMajor, AdjustMinor, UndoMajor } from "@shopify/polaris-icons"
+import { VariantMajor, VocabularyMajor, AdjustMinor, UndoMajor, CodeMajor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 import func from "@/util/func"
 
@@ -35,6 +35,12 @@ const SettingsLeftNav = () => {
             selected: page === "logs",
             onClick: () => navigate("/dashboard/settings/logs")
         }] : []
+    const moduleInfoArr = [{
+            label: 'Module Info',
+            icon: CodeMajor,
+            selected: page === "module-info",
+            onClick: () => navigate("/dashboard/settings/module-info")
+        }]
     const metricsArr = window.DASHBOARD_MODE !== 'ON_PREM' ? [{
         label: 'Metrics',
         icon: ReportFilledMinor,
@@ -109,6 +115,7 @@ const SettingsLeftNav = () => {
                     },
                     
                     ...logsArr,
+                    ...moduleInfoArr,
                     ...metricsArr,
                     {
                         label: 'Auth types',

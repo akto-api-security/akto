@@ -1,7 +1,6 @@
-import { Button, HorizontalStack, Text, VerticalStack, Box, Spinner, Divider, Scrollable } from "@shopify/polaris"
+import { Button, Text, VerticalStack, Box, Spinner, Divider, Scrollable } from "@shopify/polaris"
 import {
-    CancelMajor,
-    EditMinor
+    CancelMajor
 } from '@shopify/polaris-icons';
 import "./style.css"
 

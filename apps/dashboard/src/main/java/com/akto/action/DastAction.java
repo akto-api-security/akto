@@ -23,7 +23,15 @@ public class DastAction extends UserAction {
     public String fetchAllDastScans() {
         try {
             loggerMaker.infoAndAddToDb("Fetching all DAST scans");
-            crawlerRuns = CrawlerRunDao.instance.findAll(Filters.empty());
+            crawlerRuns = CrawlerRunDao.instance.findAll(
+                Filters.or(
+                    Filters.exists(CrawlerRun.STATUS, false), // for backward compatibility
+                    Filters.eq(CrawlerRun.STATUS, CrawlerRun.CrawlerRunStatus.RUNNING.name()),
+                    Filters.eq(CrawlerRun.STATUS, CrawlerRun.CrawlerRunStatus.COMPLETED.name()),
+                    Filters.eq(CrawlerRun.STATUS, CrawlerRun.CrawlerRunStatus.STOP_REQUESTED.name()),
+                    Filters.eq(CrawlerRun.STATUS, CrawlerRun.CrawlerRunStatus.STOPPED.name())
+                )
+            );
             loggerMaker.infoAndAddToDb("Fetched " + crawlerRuns.size() + " DAST scans");
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {

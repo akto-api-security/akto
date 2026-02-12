@@ -74,10 +74,10 @@ public class RiskScoreSyncCron {
                         int accountId = t.getId();
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                         FeatureAccess featureAccess = getFeatureAccessSaas(accountId, "THREAT_DETECTION");
-                        if(!featureAccess.getIsGranted()){
-                            loggerMaker.debugAndAddToDb("Feature access not granted for account " + accountId);
-                            return;
-                        }
+                        // if(!featureAccess.getIsGranted()){
+                        //     loggerMaker.debugAndAddToDb("Feature access not granted for account " + accountId);
+                        //     return;
+                        // }
                         int startTimestamp = Context.now();
                         loggerMaker.debugAndAddToDb("Risk score sync cron started for account " + accountId + " at " + startTimestamp);
                         LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
@@ -109,28 +109,37 @@ public class RiskScoreSyncCron {
                             String endpoint = id.getString("endpoint");
                             apiCollectionIdsFromEvents.add(apiCollectionIdFromDoc);
                             List<String> severities = (List<String>) document.get("severities");
-                            String key = apiCollectionIdFromDoc + ":" + endpoint + ":" + method;
+                            String key = apiCollectionIdFromDoc + " " + endpoint + " " + method;
                             apiInfoKeyToSeverities.put(key, severities);
                         }
 
-                        List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.in(ApiInfo.ID_API_COLLECTION_ID, apiCollectionIdsFromEvents));
-                        Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
+                        loggerMaker.warnAndAddToDb("Malicious events count: " + apiInfoKeyToSeverities.size());
 
-                        RuntimeUtil.fillURLTemplatesMap(apiInfos, null, apiCollectionUrlTemplates);
+                        List<ApiInfo> apiInfos = ApiInfoDao.instance.getMCollection().find(Filters.in(ApiInfo.ID_API_COLLECTION_ID, apiCollectionIdsFromEvents)).into(new ArrayList<>());
+                        Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = new HashMap<>();
+                        Map<String, ApiInfoKey> apiInfoKeyToApiInfo = new HashMap<>();
+
+                        RuntimeUtil.fillURLTemplatesMap(apiInfos, null, apiCollectionUrlTemplates, apiInfoKeyToApiInfo);
                         List<WriteModel<ApiInfo>> updates = new ArrayList<>();
                         Map<ApiInfoKey, Float> apiInfoKeyToThreatScore = new HashMap<>();
 
                         for(String apiInfoKey : apiInfoKeyToSeverities.keySet()){
-                            String[] parts = apiInfoKey.split(":");
+                            String[] parts = apiInfoKey.split(" ");
                             int apiCollectionId = Integer.parseInt(parts[0]);
                             String url = parts[1];
                             String method = parts[2];
                             URLTemplate urlTemplate = isMatchingUrl(apiCollectionId, url, method, apiCollectionUrlTemplates, lfiTrie, osCommandInjectionTrie, ssrfTrie);
                             List<String> severities = apiInfoKeyToSeverities.get(apiInfoKey);
                             float threatScore = MaliciousEventDao.getThreatScoreFromSeverities(severities);
-                            if(urlTemplate != null){
-                                loggerMaker.warnAndAddToDb("Updating risk score for " + urlTemplate.getTemplateString() + " " + urlTemplate.getMethod().name() + " " + apiCollectionId + " to " + threatScore);
-                                ApiInfoKey apiInfoKeyObj = new ApiInfoKey(apiCollectionId, urlTemplate.getTemplateString(), urlTemplate.getMethod());
+                            if(urlTemplate != null || apiInfoKeyToApiInfo.containsKey(apiInfoKey)){
+                                ApiInfoKey apiInfoKeyObj = null;
+                                if(urlTemplate != null){
+                                    apiInfoKeyObj = new ApiInfoKey(apiCollectionId, urlTemplate.getTemplateString(), urlTemplate.getMethod());
+                                    loggerMaker.warnAndAddToDb("Updating risk score for " + urlTemplate.getTemplateString() + " " + urlTemplate.getMethod().name() + " " + apiCollectionId + " to " + threatScore);
+                                }else{
+                                    apiInfoKeyObj = apiInfoKeyToApiInfo.get(apiInfoKey);
+                                    loggerMaker.warnAndAddToDb("Updating risk score for from normal api info " + url + " " + method + " " + apiCollectionId + " to " + threatScore);
+                                }
                                 apiInfoKeyToThreatScore.put(apiInfoKeyObj, Math.max(apiInfoKeyToThreatScore.getOrDefault(apiInfoKeyObj, 0.0f), threatScore));
                             }
                         }

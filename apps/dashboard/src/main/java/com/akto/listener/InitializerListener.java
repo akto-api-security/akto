@@ -5,36 +5,19 @@ import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.task.Cluster.callDibs;
 import static com.akto.utils.Utils.deleteApis;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
+import static com.akto.utils.crons.OrganizationCache.domainToOrgInfoCache;
 import static com.mongodb.client.model.Filters.eq;
 
-import com.akto.dao.metrics.MetricDataDao;
-import com.akto.dto.jobs.JobExecutorType;
-import com.akto.dto.threat_detection.ThreatComplianceInfo;
-import com.akto.utils.crons.JobsCron;
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -46,16 +29,8 @@ import java.util.zip.ZipInputStream;
 
 import javax.servlet.ServletContextListener;
 
-import com.akto.dao.testing.*;
-import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.EnumUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
-import org.json.JSONObject;
-
 import com.akto.DaoInit;
+import com.akto.action.AdxIntegrationAction;
 import com.akto.action.AdminSettingsAction;
 import com.akto.action.ApiCollectionsAction;
 import com.akto.action.CustomDataTypeAction;
@@ -64,43 +39,11 @@ import com.akto.action.observe.InventoryAction;
 import com.akto.action.settings.AdvancedTrafficFiltersAction;
 import com.akto.action.testing.StartTestAction;
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AccountsContextDao;
-import com.akto.dao.AccountsDao;
-import com.akto.dao.ActivitiesDao;
-import com.akto.dao.AktoDataTypeDao;
-import com.akto.dao.AnalyserLogsDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.ApiTokensDao;
-import com.akto.dao.AuthMechanismsDao;
-import com.akto.dao.BackwardCompatibilityDao;
-import com.akto.dao.BillingLogsDao;
-import com.akto.dao.ConfigsDao;
-import com.akto.dao.CustomDataTypeDao;
-import com.akto.dao.DashboardLogsDao;
-import com.akto.dao.DataIngestionLogsDao;
-import com.akto.dao.DependencyFlowNodesDao;
-import com.akto.dao.DependencyNodeDao;
-import com.akto.dao.FilterSampleDataDao;
-import com.akto.dao.LogsDao;
-import com.akto.dao.MCollection;
-import com.akto.dao.ProtectionLogsDao;
-import com.akto.dao.PupeteerLogsDao;
-import com.akto.dao.RBACDao;
-import com.akto.dao.RuntimeLogsDao;
-import com.akto.dao.SSOConfigsDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.SensitiveSampleDataDao;
-import com.akto.dao.SetupDao;
-import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.SuspectSampleDataDao;
-import com.akto.dao.UsersDao;
-import com.akto.dao.MaliciousEventDao;
-import com.akto.dto.threat_detection_backend.MaliciousEventDto;
+import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
+import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.EventsMetricsDao;
@@ -109,34 +52,19 @@ import com.akto.dao.pii.PIISourceDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.upload.FileUploadLogsDao;
 import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dao.usage.UsageMetricsDao;
-import com.akto.dto.Account;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.AktoDataType;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.ApiCollectionUsers;
+import com.akto.dto.*;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.BackwardCompatibility;
-import com.akto.dto.Config;
 import com.akto.dto.Config.AzureConfig;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.Config.OktaConfig;
-import com.akto.dto.CustomDataType;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.IgnoreData;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
-import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
-import com.akto.dto.SensitiveSampleData;
-import com.akto.dto.TelemetrySettings;
-import com.akto.dto.User;
 import com.akto.dto.User.AktoUIMode;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
@@ -147,6 +75,7 @@ import com.akto.dto.data_types.RegexPredicate;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.events.EventsExample;
 import com.akto.dto.events.EventsMetrics;
+import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.notifications.CustomWebhook.WebhookOptions;
@@ -159,20 +88,12 @@ import com.akto.dto.sso.SAMLConfig;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.testing.AllTestingEndpoints;
-import com.akto.dto.testing.AuthMechanism;
-import com.akto.dto.testing.ComplianceInfo;
-import com.akto.dto.testing.ComplianceMapping;
-import com.akto.dto.testing.EndpointLogicalGroup;
-import com.akto.dto.testing.RegexTestingEndpoints;
-import com.akto.dto.testing.Remediation;
-import com.akto.dto.testing.RiskScoreTestingEndpoints;
-import com.akto.dto.testing.TestRoles;
-import com.akto.dto.testing.TestingEndpoints;
-import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.dto.testing.*;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.sources.AuthWithCond;
+import com.akto.dto.threat_detection.ThreatComplianceInfo;
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -201,65 +122,45 @@ import com.akto.testing.TemplateMapper;
 import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
-import com.akto.util.AccountTask;
-import com.akto.util.ConnectionInfo;
-import com.akto.util.Constants;
-import com.akto.util.DashboardMode;
-import com.akto.util.DbMode;
-import com.akto.util.EmailAccountName;
-import com.akto.util.IntercomEventsUtil;
-import com.akto.util.JSONUtils;
-import com.akto.util.Pair;
-import com.akto.util.UsageUtils;
+import com.akto.util.*;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TemplatePlan;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.util.filter.DictionaryFilter;
+import com.akto.util.OrganizationInfo;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.tasks.OrganizationTask;
 import com.akto.utils.Auth0;
 import com.akto.utils.AutomatedApiGroupsUtils;
 import com.akto.utils.TestTemplateUtils;
 import com.akto.utils.billing.OrganizationUtils;
-import com.akto.utils.crons.Crons;
-import com.akto.utils.crons.SyncCron;
-import com.akto.utils.crons.TokenGeneratorCron;
-import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
-import com.akto.utils.crons.AgentBasePromptDetectionCron;
+import com.akto.utils.crons.*;
 import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.jobs.JobUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import com.mongodb.BasicDBList;
-import com.akto.utils.crons.TestingAlertsCron;
-import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.ReadPreference;
-import com.mongodb.WriteConcern;
+import com.mongodb.*;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.BulkWriteOptions;
-import com.mongodb.client.model.DeleteOneModel;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.UpdateOneModel;
-import com.mongodb.client.model.UpdateOptions;
-import com.mongodb.client.model.Updates;
-import com.mongodb.client.model.WriteModel;
+import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import com.slack.api.Slack;
 import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
 
+import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.EnumUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+import org.json.JSONObject;
+
 import io.intercom.api.Intercom;
 import okhttp3.OkHttpClient;
-
-import java.io.UnsupportedEncodingException;
 
 public class InitializerListener implements ServletContextListener {
 
@@ -1553,6 +1454,26 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 1, TimeUnit.HOURS);
     }
 
+    /**
+     * Every 15 minutes: sync threat activity to webhook integration (per account with integration configured).
+     */
+    public void setUpThreatActivityWebhookSyncScheduler() {
+        scheduler.scheduleWithFixedDelay(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            AdxIntegrationAction.runThreatActivityWebhookSyncForAccount(t.getId());
+                        } catch (Exception e) {
+                            logger.errorAndAddToDb("Threat-activity webhook sync error for account " + t.getId() + ": " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "threat-activity-webhook-sync");
+            }
+        }, 0, 15, TimeUnit.MINUTES);
+    }
+
     static class ChangesInfo {
         public Map<String, String> newSensitiveParams = new HashMap<>();
         public List<BasicDBObject> newSensitiveParamsObject = new ArrayList<>();
@@ -2559,7 +2480,7 @@ public class InitializerListener implements ServletContextListener {
             e.printStackTrace();
         }
 
-        boolean runJobFunctions = JobUtils.getRunJobFunctions();
+        int runJobFunctions = JobUtils.getRunJobFunctions();
         boolean runJobFunctionsAnyway = JobUtils.getRunJobFunctionsAnyway();
 
         executorService.schedule(new Runnable() {
@@ -2567,7 +2488,7 @@ public class InitializerListener implements ServletContextListener {
 
                 ReadPreference readPreference = ReadPreference.primary();
                 WriteConcern writeConcern = WriteConcern.ACKNOWLEDGED;
-                if (runJobFunctions || DashboardMode.isSaasDeployment()) {
+                if (runJobFunctions > 0 || DashboardMode.isSaasDeployment()) {
                     readPreference = ReadPreference.primary();
                     writeConcern = WriteConcern.W1;
                 }
@@ -2591,6 +2512,9 @@ public class InitializerListener implements ServletContextListener {
                 setDashboardMode();
                 updateGlobalAktoVersion();
 
+                com.akto.otel.TraceProcessingService.Holder.setInstance(new com.akto.otel.TraceProcessingServiceImpl());
+                logger.infoAndAddToDb("TraceProcessingService initialized");
+
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account account) {
@@ -2603,9 +2527,11 @@ public class InitializerListener implements ServletContextListener {
                 SingleTypeInfo.init();
 
                 int now = Context.now();
-                if (runJobFunctions || runJobFunctionsAnyway) {
+
+                if (runJobFunctions > 0 || runJobFunctionsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
+                    logger.info("Job mode: " + runJobFunctions + " (runAnyway: " + runJobFunctionsAnyway + ")");
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
@@ -2613,30 +2539,38 @@ public class InitializerListener implements ServletContextListener {
                             runInitializerFunctions();
                         }
                     }, "context-initializer-secondary");
-                    logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
-                    setUpWebhookScheduler();
-                    logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
-                    setUpTrafficAlertScheduler();
-                    logger.warn("Started daily schedulers", LogDb.DASHBOARD);
-                    setUpDailyScheduler();
-                    if (DashboardMode.isMetered()) {
-                        setupUsageScheduler();
+
+                    if (runJobFunctions == 1) {
+                        logger.warn("Starting CATEGORY 1 job schedulers", LogDb.DASHBOARD);
+                        logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
+                        setUpWebhookScheduler();
+                        setUpThreatActivityWebhookSyncScheduler();
+                        logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
+                        setUpTrafficAlertScheduler();
+                        logger.warn("Started daily schedulers", LogDb.DASHBOARD);
+                        setUpDailyScheduler();
+                        if (DashboardMode.isMetered()) {
+                            setupUsageScheduler();
+                        }
+                        syncCronInfo.setUpUpdateCronScheduler();
+                        setUpTestEditorTemplatesScheduler();
                     }
-                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                    syncCronInfo.setUpUpdateCronScheduler();
-                    syncCronInfo.setUpMcpMaliciousnessCronScheduler();
-                    agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
-                    setUpTestEditorTemplatesScheduler();
+                    if (runJobFunctions == 2) {
+                        logger.warn("Starting CATEGORY 2 job schedulers", LogDb.DASHBOARD);
+                        updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                        syncCronInfo.setUpMcpMaliciousnessCronScheduler();
+                        agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
+                        setupAutomatedApiGroupsScheduler();
+                    }
+
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     updateApiGroupsForAccounts();
-                    setupAutomatedApiGroupsScheduler();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
                         crons.insertHistoricalDataJob();
                         if(DashboardMode.isOnPremDeployment()){
                             crons.insertHistoricalDataJobForOnPrem();
                         }
-
                         trimCappedCollectionsJob();
                         setUpPiiAndTestSourcesScheduler();
                         cleanInventoryJobRunner();
@@ -2957,8 +2891,20 @@ public class InitializerListener implements ServletContextListener {
     public static Organization fetchAndSaveFeatureWiseAllowed(Organization organization) {
 
         int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
-        if((lastFeatureMapUpdate + REFRESH_INTERVAL) >= Context.now()){
+        
+        // Check if planType is missing or invalid - if so, force refresh regardless of time interval
+        String currentPlanType = organization.getplanType();
+        boolean planTypeMissing = currentPlanType == null || currentPlanType.isEmpty() || "planType".equals(currentPlanType);
+        
+        if((lastFeatureMapUpdate + REFRESH_INTERVAL) >= Context.now() && !planTypeMissing){
+            logger.debugAndAddToDb("Skipping refresh for organization " + organization.getId() + 
+                " - recent update and planType exists: " + currentPlanType, LogDb.DASHBOARD);
             return organization;
+        }
+        
+        if (planTypeMissing) {
+            logger.debugAndAddToDb("Forcing refresh for organization " + organization.getId() + 
+                " - planType missing/invalid: " + currentPlanType, LogDb.DASHBOARD);
         }
         HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
 
@@ -3034,6 +2980,68 @@ public class InitializerListener implements ServletContextListener {
             gracePeriod = OrganizationUtils.fetchOrgGracePeriodFromMetaData(metaData);
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
             planType = OrganizationUtils.fetchplanType(metaData);
+
+            if(planType== null || planType.isEmpty()){
+                String userDomain = organization.getAdminEmail().split("@")[1].toLowerCase();
+                OrganizationInfo orgInfo = domainToOrgInfoCache.get(userDomain);
+                if(orgInfo == null){
+                       logger.debugAndAddToDb("Domain " +userDomain + "not found in cache",LogDb.DASHBOARD);
+                        // Fetch all organizations with matching admin email domain
+                        try {
+                            List<Organization> orgsWithSameDomain = OrganizationsDao.instance.findAll(
+                                Filters.regex(Organization.ADMIN_EMAIL, ".*@" + Pattern.quote(userDomain) + "$", "i"),
+                                Projections.include(Organization.ID, Organization.ADMIN_EMAIL, Organization.PLAN_TYPE)
+                            );
+                            
+                            // Find the first organization with non-empty, non-null planType by hitting billing API
+                            String validPlanType = null;
+                            for (Organization org : orgsWithSameDomain) {
+                                try {
+                                    // Hit the billing API to fetch organization metadata ONLY for planType extraction
+                                    // This is separate from original organization's metadata and used only for planType lookup
+                                    BasicDBObject domainOrgMetaData = OrganizationUtils.fetchOrgMetaData(org.getId(), org.getAdminEmail());
+                                    if (domainOrgMetaData != null) {
+                                        // Extract planType ONLY from this domain-based organization metadata
+                                        String domainOrgPlanType = OrganizationUtils.fetchplanType(domainOrgMetaData);
+                                        if (domainOrgPlanType != null && !domainOrgPlanType.isEmpty() && !"planType".equals(domainOrgPlanType)) {
+                                            validPlanType = domainOrgPlanType;
+                                            logger.debugAndAddToDb("Found valid planType: " + validPlanType + " from domain organization: " + org.getId() + 
+                                                " for domain: " + userDomain + " via billing API (used only for planType, not other fields)", LogDb.DASHBOARD);
+                                            break;
+                                        } else {
+                                            logger.debugAndAddToDb("Domain organization: " + org.getId() + " has invalid/empty planType: " + domainOrgPlanType + 
+                                                " from billing API", LogDb.DASHBOARD);
+                                        }
+                                    } else {
+                                        logger.debugAndAddToDb("Failed to fetch metadata from billing API for domain organization: " + org.getId(), LogDb.DASHBOARD);
+                                    }
+                                } catch (Exception apiException) {
+                                    logger.errorAndAddToDb(apiException, "Error while fetching metadata from billing API for organization: " + org.getId());
+                                }
+                            }
+                            
+                            if (validPlanType != null) {
+                                // Apply the planType found from domain-based search to the original organization
+                                // This ONLY sets planType - all other metadata fields remain from original organization
+                                planType = validPlanType;
+                                
+                                // Update the organization cache with the new planType for this domain
+                                OrganizationInfo updatedOrgInfo = new OrganizationInfo(organization.getId(), organization.getAdminEmail(), planType);
+                                OrganizationCache.domainToOrgInfoCache.put(userDomain, updatedOrgInfo);
+                                
+                                logger.debugAndAddToDb("Set planType to: " + planType + " for original organization: " + organization.getId() + 
+                                    " based on domain match with organization having valid planType (other metadata fields preserved from original org). Updated cache for domain: " + userDomain, LogDb.DASHBOARD);
+                            } else {
+                                // Update the organization cache with current planType
+                                OrganizationInfo updatedOrgInfo = new OrganizationInfo(organization.getId(), organization.getAdminEmail(), planType);
+                                OrganizationCache.domainToOrgInfoCache.put(userDomain, updatedOrgInfo);
+                                logger.debugAndAddToDb("No organization found with valid planType for domain so adding data in cache with original planType: " + userDomain, LogDb.DASHBOARD);
+                            }
+                        } catch (Exception e) {
+                            logger.errorAndAddToDb(e, "Error while fetching organizations by domain: " + userDomain);
+                        }
+                }
+            }
             trialMsg = OrganizationUtils.fetchtrialMsg(metaData);
             protectionTrialMsg = OrganizationUtils.fetchprotectionTrialMsg(metaData);
             agentTrialMsg = OrganizationUtils.fetchagentTrialMsg(metaData);
@@ -4262,6 +4270,15 @@ public class InitializerListener implements ServletContextListener {
                                     updates.add(Updates.set(YamlTemplate.INACTIVE, inactive));
                                 }
                             } catch (Exception e) {
+                            }
+
+                            try {
+                                Object estimatedTokensObj = TestConfigYamlParser.getFieldIfExists(templateContent, YamlTemplate.ESTIMATED_TOKENS);
+                                if (estimatedTokensObj != null && estimatedTokensObj instanceof Integer) {
+                                    updates.add(Updates.set(YamlTemplate.ESTIMATED_TOKENS, (int) estimatedTokensObj));
+                                }
+                            } catch (Exception e) {
+                                logger.errorAndAddToDb("Error parsing estimatedTokens for template " + id + ": " + e.getMessage(), LogDb.DASHBOARD);
                             }
 
                             if (Constants._AKTO.equals(author)) {

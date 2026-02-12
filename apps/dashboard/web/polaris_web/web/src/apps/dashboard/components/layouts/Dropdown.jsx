@@ -124,6 +124,13 @@ function Dropdown(props) {
 
     }, [deselectedOptions, props.initial, props.preSelected, props.value, props.menuItems, props.allowMultiple])
 
+    const handleChevronClick = () => {
+        const inputElement = document.getElementById(id);
+        if (inputElement) {
+            inputElement.focus();
+        }
+    };
+
     const textField = (
         <Autocomplete.TextField
             id={id}
@@ -133,26 +140,36 @@ function Dropdown(props) {
             {...props.label ? {label : props.label} : null}
             {...props.helpText ? {helpText : props.helpText} : null}
             {...props.placeHolder ? {placeholder : props.placeHolder} : null}
-            suffix={<Icon source={ChevronDownMinor} />}
+            suffix={
+                <span
+                    onClick={handleChevronClick}
+                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                >
+                    <Icon source={ChevronDownMinor} />
+                </span>
+            }
         />
 
     );
 
     return (
-        <Autocomplete
-            options={options}
-            selected={selectedOptions}
-            onSelect={updateSelection}
-            textField={textField}
-            preferredPosition='below'
-            {...props?.allowMultiple === true? {allowMultiple:true} : {}}
-            {...(props.subItems ? {actionBefore:{
-                content: props.subContent,
-                wrapOverflow: true,
-                onAction: props.subClick,
-                suffix: <Box><Icon source={CircleRightMajor}/></Box>
-            }} : null)}
-        />
+        <>
+            <style>{`#${id} { cursor: pointer; }`}</style>
+            <Autocomplete
+                options={options}
+                selected={selectedOptions}
+                onSelect={updateSelection}
+                textField={textField}
+                preferredPosition='below'
+                {...props?.allowMultiple === true? {allowMultiple:true} : {}}
+                {...(props.subItems ? {actionBefore:{
+                    content: props.subContent,
+                    wrapOverflow: true,
+                    onAction: props.subClick,
+                    suffix: <Box><Icon source={CircleRightMajor}/></Box>
+                }} : null)}
+            />
+        </>
     )
 }
 

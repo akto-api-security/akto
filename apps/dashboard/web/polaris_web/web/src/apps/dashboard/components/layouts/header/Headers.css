@@ -48,3 +48,14 @@ body:has(.agentic-security-nav) .Polaris-TopBar__SecondaryMenu .Polaris-Text--su
 body:has(.agentic-security-nav) .Polaris-TopBar__SecondaryMenu text {
     fill: #ffffff !important;
 }
+
+/* Reduce spacing between header icons */
+.Polaris-TopBar__SecondaryMenu {
+    gap: 8px !important;
+}
+
+/* Remove extra padding from bell button */
+#beamer-btn.Polaris-Button {
+    padding: 0 !important;
+    margin: 0 4px 0 0 !important;
+}

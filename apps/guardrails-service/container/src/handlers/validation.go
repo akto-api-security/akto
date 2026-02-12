@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/akto-api-security/guardrails-service/models"
+	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -38,10 +39,12 @@ func (h *ValidationHandler) IngestData(c *gin.Context) {
 		return
 	}
 
-	h.logger.Info("Received batch data", zap.Int("size", len(req.BatchData)))
+	h.logger.Info("Received batch data",
+		zap.Int("size", len(req.BatchData)),
+		zap.String("contextSource", req.ContextSource))
 
-	// Validate the batch
-	results, err := h.validatorService.ValidateBatch(c.Request.Context(), req.BatchData)
+	// Validate the batch with optional contextSource
+	results, err := h.validatorService.ValidateBatch(c.Request.Context(), req.BatchData, req.ContextSource)
 	if err != nil {
 		h.logger.Error("Failed to validate batch", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, models.ValidationResponse{
@@ -81,7 +84,8 @@ func (h *ValidationHandler) IngestData(c *gin.Context) {
 // ValidateRequest validates a single request payload
 func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	var req struct {
-		Payload string `json:"payload" binding:"required"`
+		Payload       string `json:"payload" binding:"required"`
+		ContextSource string `json:"contextSource,omitempty"` // Optional context source
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -91,7 +95,10 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		return
 	}
 
-	result, err := h.validatorService.ValidateRequest(c.Request.Context(), req.Payload)
+	// Extract session and request IDs from headers
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+
+	result, err := h.validatorService.ValidateRequest(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID)
 	if err != nil {
 		h.logger.Error("Failed to validate request", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -106,7 +113,8 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 // ValidateResponse validates a single response payload
 func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 	var req struct {
-		Payload string `json:"payload" binding:"required"`
+		Payload       string `json:"payload" binding:"required"`
+		ContextSource string `json:"contextSource,omitempty"` // Optional context source
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -116,7 +124,10 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		return
 	}
 
-	result, err := h.validatorService.ValidateResponse(c.Request.Context(), req.Payload)
+	// Extract session and request IDs from headers
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+
+	result, err := h.validatorService.ValidateResponse(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID)
 	if err != nil {
 		h.logger.Error("Failed to validate response", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
