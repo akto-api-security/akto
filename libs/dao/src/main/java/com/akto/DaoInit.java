@@ -383,7 +383,7 @@ public class DaoInit {
                 new EnumCodec<>(Method.class),
                 new EnumCodec<>(Credential.Type.class),
                 new EnumCodec<>(ApiToken.Utility.class),
-                new EnumCodec<>(ApiInfo.AuthType.class),
+                // AuthType is now a String constant class, not an enum - removed from EnumCodec
                 new EnumCodec<>(ApiInfo.ApiAccessType.class),
                 new EnumCodec<>(TestResult.TestError.class),
                 new EnumCodec<>(AuthParam.Location.class),

@@ -7,7 +7,7 @@ public class ApiStats {
     private int timestamp;
     private Map<Integer, Integer> riskScoreMap = new HashMap<>();
     private Map<ApiInfo.ApiType, Integer> apiTypeMap = new HashMap<>();
-    private Map<ApiInfo.AuthType, Integer> authTypeMap = new HashMap<>();
+    private Map<String, Integer> authTypeMap = new HashMap<>();
     private Map<ApiInfo.ApiAccessType, Integer> accessTypeMap = new HashMap<>();
     private Map<String, Integer> criticalMap = new HashMap<>();
     private int totalAPIs = 0;
@@ -16,7 +16,7 @@ public class ApiStats {
     private int totalInScopeForTestingApis = 0;
 
     public ApiStats(int timestamp, Map<Integer, Integer> riskScoreMap, Map<ApiInfo.ApiType, Integer> apiTypeMap,
-                    Map<ApiInfo.AuthType, Integer> authTypeMap, Map<ApiInfo.ApiAccessType, Integer> accessTypeMap,
+                    Map<String, Integer> authTypeMap, Map<ApiInfo.ApiAccessType, Integer> accessTypeMap,
                     int totalAPIs, int apisTestedInLookBackPeriod, float totalRiskScore, Map<String, Integer> criticalMap) {
         this.riskScoreMap = riskScoreMap;
         this.apiTypeMap = apiTypeMap;
@@ -56,7 +56,7 @@ public class ApiStats {
         apiTypeMap.put(apiType, val);
     }
 
-    public void addAuthType(ApiInfo.AuthType authType) {
+    public void addAuthType(String authType) {
         Integer val = this.authTypeMap.getOrDefault(authType, 0);
         val += 1;
         authTypeMap.put(authType, val);
@@ -90,11 +90,11 @@ public class ApiStats {
         this.apiTypeMap = apiTypeMap;
     }
 
-    public Map<ApiInfo.AuthType, Integer> getAuthTypeMap() {
+    public Map<String, Integer> getAuthTypeMap() {
         return authTypeMap;
     }
 
-    public void setAuthTypeMap(Map<ApiInfo.AuthType, Integer> authTypeMap) {
+    public void setAuthTypeMap(Map<String, Integer> authTypeMap) {
         this.authTypeMap = authTypeMap;
     }
 

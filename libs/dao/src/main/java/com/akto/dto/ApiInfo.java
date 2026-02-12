@@ -19,13 +19,13 @@ public class ApiInfo {
     public static final String ID_METHOD = "_id." + ApiInfoKey.METHOD;
 
     public static final String ALL_AUTH_TYPES_FOUND = "allAuthTypesFound";
-    private Set<Set<AuthType>> allAuthTypesFound;
+    private Set<Set<String>> allAuthTypesFound;
 
 
 
     // this annotation makes sure that data is not stored in mongo
     @BsonIgnore
-    private List<AuthType> actualAuthType;
+    private List<String> actualAuthType;
 
     public static final String API_ACCESS_TYPES = "apiAccessTypes";
     private Set<ApiAccessType> apiAccessTypes;
@@ -83,8 +83,43 @@ public class ApiInfo {
         REST, GRAPHQL, GRPC, SOAP
     }
 
-    public enum AuthType {
-        UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM, API_KEY, MTLS, SESSION_TOKEN
+    /**
+     * Auth type constants - using String instead of enum for flexibility with custom types.
+     * Standard auth types remain as constants, custom types use their CustomAuthType.name.
+     * This allows dynamic auth type names from CustomAuthType configurations.
+     */
+    public static class AuthType {
+        public static final String UNAUTHENTICATED = "UNAUTHENTICATED";
+        public static final String BASIC = "BASIC";
+        public static final String AUTHORIZATION_HEADER = "AUTHORIZATION_HEADER";
+        public static final String JWT = "JWT";
+        public static final String API_TOKEN = "API_TOKEN";
+        public static final String BEARER = "BEARER";
+        public static final String CUSTOM = "CUSTOM";  // Kept for backward compatibility
+        public static final String API_KEY = "API_KEY";
+        public static final String MTLS = "MTLS";
+        public static final String SESSION_TOKEN = "SESSION_TOKEN";
+
+        private AuthType() {} // Prevent instantiation
+
+        /**
+         * Returns all standard auth type constants.
+         * Used for testing and demo data generation.
+         */
+        public static String[] getAllStandardTypes() {
+            return new String[]{
+                UNAUTHENTICATED,
+                BASIC,
+                AUTHORIZATION_HEADER,
+                JWT,
+                API_TOKEN,
+                BEARER,
+                CUSTOM,
+                API_KEY,
+                MTLS,
+                SESSION_TOKEN
+            };
+        }
     }
 
     public enum ApiAccessType {
@@ -325,9 +360,9 @@ public class ApiInfo {
     }
 
     public void calculateActualAuth() {
-        List<AuthType> result = new ArrayList<>();
-        Set<AuthType> uniqueAuths = new HashSet<>();
-        for (Set<AuthType> authTypes: this.allAuthTypesFound) {
+        List<String> result = new ArrayList<>();
+        Set<String> uniqueAuths = new HashSet<>();
+        for (Set<String> authTypes: this.allAuthTypesFound) {
             if (authTypes.contains(AuthType.UNAUTHENTICATED)) {
                 this.actualAuthType = Collections.singletonList(AuthType.UNAUTHENTICATED);
                 uniqueAuths.add(AuthType.UNAUTHENTICATED);
@@ -338,7 +373,7 @@ public class ApiInfo {
             }
         }
 
-        for (AuthType authType: uniqueAuths) {
+        for (String authType: uniqueAuths) {
             result.add(authType);
         }
 
@@ -356,14 +391,38 @@ public class ApiInfo {
 
     public void addStats(ApiStats apiStats) {
         this.calculateActualAuth();
-        List<ApiInfo.AuthType> actualAuthTypes = this.actualAuthType;
-        if (actualAuthTypes != null && !actualAuthTypes.isEmpty()) apiStats.addAuthType(actualAuthTypes.get(0));
+        List<String> actualAuthTypes = this.actualAuthType;
+        if (actualAuthTypes != null && !actualAuthTypes.isEmpty()) {
+            String authType = actualAuthTypes.get(0);
+            // Aggregate custom auth types as CUSTOM for statistics
+            if (!isStandardAuthType(authType)) {
+                apiStats.addAuthType(AuthType.CUSTOM);
+            } else {
+                apiStats.addAuthType(authType);
+            }
+        }
 
         apiStats.addRiskScore(Math.round(this.riskScore));
 
         apiStats.addAccessType(this.findActualAccessType());
 
         apiStats.addApiType(this.apiType);
+    }
+
+    /**
+     * Checks if the given auth type is a standard predefined type.
+     * Custom auth type names (from CustomAuthType.name) return false.
+     */
+    private boolean isStandardAuthType(String authType) {
+        return authType.equals(AuthType.UNAUTHENTICATED) ||
+               authType.equals(AuthType.BASIC) ||
+               authType.equals(AuthType.AUTHORIZATION_HEADER) ||
+               authType.equals(AuthType.JWT) ||
+               authType.equals(AuthType.API_TOKEN) ||
+               authType.equals(AuthType.BEARER) ||
+               authType.equals(AuthType.API_KEY) ||
+               authType.equals(AuthType.MTLS) ||
+               authType.equals(AuthType.SESSION_TOKEN);
     }
 
     public String findSeverity() {
@@ -424,6 +483,7 @@ public class ApiInfo {
         return url;
     }
 
+
     public static String getForwardNormalizedUrl(String url){
         url = getNormalizedUrl(url);
         if (url.startsWith("/")) {
@@ -432,11 +492,11 @@ public class ApiInfo {
         return url;
     }
 
-    public Set<Set<AuthType>> getAllAuthTypesFound() {
+    public Set<Set<String>> getAllAuthTypesFound() {
         return allAuthTypesFound;
     }
 
-    public void setAllAuthTypesFound(Set<Set<AuthType>> allAuthTypesFound) {
+    public void setAllAuthTypesFound(Set<Set<String>> allAuthTypesFound) {
         this.allAuthTypesFound = allAuthTypesFound;
     }
 
@@ -448,11 +508,11 @@ public class ApiInfo {
         this.apiAccessTypes = apiAccessTypes;
     }
 
-    public List<AuthType> getActualAuthType() {
+    public List<String> getActualAuthType() {
         return actualAuthType;
     }
 
-    public void setActualAuthType(List<AuthType> actualAuthType) {
+    public void setActualAuthType(List<String> actualAuthType) {
         this.actualAuthType = actualAuthType;
     }
 
