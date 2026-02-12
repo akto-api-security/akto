@@ -1,5 +1,6 @@
 import { EmptyState, LegacyCard, Page } from '@shopify/polaris'
 import React, { useEffect, useReducer, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
 import Dropdown from '../../../components/layouts/Dropdown'
 import {produce} from "immer"
@@ -73,7 +74,8 @@ function MetricsSection({ sectionTitle, metricsToDisplay, orderedResult, nameMap
 }
 
 function Metrics() {
-    
+
+    const navigate = useNavigate()
     const [hosts, setHosts] = useState([])
     const apiCollections = PersistStore(state => state.allCollections)
     const [metricsList, setMetricList] = useState([])
@@ -158,7 +160,7 @@ function Metrics() {
         'CYBORG_CALL_LATENCY',
         'CYBORG_CALL_COUNT',
         'CYBORG_DATA_SIZE',
-        'DATA_INGESTION_API_COUNT'
+        'DATA_INGESTION_API_COUNT',
     ];
 
     const names = [...oldMetrics, ...newMetrics];
@@ -195,8 +197,7 @@ function Metrics() {
                 const trend = metricData.map(item => ([item.timestamp * 1000,item.value]));
                 result.push(
                     { "data": trend, "color": null, "name": currentNameMap.get(metricId)?.descriptionName },
-                )
-
+                );
                 metricsData[metricId] = result;
             }
         }
@@ -280,7 +281,7 @@ function Metrics() {
     const postgresqlMetricsKeys = newMetrics.slice(13, 22);
     const testingMetricsKeys = newMetrics.slice(22, 26);
     const cyborgMetricsKeys = newMetrics.slice(26, 29);
-    const dataIngestionMetricsKeys = newMetrics.slice(29);
+    const dataIngestionMetricsKeys = newMetrics.slice(29, 30);
 
     const graphContainer = (
         <>
@@ -336,7 +337,21 @@ function Metrics() {
                     <LegacyCard.Header title="Metrics">
                         <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
                         <Dropdown menuItems={menuItems} initial= {groupBy} selected={handleChange}
-                                    subItems={hosts.length > 0} subContent="Group by Id" subClick={changeItems}
+                                    subItems={hosts.length > 0}
+                                    subContent="Group by Id"
+                                    subClick={changeItems}
+                        />
+                        <Dropdown
+                            menuItems={[
+                                { label: "All", value: "ALL" },
+                                { label: "Traffic Collectors", value: "TRAFFIC_COLLECTORS" }
+                            ]}
+                            initial="ALL"
+                            selected={(val) => {
+                                if (val === "TRAFFIC_COLLECTORS") {
+                                    navigate("/dashboard/settings/traffic-collectors-metrics");
+                                }
+                            }}
                         />
                     </LegacyCard.Header>
                 </LegacyCard.Section>

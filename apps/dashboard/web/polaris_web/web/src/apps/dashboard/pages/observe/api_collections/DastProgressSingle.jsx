@@ -10,19 +10,19 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 
 const headers = [
     {
-        title: "URL",
-        text: "URL",
-        value: "urlComp",
-        textValue: "url",
-        filterKey: "url",
-        showFilter: true
-    },
-    {
-        title: "Source URL",
-        text: "Source URL",
+        title: "Pages crawled",
+        text: "Pages crawled",
         value: "sourceUrlComp",
         textValue: "sourceUrl",
         filterKey: "sourceUrl",
+        showFilter: true
+    },
+    {
+        title: "Discovered Links",
+        text: "Discovered Links",
+        value: "urlComp",
+        textValue: "url",
+        filterKey: "url",
         showFilter: true
     },
     {
@@ -64,11 +64,24 @@ function DastProgressSingle() {
     const [loading, setLoading] = useState(false)
     const [data, setData] = useState([])
     const [crawlDetails, setCrawlDetails] = useState(null)
+    const [scanMetadata, setScanMetadata] = useState(null)
 
     const fetchDastScan = async () => {
         try {
             setLoading(true)
             const resp = await api.fetchDastScan(crawlId)
+
+            // Fetch all scans to get metadata for this specific crawl
+            const allScans = await api.fetchAllDastScans()
+            const currentScan = allScans?.find(scan => scan.crawlId === crawlId)
+
+            if (currentScan) {
+                setScanMetadata({
+                    moduleName: currentScan.moduleName || "Internal DAST (Akto)",
+                    applicationPages: currentScan.applicationPages || "-",
+                    urlTemplatePatterns: currentScan.urlTemplatePatterns || "-"
+                })
+            }
 
             const crawlerUrls = resp || []
             const formattedData = crawlerUrls.map((urlItem, index) => {
@@ -188,6 +201,25 @@ function DastProgressSingle() {
                                         <Text variant="bodyMd" fontWeight="semibold" color="warning">{crawlDetails.rejectedUrls}</Text>
                                     </Box>
                                 </HorizontalStack>
+                                {scanMetadata && (
+                                    <>
+                                        <Divider />
+                                        <VerticalStack gap="3">
+                                            <Box>
+                                                <Text variant="bodyMd" color="subdued">Module Name</Text>
+                                                <Text variant="bodyMd" fontWeight="semibold">{scanMetadata.moduleName}</Text>
+                                            </Box>
+                                            <Box>
+                                                <Text variant="bodyMd" color="subdued">Application Pages</Text>
+                                                <Text variant="bodyMd" fontWeight="regular">{scanMetadata.applicationPages}</Text>
+                                            </Box>
+                                            <Box>
+                                                <Text variant="bodyMd" color="subdued">URL Template Patterns</Text>
+                                                <Text variant="bodyMd" fontWeight="regular" breakWord>{scanMetadata.urlTemplatePatterns}</Text>
+                                            </Box>
+                                        </VerticalStack>
+                                    </>
+                                )}
                             </VerticalStack>
                         </Card>
                     </Box>

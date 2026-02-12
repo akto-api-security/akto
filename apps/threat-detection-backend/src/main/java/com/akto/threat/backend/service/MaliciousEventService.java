@@ -1,5 +1,7 @@
 package com.akto.threat.backend.service;
 
+import com.akto.dao.AgenticSessionContextDao;
+import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.dto.type.URLMethods;
@@ -16,12 +18,18 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.TimeRangeFilter;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
+import com.akto.proto.generated.threat_detection.service.agentic_session_service.v1.BulkUpdateAgenticSessionContextRequest;
+import com.akto.proto.generated.threat_detection.message.agentic_session.v1.SessionDocumentMessage;
+import com.akto.proto.generated.threat_detection.message.agentic_session.v1.ConversationEntry;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.util.ThreatDetectionConstants;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.WriteModel;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.DistinctIterable;
 import com.mongodb.client.MongoCursor;
 import org.bson.conversions.Bson;
@@ -39,6 +47,7 @@ public class MaliciousEventService {
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
 
   private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
+  private static final List<String> IGNORED_POLICIES_FOR_ACCOUNT = Arrays.asList("WeakOrMissingAuth", "PIIDataLeak");
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MaliciousEventDao maliciousEventDao) {
@@ -109,6 +118,29 @@ public class MaliciousEventService {
     String actor = evt.getActor();
     String filterId = evt.getFilterId();
 
+    MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder();
+    String severity = evt.getSeverity();
+    // Skip recording for specific policies on specific account
+    if("1763355072".equals(accountId)){
+      if (IGNORED_POLICIES_FOR_ACCOUNT.contains(filterId)) {
+        return;
+      }
+
+      if ("OSCommandInjection".equals(filterId) && evt.getLatestApiEndpoint().contains("api-transactions")) {
+        return;
+      }
+
+      if (("WeakAuthentication").equals(filterId)) {
+        String host = evt.getHost() != null ? evt.getHost() : "";
+        String hostWithoutPort = host.replaceAll(":\\d+$", "");
+        boolean isInternalHost = host.contains(".svc") ||
+            !hostWithoutPort.matches(".*\\.[a-zA-Z]{2,}$");
+        if (isInternalHost) {
+          severity = "LOW";
+        }
+      }
+    }
+
     String refId = UUID.randomUUID().toString();
     logger.debug("received malicious event " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
 
@@ -130,27 +162,34 @@ public class MaliciousEventService {
         contextSource = evt.getContextSource();
     }
 
-    MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder()
-            .setDetectedAt(evt.getDetectedAt())
-            .setActor(actor)
-            .setFilterId(filterId)
-            .setLatestApiEndpoint(evt.getLatestApiEndpoint())
-            .setLatestApiMethod(URLMethods.Method.fromString(evt.getLatestApiMethod()))
-            .setLatestApiOrig(evt.getLatestApiPayload())
-            .setLatestApiCollectionId(evt.getLatestApiCollectionId())
-            .setEventType(maliciousEventType)
-            .setLatestApiIp(evt.getLatestApiIp())
-            .setCountry(evt.getMetadata().getCountryCode())
-            .setCategory(evt.getCategory())
-            .setSubCategory(evt.getSubCategory())
-            .setRefId(refId)
-            .setSeverity(evt.getSeverity())
-            .setType(evt.getType())
-            .setMetadata(evt.getMetadata().toString())
-            .setSuccessfulExploit(evt.getSuccessfulExploit())
-            .setStatus(MaliciousEventDto.Status.valueOf(status.toUpperCase()))
-            .setLabel(label)
-            .setHost(evt.getHost() != null ? evt.getHost() : "");
+    // Extract sessionId from the event message
+    String sessionId = null;
+    if (evt.getSessionId() != null && !evt.getSessionId().isEmpty()) {
+        sessionId = evt.getSessionId();
+    }
+
+    builder.setDetectedAt(evt.getDetectedAt())
+        .setActor(actor)
+        .setFilterId(filterId)
+        .setLatestApiEndpoint(evt.getLatestApiEndpoint())
+        .setLatestApiMethod(URLMethods.Method.fromString(evt.getLatestApiMethod()))
+        .setLatestApiOrig(evt.getLatestApiPayload())
+        .setLatestApiCollectionId(evt.getLatestApiCollectionId())
+        .setEventType(maliciousEventType)
+        .setLatestApiIp(evt.getLatestApiIp())
+        .setSessionId(sessionId)
+        .setCountry(evt.getMetadata().getCountryCode())
+        .setDestCountry(evt.getMetadata() != null && evt.getMetadata().getDestCountryCode() != null ? evt.getMetadata().getDestCountryCode() : "")
+        .setCategory(evt.getCategory())
+        .setSubCategory(evt.getSubCategory())
+        .setRefId(refId)
+        .setSeverity(severity)
+        .setType(evt.getType())
+        .setMetadata(evt.getMetadata().toString())
+        .setSuccessfulExploit(evt.getSuccessfulExploit())
+        .setStatus(MaliciousEventDto.Status.valueOf(status.toUpperCase()))
+        .setLabel(label)
+        .setHost(evt.getHost() != null ? evt.getHost() : "");
 
     // Set contextSource if available
     if (contextSource != null && !contextSource.isEmpty()) {
@@ -171,7 +210,10 @@ public class MaliciousEventService {
     Set<T> result = new HashSet<>();
     MongoCursor<T> cursor = r.cursor();
     while (cursor.hasNext()) {
-      result.add(cursor.next());
+      T value = cursor.next();
+      if (value != null) {
+        result.add(value);
+      }
     }
     return result;
   }
@@ -351,7 +393,7 @@ public class MaliciousEventService {
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       while (cursor.hasNext()) {
         MaliciousEventDto evt = cursor.next();
-        String metadata = evt.getMetadata() != null ? evt.getMetadata() : "";
+        String metadata = ThreatUtils.fetchMetadataString(evt.getMetadata() != null ? evt.getMetadata() : "");
 
         maliciousEvents.add(
             ListMaliciousRequestsResponse.MaliciousEvent.newBuilder()
@@ -361,6 +403,7 @@ public class MaliciousEventService {
                 .setId(evt.getId())
                 .setIp(evt.getLatestApiIp())
                 .setCountry(evt.getCountry())
+                .setDestCountry(evt.getDestCountry() != null ? evt.getDestCountry() : "")
                 .setPayload(evt.getLatestApiOrig())
                 .setEndpoint(evt.getLatestApiEndpoint())
                 .setMethod(evt.getLatestApiMethod().name())
@@ -377,6 +420,8 @@ public class MaliciousEventService {
                 .setLabel(convertModelLabelToString(evt.getLabel()))
                 .setHost(evt.getHost() != null ? evt.getHost() : "")
                 .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
+                .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
+                .setSessionId(evt.getSessionId() != null && !evt.getSessionId().isEmpty() ? evt.getSessionId() : "")
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
@@ -577,5 +622,82 @@ public class MaliciousEventService {
     }
 
     return query;
+  }
+
+  public SessionDocument fetchSessionContext(String accountId, String sessionId) {
+    try {
+      return AgenticSessionContextDao.instance.findBySessionIdentifier(accountId, sessionId);
+    } catch (Exception e) {
+      logger.error("Error fetching session context", e);
+      return null;
+    }
+  }
+
+  public void bulkUpdateAgenticSessionContext(String accountId, BulkUpdateAgenticSessionContextRequest req) {
+    if (req == null || req.getSessionDocumentsCount() == 0) {
+      return;
+    }
+
+    // Convert protobuf messages to SessionDocument objects
+    List<SessionDocument> sessionDocuments = new ArrayList<>();
+    for (SessionDocumentMessage msg : req.getSessionDocumentsList()) {
+      sessionDocuments.add(convertToSessionDocument(msg));
+    }
+
+    // Perform bulk upsert
+    List<WriteModel<SessionDocument>> bulkUpdates = new ArrayList<>();
+    UpdateOptions updateOptions = new UpdateOptions().upsert(true);
+    long currentTime = com.akto.dao.context.Context.now();
+
+    for (SessionDocument sessionDocument : sessionDocuments) {
+      if (sessionDocument == null || sessionDocument.getSessionIdentifier() == null || sessionDocument.getSessionIdentifier().isEmpty()) {
+        continue;
+      }
+
+      Bson filter = Filters.eq(SessionDocument.SESSION_IDENTIFIER, sessionDocument.getSessionIdentifier());
+      sessionDocument.setUpdatedAt(currentTime);
+
+      Bson updates = Updates.combine(
+          Updates.setOnInsert(SessionDocument.SESSION_IDENTIFIER, sessionDocument.getSessionIdentifier()),
+          Updates.setOnInsert(SessionDocument.CREATED_AT, currentTime),
+          Updates.set(SessionDocument.SESSION_SUMMARY, sessionDocument.getSessionSummary()),
+          Updates.set(SessionDocument.CONVERSATION_INFO, sessionDocument.getConversationInfo()),
+          Updates.set(SessionDocument.IS_MALICIOUS, sessionDocument.isMalicious()),
+          Updates.set(SessionDocument.BLOCKED_REASON, sessionDocument.getBlockedReason()),
+          Updates.set(SessionDocument.UPDATED_AT, sessionDocument.getUpdatedAt())
+      );
+
+      bulkUpdates.add(new UpdateOneModel<>(filter, updates, updateOptions));
+    }
+
+    if (!bulkUpdates.isEmpty()) {
+      try {
+        AgenticSessionContextDao.instance.getCollection(accountId).bulkWrite(bulkUpdates);
+      } catch (Exception e) {
+        logger.error("Error bulk updating session context", e);
+      }
+    }
+  }
+
+  private SessionDocument convertToSessionDocument(SessionDocumentMessage msg) {
+    SessionDocument doc = new SessionDocument();
+    doc.setSessionIdentifier(msg.getSessionIdentifier());
+    doc.setSessionSummary(msg.getSessionSummary());
+    doc.setMalicious(msg.getIsMalicious());
+    doc.setBlockedReason(msg.getBlockedReason());
+
+    // Convert conversation entries
+    List<SessionDocument.ConversationInfo> convInfo = new ArrayList<>();
+    for (ConversationEntry entry : msg.getConversationInfoList()) {
+      SessionDocument.ConversationInfo conv = new SessionDocument.ConversationInfo();
+      conv.setRequestId(entry.getRequestId());
+      conv.setRequestPayload(entry.getRequestPayload());
+      conv.setResponsePayload(entry.getResponsePayload());
+      conv.setTimestamp(entry.getTimestamp());
+      convInfo.add(conv);
+    }
+    doc.setConversationInfo(convInfo);
+
+    return doc;
   }
 }

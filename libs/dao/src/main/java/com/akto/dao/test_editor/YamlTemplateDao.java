@@ -82,6 +82,7 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
                     }
                     testConfig.setInactive(yamlTemplate.getInactive());
                     testConfig.setAuthor(yamlTemplate.getAuthor());
+                    testConfig.setEstimatedTokens(yamlTemplate.getEstimatedTokens());
                     if (testConfig.getWordlists() != null) {
                         testConfig.getWordlists().putAll(commonWordListMap);
                     } else {

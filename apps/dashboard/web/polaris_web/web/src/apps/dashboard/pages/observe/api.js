@@ -277,6 +277,15 @@ export default {
             }
         })
     },
+    fetchOpenApiSchema(apiCollectionId) {
+        return request({
+            url: '/api/fetchOpenApiSchema',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
     exportToPostman(apiCollectionId) {
         return request({
             url: '/api/createPostmanApi',
@@ -751,11 +760,23 @@ export default {
         })
     },
 
-    async getSensitiveInfoForCollections(){
-        return await request({
-            url: '/api/getSensitiveInfoForCollections',
+    fetchLatestTraces(apiCollectionId) {
+        return request({
+            url: '/api/fetchLatestTraces',
             method: 'post',
-            data:{},
+            data: {
+                apiCollectionId
+            }
+        })
+    },
+
+    fetchSpansForTrace(traceId) {
+        return request({
+            url: '/api/fetchSpansForTrace',
+            method: 'post',
+            data: {
+                traceId
+            }
         })
     },
 
@@ -986,6 +1007,24 @@ export default {
             }
         })
         return resp
+    },
+
+    async getSwaggerDependencies(apiCollectionId) {
+        const resp = await request({
+            url: '/api/getSwaggerDependencies',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+        return resp
+    },
+
+    getAllIconsCache(){
+        return request({
+            url: '/api/getAllIconsCache',
+            method: 'get'
+        })
     }
 
 }

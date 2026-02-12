@@ -25,6 +25,8 @@ public class DashboardMaliciousEvent {
   private String label;
   private String host;
   private String jiraTicketUrl;
+  private String severity;
+  private String sessionId;
   public DashboardMaliciousEvent() {}
 
   public DashboardMaliciousEvent(
@@ -48,7 +50,9 @@ public class DashboardMaliciousEvent {
       String status,
       String label,
       String host,
-      String jiraTicketUrl) {
+      String jiraTicketUrl,
+      String severity,
+      String sessionId) {
     this.id = id;
     this.actor = actor;
     this.filter_id = filter;
@@ -70,6 +74,8 @@ public class DashboardMaliciousEvent {
     this.label = label;
     this.host = host;
     this.jiraTicketUrl = jiraTicketUrl;
+    this.severity = severity;
+    this.sessionId = sessionId;
   }
 
   public String getId() {
@@ -238,6 +244,22 @@ public class DashboardMaliciousEvent {
 
   public void setJiraTicketUrl(String jiraTicketUrl) {
     this.jiraTicketUrl = jiraTicketUrl;
+  }
+
+  public String getSeverity() {
+    return severity;
+  }
+
+  public void setSeverity(String severity) {
+    this.severity = severity;
+  }
+
+  public String getSessionId() {
+    return sessionId;
+  }
+
+  public void setSessionId(String sessionId) {
+    this.sessionId = sessionId;
   }
 
 }

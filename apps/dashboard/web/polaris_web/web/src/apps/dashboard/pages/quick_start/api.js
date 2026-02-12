@@ -170,11 +170,20 @@ const api = {
         })
     },
 
-    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime) {
+    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHexId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName) {
         return request({
             url: '/api/initiateCrawler',
             method: 'post',
-            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls, crawlingTime}
+            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHexId, outscopeUrls, crawlingTime, selectedModuleName, customHeaders, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName},
+            timeout: 360000
+        })
+    },
+
+    fetchAvailableDastModules() {
+        return request({
+            url: '/api/fetchAvailableDastModules',
+            method: 'post',
+            data: {}
         })
     },
 
@@ -183,6 +192,19 @@ const api = {
             url: '/api/initiateMCPScan',
             method: 'post',
             data: {serverUrl, authKey, authValue, dashboardUrl}
+        })
+    },
+
+    initiateAIAgentConnectorImport(connectorType, connectorConfig, dataIngestionUrl, recurringIntervalSeconds) {
+        return request({
+            url: '/api/initiateAIAgentConnectorImport',
+            method: 'post',
+            data: {
+                connectorType,
+                dataIngestionUrl,
+                recurringIntervalSeconds,
+                ...connectorConfig
+            }
         })
     },
 
@@ -236,6 +258,14 @@ const api = {
                 recurringIntervalSeconds,
                 ...connectorConfig
             }
+        })
+    },
+
+    saveDataDogConnector(datadogApiKey, datadogAppKey, datadogSite, serviceNames) {
+        return request({
+            url: '/api/saveDataDogConfigs',
+            method: 'post',
+            data: {datadogApiKey, datadogAppKey, datadogSite, serviceNames}
         })
     },
 

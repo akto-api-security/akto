@@ -220,7 +220,9 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             smr.getStatus(),
                             smr.getLabel(),
                             smr.getHost(),
-                            smr.getJiraTicketUrl()))
+                            smr.getJiraTicketUrl(),
+                            smr.getSeverity(),
+                            smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : ""))
                     .collect(Collectors.toList());
                 this.total = m.getTotal();
               });

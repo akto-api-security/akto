@@ -84,7 +84,7 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
     filters = [
       {
         key: 'latestAttack',
-        label: 'Latest attack sub-category',
+        label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
         type: 'select',
         choices: attackTypeChoices,
         multiple: true

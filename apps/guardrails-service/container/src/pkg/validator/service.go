@@ -11,10 +11,15 @@ import (
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
+	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
 	"github.com/akto-api-security/mcp-endpoint-shield/mcp/types"
 	"go.uber.org/zap"
 )
+
+// const (
+// 	ContextSource = types.ContextSourceAgentic
+// )
 
 // policyCache holds cached policies and their metadata
 type policyCache struct {
@@ -28,11 +33,12 @@ type policyCache struct {
 
 // Service handles payload validation using akto-gateway library
 type Service struct {
-	config    *config.Config
-	dbClient  *dbabstractor.Client
-	processor mcp.RequestProcessor
-	logger    *zap.Logger
-	cache     *policyCache
+	config     *config.Config
+	dbClient   *dbabstractor.Client
+	processor  mcp.RequestProcessor
+	logger     *zap.Logger
+	cache      *policyCache
+	sessionMgr *session.SessionManager
 }
 
 // NewService creates a new validator service
@@ -59,23 +65,73 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		false, // skipThreat - false to enable threat reporting
 	)
 
+	// Initialize session manager if enabled
+	var sessionManager *session.SessionManager
+	if cfg.SessionEnabled && cfg.DatabaseAbstractorURL != "" && cfg.ThreatBackendURL != "" {
+		syncInterval := time.Duration(cfg.SessionSyncIntervalMin) * time.Minute
+		var err error
+		sessionManager, err = session.NewSessionManager(
+			cfg.DatabaseAbstractorURL,
+			cfg.DatabaseAbstractorToken,
+			cfg.ThreatBackendURL,
+			cfg.ThreatBackendToken,
+			syncInterval,
+			logger,
+		)
+		if err != nil {
+			logger.Warn("Failed to initialize session manager", zap.Error(err))
+			sessionManager = nil
+		} else {
+			sessionManager.Start()
+			logger.Info("Session manager started",
+				zap.Duration("syncInterval", syncInterval),
+				zap.String("cyborgURL", cfg.DatabaseAbstractorURL),
+				zap.String("tbsURL", cfg.ThreatBackendURL))
+		}
+	}
+
 	return &Service{
-		config:    cfg,
-		dbClient:  dbClient,
-		processor: processor,
-		logger:    logger,
-		cache:     &policyCache{},
+		config:     cfg,
+		dbClient:   dbClient,
+		processor:  processor,
+		logger:     logger,
+		cache:      &policyCache{},
+		sessionMgr: sessionManager,
 	}, nil
 }
 
-// getCachedPolicies returns cached policies if still valid, otherwise fetches fresh policies
-func (s *Service) getCachedPolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
+func (s *Service) filterPoliciesByContextSource(policies []types.Policy, contextSource string) []types.Policy {
+	if contextSource == "" {
+		return policies
+	}
+
+	if contextSource == string(types.ContextSourceAgentic) {
+		filtered := make([]types.Policy, 0)
+		for _, policy := range policies {
+			if policy.ContextSource == "" || policy.ContextSource == "AGENTIC" {
+				filtered = append(filtered, policy)
+			}
+		}
+		return filtered
+	}
+
+	filtered := make([]types.Policy, 0)
+	for _, policy := range policies {
+		if policy.ContextSource == contextSource {
+			filtered = append(filtered, policy)
+		}
+	}
+	return filtered
+}
+
+func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
 	refreshInterval := time.Duration(s.config.PolicyRefreshIntervalMin) * time.Minute
 
 	// Check if cache is valid
 	s.cache.mu.RLock()
 	if !s.cache.lastFetched.IsZero() && time.Since(s.cache.lastFetched) < refreshInterval {
-		policies := s.cache.policies
+		// Filter policies by contextSource from cached data
+		filteredPolicies := s.filterPoliciesByContextSource(s.cache.policies, contextSource)
 		auditPolicies := s.cache.auditPolicies
 		compiledRules := s.cache.compiledRules
 		hasAuditRules := s.cache.hasAuditRules
@@ -83,16 +139,26 @@ func (s *Service) getCachedPolicies() ([]types.Policy, map[string]*types.AuditPo
 		s.cache.mu.RUnlock()
 		s.logger.Debug("Using cached policies",
 			zap.Time("lastFetched", s.cache.lastFetched),
-			zap.Int("policiesCount", len(policies)))
-		return policies, auditPolicies, compiledRules, hasAuditRules, nil
+			zap.String("contextSource", contextSource),
+			zap.Int("totalPoliciesCount", len(s.cache.policies)),
+			zap.Int("filteredPoliciesCount", len(filteredPolicies)))
+		return filteredPolicies, auditPolicies, compiledRules, hasAuditRules, nil
 	}
 	s.cache.mu.RUnlock()
 
 	// Cache is stale or empty, fetch fresh policies
-	return s.refreshPolicies()
+	allPolicies, auditPolicies, compiledRules, hasAuditRules, err := s.refreshPolicies()
+	if err != nil {
+		return nil, nil, nil, false, err
+	}
+
+	// Filter by contextSource before returning
+	filteredPolicies := s.filterPoliciesByContextSource(allPolicies, contextSource)
+	return filteredPolicies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
 // refreshPolicies fetches fresh policies from database and updates the cache
+// Fetches ALL policies without filtering by contextSource
 func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
 	s.cache.mu.Lock()
 	defer s.cache.mu.Unlock()
@@ -104,21 +170,21 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 		return s.cache.policies, s.cache.auditPolicies, s.cache.compiledRules, s.cache.hasAuditRules, nil
 	}
 
-	s.logger.Info("Refreshing policies cache")
+	s.logger.Info("Refreshing policies cache - fetching ALL policies")
 
 	policies, auditPolicies, compiledRules, hasAuditRules, err := s.fetchAndParsePolicies()
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
 
-	// Update cache
+	// Update cache with ALL policies
 	s.cache.policies = policies
 	s.cache.auditPolicies = auditPolicies
 	s.cache.compiledRules = compiledRules
 	s.cache.hasAuditRules = hasAuditRules
 	s.cache.lastFetched = time.Now()
 
-	s.logger.Info("Policy cache refreshed",
+	s.logger.Info("Policy cache refreshed with ALL policies",
 		zap.Int("policiesCount", len(policies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
 		zap.Time("lastFetched", s.cache.lastFetched))
@@ -126,9 +192,19 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
+// extractHostHeader extracts the host header value from request headers
+func extractHostHeader(headers map[string]string) string {
+	if host, ok := headers["Host"]; ok {
+		return host
+	}
+	if host, ok := headers["host"]; ok {
+		return host
+	}
+	return ""
+}
+
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
 func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
-	// Fetch guardrail policies from database abstractor
 	rawGuardrailPolicies, err := s.dbClient.FetchGuardrailPolicies()
 	if err != nil {
 		return nil, nil, nil, false, fmt.Errorf("failed to fetch guardrail policies: %w", err)
@@ -234,19 +310,33 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
-// ValidateRequest validates a request payload against guardrail policies
-func (s *Service) ValidateRequest(ctx context.Context, payload string) (*mcp.ValidationResult, error) {
-	s.logger.Info("Validating request payload")
+// ValidateRequest validates a request payload against guardrail policies with session tracking
+func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSource string, sessionID string, requestID string) (*mcp.ValidationResult, error) {
+	s.logger.Info("Validating request payload",
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
+
+	// Check if session is already malicious
+	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
+		return result, nil
+	}
+
+	// Track request and generate summary asynchronously
+	session.TrackRequestAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload)
+
+	// Inject session summary into payload if available
+	payloadToValidate := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID)
 
 	// Get cached policies (refreshes if stale)
-	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies()
+	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(contextSource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
 
 	// Create validation context
 	valCtx := &mcp.ValidationContext{
-		// Add any context information needed
+		ContextSource: types.ContextSource(contextSource),
+		SessionID:     sessionID,
 	}
 
 	s.logger.Debug("Calling ProcessRequest",
@@ -254,10 +344,10 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string) (*mcp.Val
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
 		zap.Int("compiledRulesCount", len(compiledRules)),
 		zap.Bool("hasAuditRules", hasAuditRules),
-		zap.String("payload", payload))
+		zap.String("payload", payloadToValidate))
 
-	// Use processor's ProcessRequest method with external policies
-	processResult, err := s.processor.ProcessRequest(ctx, payload, valCtx, policies, auditPolicies, hasAuditRules)
+	// Use processor's ProcessRequest method with external policies (using modified payload)
+	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
 	if err != nil {
 		s.logger.Error("ProcessRequest failed", zap.Error(err))
 		return nil, fmt.Errorf("failed to process request: %w", err)
@@ -270,36 +360,42 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string) (*mcp.Val
 		zap.Any("blockedResponse", processResult.BlockedResponse),
 		zap.Any("parsedData", processResult.ParsedData))
 
-	// Convert ProcessResult to ValidationResult for backward compatibility
+	// Track blocked response if request was blocked
+	session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, requestID, processResult)
+
+	// Convert ProcessResult to ValidationResult
 	result := &mcp.ValidationResult{
 		Allowed:         !processResult.IsBlocked,
 		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
 		ModifiedPayload: processResult.ModifiedPayload,
-		Reason:          "", // Extract from BlockedResponse if needed
-		Metadata:        processResult.ParsedData,
+		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
+		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 	}
 
 	s.logger.Info("Request validation completed",
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
-		zap.String("reason", result.Reason))
+		zap.String("sessionID", sessionID))
 
 	return result, nil
 }
 
-// ValidateResponse validates a response payload against guardrail policies
-func (s *Service) ValidateResponse(ctx context.Context, payload string) (*mcp.ValidationResult, error) {
-	s.logger.Info("Validating response payload")
+// ValidateResponse validates a response payload against guardrail policies with session tracking
+func (s *Service) ValidateResponse(ctx context.Context, payload string, contextSource string, sessionID string, requestID string) (*mcp.ValidationResult, error) {
+	s.logger.Info("Validating response payload",
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
 
 	// Get cached policies (refreshes if stale)
-	policies, _, _, _, err := s.getCachedPolicies()
+	policies, _, _, _, err := s.getCachedPolicies(contextSource)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
 
 	// Create validation context
 	valCtx := &mcp.ValidationContext{
-		// Add any context information needed
+		ContextSource: types.ContextSource(contextSource),
+		SessionID:     sessionID,
 	}
 
 	// Use processor's ProcessResponse method with external policies
@@ -308,29 +404,33 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string) (*mcp.Va
 		return nil, fmt.Errorf("failed to process response: %w", err)
 	}
 
+	// Track response and generate summary
+	isMalicious := processResult.IsBlocked
+	session.TrackResponseAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload, isMalicious)
+
 	// Convert ProcessResult to ValidationResult for backward compatibility
 	result := &mcp.ValidationResult{
 		Allowed:         !processResult.IsBlocked,
 		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
 		ModifiedPayload: processResult.ModifiedPayload,
-		Reason:          "", // Extract from BlockedResponse if needed
-		Metadata:        processResult.ParsedData,
+		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
+		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 	}
 
 	s.logger.Info("Response validation completed",
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
-		zap.String("reason", result.Reason))
+		zap.String("sessionID", sessionID))
 
 	return result, nil
 }
 
 // ValidateBatch validates a batch of request/response pairs
-func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDataBatch) ([]ValidationBatchResult, error) {
+func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDataBatch, contextSource string) ([]ValidationBatchResult, error) {
 	s.logger.Info("Validating batch data", zap.Int("count", len(batchData)))
 
 	// Get cached policies (refreshes if stale)
-	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies()
+	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies(string(contextSource))
 	if err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
@@ -360,6 +460,9 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			json.Unmarshal([]byte(data.ResponseHeaders), &respHeaders)
 		}
 
+		// Extract host header for McpServerName
+		mcpServerName := extractHostHeader(reqHeaders)
+
 		// Create validation context with actual data
 		valCtx := &mcp.ValidationContext{
 			IP:              data.IP,
@@ -370,6 +473,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			StatusCode:      statusCode,
 			RequestPayload:  data.RequestPayload,
 			ResponsePayload: data.ResponsePayload,
+			ContextSource:   types.ContextSource(contextSource),
+			McpServerName:   mcpServerName,
 		}
 
 		var reqResult, respResult *mcp.ValidationResult
@@ -398,8 +503,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					Allowed:         !processResult.IsBlocked,
 					Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != data.RequestPayload,
 					ModifiedPayload: processResult.ModifiedPayload,
-					Reason:          "",
-					Metadata:        processResult.ParsedData,
+					Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
+					Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 				}
 				result.RequestAllowed = reqResult.Allowed
 				result.RequestModified = reqResult.Modified
@@ -419,8 +524,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					Allowed:         !processResult.IsBlocked,
 					Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != data.ResponsePayload,
 					ModifiedPayload: processResult.ModifiedPayload,
-					Reason:          "",
-					Metadata:        processResult.ParsedData,
+					Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
+					Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 				}
 				result.ResponseAllowed = respResult.Allowed
 				result.ResponseModified = respResult.Modified

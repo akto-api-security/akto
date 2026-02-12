@@ -80,6 +80,17 @@ public class Kafka {
     this(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING, logDb);
   }
 
+  public Kafka(String brokerIP, int lingerMS, int batchSize, String username, String password, LogDb logDb) {
+    producerReady = false;
+    try {
+      logger = new LoggerMaker(Kafka.class, logDb);
+      setProducer(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING, 5000, 0, username, password);
+    } catch (Exception e) {
+      logger.errorAndAddToDb("Error while creating producer: " + e.getMessage());
+      e.printStackTrace();
+    }
+  }
+
   public Kafka(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout, int retriesConfig) {
     this(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING, maxRequestTimeout, retriesConfig);
   }
@@ -126,6 +137,20 @@ public class Kafka {
       int maxRequestTimeout,
       int retriesConfig
       ) {
+    setProducer(brokerIP, lingerMS, batchSize, keySerializer, valueSerializer, maxRequestTimeout, retriesConfig, null, null);
+  }
+
+  private void setProducer(
+      String brokerIP,
+      int lingerMS,
+      int batchSize,
+      Serializer keySerializer,
+      Serializer valueSerializer,
+      int maxRequestTimeout,
+      int retriesConfig,
+      String username,
+      String password
+      ) {
     if (producer != null) close(); // close existing producer connection
 
     Properties kafkaProps = new Properties();
@@ -139,6 +164,11 @@ public class Kafka {
     kafkaProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, lingerMS + maxRequestTimeout);
     if(retriesConfig > 0){
       kafkaProps.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
+    }
+
+    // Add SASL authentication if username and password are provided
+    if (username != null && !username.isEmpty() && password != null && !password.isEmpty()) {
+      KafkaConfig.addAuthenticationProperties(kafkaProps, username, password);
     }
 
     try {

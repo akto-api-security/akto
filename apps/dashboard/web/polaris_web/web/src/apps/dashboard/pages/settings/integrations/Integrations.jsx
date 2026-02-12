@@ -40,11 +40,11 @@ function Integrations() {
         name:'CI/CD',
         source: '/public/ciCd_logo.svg'
     }
-    let aktoGptObj={
-        id: 'akto_gpt',
-        name:'Akto GPT',
-        source: '/public/gpt_logo.svg'
-    }
+    // let aktoGptObj={
+    //     id: 'akto_gpt',
+    //     name:'Akto GPT',
+    //     source: '/public/gpt_logo.svg'
+    // }
     let slackObj={
         id: 'slack',
         name:'Slack',   
@@ -239,7 +239,7 @@ function Integrations() {
     const trafficItems = [burpSuiteObj, postmanObj];
     const reportingItems = [githubAppObj];
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
-    const aiItems = [aktoGptObj, agentConfigObj, mcpRegistryObj];
+    const aiItems = [/* aktoGptObj, */ agentConfigObj, mcpRegistryObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];

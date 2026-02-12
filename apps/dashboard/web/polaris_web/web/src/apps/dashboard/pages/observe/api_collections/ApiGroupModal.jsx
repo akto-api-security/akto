@@ -6,6 +6,7 @@ import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
 import api from "../api";
 import func from "@/util/func"
 import PersistStore from "../../../../main/PersistStore"
+import { mapLabel, getDashboardCategory } from "../../../../main/labelHelper"
 
 const Operation = {
     ADD: "ADD",
@@ -23,6 +24,9 @@ function ApiGroupModal(props){
 
     const [apiGroupName, setApiGroupName] = useState(currentApiGroupName)
 
+    const entityLabel = mapLabel('API', getDashboardCategory())
+    const groupLabel = mapLabel('API group', getDashboardCategory())
+
     function getApis(){
         return apis.map((x) => {
             let tmp = x.split("###");
@@ -38,7 +42,7 @@ function ApiGroupModal(props){
         let ret = getApis();
 
         api.addApisToCustomCollection(ret, apiGroupName).then((resp)=>{
-            func.setToast(true, false, <div data-testid="api_added_to_group_message">APIs added to API group successfully</div>)
+            func.setToast(true, false, <div data-testid="api_added_to_group_message">{`${entityPlural} added to ${groupLabel} successfully`}</div>)
             setCollectionsMap(func.mapCollectionIdToName(resp?.apiCollections))
             setAllCollections(resp?.apiCollections)
             toggleApiGroupModal()
@@ -49,7 +53,7 @@ function ApiGroupModal(props){
         let ret = getApis();
 
         api.removeApisFromCustomCollection(ret, apiGroupName).then((resp)=>{
-            func.setToast(true, false, "APIs removed from API group successfully")
+            func.setToast(true, false, `${entityPlural} removed from ${groupLabel} successfully`)
             setCollectionsMap(func.mapCollectionIdToName(resp?.apiCollections))
             setAllCollections(resp?.apiCollections)
             toggleApiGroupModal()
@@ -59,13 +63,13 @@ function ApiGroupModal(props){
 
     const existingTab = {
         id: 'existing',
-        content: 'Existing API group',
+        content: 'Existing Group',
         component: (
             <Box padding={5} key={"existing"}>
                 <DropdownSearch
                     id={"select-api-group"}
-                    label="Select API group"
-                    placeholder="Select API group"
+                    label={`Select ${groupLabel}`}
+                    placeholder={`Select ${groupLabel}`}
                     optionsList={
                         activatedGroupCollections.map((x) => {
                             return {
@@ -83,13 +87,13 @@ function ApiGroupModal(props){
 
     const newTab = {
         id: 'new',
-        content: 'New API group',
+        content: 'New Group',
         component: (
             <Box padding={5} key={"new"}>
                 <TextField
                     id="create-api-group"
                     label="Name"
-                    helpText="Enter name for new API group"
+                    helpText={`Enter name for new ${groupLabel}`}
                     value={apiGroupName}
                     onChange={(input) => setApiGroupName(input)}
                     autoComplete="off"
@@ -104,11 +108,17 @@ function ApiGroupModal(props){
         tabs.push(newTab)
     }
 
-    const plurality = func.addPlurality(getApis().length);
+    const apisCount = apis.length
+    const plurality = func.addPlurality(apisCount);
+    const entityPlural = plurality === 's' ? `${entityLabel}s` : entityLabel
 
-    const title = operation === Operation.ADD ?`Add API${plurality} to API group` : `Remove API${plurality} from API group`
+    const title = operation === Operation.ADD
+        ? `Add to ${groupLabel}`
+        : `Remove from ${groupLabel}`
 
-    const buttonTitle = operation === Operation.ADD ? <div data-testid="add_api_button">{`Add API${plurality}`}</div> : `Remove API${plurality}`
+    const buttonTitle = operation === Operation.ADD
+        ? <div data-testid="add_api_button">{`Add ${entityPlural}`}</div>
+        : `Remove ${entityPlural}`
 
     const buttonAction = operation === Operation.ADD ? addAPIs : removeAPIs
 
@@ -139,7 +149,7 @@ function ApiGroupModal(props){
                     />
                 </Modal.Section> :
                 <Modal.Section>
-                    {`Are you sure you want to remove ${getApis().length} API${plurality} from ${apiGroupName} [Only APIs added manually can be removed]?`}
+                    {`Are you sure you want to remove ${apisCount} ${entityPlural} from ${apiGroupName} [Only ${entityLabel}s added manually can be removed]?`}
                 </Modal.Section>
             }
         </Modal>

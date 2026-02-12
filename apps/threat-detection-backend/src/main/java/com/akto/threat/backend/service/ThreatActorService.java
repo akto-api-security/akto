@@ -4,7 +4,6 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.log.LoggerMaker;
-import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse;
@@ -12,6 +11,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ParamEnumerationConfig;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.RatelimitConfig;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Actor;
@@ -21,18 +21,17 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Sp
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse.ActivityData;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchThreatsForActorRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchThreatsForActorResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
-import com.akto.ProtoMessageUtils;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.threat.backend.db.ActorInfoModel;
+import com.akto.threat.backend.dto.ParamEnumerationConfigDTO;
 import com.akto.threat.backend.dto.RateLimitConfigDTO;
 import com.akto.util.ThreatDetectionConstants;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
-import com.akto.threat.backend.utils.ThreatUtils;
-import com.google.protobuf.TextFormat;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -104,6 +103,12 @@ public class ThreatActorService {
             boolean archivalEnabled = (Boolean) archivalEnabledObj;
             builder.setArchivalEnabled(archivalEnabled);
         }
+
+        // Handle paramEnumerationConfig using DTO
+        ParamEnumerationConfig paramEnumConfig = ParamEnumerationConfigDTO.parseFromDocument(doc);
+        if (paramEnumConfig != null) {
+            builder.setParamEnumerationConfig(paramEnumConfig);
+        }
     }
     return builder.build();
 }
@@ -142,6 +147,14 @@ public class ThreatActorService {
         newDoc.append("archivalDays", updatedConfig.getArchivalDays());
     }
 
+    // Handle paramEnumerationConfig using DTO
+    if (updatedConfig.hasParamEnumerationConfig()) {
+        Document paramEnumConfigDoc = ParamEnumerationConfigDTO.toDocument(updatedConfig.getParamEnumerationConfig());
+        if (paramEnumConfigDoc != null) {
+            newDoc.append("paramEnumerationConfig", paramEnumConfigDoc.get("paramEnumerationConfig"));
+        }
+    }
+
     // Note: archivalEnabled is now handled by separate endpoint /toggle_archival_enabled
     // This prevents other config updates from accidentally resetting it
 
@@ -154,12 +167,15 @@ public class ThreatActorService {
         coll.insertOne(newDoc);
     }
 
-    // Set the actor, ratelimitConfig, and archivalDays in the returned proto
+    // Set the actor, ratelimitConfig, paramEnumerationConfig in the returned proto
     if (updatedConfig.hasActor()) {
         builder.setActor(updatedConfig.getActor());
     }
     if (updatedConfig.hasRatelimitConfig()) {
         builder.setRatelimitConfig(updatedConfig.getRatelimitConfig());
+    }
+    if (updatedConfig.hasParamEnumerationConfig()) {
+        builder.setParamEnumerationConfig(updatedConfig.getParamEnumerationConfig());
     }
     // Read archivalDays from the saved document to return the current value
     Document savedDoc = coll.find().first();
@@ -215,6 +231,8 @@ public class ThreatActorService {
         int limit = request.getLimit();
         Map<String, Integer> sort = request.getSortMap();
 
+        boolean isAgenticOrEndpoint = ThreatUtils.isAgenticOrEndpointContext(contextSource);
+
         ListThreatActorsRequest.Filter filter = request.getFilter();
         Document match = new Document();
 
@@ -242,15 +260,21 @@ public class ThreatActorService {
         // Sort first for $first to work
         pipeline.add(new Document("$sort", new Document("detectedAt", -1)));
 
-        pipeline.add(new Document("$group", new Document("_id", "$actor")
+        Document groupDoc = new Document("_id", "$actor")
             .append("latestApiEndpoint", new Document("$first", "$latestApiEndpoint"))
             .append("latestApiMethod", new Document("$first", "$latestApiMethod"))
             .append("latestApiIp", new Document("$first", "$latestApiIp"))
             .append("latestApiHost", new Document("$first", "$host"))
             .append("country", new Document("$first", "$country"))
             .append("discoveredAt", new Document("$first", "$detectedAt"))
-            .append("latestSubCategory", new Document("$first", "$filterId"))
-        ));
+            .append("latestSubCategory", new Document("$first", "$filterId"));
+
+        // Only add metadata field for AGENTIC or ENDPOINT contexts
+        if (isAgenticOrEndpoint) {
+            groupDoc.append("latestMetadata", new Document("$first", "$metadata"));
+        }
+
+        pipeline.add(new Document("$group", groupDoc));
 
         if (!filter.getHostsList().isEmpty()) {
             pipeline.add(new Document("$match", new Document("latestApiHost", new Document("$in", filter.getHostsList()))));
@@ -273,38 +297,11 @@ public class ThreatActorService {
         List<Document> countList = result.getList("count", Document.class, Collections.emptyList());
         long total = countList.isEmpty() ? 0 : countList.get(0).getInteger("total");
 
-        // Activity fetch
         List<ListThreatActorResponse.ThreatActor> actors = new ArrayList<>();
         for (Document doc : paginated) {
             String actorId = doc.getString("_id");
-            List<ActivityData> activityDataList = new ArrayList<>();
 
-            // Build activity query with filtering
-            Document activityQuery = new Document("actor", actorId);
-
-            if (!contextFilter.isEmpty()) {
-                activityQuery.putAll(contextFilter);
-            }
-
-            try (MongoCursor<MaliciousEventDto> cursor2 = maliciousEventDao.getCollection(accountId)
-                    .find(activityQuery)
-                    .sort(Sorts.descending("detectedAt"))
-                    .limit(40)
-                    .cursor()) {
-                while (cursor2.hasNext()) {
-                    MaliciousEventDto event = cursor2.next();
-                    activityDataList.add(ActivityData.newBuilder()
-                        .setUrl(event.getLatestApiEndpoint())
-                        .setDetectedAt(event.getDetectedAt())
-                        .setSubCategory(event.getFilterId())
-                        .setSeverity(event.getSeverity())
-                        .setMethod(event.getLatestApiMethod().name())
-                        .setHost(event.getHost() != null ? event.getHost() : "")
-                        .build());
-                }
-            }
-
-            actors.add(ListThreatActorResponse.ThreatActor.newBuilder()
+            ListThreatActorResponse.ThreatActor.Builder actorBuilder = ListThreatActorResponse.ThreatActor.newBuilder()
                 .setId(actorId)
                 .setLatestApiEndpoint(doc.getString("latestApiEndpoint"))
                 .setLatestApiMethod(doc.getString("latestApiMethod"))
@@ -312,9 +309,14 @@ public class ThreatActorService {
                 .setLatestApiHost(doc.getString("latestApiHost") != null ? doc.getString("latestApiHost") : "")
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
                 .setCountry(doc.getString("country"))
-                .setLatestSubcategory(doc.getString("latestSubCategory"))
-                .addAllActivityData(activityDataList)
-                .build());
+                .setLatestSubcategory(doc.getString("latestSubCategory"));
+
+            // Only add metadata field for AGENTIC or ENDPOINT contexts
+            if (isAgenticOrEndpoint) {
+                actorBuilder.setLatestMetadata(ThreatUtils.fetchMetadataString(doc.getString("latestMetadata")));
+            }
+
+            actors.add(actorBuilder.build());
         }
 
         return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();
@@ -539,23 +541,6 @@ public class ThreatActorService {
         return ThreatActivityTimelineResponse.newBuilder().addAllThreatActivityTimeline(timeline).build();
   }
 
-
-  private String fetchMetadataString(String metadataStr){
-    if(metadataStr == null || metadataStr.isEmpty()){
-        return "";
-    }
-
-    Metadata.Builder metadataBuilder = Metadata.newBuilder();
-    try {
-      TextFormat.getParser().merge(metadataStr, metadataBuilder);
-    } catch (Exception e) {
-      return "";
-    }
-    Metadata metadataProto = metadataBuilder.build();
-    metadataStr = ProtoMessageUtils.toString(metadataProto).orElse("");
-    return metadataStr;
-  }
-
   private List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> fetchMaliciousPayloadsResponse(FindIterable<MaliciousEventDto> respList){
     if (respList == null) {
       return Collections.emptyList();
@@ -565,7 +550,7 @@ public class ThreatActorService {
         maliciousPayloadsResponse.add(
             FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
             setOrig(HttpResponseParams.getSampleStringFromProtoString(event.getLatestApiOrig())).
-            setMetadata(fetchMetadataString(event.getMetadata() != null ? event.getMetadata() : "")).
+            setMetadata(ThreatUtils.fetchMetadataString(event.getMetadata() != null ? event.getMetadata() : "")).
             setTs(event.getDetectedAt()).build());
     }
     return maliciousPayloadsResponse;
@@ -582,7 +567,7 @@ public class ThreatActorService {
     if (request.getEventType().equalsIgnoreCase(MaliciousEventDto.EventType.AGGREGATED.name())) {
         Bson matchConditions = Filters.and(
             Filters.eq("actor", request.getActor()),
-            Filters.gte("filterId", request.getFilterId())
+            Filters.eq("filterId", request.getFilterId())
         );
         matchConditions = Filters.or(
             matchConditions,
@@ -707,6 +692,49 @@ public class ThreatActorService {
 
         return ModifyThreatActorStatusResponse.newBuilder().build();
       }
+
+  public FetchThreatsForActorResponse fetchThreatsForActor(
+      String accountId, FetchThreatsForActorRequest request, String contextSource) {
+
+    String actor = request.getActor();
+    int limit = request.getLimit() > 0 ? request.getLimit() : 20;
+
+    boolean isAgenticOrEndpoint = ThreatUtils.isAgenticOrEndpointContext(contextSource);
+
+    Document activityQuery = new Document("actor", actor);
+
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+      activityQuery.putAll(contextFilter);
+    }
+
+    List<FetchThreatsForActorResponse.ActivityData> activities = new ArrayList<>();
+
+    try (MongoCursor<MaliciousEventDto> cursor = maliciousEventDao.getCollection(accountId)
+        .find(activityQuery)
+        .sort(Sorts.descending("detectedAt"))
+        .limit(limit)
+        .cursor()) {
+      while (cursor.hasNext()) {
+        MaliciousEventDto event = cursor.next();
+        FetchThreatsForActorResponse.ActivityData.Builder activityBuilder = FetchThreatsForActorResponse.ActivityData.newBuilder()
+            .setUrl(event.getLatestApiEndpoint())
+            .setDetectedAt(event.getDetectedAt())
+            .setSubCategory(event.getFilterId())
+            .setSeverity(event.getSeverity())
+            .setMethod(event.getLatestApiMethod().name())
+            .setHost(event.getHost() != null ? event.getHost() : "");
+
+        if (isAgenticOrEndpoint) {
+          activityBuilder.setMetadata(ThreatUtils.fetchMetadataString(event.getMetadata()));
+        }
+
+        activities.add(activityBuilder.build());
+      }
+    }
+
+    return FetchThreatsForActorResponse.newBuilder().addAllActivities(activities).build();
+  }
 
   public FetchTopNDataResponse fetchTopNData(
       String accountId, long startTs, long endTs, List<String> latestAttackList, int limit, String contextSource) {

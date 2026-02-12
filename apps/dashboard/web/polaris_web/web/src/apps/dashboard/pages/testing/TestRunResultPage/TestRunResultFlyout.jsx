@@ -5,7 +5,8 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link } from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, ActionList } from '@shopify/polaris'
+import { EditMinor } from '@shopify/polaris-icons'
 import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
@@ -21,7 +22,6 @@ import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
-import ChatInterface from '../../../components/shared/ChatInterface.jsx'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
 import ApiGroups from '../../../components/shared/ApiGroups'
 import ForbiddenRole from '../../../components/shared/ForbiddenRole'
@@ -59,6 +59,9 @@ function TestRunResultFlyout(props) {
     const [description, setDescription] = useState("")
     const [editDescription, setEditDescription] = useState("")
     const [isEditingDescription, setIsEditingDescription] = useState(false)
+
+    const [severityPopoverActive, setSeverityPopoverActive] = useState(false)
+    const [isHoveringSeverity, setIsHoveringSeverity] = useState(false)
 
     const [vulnerabilityAnalysisError, setVulnerabilityAnalysisError] = useState(null)
     const [refreshFlag, setRefreshFlag] = useState(Date.now().toString())
@@ -140,6 +143,31 @@ function TestRunResultFlyout(props) {
             }
         } catch (err) {
             func.setToast(true, true, "Failed to save description");
+        }
+    }
+
+    const handleSeverityUpdate = async (newSeverity) => {
+        setSeverityPopoverActive(false);
+        try {
+            await issuesApi.bulkUpdateIssueSeverity([issueDetails.id], newSeverity);
+            func.setToast(true, false, `Severity updated to ${newSeverity}`);
+
+            // Update issueDetails object
+            issueDetails.severity = newSeverity;
+
+            // Trigger re-render using existing refreshFlag state
+            setRefreshFlag(Date.now().toString());
+
+            // Update local state
+            if (typeof props.setIssueDetails === 'function') {
+                props.setIssueDetails({ ...issueDetails, severity: newSeverity });
+            }
+            // Trigger refresh if needed
+            if (typeof props.refreshIssueDetails === 'function') {
+                props.refreshIssueDetails();
+            }
+        } catch (err) {
+            func.setToast(true, true, "Failed to update severity");
         }
     }
 
@@ -380,7 +408,8 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
-    const owaspData = func.categoryMapping[selectedTestRunResult?.testCategory] || {};
+    const categoryKey = selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] || selectedTestRunResult?.testCategory;
+    const owaspData = func.categoryMapping[categoryKey] || {};
     const owaspMapping = owaspData.label || "";
     const owaspUrl = owaspData.url || "";
 
@@ -424,7 +453,54 @@ function TestRunResultFlyout(props) {
                                     <Button removeUnderline plain monochrome onClick={() => openTest()}>
                                         <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
                                     </Button>
-                                    {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
+                                    {(severity && severity?.length > 0) ? (
+                                        issueDetails?.testRunIssueStatus === 'IGNORED' ?
+                                            <Badge size='small'>Ignored</Badge> :
+                                            <Popover
+                                                active={severityPopoverActive}
+                                                activator={
+                                                    <Button
+                                                        plain
+                                                        removeUnderline
+                                                        onClick={() => setSeverityPopoverActive(!severityPopoverActive)}
+                                                        onMouseEnter={() => setIsHoveringSeverity(true)}
+                                                        onMouseLeave={() => setIsHoveringSeverity(false)}
+                                                    >
+                                                        <HorizontalStack gap="1" align="center">
+                                                            <Box className={`badge-wrapper-${severity.toUpperCase()}`}>
+                                                                <Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge>
+                                                            </Box>
+                                                            {isHoveringSeverity && (
+                                                                <Icon source={EditMinor} tone="base" />
+                                                            )}
+                                                        </HorizontalStack>
+                                                    </Button>
+                                                }
+                                                onClose={() => setSeverityPopoverActive(false)}
+                                                autofocusTarget="first-node"
+                                            >
+                                                <ActionList
+                                                    items={[
+                                                        {
+                                                            content: 'Critical',
+                                                            onAction: () => handleSeverityUpdate('CRITICAL')
+                                                        },
+                                                        {
+                                                            content: 'High',
+                                                            onAction: () => handleSeverityUpdate('HIGH')
+                                                        },
+                                                        {
+                                                            content: 'Medium',
+                                                            onAction: () => handleSeverityUpdate('MEDIUM')
+                                                        },
+                                                        {
+                                                            content: 'Low',
+                                                            onAction: () => handleSeverityUpdate('LOW')
+                                                        }
+                                                    ]}
+                                                />
+                                            </Popover>
+                                    ) : null}
                                 </HorizontalStack>
                                 {owaspMapping.length > 0 ? (
                                     <Link onClick={() => owaspUrl && window.open(owaspUrl, '_blank')}>
@@ -696,7 +772,7 @@ function TestRunResultFlyout(props) {
 
         // TODO: Replace with real AI analysis from backend
         // Mock analysis for UI development - replace when backend endpoint is ready
-        const analysis = "Your HR Agent exposed its system instructions after a follow up request framed as internal debugging. The disclosure occurred while interacting with getAutomationTestCommandLogs, indicating a multi part prompt injection vulnerability.";
+        const analysis = "Your AI Agent exposed its system instructions after a follow up request framed as internal debugging. The disclosure occurred while interacting with getAutomationTestCommandLogs, indicating a multi part prompt injection vulnerability.";
 
         // TODO: Implement real message sending handler
         // Replace with actual API call when chat endpoint is available

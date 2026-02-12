@@ -10,9 +10,10 @@ import { Badge, IndexFiltersMode, Avatar, Box, HorizontalStack, Text } from "@sh
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
+import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import IpReputationScore from "./IpReputationScore";
 
 const resourceName = {
@@ -45,7 +46,7 @@ const getHeaders = () => {
     },
   ];
 
-  if (func.isDemoAccount()) {
+  if (func.shouldShowIpReputation()) {
     baseHeaders.push({
       text: "Reputation",
       value: "reputationScore",
@@ -53,12 +54,27 @@ const getHeaders = () => {
     });
   }
 
+  baseHeaders.push({
+    text: "Filter",
+    value: "filterId",
+    title: labelMap[PersistStore.getState().dashboardCategory]["Attack type"],
+  });
+
+  // Only show detection type for Agentic Security (Argus) and Endpoint Security (Atlas), not for API Security
+  if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+    baseHeaders.push({
+      text: "Detection Type",
+      value: "detectionType",
+      title: "Detection Type",
+    });
+    baseHeaders.push({
+      text: "Rule Violated",
+      value: "ruleViolated",
+      title: "Rule Violated",
+      maxWidth: "200px",
+    });
+  }
   baseHeaders.push(
-    {
-      text: "Filter",
-      value: "filterId",
-      title: "Attack type",
-    },
     {
       text: "Compliance",
       value: "compliance",
@@ -513,11 +529,16 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 //    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
     let ret = res?.maliciousEvents.map((x) => {
-      const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
+      const severity = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
+        ? (x?.severity || "HIGH")
+        : (x?.severity || threatFiltersMap[x?.filterId]?.severity || "HIGH")
 
       const filterTemplate = threatFiltersMap[x?.filterId];
       const complianceMap = filterTemplate?.compliance?.mapComplianceToListClauses || {};
       const complianceList = Object.keys(complianceMap);
+
+      // Determine if this is session-based by checking if sessionId is present and not empty
+      const isSessionBased = x?.sessionId && x.sessionId !== '';
 
       let nextUrl = null;
       if (x.refId && x.eventType && x.actor && x.filterId) {
@@ -556,6 +577,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
         ),
+        detectionType: (
+          <Badge status={isSessionBased ? 'info' : 'default'}>
+            {isSessionBased ? 'Session' : 'Single Prompt'}
+          </Badge>
+        ),
+        ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && {
+          detectionType: (
+            <Badge status={isSessionBased ? 'info' : 'default'}>
+              {isSessionBased ? 'Session' : 'Single Prompt'}
+            </Badge>
+          ),
+          ruleViolated: extractRuleViolated(x?.metadata)
+        }),
         compliance: complianceList.length > 0 ? (
           <HorizontalStack wrap={false} gap={1}>
             {complianceList.slice(0, 2).map((complianceName, idx) =>
@@ -576,7 +610,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         nextUrl: nextUrl
       };
 
-      if (func.isDemoAccount()) {
+      if (func.shouldShowIpReputation()) {
         rowData.reputationScore = <IpReputationScore ipAddress={x.actor} />;
       }
 
@@ -596,7 +630,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     let ipChoices = res?.ips.map((x) => {
       return { label: x, value: x };
     });
-    
+
     // Extract unique hosts from the fetched data
     let hostChoices = [];
     if (res?.hosts && Array.isArray(res.hosts) && res.hosts.length > 0) {
@@ -605,12 +639,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         .map(x => ({ label: x, value: x }));
     }
 
-    const attackTypeChoices = Object.keys(threatFiltersMap).length === 0 ? [] : Object.entries(threatFiltersMap).map(([key, value]) => {
-      return {
-        label: value?._id || key,
-        value: value?._id || key
-      }
-    })
+    const attackTypeChoices = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
+      ? (res?.subCategory || []).map(x => ({ label: x, value: x }))
+      : Object.keys(threatFiltersMap).length === 0 ? [] : Object.entries(threatFiltersMap).map(([key, value]) => {
+          return {
+            label: value?._id || key,
+            value: value?._id || key
+          }
+        })
 
     filters = [
       {
@@ -642,7 +678,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       },
       {
         key: 'latestAttack',
-        label: 'Latest attack sub-category',
+        label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
         type: 'select',
         choices: attackTypeChoices,
         multiple: true

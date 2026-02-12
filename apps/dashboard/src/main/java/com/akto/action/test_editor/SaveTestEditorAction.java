@@ -2,6 +2,7 @@ package com.akto.action.test_editor;
 
 import com.akto.action.UserAction;
 import com.akto.action.testing_issues.IssuesAction;
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.CustomAuthTypeDao;
@@ -20,6 +21,8 @@ import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
@@ -51,6 +54,7 @@ import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
 import com.akto.utils.TrafficFilterUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -254,6 +258,15 @@ public class SaveTestEditorAction extends UserAction {
                     updates.add(Updates.set(YamlTemplate.INACTIVE, inactive));
                 }
             } catch (Exception e) {
+            }
+
+            try {
+                Object estimatedTokensObj = TestConfigYamlParser.getFieldIfExists(content, YamlTemplate.ESTIMATED_TOKENS);
+                if (estimatedTokensObj != null && estimatedTokensObj instanceof Integer) {
+                    updates.add(Updates.set(YamlTemplate.ESTIMATED_TOKENS, (int) estimatedTokensObj));
+                }
+            } catch (Exception e) {
+                logger.errorAndAddToDb("Error parsing estimatedTokens for template " + id + ": " + e.getMessage(), LogDb.DASHBOARD);
             }
 
             YamlTemplateDao.instance.updateOne(
@@ -490,6 +503,7 @@ public class SaveTestEditorAction extends UserAction {
         }
     }
 
+    @Audit(description = "User set a test inactive in test editor", resource = Resource.TEST_EDITOR, operation = Operation.UPDATE, metadataGenerators = {"getOriginalTestId", "getInactive"})
     public String setTestInactive() {
 
         if (originalTestId == null) {

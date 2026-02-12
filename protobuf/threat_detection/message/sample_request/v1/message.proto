@@ -8,6 +8,11 @@ option java_package = "threat_detection.message.sample_request.v1";
 message Metadata {
   string country_code = 1;
   repeated SchemaConformanceError schema_errors = 2;
+  string policy_name = 3;
+  string rule_violated = 4;
+  string risk_score = 5;
+  string reason = 6;
+  string dest_country_code = 7;
 }
 
 message SchemaConformanceError {
