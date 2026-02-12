@@ -40,6 +40,10 @@ public class ActorInfoDao extends AccountBasedDao<ActorInfoModel> {
         }
 
         java.util.Map<String, org.bson.conversions.Bson> required = new java.util.LinkedHashMap<>();
+
+        // Unique index on actorId for upsert operations in FlushMessagesToDB
+        required.put("idx_actorId", Indexes.ascending("actorId"));
+
         required.put("idx_discoveredAt", Indexes.descending("discoveredAt"));
         // Note: idx_lastAttackTs removed - redundant with compound indexes and confuses query planner
 
@@ -73,7 +77,12 @@ public class ActorInfoDao extends AccountBasedDao<ActorInfoModel> {
 
         for (java.util.Map.Entry<String, org.bson.conversions.Bson> e : required.entrySet()) {
             if (!existing.contains(e.getKey())) {
-                coll.createIndex(e.getValue(), new IndexOptions().name(e.getKey()));
+                IndexOptions options = new IndexOptions().name(e.getKey());
+                // Make actorId index unique
+                if ("idx_actorId".equals(e.getKey())) {
+                    options.unique(true);
+                }
+                coll.createIndex(e.getValue(), options);
             }
         }
     }

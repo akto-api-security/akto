@@ -406,8 +406,7 @@ public class ThreatActorService {
             return actorInfoDao.getCollection(accountId).countDocuments(match);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(
-                "Error counting actor_info documents: " + e.getMessage() +
-                " | Filter: " + match.toJson(),
+                "Error counting actor_info documents: " + e.getMessage(),
                 LoggerMaker.LogDb.THREAT_DETECTION
             );
             // Throw exception to fail fast - don't return incorrect count
