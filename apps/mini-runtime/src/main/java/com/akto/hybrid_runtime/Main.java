@@ -1209,7 +1209,7 @@ public class Main {
                 return null;
             }
             // Read security protocol from environment, default to SASL_PLAINTEXT
-            String securityProtocol = System.getenv().getOrDefault("KAFKA_SECURITY_PROTOCOL", KafkaConfig.SECURITY_PROTOCOL_SASL_PLAINTEXT);
+            String securityProtocol = System.getenv().getOrDefault(KafkaConfig.ENV_KAFKA_SECURITY_PROTOCOL, KafkaConfig.SECURITY_PROTOCOL_SASL_PLAINTEXT);
             KafkaConfig.addAuthenticationProperties(properties, kafkaUsername, kafkaPassword, securityProtocol);
         }
 
