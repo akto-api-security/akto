@@ -174,7 +174,7 @@ public class ThreatDetector {
         }
 
         // Step 2: Use AuthPolicy to find auth types
-        Set<ApiInfo.AuthType> authTypes = AuthPolicy.findAuthTypes(headers);
+        Set<String> authTypes = AuthPolicy.findAuthTypes(headers);
 
         // Step 3: Basic auth is always weak
         if (authTypes.contains(ApiInfo.AuthType.BASIC)) {
