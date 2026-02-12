@@ -148,7 +148,7 @@ export default function LeftNav() {
                 }
             }] : []),
             ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
-                label: "Endpoint Security Posture",
+                label: "Dashboard",
                 icon: ReportFilledMinor,
                 onClick: () => {
                     handleSelect("dashboard_endpoint_posture");
