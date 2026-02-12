@@ -813,6 +813,16 @@ public class DbLayer {
             Updates.set(TestingRunResultSummary.TOTAL_APIS, totalApiCount));
     }
 
+    public static TestingRunResultSummary updateMetadataInSummary(String summaryId, Map<String, String> metadata) {
+        ObjectId summaryObjectId = new ObjectId(summaryId);
+        return TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                Filters.eq(Constants.ID, summaryObjectId),
+                Updates.combine(
+                        Updates.set(TestingRunResultSummary.METADATA_STRING, metadata)
+                )
+        );
+    }
+
     public static void insertActivity(int count) {
         ActivitiesDao.instance.insertActivity("High Vulnerability detected", count + " HIGH vulnerabilites detected");
     }

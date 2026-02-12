@@ -402,11 +402,13 @@ public class TestExecutor {
                         String errorMessage = "Failed to fetch auth token after three retries";
                         loggerMaker.errorAndAddToDb(errorMessage, LogDb.TESTING);
                         testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, errorMessage));
-                        
-                        // Mark test run summary as FAILED when auth fails
+
+                        Map<String, String> metadata = new HashMap<>();
+                        metadata.put("error", errorMessage);
                         dataActor.updateIssueCountAndStateInSummary(summaryId.toHexString(), new HashMap<>(), State.FAILED.toString());
+                        dataActor.updateMetadataInSummary(summaryId.toHexString(), metadata);
                         loggerMaker.infoAndAddToDb("Test run marked as FAILED due to auth failure", LogDb.TESTING);
-                        return; // Exit early if auth fails
+                        return;
                     }
                     loggerMaker.infoAndAddToDb("Successfully pre-fetched auth token", LogDb.TESTING);
                 }
