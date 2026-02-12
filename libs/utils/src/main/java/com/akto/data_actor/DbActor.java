@@ -564,6 +564,10 @@ public class DbActor extends DataActor {
         DbLayer.updateTotalApiCountInTestSummary(summaryId, totalApiCount);
     }
 
+    public TestingRunResultSummary updateMetadataInSummary(String summaryId, Map<String, String> metadata) {
+        return DbLayer.updateMetadataInSummary(summaryId, metadata);
+    }
+
     public void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         DbLayer.modifyHybridTestingSetting(hybridTestingEnabled);
     }

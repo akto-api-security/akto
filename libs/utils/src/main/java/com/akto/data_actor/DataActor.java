@@ -198,6 +198,8 @@ public abstract class DataActor {
 
     public abstract void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount);
 
+    public abstract TestingRunResultSummary updateMetadataInSummary(String summaryId, Map<String, String> metadata);
+
     public abstract void insertActivity(int count);
 
     public abstract TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues);
