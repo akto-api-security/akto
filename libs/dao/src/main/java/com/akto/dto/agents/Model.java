@@ -19,6 +19,7 @@ public class Model {
     public final static String PARAM_MODEL = "model";
     public final static String PARAM_API_KEY = "apiKey";
     public final static String PARAM_AZURE_OPENAI_ENDPOINT = "azureOpenAIEndpoint";
+    public final static String PARAM_OLLAMA_ENDPOINT = "ollamaAIEndpoint";
 
     public final static String _PARAMS = "params";
     Map<String, String> params;

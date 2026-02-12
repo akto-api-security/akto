@@ -16,7 +16,8 @@ public class GenericAgentConversation {
         TEST_EXECUTION_RESULT,
         PROMPT_PLAYGROUND,
         ANALYZE_REQUESTS,
-        DOCS_AGENT
+        DOCS_AGENT,
+        ANALYZE_DASHBOARD_DATA
     }
 
     private String title;

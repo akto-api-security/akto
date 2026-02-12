@@ -1,7 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Box, VerticalStack } from '@shopify/polaris';
-import AiAnalysisCard from './components/AiAnalysisCard';
 import ConversationHistory from './components/ConversationHistory';
 
 function TestRunResultChat({ analysis, conversations, onSendMessage, isStreaming }) {

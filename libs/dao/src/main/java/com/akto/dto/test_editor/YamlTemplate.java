@@ -25,6 +25,8 @@ public class YamlTemplate {
     public static final String REPOSITORY_URL = "repositoryUrl";
     public static final String SETTINGS = "attributes";
     private TemplateSettings attributes;
+    private int estimatedTokens;
+    public static final String ESTIMATED_TOKENS = "estimatedTokens";
 
     public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info, TemplateSettings attributes) {
         this.id = id;
@@ -134,5 +136,13 @@ public class YamlTemplate {
 
     public void setAttributes(TemplateSettings attributes) {
         this.attributes = attributes;
+    }
+
+    public int getEstimatedTokens() {
+        return estimatedTokens;
+    }
+
+    public void setEstimatedTokens(int estimatedTokens) {
+        this.estimatedTokens = estimatedTokens;
     }
 }

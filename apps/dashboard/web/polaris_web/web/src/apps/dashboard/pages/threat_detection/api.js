@@ -287,6 +287,20 @@ const threatDetectionRequests = {
             method: 'post',
             data: { ipAddress }
         })
+    },
+    fetchThreatsForActor(actor, limit = 20) {
+        return request({
+            url: '/api/fetchThreatsForActor',
+            method: 'post',
+            data: { actor, limit }
+        })
+    },
+    fetchSessionContext(sessionId) {
+        return request({
+            url: '/api/fetchSessionContext',
+            method: 'post',
+            data: { sessionId }
+        })
     }
 }
 export default threatDetectionRequests

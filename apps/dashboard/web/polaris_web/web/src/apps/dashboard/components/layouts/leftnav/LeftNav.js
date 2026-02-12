@@ -1,4 +1,4 @@
-import {Box, Navigation, Text} from "@shopify/polaris";
+import {Badge, Box, Navigation, Text} from "@shopify/polaris";
 import {
     AppsFilledMajor,
     InventoryFilledMajor,
@@ -583,9 +583,10 @@ export default function LeftNav() {
 
         // Add Ask AI navigation item
         const askAiExists = items.find(item => item.key === "ask_ai")
-        if (!askAiExists && window.USER_NAME.indexOf("@akto.io")) {
+        if (!askAiExists) {
             items.splice(1, 0, {
                 label: "Ask Akto",
+                badge: <Badge status="info">Beta</Badge>,
                 icon: MagicMinor,
                 onClick: () => {
                     handleSelect("dashboard_ask_ai")

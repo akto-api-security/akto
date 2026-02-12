@@ -54,14 +54,19 @@ const getHeaders = () => {
     });
   }
 
-  baseHeaders.push(
-    {
-      text: "Filter",
-      value: "filterId",
-      title: labelMap[PersistStore.getState().dashboardCategory]["Attack type"],
-    });
+  baseHeaders.push({
+    text: "Filter",
+    value: "filterId",
+    title: labelMap[PersistStore.getState().dashboardCategory]["Attack type"],
+  });
 
+  // Only show detection type for Agentic Security (Argus) and Endpoint Security (Atlas), not for API Security
   if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+    baseHeaders.push({
+      text: "Detection Type",
+      value: "detectionType",
+      title: "Detection Type",
+    });
     baseHeaders.push({
       text: "Rule Violated",
       value: "ruleViolated",
@@ -532,6 +537,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       const complianceMap = filterTemplate?.compliance?.mapComplianceToListClauses || {};
       const complianceList = Object.keys(complianceMap);
 
+      // Determine if this is session-based by checking if sessionId is present and not empty
+      const isSessionBased = x?.sessionId && x.sessionId !== '';
+
       let nextUrl = null;
       if (x.refId && x.eventType && x.actor && x.filterId) {
         const params = new URLSearchParams();
@@ -569,7 +577,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
         ),
+        detectionType: (
+          <Badge status={isSessionBased ? 'info' : 'default'}>
+            {isSessionBased ? 'Session' : 'Single Prompt'}
+          </Badge>
+        ),
         ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && {
+          detectionType: (
+            <Badge status={isSessionBased ? 'info' : 'default'}>
+              {isSessionBased ? 'Session' : 'Single Prompt'}
+            </Badge>
+          ),
           ruleViolated: extractRuleViolated(x?.metadata)
         }),
         compliance: complianceList.length > 0 ? (

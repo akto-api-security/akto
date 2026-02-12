@@ -98,7 +98,7 @@ public class TestDBSync extends MongoBasedTest {
         }
         sync.computeDelta(aggr, true, 0, false);
         sync.syncWithDB(false, true, SyncLimit.noLimit, SyncLimit.noLimit, SyncLimit.noLimit, Source.HAR);
-        APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb, false, false);
+        APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb, false, false, false);
         sync.buildFromDB(false, true);
 
         assertEquals(0, sync.getDbState(123).getStrictURLToMethods().size());
@@ -144,7 +144,7 @@ public class TestDBSync extends MongoBasedTest {
         parser.syncFunction(responseParams, false, true, null);
         assertTrue(parser.getSyncCount() == 0);
 
-        APICatalogSync.mergeUrlsAndSave(123, true, false, parser.apiCatalogSync.existingAPIsInDb, false, false);
+        APICatalogSync.mergeUrlsAndSave(123, true, false, parser.apiCatalogSync.existingAPIsInDb, false, false, false);
         parser.apiCatalogSync.buildFromDB(false, true);
 
         SampleData sd = SampleDataDao.instance.findOne(Filters.eq("_id.url", "immediate/INTEGER"));
@@ -231,7 +231,7 @@ public class TestDBSync extends MongoBasedTest {
         
         sync.computeDelta(aggr2, true, 123, false);
         sync.syncWithDB(false, true, SyncLimit.noLimit, SyncLimit.noLimit, SyncLimit.noLimit, Source.HAR);
-        APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb, false, false);
+        APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb, false, false, false);
         sync.buildFromDB(false, true);
 
         assertEquals(1, sync.getDbState(123).getStrictURLToMethods().size());

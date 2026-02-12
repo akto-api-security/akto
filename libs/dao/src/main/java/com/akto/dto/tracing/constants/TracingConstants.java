@@ -65,4 +65,19 @@ public final class TracingConstants {
         private ServiceType() {}
     }
 
+    public static final class EdgeParamType {
+        public static final String LLM_RESPONSE = "llm_response";
+        public static final String LLM_PROMPT = "llm_prompt";
+        public static final String USER_INPUT = "user_input";
+        public static final String SYSTEM_MESSAGE = "system_message";
+        public static final String HTTP_REQUEST = "http_request";
+        public static final String HTTP_RESPONSE = "http_response";
+        public static final String TOOL_INPUT = "tool_input";
+        public static final String TOOL_OUTPUT = "tool_output";
+        public static final String FINAL_OUTPUT = "final_output";
+        public static final String INTERMEDIATE_DATA = "intermediate_data";
+        public static final String UNKNOWN = "unknown";
+        private EdgeParamType() {}
+    }
+
 }

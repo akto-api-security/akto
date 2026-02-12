@@ -4,7 +4,6 @@ import MarkdownViewer from '../../../components/shared/MarkdownViewer';
 
 function AgenticStreamingResponse({ content, timeTaken, onStreamingComplete, skipStreaming = false }) {
     const [displayedContent, setDisplayedContent] = useState('');
-    const [isStreamingComplete, setIsStreamingComplete] = useState(false);
     const hasCalledComplete = useRef(false);
 
     useEffect(() => {
@@ -13,7 +12,6 @@ function AgenticStreamingResponse({ content, timeTaken, onStreamingComplete, ski
         // If skipStreaming is true, show content immediately
         if (skipStreaming) {
             setDisplayedContent(content);
-            setIsStreamingComplete(true);
             if (onStreamingComplete && !hasCalledComplete.current) {
                 hasCalledComplete.current = true;
                 onStreamingComplete();
@@ -23,7 +21,6 @@ function AgenticStreamingResponse({ content, timeTaken, onStreamingComplete, ski
 
         // Reset state when content changes
         setDisplayedContent('');
-        setIsStreamingComplete(false);
         hasCalledComplete.current = false;
 
         // Split content into words for streaming
@@ -39,7 +36,6 @@ function AgenticStreamingResponse({ content, timeTaken, onStreamingComplete, ski
                 currentIndex++;
             } else {
                 clearInterval(streamInterval);
-                setIsStreamingComplete(true);
                 if (onStreamingComplete && !hasCalledComplete.current) {
                     hasCalledComplete.current = true;
                     onStreamingComplete();
@@ -66,17 +62,8 @@ function AgenticStreamingResponse({ content, timeTaken, onStreamingComplete, ski
                 borderRadius='3'
                 borderRadiusEndStart='0'
             >
-                {isStreamingComplete ? (
-                    // Once streaming is complete, show in MarkdownViewer
-                    <MarkdownViewer markdown={content} />
-                ) : (
-                    // While streaming, show plain text with similar styling
-                    <Box padding="4">
-                        <Text as="p" variant="bodyMd">
-                            {displayedContent}
-                        </Text>
-                    </Box>
-                )}
+                {/* Render markdown in real-time during streaming */}
+                <MarkdownViewer markdown={displayedContent} />
             </Box>
         </VerticalStack>
     );

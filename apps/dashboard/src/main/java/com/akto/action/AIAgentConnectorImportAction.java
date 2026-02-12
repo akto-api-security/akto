@@ -67,6 +67,12 @@ public class AIAgentConnectorImportAction extends UserAction {
     private String databricksSchema;
     private String databricksPrefix;
 
+    // Vertex AI Custom Deployed Model-specific parameters
+    private String vertexAIProjectId;
+    private String vertexAIBigQueryDataset;
+    private String vertexAIBigQueryTable;
+    private String vertexAIJsonAuthFilePath;
+
     /**
      * Unified method to initiate import for any AI Agent Connector.
      * The connector type is determined by the connectorType parameter.
@@ -92,6 +98,8 @@ public class AIAgentConnectorImportAction extends UserAction {
                 ? recurringIntervalSeconds
                 : DEFAULT_RECURRING_INTERVAL_SECONDS;
 
+            String jobType = getJobTypeForConnector(connectorType);
+
             // Create entry in per-account jobs collection
             // Convert Map<String, String> config to Map<String, Object> for generic storage
             Map<String, Object> jobConfig = new HashMap<>(config);
@@ -99,8 +107,8 @@ public class AIAgentConnectorImportAction extends UserAction {
             int now = Context.now();
             AccountJob accountJob = new AccountJob(
                 Context.accountId.get(),        // accountId
-                "AI_AGENT_CONNECTOR",          // jobType (generic)
-                connectorType,                  // subType (N8N, LANGCHAIN, COPILOT_STUDIO)
+                jobType,                        // jobType
+                connectorType,                  // subType (N8N, LANGCHAIN, COPILOT_STUDIO, VERTEX_AI_CUSTOM_DEPLOYED_MODEL, etc.)
                 jobConfig,                      // flexible config map
                 interval,                       // recurringIntervalSeconds
                 now,                            // createdAt
@@ -131,6 +139,11 @@ public class AIAgentConnectorImportAction extends UserAction {
      * Builds configuration map based on connector type.
      */
     private Map<String, String> buildConfig() {
+        if (dataIngestionUrl == null || dataIngestionUrl.isEmpty()) {
+            loggerMaker.error("Missing required Data Ingestion Service URL", LogDb.DASHBOARD);
+            return null;
+        }
+        
         Map<String, String> config = new HashMap<>();
         config.put(CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
 
@@ -236,6 +249,23 @@ public class AIAgentConnectorImportAction extends UserAction {
                 config.put(CONFIG_DATABRICKS_CATALOG, databricksCatalog != null ? databricksCatalog : "main");
                 config.put(CONFIG_DATABRICKS_SCHEMA, databricksSchema != null ? databricksSchema : "default");
                 config.put(CONFIG_DATABRICKS_PREFIX, databricksPrefix != null ? databricksPrefix : "");
+                break;
+
+            case CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL:
+                if (vertexAIProjectId == null || vertexAIProjectId.isEmpty() ||
+                    vertexAIBigQueryDataset == null || vertexAIBigQueryDataset.isEmpty() ||
+                    vertexAIBigQueryTable == null || vertexAIBigQueryTable.isEmpty()) {
+                    loggerMaker.error("Missing required Vertex AI Custom Deployed Model configuration", LogDb.DASHBOARD);
+                    return null;
+                }
+                config.put(CONFIG_VERTEX_AI_PROJECT_ID, vertexAIProjectId);
+                config.put(CONFIG_VERTEX_AI_BIGQUERY_DATASET, vertexAIBigQueryDataset);
+                config.put(CONFIG_VERTEX_AI_BIGQUERY_TABLE, vertexAIBigQueryTable);
+
+                // Optional field
+                if (vertexAIJsonAuthFilePath != null && !vertexAIJsonAuthFilePath.isEmpty()) {
+                    config.put(CONFIG_VERTEX_AI_JSON_AUTH_FILE_PATH, vertexAIJsonAuthFilePath);
+                }
                 break;
 
             default:

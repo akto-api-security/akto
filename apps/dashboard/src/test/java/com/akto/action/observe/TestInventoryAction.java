@@ -159,7 +159,7 @@ public class TestInventoryAction extends MongoBasedTest {
         assertEquals(Action.SUCCESS.toUpperCase(), result);
 
         BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
-        APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, true, existingAPIsInDb, false, false);
+        APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, true, existingAPIsInDb, false, false, false);
 
         List<SingleTypeInfo> singleTypeInfoObjectIdList  = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, "/api/books/OBJECT_ID", URLMethods.Method.POST));
         assertEquals(5, singleTypeInfoObjectIdList.size());

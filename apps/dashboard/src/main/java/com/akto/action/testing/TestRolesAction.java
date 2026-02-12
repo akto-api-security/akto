@@ -139,11 +139,11 @@ public class TestRolesAction extends UserAction {
                         param = new HardcodedAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
                             authParamDataElem.getValue(), true);
                         break;
-                    
+
                     case LOGIN_REQUEST:
                         param = new LoginRequestAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
                             authParamDataElem.getValue(), authParamDataElem.getShowHeader());
-                        break;    
+                        break;
 
                     case TLS_AUTH:
                         param = new TLSAuthParam(authParamDataElem.getCertAuthorityCertificate(),
@@ -153,12 +153,32 @@ public class TestRolesAction extends UserAction {
                     case SAMPLE_DATA:
                         param = new SampleDataAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
                             authParamDataElem.getValue(), true);
-                        break;        
+                        break;
                     default:
                         break;
                 }
 
                 authParams.add(param);
+            }
+
+            // Extract otpRefUuid from fetchOtpData URLs
+            if (this.reqData != null) {
+                for (RequestData rd : this.reqData) {
+                    if (rd.getUrl() != null && rd.getUrl().contains("/fetchOtpData/")) {
+                        // Extract UUID from URL pattern: /fetchOtpData/{uuid}
+                        String url = rd.getUrl();
+                        int lastSlashIndex = url.lastIndexOf('/');
+                        if (lastSlashIndex != -1 && lastSlashIndex < url.length() - 1) {
+                            String extractedUuid = url.substring(lastSlashIndex + 1);
+                            // Remove query params if any
+                            int queryIndex = extractedUuid.indexOf('?');
+                            if (queryIndex != -1) {
+                                extractedUuid = extractedUuid.substring(0, queryIndex);
+                            }
+                            rd.setOtpRefUuid(extractedUuid);
+                        }
+                    }
+                }
             }
 
             AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType, null);

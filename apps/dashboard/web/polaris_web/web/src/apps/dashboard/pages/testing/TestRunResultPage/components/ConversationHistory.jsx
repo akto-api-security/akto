@@ -4,7 +4,8 @@ import { Box, VerticalStack } from '@shopify/polaris';
 import ChatMessage from './ChatMessage';
 import { MESSAGE_LABELS } from './chatConstants';
 
-function ConversationHistory({ conversations }) {
+function ConversationHistory({ conversations, isInventory = false }) {
+    const label = isInventory ? MESSAGE_LABELS.INVENTORY_ANALYSIS : MESSAGE_LABELS.TESTED_INTERACTION;
     return (
         <Box paddingBlockStart="4">
             <VerticalStack gap="4">
@@ -17,7 +18,7 @@ function ConversationHistory({ conversations }) {
                             type={isUser ? 'request' : 'response'}
                             content={msg.message}
                             timestamp={msg.creationTimestamp} // Normalize then convert to seconds for ChatMessage
-                            customLabel={isUser ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE}
+                            customLabel={isInventory ? label : isUser ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE}
                             isVulnerable={msg.validation}
                             isCode={false}
                         />
@@ -36,10 +37,12 @@ ConversationHistory.propTypes = {
         creationTimestamp: PropTypes.number,
         validation: PropTypes.bool,
     })),
+    isInventory: PropTypes.bool,
 };
 
 ConversationHistory.defaultProps = {
     conversations: [],
+    isInventory: false,
 };
 
 export default ConversationHistory;

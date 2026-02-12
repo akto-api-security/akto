@@ -543,6 +543,7 @@ public class IssuesAction extends UserAction {
         
         infoObj.put("updatedTs", testConfig.getUpdateTs());
         infoObj.put("author", testConfig.getAuthor());
+        infoObj.put("estimatedTokens", testConfig.getEstimatedTokens());
 
         superCategory.put("displayName", info.getCategory().getDisplayName());
         superCategory.put("name", info.getCategory().getName());

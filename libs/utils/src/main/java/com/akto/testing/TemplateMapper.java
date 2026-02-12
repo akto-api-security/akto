@@ -140,6 +140,15 @@ public class TemplateMapper {
         } catch (Exception e) {
         }
 
+        try {
+            Object estimatedTokensObj = TestConfigYamlParser.getFieldIfExists(template, YamlTemplate.ESTIMATED_TOKENS);
+            if (estimatedTokensObj != null && estimatedTokensObj instanceof Integer) {
+                updates.add(Updates.set(YamlTemplate.ESTIMATED_TOKENS, (int) estimatedTokensObj));
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error parsing estimatedTokens: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
         String id = testConfig.getId();
         YamlTemplateDao.instance.updateOne(
                 Filters.eq(Constants.ID, id),

@@ -3,6 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import PersistStore from '../../../../main/PersistStore';
 import { formatDisplayName, ASSET_TAG_KEYS } from '../agentic/mcpClientHelper';
 import { INVENTORY_FILTER_KEY, ASSET_TAG_KEY_VALUES, extractServiceName } from '../agentic/constants';
+
+/** Agent tag keys that represent the same agent (gen-ai + mcp-server for one click) */
+const AGENT_TAG_KEYS_FOR_FILTER = [ASSET_TAG_KEYS.AI_AGENT, ASSET_TAG_KEYS.MCP_CLIENT];
 import transform from '../transform';
 import func from '@/util/func';
 
@@ -170,11 +173,18 @@ const useAgenticFilter = (normalData) => {
                 }
             }
 
-            if (filterTitle) {
+            if (filterTitle && filterValues.length > 0) {
+                // Include all collections with this agent (ai-agent + mcp-client with same value) so one click shows both gen-ai and mcp-server
+                const eq = filterValues[0].indexOf('=');
+                const filterKey = eq >= 0 ? filterValues[0].slice(0, eq) : '';
+                const filterTagValue = eq >= 0 ? filterValues[0].slice(eq + 1) : '';
+                const matchBothAgentTags = AGENT_TAG_KEYS_FOR_FILTER.includes(filterKey);
+                const matchingTags = matchBothAgentTags && filterTagValue
+                    ? AGENT_TAG_KEYS_FOR_FILTER.map(k => `${k}=${filterTagValue}`)
+                    : [filterValues[0]];
                 filteredCollections = normalData.filter(collection => {
-                    // Get formatted envType strings (handles both raw and transformed data)
                     const envTypeArr = getFormattedEnvType(collection);
-                    return envTypeArr.some(tag => tag === filterValues[0]);
+                    return envTypeArr.some(tag => tag === filterValues[0] || matchingTags.includes(tag));
                 });
             }
         }

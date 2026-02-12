@@ -117,10 +117,12 @@ public class ModuleInfoAction extends UserAction {
 
     private String getFieldType(String key) {
         if (key.equals("AKTO_IGNORE_ENVOY_PROXY_CALLS") ||
-            key.equals("AKTO_IGNORE_IP_TRAFFIC") ||
-            key.equals("AKTO_K8_METADATA_CAPTURE") ||
-            key.equals("AKTO_THREAT_ENABLED") ||
-            key.equals("AGGREGATION_RULES_ENABLED")) {
+                key.equals("AKTO_IGNORE_IP_TRAFFIC") ||
+                key.equals("AKTO_K8_METADATA_CAPTURE") ||
+                key.equals("AKTO_THREAT_ENABLED") ||
+                key.equals("AGGREGATION_RULES_ENABLED") ||
+                key.equals("SKIP_THREAT") ||
+                key.equals("APPLY_GUARDRAILS_TO_SSE")) {
             return "boolean";
         }
         return "text";
@@ -192,6 +194,7 @@ public class ModuleInfoAction extends UserAction {
                 Filters.or(
                     Filters.regex(ModuleInfo.NAME, _DEFAULT_PREFIX_REGEX_STRING),
                     Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.TRAFFIC_COLLECTOR.toString()),
+                    Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.AKTO_AGENT_GATEWAY.toString()),
                     Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.THREAT_DETECTION.toString())
                 )
             );

@@ -18,8 +18,6 @@ import testingFunc from "../../testing/transform";
 import { mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import EmptySampleApi from "./EmptySampleApi";
 import Store from "../../../store";
-import ChatContainer from "../../../components/shared/ChatContainer";
-import ChatInterface from "../../../components/shared/ChatInterface";
 import LocalStore from "../../../../main/LocalStorageStore";
 import observeFunc from "../../observe/transform"
 
@@ -541,7 +539,6 @@ const SampleApi = () => {
                             </Box>
                             
                         </VerticalStack>
-                        {conversationsList?.length > 0 ? <ChatInterface conversations={conversationsList} sort={false}/> : <ChatContainer/>}
                     </VerticalStack>
                 </Modal.Section>
                 

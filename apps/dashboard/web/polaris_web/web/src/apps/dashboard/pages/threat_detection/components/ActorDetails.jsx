@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { Box, VerticalStack, HorizontalStack, Text, Divider, Grid, HorizontalGrid, LegacyCard, Modal, Button } from "@shopify/polaris"
+import { useState, useEffect } from "react"
+import { Box, VerticalStack, HorizontalStack, Text, Divider, Grid, HorizontalGrid, LegacyCard, Modal, Button, Spinner } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout"
 import { ActivityLog } from "./ActivityLog";
 import Store from "../../../store";
@@ -8,6 +8,8 @@ import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
     const [ipStatus, setIpStatus] = useState(actorDetails.status || "active")
     const [showModal, setShowModal] = useState(false)
+    const [activityLog, setActivityLog] = useState([])
+    const [loadingActivity, setLoadingActivity] = useState(true)
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -17,6 +19,24 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
           message: message
         })
     }
+
+    useEffect(() => {
+        const fetchActivityData = async () => {
+            setLoadingActivity(true)
+            try {
+                const res = await api.fetchThreatsForActor(actorDetails.id)
+                setActivityLog(res?.actorActivities || [])
+            } catch (error) {
+                console.error("Error fetching activity data:", error)
+                setToast(true, true, "Failed to load activity data")
+                setActivityLog([])
+            } finally {
+                setLoadingActivity(false)
+            }
+        }
+        fetchActivityData()
+    }, [actorDetails.id])
+
     const handleBlockUnblockIp = async (status) => {
         try {
             const res = await api.modifyThreatActorStatus(actorDetails.latestApiIp, status)
@@ -69,8 +89,7 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
 
     const components = [
         <ThreatActorHeader />,
-        // <Divider />,
-        <ActivityLog activityLog={actorDetails.activity} actorDetails={actorDetails} />
+        <ActivityLog activityLog={activityLog} actorDetails={actorDetails} loading={loadingActivity} />
     ]
     return (
         <FlyLayout

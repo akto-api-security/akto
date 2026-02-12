@@ -2,7 +2,9 @@ package com.akto.action;
 
 import java.net.URL;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -103,11 +105,10 @@ public class MCPScanAction extends UserAction {
             APIConfig apiConfig = new APIConfig("userIdentifier","access-token", 1, 1, 1);
             try {
                 loggerMaker.info("Starting MCP sync job..");
-                String authHeader;
+                Map<String, String> authHeader = new HashMap<>();
                 if(authKey != null && !authKey.isEmpty() && authValue != null && !authValue.isEmpty()) {
-                    authHeader = "\"" + authKey + "\": \"" + authValue + "\"";
+                    authHeader.put(authKey, authValue);
                 } else {
-                    authHeader = "";
                     loggerMaker.info("No authentication credentials provided");
                 }
                 int accountId = Context.accountId.get();

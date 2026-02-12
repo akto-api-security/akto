@@ -10,19 +10,19 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 
 const headers = [
     {
-        title: "URL",
-        text: "URL",
-        value: "urlComp",
-        textValue: "url",
-        filterKey: "url",
-        showFilter: true
-    },
-    {
-        title: "Source URL",
-        text: "Source URL",
+        title: "Pages crawled",
+        text: "Pages crawled",
         value: "sourceUrlComp",
         textValue: "sourceUrl",
         filterKey: "sourceUrl",
+        showFilter: true
+    },
+    {
+        title: "Discovered Links",
+        text: "Discovered Links",
+        value: "urlComp",
+        textValue: "url",
+        filterKey: "url",
         showFilter: true
     },
     {

@@ -22,7 +22,6 @@ import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
-import ChatInterface from '../../../components/shared/ChatInterface.jsx'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
 import ApiGroups from '../../../components/shared/ApiGroups'
 import ForbiddenRole from '../../../components/shared/ForbiddenRole'

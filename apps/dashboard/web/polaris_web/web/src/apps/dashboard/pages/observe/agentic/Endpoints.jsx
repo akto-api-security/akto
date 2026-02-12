@@ -102,8 +102,12 @@ function Endpoints() {
             const prettifiedAgents = prettifyGroupData(agentGroups);
             const prettifiedServices = prettifyGroupData(serviceGroups);
 
-            // Combine all data
-            const allData = [...prettifiedAgents, ...prettifiedServices];
+            // For AI Agent: agent row already represents both gen-ai and mcp-server for that agent.
+            // Don't show a separate service row with the same key (would show as "2 columns").
+            const agentGroupKeys = new Set(prettifiedAgents.map((a) => a.groupKey));
+            const servicesToShow = prettifiedServices.filter((s) => !agentGroupKeys.has(s.groupKey));
+
+            const allData = [...prettifiedAgents, ...servicesToShow];
 
             // Calculate unique endpoint IDs across all collections
             const uniqueEndpointIds = new Set();
@@ -142,18 +146,17 @@ function Endpoints() {
         const updatedFiltersMap = { ...filtersMap };
 
         if (row.rowType === ROW_TYPES.AGENT) {
-            // Agent row clicked - filter by agent tag to show resources discovered by this agent
+            // Agent row: filter by agent tag so one click shows both gen-ai and mcp-server for that agent
             if (row.tagKey && row.tagValue) {
                 const filterValue = `${row.tagKey}=${row.tagValue}`;
                 updatedFiltersMap[INVENTORY_FILTER_KEY] = createEnvTypeFilter([filterValue], false);
             }
         } else if (row.rowType === ROW_TYPES.SERVICE) {
-            // Service row clicked - filter by all hostnames for this service
-            if (row.hostNames && row.hostNames.length > 0) {
+            // Service row (e.g. MCP server): filter by hostnames so only that service's collections open
+            if (row.hostNames?.length > 0) {
                 updatedFiltersMap[INVENTORY_FILTER_KEY] = createHostnameFilter(row.hostNames);
             }
         } else {
-            // Fallback: clear filters
             delete updatedFiltersMap[INVENTORY_FILTER_KEY];
         }
 

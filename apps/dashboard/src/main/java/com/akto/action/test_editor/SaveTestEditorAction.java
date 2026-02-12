@@ -260,6 +260,15 @@ public class SaveTestEditorAction extends UserAction {
             } catch (Exception e) {
             }
 
+            try {
+                Object estimatedTokensObj = TestConfigYamlParser.getFieldIfExists(content, YamlTemplate.ESTIMATED_TOKENS);
+                if (estimatedTokensObj != null && estimatedTokensObj instanceof Integer) {
+                    updates.add(Updates.set(YamlTemplate.ESTIMATED_TOKENS, (int) estimatedTokensObj));
+                }
+            } catch (Exception e) {
+                logger.errorAndAddToDb("Error parsing estimatedTokens for template " + id + ": " + e.getMessage(), LogDb.DASHBOARD);
+            }
+
             YamlTemplateDao.instance.updateOne(
                     Filters.eq(Constants.ID, id),
                     Updates.combine(updates));

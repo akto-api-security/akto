@@ -235,8 +235,10 @@ public class DbActor extends DataActor {
     public void bulkInsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception {
         DbLayer.bulkinsertApiHitCount(apiHitCountInfoList);
     }
+    
+    @Override
     public void updateModuleInfo(ModuleInfo moduleInfo) {
-        return;
+        DbLayer.updateModuleInfo(moduleInfo);
     }
 
     public String fetchOpenApiSchema(int apiCollectionId) {
@@ -249,6 +251,11 @@ public class DbActor extends DataActor {
 
     public List<ApiCollection> fetchAllApiCollections() {
         return DbLayer.fetchAllApiCollections();
+    }
+
+    @Override
+    public List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
+        return DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName);
     }
 
 

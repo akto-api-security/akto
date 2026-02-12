@@ -11,6 +11,7 @@ public class AdapterFactory {
 
     private static final String CONNECTOR_LITELLM = "litellm";
     private static final String CONNECTOR_CLAUDE_CODE_CLI = "claude_code_cli";
+    private static final String CONNECTOR_CURSOR = "cursor";
 
     private final StandardGuardrailsAdapter standardAdapter;
     private final LiteLLMAdapter liteLLMAdapter;
@@ -32,7 +33,7 @@ public class AdapterFactory {
         if (connectorValue != null) {
             String connector = connectorValue.toString();
 
-            if (CONNECTOR_LITELLM.equalsIgnoreCase(connector) || CONNECTOR_CLAUDE_CODE_CLI.equalsIgnoreCase(connector)) {
+            if (CONNECTOR_LITELLM.equalsIgnoreCase(connector) || CONNECTOR_CLAUDE_CODE_CLI.equalsIgnoreCase(connector) || CONNECTOR_CURSOR.equalsIgnoreCase(connector)) {
                 logger.info("Selecting LiteLLM adapter based on akto_connector=litellm");
                 return liteLLMAdapter;
             }

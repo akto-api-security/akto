@@ -4,6 +4,7 @@ public enum ModelType {
 
     OPENAI,
     ANTHROPIC,
-    AZURE_OPENAI
+    AZURE_OPENAI,
+    OLLAMA
 
 }

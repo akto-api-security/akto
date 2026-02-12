@@ -111,11 +111,11 @@ public class McpToolsSyncJobExecutor {
         }
 
         eligibleCollections.forEach(apiCollection -> {
-            runJobforCollection(apiCollection, apiConfig, "");
+            runJobforCollection(apiCollection, apiConfig, new HashMap<>());
         });
     }
 
-    public void runJobforCollection(ApiCollection apiCollection, APIConfig apiConfig, String authHeader) {
+    public void runJobforCollection(ApiCollection apiCollection, APIConfig apiConfig, Map<String, String> authHeader) {
         if (apiCollection == null || StringUtils.isEmpty(apiCollection.getHostName())) {
             logger.error("Invalid ApiCollection provided for MCP sync job.");
             return;
@@ -135,7 +135,6 @@ public class McpToolsSyncJobExecutor {
         List<HttpResponseParams> resourcesResponseList = handleMcpResourceDiscovery(apiCollection, authHeader);
         List<HttpResponseParams> promptsResponseList = handleMcpPromptsDiscovery(apiCollection, authHeader);
         processResponseParams(apiConfig, new ArrayList<HttpResponseParams>() {{
-            addAll(initResponseList);
             addAll(toolsResponseList);
             addAll(resourcesResponseList);
             addAll(promptsResponseList);
@@ -162,8 +161,8 @@ public class McpToolsSyncJobExecutor {
     }
 
 
-
-    private List<HttpResponseParams> initializeMcpServerCapabilities(ApiCollection apiCollection, String authHeader) {
+    private List<HttpResponseParams> initializeMcpServerCapabilities(ApiCollection apiCollection,
+        Map<String, String> authHeader) {
         String host = apiCollection.getHostName();
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
 
@@ -205,7 +204,7 @@ public class McpToolsSyncJobExecutor {
         return responseParamsList;
     }
 
-    private void initNotifications(ApiCollection apiCollection, String authHeader) {
+    private void initNotifications(ApiCollection apiCollection, Map<String, String> authHeader) {
         try {
             JSONRPCRequest initNotificationsRequest = new JSONRPCRequest(
                 McpSchema.JSONRPC_VERSION,
@@ -225,7 +224,19 @@ public class McpToolsSyncJobExecutor {
         }
     }
 
-    private List<HttpResponseParams> handleMcpToolsDiscovery(ApiCollection apiCollection, String authHeader) {
+    private String buildHeadersForTransportType(Map<String, String> authHeader, ApiCollection apiCollection) {
+        Map<String, String> headers = buildHeaders(apiCollection.getHostName(), authHeader);
+
+        if (TRANSPORT_HTTP.equalsIgnoreCase(apiCollection.getMcpTransportType())) {
+            headers.put(HttpRequestResponseUtils.HEADER_ACCEPT,
+                HttpRequestResponseUtils.APPLICATION_JSON + ","
+                    + HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE);
+        }
+
+        return JSONUtils.getString(headers);
+    }
+
+    private List<HttpResponseParams> handleMcpToolsDiscovery(ApiCollection apiCollection, Map<String, String> authHeader) {
         String host = apiCollection.getHostName();
 
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
@@ -249,7 +260,7 @@ public class McpToolsSyncJobExecutor {
             if (toolsResult != null && !CollectionUtils.isEmpty(toolsResult.getTools())) {
                 int id = 2;
                 String urlWithQueryParams = toolsListResponsePair.getSecond().getRequestParams().getURL();
-                String toolsCallRequestHeaders = buildHeaders(host, authHeader);
+                String toolsCallRequestHeaders = buildHeadersForTransportType(authHeader, apiCollection);
 
                 for (Tool tool : toolsResult.getTools()) {
                     JSONRPCRequest request = new JSONRPCRequest(
@@ -279,7 +290,7 @@ public class McpToolsSyncJobExecutor {
         return responseParamsList;
     }
 
-    private List<HttpResponseParams> handleMcpResourceDiscovery(ApiCollection apiCollection, String authHeader) {
+    private List<HttpResponseParams> handleMcpResourceDiscovery(ApiCollection apiCollection, Map<String, String> authHeader) {
         String host = apiCollection.getHostName();
 
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
@@ -302,7 +313,7 @@ public class McpToolsSyncJobExecutor {
             if (resourcesResult != null && !CollectionUtils.isEmpty(resourcesResult.getResources())) {
                 int id = 2;
                 String urlWithQueryParams = resourcesListResponsePair.getSecond().getRequestParams().getURL();
-                String resourcesReadRequestHeaders = buildHeaders(host, authHeader);
+                String resourcesReadRequestHeaders = buildHeadersForTransportType(authHeader, apiCollection);
 
                 for (Resource resource : resourcesResult.getResources()) {
                     JSONRPCRequest request = new JSONRPCRequest(
@@ -332,7 +343,7 @@ public class McpToolsSyncJobExecutor {
         return responseParamsList;
     }
 
-    private List<HttpResponseParams> handleMcpPromptsDiscovery(ApiCollection apiCollection, String authHeader) {
+    private List<HttpResponseParams> handleMcpPromptsDiscovery(ApiCollection apiCollection, Map<String, String> authHeader) {
         String host = apiCollection.getHostName();
 
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
@@ -355,7 +366,7 @@ public class McpToolsSyncJobExecutor {
             if (promptsResult != null && !CollectionUtils.isEmpty(promptsResult.getPrompts())) {
                 int id = 2;
                 String urlWithQueryParams = promptsListResponsePair.getSecond().getRequestParams().getURL();
-                String promptsGetRequestHeaders = buildHeaders(host, authHeader);
+                String promptsGetRequestHeaders = buildHeadersForTransportType(authHeader, apiCollection);
 
                 for (Prompt prompt : promptsResult.getPrompts()) {
                     JSONRPCRequest request = new JSONRPCRequest(
@@ -433,7 +444,7 @@ public class McpToolsSyncJobExecutor {
         }
     }
 
-    private Pair<JSONRPCResponse, HttpResponseParams> getMcpMethodResponse(String host, String authHeader,  String mcpMethod,
+    private Pair<JSONRPCResponse, HttpResponseParams> getMcpMethodResponse(String host, Map<String, String> authHeader,  String mcpMethod,
         String mcpMethodRequestJson, ApiCollection apiCollection) throws Exception {
         OriginalHttpRequest mcpRequest = createRequest(host, authHeader, mcpMethod, mcpMethodRequestJson, apiCollection);
         String jsonrpcResponse = sendRequest(mcpRequest, apiCollection);
@@ -449,7 +460,7 @@ public class McpToolsSyncJobExecutor {
             HttpResponseParams responseParams = convertToAktoFormat(
                 apiCollection.getId(),
                 mcpRequest.getPathWithQueryParams(),
-                buildHeaders(host, authHeader),
+                buildHeadersForTransportType(authHeader, apiCollection),
                 URLMethods.Method.POST.name(),
                 mcpRequest.getBody(),
                 new OriginalHttpResponse(jsonrpcResponse, Collections.emptyMap(), HttpStatus.SC_OK)
@@ -464,7 +475,7 @@ public class McpToolsSyncJobExecutor {
         ), null);
     }
 
-    private OriginalHttpRequest createRequest(String host, String authHeader, String mcpMethod, String mcpMethodRequestJson, ApiCollection apiCollection) {
+    private OriginalHttpRequest createRequest(String host, Map<String, String> authHeader, String mcpMethod, String mcpMethodRequestJson, ApiCollection apiCollection) {
         String mcpEndpoint = apiCollection.getSseCallbackUrl();
         String path = mcpMethod;
         String queryParams = null;
@@ -486,30 +497,33 @@ public class McpToolsSyncJobExecutor {
         }
         
         // Build full URL with scheme and host
+        Map<String, String> headers = buildHeaders(host, authHeader);
         return new OriginalHttpRequest(path,
             queryParams,
             URLMethods.Method.POST.name(),
             mcpMethodRequestJson,
-            OriginalHttpRequest.buildHeadersMap(buildHeaders(host, authHeader)),
+            OriginalHttpRequest.buildHeadersMap(JSONUtils.getString(headers)),
             "HTTP/1.1"
         );
     }
 
-    private String buildHeaders(String host, String authHeader) {
-        //add authHeader if not empty
-        if (authHeader == null || authHeader.isEmpty()) {
-            authHeader = "";
-        } else {
-            authHeader = "," + authHeader;
+    private Map<String, String> buildHeaders(String host, Map<String, String> authHeader) {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json");
+        headers.put("accept", "*/*");
+        headers.put("host", host);
+
+        // Add authHeader if not empty
+        if (authHeader != null && !authHeader.isEmpty()) {
+            headers.putAll(authHeader);
         }
 
         // Add mcp-session-id if available
-        String sessionHeader = "";
         if (StringUtils.isNoneBlank(mcpSessionId)) {
-            sessionHeader = ",\"mcp-session-id\":\"" + mcpSessionId + "\"";
+            headers.put("mcp-session-id", mcpSessionId);
         }
 
-        return "{\"Content-Type\":\"application/json\",\"Accept\":\"*/*\",\"host\":\"" + host + "\"" + authHeader + sessionHeader + "}";
+        return headers;
     }
 
     private String sendRequest(OriginalHttpRequest request, ApiCollection apiCollection) throws Exception {
