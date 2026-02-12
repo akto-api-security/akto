@@ -1074,7 +1074,7 @@ const claudeCodeCliHookObj = {
 }
 
 const geminiCliHookObj = {
-    icon: '/public/gemini.svg',
+    icon: '/public/gemini-cli.svg',
     label: "Gemini CLI Hook",
     text: "Import your Gemini CLI proxy traffic, seamlessly into AKTO.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/gemini-cli-hooks',
