@@ -191,6 +191,7 @@ public class DbAction extends ActionSupport {
     int testResultsCount;
     Bson completedUpdate;
     int totalApiCount;
+    Map<String, String> metadata;
     boolean hybridTestingEnabled;
     TestingRun testingRun;
     TestingRunConfig testingRunConfig;
@@ -1678,6 +1679,19 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String updateMetadataInSummary() {
+        try {
+            trrs = DbLayer.updateMetadataInSummary(summaryId, metadata);
+            if (trrs != null && trrs.getTestingRunId() != null) {
+                trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateMetadataInSummary...");
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String modifyHybridTestingSetting() {
         try {
             DbLayer.modifyHybridTestingSetting(hybridTestingEnabled);
@@ -2516,6 +2530,14 @@ public class DbAction extends ActionSupport {
 
     public void setTotalApiCount(int totalApiCount) {
         this.totalApiCount = totalApiCount;
+    }
+
+    public Map<String, String> getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(Map<String, String> metadata) {
+        this.metadata = metadata;
     }
 
     public boolean isHybridTestingEnabled() {
