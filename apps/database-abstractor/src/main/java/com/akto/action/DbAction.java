@@ -283,6 +283,7 @@ public class DbAction extends ActionSupport {
     Map<String, Integer> totalCountIssues;
     int testInitiatedCount;
     int testResultsCount;
+    Map<String, String> metadata;
     Bson completedUpdate;
     int totalApiCount;
     boolean hybridTestingEnabled;
@@ -2747,6 +2748,19 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String updateMetadataInSummary() {
+        try {
+            trrs = DbLayer.updateMetadataInSummary(summaryId, metadata);
+            if (trrs != null && trrs.getTestingRunId() != null) {
+                trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateMetadataInSummary " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public static void sendSlack(TestingRunResultSummary trrs, Map<String, Integer> totalCountIssues, int accountId) {
         TestingRun testingRun = DbLayer.findTestingRun(trrs.getTestingRunId().toHexString());
         loggerMaker.infoAndAddToDb("Trying to send slack alert for trrs " + trrs.getId() + " accountId " + accountId);
@@ -4506,6 +4520,14 @@ public class DbAction extends ActionSupport {
 
     public void setState(String state) {
         this.state = state;
+    }
+
+    public Map<String, String> getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(Map<String, String> metadata) {
+        this.metadata = metadata;
     }
 
     public String getVpcId() {

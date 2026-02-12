@@ -1780,6 +1780,16 @@ public class DbLayer {
             ,options);
     }
 
+    public static TestingRunResultSummary updateMetadataInSummary(String summaryId, Map<String, String> metadata) {
+        ObjectId summaryObjectId = new ObjectId(summaryId);
+        return TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                Filters.eq(Constants.ID, summaryObjectId),
+                Updates.combine(
+                        Updates.set(TestingRunResultSummary.METADATA_STRING, metadata)
+                )
+        );
+    }
+
     public static List<Integer> fetchDeactivatedCollections() {
         return new ArrayList<>(UsageMetricCalculator.getDeactivated());
     }
