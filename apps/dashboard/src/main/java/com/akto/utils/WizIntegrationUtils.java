@@ -24,8 +24,8 @@ public class WizIntegrationUtils {
     private static final LoggerMaker loggerMaker = new LoggerMaker(WizIntegrationUtils.class, LogDb.DASHBOARD);
     public static final String AUTH_ENDPOINT = "https://auth.app.wiz.io/oauth/token";
 
-    public static String generateAccessToken(WizIntegration wizIntegration) throws Exception {
-        if (wizIntegration.getClientId() == null || wizIntegration.getClientSecret() == null) {
+    public static String generateAccessToken(String clientId, String clientSecret) throws Exception {
+        if (clientId == null || clientSecret == null) {
             throw new Exception("Client ID and Client Secret are required");
         }
 
@@ -33,8 +33,8 @@ public class WizIntegrationUtils {
 
         String formBody = "grant_type=client_credentials" +
                           "&audience=wiz-api" +
-                          "&client_id=" + URLEncoder.encode(wizIntegration.getClientId(), "UTF-8") +
-                          "&client_secret=" + URLEncoder.encode(wizIntegration.getClientSecret(), "UTF-8");
+                          "&client_id=" + URLEncoder.encode(clientId, "UTF-8") +
+                          "&client_secret=" + URLEncoder.encode(clientSecret, "UTF-8");
 
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Content-Type", Collections.singletonList("application/x-www-form-urlencoded"));
@@ -66,11 +66,13 @@ public class WizIntegrationUtils {
         String accessToken = responseObj.getString("access_token");
         int expiresIn = responseObj.getInt("expires_in", 86400);
 
+        if (accessToken == null || accessToken.isEmpty()) { 
+            throw new Exception("Received empty access token from Wiz"); 
+        }
+
         loggerMaker.infoAndAddToDb(String.format("Successfully generated Wiz access token. Expires in: %d seconds", expiresIn));
 
         long tokenExpiryTs = System.currentTimeMillis() + (expiresIn * 1000L);
-        wizIntegration.setAccessToken(accessToken);
-        wizIntegration.setTokenExpiryTs(tokenExpiryTs);
 
         Bson tokenUpdate = Updates.combine(
             Updates.set(WizIntegration.ACCESS_TOKEN,accessToken),
@@ -98,6 +100,9 @@ public class WizIntegrationUtils {
         }
 
         loggerMaker.infoAndAddToDb("Cached access token expired or missing, generating new Wiz access token");
-        return generateAccessToken(wizIntegration);
+
+        String clientId = wizIntegration.getClientId(); 
+        String clientSecret = wizIntegration.getClientSecret();
+        return generateAccessToken(clientId, clientSecret);
     }
 }

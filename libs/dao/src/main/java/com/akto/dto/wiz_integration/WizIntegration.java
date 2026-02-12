@@ -20,6 +20,8 @@ public class WizIntegration {
     public static final String TENANT_DATA_CENTER = "tenantDataCenter";
     public static final String ACCESS_TOKEN = "accessToken";
     public static final String TOKEN_EXPIRY_TS = "tokenExpiryTs";
+    public static final String CREATED_TS = "createdTs";
+    public static final String UPDATED_TS = "updatedTs";
 
     // OAuth 2.0 Client Credentials
     private String clientId;
@@ -32,6 +34,11 @@ public class WizIntegration {
     // Token management for caching
     private String accessToken;
     private long tokenExpiryTs;
+
+    // audit fields
+    private int createdTs;
+    private int updatedTs;
+
 
     public boolean isTokenValid() {
         return accessToken != null &&
