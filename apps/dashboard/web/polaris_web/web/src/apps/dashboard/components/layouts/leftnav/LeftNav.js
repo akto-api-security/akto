@@ -148,7 +148,7 @@ export default function LeftNav() {
                 }
             }] : []),
             ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
-                label: "Agentic Security Posture",
+                label: "Endpoint Security Posture",
                 icon: ReportFilledMinor,
                 onClick: () => {
                     handleSelect("dashboard_endpoint_posture");

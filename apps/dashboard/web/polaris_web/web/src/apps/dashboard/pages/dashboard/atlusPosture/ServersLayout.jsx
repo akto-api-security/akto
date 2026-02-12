@@ -1,7 +1,26 @@
-import { Avatar, Box, DataTable, HorizontalStack, ProgressBar, Scrollable, Text } from '@shopify/polaris'
+import { Avatar, Box, Card, DataTable, HorizontalStack, ProgressBar, Scrollable, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
+import ComponentHeader from '../new_components/ComponentHeader'
 
-function ServersLayout({items, boxHeight}) {
+function ServersLayout({ title, itemId, tooltipContent, items, hasItems, emptyMessage, onRemove, boxHeight = "200px" }) {
+    if (!hasItems) {
+        return (
+            <Card>
+                <VerticalStack gap={4}>
+                    <ComponentHeader
+                        title={title}
+                        itemId={itemId}
+                        onRemove={onRemove}
+                        tooltipContent={tooltipContent}
+                    />
+                    <Box minHeight={boxHeight}>
+                        <Text alignment='center' color='subdued'>{emptyMessage}</Text>
+                    </Box>
+                </VerticalStack>
+            </Card>
+        )
+    }
+
     let totalServers = 0
 
     items.forEach((item) =>{ 
@@ -32,17 +51,27 @@ function ServersLayout({items, boxHeight}) {
     })
 
     return (
-        <Scrollable style={{maxHeight: boxHeight}} focusable shadow>
-            <DataTable headings={[]}
-                columnContentTypes={[
-                    'text',
-                    'numeric'
-                ]}
-                rows={tableRows}
-                increasedTableDensity
-                hoverable={false}
-            />
-        </Scrollable>
+        <Card>
+            <VerticalStack gap={4}>
+                <ComponentHeader
+                    title={title}
+                    itemId={itemId}
+                    onRemove={onRemove}
+                    tooltipContent={tooltipContent}
+                />
+                <Scrollable style={{maxHeight: boxHeight}} focusable shadow>
+                    <DataTable headings={[]}
+                        columnContentTypes={[
+                            'text',
+                            'numeric'
+                        ]}
+                        rows={tableRows}
+                        increasedTableDensity
+                        hoverable={false}
+                    />
+                </Scrollable>
+            </VerticalStack>
+        </Card>
     )
 }
 

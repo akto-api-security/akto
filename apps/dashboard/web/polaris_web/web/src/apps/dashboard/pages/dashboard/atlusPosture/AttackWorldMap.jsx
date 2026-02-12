@@ -3,7 +3,8 @@ import Highcharts from "highcharts/highmaps";
 import Exporting from "highcharts/modules/exporting";
 import ExportData from "highcharts/modules/export-data";
 import FullScreen from "highcharts/modules/full-screen";
-import InfoCard from "../new_components/InfoCard";
+import { Card, VerticalStack, Box } from "@shopify/polaris";
+import ComponentHeader from "../new_components/ComponentHeader";
 
 // Initialize modules
 Exporting(Highcharts);
@@ -29,7 +30,7 @@ if (!document.head.querySelector('style[data-attack-map]')) {
     document.head.appendChild(style);
 }
 
-function AttackWorldMap({ attackRequests, style }) {
+function AttackWorldMap({ attackRequests, style, itemId, onRemoveComponent }) {
 
     // Function to get color based on attack type
     const getColorForAttackType = useCallback((attackType) => {
@@ -282,15 +283,21 @@ function AttackWorldMap({ attackRequests, style }) {
     }, [attackRequests, fetchMapData]);
 
     return (
-        <InfoCard
-            title="Guardrail Attack Map"
-            titleToolTip="Visual representation of attack requests showing source locations and destination servers"
-            component={
-                <div style={{ position: 'relative', width: '100%', height: style?.height || '500px' }}>
-                    <div id="attack-world-map-container" style={style || { width: "100%", height: "500px" }}></div>
-                </div>
-            }
-        />
+        <Card>
+            <VerticalStack gap={4}>
+                <ComponentHeader
+                    title="Attack Flow Map"
+                    itemId={itemId}
+                    onRemove={onRemoveComponent}
+                    tooltipContent="Visual representation of attack requests showing source locations and destination servers"
+                />
+                <Box>
+                    <div style={{ position: 'relative', width: '100%', height: style?.height || '500px' }}>
+                        <div id="attack-world-map-container" style={style || { width: "100%", height: "500px" }}></div>
+                    </div>
+                </Box>
+            </VerticalStack>
+        </Card>
     );
 }
 

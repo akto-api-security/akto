@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
-import { HorizontalStack, Box, Text, Spinner, Button } from '@shopify/polaris'
+import { useState, useEffect, useRef, useReducer } from 'react'
+import { HorizontalStack, Box, Text, Spinner, Button, Card, VerticalStack, HorizontalGrid } from '@shopify/polaris'
+import { produce } from 'immer'
 import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCards'
 import TitleWithInfo from '../../components/shared/TitleWithInfo'
-import SummaryCard from './new_components/SummaryCard'
-import InfoCard from './new_components/InfoCard'
+import DateRangeFilter from '../../components/layouts/DateRangeFilter'
+import ComponentHeader from './new_components/ComponentHeader'
+import CardWithHeader from './new_components/CardWithHeader'
 import ServersLayout from './atlusPosture/ServersLayout'
 import AttackWorldMap from './atlusPosture/AttackWorldMap'
 import ComplianceAtRisksCard from './new_components/ComplianceAtRisksCard'
@@ -13,6 +15,7 @@ import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent'
 import dashboardApi from './api'
 import api from '../observe/api'
 import func from '@/util/func'
+import values from '@/util/values'
 import { getTypeFromTags, CLIENT_TYPES, getDomainForFavicon } from '../observe/agentic/mcpClientHelper'
 import { extractEndpointId } from '../observe/agentic/constants'
 import { GridLayout } from 'react-grid-layout'
@@ -107,14 +110,14 @@ const processAgenticCollections = (collections, topN = 4) => {
 // Default layout configuration - each component is independently draggable/resizable
 const defaultLayout = [
     { i: 'summary', x: 0, y: 0, w: 12, h: 3, minW: 6, minH: 2, maxH: 6 },
-    { i: 'mcpServers', x: 0, y: 3, w: 4, h: 5, minW: 3, minH: 3, maxH: 10 },
-    { i: 'llms', x: 4, y: 3, w: 4, h: 5, minW: 3, minH: 3, maxH: 10 },
-    { i: 'aiAgents', x: 8, y: 3, w: 4, h: 5, minW: 3, minH: 3, maxH: 10 },
-    { i: 'attackFlowMap', x: 0, y: 8, w: 6, h: 9, minW: 4, minH: 4, maxH: 18 },
-    { i: 'complianceAtRisks', x: 6, y: 8, w: 6, h: 9, minW: 4, minH: 4, maxH: 18 },
-    { i: 'threatCategory', x: 0, y: 17, w: 12, h: 9, minW: 6, minH: 4, maxH: 18 },
-    { i: 'dataProtectionTrends', x: 0, y: 26, w: 6, h: 9, minW: 4, minH: 4, maxH: 18 },
-    { i: 'guardrailPolicies', x: 6, y: 26, w: 6, h: 9, minW: 4, minH: 4, maxH: 18 }
+    { i: 'mcpServers', x: 0, y: 3, w: 4, h: 4, minW: 3, minH: 3, maxH: 10 },
+    { i: 'llms', x: 4, y: 3, w: 4, h: 4, minW: 3, minH: 3, maxH: 10 },
+    { i: 'aiAgents', x: 8, y: 3, w: 4, h: 4, minW: 3, minH: 3, maxH: 10 },
+    { i: 'attackFlowMap', x: 0, y: 8, w: 6, h: 6, minW: 4, minH: 4, maxH: 18 },
+    { i: 'complianceAtRisks', x: 6, y: 8, w: 6, h: 6, minW: 4, minH: 4, maxH: 18 },
+    { i: 'threatCategory', x: 0, y: 14, w: 12, h: 9.5, minW: 6, minH: 4, maxH: 18 },
+    { i: 'dataProtectionTrends', x: 0, y: 23.5, w: 6, h: 7, minW: 4, minH: 4, maxH: 18 },
+    { i: 'guardrailPolicies', x: 6, y: 23.5, w: 6, h: 7, minW: 4, minH: 4, maxH: 18 }
 ]
 
 function EndpointPosture() {
@@ -128,6 +131,9 @@ function EndpointPosture() {
     const [attackRequests, setAttackRequests] = useState([])
     const [loading, setLoading] = useState(true)
 
+    // Date range filter state
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3])
+
     const containerRef = useRef(null)
     const [gridWidth, setGridWidth] = useState(1200)
 
@@ -135,6 +141,12 @@ function EndpointPosture() {
     const [layout, setLayout] = useState(() => {
         const savedLayout = localStorage.getItem('endpointDashboardLayout')
         return savedLayout ? JSON.parse(savedLayout) : defaultLayout
+    })
+
+    // State to track which widgets are visible
+    const [hiddenWidgets, setHiddenWidgets] = useState(() => {
+        const saved = localStorage.getItem('endpointDashboardHidden')
+        return saved ? JSON.parse(saved) : []
     })
 
     // Dynamic width calculation
@@ -167,12 +179,16 @@ function EndpointPosture() {
         }
     }, [])
 
+    const getTimeEpoch = (key) => {
+        return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
+    }
+
     useEffect(() => {
 
         const fetchSummaryData = async () => {
             try {
-                const endTimestamp = Math.floor(Date.now() / 1000)
-                const startTimestamp = endTimestamp - (30 * 24 * 60 * 60) // Last 30 days
+                const startTimestamp = getTimeEpoch("since")
+                const endTimestamp = getTimeEpoch("until")
 
                 // Fetch data from existing APIs in parallel
                 const [
@@ -288,7 +304,7 @@ function EndpointPosture() {
         }
 
         fetchSummaryData()
-    }, [])
+    }, [currDateRange])
 
     if (loading) {
         return (
@@ -307,13 +323,27 @@ function EndpointPosture() {
         localStorage.setItem('endpointDashboardLayout', JSON.stringify(newLayout))
     }
 
-    // Reset layout to default
+    // Hide widget
+    const hideWidget = (widgetId) => {
+        const newHidden = [...hiddenWidgets, widgetId]
+        setHiddenWidgets(newHidden)
+        localStorage.setItem('endpointDashboardHidden', JSON.stringify(newHidden))
+    }
+
+    // Reset layout to default and show all widgets
     const resetLayout = () => {
         // Create a deep copy to force re-render
         const resetLayoutCopy = JSON.parse(JSON.stringify(defaultLayout))
         setLayout(resetLayoutCopy)
         localStorage.removeItem('endpointDashboardLayout')
+
+        // Show all widgets
+        setHiddenWidgets([])
+        localStorage.removeItem('endpointDashboardHidden')
     }
+
+    // Check if widget is visible
+    const isWidgetVisible = (widgetId) => !hiddenWidgets.includes(widgetId)
 
     const resetButton = (
         <Button onClick={resetLayout}>
@@ -321,9 +351,10 @@ function EndpointPosture() {
         </Button>
     )
 
-    const summaryHeader = (
-        <SummaryCard 
-            summaryItems={summaryInfoData}
+    const dateRangeFilter = (
+        <DateRangeFilter
+            initialDispatch={currDateRange}
+            dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })}
         />
     )
 
@@ -331,110 +362,133 @@ function EndpointPosture() {
     const hasLlms = commonLlmsInBrowsers && commonLlmsInBrowsers.length > 0
     const hasAiAgents = commonAiAgents && commonAiAgents.length > 0
 
-    const mcpServersComponent = (
-        <InfoCard
-            title="Common MCP Servers"
-            component={
-                <div style={{ marginTop: "20px" }}>
-                    {hasMcpServers ? (
-                        <ServersLayout items={commonMcpServers} boxHeight="200px" />
-                    ) : (
-                        <Box minHeight="200px">
-                            <Text alignment='center' color='subdued'>No MCP servers detected</Text>
+    const summaryHeader = (
+        <Card>
+            <VerticalStack gap={4}>
+                <ComponentHeader title='Endpoint Summary' itemId='summary' onRemove={hideWidget} tooltipContent="Overview of key endpoint security metrics" />
+                <HorizontalGrid columns={summaryInfoData.length} gap={4}>
+                    {summaryInfoData.map((item, index) => (
+                        <Box borderInlineEndWidth={index < (summaryInfoData.length - 1) ? "1" : ""} key={index} borderColor="transparent">
+                            <HorizontalStack>
+                                <VerticalStack gap="4">
+                                    <TitleWithInfo
+                                        titleComp={
+                                            <Text variant="headingMd">
+                                                {item.title}
+                                            </Text>
+                                        }
+                                        docsUrl={item?.docsUrl}
+                                        tooltipContent={item?.tooltipContent}
+                                    />
+                                    <HorizontalGrid gap={1} columns={2}>
+                                        <VerticalStack gap={4}>
+                                            {item?.isComp ? item.data :
+                                                <div className='custom-color'>
+                                                    <Text variant={item.variant ? item.variant : 'bodyLg'} color={item.color ? item.color : ""}>
+                                                        {item.data}
+                                                    </Text>
+                                                </div>
+                                            }
+                                            {item.byLineComponent ? item.byLineComponent : null}
+                                        </VerticalStack>
+                                        {item.smoothChartComponent ? item.smoothChartComponent : null}
+                                    </HorizontalGrid>
+                                </VerticalStack>
+                            </HorizontalStack>
                         </Box>
-                    )}
-                </div>
-            }
+                    ))}
+                </HorizontalGrid>
+            </VerticalStack>
+        </Card>
+    )
+
+    const mcpServersComponent = (
+        <ServersLayout
+            title='Common MCP Servers'
+            itemId='mcpServers'
             tooltipContent="The most common MCP servers detected in your environment."
+            items={commonMcpServers}
+            hasItems={hasMcpServers}
+            emptyMessage="No MCP servers detected"
+            onRemove={hideWidget}
         />
     )
 
     const llmsComponent = (
-        <InfoCard
-            title="Common LLMs in browsers"
-            component={
-                <div style={{ marginTop: "20px" }}>
-                    {hasLlms ? (
-                        <ServersLayout items={commonLlmsInBrowsers} boxHeight="200px" />
-                    ) : (
-                        <Box minHeight="200px">
-                            <Text alignment='center' color='subdued'>No LLMs detected</Text>
-                        </Box>
-                    )}
-                </div>
-            }
+        <ServersLayout
+            title='Common LLMs in browsers'
+            itemId='llms'
             tooltipContent="The most common LLMs agents detected in your environment."
+            items={commonLlmsInBrowsers}
+            hasItems={hasLlms}
+            emptyMessage="No LLMs detected"
+            onRemove={hideWidget}
         />
     )
 
     const aiAgentsComponent = (
-        <InfoCard
-            title="Common AI Agents"
-            component={
-                <div style={{ marginTop: "20px" }}>
-                    {hasAiAgents ? (
-                        <ServersLayout items={commonAiAgents} boxHeight="200px" />
-                    ) : (
-                        <Box minHeight="200px">
-                            <Text alignment='center' color='subdued'>No AI agents detected</Text>
-                        </Box>
-                    )}
-                </div>
-            }
+        <ServersLayout
+            title='Common AI Agents'
+            itemId='aiAgents'
             tooltipContent="The most common AI agents detected in your environment."
+            items={commonAiAgents}
+            hasItems={hasAiAgents}
+            emptyMessage="No AI agents detected"
+            onRemove={hideWidget}
         />
-    )
-
-    const threatCategoryStackedChartComponent = (
-        <ThreatCategoryStackedChartWrapper/>
     )
 
     const hasAttackFlowData = attackRequests && attackRequests.length > 0
     const hasComplianceData = complianceData && complianceData.length > 0
 
-    const attackFlowMapComponent = (
-        <InfoCard
-            title="Attack Flow Map"
-            component={
-                <div style={{ marginTop: "20px" }}>
-                    {hasAttackFlowData ? (
-                        <AttackWorldMap
-                            attackRequests={attackRequests}
-                            style={{
-                                width: "100%",
-                                height: "300px",
-                                marginRight: "auto",
-                            }}
-                        />
-                    ) : (
-                        <Box minHeight="300px">
-                            <Text alignment='center' color='subdued'>No attack flow data in the selected period</Text>
-                        </Box>
-                    )}
-                </div>
-            }
-            titleToolTip="Visualization of attack sources and destinations"
+    const threatCategoryStackedChartComponent = (
+        <ThreatCategoryStackedChartWrapper
+            startTimestamp={getTimeEpoch("since")}
+            endTimestamp={getTimeEpoch("until")}
+            itemId='threatCategory'
+            onRemoveComponent={hideWidget}
         />
     )
 
-    const complianceAtRisksComponent = (
-        <InfoCard
-            title="Compliance At Risks"
-            component={
-                <div style={{ marginTop: "20px" }}>
-                    {hasComplianceData ? (
-                        <ComplianceAtRisksCard
-                            complianceData={complianceData}
-                            tooltipContent="Overview of compliance risks across different security standards"
-                        />
-                    ) : (
-                        <Box minHeight="300px">
-                            <Text alignment='center' color='subdued'>No compliance risk data available</Text>
-                        </Box>
-                    )}
-                </div>
-            }
-            titleToolTip="Overview of compliance risks across different security standards"
+    const attackFlowMapComponent = hasAttackFlowData ? (
+        <AttackWorldMap
+            attackRequests={attackRequests}
+            style={{
+                width: "100%",
+                height: "100%",
+                marginRight: "auto",
+            }}
+            itemId='attackFlowMap'
+            onRemoveComponent={hideWidget}
+        />
+    ) : (
+        <CardWithHeader
+            title='Attack Flow Map'
+            itemId='attackFlowMap'
+            onRemove={hideWidget}
+            tooltipContent="Geographic visualization of attack sources"
+            hasData={false}
+            emptyMessage="No attack flow data in the selected period"
+            minHeight="300px"
+        />
+    )
+
+    const complianceAtRisksComponent = hasComplianceData ? (
+        <ComplianceAtRisksCard
+            complianceData={complianceData}
+            itemId='complianceAtRisks'
+            onRemoveComponent={hideWidget}
+            tooltipContent="Overview of compliance risks across different security standards"
+        />
+    ) : (
+        <CardWithHeader
+            title='Compliance at Risks'
+            itemId='complianceAtRisks'
+            onRemove={hideWidget}
+            tooltipContent="Overview of compliance risks across different security standards"
+            hasData={false}
+            emptyMessage="No compliance risk data available"
+            minHeight="300px"
         />
     )
 
@@ -448,54 +502,49 @@ function EndpointPosture() {
     const hasDataProtectionTrends = dataProtectionTrendsData && dataProtectionTrendsData.length > 0 &&
                                      dataProtectionTrendsData.some(item => item.data && item.data.length > 0)
 
-    const dataProtectionTrendsComponent = (
-        <InfoCard
+    const dataProtectionTrendsComponent = hasDataProtectionTrends ? (
+        <CustomLineChart
             title="Data Protection Trends"
-            titleToolTip="Trends showing how data protection mechanisms are being triggered over time"
-            component={
-                <div style={{ marginTop: "20px" }}>
-                    {hasDataProtectionTrends ? (
-                        <CustomLineChart
-                            title="Data Protection Trends"
-                            chartData={dataProtectionTrendsData}
-                            labels={dataProtectionTrendsLabels}
-                            chartHeight={290}
-                            tooltipContent="Trends showing how data protection mechanisms are being triggered over time"
-                        />
-                    ) : (
-                        <Box minHeight="250px">
-                            <Text alignment='center' color='subdued'>No data protection trend data in the selected period</Text>
-                        </Box>
-                    )}
-                </div>
-            }
+            chartData={dataProtectionTrendsData}
+            labels={dataProtectionTrendsLabels}
+            chartHeight={290}
+            itemId='dataProtectionTrends'
+            onRemoveComponent={hideWidget}
+            tooltipContent="Trends showing how data protection mechanisms are being triggered over time"
+        />
+    ) : (
+        <CardWithHeader
+            title='Data Protection Trends'
+            itemId='dataProtectionTrends'
+            onRemove={hideWidget}
+            tooltipContent="Trends showing how data protection mechanisms are being triggered over time"
+            hasData={false}
+            emptyMessage="No data protection trend data in the selected period"
         />
     )
 
     const guardrailPoliciesComponent = (
-        <InfoCard
-            component={
-                <div style={{ marginTop: "20px" }}>
-                    {hasGuardrailData ? (
-                        <ChartypeComponent
-                            data={guardrailPoliciesData}
-                            title="Top Triggered Guardrail Policies"
-                            isNormal={true}
-                            boxHeight={'250px'}
-                            chartOnLeft={true}
-                            dataTableWidth="250px"
-                            pieInnerSize="50%"
-                        />
-                    ) : (
-                        <Box minHeight="250px">
-                            <Text alignment='center' color='subdued'>No guardrail policy data available</Text>
-                        </Box>
-                    )}
-                </div>
-            }
-            title="Top Triggered Guardrail Policies"
-            titleToolTip="Distribution of the most frequently triggered guardrail policies"
-        />
+        <CardWithHeader
+            title='Top Triggered Guardrail Policies'
+            itemId='guardrailPolicies'
+            onRemove={hideWidget}
+            tooltipContent="Most frequently triggered guardrail policies"
+            hasData={hasGuardrailData}
+            emptyMessage="No guardrail policy data available"
+            minHeight="250px"
+        >
+            <Box paddingBlockStart={3}>
+                <ChartypeComponent
+                    data={guardrailPoliciesData}
+                    title="Top Triggered Guardrail Policies"
+                    isNormal={true}
+                    boxHeight={'250px'}
+                    chartOnLeft={true}
+                    dataTableWidth="250px"
+                    pieInnerSize="50%"
+                />
+            </Box>
+        </CardWithHeader>
     )
 
     return (
@@ -509,11 +558,12 @@ function EndpointPosture() {
                 />
             }
             primaryAction={resetButton}
+            secondaryActions={[dateRangeFilter]}
             components={[
                 <div key="grid-container" ref={containerRef} style={{ width: '100%' }}>
                     <GridLayout
                         width={gridWidth}
-                        layout={layout}
+                        layout={layout.filter(item => isWidgetVisible(item.i))}
                         gridConfig={{
                             cols: 12,
                             rowHeight: 50,
@@ -521,7 +571,8 @@ function EndpointPosture() {
                             containerPadding: [0, 0]
                         }}
                         dragConfig={{
-                            enabled: true
+                            enabled: true,
+                            handle: '.drag-handle-icon'
                         }}
                         resizeConfig={{
                             enabled: true
@@ -529,41 +580,59 @@ function EndpointPosture() {
                         compactor={null}
                         onLayoutChange={onLayoutChange}
                     >
-                        <div key="summary">
-                            {summaryHeader}
-                        </div>
+                        {isWidgetVisible('summary') && (
+                            <div key="summary">
+                                {summaryHeader}
+                            </div>
+                        )}
 
-                        <div key="mcpServers">
-                            {mcpServersComponent}
-                        </div>
+                        {isWidgetVisible('mcpServers') && (
+                            <div key="mcpServers">
+                                {mcpServersComponent}
+                            </div>
+                        )}
 
-                        <div key="llms">
-                            {llmsComponent}
-                        </div>
+                        {isWidgetVisible('llms') && (
+                            <div key="llms">
+                                {llmsComponent}
+                            </div>
+                        )}
 
-                        <div key="aiAgents">
-                            {aiAgentsComponent}
-                        </div>
+                        {isWidgetVisible('aiAgents') && (
+                            <div key="aiAgents">
+                                {aiAgentsComponent}
+                            </div>
+                        )}
 
-                        <div key="attackFlowMap">
-                            {attackFlowMapComponent}
-                        </div>
+                        {isWidgetVisible('attackFlowMap') && (
+                            <div key="attackFlowMap">
+                                {attackFlowMapComponent}
+                            </div>
+                        )}
 
-                        <div key="complianceAtRisks">
-                            {complianceAtRisksComponent}
-                        </div>
+                        {isWidgetVisible('complianceAtRisks') && (
+                            <div key="complianceAtRisks">
+                                {complianceAtRisksComponent}
+                            </div>
+                        )}
 
-                        <div key="threatCategory">
-                            {threatCategoryStackedChartComponent}
-                        </div>
+                        {isWidgetVisible('threatCategory') && (
+                            <div key="threatCategory">
+                                {threatCategoryStackedChartComponent}
+                            </div>
+                        )}
 
-                        <div key="dataProtectionTrends">
-                            {dataProtectionTrendsComponent}
-                        </div>
+                        {isWidgetVisible('dataProtectionTrends') && (
+                            <div key="dataProtectionTrends">
+                                {dataProtectionTrendsComponent}
+                            </div>
+                        )}
 
-                        <div key="guardrailPolicies">
-                            {guardrailPoliciesComponent}
-                        </div>
+                        {isWidgetVisible('guardrailPolicies') && (
+                            <div key="guardrailPolicies">
+                                {guardrailPoliciesComponent}
+                            </div>
+                        )}
                     </GridLayout>
                 </div>
             ]}

@@ -8,15 +8,9 @@
 
 .react-grid-item {
     box-sizing: border-box;
-    cursor: grab;
-}
-
-.react-grid-item:active {
-    cursor: grabbing;
 }
 
 .react-grid-item.react-draggable-dragging {
-    cursor: grabbing;
     opacity: 0.9;
 }
 
@@ -64,4 +58,10 @@
 
 .react-grid-item .react-resizable-handle:hover::after {
     border-color: transparent transparent rgba(0, 0, 0, 0.7) transparent !important;
+}
+
+/* Add hover background to close button in ComponentHeader */
+.component-header-close-button button:hover {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+    border-radius: 4px;
 }

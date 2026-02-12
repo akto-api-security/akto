@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import InfoCard from "../new_components/InfoCard";
-import { Spinner, Text, SkeletonBodyText, SkeletonDisplayText } from "@shopify/polaris";
+import { Card, VerticalStack, Text, SkeletonBodyText, SkeletonDisplayText } from "@shopify/polaris";
+import ComponentHeader from "../new_components/ComponentHeader";
 import StackedAreaChart from "../../../components/charts/StackedAreaChart";
 import threatDetectionApi from "../../threat_detection/api";
 import dayjs from "dayjs";
@@ -233,7 +233,7 @@ const ChartLegend = ({ items, onToggle }) => {
   );
 };
 
-function ThreatCategoryChart({ startTimestamp, endTimestamp }) {
+function ThreatCategoryChart({ startTimestamp, endTimestamp, itemId, onRemoveComponent }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [chartData, setChartData] = useState([]);
@@ -335,11 +335,15 @@ function ThreatCategoryChart({ startTimestamp, endTimestamp }) {
   }, []);
 
   return (
-    <InfoCard
-      title="Threat Activity (by Category)"
-      titleToolTip="Stacked area view showing distribution of activity across categories over time"
-      component={
-        loading ? (
+    <Card>
+      <VerticalStack gap={4}>
+        <ComponentHeader
+          title="Threat Activity (by Category)"
+          itemId={itemId}
+          onRemove={onRemoveComponent}
+          tooltipContent="Stacked area view showing distribution of activity across categories over time"
+        />
+        {loading ? (
           <ChartSkeleton />
         ) : error ? (
           <ErrorState message={error} />
@@ -398,9 +402,9 @@ function ThreatCategoryChart({ startTimestamp, endTimestamp }) {
               <EmptyState message="No threat activity data found for the selected time period." />
             )}
           </>
-        )
-      }
-    />
+        )}
+      </VerticalStack>
+    </Card>
   );
 }
 
