@@ -10,7 +10,7 @@ import DateRangeFilter from "../../../components/layouts/DateRangeFilter.jsx";
 import { produce } from "immer";
 import "./style.css"
 import values from "@/util/values";
-import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
+import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import threatDetectionApi from "../../threat_detection/api.js"
 import SessionStore from "../../../../main/SessionStore"
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
@@ -156,6 +156,9 @@ function ThreatCompliancePage() {
         additionalFilters: currentAppliedFilters
     });
 
+    // Only show session context features for Agentic Security (Argus) and Endpoint Security (Atlas), not for API Security
+    const showSessionContext = isAgenticSecurityCategory() || isEndpointSecurityCategory();
+
     const headers = [
         {
             title: '',
@@ -170,6 +173,16 @@ function ThreatCompliancePage() {
             title: "Threat name",
             text: "Threat name",
             value: "issueName",
+        },
+        ...(showSessionContext ? [{
+            title: "Detection Type",
+            text: "Detection Type",
+            value: "detectionType"
+        }] : []),
+        {
+            title: "Detection Type",
+            text: "Detection Type",
+            value: "detectionType"
         },
         {
             title: mapLabel("Number of endpoints", dashboardCategory),
@@ -270,6 +283,7 @@ function ThreatCompliancePage() {
                     method: threatData.method || '',
                     apiCollectionId: threatData.apiCollectionId,
                     templateId: threatData.filterId,
+                    sessionContext: threatData.sessionContext || ''
                 },
                 currentEventId: threatData.eventId || '',
                 currentEventStatus: threatData.status || '',
@@ -298,7 +312,8 @@ function ThreatCompliancePage() {
         apiCollectionId: item?.apiCollectionId,
         status: item?.status,
         eventId: item?.id,
-        jiraTicketUrl: item?.jiraTicketUrl
+        jiraTicketUrl: item?.jiraTicketUrl,
+        sessionContext: item?.sessionContext || ''
     });
 
 
@@ -309,6 +324,10 @@ function ThreatCompliancePage() {
             let maxShowCompliance = 2
             let badge = totalCompliance > maxShowCompliance ? <Badge size="extraSmall">+{totalCompliance - maxShowCompliance}</Badge> : null
 
+            // Extract detection type from metadata
+            const detectionType = threat.detectionType || 'SINGLE_PROMPT';
+            const isSessionBased = detectionType === 'SESSION_CONTEXT';
+
             return {
                 key: key,
                 id: threat.urls.map((urlObj) => JSON.stringify({ eventId: urlObj.threatData?.eventId || "" })),
@@ -316,6 +335,13 @@ function ThreatCompliancePage() {
                     <Badge size="small" key={idx}>{threat.severity}</Badge>
                 </div>,
                 issueName: threatFiltersMapWithTestName[threat.issueName]?.testName || threat.issueName,
+                ...(showSessionContext && {
+                    detectionType: (
+                        <Badge status={isSessionBased ? 'info' : 'default'}>
+                            {isSessionBased ? 'Session' : 'Single Prompt'}
+                        </Badge>
+                    )
+                }),
                 numberOfEndpoints: threat.numberOfEndpoints,
                 domains: (
                     <ShowListInBadge
@@ -365,6 +391,7 @@ function ThreatCompliancePage() {
             let latestAttack = [];
             let hostFilter = [];
             let severityFilter = [];
+            let detectionTypeFilter = [];
 
             let latestApiOrigRegex = queryValue.length > 3 ? queryValue : "";
 
@@ -385,6 +412,9 @@ function ThreatCompliancePage() {
             }
             if (filtersObj?.severity) {
                 severityFilter = filtersObj?.severity;
+            }
+            if (filtersObj?.detectionType) {
+                detectionTypeFilter = filtersObj?.detectionType;
             }
 
             // Update current applied filters for report export
@@ -443,6 +473,23 @@ function ThreatCompliancePage() {
                     return;
                 }
 
+                // Parse sessionContext for detection type filtering
+                let sessionData = {};
+                try {
+                    if (item?.sessionContext) {
+                        sessionData = typeof item.sessionContext === 'string'
+                            ? JSON.parse(item.sessionContext)
+                            : item.sessionContext;
+                    }
+                } catch (e) {
+                    console.error('[ThreatCompliancePage] Error parsing sessionContext:', e);
+                }
+
+                const itemDetectionType = sessionData?.detectionType || 'SINGLE_PROMPT';
+                if (detectionTypeFilter.length > 0 && !detectionTypeFilter.includes(itemDetectionType)) {
+                    return;
+                }
+
                 const key = `${item?.filterId}|${threatPolicy.severity || 'HIGH'}`;
 
                 // Get domain from collectionsMap, fall back to host field, then "-"
@@ -473,6 +520,8 @@ function ThreatCompliancePage() {
                             threatData: createThreatDataObject(item)
                         }],
                         isThreat: true,
+                        sessionContext: sessionData,
+                        detectionType: sessionData?.detectionType || 'SINGLE_PROMPT'
                     });
                 } else {
                     const existingThreat = uniqueThreatsMap.get(key);
@@ -571,6 +620,24 @@ function ThreatCompliancePage() {
                     { label: 'High', value: 'HIGH' },
                     { label: 'Medium', value: 'MEDIUM' },
                     { label: 'Low', value: 'LOW' }
+                ]
+            },
+            ...(showSessionContext ? [{
+                key: 'detectionType',
+                label: 'Detection Type',
+                title: 'Detection Type',
+                choices: [
+                    { label: 'Session Context', value: 'SESSION_CONTEXT' },
+                    { label: 'Single Prompt', value: 'SINGLE_PROMPT' },
+                ]
+            }] : []),
+            {
+                key: 'detectionType',
+                label: 'Detection Type',
+                title: 'Detection Type',
+                choices: [
+                    { label: 'Session Context', value: 'SESSION_CONTEXT' },
+                    { label: 'Single Prompt', value: 'SINGLE_PROMPT' },
                 ]
             },
             {

@@ -5,6 +5,7 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.ahocorasick.trie.Trie;
 import org.json.JSONObject;
@@ -27,6 +28,8 @@ import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.util.Constants;
+import com.akto.util.modifier.JwtModifier;
+import com.akto.utils.AuthPolicy;
 import com.client9.libinjection.SQLParse;
 import com.akto.util.Pair;
 
@@ -38,6 +41,7 @@ public class ThreatDetector {
 
     public static final String LFI_FILTER_ID = "LocalFileInclusionLFIRFI";
     public static final String USER_AUTH_MISMATCH_FILTER_ID = "UserAuthMismatch";
+    public static final String WEAK_AUTHENTICATION_FILTER_ID = "WeakAuthentication";
     public static final String SQL_INJECTION_FILTER_ID = "SQLInjection";
     public static final String OS_COMMAND_INJECTION_FILTER_ID = "OSCommandInjection";
     public static final String SSRF_FILTER_ID = "SSRF";
@@ -75,6 +79,9 @@ public class ThreatDetector {
             }
             if (threatFilter.getId().equals(PARAM_ENUMERATION_FILTER_ID)) {
                 return isParamEnumerationThreat(httpResponseParams, matchedTemplate);
+            }
+            if (threatFilter.getId().equals(WEAK_AUTHENTICATION_FILTER_ID)) {
+                return isWeakAuthenticationThreat(httpResponseParams);
             }
             return validateFilterForRequest(threatFilter, rawApi, apiInfoKey);
         } catch (Exception e) {
@@ -133,6 +140,268 @@ public class ThreatDetector {
 
     }
 
+    public boolean isWeakAuthenticationThreat(HttpResponseParams httpResponseParams) {
+        if (httpResponseParams == null || httpResponseParams.getRequestParams() == null) {
+            return false;
+        }
+
+        Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
+        if (headers == null || headers.isEmpty()) {
+            return false;
+        }
+
+        // Step 1: Check structural issues in Authorization header
+        if (hasDuplicateAuthHeaders(headers)) {
+            logger.debug("Weak authentication: Multiple Authorization headers detected");
+            return true;
+        }
+
+        if (hasHeaderInjection(headers)) {
+            logger.debug("Weak authentication: Header injection detected");
+            return true;
+        }
+
+        if (hasOversizedToken(headers)) {
+            logger.debug("Weak authentication: Oversized token detected");
+            return true;
+        }
+
+        // Step 1.5: Check for Bearer with empty/malformed token directly
+        // This catches cases that AuthPolicy might not classify as BEARER type
+        if (hasEmptyOrMalformedBearer(headers)) {
+            logger.debug("Weak authentication: Empty or malformed Bearer token detected");
+            return true;
+        }
+
+        // Step 2: Use AuthPolicy to find auth types
+        Set<ApiInfo.AuthType> authTypes = AuthPolicy.findAuthTypes(headers);
+
+        // Step 3: Basic auth is always weak
+        if (authTypes.contains(ApiInfo.AuthType.BASIC)) {
+            logger.debug("Weak authentication: Basic Auth detected");
+            return true;
+        }
+
+        // Step 4: For Bearer auth, apply extra validations
+        if (authTypes.contains(ApiInfo.AuthType.BEARER)) {
+            String token = AuthPolicy.extractBearerToken(headers);
+
+            // Check for empty bearer token
+            if (token == null || token.trim().isEmpty()) {
+                logger.debug("Weak authentication: Empty bearer token detected");
+                return true;
+            }
+
+            // Check if it's a valid JWT
+            if (KeyTypes.isJWT(token)) {
+                if (isWeakJwtAlgorithm(token)) {
+                    logger.debug("Weak authentication: Weak JWT algorithm detected");
+                    return true;
+                }
+                if (isJwtExpired(token)) {
+                    logger.debug("Weak authentication: Expired JWT detected");
+                    return true;
+                }
+            } else {
+                // Not a valid JWT - check if it's a fake/suspicious token
+                if (token.length() < 10) {
+                    logger.debug("Weak authentication: Fake/invalid bearer token detected");
+                    return true;
+                }
+            }
+        }
+
+        // Step 5: Check JWT tokens in cookies and other headers
+        if (authTypes.contains(ApiInfo.AuthType.JWT)) {
+            List<String> jwtTokens = AuthPolicy.extractAllJwtTokens(headers);
+            for (String jwt : jwtTokens) {
+                if (isWeakJwtAlgorithm(jwt)) {
+                    logger.debug("Weak authentication: Weak JWT algorithm detected in cookie/header");
+                    return true;
+                }
+                if (isJwtExpired(jwt)) {
+                    logger.debug("Weak authentication: Expired JWT detected in cookie/header");
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean hasDuplicateAuthHeaders(Map<String, List<String>> headers) {
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(AuthPolicy.AUTHORIZATION_HEADER_NAME)) {
+                List<String> values = entry.getValue();
+                return values != null && values.size() > 1;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasHeaderInjection(Map<String, List<String>> headers) {
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(AuthPolicy.AUTHORIZATION_HEADER_NAME)) {
+                List<String> values = entry.getValue();
+                if (values != null) {
+                    for (String value : values) {
+                        if (value != null && (value.contains("\n") || value.contains("\r"))) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean hasOversizedToken(Map<String, List<String>> headers) {
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(AuthPolicy.AUTHORIZATION_HEADER_NAME)) {
+                List<String> values = entry.getValue();
+                if (values != null) {
+                    for (String value : values) {
+                        if (value != null && value.length() > 2048) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean hasEmptyOrMalformedBearer(Map<String, List<String>> headers) {
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            String headerName = entry.getKey();
+            if (headerName == null || !headerName.equalsIgnoreCase(AuthPolicy.AUTHORIZATION_HEADER_NAME)) {
+                continue;
+            }
+
+            List<String> values = entry.getValue();
+            if (values == null) {
+                continue;
+            }
+
+            for (String value : values) {
+                if (value == null) {
+                    continue;
+                }
+
+                String trimmed = value.trim();
+                if (trimmed.length() < 6 || !trimmed.substring(0, 6).equalsIgnoreCase("bearer")) {
+                    continue;
+                }
+
+                // Extract token part after "Bearer"
+                String tokenPart = trimmed.length() > 6 ? trimmed.substring(6).trim() : "";
+
+                // Empty bearer token (e.g., "Bearer" or "Bearer ")
+                if (tokenPart.isEmpty()) {
+                    return true;
+                }
+
+                // Check if token looks like JWT but is malformed
+                if (!tokenPart.contains(".")) {
+                    continue;
+                }
+
+                String[] parts = tokenPart.split("\\.");
+                // Valid JWT has exactly 3 parts
+                if (parts.length != 3) {
+                    return true;
+                }
+
+                // Check if any part is empty
+                for (String part : parts) {
+                    if (part.isEmpty()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isWeakJwtAlgorithm(String jwt) {
+        try {
+            String alg = extractAlgFromJwt(jwt);
+            if (alg == null) {
+                return false;
+            }
+
+            // Check for HS256 (weak symmetric algorithm)
+            if (alg.equalsIgnoreCase("HS256")) {
+                return true;
+            }
+
+            // Check for alg=none (algorithm confusion attack)
+            if (alg.equalsIgnoreCase("none")) {
+                return true;
+            }
+
+            return false;
+        } catch (Exception e) {
+            logger.debug("Error checking JWT algorithm: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private String extractAlgFromJwt(String jwt) {
+        try {
+            Map<String, String> headerMap = new HashMap<>();
+            Map<String, Object> result = JwtModifier.manipulateJWTHeaderToMap(jwt, headerMap);
+
+            if (result != null && result.containsKey("alg")) {
+                Object alg = result.get("alg");
+                return alg != null ? alg.toString() : null;
+            }
+
+            return null;
+        } catch (Exception e) {
+            logger.debug("Error extracting alg from JWT: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private boolean isJwtExpired(String jwt) {
+        try {
+            Long exp = extractExpFromJwt(jwt);
+            if (exp == null) {
+                return false;
+            }
+
+            // Get current time in seconds (JWT exp is in seconds since epoch)
+            long currentTime = System.currentTimeMillis() / 1000;
+
+            // Token is expired if exp is less than current time
+            return exp < currentTime;
+        } catch (Exception e) {
+            logger.debug("Error checking JWT expiration: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private Long extractExpFromJwt(String jwt) {
+        try {
+            Map<String, Object> payloadMap = JwtModifier.extractBodyFromJWT(jwt);
+
+            if (payloadMap != null && payloadMap.containsKey("exp")) {
+                Object exp = payloadMap.get("exp");
+                if (exp instanceof Number) {
+                    return ((Number) exp).longValue();
+                } else if (exp instanceof String) {
+                    return Long.parseLong((String) exp);
+                }
+            }
+
+            return null;
+        } catch (Exception e) {
+            logger.debug("Error extracting exp from JWT: " + e.getMessage());
+            return null;
+        }
+    }
+    
     public boolean isParamEnumerationThreat(HttpResponseParams httpResponseParams, URLTemplate matchedTemplate) {
 
         URLTemplate urlTemplate = matchedTemplate;

@@ -21,7 +21,11 @@ public class TrafficMetrics {
         OUTGOING_REQUESTS_MIRRORING("API calls extracted", "Count of API req-resp processed by traffic mirroring module"),
         INCOMING_PACKETS_MIRRORING("Bytes received", "Bytes of data received from traffic mirroring"),
         TOTAL_REQUESTS_RUNTIME("API calls received", "Count of API req-resp recevied by runtime module"),
-        FILTERED_REQUESTS_RUNTIME("API calls processed", "Count of API req-resp processed successfully by runtime module");
+        FILTERED_REQUESTS_RUNTIME("API calls processed", "Count of API req-resp processed successfully by runtime module"),
+        TC_CPU_USAGE("Traffic Collector CPU Usage", "CPU usage percentage of traffic collector modules"),
+        TC_MEMORY_USAGE("Traffic Collector Memory Used", "Memory used in MB by traffic collector modules"),
+        TC_TOTAL_CPU_USAGE("Traffic Collector Total CPU Cores", "Total CPU cores available on traffic collector instances"),
+        TC_TOTAL_MEMORY_USAGE("Traffic Collector Total Memory", "Total memory in MB available on traffic collector instances");
 
         private final String description;
         private final String descriptionName;

@@ -21,7 +21,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Sp
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse.ActivityData;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchThreatsForActorRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchThreatsForActorResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
@@ -296,42 +297,9 @@ public class ThreatActorService {
         List<Document> countList = result.getList("count", Document.class, Collections.emptyList());
         long total = countList.isEmpty() ? 0 : countList.get(0).getInteger("total");
 
-        // Activity fetch
         List<ListThreatActorResponse.ThreatActor> actors = new ArrayList<>();
         for (Document doc : paginated) {
             String actorId = doc.getString("_id");
-            List<ActivityData> activityDataList = new ArrayList<>();
-
-            // Build activity query with filtering
-            Document activityQuery = new Document("actor", actorId);
-
-            if (!contextFilter.isEmpty()) {
-                activityQuery.putAll(contextFilter);
-            }
-
-            try (MongoCursor<MaliciousEventDto> cursor2 = maliciousEventDao.getCollection(accountId)
-                    .find(activityQuery)
-                    .sort(Sorts.descending("detectedAt"))
-                    .limit(40)
-                    .cursor()) {
-                while (cursor2.hasNext()) {
-                    MaliciousEventDto event = cursor2.next();
-                    ActivityData.Builder activityBuilder = ActivityData.newBuilder()
-                        .setUrl(event.getLatestApiEndpoint())
-                        .setDetectedAt(event.getDetectedAt())
-                        .setSubCategory(event.getFilterId())
-                        .setSeverity(event.getSeverity())
-                        .setMethod(event.getLatestApiMethod().name())
-                        .setHost(event.getHost() != null ? event.getHost() : "");
-
-                    // Only add metadata field for AGENTIC or ENDPOINT contexts
-                    if (isAgenticOrEndpoint) {
-                        activityBuilder.setMetadata(ThreatUtils.fetchMetadataString(event.getMetadata()));
-                    }
-
-                    activityDataList.add(activityBuilder.build());
-                }
-            }
 
             ListThreatActorResponse.ThreatActor.Builder actorBuilder = ListThreatActorResponse.ThreatActor.newBuilder()
                 .setId(actorId)
@@ -341,8 +309,7 @@ public class ThreatActorService {
                 .setLatestApiHost(doc.getString("latestApiHost") != null ? doc.getString("latestApiHost") : "")
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
                 .setCountry(doc.getString("country"))
-                .setLatestSubcategory(doc.getString("latestSubCategory"))
-                .addAllActivityData(activityDataList);
+                .setLatestSubcategory(doc.getString("latestSubCategory"));
 
             // Only add metadata field for AGENTIC or ENDPOINT contexts
             if (isAgenticOrEndpoint) {
@@ -600,7 +567,7 @@ public class ThreatActorService {
     if (request.getEventType().equalsIgnoreCase(MaliciousEventDto.EventType.AGGREGATED.name())) {
         Bson matchConditions = Filters.and(
             Filters.eq("actor", request.getActor()),
-            Filters.gte("filterId", request.getFilterId())
+            Filters.eq("filterId", request.getFilterId())
         );
         matchConditions = Filters.or(
             matchConditions,
@@ -725,6 +692,49 @@ public class ThreatActorService {
 
         return ModifyThreatActorStatusResponse.newBuilder().build();
       }
+
+  public FetchThreatsForActorResponse fetchThreatsForActor(
+      String accountId, FetchThreatsForActorRequest request, String contextSource) {
+
+    String actor = request.getActor();
+    int limit = request.getLimit() > 0 ? request.getLimit() : 20;
+
+    boolean isAgenticOrEndpoint = ThreatUtils.isAgenticOrEndpointContext(contextSource);
+
+    Document activityQuery = new Document("actor", actor);
+
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    if (!contextFilter.isEmpty()) {
+      activityQuery.putAll(contextFilter);
+    }
+
+    List<FetchThreatsForActorResponse.ActivityData> activities = new ArrayList<>();
+
+    try (MongoCursor<MaliciousEventDto> cursor = maliciousEventDao.getCollection(accountId)
+        .find(activityQuery)
+        .sort(Sorts.descending("detectedAt"))
+        .limit(limit)
+        .cursor()) {
+      while (cursor.hasNext()) {
+        MaliciousEventDto event = cursor.next();
+        FetchThreatsForActorResponse.ActivityData.Builder activityBuilder = FetchThreatsForActorResponse.ActivityData.newBuilder()
+            .setUrl(event.getLatestApiEndpoint())
+            .setDetectedAt(event.getDetectedAt())
+            .setSubCategory(event.getFilterId())
+            .setSeverity(event.getSeverity())
+            .setMethod(event.getLatestApiMethod().name())
+            .setHost(event.getHost() != null ? event.getHost() : "");
+
+        if (isAgenticOrEndpoint) {
+          activityBuilder.setMetadata(ThreatUtils.fetchMetadataString(event.getMetadata()));
+        }
+
+        activities.add(activityBuilder.build());
+      }
+    }
+
+    return FetchThreatsForActorResponse.newBuilder().addAllActivities(activities).build();
+  }
 
   public FetchTopNDataResponse fetchTopNData(
       String accountId, long startTs, long endTs, List<String> latestAttackList, int limit, String contextSource) {

@@ -1,4 +1,4 @@
-import {Box, Navigation, Text} from "@shopify/polaris";
+import {Badge, Box, Navigation, Text} from "@shopify/polaris";
 import {
     AppsFilledMajor,
     InventoryFilledMajor,
@@ -421,13 +421,8 @@ export default function LeftNav() {
                     ),
                     icon: DiamondAlertMinor,
                     onClick: () => {
-                        if (dashboardCategory === CATEGORY_API_SECURITY) {
-                            handleSelect("dashboard_threat_dashboard");
-                            navigate("/dashboard/protection/threat-dashboard");
-                        } else {
-                            handleSelect("dashboard_threat_actor");
-                            navigate("/dashboard/protection/threat-actor");
-                        }
+                        handleSelect("dashboard_threat_actor");
+                        navigate("/dashboard/protection/threat-actor");
                         setActive("normal");
                     },
                     selected: (leftNavSelected.includes("_threat") && !leftNavSelected.includes("_reports")) || leftNavSelected.includes("_guardrails"),
@@ -588,9 +583,10 @@ export default function LeftNav() {
 
         // Add Ask AI navigation item
         const askAiExists = items.find(item => item.key === "ask_ai")
-        if (!askAiExists && window.USER_NAME.indexOf("@akto.io")) {
+        if (!askAiExists) {
             items.splice(1, 0, {
                 label: "Ask Akto",
+                badge: <Badge status="info">Beta</Badge>,
                 icon: MagicMinor,
                 onClick: () => {
                     handleSelect("dashboard_ask_ai")

@@ -509,11 +509,9 @@ function Jira() {
             // Handle both wrapped and unwrapped responses
             const values = Array.isArray(response) ? response : response?.availableFieldValues;
 
-            if (values && values.length > 0) {
-                actions.updateProject(index, {
-                    availableFieldValues: values
-                });
-            }
+            actions.updateProject(index, {
+                availableFieldValues: values || []
+            });
         } catch (error) {
             func.setToast(true, true, `Failed to fetch field values: ${error.message || 'Unknown error'}`);
         } finally {
@@ -575,10 +573,11 @@ function Jira() {
                 fieldName: selectedField?.name || fieldId,
                 fieldType: selectedField?.type || "unknown"
             },
-            fieldSearchQuery: undefined
+            fieldSearchQuery: undefined,
+            availableFieldValues: [] // Clear previous values
         });
 
-        // Fetch values for the selected field
+        // Always fetch field values - backend will return empty array if no options
         if (project.projectId) {
             fetchFieldValues(project.projectId, fieldId, index);
         }
@@ -914,18 +913,18 @@ function Jira() {
                                         )}
 
                                         {/* Severity Value Mapping */}
-                                        {project.availableFieldValues && project.availableFieldValues.length > 0 && (
+                                        {project.priorityFieldMapping?.fieldId && project.availableFieldValues && project.availableFieldValues.length > 0 && (
                                             <>
                                                 <HorizontalStack gap={12}>
                                                     <Text fontWeight='semibold' variant='headingXs'>Akto Severity</Text>
                                                     <Text fontWeight='semibold' variant='headingXs'>Jira Value</Text>
                                                 </HorizontalStack>
                                                 {aktoSeverities.map(severity => {
+                                                    const selectedValueId = project.priorityFieldMapping?.severityToValueMap?.[severity];
                                                     const valueOptions = project.availableFieldValues.map(v => ({
                                                         label: v.name,
                                                         value: v.id || v.name
                                                     }));
-                                                    const selectedValueId = project.priorityFieldMapping?.severityToValueMap?.[severity];
                                                     const selectedValue = project.availableFieldValues.find(v =>
                                                         (v.id && v.id === selectedValueId) || v.name === selectedValueId
                                                     );
@@ -957,7 +956,7 @@ function Jira() {
                                         )}
 
                                         {/* Save Button */}
-                                        {project.availableFieldValues && project.availableFieldValues.length > 0 && (
+                                        {project.priorityFieldMapping?.fieldId && project.availableFieldValues && project.availableFieldValues.length > 0 && (
                                             <HorizontalStack gap={2}>
                                                 <Button
                                                     primary

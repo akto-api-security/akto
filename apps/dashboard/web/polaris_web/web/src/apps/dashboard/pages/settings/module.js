@@ -246,9 +246,9 @@ const settingFunctions = {
       })
       return trafficData
     },
-    fetchAllMetricsData: async function(startTime, endTime) {
+    fetchAllMetricsData: async function(startTime, endTime, metricIdPrefix, instanceId) {
       let metricsData = {}
-      await settingRequests.fetchMetrics(startTime, endTime).then((resp) => {
+      await settingRequests.fetchMetrics(startTime, endTime, metricIdPrefix, instanceId).then((resp) => {
         console.log("resp", resp)
         metricsData = resp?.result?.metrics
       })

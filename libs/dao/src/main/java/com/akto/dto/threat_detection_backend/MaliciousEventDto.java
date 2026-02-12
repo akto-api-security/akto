@@ -30,6 +30,7 @@ public class MaliciousEventDto {
   private String host;
   private String jiraTicketUrl;
   private String contextSource;
+  private String sessionId;
 
   public enum EventType {
     SINGLE,
@@ -75,6 +76,7 @@ public class MaliciousEventDto {
     this.metadata = builder.metadata;
     this.jiraTicketUrl = builder.jiraTicketUrl;
     this.contextSource = builder.contextSource;
+    this.sessionId = builder.sessionId;
   }
 
   public static class Builder {
@@ -101,6 +103,7 @@ public class MaliciousEventDto {
     private String host;
     private String jiraTicketUrl;
     private String contextSource;
+    private String sessionId;
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
       return this;
@@ -216,6 +219,11 @@ public class MaliciousEventDto {
       return this;
     }
 
+    public Builder setSessionId(String sessionId) {
+      this.sessionId = sessionId;
+      return this;
+    }
+
     public MaliciousEventDto build() {
       return new MaliciousEventDto(this);
     }
@@ -259,6 +267,10 @@ public class MaliciousEventDto {
 
   public String getCountry() {
     return country;
+  }
+
+  public String getDestCountry() {
+    return destCountry;
   }
 
   public URLMethods.Method getLatestApiMethod() {
@@ -307,10 +319,6 @@ public class MaliciousEventDto {
 
   public void setCountry(String country) {
     this.country = country;
-  }
-
-  public String getDestCountry() {
-    return destCountry;
   }
 
   public void setDestCountry(String destCountry) {
@@ -415,6 +423,14 @@ public class MaliciousEventDto {
 
   public void setContextSource(String contextSource) {
     this.contextSource = contextSource;
+  }
+
+  public String getSessionId() {
+    return sessionId;
+  }
+
+  public void setSessionId(String sessionId) {
+    this.sessionId = sessionId;
   }
 
 }

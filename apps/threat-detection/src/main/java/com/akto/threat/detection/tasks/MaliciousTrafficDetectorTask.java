@@ -2,6 +2,7 @@ package com.akto.threat.detection.tasks;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,6 +33,7 @@ import com.akto.RawApiMetadataFactory;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Rule;
@@ -198,8 +200,10 @@ public class MaliciousTrafficDetectorTask implements Task {
               AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
               if (config == null) {
                 Context.isRedactPayload.set(false);
+                Context.accountId.set(1000000);
               } else {
                 Context.isRedactPayload.set(config.isRedacted());
+                Context.accountId.set(config.getAccountId());
               }
 
               for (ConsumerRecord<String, byte[]> record : records) {
@@ -435,7 +439,6 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
-    Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     String actor = this.threatConfigEvaluator.getActorId(responseParam);
     if (actor == null || actor.isEmpty()) {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
@@ -457,22 +460,27 @@ public class MaliciousTrafficDetectorTask implements Task {
     String url = responseParam.getRequestParams().getURL();
     URLMethods.Method method =
         URLMethods.Method.fromString(responseParam.getRequestParams().getMethod());
-    ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
-
-    String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, url, method.toString());
-    if (this.apiCountWindowBasedThresholdNotifier != null) {
-        this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
-    }
-
-    List<SchemaConformanceError> errors = null; 
-
 
     // Convert static URL to template URL once for reuse
-    // This is used for: 1) Redis/CMS aggregation, 2) ParamEnumeration filter
+    // This is used for: 1) API count increment, 2) Redis/CMS aggregation, 3) ParamEnumeration filter
     URLTemplate matchedTemplate = null;
     if (apiDistributionEnabled && apiCollectionId != 0) {
       matchedTemplate = threatDetector.findMatchingUrlTemplate(responseParam);
     }
+
+    // Use template URL if available, otherwise fall back to static URL
+    // This ensures API counts aggregate on template URLs (e.g., /api/users/INTEGER instead of /api/users/123)
+    String urlForAggregation = matchedTemplate != null ? matchedTemplate.getTemplateString() : url;
+
+    ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
+
+    // Increment API count using template URL for proper aggregation (skip for default collection)
+    String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, urlForAggregation, method.toString());
+    if (apiCollectionId != 0 && this.apiCountWindowBasedThresholdNotifier != null) {
+      this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
+    }
+
+    List<SchemaConformanceError> errors = null;
 
     // Check SuccessfulExploit category filters
     boolean successfulExploit = false; 
@@ -487,19 +495,17 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (apiDistributionEnabled && apiCollectionId != 0) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
 
-      // Use pre-matched template for Redis storage
+      // Use pre-matched template URL for Redis storage
       // This aggregates requests like /api/users/1, /api/users/2 under /api/users/INTEGER
-      String templateUrl = matchedTemplate != null ? matchedTemplate.getTemplateString() : url;
-
-      String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, templateUrl, method.toString());
-      String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, templateUrl, method.toString());
+      String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, urlForAggregation, method.toString());
+      String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, urlForAggregation, method.toString());
       long curEpochMin = responseParam.getTime() / 60;
       this.distributionCalculator.updateFrequencyBuckets(distributionKey, curEpochMin, ipApiCmsKey);
 
       // Check and raise alert for RateLimits
       RatelimitConfigItem ratelimitConfig = this.threatConfigEvaluator.getDefaultRateLimitConfig();
 
-      ApiInfo.ApiInfoKey templateApiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, templateUrl, method);
+      ApiInfo.ApiInfoKey templateApiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method);
       long ratelimit = this.threatConfigEvaluator.getRatelimit(templateApiInfoKey);
 
       long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin,
@@ -538,19 +544,18 @@ public class MaliciousTrafficDetectorTask implements Task {
 
       // Evaluate filter first (ignore and filter are independent conditions)
       // SchemaConform check is disabled
-      if(Context.accountId.get() == 1758179941 && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
+      List<Integer> accountIds = Arrays.asList(1758179941, 1763355072);
+      if(accountIds.contains(Context.accountId.get()) && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
-        vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
+        // vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
         
-        // String apiSchema = getApiSchema(apiCollectionId);
+        String apiSchema = getApiSchema(apiCollectionId);
 
-        // if (apiSchema == null || apiSchema.isEmpty()) {
+        if (apiSchema == null || apiSchema.isEmpty()) {
+          continue;
+        }
 
-        //   continue;
-
-        // }
-
-        // vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
+        vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
         hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
       }else {
@@ -675,6 +680,11 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (requestHeaders != null && requestHeaders.containsKey("host") && !requestHeaders.get("host").isEmpty()) {
       host = requestHeaders.get("host").get(0);
     }
+
+    // TODO: Extract sessionId from cookies or headers when needed
+    String sessionId = "";
+
+    String contextSourceValue = CONTEXT_SOURCE.API.name();
     
     MaliciousEventMessage maliciousEvent =
         MaliciousEventMessage.newBuilder()
@@ -696,6 +706,8 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setSuccessfulExploit(maliciousReq.getSuccessfulExploit())
             .setStatus(maliciousReq.getStatus())
             .setHost(host != null ? host : "")
+            .setContextSource(contextSourceValue)
+            .setSessionId(sessionId != null ? sessionId : "")
             .build();
     MaliciousEventKafkaEnvelope envelope =
         MaliciousEventKafkaEnvelope.newBuilder()

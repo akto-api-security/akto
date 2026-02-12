@@ -15,9 +15,6 @@ import RunTest from "./RunTest"
 import ObserveStore from "../observeStore"
 import WorkflowTests from "./WorkflowTests"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
-// import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
-import dashboardFunc from "../../transform"
-import settingsRequests from "../../settings/api"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"
 import { CellType } from "../../../components/tables/rows/GithubRow"
@@ -34,10 +31,13 @@ import { SelectSource } from "./SelectSource"
 import InlineEditableText from "../../../components/shared/InlineEditableText"
 import IssuesApi from "../../issues/api"
 import SequencesFlow from "./SequencesFlow"
+import SwaggerDependenciesFlow from "./SwaggerDependenciesFlow"
+import SchemaView from "./SchemaView"
 import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper"
-import AgentDiscoverGraph from "./AgentDiscoverGraph"
 import McpToolsGraph from "./McpToolsGraph"
 import { findTypeTag, TYPE_TAG_KEYS } from "../agentic/mcpClientHelper"
+import AgentDiscoverGraphWithDummyData from "./AgentDiscoveryGraphWithDummyData"
+import AgentDiscoverGraph from "./AgentDiscoverGraph"
 
 const headings = [
     {
@@ -244,6 +244,8 @@ function ApiEndpoints(props) {
     const [apiDetail, setApiDetail] = useState({})
     const [exportOpen, setExportOpen] = useState(false)
     const [showSequencesFlow, setShowSequencesFlow] = useState(false)
+    const [showSwaggerDependenciesFlow, setShowSwaggerDependenciesFlow] = useState(false)
+    const [showSchemaView, setShowSchemaView] = useState(false)
 
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
@@ -265,7 +267,7 @@ function ApiEndpoints(props) {
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
     const [currentKey, setCurrentKey] = useState(Date.now()); // to force remount InlineEditableText component
-    const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS')
+    const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS');
 
 
     // the values used here are defined at the server.
@@ -1115,9 +1117,52 @@ function ApiEndpoints(props) {
 
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
     const isApiGroup = collectionsObj?.type === 'API_GROUP'
-    const isHostnameCollection = hostNameMap[collectionsObj?.id] !== null && hostNameMap[collectionsObj?.id] !== undefined 
+    const isHostnameCollection = hostNameMap[collectionsObj?.id] !== null && hostNameMap[collectionsObj?.id] !== undefined
     const collectionTypeListComp = getCollectionTypeListComp(collectionsObj)
-    
+
+    // View toggle configurations for DRY principle
+    const viewConfigs = [
+        {
+            key: 'sequences',
+            label: 'Display graph view',
+            state: showSequencesFlow,
+            setState: setShowSequencesFlow,
+            condition: true
+        },
+        {
+            key: 'dependencies',
+            label: 'Display dependencies graph',
+            state: showSwaggerDependenciesFlow,
+            setState: setShowSwaggerDependenciesFlow,
+            condition: !isApiGroup && !isHostnameCollection && hasAccessToDiscoveryAgent
+        },
+        {
+            key: 'schema',
+            label: 'View Schema',
+            state: showSchemaView,
+            setState: setShowSchemaView,
+            condition: true 
+        }
+    ];
+
+    // Helper to create toggle item for switch view menu
+    const createViewToggleItem = (config) => {
+        if (!config.condition) return null;
+
+        return {
+            content: config.state ? "Display table view" : config.label,
+            onAction: () => {
+                config.setState(!config.state);
+                // Reset all other views (mutual exclusion)
+                viewConfigs.forEach(c => {
+                    if (c.key !== config.key) c.setState(false);
+                });
+                setExportOpen(false);
+            },
+            prefix: <Box width="24px"><Icon source={config.state ? HideMinor : ViewMinor} /></Box>
+        };
+    };
+
     const secondaryActionsComponent = (
         <HorizontalStack gap="2">
 
@@ -1137,19 +1182,11 @@ function ApiEndpoints(props) {
                     sections={[
                         {
                             title: 'Switch view',
-                            items: [
-                                {
-                                    content: showSequencesFlow ? "Display table view" : "Display graph view",
-                                    onAction: () => { 
-                                        setShowSequencesFlow(!showSequencesFlow); 
-                                        setExportOpen(false); 
-                                    },
-                                    prefix: <Box width="24px"> <Icon source={showSequencesFlow ? HideMinor: ViewMinor} /></Box>
-                                },
-                               
-                            ]
+                            items: viewConfigs
+                                .map(config => createViewToggleItem(config))
+                                .filter(Boolean)
                         },
-                        ...(showSequencesFlow ? [] : [
+                        ...(showSequencesFlow || showSwaggerDependenciesFlow || showSchemaView ? [] : [
                             {
                                 title:'Re-Compute',
                                 items: [
@@ -1519,8 +1556,8 @@ function ApiEndpoints(props) {
         setShowDetails={setShowDetails}
         apiDetail={apiDetail}
         headers={transform.getDetailsHeaders()}
-        // isGptActive={isGptActive}
         collectionIssuesData={collectionIssuesData}
+        hasAccessToDiscoveryAgent={hasAccessToDiscoveryAgent}
     />,
     ]
 
@@ -1533,7 +1570,7 @@ function ApiEndpoints(props) {
                     apiCollectionId={apiCollectionId}
                     endpointsList={loading ? [] : endpointData["all"]}
                 />
-            ] : showEmptyScreen ? [
+            ] : showEmptyScreen && !(showSequencesFlow || showSwaggerDependenciesFlow || showSchemaView) ? [
                 <EmptyScreensLayout key={"emptyScreen"}
                     iconSrc={"/public/file_plus.svg"}
                     headingText={getEmptyScreenText(collectionsObj).headingText}
@@ -1544,8 +1581,12 @@ function ApiEndpoints(props) {
                     docsUrl={ENDPOINTS_PAGE_DOCS_URL}
                 />] : showSequencesFlow ? [
                 <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
+            ] : showSwaggerDependenciesFlow ? [
+                <SwaggerDependenciesFlow key="swagger-dependencies-flow" apiCollectionId={apiCollectionId}  />
+            ] : showSchemaView ? [
+                <SchemaView key="schema-view" apiCollectionId={apiCollectionId} />
             ] : [
-                func.isDemoAccount() ? <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : null,
+                func.isDemoAccount() ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
                 (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
                 // Hide "Test your Endpoints" banner for Endpoint Security
                 (!isEndpointSecurityCategory() && (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,

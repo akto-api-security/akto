@@ -277,6 +277,15 @@ export default {
             }
         })
     },
+    fetchOpenApiSchema(apiCollectionId) {
+        return request({
+            url: '/api/fetchOpenApiSchema',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
     exportToPostman(apiCollectionId) {
         return request({
             url: '/api/createPostmanApi',
@@ -751,6 +760,26 @@ export default {
         })
     },
 
+    fetchLatestTraces(apiCollectionId) {
+        return request({
+            url: '/api/fetchLatestTraces',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
+
+    fetchSpansForTrace(traceId) {
+        return request({
+            url: '/api/fetchSpansForTrace',
+            method: 'post',
+            data: {
+                traceId
+            }
+        })
+    },
+
     async getCoverageInfoForCollections(){
         return await request({
             url: '/api/getCoverageInfoForCollections',
@@ -972,6 +1001,17 @@ export default {
     async fetchMcpToolsApiCalls(apiCollectionId) {
         const resp = await request({
             url: '/api/fetchMcpToolsApiCalls',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+        return resp
+    },
+
+    async getSwaggerDependencies(apiCollectionId) {
+        const resp = await request({
+            url: '/api/getSwaggerDependencies',
             method: 'post',
             data: {
                 apiCollectionId: apiCollectionId

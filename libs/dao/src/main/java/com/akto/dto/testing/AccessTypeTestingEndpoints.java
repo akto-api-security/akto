@@ -39,11 +39,11 @@ public class AccessTypeTestingEndpoints extends TestingEndpoints {
             return false;
         }
 
-        // Special case: if only THIRD_PARTY is selected, exclude APIs that also have PUBLIC
+        // Special case: if only THIRD_PARTY is selected, match APIs with exactly one entry: THIRD_PARTY
         boolean onlyThirdParty = apiAccessTypes.size() == 1 && apiAccessTypes.contains("THIRD_PARTY");
         if (onlyThirdParty) {
-            return apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.THIRD_PARTY)
-                && !apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.PUBLIC);
+            return apiInfo.getApiAccessTypes().size() == 1
+                && apiInfo.getApiAccessTypes().contains(ApiInfo.ApiAccessType.THIRD_PARTY);
         }
 
         for (String accessTypeStr : apiAccessTypes) {
@@ -89,12 +89,12 @@ public class AccessTypeTestingEndpoints extends TestingEndpoints {
             return MCollection.noMatchFilter;
         }
 
-        // Special case: if only THIRD_PARTY is selected, exclude APIs that also have PUBLIC
+        // Special case: if only THIRD_PARTY is selected, match APIs with exactly one entry: THIRD_PARTY
         Bson accessTypeFilter;
         if (accessTypeEnums.size() == 1 && accessTypeEnums.contains(ApiInfo.ApiAccessType.THIRD_PARTY)) {
             accessTypeFilter = Filters.and(
-                Filters.in(ApiInfo.API_ACCESS_TYPES, accessTypeEnums),
-                Filters.nin(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.PUBLIC)
+                Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY),
+                Filters.size(ApiInfo.API_ACCESS_TYPES, 1)
             );
         } else {
             accessTypeFilter = Filters.in(ApiInfo.API_ACCESS_TYPES, accessTypeEnums);

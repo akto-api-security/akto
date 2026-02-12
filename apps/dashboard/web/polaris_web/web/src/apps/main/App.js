@@ -27,9 +27,11 @@ import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
 import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
 import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
+import ModuleInfoPage from "../dashboard/pages/settings/module_info/ModuleInfoPage";
 import About from "../dashboard/pages/settings/about/About";
 import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
+import TrafficCollectorsMetrics from "../dashboard/pages/settings/metrics/TrafficCollectorsMetrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import PromptHardening from "../dashboard/pages/prompt_hardening/PromptHardening";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
@@ -382,6 +384,10 @@ const router = createBrowserRouter([
                         element: <Metrics/>,
                     },
                     {
+                        path: "traffic-collectors-metrics",
+                        element: <TrafficCollectorsMetrics/>,
+                    },
+                    {
                         path: "integrations/burp",
                         element: <BurpSuite/>,
                     },
@@ -508,6 +514,10 @@ const router = createBrowserRouter([
                     {
                         path: "logs",
                         element: <HealthLogs/>,
+                    },
+                    {
+                        path: "module-info",
+                        element: <ModuleInfoPage/>,
                     },
                     {
                         path: "auth-types",

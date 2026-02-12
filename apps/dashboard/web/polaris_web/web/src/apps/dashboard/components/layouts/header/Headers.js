@@ -340,7 +340,12 @@ export default function Header() {
                             <Box minWidth='170px'>
                                 <Dropdown
                                     menuItems={[
-                                        { value: "API Security", label: "API Security", id: "api-security" },
+                                        {
+                                            value: "API Security",
+                                            label: "API Security",
+                                            id: "api-security",
+                                            helpText: "Discover and Secure Your APIs"
+                                        },
                                         {
                                             value: "Agentic Security",
                                             label: "Akto ARGUS",
@@ -353,7 +358,12 @@ export default function Header() {
                                             id: "endpoint-security",
                                             helpText: "Agentic AI Security for Employee Endpoints"
                                         },
-                                        { value: "DAST", label: "DAST", id: "dast" },
+                                        {
+                                            value: "DAST",
+                                            label: "DAST",
+                                            id: "dast",
+                                            helpText: "Scan Your Apps for Vulnerabilities"
+                                        },
                                     ]}
                                     initial={dropdownInitial}
                                     selected={(val) => handleDashboardChange(val)}
