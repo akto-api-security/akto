@@ -4,7 +4,6 @@ import com.akto.PayloadEncodeUtil;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
@@ -48,9 +47,6 @@ import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
-import com.mongodb.client.model.Projections;
 
 import static com.akto.test_editor.execution.Build.modifyRequest;
 import com.akto.testing.kafka_utils.TestingConfigurations;
