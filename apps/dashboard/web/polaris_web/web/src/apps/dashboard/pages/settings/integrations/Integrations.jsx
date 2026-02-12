@@ -186,6 +186,12 @@ function Integrations() {
       source: '/public/cloudflareWaf.png'
     }
 
+    let wizObj = {
+        id: 'wiz',
+        name:'Wiz',
+        source: '/public/wiz_logo.svg'
+    }
+
     let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, googleWorkSpaceObj]
     const [currItems , setCurrentItems] = useState(getTabItems('all'))
     const tabs = [
@@ -248,7 +254,7 @@ function Integrations() {
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
     const aiItems = [/* aktoGptObj, */ agentConfigObj, mcpRegistryObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
-    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj];
+    const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj, wizObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
     const siemItems = [splunkObj, datadogObj];
     switch (tabId) {
