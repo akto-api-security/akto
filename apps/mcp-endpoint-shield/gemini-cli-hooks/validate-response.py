@@ -138,10 +138,8 @@ def build_ingestion_payload(
         "candidates": [
             {
                 "content": {"role": "model", "parts": [full_response_text]},
-                "finishReason": "STOP",
             }
-        ],
-        "text": full_response_text,
+        ]
     }
     if usage_metadata:
         llm_response["usageMetadata"] = usage_metadata
