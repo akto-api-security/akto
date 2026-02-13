@@ -27,7 +27,20 @@ const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsL
                     if (part.length > 2) { data = await sharedIconCacheService.getIconByKeyword(part); if (data) break; }
                 }
             }
-            if (data && mounted) setIconData(data);
+            if (data && mounted) { setIconData(data); return; }
+            // Fallback for API Security/DAST: probe favicon.ico directly
+            // Unlike Google's favicon service, this will fail for domains without a real favicon
+            if (!data && hostName?.trim() && mounted && (isApiSecurityCategory() || isDastCategory())) {
+                const full = hostName.replace(/^(https?:\/\/)/, '').split('/')[0];
+                const parts = full.split('.');
+                const root = parts.length > 2 ? parts.slice(-2).join('.') : full;
+                if (root) {
+                    const img = new Image();
+                    img.onload = () => { if (mounted) setFaviconUrl(sharedIconCacheService.getFaviconUrl(root)); };
+                    img.onerror = () => { /* no favicon — falls through to ListBulletsIcon */ };
+                    img.src = `https://${root}/favicon.ico`;
+                }
+            }
         })();
         return () => { mounted = false; };
     }, [hostName, assetTagValue]);
