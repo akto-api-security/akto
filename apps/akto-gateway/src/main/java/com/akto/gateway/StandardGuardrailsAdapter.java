@@ -35,12 +35,15 @@ public class StandardGuardrailsAdapter implements GuardrailsAdapter {
         logger.debug("Extracted standard payload (length: {})",
                 payload != null ? payload.length() : 0);
 
+        // Extract contextSource from request, default to "AGENTIC" if not provided
+        String contextSource = extractContextSource(request);
+
         // Format the API request for /validate/request endpoint
         Map<String, Object> apiRequest = new HashMap<>();
         apiRequest.put("payload", payload != null ? payload : "");
-        apiRequest.put("contextSource", "AGENTIC");
+        apiRequest.put("contextSource", contextSource);
 
-        logger.debug("Formatted API request for guardrails service");
+        logger.debug("Formatted API request for guardrails service with contextSource: {}", contextSource);
         return apiRequest;
     }
 
@@ -74,5 +77,22 @@ public class StandardGuardrailsAdapter implements GuardrailsAdapter {
             logger.warn("Failed to extract payload: {}", e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Extract contextSource from request map
+     * Returns the contextSource value if present, defaults to "AGENTIC"
+     */
+    private String extractContextSource(Map<String, Object> request) {
+        if (request == null) {
+            return "AGENTIC";
+        }
+
+        Object contextSource = request.get("contextSource");
+        if (contextSource instanceof String) {
+            return (String) contextSource;
+        }
+
+        return "AGENTIC";
     }
 }
