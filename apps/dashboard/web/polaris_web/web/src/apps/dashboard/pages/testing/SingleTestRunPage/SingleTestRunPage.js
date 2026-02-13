@@ -366,6 +366,28 @@ function SingleTestRunPage() {
             console.error("Error fetching collection endpoints:", error);
           }
         }
+      } else if (testingEndpoints.type === "MULTI_COLLECTION" && testingEndpoints.apiCollectionIds) {
+        try {
+          let allEndpoints = [];
+          for (const collectionId of testingEndpoints.apiCollectionIds) {
+            try {
+              const response = await observeApi.fetchApiInfosForCollection(collectionId);
+              if (response?.apiInfoList) {
+                allEndpoints = allEndpoints.concat(response.apiInfoList);
+              }
+            } catch (error) {
+              console.error(`Error fetching collection ${collectionId} endpoints:`, error);
+            }
+          }
+
+          const limitedEndpoints = allEndpoints.slice(0, 5000);
+          const limitedEndpointsIds = limitedEndpoints.map(endpoint => endpoint.id);
+          populateTestingEndpointsApisList(limitedEndpointsIds);
+
+          apiEndpoints = getApiEndpointsMap(limitedEndpoints, testingEndpoints.type);
+        } catch (error) {
+          console.error("Error fetching multi-collection endpoints:", error);
+        }
       } else if (testingEndpoints.type === "CUSTOM"
         && testingEndpoints.apisList) {
         const limitedApis = testingEndpoints.apisList.slice(0, 5000);
@@ -387,7 +409,7 @@ function SingleTestRunPage() {
   }
 
   const getApiEndpointsMap = (endpoints, type) => {
-    if (type === null || type === undefined || type === "COLLECTION_WISE") {
+    if (type === null || type === undefined || type === "COLLECTION_WISE" || type === "MULTI_COLLECTION") {
       return endpoints.map(endpoint => ({
         label: endpoint.id.url,
         value: endpoint.id.url
@@ -775,6 +797,10 @@ function SingleTestRunPage() {
       return testingEndpoints.apiCollectionId;
     }
 
+    if (testingEndpoints.type === "MULTI_COLLECTION") {
+      return testingEndpoints.apiCollectionIds;
+    }
+
     return (testingEndpoints.apisList?.length > 0) ? testingEndpoints.apisList[0].apiCollectionId : undefined;
   }
 
@@ -1024,12 +1050,23 @@ function SingleTestRunPage() {
             <Text color="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
           </HorizontalStack>
           <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
-          <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
-            <HorizontalStack gap={"1"}>
-              <Box><Icon color="subdued" source={ArchiveMinor} /></Box>
-              <Text color="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
-            </HorizontalStack>
-          </Link>
+          {selectedTestRun?.testingEndpoints?.type === "MULTI_COLLECTION" && Array.isArray(selectedTestRun?.testingEndpoints?.apiCollectionIds) ? (
+            selectedTestRun.testingEndpoints.apiCollectionIds.map((cid, idx) => (
+              <Link key={cid} monochrome target="_blank" url={"/dashboard/observe/inventory/" + cid} removeUnderline>
+                <HorizontalStack gap={"1"}>
+                  <Box><Icon color="subdued" source={ArchiveMinor} /></Box>
+                  <Text color="subdued" variant="bodyMd">{collectionsMap[cid]}</Text>
+                </HorizontalStack>
+              </Link>
+            ))
+          ) : (
+            <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
+              <HorizontalStack gap={"1"}>
+                <Box><Icon color="subdued" source={ArchiveMinor} /></Box>
+                <Text color="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
+              </HorizontalStack>
+            </Link>
+          )}
           <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
           <HorizontalStack gap={"1"}>
             <Box><Icon color="subdued" source={PriceLookupMinor} /></Box>
@@ -1228,7 +1265,14 @@ function SingleTestRunPage() {
       {
         content: 'See ' + mapLabel("APIs", getDashboardCategory()),
         icon: ViewMajor,
-        onAction: () => { setShowTestingEndpointsModal(true) }
+        onAction: () => {
+          if (selectedTestRun?.testingEndpoints?.type === "MULTI_COLLECTION" && Array.isArray(selectedTestRun?.testingEndpoints?.apiCollectionIds)) {
+            // Show modal for all collections
+            setShowTestingEndpointsModal({ multi: true, collectionIds: selectedTestRun.testingEndpoints.apiCollectionIds });
+          } else {
+            setShowTestingEndpointsModal({ multi: false, collectionId: selectedTestRun?.apiCollectionId });
+          }
+        }
       },
       {
         content: 'Re-Calculate Issues Count',
