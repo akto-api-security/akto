@@ -25,7 +25,12 @@ const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsL
                     if (part.length > 2) { data = await sharedIconCacheService.getIconByKeyword(part); if (data) break; }
                 }
             }
-            if (data && mounted) setIconData(data);
+            if (data && mounted) { setIconData(data); return; }
+            // Fallback: use hostName as domain for favicon if no icon found
+            if (!data && hostName?.trim() && mounted) {
+                const domain = hostName.replace(/^(https?:\/\/)/, '').split('/')[0];
+                if (domain) { setFaviconUrl(sharedIconCacheService.getFaviconUrl(domain)); return; }
+            }
         })();
         return () => { mounted = false; };
     }, [hostName, assetTagValue]);
