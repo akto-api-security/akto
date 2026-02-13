@@ -174,13 +174,12 @@ def build_ingestion_payload(
 ) -> Dict[str, Any]:
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
-        tags["ai-agent"] = "gemini"
+        tags["ai-agent"] = "geminicli"
         tags["source"] = "ENDPOINT"
 
     request_metadata = {
         "model": model or "",
         "tag": tags,
-        "interaction_type": "chat",
     }
     if MODE == "atlas":
         request_metadata["machine_id"] = os.getenv("DEVICE_ID") or get_machine_id()
@@ -322,7 +321,3 @@ def main():
 
     sys.stdout.write(json.dumps({}))
     sys.exit(0)
-
-
-if __name__ == "__main__":
-    main()
