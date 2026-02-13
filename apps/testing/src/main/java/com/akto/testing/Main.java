@@ -1039,10 +1039,12 @@ public class Main {
             MultiCollectionTestingEndpoints multiCollectionTestingEndpoints = (MultiCollectionTestingEndpoints) testingEndpoints;
             List<Integer> collectionIds = multiCollectionTestingEndpoints.getApiCollectionIds();
             List<String> collectionNames = new ArrayList<>();
-            for (Integer colId : collectionIds) {
-                ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(colId);
-                if (apiCollection != null) {
-                    collectionNames.add(apiCollection.getName());
+            if (collectionIds != null) {
+                for (Integer colId : collectionIds) {
+                    ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(colId);
+                    if (apiCollection != null) {
+                        collectionNames.add(apiCollection.getName());
+                    }
                 }
             }
             if (!collectionNames.isEmpty()) {
