@@ -4,7 +4,7 @@ import { AutomationMajor, MagicMajor } from '@shopify/polaris-icons';
 import IconCacheService from "@/services/IconCacheService";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import LaptopIcon from "@/assets/Laptop.svg";
-import ListBulletsIcon from "@/assets/list-bullets-duotone.svg";
+import HardDrivesIcon from "@/assets/hard-drives-duotone.svg";
 import { getDomainForFavicon } from "../../pages/observe/agentic/mcpClientHelper";
 import { isApiSecurityCategory, isDastCategory } from "../../../main/labelHelper";
 
@@ -37,7 +37,7 @@ const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsL
                 if (root) {
                     const img = new Image();
                     img.onload = () => { if (mounted) setFaviconUrl(sharedIconCacheService.getFaviconUrl(root)); };
-                    img.onerror = () => { /* no favicon — falls through to ListBulletsIcon */ };
+                    img.onerror = () => { /* no favicon — falls through to HardDrivesIcon */ };
                     img.src = `https://${root}/favicon.ico`;
                 }
             }
@@ -49,7 +49,7 @@ const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsL
     if (faviconUrl) return <Avatar source={faviconUrl} shape="square" size="extraSmall" />;
 
     // API Security and DAST fallback
-    if (isApiSecurityCategory() || isDastCategory()) return <Avatar source={ListBulletsIcon} shape="square" size="extraSmall" />;
+    if (isApiSecurityCategory() || isDastCategory()) return <Avatar source={HardDrivesIcon} shape="square" size="extraSmall" />;
 
     // Argus / Atlas fallbacks
     if (tagsList?.some(t => t.name === "gen-ai")) return <Icon source={tagsList.some(t => t.name === "AI Agent") ? AutomationMajor : MagicMajor} color="base" />;
