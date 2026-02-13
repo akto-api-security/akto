@@ -48,6 +48,7 @@ import com.akto.rules.RequiredConfigs;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.TestingUtilsSingleton;
+import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
@@ -286,6 +287,10 @@ public class SaveTestEditorAction extends UserAction {
     List<AgentConversationResult> agentConversationResults;
 
     public String runTestForGivenTemplate() {
+        // Role cache is static and shared across accounts; clear at entry point so this request
+        // does not use a role cached from a previous request (possibly another account).
+        Executor.clearRoleCache();
+
         TestExecutor executor = new TestExecutor();
         TestConfig testConfig;
         try {
