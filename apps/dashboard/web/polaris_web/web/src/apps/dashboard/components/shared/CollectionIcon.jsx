@@ -27,14 +27,7 @@ const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsL
                     if (part.length > 2) { data = await sharedIconCacheService.getIconByKeyword(part); if (data) break; }
                 }
             }
-            if (data && mounted) { setIconData(data); return; }
-            // Fallback: use root domain from hostName for favicon (API Security and DAST only)
-            if (!data && hostName?.trim() && mounted && (isApiSecurityCategory() || isDastCategory())) {
-                const full = hostName.replace(/^(https?:\/\/)/, '').split('/')[0];
-                const parts = full.split('.');
-                const root = parts.length > 2 ? parts.slice(-2).join('.') : full;
-                if (root) { setFaviconUrl(sharedIconCacheService.getFaviconUrl(root)); return; }
-            }
+            if (data && mounted) setIconData(data);
         })();
         return () => { mounted = false; };
     }, [hostName, assetTagValue]);
