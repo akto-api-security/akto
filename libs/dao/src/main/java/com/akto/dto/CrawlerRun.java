@@ -78,6 +78,9 @@ public class CrawlerRun {
     public static final String TEST_ROLE_HEX_ID = "testRoleHexId";
     private String testRoleHexId;
 
+    public static final String USER_PROMPT = "userPrompt";
+    private String userPrompt;
+
     public CrawlerRun() {
     }
 
@@ -106,6 +109,7 @@ public class CrawlerRun {
                 ", outScopeUrls=" + outScopeUrls +
                 ", status='" + status.name() + '\'' +
                 ", moduleName='" + moduleName + '\'' +
+                ", userPrompt='" + userPrompt + '\'' +
                 ", runTestAfterCrawling='" + runTestAfterCrawling + '\'' +
                 '}';
     }

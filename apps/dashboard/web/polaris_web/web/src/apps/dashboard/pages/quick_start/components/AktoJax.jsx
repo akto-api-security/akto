@@ -41,6 +41,7 @@ const AktoJax = () => {
     const [runTestAfterCrawling, setRunTestAfterCrawling] = useState(false);
     const [selectedMiniTestingService, setSelectedMiniTestingService] = useState('');
     const [collectionName, setCollectionName] = useState('');
+    const [userPrompt, setUserPrompt] = useState('');
 
     const [availableModules, setAvailableModules] = useState([])
     const [selectedModule, setSelectedModule] = useState("")
@@ -86,7 +87,7 @@ const AktoJax = () => {
         });
 
         setLoading(true)
-        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule, customHeadersMap, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName).then((res) => {
+        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule, customHeadersMap, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName, userPrompt).then((res) => {
             func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
         }).catch((err) => {
         }).finally(() => {
@@ -102,6 +103,7 @@ const AktoJax = () => {
             setUrlTemplatePatterns('')
             setApplicationPages('')
             setCollectionName('')
+            setUserPrompt('')
         })
     }
 
@@ -137,6 +139,7 @@ const AktoJax = () => {
             setRunTestAfterCrawling(duplicateScanData.runTestAfterCrawling || false)
             setSelectedMiniTestingService(duplicateScanData.selectedMiniTestingService || '')
             setApiKey(duplicateScanData.apiKey || '')
+            setUserPrompt(duplicateScanData.userPrompt || '')
             setCollectionName(duplicateScanData.collectionName || '')
 
             // Convert custom headers: object → array
@@ -197,6 +200,17 @@ const AktoJax = () => {
             <CustomHeadersInput
                 customHeaders={customHeaders}
                 setCustomHeaders={setCustomHeaders}
+            />
+
+            <Box paddingBlockStart={3}><Divider /></Box>
+
+            <TextField
+                label="Custom prompt for crawl (Optional)"
+                value={userPrompt}
+                onChange={(value) => setUserPrompt(value)}
+                placeholder='E.g. Focus on crawling the login and payment pages'
+                helpText="This prompt will be used to guide the crawler to focus on specific areas of your application. It can help improve crawl efficiency and ensure critical paths are thoroughly tested."
+                multiline={true}
             />
 
             <Box paddingBlockStart={3}><Divider /></Box>

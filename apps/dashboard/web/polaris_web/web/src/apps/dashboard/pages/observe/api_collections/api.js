@@ -71,6 +71,16 @@ export default {
             data: { crawlId }
         })
     },
+    getLatestCrawlerFrame(crawlId) {
+        return request({
+            url: '/api/getLatestCrawlerFrame',
+            method: 'post',
+            data: { crawlId }
+        }).then(resp => {
+            // Parse the JSON string response
+            return typeof resp === 'string' ? JSON.parse(resp) : resp
+        })
+    },
     findMissingUrls(missingUrls){
         return request({
             url: '/api/findMissingUrls',

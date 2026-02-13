@@ -46,7 +46,7 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, s
                 />
             </HorizontalStack>
 
-            <TextField
+            {/* <TextField
                 label={
                     <HorizontalStack gap="1">
                         <Text>URL Template Patterns</Text>
@@ -58,7 +58,7 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, s
                 placeholder="URL patterns to make templates (eg: /api/users/*, /products/*). Separate multiple patterns with a comma."
                 value={urlTemplatePatterns}
                 onChange={(value) => setUrlTemplatePatterns(value)}
-            />
+            /> */}
 
             <TextField
                 label={
