@@ -1,10 +1,10 @@
-import { Box, Checkbox, HorizontalStack, Icon, Text, TextField, Tooltip, VerticalStack } from '@shopify/polaris'
+import { Box, Checkbox, HorizontalStack, Icon, Select, Text, TextField, Tooltip, VerticalStack } from '@shopify/polaris'
 import { InfoMinor } from '@shopify/polaris-icons'
 import React, { useEffect, useState } from 'react'
 import Dropdown from '../../../components/layouts/Dropdown'
 import testingApi from '../../testing/api';
 
-const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, setUrlTemplatePatterns, applicationPages, setApplicationPages, maxPageVisits, setMaxPageVisits, domLoadTimeout, setDomLoadTimeout, waitAfterEvent, setWaitAfterEvent, enableJsRendering, setEnableJsRendering, parseSoapServices, setParseSoapServices, parseRestServices, setParseRestServices, clickExternalLinks, setClickExternalLinks, crawlingTime, setCrawlingTime, runTestAfterCrawling, setRunTestAfterCrawling, selectedMiniTestingService, setSelectedMiniTestingService, enableAiJsDiscovery, setEnableAiJsDiscovery }) => {
+const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, setUrlTemplatePatterns, applicationPages, setApplicationPages, maxPageVisits, setMaxPageVisits, domLoadTimeout, setDomLoadTimeout, waitAfterEvent, setWaitAfterEvent, enableJsRendering, setEnableJsRendering, parseSoapServices, setParseSoapServices, parseRestServices, setParseRestServices, clickExternalLinks, setClickExternalLinks, crawlingTime, setCrawlingTime, runTestAfterCrawling, setRunTestAfterCrawling, selectedMiniTestingService, setSelectedMiniTestingService, enableAiJsDiscovery, setEnableAiJsDiscovery, crawlMode, setCrawlMode }) => {
     const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([]);
     const handleMiniTestingServiceChange = (value) => {
         setSelectedMiniTestingService(value)
@@ -46,7 +46,7 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, s
                 />
             </HorizontalStack>
 
-            <TextField
+            {/* <TextField
                 label={
                     <HorizontalStack gap="1">
                         <Text>URL Template Patterns</Text>
@@ -58,7 +58,7 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, s
                 placeholder="URL patterns to make templates (eg: /api/users/*, /products/*). Separate multiple patterns with a comma."
                 value={urlTemplatePatterns}
                 onChange={(value) => setUrlTemplatePatterns(value)}
-            />
+            /> */}
 
             <TextField
                 label={
@@ -157,6 +157,21 @@ const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, urlTemplatePatterns, s
                         />
                     )}
                 </HorizontalStack>
+                {window?.STIGG_FEATURE_WISE_ALLOWED?.AI_DAST?.isGranted && (
+                    <Box maxWidth="300px">
+                        <Select
+                            label="Crawl mode"
+                            helpText="DETERMINISTIC = rule-based crawl (default). AGENTIC = AI agent drives the browser. HYBRID = deterministic with AI on stuck pages."
+                            options={[
+                                { label: 'Deterministic', value: 'DETERMINISTIC' },
+                                { label: 'AI Agentic', value: 'AGENTIC' },
+                                { label: 'Hybrid', value: 'HYBRID' },
+                            ]}
+                            value={crawlMode}
+                            onChange={(value) => setCrawlMode(value)}
+                        />
+                    </Box>
+                )}
                 {runTestAfterCrawling && miniTestingServiceNames.length > 0 && (
                     <Dropdown
                         label="Select testing module:"

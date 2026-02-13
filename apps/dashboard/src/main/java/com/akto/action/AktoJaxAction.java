@@ -46,6 +46,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
+import com.akto.websocket.CrawlerFrameCache;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -97,6 +98,16 @@ public class AktoJaxAction extends UserAction {
     private boolean enableAiJsDiscovery;
     @Getter @Setter
     private String crawlUrlsBatch;
+    @Getter @Setter
+    private String userPrompt;
+    @Getter @Setter
+    private String crawlMode;
+
+    // Fields for live browser view
+    private String frameData;
+    private String currentUrl;
+    @Getter @Setter
+    private String latestFrameJson;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoJaxAction.class, LogDb.DASHBOARD);
 
@@ -256,6 +267,8 @@ public class AktoJaxAction extends UserAction {
                 crawlerRun.setUrlTemplatePatterns(urlTemplatePatterns);
                 crawlerRun.setApplicationPages(applicationPages);
                 crawlerRun.setEnableAiJsDiscovery(enableAiJsDiscovery);
+                crawlerRun.setUserPrompt(userPrompt);
+                crawlerRun.setCrawlMode(crawlMode);
 
                 if(runTestAfterCrawling && selectedMiniTestingService != null && !selectedMiniTestingService.isEmpty()) {
                     crawlerRun.setSelectedMiniTestingService(selectedMiniTestingService);
@@ -269,7 +282,7 @@ public class AktoJaxAction extends UserAction {
                 // Fallback to internal DAST API
                 initiateInternalCrawl(crawlId, hostname, username, password, apiKey,
                     dashboardUrl, collectionId, cookies, crawlingTime, outscopeUrls, runTestAfterCrawling,
-                    urlTemplatePatterns, applicationPages, testRoleHexId, enableAiJsDiscovery);
+                    urlTemplatePatterns, applicationPages, testRoleHexId, enableAiJsDiscovery, userPrompt, crawlMode);
             }
 
             // Send Slack alert for crawler initiation
@@ -382,7 +395,8 @@ public class AktoJaxAction extends UserAction {
                                      int collectionId, String cookies, int crawlingTime,
                                      String outscopeUrls, boolean runTestAfterCrawling,
                                      String urlTemplatePatterns, String applicationPages,
-                                     String testRoleHexId, boolean enableAiJsDiscovery) throws Exception {
+                                     String testRoleHexId, boolean enableAiJsDiscovery,
+                                     String userPrompt, String crawlMode) throws Exception {
         String url = System.getenv("AKTOJAX_SERVICE_URL") + "/triggerCrawler";
         loggerMaker.infoAndAddToDb("Using internal DAST crawler service: " + url);
 
@@ -393,6 +407,7 @@ public class AktoJaxAction extends UserAction {
         requestBody.put("collectionId", collectionId);
         requestBody.put("accountId", Context.accountId.get());
         requestBody.put("outscopeUrls", outscopeUrls);
+        requestBody.put("userPrompt", userPrompt);
         requestBody.put("crawlId", crawlId);
         requestBody.put("crawlingTime", crawlingTime);
 
@@ -418,6 +433,9 @@ public class AktoJaxAction extends UserAction {
         }
 
         requestBody.put("enableAiJsDiscovery", enableAiJsDiscovery);
+        if (!StringUtils.isEmpty(crawlMode)) {
+            requestBody.put("crawlMode", crawlMode);
+        }
 
         String reqData = requestBody.toString();
         loggerMaker.infoAndAddToDb("Internal DAST crawler request data: " + reqData);
@@ -451,6 +469,8 @@ public class AktoJaxAction extends UserAction {
             crawlerRun.setUrlTemplatePatterns(urlTemplatePatterns);
             crawlerRun.setApplicationPages(applicationPages);
             crawlerRun.setEnableAiJsDiscovery(enableAiJsDiscovery);
+            crawlerRun.setUserPrompt(userPrompt);
+            crawlerRun.setCrawlMode(crawlMode);
 
             if(runTestAfterCrawling && selectedMiniTestingService != null && !selectedMiniTestingService.isEmpty()) {
                 crawlerRun.setSelectedMiniTestingService(selectedMiniTestingService);
@@ -715,17 +735,23 @@ public class AktoJaxAction extends UserAction {
                         Updates.set(CrawlerRun.STATUS, status),
                         Updates.set(CrawlerRun.END_TIMESTAMP, Context.now())
                 );
+                // Clear frame from memory when crawl completes
+                CrawlerFrameCache.instance.clearFrame(crawlId);
             } else if (status.equals(CrawlerRun.CrawlerRunStatus.FAILED.name())) {
                 updates = Updates.combine(
                         Updates.set(CrawlerRun.STATUS, status),
                         Updates.set(CrawlerRun.END_TIMESTAMP, Context.now()),
                         Updates.set(CrawlerRun.ERROR_MESSAGE, errorMessage)
                 );
+                // Clear frame from memory when crawl fails
+                CrawlerFrameCache.instance.clearFrame(crawlId);
             } else if (status.equals(CrawlerRun.CrawlerRunStatus.STOPPED.name())) {
                 updates = Updates.combine(
                         Updates.set(CrawlerRun.STATUS, status),
                         Updates.set(CrawlerRun.END_TIMESTAMP, Context.now())
                 );
+                // Clear frame from memory when crawl is stopped
+                CrawlerFrameCache.instance.clearFrame(crawlId);
             }
 
             CrawlerRunDao.instance.updateOne(
@@ -745,6 +771,61 @@ public class AktoJaxAction extends UserAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in updateCrawlerStatus");
             return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Upload crawler frame from DAST module
+     * Stores latest frame in memory for live browser view
+     */
+    public String uploadCrawlerFrame() {
+        try {
+            if (crawlId == null || frameData == null) {
+                addActionError("crawlId and frameData are required");
+                return ERROR.toUpperCase();
+            }
+
+            // Create frame JSON
+            JSONObject frame = new JSONObject();
+            frame.put("crawlId", crawlId);
+            frame.put("frameData", frameData);
+            frame.put("currentUrl", currentUrl);
+            frame.put("timestamp", timestamp > 0 ? timestamp : Context.now());
+
+            // Store in memory
+            CrawlerFrameCache.instance.storeFrame(crawlId, frame.toString());
+
+            loggerMaker.infoAndAddToDb("Frame uploaded for crawl: " + crawlId, LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error uploading frame: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Failed to upload frame");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Get latest crawler frame for frontend
+     * Returns latest frame for given crawlId
+     */
+    public String getLatestCrawlerFrame() {
+        try {
+            if (crawlId == null) {
+                addActionError("crawlId is required");
+                return ERROR.toUpperCase();
+            }
+
+            latestFrameJson = CrawlerFrameCache.instance.getLatestFrame(crawlId);
+
+            if (latestFrameJson == null) {
+                latestFrameJson = "{}"; // Return empty object if no frame yet
+            }
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching frame: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Failed to fetch frame");
+            return ERROR.toUpperCase();
         }
     }
 
@@ -938,5 +1019,29 @@ public class AktoJaxAction extends UserAction {
 
     public void setCollectionName(String collectionName) {
         this.collectionName = collectionName;
+    }
+
+    public String getFrameData() {
+        return frameData;
+    }
+
+    public void setFrameData(String frameData) {
+        this.frameData = frameData;
+    }
+
+    public String getCurrentUrl() {
+        return currentUrl;
+    }
+
+    public void setCurrentUrl(String currentUrl) {
+        this.currentUrl = currentUrl;
+    }
+
+    public String getUserPrompt() {
+        return userPrompt;
+    }
+
+    public void setUserPrompt(String userPrompt) {
+        this.userPrompt = userPrompt;
     }
 }

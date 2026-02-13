@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { Box, IndexFiltersMode, Text, HorizontalStack, Badge, Card, VerticalStack, Divider } from "@shopify/polaris"
+import { Box, IndexFiltersMode, Text, HorizontalStack, Badge, Card, VerticalStack, Divider, Button } from "@shopify/polaris"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable"
 import func from "@/util/func"
 import api from "./api"
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered"
 import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
+import LiveBrowserView from './LiveBrowserView'
 
 const headers = [
     {
@@ -65,6 +66,8 @@ function DastProgressSingle() {
     const [data, setData] = useState([])
     const [crawlDetails, setCrawlDetails] = useState(null)
     const [scanMetadata, setScanMetadata] = useState(null)
+    const [showLiveBrowser, setShowLiveBrowser] = useState(false)
+    const [crawlerStatus, setCrawlerStatus] = useState(null)
 
     const fetchDastScan = async () => {
         try {
@@ -81,6 +84,7 @@ function DastProgressSingle() {
                     applicationPages: currentScan.applicationPages || "-",
                     urlTemplatePatterns: currentScan.urlTemplatePatterns || "-"
                 })
+                setCrawlerStatus(currentScan.status)
             }
 
             const crawlerUrls = resp || []
@@ -175,6 +179,11 @@ function DastProgressSingle() {
             title={
                 <Text variant="headingLg" as="h1">DAST Scan Details</Text>
             }
+            primaryAction={crawlerStatus === 'RUNNING' && (
+                <Button onClick={() => setShowLiveBrowser(!showLiveBrowser)}>
+                    {showLiveBrowser ? 'Hide Live View' : 'Show Live View'}
+                </Button>
+            )}
             components={[
                 crawlDetails && (
                     <Box paddingBlockEnd="4">
@@ -224,6 +233,14 @@ function DastProgressSingle() {
                         </Card>
                     </Box>
                 ),
+                showLiveBrowser && crawlerStatus === 'RUNNING' && (
+                    <Box paddingBlockEnd="4" key="live-view">
+                        <LiveBrowserView crawlId={crawlId} />
+                    </Box>
+                ),
+
+                // todo("dast graph")
+
                 <GithubSimpleTable
                     data={data}
                     sortOptions={sortOptions}

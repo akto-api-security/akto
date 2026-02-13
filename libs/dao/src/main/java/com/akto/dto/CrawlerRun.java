@@ -81,6 +81,12 @@ public class CrawlerRun {
     public static final String ENABLE_AI_JS_DISCOVERY = "enableAiJsDiscovery";
     private boolean enableAiJsDiscovery;
 
+    public static final String USER_PROMPT = "userPrompt";
+    private String userPrompt;
+
+    public static final String CRAWL_MODE = "crawlMode";
+    private String crawlMode;
+
     public CrawlerRun() {
     }
 
@@ -109,6 +115,7 @@ public class CrawlerRun {
                 ", outScopeUrls=" + outScopeUrls +
                 ", status='" + status.name() + '\'' +
                 ", moduleName='" + moduleName + '\'' +
+                ", userPrompt='" + userPrompt + '\'' +
                 ", runTestAfterCrawling='" + runTestAfterCrawling + '\'' +
                 '}';
     }
