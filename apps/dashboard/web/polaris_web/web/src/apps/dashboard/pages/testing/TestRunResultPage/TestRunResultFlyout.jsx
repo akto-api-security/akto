@@ -38,7 +38,7 @@ function isSkippedTestError(errorText) {
 }
 
 function TestRunResultFlyout(props) {
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, wizFindingUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -405,6 +405,14 @@ function TestRunResultFlyout(props) {
         }
     }
 
+    const handleWizFindingCreation = async () => {
+        await issuesApi.createWizFinding(issueDetails.id).then((res) => {
+            func.setToast(true, false, "Wiz finding created")
+        }).catch((err) => {
+            func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating wiz finding")
+        })
+    }
+
     const issues = [{
         content: 'False positive',
         onAction: () => { ignoreAction("False positive") }
@@ -663,6 +671,13 @@ function TestRunResultFlyout(props) {
                                 issueId={issueDetails.id}
                                 isDevRevModal={true}
                             />
+                           
+                            { window.WIZ_INTEGRATED === 'true' ? 
+                                <Button id={"create-wiz-finding-button"} primary onClick={handleWizFindingCreation} disabled={ wizFindingUrl !== "" || window.WIZ_INTEGRATED !== "true"}>
+                                    Create Wiz Finding
+                                </Button> 
+                                : <></>
+                            }
                         </HorizontalStack>
                     }
                 </HorizontalStack>
