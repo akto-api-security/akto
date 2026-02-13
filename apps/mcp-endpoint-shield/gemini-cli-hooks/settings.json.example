@@ -7,8 +7,8 @@
           {
             "name": "akto-validate-prompt",
             "type": "command",
-            "command": "python3 $GEMINI_PROJECT_DIR/.gemini/hooks/validate-prompt.py",
-            "timeout": 10000, #time is in ms
+            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-validate-prompt-wrapper.sh",
+            "timeout": 10000
             "description": "Validates prompts against Akto Guardrails before sending to Gemini"
           }
         ]
@@ -21,8 +21,8 @@
           {
             "name": "akto-validate-response",
             "type": "command",
-            "command": "python3 $GEMINI_PROJECT_DIR/.gemini/hooks/validate-response.py",
-            "timeout": 10000, #time is in ms
+            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-validate-response-wrapper.sh",
+            "timeout": 10000
             "description": "Sends prompt/response pairs to Akto for ingestion"
           }
         ]
