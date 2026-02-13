@@ -34,7 +34,7 @@ import ReactFlow, {
 
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
-import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../../main/labelHelper";
 import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
 import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
@@ -52,7 +52,7 @@ const API_COLLECTIONS_CACHE_DURATION_SECONDS = 5 * 60; // 5 minutes
 const COLLECTIONS_LAZY_RENDER_THRESHOLD = 100; // Collections count above which we use lazy rendering optimization
 
 const headers = [
-    ...((isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? [{
+    ...((isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory() || isApiSecurityCategory() || isDastCategory()) ? [{
         title: "",
         text: "",
         value: "iconComp",
@@ -319,11 +319,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             descriptionComp: (<Box maxWidth="350px"><Text>{c.description}</Text></Box>),
             outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
             username: getUsernameForCollection(c, usernameMap),
-        ...((tagsList.includes("mcp-server")) ? {
-            iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
-        } : (tagsList.includes("gen-ai")) ? {
-            iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
-        } : (tagsList.includes("browser-llm")) ? {
+        ...((tagsList.includes("mcp-server") || tagsList.includes("gen-ai") || tagsList.includes("browser-llm") || ((isApiSecurityCategory() || isDastCategory()) && c.hostName)) ? {
             iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
         } : {})
         };
@@ -1712,6 +1708,12 @@ function ApiCollections(props) {
             // Move source column after Endpoint ID
             modifiedHeaders = moveSourceColumnAfterEndpointId(modifiedHeaders);
         }
+
+        // For API Security and DAST, only show icons column on hostname tab
+        if ((isApiSecurityCategory() || isDastCategory()) && selectedTab !== 'hostname') {
+            modifiedHeaders = modifiedHeaders.filter(h => h.value !== 'iconComp');
+        }
+
         return modifiedHeaders;
     };
     const dynamicHeaders = getModifiedHeaders();

@@ -8,7 +8,8 @@ import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor,
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 import ShowListInBadge from "../../components/shared/ShowListInBadge";
-import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory } from "../../../main/labelHelper";
+import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../main/labelHelper";
+import { CollectionIcon } from "../../components/shared/CollectionIcon";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -587,8 +588,15 @@ const transform = {
                 ? <Text></Text>
                 : (isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>);
 
+            // Create iconComp for collections if not already present
+            const showIcon = isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory() || ((isApiSecurityCategory() || isDastCategory()) && c.hostName);
+            const iconComp = c.iconComp || (showIcon ? (
+                <Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>
+            ) : undefined);
+
             return{
                 ...c,
+                ...(iconComp ? { iconComp } : {}),
                 id: c.id,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
