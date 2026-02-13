@@ -50,7 +50,7 @@ public class WizIntegrationAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        //Verify credentials by getting OAuth token
+        // Verify credentials by getting OAuth token
         try {
             WizIntegrationUtils.generateAccessToken(clientId, clientSecret);
         } catch (Exception e) {
@@ -99,7 +99,7 @@ public class WizIntegrationAction extends UserAction {
     @Setter
     private TestingIssuesId testingIssuesId;
 
-    public String sendToWiz() {
+    public String createWizFinding() {
         return Action.SUCCESS.toUpperCase();
     }
 }
