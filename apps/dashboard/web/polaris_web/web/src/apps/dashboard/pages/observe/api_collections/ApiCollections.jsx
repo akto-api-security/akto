@@ -2,6 +2,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import RegistryBadge from "../../../components/shared/RegistryBadge";
+import RunTest from "./RunTest";
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
@@ -517,6 +518,8 @@ function ApiCollections(props) {
     const [analysisConversations, setAnalysisConversations] = useState([]);
     const [analysisLoading, setAnalysisLoading] = useState(false);
     const [analysisConversationId, setAnalysisConversationId] = useState(null);
+    const [showMultiCollectionRunTest, setShowMultiCollectionRunTest] = useState(false);
+    const [selectedCollectionIdsForTest, setSelectedCollectionIdsForTest] = useState([]);
 
     // const dummyData = dummyJson;
 
@@ -1331,6 +1334,18 @@ function ApiCollections(props) {
                 }
             )
         }
+
+        // Add Run Test button for multi-collection testing
+        if (selectedResources.length > 1) {
+            actions.push({
+                content:  "Run Test",
+                onAction: () => {
+                    setSelectedCollectionIdsForTest(selectedResources);
+                    setShowMultiCollectionRunTest(true);
+                }
+            })
+        }
+
         const bulkActionsOptions = [...actions];
         bulkActionsOptions.push(toggleEnvType)
         return bulkActionsOptions
@@ -1894,6 +1909,19 @@ function ApiCollections(props) {
                         </Box>
                     </Modal.Section>
                 </Modal>
+            )}
+            {showMultiCollectionRunTest && (
+                <RunTest
+                    apiCollectionIds={selectedCollectionIdsForTest}
+                    endpoints={[]}
+                    filtered={false}
+                    runTestFromOutside={true}
+                    closeRunTest={() => {
+                        setShowMultiCollectionRunTest(false);
+                        resetResourcesSelected();
+                    }}
+                    disabled={false}
+                />
             )}
         </>
     )
