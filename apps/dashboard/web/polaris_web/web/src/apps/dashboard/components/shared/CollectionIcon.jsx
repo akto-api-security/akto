@@ -28,11 +28,10 @@ const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsL
                 }
             }
             if (data && mounted) { setIconData(data); return; }
-            // Fallback: use root domain from hostName for favicon
-            if (!data && hostName?.trim() && mounted) {
+            // Fallback: use root domain from hostName for favicon (API Security and DAST only)
+            if (!data && hostName?.trim() && mounted && (isApiSecurityCategory() || isDastCategory())) {
                 const full = hostName.replace(/^(https?:\/\/)/, '').split('/')[0];
                 const parts = full.split('.');
-                // Extract root domain (e.g. "blinkrx.codes" from "api.staging.blinkrx.codes")
                 const root = parts.length > 2 ? parts.slice(-2).join('.') : full;
                 if (root) { setFaviconUrl(sharedIconCacheService.getFaviconUrl(root)); return; }
             }
