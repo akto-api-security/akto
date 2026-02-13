@@ -323,6 +323,7 @@ const transform = {
     obj['authError'] = authError; // For clean display near title/created by
     obj['metadata'] = func.flattenObject(filteredMetadata)
     obj['apiCollectionId'] = apiCollectionId
+    obj['testingEndpoints'] = data?.testingEndpoints
     obj['userEmail'] = data.userEmail
     obj['scan_frequency'] = getScanFrequency(data.periodInSeconds)
     obj['total_apis'] = testingRunResultSummary?.totalApis
