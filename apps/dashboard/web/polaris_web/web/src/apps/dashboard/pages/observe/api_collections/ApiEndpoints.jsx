@@ -1550,6 +1550,7 @@ function ApiEndpoints(props) {
             "lastSeenTs": "Last Seen",
             "detectedTs": "Discovered timestamp",
         }}
+        onExportCsv={() => exportCsv()}
     />,
     <ApiDetails
         key="api-details"

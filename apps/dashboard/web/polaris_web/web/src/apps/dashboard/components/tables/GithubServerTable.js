@@ -12,9 +12,12 @@ import {
   Tabs,
   LegacyTabs,
   Text,
-  Link} from '@shopify/polaris';
+  Link,
+  Button,
+  Tooltip} from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useMemo, useRef, useReducer } from 'react';
+import { createPortal } from 'react-dom';
 import "./style.css"
 import transform from '../../pages/observe/transform';
 import DropdownSearch from '../shared/DropdownSearch';
@@ -30,6 +33,8 @@ import values from "@/util/values"
 import { produce } from 'immer';
 import DateRangePicker from '../layouts/DateRangePicker';
 import SpinnerCentered from '../progress/SpinnerCentered';
+import { ImportMinor } from '@shopify/polaris-icons';
+import { saveAs } from 'file-saver';
 
 function GithubServerTable(props) {
 
@@ -44,6 +49,8 @@ function GithubServerTable(props) {
 
   const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
   const [hideFilter, setHideFilter] = useState(false)
+  const filtersWrapRef = useRef(null)
+  const [exportPortalTarget, setExportPortalTarget] = useState(null)
 
   const filtersMap = PersistStore(state => state.filtersMap)
   const setFiltersMap = PersistStore(state => state.setFiltersMap)
@@ -97,6 +104,16 @@ function GithubServerTable(props) {
   const [filterNegationState, setFilterNegationState] = useState({})
 
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.filterKey || e.value] = 'OR'; return map }, {})
+
+  useEffect(() => {
+    const actionWrap = filtersWrapRef.current?.querySelector('[class*="IndexFilters__ActionWrap"]')
+    if (!actionWrap) return
+    const target = document.createElement('span')
+    target.style.display = 'contents'
+    actionWrap.insertBefore(target, actionWrap.firstChild)
+    setExportPortalTarget(target)
+    return () => { target.remove(); setExportPortalTarget(null) }
+  }, [mode])
 
   useEffect(() => {
     const handleEsc = (event) => {
@@ -623,6 +640,21 @@ function GithubServerTable(props) {
       props.setSelectedResourcesForPrimaryAction(bulkActionResources)
     }
   }, [bulkActionResources, props.setSelectedResourcesForPrimaryAction])
+
+  const handleExportCsv = useCallback(() => {
+    if (props.onExportCsv) return props.onExportCsv()
+    const cols = props.headers.filter(x => x.text?.length > 0)
+    const csv = [
+      cols.map(x => x.text).join(","),
+      ...data.map(row => cols.map(x => {
+        const val = row[x.textValue || x.value]
+        return `"${val == null ? '-' : String(val).replace(/"/g, '""')}"`
+      }).join(","))
+    ].join("\r\n")
+    saveAs(new Blob([csv], { type: "text/csv;charset=UTF-8" }), `${props.csvFileName || "export"}.csv`)
+    func.setToast(true, false, "CSV exported successfully")
+  }, [props.onExportCsv, props.headers, props.csvFileName, data])
+
   return (
     <div className={tableClass} style={{display: "flex", flexDirection: "column", gap: "20px"}}>
       <LegacyCard>
@@ -630,32 +662,39 @@ function GithubServerTable(props) {
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
           <div>
             <LegacyCard.Section flush>
-              <IndexFilters
-                sortOptions={props.sortOptions}
-                sortSelected={sortSelected}
-                queryValue={queryValue}
-                queryPlaceholder={`Search in ${transform.formatNumberWithCommas(total)} ${total === 1 ? props.resourceName.singular : props.resourceName.plural}`}
-                onQueryChange={handleFiltersQueryChange}
-                onQueryClear={handleFiltersQueryClear}
-                {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}
-                onSort={setSortSelected}
-                cancelAction={{
-                  onAction: () => {},
-                  disabled: false,
-                  loading: false,
-                }}
-                tabs={props.tableTabs ? props.tableTabs : []}
-                canCreateNewView={false}
-                filters={filters}
-                appliedFilters={appliedFilters}
-                onClearAll={handleFiltersClearAll}
-                mode={mode}
-                setMode={setMode}
-                loading={props.loading || false}
-                selected={props?.selected}
-                onSelect={(x) => handleTabChange(x)}
-                hideFilters={hideFilter}
-              ></IndexFilters>
+              <span ref={filtersWrapRef}>
+                <IndexFilters
+                  sortOptions={props.sortOptions}
+                  sortSelected={sortSelected}
+                  queryValue={queryValue}
+                  queryPlaceholder={`Search in ${transform.formatNumberWithCommas(total)} ${total === 1 ? props.resourceName.singular : props.resourceName.plural}`}
+                  onQueryChange={handleFiltersQueryChange}
+                  onQueryClear={handleFiltersQueryClear}
+                  {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}
+                  onSort={setSortSelected}
+                  cancelAction={{
+                    onAction: () => {},
+                    disabled: false,
+                    loading: false,
+                  }}
+                  tabs={props.tableTabs ? props.tableTabs : []}
+                  canCreateNewView={false}
+                  filters={filters}
+                  appliedFilters={appliedFilters}
+                  onClearAll={handleFiltersClearAll}
+                  mode={mode}
+                  setMode={setMode}
+                  loading={props.loading || false}
+                  selected={props?.selected}
+                  onSelect={(x) => handleTabChange(x)}
+                  hideFilters={hideFilter}
+                />
+              </span>
+              {exportPortalTarget && data.length > 0 && createPortal(
+                <Tooltip content="Export as CSV" dismissOnMouseOut>
+                  <Button size="slim" icon={ImportMinor} onClick={handleExportCsv} accessibilityLabel="Export as CSV" />
+                </Tooltip>, exportPortalTarget
+              )}
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               <div className={tableHeightClass}>
               {props.loading && props.loadingText ? (
