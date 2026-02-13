@@ -75,32 +75,25 @@ public class GuardrailMetricsProcessor {
 
 
         for (DashboardMaliciousEvent event : allThreats) {
-            String label = event.getLabel();
-            boolean isGuardrail = "GUARDRAIL".equalsIgnoreCase(label);
-
             // 1. Count guardrail policies
-            if (isGuardrail) {
-                String filterId = event.getFilterId();
-                if (filterId != null && !filterId.isEmpty()) {
-                    policyCounts.put(filterId, policyCounts.getOrDefault(filterId, 0L) + 1);
-                }
+            String filterId = event.getFilterId();
+            if (filterId != null && !filterId.isEmpty()) {
+                policyCounts.put(filterId, policyCounts.getOrDefault(filterId, 0L) + 1);
             }
 
-            // 2. Collect data protection trends data (guardrail events only)
-            if (isGuardrail) {
-                long timestamp = event.getTimestamp();
-                if (timestamp > 0 && timestamp >= startTimestamp && timestamp <= endTimestamp) {
-                    String category = event.getSubCategory();
-                    if (category == null || category.isEmpty()) {
-                        category = event.getFilterId();
-                    }
-                    if (category == null || category.isEmpty()) {
-                        category = "Unknown";
-                    }
-
-                    categoryCounts.put(category, categoryCounts.getOrDefault(category, 0L) + 1);
-                    categoryTimestamps.computeIfAbsent(category, k -> new ArrayList<>()).add((int) timestamp);
+            // 2. Collect data protection trends data
+            long timestamp = event.getTimestamp();
+            if (timestamp > 0 && timestamp >= startTimestamp && timestamp <= endTimestamp) {
+                String category = event.getSubCategory();
+                if (category == null || category.isEmpty()) {
+                    category = event.getFilterId();
                 }
+                if (category == null || category.isEmpty()) {
+                    category = "Unknown";
+                }
+
+                categoryCounts.put(category, categoryCounts.getOrDefault(category, 0L) + 1);
+                categoryTimestamps.computeIfAbsent(category, k -> new ArrayList<>()).add((int) timestamp);
             }
 
             // 3. Calculate average threat score (all events)
@@ -114,7 +107,6 @@ public class GuardrailMetricsProcessor {
             }
 
             // 4. Count sensitive data events
-            String filterId = event.getFilterId();
             String subCategory = event.getSubCategory();
             boolean isPIIFilter = ThreatDetectionConstants.PII_DATA_LEAK_FILTER_ID.equals(filterId);
             boolean isPIISubCategory = subCategory != null &&
@@ -128,8 +120,8 @@ public class GuardrailMetricsProcessor {
                 successfulExploitCount++;
             }
 
-            // 6. Collect compliance data (guardrail events only)
-            if (isGuardrail && filterId != null && !filterId.isEmpty()) {
+            // 6. Collect compliance data
+            if (filterId != null && !filterId.isEmpty()) {
                 // Create unique endpoint identifier
                 String endpointKey = event.getMethod() + "|" + event.getUrl();
 
@@ -152,30 +144,28 @@ public class GuardrailMetricsProcessor {
                 }
             }
 
-            // 7. Collect attack flows for world map (guardrail events only)
-            if (isGuardrail) {
-                String sourceCountry = event.getCountry();
-                String destCountry = event.getDestCountry();
+            // 7. Collect attack flows for world map
+            String sourceCountry = event.getCountry();
+            String destCountry = event.getDestCountry();
 
-                if (sourceCountry != null && !sourceCountry.isEmpty() &&
-                    destCountry != null && !destCountry.isEmpty()) {
+            if (sourceCountry != null && !sourceCountry.isEmpty() &&
+                destCountry != null && !destCountry.isEmpty()) {
 
-                    String flowKey = sourceCountry + "|" + destCountry;
+                String flowKey = sourceCountry + "|" + destCountry;
 
-                    String attackType = event.getSubCategory();
-                    if (attackType == null || attackType.isEmpty()) {
-                        attackType = event.getCategory();
-                    }
-                    if (attackType == null || attackType.isEmpty()) {
-                        attackType = "Unknown";
-                    }
-
-                    countryFlowAttackCounts.putIfAbsent(flowKey, new HashMap<>());
-                    Map<String, Long> attackCounts = countryFlowAttackCounts.get(flowKey);
-                    attackCounts.put(attackType, attackCounts.getOrDefault(attackType, 0L) + 1);
-
-                    countryFlowMapping.put(flowKey, sourceCountry + "|" + destCountry);
+                String attackType = event.getSubCategory();
+                if (attackType == null || attackType.isEmpty()) {
+                    attackType = event.getCategory();
                 }
+                if (attackType == null || attackType.isEmpty()) {
+                    attackType = "Unknown";
+                }
+
+                countryFlowAttackCounts.putIfAbsent(flowKey, new HashMap<>());
+                Map<String, Long> attackCounts = countryFlowAttackCounts.get(flowKey);
+                attackCounts.put(attackType, attackCounts.getOrDefault(attackType, 0L) + 1);
+
+                countryFlowMapping.put(flowKey, sourceCountry + "|" + destCountry);
             }
         }
 
