@@ -29,9 +29,5 @@ public class ThreatDetectionDaoInit {
             // api distribution data indices
             ApiDistributionDataDao.instance.createIndicesIfAbsent(accountId);
         } catch (Exception ignored) {}
-
-        try {
-            ActorInfoDao.instance.createIndicesIfAbsent(accountId);
-        } catch (Exception ignored) {}
     }
 }

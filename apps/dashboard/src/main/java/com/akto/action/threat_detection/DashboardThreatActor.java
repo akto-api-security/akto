@@ -7,7 +7,6 @@ import lombok.Setter;
 public class DashboardThreatActor {
 
   private String id;
-  private String objectId;  // MongoDB ObjectId hex string for cursor-based pagination
   private String latestApiEndpoint;
   private String latestApiIp;
   private Method latestApiMethod;
@@ -22,7 +21,6 @@ public class DashboardThreatActor {
 
   public DashboardThreatActor(
       String id,
-      String objectId,
       String latestApiEndpoint,
       String latestApiIp,
       Method latestApiMethod,
@@ -33,7 +31,6 @@ public class DashboardThreatActor {
       String latestMetadata) {
 
     this.id = id;
-    this.objectId = objectId;
     this.latestApiEndpoint = latestApiEndpoint;
     this.latestApiIp = latestApiIp;
     this.latestApiMethod = latestApiMethod;
@@ -50,14 +47,6 @@ public class DashboardThreatActor {
 
   public void setId(String id) {
     this.id = id;
-  }
-
-  public String getObjectId() {
-    return objectId;
-  }
-
-  public void setObjectId(String objectId) {
-    this.objectId = objectId;
   }
 
   public String getLatestApiEndpoint() {

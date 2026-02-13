@@ -96,7 +96,6 @@ message ListThreatActorsRequest {
   Filter filter = 4;
   uint32 start_ts = 5;
   uint32 end_ts = 6;
-  optional string cursor = 7;  // ObjectId hex string for cursor-based pagination (new flow)
 }
 
 message ListThreatActorResponse {
@@ -120,7 +119,6 @@ message ListThreatActorResponse {
     string latest_subcategory = 8;
     string latest_api_host = 9;
     string latest_metadata = 10;
-    optional string object_id = 11;  // MongoDB ObjectId hex string for cursor-based pagination
   }
   repeated ThreatActor actors = 1;
   uint64 total = 2;
@@ -446,15 +444,4 @@ message FetchThreatsForActorResponse {
     string metadata = 7;
   }
   repeated ActivityData activities = 1;
-}
-
-message ActorCountsFromActorInfoRequest {
-  uint32 start_ts = 1;
-  uint32 end_ts = 2;
-  repeated string latest_attack = 3;
-}
-
-message ActorCountsFromActorInfoResponse {
-  int32 critical_actors = 1;  // Actors with isCritical=true (HIGH or CRITICAL severity)
-  int32 active_actors = 2;    // Actors with status=ACTIVE
 }

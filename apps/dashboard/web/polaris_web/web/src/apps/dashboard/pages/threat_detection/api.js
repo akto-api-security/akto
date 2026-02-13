@@ -56,25 +56,20 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs, actorId, host, cursor) {
-        const data = {
-            skip: skip,
-            sort: sort,
-            latestAttack: latestAttack,
-            country: country,
-            startTs: startTs,
-            endTs: endTs,
-            actorId: actorId,
-            host: host
-        };
-        // Add cursor if provided (for new cursor-based pagination)
-        if (cursor) {
-            data.cursor = cursor;
-        }
+    fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs, actorId, host) {
         return request({
             url: '/api/fetchThreatActors',
             method: 'post',
-            data: data
+            data: {
+                skip: skip,
+                sort: sort,
+                latestAttack: latestAttack,
+                country: country,
+                startTs: startTs,
+                endTs: endTs,
+                actorId: actorId,
+                host: host
+            }
         })
     },
     fetchThreatApis(skip, sort, latestAttack) {
