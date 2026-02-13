@@ -4,7 +4,7 @@ import { AutomationMajor, MagicMajor } from '@shopify/polaris-icons';
 import IconCacheService from "@/services/IconCacheService";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import LaptopIcon from "@/assets/Laptop.svg";
-import ListBulletsIcon from "/list-bullets-duotone.svg";
+import ListBulletsIcon from "@/assets/list-bullets-duotone.svg";
 import { getDomainForFavicon } from "../../pages/observe/agentic/mcpClientHelper";
 import { isApiSecurityCategory, isDastCategory } from "../../../main/labelHelper";
 
