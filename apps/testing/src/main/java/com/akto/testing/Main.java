@@ -894,6 +894,7 @@ public class Main {
             if (collectionIds == null || collectionIds.isEmpty()) {
                 return;
             }
+            // Added to handle the case where multiple collection ids are present,but we will take any api changes from first collection only
             apiCollectionId = collectionIds.get(0);
         } else if (tr.getTestingEndpoints() instanceof CustomTestingEndpoints) {
             CustomTestingEndpoints eps = (CustomTestingEndpoints) tr.getTestingEndpoints();
@@ -1048,7 +1049,7 @@ public class Main {
                 }
             }
             if (!collectionNames.isEmpty()) {
-                collection = String.join(", ", collectionNames);
+                collection = String.join(", ", collectionNames);   // CSV format of collection names in test alerts
             }
         }
 
