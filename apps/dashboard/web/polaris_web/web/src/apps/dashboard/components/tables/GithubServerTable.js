@@ -651,7 +651,8 @@ function GithubServerTable(props) {
         return `"${val == null ? '-' : String(val).replace(/"/g, '""')}"`
       }).join(","))
     ].join("\r\n")
-    saveAs(new Blob([csv], { type: "text/csv;charset=UTF-8" }), `${props.csvFileName || "export"}.csv`)
+    const fileName = props.csvFileName || props.resourceName?.plural || "export"
+    saveAs(new Blob([csv], { type: "text/csv;charset=UTF-8" }), `${fileName}.csv`)
     func.setToast(true, false, "CSV exported successfully")
   }, [props.onExportCsv, props.headers, props.csvFileName, data])
 
