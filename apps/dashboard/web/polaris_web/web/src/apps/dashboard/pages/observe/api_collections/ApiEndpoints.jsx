@@ -1690,7 +1690,7 @@ function ApiEndpoints(props) {
                             <Box maxWidth="35vw">
                                 <VerticalStack gap={2}>
                                     <HorizontalStack gap={2} blockAlign="center">
-                                        {isHostnameCollection && (
+                                        {(isHostnameCollection || collectionsObj?.hostName) && (
                                             <CollectionIcon hostName={collectionsObj?.hostName} displayName={pageTitle} tagsList={collectionsObj?.tagsList} />
                                         )}
                                         <>
