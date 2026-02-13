@@ -37,6 +37,7 @@ AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = "claude_code_cli"
+CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 
 # Configure CLAUDE_API_URL based on mode
 if MODE == "atlas":
@@ -116,7 +117,8 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
             "queryParams": {},
             "metadata": {
                 "tag": tags
-            }
+            },
+            "contextSource": CONTEXT_SOURCE
         },
         "response": {
             "body": {

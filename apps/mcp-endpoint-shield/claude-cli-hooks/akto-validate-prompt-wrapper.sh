@@ -7,6 +7,7 @@ export AKTO_DATA_INGESTION_URL="{{AKTO_DATA_INGESTION_URL}}"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="claude_code_cli"
+export CONTEXT_SOURCE="ENDPOINT"
 
 # Execute Python hook script
 exec python3 "$HOME/.claude/hooks/akto-validate-prompt.py" "$@"
