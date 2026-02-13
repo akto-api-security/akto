@@ -26,10 +26,13 @@ const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsL
                 }
             }
             if (data && mounted) { setIconData(data); return; }
-            // Fallback: use hostName as domain for favicon if no icon found
+            // Fallback: use root domain from hostName for favicon
             if (!data && hostName?.trim() && mounted) {
-                const domain = hostName.replace(/^(https?:\/\/)/, '').split('/')[0];
-                if (domain) { setFaviconUrl(sharedIconCacheService.getFaviconUrl(domain)); return; }
+                const full = hostName.replace(/^(https?:\/\/)/, '').split('/')[0];
+                const parts = full.split('.');
+                // Extract root domain (e.g. "blinkrx.codes" from "api.staging.blinkrx.codes")
+                const root = parts.length > 2 ? parts.slice(-2).join('.') : full;
+                if (root) { setFaviconUrl(sharedIconCacheService.getFaviconUrl(root)); return; }
             }
         })();
         return () => { mounted = false; };
