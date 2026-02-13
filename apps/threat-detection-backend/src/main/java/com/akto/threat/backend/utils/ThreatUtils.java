@@ -27,9 +27,9 @@ public class ThreatUtils {
 
         // For API context, just return simple equality filter (most common case - 70% of data)
         // This allows MongoDB to use indexes efficiently
-        if ("API".equalsIgnoreCase(contextSource)) {
-            return new Document("contextSource", "API");
-        }
+        // if ("API".equalsIgnoreCase(contextSource)) {
+        //     return new Document("contextSource", "API");
+        // }
 
         // For ENDPOINT and AGENTIC, need to include legacy filter for backward compatibility
         Document contextSourceFilter = new Document("contextSource", contextSource);

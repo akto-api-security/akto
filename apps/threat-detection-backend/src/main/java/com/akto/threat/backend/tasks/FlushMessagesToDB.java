@@ -184,8 +184,18 @@ public class FlushMessagesToDB {
         return;
       }
 
-      // Use actorId as the filter
-      Bson filter = Filters.eq("actorId", actor);
+      // Get contextSource, default to "API" if null or empty
+      String contextSource = event.getContextSource();
+      if (contextSource == null || contextSource.isEmpty()) {
+        contextSource = "API";
+      }
+
+      // Use compound filter (actorId, contextSource) for upsert
+      // This allows same actor to have separate entries per context
+      Bson filter = Filters.and(
+          Filters.eq("actorId", actor),
+          Filters.eq("contextSource", contextSource)
+      );
 
       // Check if this event is critical (HIGH or CRITICAL severity)
       String severity = event.getSeverity();
@@ -203,19 +213,20 @@ public class FlushMessagesToDB {
       updatesList.add(Updates.set("country", event.getCountry() != null ? event.getCountry() : ""));
       updatesList.add(Updates.set("severity", severity != null ? severity : ""));
       updatesList.add(Updates.set("host", event.getHost() != null ? event.getHost() : ""));
-      updatesList.add(Updates.set("contextSource", event.getContextSource() != null ? event.getContextSource() : ""));
       updatesList.add(Updates.set("latestMetadata", event.getMetadata() != null ? event.getMetadata() : ""));
       updatesList.add(Updates.max("lastAttackTs", event.getDetectedAt()));
       updatesList.add(Updates.min("discoveredAt", event.getDetectedAt()));
       updatesList.add(Updates.set("updatedAt", Context.now()));
       updatesList.add(Updates.setOnInsert("actorId", actor));
+      updatesList.add(Updates.setOnInsert("contextSource", contextSource));  // Set on insert
       updatesList.add(Updates.setOnInsert("status", "ACTIVE"));
-      updatesList.add(Updates.setOnInsert("isCritical", false));  // Initialize to false on insert
+      updatesList.add(Updates.setOnInsert("isCritical", isCriticalEvent));  // Initialize on insert
       updatesList.add(Updates.inc("totalAttacks", 1));
 
-      // ONLY set isCritical to true if this event is HIGH/CRITICAL, never set back to false
+      // For updates: ONLY set isCritical to true if this event is HIGH/CRITICAL
+      // Use $max to ensure once it's true, it stays true (false < true in MongoDB)
       if (isCriticalEvent) {
-        updatesList.add(Updates.set("isCritical", true));
+        updatesList.add(Updates.max("isCritical", true));
       }
 
       Bson updates = Updates.combine(updatesList);
