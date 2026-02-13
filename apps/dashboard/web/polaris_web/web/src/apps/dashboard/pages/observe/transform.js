@@ -589,9 +589,8 @@ const transform = {
                 : (isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>);
 
             // Create iconComp for collections if not already present
-            const showIconForArgusAtlas = isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory();
-            const showIconForApiDast = (isApiSecurityCategory() || isDastCategory()) && c.hostName;
-            const iconComp = c.iconComp || ((showIconForArgusAtlas || showIconForApiDast) ? (
+            const showIcon = isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory() || ((isApiSecurityCategory() || isDastCategory()) && c.hostName);
+            const iconComp = c.iconComp || (showIcon ? (
                 <Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>
             ) : undefined);
 

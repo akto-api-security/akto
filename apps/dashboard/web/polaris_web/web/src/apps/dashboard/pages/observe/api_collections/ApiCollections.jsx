@@ -319,13 +319,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             descriptionComp: (<Box maxWidth="350px"><Text>{c.description}</Text></Box>),
             outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
             username: getUsernameForCollection(c, usernameMap),
-        ...((tagsList.includes("mcp-server")) ? {
-            iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
-        } : (tagsList.includes("gen-ai")) ? {
-            iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
-        } : (tagsList.includes("browser-llm")) ? {
-            iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
-        } : ((isApiSecurityCategory() || isDastCategory()) && c.hostName) ? {
+        ...((tagsList.includes("mcp-server") || tagsList.includes("gen-ai") || tagsList.includes("browser-llm") || ((isApiSecurityCategory() || isDastCategory()) && c.hostName)) ? {
             iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
         } : {})
         };
