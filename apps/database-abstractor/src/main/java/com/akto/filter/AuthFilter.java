@@ -20,6 +20,11 @@ public class AuthFilter implements Filter {
     private static final List<String> TARGET_ACCOUNT_IDS = Arrays.asList(
         "1728622642"
     );
+    private static final List<String> SKIP_AUTH_ACCOUNT_IDS = Arrays.asList(
+        "1721887185"
+    );
+    private static final String NO_AUTH_API_PREFIX = "updateModuleInfo";
+
     private static final long LOG_INTERVAL_SECONDS = 5 * 60; // 5 minutes
     private static volatile long lastLogTime = 0;
 
@@ -33,11 +38,16 @@ public class AuthFilter implements Filter {
         HttpServletRequest httpServletRequest= (HttpServletRequest) servletRequest;
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
         String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
+        String requestURI = httpServletRequest.getRequestURI();
 
         try {
             Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
             Context.accountId.set((int) claims.getBody().get(ACCOUNT_ID));
         } catch (Exception e) {
+            if (shouldSkipAuth(e, requestURI)) {
+                chain.doFilter(servletRequest, servletResponse);
+                return;
+            }
             logExpiredTokenForTargetAccount(e);
             System.out.println(e.getMessage());
             httpServletResponse.sendError(401);
@@ -45,6 +55,32 @@ public class AuthFilter implements Filter {
         }
 
         chain.doFilter(servletRequest, servletResponse);
+    }
+
+    private boolean shouldSkipAuth(Exception e, String requestURI) {
+        if (requestURI == null || !requestURI.contains(NO_AUTH_API_PREFIX)) {
+            return false;
+        }
+
+        try {
+            if (e instanceof ExpiredJwtException) {
+                ExpiredJwtException expiredEx = (ExpiredJwtException) e;
+                Claims claims = expiredEx.getClaims();
+                if (claims != null) {
+                    Object accountIdObj = claims.get(ACCOUNT_ID);
+                    if (accountIdObj != null) {
+                        String accountId = String.valueOf(accountIdObj);
+                        if (SKIP_AUTH_ACCOUNT_IDS.contains(accountId)) {
+                            Context.accountId.set(Integer.parseInt(accountId));
+                            return true;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            // Ignore parsing errors
+        }
+        return false;
     }
 
     private void logExpiredTokenForTargetAccount(Exception e) {
