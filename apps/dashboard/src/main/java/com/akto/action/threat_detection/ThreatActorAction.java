@@ -52,7 +52,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   List<ThreatActorPerCountry> actorsCountPerCountry;
   List<BasicDBObject> threatComplianceInfos;
   int skip;
-  String cursor;  // ObjectId hex string for cursor-based pagination
   static final int LIMIT = 50;
   long total;
   Map<String, Integer> sort;
@@ -189,9 +188,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             put("filter", filter);
             put("start_ts", startTs);
             put("end_ts", endTs);
-            if (cursor != null && !cursor.isEmpty()) {
-              put("cursor", cursor);
-            }
           }
         };
     String msg = objectMapper.valueToTree(body).toString();
@@ -212,7 +208,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                             smr ->
                                 new DashboardThreatActor(
                                     smr.getId(),
-                                    smr.getObjectId(),
                                     smr.getLatestApiEndpoint(),
                                     smr.getLatestApiIp(),
                                     URLMethods.Method.fromString(smr.getLatestApiMethod()),
@@ -687,14 +682,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setSkip(int skip) {
     this.skip = skip;
-  }
-
-  public String getCursor() {
-    return cursor;
-  }
-
-  public void setCursor(String cursor) {
-    this.cursor = cursor;
   }
 
   public List<String> getLatestAttack() {
