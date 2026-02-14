@@ -69,21 +69,30 @@ public class IconUtils {
     /**
      * Fetch icon from Google Favicon API with cascading domain fallback and store in database
      * Tries full hostname first, then progressively removes subdomains until success or TLD reached
+     * Also detects redirects (e.g., short.example → example.com) and uses final destination
      */
     public static void fetchAndStoreIconWithCascade(String fullHostname) {
         if (fullHostname == null || fullHostname.trim().isEmpty()) {
             return;
         }
-        
+
         String cleanHostName = fullHostname.trim().toLowerCase();
+
+        // Detect redirects: try to follow redirects and extract final destination domain
+        String finalDomain = detectRedirectDomain(cleanHostName);
+        if (finalDomain != null && !finalDomain.equals(cleanHostName)) {
+            loggerMaker.infoAndAddToDb("Detected redirect: " + cleanHostName + " → " + finalDomain, LogDb.DASHBOARD);
+            cleanHostName = finalDomain;
+        }
+
         String[] parts = cleanHostName.split("\\.");
-        
+
         if (parts.length < 2) {
             // Single part domain, try as-is
             tryFetchAndStoreIcon(cleanHostName, cleanHostName);
             return;
         }
-        
+
         // Try from full hostname down to main domain (last 2 parts)
         for (int i = 0; i <= parts.length - 2; i++) {
             StringBuilder domainBuilder = new StringBuilder();
@@ -92,14 +101,52 @@ public class IconUtils {
                 domainBuilder.append(parts[j]);
             }
             String candidateDomain = domainBuilder.toString();
-            
+
             // Try to fetch icon for this domain level
             if (tryFetchAndStoreIcon(candidateDomain, fullHostname)) {
                 return; // Success - stop trying other levels
             }
         }
-        
+
         loggerMaker.infoAndAddToDb("Failed to fetch icon for hostname: " + fullHostname + " after trying all domain levels", LogDb.DASHBOARD);
+    }
+
+    /**
+     * Detect if domain redirects and extract final destination
+     * Returns the final domain after following redirects, or null if detection fails
+     */
+    private static String detectRedirectDomain(String hostname) {
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL("https://" + hostname);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("HEAD");
+            connection.setInstanceFollowRedirects(true);
+            connection.setConnectTimeout(3000);
+            connection.setReadTimeout(3000);
+
+            connection.getResponseCode(); // Trigger connection to follow redirects
+
+            // Check if redirect occurred by comparing request URL with final URL
+            String finalUrl = connection.getURL().toString();
+            URL parsedFinalUrl = new URL(finalUrl);
+            String finalHost = parsedFinalUrl.getHost().replaceFirst("^www\\.", "");
+
+            // Extract root domain (last 2 parts) from final destination
+            String[] parts = finalHost.split("\\.");
+            if (parts.length >= 2) {
+                return parts[parts.length - 2] + "." + parts[parts.length - 1];
+            }
+            return finalHost;
+
+        } catch (Exception e) {
+            // Redirect detection failed - not critical, return null to use original
+            return null;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
     }
 
     /**
