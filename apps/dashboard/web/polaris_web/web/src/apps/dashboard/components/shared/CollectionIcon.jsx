@@ -28,17 +28,33 @@ const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsL
                 }
             }
             if (data && mounted) { setIconData(data); return; }
-            // Fallback for API Security/DAST: probe favicon.ico directly
-            // Unlike Google's favicon service, this will fail for domains without a real favicon
+            // Fallback for API Security/DAST: extract root domain, detect redirects, use Google favicon
             if (!data && hostName?.trim() && mounted && (isApiSecurityCategory() || isDastCategory())) {
                 const full = hostName.replace(/^(https?:\/\/)/, '').split('/')[0];
                 const parts = full.split('.');
-                const root = parts.length > 2 ? parts.slice(-2).join('.') : full;
+                let root = parts.length > 2 ? parts.slice(-2).join('.') : full;
                 if (root) {
-                    const img = new Image();
-                    img.onload = () => { if (mounted) setFaviconUrl(sharedIconCacheService.getFaviconUrl(root)); };
-                    img.onerror = () => { /* no favicon — falls through to HardDrivesIcon */ };
-                    img.src = `https://${root}/favicon.ico`;
+                    let reachable = false;
+                    // Try cors first — can read redirect target (e.g., fb.com → facebook.com)
+                    try {
+                        const resp = await Promise.race([
+                            fetch(`https://${root}`, { method: 'HEAD', redirect: 'follow' }),
+                            new Promise((_, rej) => setTimeout(() => rej('timeout'), 3000))
+                        ]);
+                        reachable = true;
+                        if (resp.redirected) {
+                            const h = new URL(resp.url).hostname.replace(/^www\./, '');
+                            const p = h.split('.');
+                            root = p.length > 2 ? p.slice(-2).join('.') : h;
+                        }
+                    } catch (_) {
+                        // CORS blocked — fall back to no-cors existence check
+                        reachable = await Promise.race([
+                            fetch(`https://${root}`, { mode: 'no-cors', method: 'HEAD' }).then(() => true).catch(() => false),
+                            new Promise(r => setTimeout(() => r(false), 3000))
+                        ]);
+                    }
+                    if (reachable && mounted) setFaviconUrl(sharedIconCacheService.getFaviconUrl(root));
                 }
             }
         })();
