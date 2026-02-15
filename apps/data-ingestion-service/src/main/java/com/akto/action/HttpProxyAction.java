@@ -231,7 +231,7 @@ public class HttpProxyAction extends ActionSupport {
                         Map<String, Object> blockedBody = new HashMap<>();
                         blockedBody.put("x-blocked-by", "Akto Proxy");
                         blockedResponse.put("body", blockedBody);
-                        blockedResponse.put("statusCode", 400);
+                        blockedResponse.put("statusCode", 200);
                         blockedResponse.put("status", "forbidden");
                         
                         Map<String, Object> responseHeaders = new HashMap<>();
