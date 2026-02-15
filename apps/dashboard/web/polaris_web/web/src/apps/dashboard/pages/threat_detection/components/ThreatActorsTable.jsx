@@ -120,6 +120,7 @@ const sortOptions = [
 
 function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   const [loading, setLoading] = useState(false);
+  const [lastCursor, setLastCursor] = useState(null);  // Track last ObjectId for cursor pagination
   const [filters, setFilters] = useState([
     {
       key: 'actorId',
@@ -181,7 +182,10 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     let total = 0;
     let ret = [];
     try {
-      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || [], startTimestamp, endTimestamp, filters.actorId || [], filters.host || []);
+      // Use cursor-based pagination: send lastCursor if skip > 0, otherwise null for first page
+      const cursor = skip > 0 ? lastCursor : null;
+      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || [], startTimestamp, endTimestamp, filters.actorId || [], filters.host || [], cursor);
+      // Always show total for now (will optimize to hide on cursor pagination later)
       total = res.total;
       if (res?.actors?.length === 0) {
         return { value: [], total: 0 };
@@ -284,6 +288,13 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
 
         return baseData;
       }));
+
+      // Store last actor's MongoDB ObjectId as cursor for next page
+      if (ret.length > 0) {
+        const lastActor = ret[ret.length - 1];
+        // Use objectId (MongoDB _id) for cursor-based pagination, not id (actorId/IP)
+        setLastCursor(lastActor.objectId);
+      }
     } catch (e) {
       setToast(true, true, "Error fetching threat actors");
     } finally {
@@ -353,6 +364,11 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   useEffect(() => {
     fillFilters();
   }, []);
+
+  // Reset cursor when date range changes
+  useEffect(() => {
+    setLastCursor(null);
+  }, [startTimestamp, endTimestamp]);
 
   const getHeaders = () => {
     const baseHeaders = [...getBaseHeaders()];
