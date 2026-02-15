@@ -257,6 +257,10 @@ function ApiEndpoints(props) {
     const [redacted, setIsRedacted] = useState(false)
     const [showRedactModal, setShowRedactModal] = useState(false)
     const [tableLoading, setTableLoading] = useState(false)
+    const [showBulkGuardrailModal, setShowBulkGuardrailModal] = useState(false)
+    const [bulkGuardrailEnabled, setBulkGuardrailEnabled] = useState(false)
+    const [bulkGuardrailApiIds, setBulkGuardrailApiIds] = useState([])
+    const [updatingGuardrails, setUpdatingGuardrails] = useState(false)
 
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
@@ -1429,6 +1433,16 @@ function ApiEndpoints(props) {
             onAction: () => handleBulkDeMerge(selectedResources)
         })
 
+        // Add bulk guardrail actions
+        ret.push({
+            content: 'Enable guardrails',
+            onAction: () => handleBulkGuardrail(selectedResources, true)
+        })
+        ret.push({
+            content: 'Disable guardrails',
+            onAction: () => handleBulkGuardrail(selectedResources, false)
+        })
+
         if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
             ret.push({
                 content: 'Delete ' + mapLabel('APIs', getDashboardCategory()),
@@ -1437,6 +1451,57 @@ function ApiEndpoints(props) {
         }
 
         return ret;
+    }
+
+    function handleBulkGuardrail(selectedResources, enabled) {
+        // Extract API Info IDs from selected resources
+        const apiInfoIds = selectedResources.map(resourceId => {
+            const endpoint = endpointData["all"].find(e => e.id === resourceId)
+            if (endpoint) {
+                return `${endpoint.apiCollectionId} ${endpoint.endpoint} ${endpoint.method}`
+            }
+            return null
+        }).filter(id => id !== null)
+
+        if (apiInfoIds.length === 0) {
+            func.setToast(true, true, "No valid endpoints selected")
+            return
+        }
+
+        setBulkGuardrailApiIds(apiInfoIds)
+        setBulkGuardrailEnabled(enabled)
+        setShowBulkGuardrailModal(true)
+    }
+
+    async function handleBulkGuardrailConfirm() {
+        setUpdatingGuardrails(true)
+        try {
+            await api.bulkAgentProxyGuardrail(bulkGuardrailApiIds, bulkGuardrailEnabled)
+            func.setToast(true, false, `Successfully ${bulkGuardrailEnabled ? 'enabled' : 'disabled'} guardrails for ${bulkGuardrailApiIds.length} endpoint(s)`)
+            setShowBulkGuardrailModal(false)
+            // Refresh data to show updated guardrail status
+            setTimeout(() => {
+                fetchData()
+            }, 500)
+        } catch (error) {
+            func.setToast(true, true, `Error updating guardrails: ${error.message || 'Unknown error'}`)
+        } finally {
+            setUpdatingGuardrails(false)
+        }
+    }
+
+    async function handleToggleGuardrail(apiInfoId, enabled, event) {
+        event?.stopPropagation() // Prevent row click
+        try {
+            await api.updateAgentProxyGuardrail(apiInfoId, enabled)
+            func.setToast(true, false, `Guardrails ${enabled ? 'enabled' : 'disabled'} successfully`)
+            // Refresh data to show updated guardrail status
+            setTimeout(() => {
+                fetchData()
+            }, 500)
+        } catch (error) {
+            func.setToast(true, true, `Error updating guardrail: ${error.message || 'Unknown error'}`)
+        }
     }
 
     let modal = (
@@ -1506,8 +1571,65 @@ function ApiEndpoints(props) {
         </Modal>
     )
 
+    let bulkGuardrailModal = (
+        <Modal
+            open={showBulkGuardrailModal}
+            onClose={() => setShowBulkGuardrailModal(false)}
+            title={`${bulkGuardrailEnabled ? 'Enable' : 'Disable'} Guardrails`}
+            primaryAction={{
+                content: bulkGuardrailEnabled ? 'Enable' : 'Disable',
+                onAction: handleBulkGuardrailConfirm,
+                loading: updatingGuardrails
+            }}
+            secondaryActions={[
+                {
+                    content: 'Cancel',
+                    onAction: () => setShowBulkGuardrailModal(false)
+                }
+            ]}
+            key="bulk-guardrail-modal"
+        >
+            <Modal.Section>
+                <VerticalStack gap="4">
+                    <Text>Are you sure you want to {bulkGuardrailEnabled ? 'enable' : 'disable'} guardrails for {bulkGuardrailApiIds.length} endpoint(s)?</Text>
+                    <Text variant="bodyMd" color="subdued">
+                        {bulkGuardrailEnabled 
+                            ? 'Guardrails will be applied to these endpoints when traffic passes through the agent proxy.'
+                            : 'Guardrails will no longer be applied to these endpoints.'}
+                    </Text>
+                </VerticalStack>
+            </Modal.Section>
+        </Modal>
+    )
+
     const canShowTags = () => {
         return isApiGroup || isQueryPage;
+    }
+
+    const getActions = (item) => {
+        const apiInfoId = `${item.apiCollectionId} ${item.endpoint} ${item.method}`
+        const guardrailEnabled = item.agentProxyGuardrailEnabled || false
+        
+        const actions = []
+        
+        // Add guardrail actions
+        if (guardrailEnabled) {
+            actions.push({
+                content: 'Disable guardrails for this endpoint',
+                onAction: async () => {
+                    handleToggleGuardrail(apiInfoId, false, null)
+                }
+            })
+        } else {
+            actions.push({
+                content: 'Enable guardrails for this endpoint',
+                onAction: async () => {
+                    handleToggleGuardrail(apiInfoId, true, null)
+                }
+            })
+        }
+        
+        return actions.length > 0 ? [{ items: actions }] : []
     }
 
     const apiEndpointTable = [<GithubSimpleTable
@@ -1542,6 +1664,8 @@ function ApiEndpoints(props) {
         tableTabs={tableTabs}
         selectable={true}
         promotedBulkActions={promotedBulkActions}
+        hasRowActions={true}
+        getActions={getActions}
         loading={tableLoading || loading}
         setSelectedResourcesForPrimaryAction={setSelectedResourcesForPrimaryAction}
         calendarFilterKeys={{
@@ -1609,7 +1733,8 @@ function ApiEndpoints(props) {
                   />,
                   modal,
                   deleteApiModal,
-                  bulkDeMergeModal
+                  bulkDeMergeModal,
+                  bulkGuardrailModal
             ]
         )
       ]
