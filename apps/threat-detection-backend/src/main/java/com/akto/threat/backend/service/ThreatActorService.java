@@ -340,7 +340,7 @@ public class ThreatActorService {
         addIpFilter(match, filter);
 
         // 6. Context Filter
-        Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+        Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource);
         if (!contextFilter.isEmpty()) {
             match.putAll(contextFilter);
             loggerMaker.infoAndAddToDb(
@@ -509,7 +509,7 @@ public class ThreatActorService {
         }
 
         // Apply simple context filter (only for ENDPOINT and AGENTIC)
-        Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+        Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource);
         if (!contextFilter.isEmpty()) {
             match.putAll(contextFilter);
         }
@@ -605,7 +605,7 @@ public class ThreatActorService {
         }
 
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource);
     if (!contextFilter.isEmpty()) {
         matchConditions.putAll(contextFilter);
     }
@@ -752,7 +752,7 @@ public class ThreatActorService {
     }
 
     // Apply context filter
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource);
     if (!contextFilter.isEmpty()) {
       match.putAll(contextFilter);
     }
@@ -835,7 +835,7 @@ public class ThreatActorService {
       match.append("detectedAt", new Document("$gte", startTs).append("$lte", endTs));
 
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource);
     if (!contextFilter.isEmpty()) {
         match.putAll(contextFilter);
     }
@@ -982,7 +982,7 @@ public class ThreatActorService {
     }
 
     // Apply context filter (for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource);
     if (!contextFilter.isEmpty()) {
       match.putAll(contextFilter);
     }
@@ -1054,7 +1054,7 @@ public class ThreatActorService {
     }
 
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource);
     if (!contextFilter.isEmpty()) {
         match.putAll(contextFilter);
     }
@@ -1156,7 +1156,7 @@ public class ThreatActorService {
 
     Document activityQuery = new Document("actor", actor);
 
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+    Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource);
     if (!contextFilter.isEmpty()) {
       activityQuery.putAll(contextFilter);
     }
@@ -1209,7 +1209,7 @@ public class ThreatActorService {
         }
 
         // Apply simple context filter (only for ENDPOINT and AGENTIC)
-        Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource);
+        Document contextFilter = ThreatUtils.buildSimpleContextFilterNew(contextSource);
         if (!contextFilter.isEmpty()) {
             match.putAll(contextFilter);
         }

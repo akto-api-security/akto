@@ -20,6 +20,22 @@ public class ThreatUtils {
         "MCPGuardrails", "AuditPolicy", "MCPMaliciousComponent"
     );
 
+    public static Document buildSimpleContextFilterNew(String contextSource) {
+        if (contextSource == null || contextSource.isEmpty()) {
+            contextSource = CONTEXT_SOURCE.API.name();
+        }
+
+        if ("API".equalsIgnoreCase(contextSource)) {
+            return new Document("contextSource", "API");
+        }
+
+        // For ENDPOINT and AGENTIC, need to include legacy filter for backward compatibility
+        Document contextSourceFilter = new Document("contextSource", contextSource);
+        Document legacyFilter = buildLegacyContextFilter(contextSource);
+
+        return new Document("$or", Arrays.asList(contextSourceFilter, legacyFilter));
+    }
+
     public static Document buildSimpleContextFilter(String contextSource) {
         if (contextSource == null || contextSource.isEmpty()) {
             contextSource = CONTEXT_SOURCE.API.name();
