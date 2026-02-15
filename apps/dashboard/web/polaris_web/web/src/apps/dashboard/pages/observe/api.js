@@ -98,6 +98,18 @@ export default {
         })
         return resp
     },
+    async getSuggestedTests(apiCollectionId, url, method) {
+        const resp = await request({
+            url: '/api/getSuggestedTests',
+            method: 'post',
+            data: {
+                apiCollectionId,
+                url,
+                method
+            }
+        })
+        return resp
+    },
     async fetchSensitiveSampleData(url, apiCollectionId, method) {
         const resp = await request({
             url: '/api/fetchSensitiveSampleData',
