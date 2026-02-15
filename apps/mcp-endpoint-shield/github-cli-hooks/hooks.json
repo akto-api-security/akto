@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "hooks": {
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "python3 /path/to/repo/.github/hooks/validate-request.py",
+        "powershell": "python /path/to/repo/.github/hooks/validate-request.py",
+        "comment": "Log user prompts to Akto (monitoring only - cannot block)",
+        "timeoutSec": 10
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "python3 /path/to/repo/.github/hooks/validate-response.py",
+        "powershell": "python /path/to/repo/.github/hooks/validate-response.py",
+        "comment": "Monitor and validate tool outputs for sensitive content (workaround for response guardrails)",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}
