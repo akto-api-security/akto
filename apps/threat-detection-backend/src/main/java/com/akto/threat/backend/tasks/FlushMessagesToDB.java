@@ -220,13 +220,13 @@ public class FlushMessagesToDB {
       updatesList.add(Updates.setOnInsert("actorId", actor));
       updatesList.add(Updates.setOnInsert("contextSource", contextSource));  // Set on insert
       updatesList.add(Updates.setOnInsert("status", "ACTIVE"));
-      updatesList.add(Updates.setOnInsert("isCritical", isCriticalEvent));  // Initialize on insert
       updatesList.add(Updates.inc("totalAttacks", 1));
 
-      // For updates: ONLY set isCritical to true if this event is HIGH/CRITICAL
-      // Use $max to ensure once it's true, it stays true (false < true in MongoDB)
+      // Only set isCritical to true if this event is HIGH/CRITICAL
+      // Never set to false - missing/null field is treated as false when reading
+      // Once set to true, stays true forever
       if (isCriticalEvent) {
-        updatesList.add(Updates.max("isCritical", true));
+        updatesList.add(Updates.set("isCritical", true));
       }
 
       Bson updates = Updates.combine(updatesList);
