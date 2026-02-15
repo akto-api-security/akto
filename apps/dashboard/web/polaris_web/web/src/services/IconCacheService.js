@@ -127,13 +127,11 @@ class IconCacheService {
 
     /**
      * Get favicon URL for a domain using external service
-     * Returns a URL that can be used directly in img src
      * @param {string} domain - The domain to get favicon for
-     * @returns {string} Favicon URL
+     * @returns {string} Favicon URL or null if domain is null
      */
     getFaviconUrl(domain) {
         if (!domain) return null;
-        // Use Google's favicon service - reliable and fast
         return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
     }
 }

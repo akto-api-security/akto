@@ -74,13 +74,16 @@ public class IconUtils {
         if (fullHostname == null || fullHostname.trim().isEmpty()) {
             return;
         }
+        
         String cleanHostName = fullHostname.trim().toLowerCase();
         String[] parts = cleanHostName.split("\\.");
+        
         if (parts.length < 2) {
             // Single part domain, try as-is
             tryFetchAndStoreIcon(cleanHostName, cleanHostName);
             return;
         }
+
         // Try from full hostname down to main domain (last 2 parts)
         for (int i = 0; i <= parts.length - 2; i++) {
             StringBuilder domainBuilder = new StringBuilder();
@@ -89,11 +92,13 @@ public class IconUtils {
                 domainBuilder.append(parts[j]);
             }
             String candidateDomain = domainBuilder.toString();
+
             // Try to fetch icon for this domain level
             if (tryFetchAndStoreIcon(candidateDomain, fullHostname)) {
                 return; // Success - stop trying other levels
             }
         }
+
         loggerMaker.infoAndAddToDb("Failed to fetch icon for hostname: " + fullHostname + " after trying all domain levels", LogDb.DASHBOARD);
     }
 

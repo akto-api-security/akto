@@ -28,24 +28,6 @@ const CollectionIcon = React.memo(({ hostName, assetTagValue, displayName, tagsL
                 }
             }
             if (data && mounted) { setIconData(data); return; }
-            // Fallback for API Security/DAST: verify domain exists before using Google's favicon service
-            if (!data && hostName?.trim() && mounted && (isApiSecurityCategory() || isDastCategory())) {
-                const full = hostName.replace(/^(https?:\/\/)/, '').split('/')[0];
-                const parts = full.split('.');
-                const root = parts.length > 2 ? parts.slice(-2).join('.') : full;
-                if (root) {
-                    // Quick check if domain is reachable - avoids showing Google's default globe
-                    try {
-                        await Promise.race([
-                            fetch(`https://${root}`, { mode: 'no-cors', method: 'HEAD' }),
-                            new Promise((_, rej) => setTimeout(() => rej('timeout'), 2000))
-                        ]);
-                        if (mounted) setFaviconUrl(sharedIconCacheService.getFaviconUrl(root));
-                    } catch (_) {
-                        // Domain unreachable - will fall through to HardDrivesIcon
-                    }
-                }
-            }
         })();
         return () => { mounted = false; };
     }, [hostName, assetTagValue]);
