@@ -376,7 +376,6 @@ function SingleTestRunPage() {
                 allEndpoints = allEndpoints.concat(response.apiInfoList);
               }
             } catch (error) {
-              console.error(`Error fetching collection ${collectionId} endpoints:`, error);
             }
           }
 
@@ -386,7 +385,6 @@ function SingleTestRunPage() {
 
           apiEndpoints = getApiEndpointsMap(limitedEndpoints, testingEndpoints.type);
         } catch (error) {
-          console.error("Error fetching multi-collection endpoints:", error);
         }
       } else if (testingEndpoints.type === "CUSTOM"
         && testingEndpoints.apisList) {
