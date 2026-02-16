@@ -178,6 +178,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     pollingExecutor.execute(
         () -> {
           // Poll data from Kafka topic
+          logger.warnAndAddToDb("Kafka polling started");
           while (true) {
             ConsumerRecords<String, byte[]> records =
                 kafkaConsumer.poll(
