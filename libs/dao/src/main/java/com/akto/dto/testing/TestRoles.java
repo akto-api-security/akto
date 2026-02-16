@@ -9,6 +9,7 @@ import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import static com.akto.util.Constants.ID;
 
@@ -54,7 +55,9 @@ public class TestRoles {
     public AuthMechanism findDefaultAuthMechanism() {
         try {
             for(AuthWithCond authWithCond: this.getAuthWithCondList()) {
-                if (authWithCond.getHeaderKVPairs().isEmpty()) {
+                boolean noHeaderCond = authWithCond.getHeaderKVPairs() == null || authWithCond.getHeaderKVPairs().isEmpty();
+                boolean noUrlCond = authWithCond.getUrlRegex() == null || authWithCond.getUrlRegex().isEmpty();
+                if (noHeaderCond && noUrlCond) {
                     AuthMechanism ret = authWithCond.getAuthMechanism();
                     if(authWithCond.getRecordedLoginFlowInput()!=null){
                         ret.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
@@ -75,21 +78,35 @@ public class TestRoles {
             return findDefaultAuthMechanism();
         }
 
+        String requestUrl = rawApi.getRequest() != null ? rawApi.getRequest().getUrl() : null;
+
         for(AuthWithCond authWithCond: this.getAuthWithCondList()) {
 
             try {
-                boolean allSatisfied = true;
-
-                if (authWithCond.getHeaderKVPairs().isEmpty()) {
+                boolean hasHeaderCond = authWithCond.getHeaderKVPairs() != null && !authWithCond.getHeaderKVPairs().isEmpty();
+                boolean hasUrlCond = authWithCond.getUrlRegex() != null && !authWithCond.getUrlRegex().isEmpty();
+                if (!hasHeaderCond && !hasUrlCond) {
                     continue;
                 }
 
-                for(String headerKey: authWithCond.getHeaderKVPairs().keySet()) {
-                    String headerVal = authWithCond.getHeaderKVPairs().get(headerKey);
-                    List<String> rawHeaderValue = rawApi.getRequest().getHeaders().getOrDefault(headerKey.toLowerCase(), new ArrayList<>());
-                    if (!rawHeaderValue.contains(headerVal)) {
+                boolean allSatisfied = true;
+
+                if (hasHeaderCond) {
+                    for(String headerKey: authWithCond.getHeaderKVPairs().keySet()) {
+                        String headerVal = authWithCond.getHeaderKVPairs().get(headerKey);
+                        List<String> rawHeaderValue = rawApi.getRequest().getHeaders().getOrDefault(headerKey.toLowerCase(), new ArrayList<>());
+                        if (!rawHeaderValue.contains(headerVal)) {
+                            allSatisfied = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (allSatisfied && hasUrlCond && requestUrl != null) {
+                    Pattern urlPattern = authWithCond.getCompiledUrlRegexPattern();
+                    if (urlPattern == null ||
+                            !urlPattern.matcher(requestUrl).matches()) {
                         allSatisfied = false;
-                        break;
                     }
                 }
 
