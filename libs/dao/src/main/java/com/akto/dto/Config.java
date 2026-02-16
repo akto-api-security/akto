@@ -771,8 +771,8 @@ public abstract class Config {
         private List<String> severityLevels;
         public static final String SEVERITY_LEVELS = "severityLevels";
 
-        public static final String LIST_ID = "listId";
-        private String listId;
+        public static final String LIST_IDS = "listIds";
+        private List<String> listIds;
         public static final String RULE_ID = "ruleId";
         private String ruleId;
         public static final String ZONE_ID = "zoneId";
@@ -848,12 +848,12 @@ public abstract class Config {
             this.severityLevels = severityLevels;
         }
 
-        public String getListId() {
-            return listId;
+        public List<String> getListIds() {
+            return listIds;
         }
 
-        public void setListId(String listId) {
-            this.listId = listId;
+        public void setListIds(List<String> listIds) {
+            this.listIds = listIds;
         }
 
         public String getRuleId() {

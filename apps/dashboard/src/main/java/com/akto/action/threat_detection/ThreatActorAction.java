@@ -378,124 +378,44 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         return getResponse;
     }
 
-    public String modifyThreatActorStatusCloudflare() {
+    private static Config.CloudflareWafConfig getCloudflareConfig() {
         int accId = Context.accountId.get();
         Bson filters = Filters.and(
             Filters.eq(Constants.ID, accId + "_" + Config.ConfigType.CLOUDFLARE_WAF),
             Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, accId)
         );
+        Config.CloudflareWafConfig config = (Config.CloudflareWafConfig) ConfigsDao.instance.findOne(filters);
+        return CloudflareWafAction.migrateToListIfNeeded(config);
+    }
 
-        Config.CloudflareWafConfig cloudflareWafConfig = (Config.CloudflareWafConfig) ConfigsDao.instance.findOne(filters);
+    private static boolean hasValidListConfig(Config.CloudflareWafConfig config) {
+        return config != null && config.getListIds() != null && !config.getListIds().isEmpty();
+    }
 
-        // Auto-migrate: create IP list if not present
-        cloudflareWafConfig = CloudflareWafAction.migrateToListIfNeeded(cloudflareWafConfig);
+    private static String getLastListId(Config.CloudflareWafConfig config) {
+        return config.getListIds().get(config.getListIds().size() - 1);
+    }
 
-        if (cloudflareWafConfig == null || cloudflareWafConfig.getListId() == null) {
+    public String modifyThreatActorStatusCloudflare() {
+        Config.CloudflareWafConfig cloudflareWafConfig = getCloudflareConfig();
+
+        if (!hasValidListConfig(cloudflareWafConfig)) {
             addActionError("Cloudflare WAF integration not configured properly.");
             return ERROR.toUpperCase();
         }
 
         boolean result;
-        if(status.equalsIgnoreCase("blocked")) {
-            result = blockIPInCloudflareWaf(cloudflareWafConfig);
+        if (status.equalsIgnoreCase("blocked")) {
+            result = addIPsToList(cloudflareWafConfig, Collections.singletonList(actorIp));
         } else {
-            result = unblockIPInCloudflareWaf(cloudflareWafConfig);
+            result = removeIPsFromLists(cloudflareWafConfig, Collections.singletonList(actorIp));
         }
 
-        if(result) {
+        if (result) {
             boolean backendRes = sendModifyThreatActorStatusToBackend(actorIp);
-
-            if (!backendRes) {
-                return ERROR.toUpperCase();
-            } else {
-                return SUCCESS.toUpperCase();
-            }
+            return backendRes ? SUCCESS.toUpperCase() : ERROR.toUpperCase();
         }
-
         return ERROR.toUpperCase();
-    }
-
-    public boolean blockIPInCloudflareWaf(Config.CloudflareWafConfig cloudflareWafConfig) {
-        try {
-            String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + cloudflareWafConfig.getAccountOrZoneId()
-                    + "/rules/lists/" + cloudflareWafConfig.getListId() + "/items";
-            Map<String, List<String>> headers = CloudflareWafAction.getAuthHeaders(cloudflareWafConfig);
-
-            BasicDBList items = new BasicDBList();
-            BasicDBObject ipItem = new BasicDBObject();
-            ipItem.put("ip", actorIp);
-            items.add(ipItem);
-
-            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", items.toString(), headers, "");
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-
-            if (response.getStatusCode() > 201 || response.getBody() == null) {
-                String cfErr = CloudflareWafAction.extractCfError(response.getBody());
-                addActionError(cfErr != null ? cfErr : "Unable to block IP address. Try again later.");
-                return false;
-            }
-        } catch (Exception e) {
-            addActionError("Unable to block IP address. Try again later.");
-            loggerMaker.errorAndAddToDb("Error adding IP to Cloudflare list: " + e.getMessage());
-            return false;
-        }
-        return true;
-    }
-
-    public boolean unblockIPInCloudflareWaf(Config.CloudflareWafConfig cloudflareWafConfig) {
-        try {
-            // Find item ID by searching the list
-            String itemId = findListItemByIP(actorIp, cloudflareWafConfig);
-            if (itemId == null || itemId.isEmpty()) {
-                addActionError("The IP is already unblocked or does not exist in the list.");
-                return false;
-            }
-
-            String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + cloudflareWafConfig.getAccountOrZoneId()
-                    + "/rules/lists/" + cloudflareWafConfig.getListId() + "/items";
-            Map<String, List<String>> headers = CloudflareWafAction.getAuthHeaders(cloudflareWafConfig);
-
-            BasicDBObject deletePayload = new BasicDBObject();
-            BasicDBList itemsList = new BasicDBList();
-            BasicDBObject itemObj = new BasicDBObject();
-            itemObj.put("id", itemId);
-            itemsList.add(itemObj);
-            deletePayload.put("items", itemsList);
-
-            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "DELETE", deletePayload.toString(), headers, "");
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-
-            if (response.getStatusCode() > 201 || response.getBody() == null) {
-                String cfErr = CloudflareWafAction.extractCfError(response.getBody());
-                addActionError(cfErr != null ? cfErr : "Unable to unblock IP address. Try again later.");
-                return false;
-            }
-        } catch (Exception e) {
-            addActionError("Unable to unblock IP address. Try again later.");
-            loggerMaker.errorAndAddToDb("Error removing IP from Cloudflare list: " + e.getMessage());
-            return false;
-        }
-        return true;
-    }
-
-    private static String findListItemByIP(String actorIp, Config.CloudflareWafConfig config) {
-        try {
-            String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
-                    + "/rules/lists/" + config.getListId() + "/items?search=" + actorIp;
-            Map<String, List<String>> headers = CloudflareWafAction.getAuthHeaders(config);
-
-            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", "", headers, "");
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-
-            if (response.getStatusCode() > 201 || response.getBody() == null) return null;
-
-            BasicDBList result = (BasicDBList) BasicDBObject.parse(response.getBody()).get("result");
-            if (result == null || result.isEmpty()) return null;
-            return ((BasicDBObject) result.get(0)).getString("id");
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error searching Cloudflare list item: " + e.getMessage());
-            return null;
-        }
     }
 
     // ==================== Bulk Block/Unblock ====================
@@ -506,43 +426,38 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             return ERROR.toUpperCase();
         }
 
-        int accId = Context.accountId.get();
-        Bson filters = Filters.and(
-            Filters.eq(Constants.ID, accId + "_" + Config.ConfigType.CLOUDFLARE_WAF),
-            Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, accId)
-        );
+        Config.CloudflareWafConfig cloudflareWafConfig = getCloudflareConfig();
 
-        Config.CloudflareWafConfig cloudflareWafConfig = (Config.CloudflareWafConfig) ConfigsDao.instance.findOne(filters);
-        cloudflareWafConfig = CloudflareWafAction.migrateToListIfNeeded(cloudflareWafConfig);
-
-        if (cloudflareWafConfig == null || cloudflareWafConfig.getListId() == null) {
+        if (!hasValidListConfig(cloudflareWafConfig)) {
             addActionError("Cloudflare WAF integration not configured properly.");
             return ERROR.toUpperCase();
         }
 
         boolean result;
         if ("blocked".equalsIgnoreCase(status)) {
-            result = bulkBlockIPs(cloudflareWafConfig, actorIps);
+            result = addIPsToList(cloudflareWafConfig, actorIps);
         } else {
-            result = bulkUnblockIPs(cloudflareWafConfig, actorIps);
+            result = removeIPsFromLists(cloudflareWafConfig, actorIps);
         }
 
         if (!result) {
             return ERROR.toUpperCase();
         }
 
-        // Notify backend for each IP
         for (String ip : actorIps) {
             sendModifyThreatActorStatusToBackend(ip);
         }
-
         return SUCCESS.toUpperCase();
     }
 
-    private boolean bulkBlockIPs(Config.CloudflareWafConfig config, List<String> ips) {
+    // ==================== Cloudflare List Operations ====================
+
+    /**
+     * Adds IPs to the last list. If list is full, creates overflow list and retries.
+     */
+    private boolean addIPsToList(Config.CloudflareWafConfig config, List<String> ips) {
         try {
-            String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
-                    + "/rules/lists/" + config.getListId() + "/items";
+            String currentListId = getLastListId(config);
             Map<String, List<String>> headers = CloudflareWafAction.getAuthHeaders(config);
 
             BasicDBList items = new BasicDBList();
@@ -552,61 +467,120 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                 items.add(ipItem);
             }
 
+            String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
+                    + "/rules/lists/" + currentListId + "/items";
             OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", items.toString(), headers, "");
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
 
             if (response.getStatusCode() > 201 || response.getBody() == null) {
                 String cfErr = CloudflareWafAction.extractCfError(response.getBody());
-                addActionError(cfErr != null ? cfErr : "Unable to block IPs.");
+
+                // Check if list is at capacity — create overflow list and retry
+                if (cfErr != null && cfErr.toLowerCase().contains("maximum")) {
+                    String newListId = CloudflareWafAction.createOverflowList(config);
+                    if (newListId == null) {
+                        addActionError("Failed to create overflow IP list.");
+                        return false;
+                    }
+                    // Retry with new list
+                    url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
+                            + "/rules/lists/" + newListId + "/items";
+                    request = new OriginalHttpRequest(url, "", "POST", items.toString(), headers, "");
+                    response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+                    if (response.getStatusCode() > 201 || response.getBody() == null) {
+                        addActionError(CloudflareWafAction.extractCfError(response.getBody()));
+                        return false;
+                    }
+                    return true;
+                }
+
+                addActionError(cfErr != null ? cfErr : "Unable to block IP(s).");
                 return false;
             }
             return true;
         } catch (Exception e) {
-            addActionError("Unable to block IPs. Try again later.");
-            loggerMaker.errorAndAddToDb("Error bulk adding IPs to Cloudflare list: " + e.getMessage());
+            addActionError("Unable to block IP(s). Try again later.");
+            loggerMaker.errorAndAddToDb("Error adding IPs to Cloudflare list: " + e.getMessage());
             return false;
         }
     }
 
-    private boolean bulkUnblockIPs(Config.CloudflareWafConfig config, List<String> ips) {
+    /**
+     * Removes IPs by searching across ALL lists and deleting from whichever contains them.
+     */
+    private boolean removeIPsFromLists(Config.CloudflareWafConfig config, List<String> ips) {
         try {
-            String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
-                    + "/rules/lists/" + config.getListId() + "/items";
             Map<String, List<String>> headers = CloudflareWafAction.getAuthHeaders(config);
 
-            // Find item IDs for all IPs
-            BasicDBList itemsToDelete = new BasicDBList();
+            // Group items to delete by their list ID
+            Map<String, BasicDBList> deleteByList = new HashMap<>();
             for (String ip : ips) {
-                String itemId = findListItemByIP(ip, config);
-                if (itemId != null && !itemId.isEmpty()) {
+                String[] found = findItemAcrossLists(ip, config);
+                if (found != null) {
+                    String foundListId = found[0];
+                    String itemId = found[1];
+                    deleteByList.computeIfAbsent(foundListId, k -> new BasicDBList());
                     BasicDBObject itemObj = new BasicDBObject();
                     itemObj.put("id", itemId);
-                    itemsToDelete.add(itemObj);
+                    deleteByList.get(foundListId).add(itemObj);
                 }
             }
 
-            if (itemsToDelete.isEmpty()) {
-                addActionError("None of the IPs were found in the block list.");
+            if (deleteByList.isEmpty()) {
+                addActionError("None of the IPs were found in the block list(s).");
                 return false;
             }
 
-            BasicDBObject deletePayload = new BasicDBObject();
-            deletePayload.put("items", itemsToDelete);
+            // Delete from each list in one call per list
+            for (Map.Entry<String, BasicDBList> entry : deleteByList.entrySet()) {
+                String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
+                        + "/rules/lists/" + entry.getKey() + "/items";
+                BasicDBObject deletePayload = new BasicDBObject();
+                deletePayload.put("items", entry.getValue());
 
-            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "DELETE", deletePayload.toString(), headers, "");
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+                OriginalHttpRequest request = new OriginalHttpRequest(url, "", "DELETE", deletePayload.toString(), headers, "");
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
 
-            if (response.getStatusCode() > 201 || response.getBody() == null) {
-                String cfErr = CloudflareWafAction.extractCfError(response.getBody());
-                addActionError(cfErr != null ? cfErr : "Unable to unblock IPs.");
-                return false;
+                if (response.getStatusCode() > 201 || response.getBody() == null) {
+                    String cfErr = CloudflareWafAction.extractCfError(response.getBody());
+                    addActionError(cfErr != null ? cfErr : "Unable to unblock IP(s).");
+                    return false;
+                }
             }
             return true;
         } catch (Exception e) {
-            addActionError("Unable to unblock IPs. Try again later.");
-            loggerMaker.errorAndAddToDb("Error bulk removing IPs from Cloudflare list: " + e.getMessage());
+            addActionError("Unable to unblock IP(s). Try again later.");
+            loggerMaker.errorAndAddToDb("Error removing IPs from Cloudflare lists: " + e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Searches for an IP across all lists. Returns [listId, itemId] or null.
+     */
+    private static String[] findItemAcrossLists(String actorIp, Config.CloudflareWafConfig config) {
+        Map<String, List<String>> headers = CloudflareWafAction.getAuthHeaders(config);
+        for (String listId : config.getListIds()) {
+            try {
+                String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
+                        + "/rules/lists/" + listId + "/items?search=" + actorIp;
+                OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", "", headers, "");
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+
+                if (response.getStatusCode() > 201 || response.getBody() == null) continue;
+
+                BasicDBList result = (BasicDBList) BasicDBObject.parse(response.getBody()).get("result");
+                if (result != null && !result.isEmpty()) {
+                    String itemId = ((BasicDBObject) result.get(0)).getString("id");
+                    if (itemId != null) {
+                        return new String[]{listId, itemId};
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error searching list " + listId + " for IP: " + e.getMessage());
+            }
+        }
+        return null;
     }
 
     public List<String> getActorIps() {

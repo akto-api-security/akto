@@ -76,14 +76,16 @@ public class CloudflareWafAction extends UserAction {
         }
 
         // 2. Find or create IP list (account-level)
-        String listId;
-        if (existingConfig != null && existingConfig.getListId() != null) {
-            listId = existingConfig.getListId();
+        List<String> listIds;
+        if (existingConfig != null && existingConfig.getListIds() != null && !existingConfig.getListIds().isEmpty()) {
+            listIds = existingConfig.getListIds();
         } else {
-            listId = findOrCreateIpList(config, "akto_blocked_ips_" + accId);
+            String listId = findOrCreateIpList(config, "akto_blocked_ips_" + accId);
             if (listId == null) {
                 return ERROR.toUpperCase();
             }
+            listIds = new ArrayList<>();
+            listIds.add(listId);
         }
 
         // 3. Find or create WAF rule
@@ -91,13 +93,13 @@ public class CloudflareWafAction extends UserAction {
         if (existingConfig != null && existingConfig.getRuleId() != null) {
             ruleId = existingConfig.getRuleId();
         } else {
-            ruleId = createWafRule(config, "akto_blocked_ips_" + accId);
+            ruleId = createWafRule(config, buildListNames(accId, listIds.size()));
             if (ruleId == null) {
                 return ERROR.toUpperCase();
             }
         }
 
-        config.setListId(listId);
+        config.setListIds(listIds);
         config.setRuleId(ruleId);
 
         // 4. Save
@@ -107,7 +109,7 @@ public class CloudflareWafAction extends UserAction {
                     Updates.set(Config.CloudflareWafConfig.INTEGRATION_TYPE, integrationType),
                     Updates.set(Config.CloudflareWafConfig.EMAIL, email),
                     Updates.set(Config.CloudflareWafConfig.SEVERITY_LEVELS, severityLevels),
-                    Updates.set(Config.CloudflareWafConfig.LIST_ID, listId),
+                    Updates.set(Config.CloudflareWafConfig.LIST_IDS, listIds),
                     Updates.set(Config.CloudflareWafConfig.RULE_ID, ruleId),
                     Updates.set(Config.CloudflareWafConfig.ZONE_ID, zoneId)
             );
@@ -126,6 +128,13 @@ public class CloudflareWafAction extends UserAction {
                 Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, accId),
                 Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
         );
+        Config.CloudflareWafConfig config = (Config.CloudflareWafConfig) ConfigsDao.instance.findOne(filters);
+        if (config != null) {
+            if (config.getRuleId() != null) {
+                deleteWafRule(config);
+            }
+            deleteAllIpLists(config);
+        }
         ConfigsDao.instance.getMCollection().deleteOne(filters);
         return SUCCESS.toUpperCase();
     }
@@ -145,7 +154,7 @@ public class CloudflareWafAction extends UserAction {
      * Called from ThreatActorAction before block/unblock.
      */
     public static Config.CloudflareWafConfig migrateToListIfNeeded(Config.CloudflareWafConfig config) {
-        if (config == null || config.getListId() != null) {
+        if (config == null || (config.getListIds() != null && !config.getListIds().isEmpty())) {
             return config;
         }
 
@@ -155,14 +164,93 @@ public class CloudflareWafAction extends UserAction {
             return config;
         }
 
-        config.setListId(listId);
+        List<String> listIds = new ArrayList<>();
+        listIds.add(listId);
+        config.setListIds(listIds);
         Bson filters = Filters.and(
                 Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, config.getAccountId()),
                 Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
         );
-        ConfigsDao.instance.updateOne(filters, Updates.set(Config.CloudflareWafConfig.LIST_ID, listId));
+        ConfigsDao.instance.updateOne(filters, Updates.set(Config.CloudflareWafConfig.LIST_IDS, listIds));
         loggerMaker.infoAndAddToDb("Auto-migrated Cloudflare WAF config for account " + config.getAccountId());
         return config;
+    }
+
+    /**
+     * Creates a new overflow list when the current one is full.
+     * Updates the WAF rule expression to include the new list.
+     * Returns the new list ID, or null on failure.
+     */
+    public static String createOverflowList(Config.CloudflareWafConfig config) {
+        int accId = config.getAccountId();
+        int nextIndex = config.getListIds().size();
+        String newListName = "akto_blocked_ips_" + accId + "_" + nextIndex;
+
+        String newListId = findOrCreateIpList(config, newListName);
+        if (newListId == null) {
+            return null;
+        }
+
+        config.getListIds().add(newListId);
+
+        // Update WAF rule expression to include new list
+        if (config.getRuleId() != null) {
+            updateWafRuleExpression(config);
+        }
+
+        // Persist updated listIds
+        Bson filters = Filters.and(
+                Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, accId),
+                Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
+        );
+        ConfigsDao.instance.updateOne(filters, Updates.set(Config.CloudflareWafConfig.LIST_IDS, config.getListIds()));
+
+        return newListId;
+    }
+
+    /**
+     * Updates the WAF rule expression to reference all lists.
+     */
+    private static void updateWafRuleExpression(Config.CloudflareWafConfig config) {
+        try {
+            boolean isZoneLevel = "zones".equalsIgnoreCase(config.getIntegrationType());
+            Map<String, List<String>> headers = getAuthHeaders(config);
+            String expression = buildExpression(buildListNames(config.getAccountId(), config.getListIds().size()));
+
+            BasicDBObject patchPayload = new BasicDBObject();
+            patchPayload.put("expression", expression);
+            patchPayload.put("action", "block");
+            patchPayload.put("description", "Akto - Block malicious IPs");
+
+            if (isZoneLevel && config.getZoneId() != null) {
+                String entrypointId = findEntrypoint("/zones/" + config.getZoneId(), headers);
+                if (entrypointId != null) {
+                    String url = CLOUDFLARE_BASE_URL + "/zones/" + config.getZoneId()
+                            + "/rulesets/" + entrypointId + "/rules/" + config.getRuleId();
+                    sendRequest(url, "PATCH", patchPayload.toString(), headers);
+                }
+            } else {
+                // Account-level: update rule inside the custom ruleset
+                // ruleId is the custom ruleset ID, need to update the rule inside it
+                String url = CLOUDFLARE_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
+                        + "/rulesets/" + config.getRuleId();
+                OriginalHttpResponse resp = sendRequest(url, "GET", "", headers);
+                if (resp.getStatusCode() <= 201 && resp.getBody() != null) {
+                    BasicDBObject result = (BasicDBObject) BasicDBObject.parse(resp.getBody()).get("result");
+                    if (result != null) {
+                        BasicDBList rules = (BasicDBList) result.get("rules");
+                        if (rules != null && !rules.isEmpty()) {
+                            String innerRuleId = ((BasicDBObject) rules.get(0)).getString("id");
+                            url = CLOUDFLARE_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
+                                    + "/rulesets/" + config.getRuleId() + "/rules/" + innerRuleId;
+                            sendRequest(url, "PATCH", patchPayload.toString(), headers);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error updating WAF rule expression: " + e.getMessage());
+        }
     }
 
     // ==================== Cloudflare API Helpers ====================
@@ -255,24 +343,28 @@ public class CloudflareWafAction extends UserAction {
         }
     }
 
-    private static void deleteIpList(Config.CloudflareWafConfig config) {
-        try {
-            String url = CLOUDFLARE_BASE_URL + "/accounts/" + config.getAccountOrZoneId() + "/rules/lists/" + config.getListId();
-            sendCfRequest(url, "DELETE", "", config);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error deleting IP list: " + e.getMessage());
+    private static void deleteAllIpLists(Config.CloudflareWafConfig config) {
+        if (config.getListIds() == null) return;
+        for (String id : config.getListIds()) {
+            try {
+                String url = CLOUDFLARE_BASE_URL + "/accounts/" + config.getAccountOrZoneId() + "/rules/lists/" + id;
+                sendCfRequest(url, "DELETE", "", config);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error deleting IP list " + id + ": " + e.getMessage());
+            }
         }
     }
 
     // --- WAF Rule ---
 
-    private static String createWafRule(Config.CloudflareWafConfig config, String listName) {
+    private static String createWafRule(Config.CloudflareWafConfig config, List<String> listNames) {
         boolean isZoneLevel = "zones".equalsIgnoreCase(config.getIntegrationType());
+        String expression = buildExpression(listNames);
 
         if (isZoneLevel) {
-            return createZoneLevelRule(config, listName);
+            return createZoneLevelRule(config, expression);
         } else {
-            return createAccountLevelRule(config, listName);
+            return createAccountLevelRule(config, expression);
         }
     }
 
@@ -280,14 +372,13 @@ public class CloudflareWafAction extends UserAction {
      * Zone-level: add block rule directly to zone entrypoint.
      * Works on all Cloudflare plans.
      */
-    private static String createZoneLevelRule(Config.CloudflareWafConfig config, String listName) {
+    private static String createZoneLevelRule(Config.CloudflareWafConfig config, String expression) {
         try {
             String zId = config.getZoneId();
             Map<String, List<String>> headers = getAuthHeaders(config);
 
-            // Check if entrypoint exists
             String entrypointId = findEntrypoint("/zones/" + zId, headers);
-            BasicDBObject blockRule = buildBlockRule(listName);
+            BasicDBObject blockRule = buildBlockRule(expression);
 
             OriginalHttpResponse resp;
             if (entrypointId != null) {
@@ -306,7 +397,7 @@ public class CloudflareWafAction extends UserAction {
                 loggerMaker.errorAndAddToDb("Failed to create zone WAF rule: " + extractCfError(resp.getBody()));
                 return null;
             }
-            return extractRuleId(resp.getBody(), listName);
+            return extractRuleId(resp.getBody());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error creating zone WAF rule: " + e.getMessage());
             return null;
@@ -317,7 +408,7 @@ public class CloudflareWafAction extends UserAction {
      * Account-level: create custom ruleset + deploy via execute rule in entrypoint.
      * Requires Enterprise plan.
      */
-    private static String createAccountLevelRule(Config.CloudflareWafConfig config, String listName) {
+    private static String createAccountLevelRule(Config.CloudflareWafConfig config, String expression) {
         try {
             String accId = config.getAccountOrZoneId();
             Map<String, List<String>> headers = getAuthHeaders(config);
@@ -325,9 +416,9 @@ public class CloudflareWafAction extends UserAction {
             // Step 1: Create custom ruleset with block rule
             String url = CLOUDFLARE_BASE_URL + "/accounts/" + accId + "/rulesets";
             BasicDBList rules = new BasicDBList();
-            rules.add(buildBlockRule(listName));
+            rules.add(buildBlockRule(expression));
             BasicDBObject payload = new BasicDBObject();
-            payload.put("name", "Akto IP Block - " + listName);
+            payload.put("name", "Akto IP Block Rules");
             payload.put("kind", "custom");
             payload.put("phase", "http_request_firewall_custom");
             payload.put("rules", rules);
@@ -350,7 +441,7 @@ public class CloudflareWafAction extends UserAction {
             actionParams.put("id", customRulesetId);
             executeRule.put("action_parameters", actionParams);
             executeRule.put("expression", "true");
-            executeRule.put("description", "Deploy Akto IP block - " + listName);
+            executeRule.put("description", "Deploy Akto IP block rules");
 
             if (entrypointId != null) {
                 url = CLOUDFLARE_BASE_URL + "/accounts/" + accId + "/rulesets/" + entrypointId + "/rules";
@@ -418,24 +509,53 @@ public class CloudflareWafAction extends UserAction {
         }
     }
 
-    private static BasicDBObject buildBlockRule(String listName) {
+    /**
+     * Builds list names for a given account and count.
+     * First list: akto_blocked_ips_{accId}, overflow: akto_blocked_ips_{accId}_1, _2, etc.
+     */
+    static List<String> buildListNames(int accId, int count) {
+        List<String> names = new ArrayList<>();
+        names.add("akto_blocked_ips_" + accId);
+        for (int i = 1; i < count; i++) {
+            names.add("akto_blocked_ips_" + accId + "_" + i);
+        }
+        return names;
+    }
+
+    /**
+     * Builds WAF rule expression from list names.
+     * Format: (ip.src in $list1) or (ip.src in $list2)
+     */
+    static String buildExpression(List<String> listNames) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < listNames.size(); i++) {
+            if (i > 0) sb.append(" or ");
+            sb.append("(ip.src in $").append(listNames.get(i)).append(")");
+        }
+        return sb.toString();
+    }
+
+    private static BasicDBObject buildBlockRule(String expression) {
         BasicDBObject rule = new BasicDBObject();
         rule.put("action", "block");
-        rule.put("expression", "(ip.src in $" + listName + ")");
+        rule.put("expression", expression);
         rule.put("description", "Akto - Block malicious IPs");
         return rule;
     }
 
-    private static String extractRuleId(String body, String listName) {
+    /**
+     * Extracts the rule ID for the Akto block rule from the ruleset response.
+     */
+    private static String extractRuleId(String body) {
         try {
             BasicDBObject result = (BasicDBObject) BasicDBObject.parse(body).get("result");
             if (result == null) return null;
             BasicDBList rules = (BasicDBList) result.get("rules");
             if (rules == null) return null;
-            String expr = "(ip.src in $" + listName + ")";
             for (Object item : rules) {
                 BasicDBObject rule = (BasicDBObject) item;
-                if (expr.equals(rule.getString("expression"))) {
+                String desc = rule.getString("description");
+                if ("Akto - Block malicious IPs".equals(desc)) {
                     return rule.getString("id");
                 }
             }
