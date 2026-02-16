@@ -771,6 +771,13 @@ public abstract class Config {
         private List<String> severityLevels;
         public static final String SEVERITY_LEVELS = "severityLevels";
 
+        public static final String LIST_ID = "listId";
+        private String listId;
+        public static final String RULE_ID = "ruleId";
+        private String ruleId;
+        public static final String ZONE_ID = "zoneId";
+        private String zoneId;
+
         public static final String _CONFIG_ID = "configId";
         public static final String CONFIG_ID = ConfigType.CLOUDFLARE_WAF.name();
 
@@ -839,6 +846,30 @@ public abstract class Config {
 
         public void setSeverityLevels(List<String> severityLevels) {
             this.severityLevels = severityLevels;
+        }
+
+        public String getListId() {
+            return listId;
+        }
+
+        public void setListId(String listId) {
+            this.listId = listId;
+        }
+
+        public String getRuleId() {
+            return ruleId;
+        }
+
+        public void setRuleId(String ruleId) {
+            this.ruleId = ruleId;
+        }
+
+        public String getZoneId() {
+            return zoneId;
+        }
+
+        public void setZoneId(String zoneId) {
+            this.zoneId = zoneId;
         }
     }
 
