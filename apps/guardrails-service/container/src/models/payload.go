@@ -64,6 +64,7 @@ type HttpResponseParams struct {
 type ValidationRequest struct {
 	BatchData     []IngestDataBatch `json:"batchData"`
 	ContextSource string            `json:"contextSource,omitempty"` // Optional context source for policy filtering
+	SkipThreat    *bool             `json:"skipThreat,omitempty"`     // Optional: skip threat reporting to TBS (default: false)
 }
 
 // ValidationResponse represents the response from validation

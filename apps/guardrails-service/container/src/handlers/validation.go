@@ -86,6 +86,7 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	var req struct {
 		Payload       string `json:"payload" binding:"required"`
 		ContextSource string `json:"contextSource,omitempty"` // Optional context source
+		SkipThreat    *bool  `json:"skipThreat,omitempty"`    // Optional: skip threat reporting to TBS (default: false)
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -98,7 +99,13 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	// Extract session and request IDs from headers
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
 
-	result, err := h.validatorService.ValidateRequest(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID)
+	// Default skipThreat to false if not provided
+	skipThreat := false
+	if req.SkipThreat != nil {
+		skipThreat = *req.SkipThreat
+	}
+
+	result, err := h.validatorService.ValidateRequest(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID, skipThreat)
 	if err != nil {
 		h.logger.Error("Failed to validate request", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -115,6 +122,7 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 	var req struct {
 		Payload       string `json:"payload" binding:"required"`
 		ContextSource string `json:"contextSource,omitempty"` // Optional context source
+		SkipThreat    *bool  `json:"skipThreat,omitempty"`    // Optional: skip threat reporting to TBS (default: false)
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -127,7 +135,13 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 	// Extract session and request IDs from headers
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
 
-	result, err := h.validatorService.ValidateResponse(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID)
+	// Default skipThreat to false if not provided
+	skipThreat := false
+	if req.SkipThreat != nil {
+		skipThreat = *req.SkipThreat
+	}
+
+	result, err := h.validatorService.ValidateResponse(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID, skipThreat)
 	if err != nil {
 		h.logger.Error("Failed to validate response", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{

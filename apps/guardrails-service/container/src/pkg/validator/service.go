@@ -33,12 +33,15 @@ type policyCache struct {
 
 // Service handles payload validation using akto-gateway library
 type Service struct {
-	config     *config.Config
-	dbClient   *dbabstractor.Client
-	processor  mcp.RequestProcessor
-	logger     *zap.Logger
-	cache      *policyCache
-	sessionMgr *session.SessionManager
+	config      *config.Config
+	dbClient    *dbabstractor.Client
+	processor   mcp.RequestProcessor // Default processor (skipThreat=false)
+	validator   mcp.PolicyValidator
+	ingestor    mcp.DataIngestor
+	sessionMgr  mcp.SessionManagerInterface
+	logger      *zap.Logger
+	cache       *policyCache
+	sessionMgr2 *session.SessionManager // Our session manager implementation
 }
 
 // NewService creates a new validator service
@@ -55,20 +58,17 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 	// Create session manager (can be nil if not using sessions)
 	var sessionMgr mcp.SessionManagerInterface = nil
 
-	// Create processor with validator, ingestor, and sessionManager
-	// skipThreat controls whether threats are reported to TBS
-	// If SkipThreatReporting is true, skip reporting and return response directly
-	skipThreat := cfg.SkipThreatReporting
-	if skipThreat {
-		logger.Info("Threat reporting to TBS is disabled - responses will be returned directly without forwarding")
-	}
-	processor := mcp.NewCommonMCPProcessor(
+	// Create default processor with validator, ingestor, and sessionManager
+	// Note: skipThreat is now controlled per-request via API parameter, not at service level
+	// Default processor created with skipThreat=false (will report threats)
+	// Per-request processors will be created on-demand with the requested skipThreat value
+	defaultProcessor := mcp.NewCommonMCPProcessor(
 		validator,
 		ingestor,
 		sessionMgr,
-		"",         // sessionID - empty for our use case
-		"",         // projectName - empty for our use case
-		skipThreat, // skipThreat - true to skip TBS reporting, false to enable threat reporting
+		"",    // sessionID - empty for our use case
+		"",    // projectName - empty for our use case
+		false, // skipThreat - default to false, will be overridden per-request if needed
 	)
 
 	// Initialize session manager if enabled
@@ -97,12 +97,15 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 	}
 
 	return &Service{
-		config:     cfg,
-		dbClient:   dbClient,
-		processor:  processor,
-		logger:     logger,
-		cache:      &policyCache{},
-		sessionMgr: sessionManager,
+		config:      cfg,
+		dbClient:    dbClient,
+		processor:   defaultProcessor,
+		validator:   validator,
+		ingestor:    ingestor,
+		sessionMgr:  sessionMgr,
+		logger:      logger,
+		cache:       &policyCache{},
+		sessionMgr2: sessionManager,
 	}, nil
 }
 
@@ -316,8 +319,26 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
+// getProcessor returns a processor with the specified skipThreat setting
+// If skipThreat matches the default processor, reuse it; otherwise create a new one
+func (s *Service) getProcessor(skipThreat bool) mcp.RequestProcessor {
+	if !skipThreat {
+		// Reuse default processor when skipThreat=false
+		return s.processor
+	}
+	// Create a new processor with skipThreat=true
+	return mcp.NewCommonMCPProcessor(
+		s.validator,
+		s.ingestor,
+		s.sessionMgr,
+		"",         // sessionID - empty for our use case
+		"",         // projectName - empty for our use case
+		skipThreat, // skipThreat - per-request setting
+	)
+}
+
 // ValidateRequest validates a request payload against guardrail policies with session tracking
-func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSource string, sessionID string, requestID string) (*mcp.ValidationResult, error) {
+func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSource string, sessionID string, requestID string, skipThreat bool) (*mcp.ValidationResult, error) {
 	s.logger.Info("Validating request payload",
 		zap.String("sessionID", sessionID),
 		zap.String("requestID", requestID))
@@ -352,8 +373,11 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSo
 		zap.Bool("hasAuditRules", hasAuditRules),
 		zap.String("payload", payloadToValidate))
 
+	// Get processor with the requested skipThreat setting
+	processor := s.getProcessor(skipThreat)
+
 	// Use processor's ProcessRequest method with external policies (using modified payload)
-	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+	processResult, err := processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
 	if err != nil {
 		s.logger.Error("ProcessRequest failed", zap.Error(err))
 		return nil, fmt.Errorf("failed to process request: %w", err)
@@ -367,7 +391,7 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSo
 		zap.Any("parsedData", processResult.ParsedData))
 
 	// Track blocked response if request was blocked
-	session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, requestID, processResult)
+	session.TrackBlockedResponse(s.sessionMgr2, s.logger, sessionID, requestID, processResult)
 
 	// Convert ProcessResult to ValidationResult
 	result := &mcp.ValidationResult{
@@ -387,7 +411,7 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSo
 }
 
 // ValidateResponse validates a response payload against guardrail policies with session tracking
-func (s *Service) ValidateResponse(ctx context.Context, payload string, contextSource string, sessionID string, requestID string) (*mcp.ValidationResult, error) {
+func (s *Service) ValidateResponse(ctx context.Context, payload string, contextSource string, sessionID string, requestID string, skipThreat bool) (*mcp.ValidationResult, error) {
 	s.logger.Info("Validating response payload",
 		zap.String("sessionID", sessionID),
 		zap.String("requestID", requestID))
@@ -404,15 +428,18 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 		SessionID:     sessionID,
 	}
 
+	// Get processor with the requested skipThreat setting
+	processor := s.getProcessor(skipThreat)
+
 	// Use processor's ProcessResponse method with external policies
-	processResult, err := s.processor.ProcessResponse(ctx, payload, valCtx, policies)
+	processResult, err := processor.ProcessResponse(ctx, payload, valCtx, policies)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process response: %w", err)
 	}
 
 	// Track response and generate summary
 	isMalicious := processResult.IsBlocked
-	session.TrackResponseAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload, isMalicious)
+	session.TrackResponseAndGenerateSummary(s.sessionMgr2, s.logger, sessionID, requestID, payload, isMalicious)
 
 	// Convert ProcessResult to ValidationResult for backward compatibility
 	result := &mcp.ValidationResult{
@@ -432,7 +459,7 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 }
 
 // ValidateBatch validates a batch of request/response pairs
-func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDataBatch, contextSource string) ([]ValidationBatchResult, error) {
+func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDataBatch, contextSource string, skipThreat bool) ([]ValidationBatchResult, error) {
 	s.logger.Info("Validating batch data", zap.Int("count", len(batchData)))
 
 	// Get cached policies (refreshes if stale)
@@ -485,6 +512,9 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		var reqResult, respResult *mcp.ValidationResult
 
+		// Get processor with the requested skipThreat setting for this batch
+		processor := s.getProcessor(skipThreat)
+
 		// Validate request payload if present
 		if data.RequestPayload != "" {
 			s.logger.Debug("Processing request",
@@ -493,7 +523,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.String("path", data.Path),
 				zap.String("payload", data.RequestPayload))
 
-			processResult, err := s.processor.ProcessRequest(ctx, data.RequestPayload, valCtx, policies, auditPolicies, hasAuditRules)
+			processResult, err := processor.ProcessRequest(ctx, data.RequestPayload, valCtx, policies, auditPolicies, hasAuditRules)
 			if err != nil {
 				s.logger.Error("Failed to validate request",
 					zap.Int("index", i),
@@ -521,7 +551,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		// Validate response payload if present
 		if data.ResponsePayload != "" {
-			processResult, err := s.processor.ProcessResponse(ctx, data.ResponsePayload, valCtx, policies)
+			processResult, err := processor.ProcessResponse(ctx, data.ResponsePayload, valCtx, policies)
 			if err != nil {
 				s.logger.Error("Failed to validate response", zap.Error(err))
 				result.ResponseError = err.Error()
