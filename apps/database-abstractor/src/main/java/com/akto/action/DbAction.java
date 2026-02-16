@@ -82,11 +82,20 @@ import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
+
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import lombok.Getter;
 import lombok.Setter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class DbAction extends ActionSupport {
     static final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
@@ -311,6 +320,12 @@ public class DbAction extends ActionSupport {
     int scheduleTs;
     TestingRunPlayground testingRunPlayground;
     private String testingRunPlaygroundId;
+    @Getter @Setter
+    List<Map<String, Object>> agentProxyGuardrailEndpoints;
+    
+    // Fields for agent proxy guardrail endpoints (reusing updatedAfter from MCP)
+    @Getter @Setter
+    String appServerName;
 
     private static final Gson gson = new Gson();
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
@@ -3454,6 +3469,95 @@ public class DbAction extends ActionSupport {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateServiceGraphEdges: " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchAgentProxyGuardrailEndpoints() {
+        try {
+            // Validate updatedAfter (must be >= 0) - reusing existing MCP updatedAfter field
+            if (updatedAfter != null && updatedAfter < 0) {
+                loggerMaker.errorAndAddToDb("Invalid updatedAfter parameter: " + updatedAfter);
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Build query for ApiInfo where guardrails are enabled
+            List<Bson> filters = new ArrayList<>();
+            filters.add(Filters.eq(ApiInfo.AGENT_PROXY_GUARDRAIL_ENABLED, true));
+
+            // Filter by updatedAt (lastSeen field in ApiInfo)
+            // updatedAfter is in milliseconds from request, convert to seconds for ApiInfo.lastSeen
+            if (updatedAfter != null && updatedAfter > 0) {
+                // Convert milliseconds to seconds (ApiInfo.lastSeen is in seconds)
+                int updatedAfterSeconds = (int) (updatedAfter / 1000);
+                filters.add(Filters.gt(ApiInfo.LAST_SEEN, updatedAfterSeconds));
+            }
+
+            // Each agent proxy instance filters by its own host (appServerName), which uniquely identifies it
+
+            Bson query = Filters.and(filters);
+
+            // Fetch ApiInfo records
+            List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(query, 0, Integer.MAX_VALUE, Sorts.ascending(ApiInfo.LAST_SEEN));
+
+            // Transform ApiInfo records to response format (return API info records directly)
+            List<Map<String, Object>> results = new ArrayList<>();
+            Set<Integer> collectionIds = new HashSet<>();
+            
+            // Collect unique collection IDs for batch lookup
+            for (ApiInfo apiInfo : apiInfoList) {
+                if (apiInfo.getId() != null && apiInfo.getId().getApiCollectionId() != 0) {
+                    collectionIds.add(apiInfo.getId().getApiCollectionId());
+                }
+            }
+
+            // Batch fetch ApiCollections for host names
+            Map<Integer, String> collectionIdToHostName = new HashMap<>();
+            if (!collectionIds.isEmpty()) {
+                List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+                    Filters.in("_id", new ArrayList<>(collectionIds)),
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)
+                );
+                for (ApiCollection collection : apiCollections) {
+                    collectionIdToHostName.put(collection.getId(), collection.getHostName());
+                }
+            }
+
+            // Filter by appServerName if provided (after fetching host names)
+            for (ApiInfo apiInfo : apiInfoList) {
+                if (apiInfo.getId() == null) continue;
+
+                String hostName = collectionIdToHostName.get(apiInfo.getId().getApiCollectionId());
+                
+                // Filter by appServerName if provided
+                if (appServerName != null && !appServerName.isEmpty()) {
+                    if (hostName == null || !hostName.equals(appServerName)) {
+                        continue;
+                    }
+                }
+
+                // Return API info record directly as map
+                ApiInfo.ApiInfoKey apiInfoKey = apiInfo.getId();
+                Map<String, Object> apiInfoMap = new HashMap<>();
+                // Use ApiInfoKey string representation as ID
+                String idString = apiInfoKey.getApiCollectionId() + " " + apiInfoKey.getUrl() + " " + apiInfoKey.getMethod().name();
+                apiInfoMap.put("id", idString);
+                apiInfoMap.put("_id", idString); // Same as id for compatibility
+                apiInfoMap.put("method", apiInfoKey.getMethod().name());
+                apiInfoMap.put("url", apiInfoKey.getUrl());
+                apiInfoMap.put("host", hostName != null ? hostName : ""); // Ensure host is always present
+                apiInfoMap.put("updatedAt", apiInfo.getLastSeen() * 1000L); // Convert seconds to milliseconds
+                apiInfoMap.put("isDeleted", false); // ApiInfo doesn't have isDeleted field, default to false
+                apiInfoMap.put("apiCollectionId", apiInfoKey.getApiCollectionId()); // Include collection ID
+
+                results.add(apiInfoMap);
+            }
+
+            agentProxyGuardrailEndpoints = results;
+            loggerMaker.infoAndAddToDb("Fetched " + agentProxyGuardrailEndpoints.size() + " agent proxy guardrail endpoint selections from api_info");
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching agent proxy guardrail endpoints: " + e.toString());
             return Action.ERROR.toUpperCase();
         }
     }
