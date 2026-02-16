@@ -6,7 +6,9 @@ import com.akto.publisher.KafkaDataPublisher;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -314,13 +316,13 @@ public class HttpProxyAction extends ActionSupport {
         }, threadName).start();
     }
 
-    /**
-     * Helper method to build TrueFoundry input map from individual fields
-     */
+    @SuppressWarnings("unchecked")
     private Map<String, Object> buildTrueFoundryInput() {
         Map<String, Object> tfInput = new HashMap<>();
         if (requestBody != null) {
-            tfInput.put("requestBody", requestBody);
+            Map<String, Object> body = new HashMap<>(requestBody);
+            extractLastUserMessage(body);
+            tfInput.put("requestBody", body);
         }
         if (responseBody != null) {
             tfInput.put("responseBody", responseBody);
@@ -332,6 +334,20 @@ public class HttpProxyAction extends ActionSupport {
             tfInput.put("context", context);
         }
         return tfInput;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void extractLastUserMessage(Map<String, Object> body) {
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) body.get("messages");
+        if (messages == null || messages.isEmpty()) {
+            return;
+        }
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            if ("user".equals(messages.get(i).get("role"))) {
+                body.put("messages", Collections.singletonList(messages.get(i)));
+                return;
+            }
+        }
     }
 
     /**
