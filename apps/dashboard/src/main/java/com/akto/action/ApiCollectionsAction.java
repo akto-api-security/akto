@@ -250,14 +250,11 @@ public class ApiCollectionsAction extends UserAction {
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude("urls"));
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
-        
-        // Start background icon processing for Argus and Atlas collections asynchronously
-        // This runs in a separate thread to not block the main response
 
-        if(!Context.contextSource.get().equals(CONTEXT_SOURCE.DAST) && !Context.contextSource.get().equals(CONTEXT_SOURCE.API)) {
-            com.akto.util.IconUtils.processIconsForCollections(this.apiCollections);
-        }
-        
+        // Start background icon processing for all collections asynchronously
+        // This runs in a separate thread to not block the main response
+        com.akto.util.IconUtils.processIconsForCollections(this.apiCollections);
+
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -1165,6 +1162,27 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchSensitiveAndUnauthenticatedValue() {
         Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+
+        if (!this.showApiInfo) {
+            Bson baseFilter = Filters.and(
+                Filters.eq(ApiInfo.IS_SENSITIVE, true),
+                Filters.in(ApiInfo.ALL_AUTH_TYPES_FOUND,
+                          Arrays.asList(Arrays.asList(ApiInfo.AuthType.UNAUTHENTICATED)))
+            );
+
+            int totalCount = (int) ApiInfoDao.instance.count(baseFilter);
+
+            Set<Integer> demosAndDeactivated = UsageMetricCalculator.getDemosAndDeactivated();
+            Bson excludedFilter = Filters.and(
+                Filters.in(ApiInfo.ID_API_COLLECTION_ID, demosAndDeactivated),
+                baseFilter
+            );
+            int excludedCount = (int) ApiInfoDao.instance.count(excludedFilter);
+
+            this.sensitiveUnauthenticatedEndpointsCount = totalCount - excludedCount;
+            return Action.SUCCESS.toUpperCase();
+        }
+
         List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(Filters.and(filterQ, Filters.eq(ApiInfo.IS_SENSITIVE, true)));
         for (ApiInfo apiInfo : sensitiveEndpoints) {
             if (apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {

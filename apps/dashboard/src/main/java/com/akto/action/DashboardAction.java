@@ -61,30 +61,50 @@ public class DashboardAction extends UserAction {
     public String findTotalIssues() {
         Set<Integer> demoCollections = new HashSet<>();
         demoCollections.addAll(deactivatedCollections);
-//        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
-//        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
-//
-//        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-//        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
-
 
         if (startTimeStamp == 0) startTimeStamp = Context.now() - 24 * 1 * 60 * 60;
-        // totoal issues count = issues that were created before endtimestamp and are either still open or fixed but last updated is after endTimestamp
+
+        // Query 1: OPEN issues before endTimeStamp excluding deactivated
+        // Optimized: (total OPEN with timestamp) - (deactivated OPEN with timestamp)
         totalIssuesCount = TestingRunIssuesDao.instance.count(
             Filters.and(
-                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
-                Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.OPEN))       
-            );
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
+            )
+        );
 
-        // issues that have been created till start timestamp
+        if (!demoCollections.isEmpty()) {
+            long excluded = TestingRunIssuesDao.instance.count(
+                Filters.and(
+                    Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                    Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
+                    Filters.in("_id.apiInfoKey.apiCollectionId", demoCollections)
+                )
+            );
+            totalIssuesCount -= excluded;
+        }
+
+        // Query 2: NOT IGNORED issues (OPEN + FIXED) before startTimeStamp excluding deactivated
+        // Optimized: (total OPEN+FIXED with timestamp) - (deactivated OPEN+FIXED with timestamp)
         oldOpenCount = TestingRunIssuesDao.instance.count(
                 Filters.and(
-                        Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
-                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
-                        Filters.ne(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.IGNORED)
+                        Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
+                            Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
+                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp)
                 )
         );
+
+        if (!demoCollections.isEmpty()) {
+            long excluded = TestingRunIssuesDao.instance.count(
+                Filters.and(
+                        Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
+                            Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
+                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
+                        Filters.in("_id.apiInfoKey.apiCollectionId", demoCollections)
+                )
+        );
+            oldOpenCount -= excluded;
+        }
 
         return SUCCESS.toUpperCase();
     }
