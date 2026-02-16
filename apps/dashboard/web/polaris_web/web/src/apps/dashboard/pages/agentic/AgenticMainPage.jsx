@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Page, VerticalStack, HorizontalStack, Button, ButtonGroup } from '@shopify/polaris';
-import { InfoMinor, MagicMinor } from '@shopify/polaris-icons';
+import { Page, VerticalStack, HorizontalStack } from '@shopify/polaris';
 import AgenticWelcomeHeader from './components/AgenticWelcomeHeader';
 import AgenticSearchInput from './components/AgenticSearchInput';
 import AgenticSuggestions from './components/AgenticSuggestions';
@@ -23,8 +22,7 @@ function AgenticMainPage() {
     const [historySearchQuery, setHistorySearchQuery] = useState('');
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [pendingConversationId, setPendingConversationId] = useState(null);
-    const [conversationType, setConversationType] = useState('ASK_AKTO');
-
+  
     const handleSearchSubmit = useCallback((query) => {
         setCurrentQuery(query);
         setLoadConversationId(null); // Clear conversation ID for new search
@@ -112,19 +110,12 @@ function AgenticMainPage() {
                     setSearchValue(''); // Clear search input when going back
                 }}
                 onLoadConversation={handleHistoryClick}
-                conversationType={conversationType}
-            />
+               />
         );
     }
 
     return (
         <Page id="agentic-main-page" fullWidth>
-            <div style={{display: 'flex', justifyContent: 'end'}}>
-                <ButtonGroup segmented={true}>
-                    <Button icon={MagicMinor} onClick={() => setConversationType('ASK_AKTO')} pressed={conversationType === 'ASK_AKTO'}>Know About Dashboard</Button>
-                    <Button icon={InfoMinor} onClick={() => setConversationType('DOCS_AGENT')} pressed={conversationType === 'DOCS_AGENT'}>Learn about Akto</Button>
-                </ButtonGroup>
-            </div>
             <div style={{height: '100vh', display: 'flex', justifyContent: 'center'}}>
             <HorizontalStack align="center" blockAlign="center">
                 <VerticalStack gap="16" align="center">

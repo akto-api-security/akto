@@ -5,7 +5,6 @@ import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.AgentConversationDao;
 import com.akto.dto.testing.GenericAgentConversation;
-import com.akto.dto.testing.GenericAgentConversation.ConversationType;
 import com.akto.util.Constants;
 import com.akto.util.McpTokenGenerator;
 import com.mongodb.BasicDBObject;
@@ -35,24 +34,10 @@ public class McpAgentAction extends UserAction {
     private String mcpToken;
     private String agentEndpoint;
     private int limit;
-    private String conversationType;
-
     private Map<String, Object> metaData;
 
     public String chatAndStoreConversation() {
         try {
-            // check for conversation type
-            if(conversationType == null) {
-                addActionError("Conversation type is required");
-                return ERROR.toUpperCase();
-            }
-            ConversationType conversationTypeEnum = null;
-            try {
-                conversationTypeEnum = ConversationType.valueOf(this.conversationType);
-            } catch (Exception e) {
-                addActionError("Invalid conversation type: " + this.conversationType);
-                return ERROR.toUpperCase();
-            }
             int timeNow = Context.now();
 
             String accessTokenForRequest = McpTokenGenerator.generateToken(getSUser().getLogin());
@@ -106,7 +91,7 @@ public class McpAgentAction extends UserAction {
             }
 
             String userEmail = getSUser() != null ? getSUser().getLogin() : null;
-            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail);
+            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, accessTokenForRequest, contextString, userEmail);
             if(responseFromMcpServer != null) {
                 responseFromMcpServer.setCreatedAt(timeNow);
                 AgentConversationDao.instance.insertOne(responseFromMcpServer);
@@ -191,8 +176,6 @@ public class McpAgentAction extends UserAction {
     public void setAgentEndpoint(String agentEndpoint) { this.agentEndpoint = agentEndpoint; }
     public int getLimit() { return limit; }
     public void setLimit(int limit) { this.limit = limit; }
-    public String getConversationType() { return conversationType; }
-    public void setConversationType(String conversationType) { this.conversationType = conversationType; }
     public Map<String, Object> getMetaData() { return metaData; }
     public void setMetaData(Map<String, Object> metaData) {
         this.metaData = metaData;

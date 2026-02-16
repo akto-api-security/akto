@@ -11,7 +11,7 @@ import AgenticHistoryModal from './components/AgenticHistoryModal';
 import './AgenticConversationPage.css';
 import { sendQuery, getConversationsList } from './services/agenticService';
 
-function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [], onLoadConversation, conversationType, metadata }) {
+function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [], onLoadConversation, metadata }) {
     // Conversation state
     const [conversationId, setConversationId] = useState(existingConversationId || null);
     const [messages, setMessages] = useState([]);
@@ -76,7 +76,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                     setMessages([userMessage]);
 
                     // Process the initial query
-                    await processQuery(initialQuery, "", conversationType);
+                    await processQuery(initialQuery, "");
                 }
             } catch (err) {
                 setError('Failed to initialize conversation');
@@ -159,11 +159,11 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
     }, []);
 
     // Process a query and handle streaming
-    const processQuery = async (query, convId, conversationType, queryMetadata) => {
+    const processQuery = async (query, convId, queryMetadata) => {
         try {
             setIsLoading(true);
 
-            let res = await sendQuery(query, convId, conversationType, queryMetadata || metadata);
+            let res = await sendQuery(query, convId, queryMetadata || metadata);
             if(res && res.conversationId) {
                 setConversationId(res.conversationId);
             }
@@ -202,7 +202,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
             setFollowUpValue('');
 
             // Process the query
-            await processQuery(query, conversationId, conversationType);
+            await processQuery(query, conversationId);
         }
     };
 

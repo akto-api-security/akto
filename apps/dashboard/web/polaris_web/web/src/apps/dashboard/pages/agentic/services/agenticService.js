@@ -1,11 +1,10 @@
 import request from "@/util/request"
 
-export const sendQuery = async (query, conversationId, conversationType, metaData) => {
+export const sendQuery = async (query, conversationId, metaData) => {
     return await request({
         url: '/api/chatAndStore',
         method: 'post',
         data: {
-            conversationType: conversationType || "ASK_AKTO",
             message: query,
             ...(conversationId && { conversationId }),
             ...(metaData && { metaData })
