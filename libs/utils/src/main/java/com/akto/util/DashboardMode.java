@@ -4,7 +4,6 @@ import com.akto.dao.SetupDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Setup;
 import com.akto.onprem.CommonConstants;
-import com.akto.onprem.Constants;
 import com.mongodb.BasicDBObject;
 
 public enum DashboardMode {
