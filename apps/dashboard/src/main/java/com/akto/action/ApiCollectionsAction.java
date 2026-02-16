@@ -1167,18 +1167,18 @@ public class ApiCollectionsAction extends UserAction {
         Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
 
         if (!this.showApiInfo) {
-            // Optimized path: total count - excluded count
             Bson baseFilter = Filters.and(
                 Filters.eq(ApiInfo.IS_SENSITIVE, true),
-                Filters.eq(ApiInfo.ALL_AUTH_TYPES_FOUND, ApiInfo.AuthType.UNAUTHENTICATED)
+                Filters.in(ApiInfo.ALL_AUTH_TYPES_FOUND,
+                          Arrays.asList(Arrays.asList(ApiInfo.AuthType.UNAUTHENTICATED)))
             );
 
             int totalCount = (int) ApiInfoDao.instance.count(baseFilter);
 
             Set<Integer> demosAndDeactivated = UsageMetricCalculator.getDemosAndDeactivated();
             Bson excludedFilter = Filters.and(
-                baseFilter,
-                Filters.in(ApiInfo.ID_API_COLLECTION_ID, demosAndDeactivated)
+                Filters.in(ApiInfo.ID_API_COLLECTION_ID, demosAndDeactivated),
+                baseFilter
             );
             int excludedCount = (int) ApiInfoDao.instance.count(excludedFilter);
 
