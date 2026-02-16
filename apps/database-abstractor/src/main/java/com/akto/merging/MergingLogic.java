@@ -6,6 +6,7 @@ import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
+import com.akto.util.filter.DictionaryFilter;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
@@ -362,8 +363,11 @@ public class MergingLogic {
 
                     URLTemplate urlTemplate = createUrlTemplate(templateEndpoint, templateMethod);
                     if (urlTemplate.match(staticEndpoint, staticMethod)) {
-                        finalResult.deleteStaticUrls.add(staticURL);
-                        iterator.remove();
+                        // Don't delete static URLs if the matching template was previously demerged
+                        if (!isDemergedUrl(urlTemplate, apiCollectionId)) {
+                            finalResult.deleteStaticUrls.add(staticURL);
+                            iterator.remove();
+                        }
                         break;
                     }
                 }
@@ -630,6 +634,15 @@ public class MergingLogic {
         for(int i = 0; i < newTokens.length; i ++) {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
+
+            // Never merge English words - they must remain static path segments
+            if (DictionaryFilter.isEnglishWord(tempToken) || DictionaryFilter.isEnglishWord(dbToken)) {
+                if (!tempToken.equalsIgnoreCase(dbToken)) {
+                    // Two different English words at the same position = no merge possible
+                    return null;
+                }
+                continue;
+            }
 
             if (tempToken.equalsIgnoreCase(dbToken)) {
                 continue;
