@@ -24,6 +24,7 @@ public class McpRequestResponseUtilsTest {
 
         HttpResponseParams responseParams = new HttpResponseParams();
         responseParams.setRequestParams(reqParams);
+        responseParams.setSource(HttpResponseParams.Source.MIRRORING);
 
         return responseParams;
     }
