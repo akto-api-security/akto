@@ -11,7 +11,7 @@ import AgenticHistoryModal from './components/AgenticHistoryModal';
 import './AgenticConversationPage.css';
 import { sendQuery, getConversationsList } from './services/agenticService';
 
-function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [], onLoadConversation, conversationType, metadata }) {
+function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [], onLoadConversation, metadata }) {
     // Conversation state
     const [conversationId, setConversationId] = useState(existingConversationId || null);
     const [messages, setMessages] = useState([]);
@@ -76,7 +76,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                     setMessages([userMessage]);
 
                     // Process the initial query
-                    await processQuery(initialQuery, "", conversationType);
+                    await processQuery(initialQuery, "");
                 }
             } catch (err) {
                 setError('Failed to initialize conversation');
@@ -159,17 +159,17 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
     }, []);
 
     // Process a query and handle streaming
-    const processQuery = async (query, convId, conversationType, queryMetadata) => {
+    const processQuery = async (query, convId, queryMetadata) => {
         try {
             setIsLoading(true);
 
-            let res = await sendQuery(query, convId, conversationType, queryMetadata || metadata);
-            if(res && res.conversationId) {
+            let res = await sendQuery(query, convId, queryMetadata || metadata);
+            if (res && res.conversationId) {
                 setConversationId(res.conversationId);
             }
 
             // Add AI response message to the conversation
-            if(res && res.response) {
+            if (res && res.response) {
                 const aiMessage = {
                     _id: "system_" + Date.now(),
                     message: res.response,
@@ -202,7 +202,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
             setFollowUpValue('');
 
             // Process the query
-            await processQuery(query, conversationId, conversationType);
+            await processQuery(query, conversationId);
         }
     };
 
@@ -242,41 +242,41 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                             <img src="/public/history.svg" alt="History" style={{ width: '20px', height: '20px' }} />
                         </Button>
                     </HorizontalStack>
-                        <Box style={{ flex: 1, overflow: 'hidden', display: 'flex', justifyContent: 'center', maxWidth: '100%' }}>
+                    <Box style={{ flex: 1, overflow: 'hidden', display: 'flex', justifyContent: 'center', maxWidth: '100%' }}>
                         <Box style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', maxWidth: '500px' }}>
                             <Box style={{ flex: 1, overflowY: 'auto', paddingBottom: '120px' }}>
                                 <Box paddingBlockStart="16" paddingBlockEnd="19">
                                     <VerticalStack gap="4" align="start">
-                            {messages.map((message, index) => (
-                                message.role === 'user' ? (
-                                    <AgenticUserMessage key={message._id || index} content={message.message} />
-                                ) : message.isComplete ? (
-                                    <VerticalStack key={message.id || `response-${index}`} gap="2" align="start">
-                                        <AgenticStreamingResponse
-                                            content={message.message}
-                                            onStreamingComplete={() => handleStreamingComplete(message._id)}
-                                            skipStreaming={message.isFromHistory || false}
-                                        />
-                                        {completedStreamingMessages.has(message._id) && (
-                                            <AgenticCopyButton content={message.message} />
-                                        )}
-                                        {index === messages.length - 1 && !isLoading && !isStreaming && message.suggestions && (
-                                            <AgenticSuggestionsList
-                                                suggestions={message.suggestions}
-                                                onSuggestionClick={(suggestion) => {
-                                                    setFollowUpValue(suggestion);
-                                                    handleFollowUpSubmit(suggestion);
-                                                }}
-                                            />
-                                        )}
-                                    </VerticalStack>
-                                ) : null
-                            ))}
+                                        {messages.map((message, index) => (
+                                            message.role === 'user' ? (
+                                                <AgenticUserMessage key={message._id || index} content={message.message} />
+                                            ) : message.isComplete ? (
+                                                <VerticalStack key={message.id || `response-${index}`} gap="2" align="start">
+                                                    <AgenticStreamingResponse
+                                                        content={message.message}
+                                                        onStreamingComplete={() => handleStreamingComplete(message._id)}
+                                                        skipStreaming={message.isFromHistory || false}
+                                                    />
+                                                    {completedStreamingMessages.has(message._id) && (
+                                                        <AgenticCopyButton content={message.message} />
+                                                    )}
+                                                    {index === messages.length - 1 && !isLoading && !isStreaming && message.suggestions && (
+                                                        <AgenticSuggestionsList
+                                                            suggestions={message.suggestions}
+                                                            onSuggestionClick={(suggestion) => {
+                                                                setFollowUpValue(suggestion);
+                                                                handleFollowUpSubmit(suggestion);
+                                                            }}
+                                                        />
+                                                    )}
+                                                </VerticalStack>
+                                            ) : null
+                                        ))}
 
-                            {/* Loading state */}
-                            {isLoading && (
-                                <AgenticThinkingBox />
-                            )}
+                                        {/* Loading state */}
+                                        {isLoading && (
+                                            <AgenticThinkingBox />
+                                        )}
                                     </VerticalStack>
                                 </Box>
                             </Box>
