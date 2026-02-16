@@ -1559,6 +1559,22 @@ public class ClientActor extends DataActor {
 
     // testing queries
 
+    private TestingRunResultSummary parseTestingRunResultSummaryFromResponsePayload(String responsePayload) {
+        try {
+            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+            BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
+            if (testingRunResultSummary == null) return null;
+            testingRunResultSummary.remove("id");
+            testingRunResultSummary.remove("testingRunId");
+            TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
+            res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
+            res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
+            return res;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     public TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
@@ -1572,19 +1588,7 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in createTRRSummaryIfAbsent", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
-            BasicDBObject payloadObj;
-            try {
-                payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
-                testingRunResultSummary.remove("id");
-                testingRunResultSummary.remove("testingRunId");
-                TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
-                res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
-                res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
-                return res;
-            } catch(Exception e) {
-                return null;
-            }
+            return parseTestingRunResultSummaryFromResponsePayload(responsePayload);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in createTRRSummaryIfAbsent" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
@@ -1665,19 +1669,7 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in findPendingTestingRunResultSummary", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
-            BasicDBObject payloadObj;
-            try {
-                payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
-                testingRunResultSummary.remove("id");
-                testingRunResultSummary.remove("testingRunId");
-                TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
-                res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
-                res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
-                return res;
-            } catch(Exception e) {
-                return null;
-            }
+            return parseTestingRunResultSummaryFromResponsePayload(responsePayload);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in findPendingTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
@@ -1961,19 +1953,7 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in fetchTestingRunResultSummary", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
-            BasicDBObject payloadObj;
-            try {
-                payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
-                testingRunResultSummary.remove("id");
-                testingRunResultSummary.remove("testingRunId");
-                TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
-                res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
-                res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
-                return res;
-            } catch(Exception e) {
-                return null;
-            }
+            return parseTestingRunResultSummaryFromResponsePayload(responsePayload);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in fetchTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
@@ -1992,19 +1972,7 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in fetchRerunTestingRunResultSummary", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
-            BasicDBObject payloadObj;
-            try {
-                payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
-                testingRunResultSummary.remove("id");
-                testingRunResultSummary.remove("testingRunId");
-                TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
-                res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
-                res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
-                return res;
-            } catch(Exception e) {
-                return null;
-            }
+            return parseTestingRunResultSummaryFromResponsePayload(responsePayload);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in fetchRerunTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
@@ -2023,19 +1991,7 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in markTestRunResultSummaryFailed", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
-            BasicDBObject payloadObj;
-            try {
-                payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
-                testingRunResultSummary.remove("id");
-                testingRunResultSummary.remove("testingRunId");
-                TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
-                res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
-                res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
-                return res;
-            } catch(Exception e) {
-                return null;
-            }
+            return parseTestingRunResultSummaryFromResponsePayload(responsePayload);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in markTestRunResultSummaryFailed" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
@@ -2503,19 +2459,7 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in updateIssueCountInSummary", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
-            BasicDBObject payloadObj;
-            try {
-                payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
-                testingRunResultSummary.remove("id");
-                testingRunResultSummary.remove("testingRunId");
-                TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
-                res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
-                res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
-                return res;
-            } catch(Exception e) {
-                return null;
-            }
+            return parseTestingRunResultSummaryFromResponsePayload(responsePayload);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in updateIssueCountInSummary" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
@@ -2543,19 +2487,7 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in updateIssueCountAndStateInSummary", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
-            BasicDBObject payloadObj;
-            try {
-                payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
-                testingRunResultSummary.remove("id");
-                testingRunResultSummary.remove("testingRunId");
-                TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
-                res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
-                res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
-                return res;
-            } catch(Exception e) {
-                return null;
-            }
+            return parseTestingRunResultSummaryFromResponsePayload(responsePayload);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in updateIssueCountAndStateInSummary" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
@@ -4053,9 +3985,9 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter) {
+    public TestingRunResultSummary findLatestTestingRunResultSummary(String testingRunId) {
         BasicDBObject obj = new BasicDBObject();
-        obj.put("filter", filter);
+        obj.put("testingRunId", testingRunId);
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findLatestTestingRunResultSummary", "", "POST",  obj.toString(), headers, "");
         try {
@@ -4065,15 +3997,7 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in findLatestTestingRunResultSummary", LoggerMaker.LogDb.TESTING);
                 return null;
             }
-            BasicDBObject payloadObj;
-            try {
-                payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject summaryObject = (BasicDBObject) payloadObj.get("trrs");
-                TestingRunResultSummary summary = objectMapper.readValue(summaryObject.toJson(), TestingRunResultSummary.class);
-                return summary;
-            } catch(Exception e) {
-                return null;
-            }
+            return parseTestingRunResultSummaryFromResponsePayload(responsePayload);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in findLatestTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
