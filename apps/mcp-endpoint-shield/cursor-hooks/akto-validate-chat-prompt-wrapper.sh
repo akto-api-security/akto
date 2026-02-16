@@ -7,7 +7,8 @@ export AKTO_DATA_INGESTION_URL="{{AKTO_DATA_INGESTION_URL}}"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 # TODO: Change to "cursor" connector once backend support is added
-export AKTO_CONNECTOR="claude_code_cli"
+export AKTO_CONNECTOR="cursor"
+export CONTEXT_SOURCE="ENDPOINT"
 
 # Execute Python hook script
 exec python3 "$HOME/.cursor/hooks/akto/akto-validate-chat-prompt.py" "$@"
