@@ -300,7 +300,8 @@ public class TestExecutor {
 
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size());
-        boolean collectionWise = testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE);
+        boolean collectionWise = testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE)
+         || testingEndpoints.getType().equals(TestingEndpoints.Type.MULTI_COLLECTION);
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
         if(collectionWise || apiInfoKeyList.size() > 500){

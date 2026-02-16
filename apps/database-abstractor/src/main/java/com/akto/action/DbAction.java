@@ -1137,6 +1137,11 @@ public class DbAction extends ActionSupport {
                     CustomTestingEndpoints endpoints = new CustomTestingEndpoints(ts.returnApis());
                     testingRun.setTestingEndpoints(endpoints);
                 }
+                else if(testingRun.getTestingEndpoints() instanceof MultiCollectionTestingEndpoints){
+                    MultiCollectionTestingEndpoints ts = (MultiCollectionTestingEndpoints) testingRun.getTestingEndpoints();
+                    CustomTestingEndpoints endpoints = new CustomTestingEndpoints(ts.returnApis());
+                    testingRun.setTestingEndpoints(endpoints);
+                }
             }
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
