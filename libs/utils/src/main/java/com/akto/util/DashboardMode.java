@@ -3,6 +3,7 @@ package com.akto.util;
 import com.akto.dao.SetupDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Setup;
+import com.akto.onprem.CommonConstants;
 import com.akto.onprem.Constants;
 import com.mongodb.BasicDBObject;
 
@@ -40,7 +41,7 @@ public enum DashboardMode {
         if("stairway".equalsIgnoreCase(dashboardMode)){
             return STAIRWAY;
         }
-        return Constants.DEFAULT_DASHBOARD_MODE;
+        return CommonConstants.DEFAULT_DASHBOARD_MODE;
     }
 
     public static boolean isLocalDeployment(){
