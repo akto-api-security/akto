@@ -59,11 +59,13 @@ public class DashboardAction extends UserAction {
     private long totalIssuesCount = 0;
     private long oldOpenCount = 0;
     public String findTotalIssues() {
+        Set<Integer> demoCollections = new HashSet<>();
+        demoCollections.addAll(deactivatedCollections);
+
         if (startTimeStamp == 0) startTimeStamp = Context.now() - 24 * 1 * 60 * 60;
 
-        // Query 1: OPEN issues before endTimeStamp
-        // Original: status=OPEN AND creationTime<=end AND apiCollectionId NOT IN deactivated
-        // Optimized: (total OPEN) - (deactivated OPEN)
+        // Query 1: OPEN issues before endTimeStamp excluding deactivated
+        // Optimized: (total OPEN with timestamp) - (deactivated OPEN with timestamp)
         totalIssuesCount = TestingRunIssuesDao.instance.count(
             Filters.and(
                 Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
@@ -71,38 +73,37 @@ public class DashboardAction extends UserAction {
             )
         );
 
-        if (!deactivatedCollections.isEmpty()) {
-            long deactivated = TestingRunIssuesDao.instance.count(
+        if (!demoCollections.isEmpty()) {
+            long excluded = TestingRunIssuesDao.instance.count(
                 Filters.and(
                     Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
                     Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
-                    Filters.in("_id.apiInfoKey.apiCollectionId", deactivatedCollections)
+                    Filters.in("_id.apiInfoKey.apiCollectionId", demoCollections)
                 )
             );
-            totalIssuesCount -= deactivated;
+            totalIssuesCount -= excluded;
         }
 
-        // Query 2: NOT IGNORED issues before startTimeStamp (i.e., OPEN + FIXED)
-        // Original: status!=IGNORED AND creationTime<=start AND apiCollectionId NOT IN deactivated
-        // Optimized: (total OPEN+FIXED) - (deactivated OPEN+FIXED)
+        // Query 2: NOT IGNORED issues (OPEN + FIXED) before startTimeStamp excluding deactivated
+        // Optimized: (total OPEN+FIXED with timestamp) - (deactivated OPEN+FIXED with timestamp)
         oldOpenCount = TestingRunIssuesDao.instance.count(
-            Filters.and(
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
-                    Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
-                Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp)
-            )
+                Filters.and(
+                        Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
+                            Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
+                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp)
+                )
         );
 
-        if (!deactivatedCollections.isEmpty()) {
-            long deactivated = TestingRunIssuesDao.instance.count(
+        if (!demoCollections.isEmpty()) {
+            long excluded = TestingRunIssuesDao.instance.count(
                 Filters.and(
-                    Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
-                        Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
-                    Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
-                    Filters.in("_id.apiInfoKey.apiCollectionId", deactivatedCollections)
+                        Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
+                            Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
+                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
+                        Filters.in("_id.apiInfoKey.apiCollectionId", demoCollections)
                 )
-            );
-            oldOpenCount -= deactivated;
+        );
+            oldOpenCount -= excluded;
         }
 
         return SUCCESS.toUpperCase();
