@@ -1246,7 +1246,9 @@ public class DbLayer {
         return new ArrayList<>(subcategorySet);
     }
 
-    public static TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
+    public static TestingRunResultSummary findLatestTestingRunResultSummary(String testingRunId){
+        if (testingRunId == null || testingRunId.isEmpty()) return null;
+        Bson filter = Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, new ObjectId(testingRunId));
         return TestingRunResultSummariesDao.instance.findLatestOne(filter);
     }
 

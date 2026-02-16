@@ -23,7 +23,7 @@ import com.akto.usage.OrgUtils;
 
 public class TestCompletion {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(TestCompletion.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestCompletion.class, LogDb.TESTING);
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 

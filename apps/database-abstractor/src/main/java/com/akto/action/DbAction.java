@@ -1850,8 +1850,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String findLatestTestingRunResultSummary(){
-        trrs = DbLayer.findLatestTestingRunResultSummary(filter);
+    public String findLatestTestingRunResultSummary() {
+        try {
+            trrs = DbLayer.findLatestTestingRunResultSummary(testingRunId);
+            if (trrs != null) {
+                trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in findLatestTestingRunResultSummary " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
