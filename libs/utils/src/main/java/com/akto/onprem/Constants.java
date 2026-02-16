@@ -35,19 +35,18 @@ public class Constants {
     private static final byte[] privateKey;
     private static final byte[] publicKey;
 
-    private static byte[][] initializeKeys() {
+    static {
         byte[] tempPrivateKey = null;
         byte[] tempPublicKey = null;
 
         // Try to initialize DB connection and fetch keys from database
         try {
-            String mongoURI = System.getenv("AKTO_MONGO_CONN");
-            if (mongoURI == null || mongoURI.isEmpty()) {
-                return new byte[][] { null, null };
-            }
             // Check if DB client is not already initialized
             if (!MCollection.checkConnection()) {
-                DaoInit.init(new ConnectionString(mongoURI));
+                String mongoURI = System.getenv("AKTO_MONGO_CONN");
+                if (mongoURI != null && !mongoURI.isEmpty()) {
+                    DaoInit.init(new ConnectionString(mongoURI));
+                }
             }
 
             // Now try to fetch keys if DB is connected
@@ -97,13 +96,8 @@ public class Constants {
             }
         }
 
-        return new byte[][] { tempPrivateKey, tempPublicKey };
-    }
-
-    static {
-        byte[][] keys = initializeKeys();
-        privateKey = keys[0];
-        publicKey = keys[1];
+        privateKey = tempPrivateKey;
+        publicKey = tempPublicKey;
     }
 
     public static byte[] getPrivateKey() {
