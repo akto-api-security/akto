@@ -42,6 +42,7 @@ AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = "claude_code_cli" # todo: update connector name to cursor
+CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 
 # Configure API_URL based on mode
 if MODE == "atlas":
@@ -63,6 +64,17 @@ def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
     return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
 
 
+def generate_curl_command(url: str, payload: Dict[str, Any], headers: Dict[str, str]) -> str:
+    """Generate an equivalent curl command for debugging."""
+    payload_json = json.dumps(payload)
+    headers_str = " ".join([f"-H '{k}: {v}'" for k, v in headers.items()])
+
+    # Escape single quotes in payload for shell
+    payload_escaped = payload_json.replace("'", "'\\''")
+
+    return f"curl -X POST {headers_str} -d '{payload_escaped}' '{url}'"
+
+
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
     import time
 
@@ -71,6 +83,11 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
+
+    # Generate and log curl command
+    curl_cmd = generate_curl_command(url, payload, headers)
+    logger.debug(f"CURL EQUIVALENT:\n{curl_cmd}")
+
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -124,7 +141,7 @@ def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: 
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
         tags["ai-agent"] = "cursor"
-        tags["source"] = "ENDPOINT"
+        tags["source"] = CONTEXT_SOURCE
 
     return {
         "url": API_URL,
@@ -141,7 +158,8 @@ def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: 
             "metadata": {
                 "tag": tags,
                 "mcp_server_name": mcp_server_name
-            }
+            },
+            "contextSource": CONTEXT_SOURCE
         },
         "response": {
             "body": json.loads(result_json) if result_json else {},
