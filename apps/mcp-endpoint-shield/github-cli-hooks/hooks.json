@@ -4,19 +4,28 @@
     "userPromptSubmitted": [
       {
         "type": "command",
-        "bash": "python3 /path/to/repo/.github/hooks/validate-request.py",
-        "powershell": "python /path/to/repo/.github/hooks/validate-request.py",
-        "comment": "Log user prompts to Akto (monitoring only - cannot block)",
-        "timeoutSec": 10
+        "bash": "./.github/hooks/prompt-hook.py",
+        "powershell": "python .github/hooks/prompt-hook.py",
+        "comment": "Validate prompts against Akto Guardrails (monitoring only - cannot block per GitHub limitation)",
+        "timeoutSec": 30
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "./.github/hooks/pre-tool-hook.py",
+        "powershell": "python .github/hooks/pre-tool-hook.py",
+        "comment": "Validate and block tool execution based on Akto Guardrails policies",
+        "timeoutSec": 30
       }
     ],
     "postToolUse": [
       {
         "type": "command",
-        "bash": "python3 /path/to/repo/.github/hooks/validate-response.py",
-        "powershell": "python /path/to/repo/.github/hooks/validate-response.py",
-        "comment": "Monitor and validate tool outputs for sensitive content (workaround for response guardrails)",
-        "timeoutSec": 10
+        "bash": "./.github/hooks/post-tool-hook.py",
+        "powershell": "python .github/hooks/post-tool-hook.py",
+        "comment": "Ingest tool execution results to Akto for monitoring and analytics",
+        "timeoutSec": 30
       }
     ]
   }
