@@ -139,11 +139,6 @@
     --p-color-bg-app-hover: #F6F6F7 !important;
 }
 
-/* 
- * Why button:has(#bulk-run-test-button)?
- * - Polaris wraps our div in a <button> element, so we need to style the parent button
- * - :has() selector targets the button that contains our #bulk-run-test-button div
- */
 button:has(#bulk-run-test-button) {
     background: var(--akto-primary) !important;
     color: white !important;

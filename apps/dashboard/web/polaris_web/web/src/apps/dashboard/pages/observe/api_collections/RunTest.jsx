@@ -831,7 +831,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
 
     return (
         <div>
-            {!parentActivator ? activator : null}
+            {!parentActivator && !runTestFromOutside ? activator : null}
             {showEditableSettings ? editableConfigsComp : null}
             <Modal
 

@@ -1050,16 +1050,50 @@ function SingleTestRunPage() {
             <Text color="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
           </HorizontalStack>
           <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
-          {selectedTestRun?.testingEndpoints?.type === "MULTI_COLLECTION" && Array.isArray(selectedTestRun?.testingEndpoints?.apiCollectionIds) ? (
-            selectedTestRun.testingEndpoints.apiCollectionIds.map((cid, idx) => (
-              <Link key={cid} monochrome target="_blank" url={"/dashboard/observe/inventory/" + cid} removeUnderline>
-                <HorizontalStack gap={"1"}>
-                  <Box><Icon color="subdued" source={ArchiveMinor} /></Box>
-                  <Text color="subdued" variant="bodyMd">{collectionsMap[cid]}</Text>
-                </HorizontalStack>
-              </Link>
-            ))
-          ) : (
+          {selectedTestRun?.testingEndpoints?.type === "MULTI_COLLECTION" && Array.isArray(selectedTestRun?.testingEndpoints?.apiCollectionIds) ? (() => {
+            const ids = selectedTestRun.testingEndpoints.apiCollectionIds;
+            const showCount = 2;
+            const shown = ids.slice(0, showCount);
+            const hidden = ids.slice(showCount);
+            return (
+              <>
+                {shown.map((cid) => (
+                  <Link key={cid} monochrome target="_blank" url={"/dashboard/observe/inventory/" + cid} removeUnderline>
+                    <HorizontalStack gap={"1"}>
+                      <Box><Icon color="subdued" source={ArchiveMinor} /></Box>
+                      <Text color="subdued" variant="bodyMd">{collectionsMap[cid]}</Text>
+                    </HorizontalStack>
+                  </Link>
+                ))}
+                {hidden.length > 0 && (
+                  <Popover
+                    active={secondaryPopover}
+                    preferredAlignment="left"
+                    preferredPosition="below"
+                    fullWidth={false}
+                    autofocusTarget="first-node"
+                    onClose={() => setSecondaryPopover(false)}
+                    activator={
+                      <Badge status="info" onClick={() => setSecondaryPopover(true)} style={{ cursor: 'pointer' }}>+{hidden.length}</Badge>
+                    }
+                  >
+                    <Popover.Pane fixed>
+                      <VerticalStack gap="2" style={{ maxHeight: '200px', overflowY: 'auto', minWidth: '180px' }}>
+                        {hidden.map((cid) => (
+                          <Link key={cid} monochrome target="_blank" url={"/dashboard/observe/inventory/" + cid} removeUnderline>
+                            <HorizontalStack gap={"1"}>
+                              <Box><Icon color="subdued" source={ArchiveMinor} /></Box>
+                              <Text color="subdued" variant="bodyMd">{collectionsMap[cid]}</Text>
+                            </HorizontalStack>
+                          </Link>
+                        ))}
+                      </VerticalStack>
+                    </Popover.Pane>
+                  </Popover>
+                )}
+              </>
+            );
+          })() : (
             <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
               <HorizontalStack gap={"1"}>
                 <Box><Icon color="subdued" source={ArchiveMinor} /></Box>
