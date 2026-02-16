@@ -3867,9 +3867,9 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter) {
+    public TestingRunResultSummary findLatestTestingRunResultSummary(String testingRunId) {
         BasicDBObject obj = new BasicDBObject();
-        obj.put("filter", filter);
+        obj.put("testingRunId", testingRunId);
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findLatestTestingRunResultSummary", "", "POST",  obj.toString(), headers, "");
         try {
