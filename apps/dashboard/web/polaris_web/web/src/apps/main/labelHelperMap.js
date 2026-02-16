@@ -24,6 +24,7 @@ export const labelMap = {
     "APIs Affected": "APIs Affected",
     "APIs": "APIs",
     "API": "API",
+    "API group": "API group",
     "API response": "API response",
     "API request": "API request",
     "API Risk Score": "API Risk Score",
@@ -67,7 +68,11 @@ export const labelMap = {
     "testing": "testing",
     "Test library":"Test library",
     "Endpoint Shield": "API Endpoint Shield",
-    "Endpoints": "Endpoints"
+    "Endpoints": "Endpoints",
+    "Attack type": "Attack type",
+    "Attack Type": "Attack Type",
+    "Latest Attack": "Latest Attack",
+    "Latest attack sub-category": "Latest attack sub-category",
   },
   "DAST": {
     "API Security Posture": "Security Posture",
@@ -94,6 +99,7 @@ export const labelMap = {
     "APIs Affected": "APIs Affected",
     "APIs": "APIs",
     "API": "API",
+    "API group": "API group",
     "API response": "API response",
     "API request": "API request",
     "API Risk Score": "API Risk Score",
@@ -138,6 +144,10 @@ export const labelMap = {
     "Test library":"Test library",
     "Endpoint Shield": "Endpoint Shield",
     "Endpoints": "Endpoints",
+    "Attack type": "Attack type",
+    "Attack Type": "Attack Type",
+    "Latest Attack": "Latest Attack",
+    "Latest attack sub-category": "Latest attack sub-category"
   },
   "MCP Security": {
     "API Security Posture": "MCP Security Posture",
@@ -310,6 +320,7 @@ export const labelMap = {
     "APIs Affected": "Agentic Components Affected",
     "APIs": "Agentic Components",
     "API": "Agentic Component",
+    "API group": "Agentic Component Group",
     "API response": "Agentic Response",
     "API request": "Agentic Request",
     "API Risk Score": "Agentic Risk Score",
@@ -356,7 +367,11 @@ export const labelMap = {
     "testing": "scanning",
     "Test library":"Probe library",
     "Endpoint Shield": "Endpoint Shield",
-    "Threat": "Guardrail"
+    "Threat": "Guardrail",
+    "Attack type": "Policy Triggered",
+    "Attack Type": "Policy Triggered",
+    "Latest Attack": "Latest Policy Triggered",
+    "Latest attack sub-category": "Policy triggered"
   },
   "Endpoint Security": {
     "Quick Start": "Connectors",
@@ -386,6 +401,7 @@ export const labelMap = {
     "APIs Affected": "Agentic Components Affected",
     "APIs": "Agentic Components",
     "API": "Agentic Component",
+    "API group": "Agentic Component Group",
     "API response": "Agentic Response",
     "API request": "Agentic Request",
     "API Risk Score": "Agentic Risk Score",
@@ -432,5 +448,11 @@ export const labelMap = {
     "Test library":"Probe library",
     "Endpoint Shield": "Endpoint Shield",
     "Threat": "Guardrail",
+    "Number of endpoints": "Number of components",
+    "Domains": "Resource",
+    "Attack type": "Policy Triggered",
+    "Attack Type": "Policy Triggered",
+    "Latest Attack": "Latest Policy Triggered",
+    "Latest attack sub-category": "Policy triggered"
   },
 }

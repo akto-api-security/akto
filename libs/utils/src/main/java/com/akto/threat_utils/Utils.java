@@ -44,6 +44,10 @@ public class Utils {
         cleanedUrl = removeMatchesFromText(cleanedUrl, lfiTrie);
         cleanedUrl = removeMatchesFromText(cleanedUrl, osCommandInjectionTrie);
         cleanedUrl = removeMatchesFromText(cleanedUrl, ssrfTrie);
+        if (cleanedUrl.startsWith("http://") || cleanedUrl.startsWith("https://")) {
+            return cleanedUrl;
+        }
+        
         cleanedUrl = cleanedUrl.replace("//", "/");
         
         

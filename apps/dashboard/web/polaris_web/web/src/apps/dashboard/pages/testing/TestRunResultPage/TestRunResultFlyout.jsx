@@ -22,7 +22,6 @@ import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
-import ChatInterface from '../../../components/shared/ChatInterface.jsx'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
 import ApiGroups from '../../../components/shared/ApiGroups'
 import ForbiddenRole from '../../../components/shared/ForbiddenRole'
@@ -409,7 +408,8 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
-    const owaspData = func.categoryMapping[selectedTestRunResult?.testCategory] || {};
+    const categoryKey = selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] || selectedTestRunResult?.testCategory;
+    const owaspData = func.categoryMapping[categoryKey] || {};
     const owaspMapping = owaspData.label || "";
     const owaspUrl = owaspData.url || "";
 
@@ -772,7 +772,7 @@ function TestRunResultFlyout(props) {
 
         // TODO: Replace with real AI analysis from backend
         // Mock analysis for UI development - replace when backend endpoint is ready
-        const analysis = "Your HR Agent exposed its system instructions after a follow up request framed as internal debugging. The disclosure occurred while interacting with getAutomationTestCommandLogs, indicating a multi part prompt injection vulnerability.";
+        const analysis = "Your AI Agent exposed its system instructions after a follow up request framed as internal debugging. The disclosure occurred while interacting with getAutomationTestCommandLogs, indicating a multi part prompt injection vulnerability.";
 
         // TODO: Implement real message sending handler
         // Replace with actual API call when chat endpoint is available

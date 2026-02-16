@@ -21,7 +21,7 @@ public class CmsCounterLayer {
     private static final double EPSILON = 0.01; // 1% error
     private static final double CONFIDENCE = 0.99; // 99% confidence
     private static final int SEED = 12345; // fixed seed for reproducibility
-    private static final int CMS_DATA_RETENTION_MINUTES = 60; // retain last 60 minutes
+    private static final int CMS_DATA_RETENTION_MINUTES = 480; // retain last 8 hours
 
     /*
      * 12:01 -> CMS
@@ -117,14 +117,14 @@ public class CmsCounterLayer {
     }
 
     /**
-     * Cleanup CMS from in-memory HashMap that are more than 60 minutes old.
+     * Cleanup CMS from in-memory HashMap that are more than 8 hours old.
      * Redis will automatically handle the expiration of keys.
      */
     public void cleanupOldWindows() {
         logger.debug("cleanupOldWindows triggered at " + Context.now());
         long currentEpochMin = Context.now() / 60;
-        long startWindow = currentEpochMin - 90;
-        long endWindow = currentEpochMin - 61;
+        long startWindow = currentEpochMin - 540; // ~9 hours ago
+        long endWindow = currentEpochMin - 481; // 8 hours + 1 minute ago
 
         for (long i = startWindow; i < endWindow; i++) {
             String windowKey = String.valueOf(i);

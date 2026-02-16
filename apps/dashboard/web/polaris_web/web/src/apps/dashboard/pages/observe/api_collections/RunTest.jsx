@@ -152,6 +152,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             testSourceConfigs: []
         }
 
+        let categoryMapForFiltering = localCategoryMap;
         if ((localCategoryMap && Object.keys(localCategoryMap).length > 0) && (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)) {
             metaDataObj = {
                 categories: Object.values(localCategoryMap),
@@ -161,11 +162,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
         } else {
             metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+
+            if (!localCategoryMap || Object.keys(localCategoryMap).length === 0) {
+                categoryMapForFiltering = {};
+                metaDataObj.categories.forEach(category => {
+                    categoryMapForFiltering[category.name] = category;
+                });
+            }
         }
-        if (func.isDemoAccount()) {
-            let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, localCategoryMap);
-            metaDataObj.subCategories = filterSubCategoriesBasedOnCategories(metaDataObj.subCategories, categoriesName);
-        }
+        let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMapForFiltering);
+        metaDataObj.subCategories = filterSubCategoriesBasedOnCategories(metaDataObj.subCategories, categoriesName);
         let categories = metaDataObj.categories
         categories = func.sortByCategoryPriority(categories, 'name')
         const categoriesNames = categories.map(category => category.name)
@@ -328,14 +334,15 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             if (!ret[x.superCategory.name]) {
                 ret[x.superCategory.name] = { selected: [], all: [] }
             }
-
+            
             let obj = {
                 label: x.testName,
                 value: x.name,
                 author: x.author,
                 nature: x?.attributes?.nature?._name || "",
                 severity: x?.superCategory?.severity?._name || "",
-                duration: x?.attributes?.duration?._name || ""
+                duration: x?.attributes?.duration?._name || "",
+                estimatedTokens: 2 * x.estimatedTokens || 0
             }
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)
@@ -453,10 +460,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         testRows = filteredTests.map(test => {
             const isCustom = test?.author !== "AKTO"
             const label = (
-                <span style={{ display: 'flex', gap: '4px', alignItems: 'flex-start' }}>
-                    <Text variant="bodyMd">{test.label}</Text>
-                    {isCustom ? <Box paddingBlockStart={"050"}><Badge status="warning" size="small">Custom</Badge></Box> : null}
-                </span>
+                <VerticalStack gap="1">
+                    <HorizontalStack gap="1" blockAlign="start" wrap>
+                        <Text variant="bodyMd">{test.label}</Text>
+                        {isCustom ? <Badge status="warning" size="small">Custom</Badge> : null}
+                        {test.estimatedTokens > 0 ? <Badge status="info" size="small">~{test.estimatedTokens.toLocaleString()} tokens</Badge> : null}
+                    </HorizontalStack>
+                </VerticalStack>
             )
             return ([(
                 <Checkbox
@@ -665,6 +675,24 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         });
         return count;
     }
+
+    function computeTokenEstimation() {
+        let totalTokens = 0;
+        const tests = { ...testRun.tests };
+        Object.keys(tests).forEach(category => {
+            (tests[category] || []).filter(t => t.selected && t.estimatedTokens > 0).forEach(t => {
+                totalTokens += t.estimatedTokens;
+            });
+        });
+
+        const totalApis = (selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0)
+            ? selectedResourcesForPrimaryAction.length
+            : (endpoints ? endpoints.length : 0);
+            
+        return totalTokens * totalApis;
+    }
+
+    const estimatedTotalTokens = computeTokenEstimation();
 
     function toggleTestsSelection(val) {
         let copyTestRun = testRun
@@ -949,6 +977,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         </div>
                                     </div>
                                 </div>
+                                {estimatedTotalTokens > 0 && (
+                                    <Box paddingBlockStart="2">
+                                        <HorizontalStack align="end" gap="1">
+                                            <Text variant="bodySm" color="subdued">Estimated Usage:</Text>
+                                            <Text variant="bodySm" fontWeight="semibold">~{estimatedTotalTokens.toLocaleString()} tokens</Text>
+                                        </HorizontalStack>
+                                    </Box>
+                                )}
                                 {RunTestConfigurationComponent}
                             </VerticalStack>
                             <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />

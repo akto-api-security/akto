@@ -1,4 +1,4 @@
-import {Box, Navigation, Text} from "@shopify/polaris";
+import {Badge, Box, Navigation, Text} from "@shopify/polaris";
 import {
     AppsFilledMajor,
     InventoryFilledMajor,
@@ -100,7 +100,8 @@ export default function LeftNav() {
         "shivam@akto.io",
         "umesh@akto.io",
         "shivansh@akto.io",
-        "aryan@akto.io"
+        "aryan@akto.io",
+        "fenil@akto.io"
     ];
     const isAllowedDashboardUser = window.USER_NAME && allowedDashboardUsers.includes(window.USER_NAME.toLowerCase());
 
@@ -146,6 +147,17 @@ export default function LeftNav() {
                     setActive("normal");
                 }
             }] : []),
+            // ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
+            //     label: "Endpoint Security Posture",
+            //     icon: ReportFilledMinor,
+            //     onClick: () => {
+            //         handleSelect("dashboard_endpoint_posture");
+            //         navigate("/dashboard/endpoint-dashboard");
+            //         setActive("normal");
+            //     },
+            //     selected: leftNavSelected === "dashboard_endpoint_posture",
+            //     key: "2a",
+            // }] : []),
             ...(dashboardCategory !== "Endpoint Security" ? [{
                 label: mapLabel("API Security Posture", dashboardCategory),
                 icon: ReportFilledMinor,
@@ -369,7 +381,7 @@ export default function LeftNav() {
                 selected: leftNavSelected === "dashboard_prompt_hardening",
                 key: "prompt_hardening",
             }] : []),
-            ...(dashboardCategory !== "Endpoint Security" ? [{
+            {
                 url: "#",
                 label: (
                     <Text
@@ -388,14 +400,30 @@ export default function LeftNav() {
                 ),
                 icon: ReportFilledMinor,
                 onClick: () => {
-                    navigate("/dashboard/reports/issues");
-                    handleSelect("dashboard_reports_issues");
+                    const targetPath = dashboardCategory === CATEGORY_ENDPOINT_SECURITY
+                        ? "/dashboard/reports/threat"
+                        : "/dashboard/reports/issues";
+                    const targetHandle = dashboardCategory === CATEGORY_ENDPOINT_SECURITY
+                        ? "dashboard_reports_threat"
+                        : "dashboard_reports_issues";
+                    navigate(targetPath);
+                    handleSelect(targetHandle);
                     setActive("normal");
                 },
                 selected: leftNavSelected.includes("_reports"),
-                subNavigationItems: reportsSubNavigationItems,
+                subNavigationItems: dashboardCategory === CATEGORY_ENDPOINT_SECURITY
+                    ? [{
+                        label: "Threat",
+                        onClick: () => {
+                            navigate("/dashboard/reports/threat");
+                            handleSelect("dashboard_reports_threat");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_reports_threat",
+                    }]
+                    : reportsSubNavigationItems,
                 key: "6",
-            }] : []),
+            },
             ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted && dashboardCategory !== CATEGORY_DAST  ?  [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
@@ -408,7 +436,7 @@ export default function LeftNav() {
                         navigate("/dashboard/protection/threat-actor");
                         setActive("normal");
                     },
-                    selected: leftNavSelected.includes("_threat") ||  leftNavSelected.includes("_guardrails"),
+                    selected: (leftNavSelected.includes("_threat") && !leftNavSelected.includes("_reports")) || leftNavSelected.includes("_guardrails"),
                     url: "#",
                     key: "7",
                     subNavigationItems: [
@@ -459,7 +487,7 @@ export default function LeftNav() {
                             },
                             selected: leftNavSelected === "dashboard_guardrails_policies",
                             }] : []),
-                        ...(dashboardCategory !== "Endpoint Security" ? [{
+                        ...(dashboardCategory === CATEGORY_API_SECURITY || dashboardCategory === CATEGORY_DAST ? [{
                             label: "Threat Policies",
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-policy");
@@ -565,20 +593,21 @@ export default function LeftNav() {
         ]
 
         // Add Ask AI navigation item
-        // const askAiExists = items.find(item => item.key === "ask_ai")
-        // if (!askAiExists && window.USER_NAME.indexOf("@akto.io")) {
-        //     items.splice(1, 0, {
-        //         label: "Ask Akto",
-        //         icon: MagicMinor,
-        //         onClick: () => {
-        //             handleSelect("dashboard_ask_ai")
-        //             navigate("/dashboard/ask-ai")
-        //             setActive("normal")
-        //         },
-        //         selected: leftNavSelected === "dashboard_ask_ai",
-        //         key: "ask_ai",
-        //     })
-        // }
+        const askAiExists = items.find(item => item.key === "ask_ai")
+        if (!askAiExists) {
+            items.splice(1, 0, {
+                label: "Ask Akto",
+                badge: <Badge status="info">Beta</Badge>,
+                icon: MagicMinor,
+                onClick: () => {
+                    handleSelect("dashboard_ask_ai")
+                    navigate("/dashboard/ask-ai")
+                    setActive("normal")
+                },
+                selected: leftNavSelected === "dashboard_ask_ai",
+                key: "ask_ai",
+            })
+        }
 
         // Add Quick Start navigation item
         const exists = items.find(item => item.key === "quick_start")

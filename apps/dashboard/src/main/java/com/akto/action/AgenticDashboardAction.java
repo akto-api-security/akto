@@ -15,6 +15,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.testing.ComplianceMapping;
+import com.akto.dto.threat_detection.ThreatComplianceInfo;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.listener.RuntimeListener;
@@ -22,6 +23,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
+import com.akto.util.TimePeriodUtils;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
@@ -33,12 +35,6 @@ import lombok.Setter;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.WeekFields;
-import java.util.Locale;
 
 public class AgenticDashboardAction extends AbstractThreatDetectionAction {
 
@@ -210,6 +206,45 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
         }
     }
 
+    /**
+     * Fetch guardrail/posture dashboard specific metrics
+     */
+    public String fetchGuardrailData() {
+        try {
+            if (endTimestamp == 0) {
+                endTimestamp = Context.now();
+            }
+            long daysBetween = (endTimestamp - startTimestamp) / Constants.ONE_DAY_TIMESTAMP;
+            Set<Integer> demoCollections = getDemoCollections();
+
+            // Fetch all malicious events once within the time range
+            List<DashboardMaliciousEvent> allThreats = fetchAllMaliciousEvents(startTimestamp, endTimestamp, demoCollections);
+
+            // Fetch threat compliance data
+            Map<String, ThreatComplianceInfo> threatComplianceMap =
+                    com.akto.util.GuardrailMetricsProcessor.fetchThreatComplianceMap();
+
+            // Process all guardrail metrics in a single optimized pass
+            com.akto.util.GuardrailMetricsProcessor.GuardrailMetrics metrics =
+                    com.akto.util.GuardrailMetricsProcessor.processGuardrailMetrics(
+                            allThreats, startTimestamp, endTimestamp, daysBetween, threatComplianceMap);
+
+            response.put("topGuardrailPolicies", metrics.topGuardrailPolicies);
+            response.put("dataProtectionTrends", metrics.dataProtectionTrends);
+            response.put("avgThreatScore", metrics.avgThreatScore);
+            response.put("sensitiveCount", metrics.sensitiveCount);
+            response.put("successfulExploits", metrics.successfulExploits);
+            response.put("complianceAtRisks", metrics.complianceAtRisks);
+            response.put("attackFlows", metrics.attackFlows);
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching guardrail data: " + e.getMessage());
+            addActionError("Error fetching guardrail data: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
 
 
     private List<BasicDBObject> fetchIssuesOverTime(int startTimestamp, int endTimestamp, long daysBetween, List<TestingRunIssues> allIssues) {
@@ -224,7 +259,7 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 .collect(Collectors.toList());
             
             // Group by time period in Java
-            Map<String, Long> timePeriodMap = groupByTimePeriod(creationTimestamps, daysBetween);
+            Map<String, Long> timePeriodMap = TimePeriodUtils.groupByTimePeriod(creationTimestamps, daysBetween);
             
             // Convert to result format
             result = convertTimePeriodMapToResult(timePeriodMap, daysBetween);
@@ -380,7 +415,7 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 
                 // No-Auth: actualAuthType is null/empty OR contains UNAUTHENTICATED
                 // Matches frontend: obj.auth_type === undefined || obj.auth_type.toLowerCase() === "unauthenticated"
-                List<ApiInfo.AuthType> authTypes = api.getActualAuthType();
+                List<String> authTypes = api.getActualAuthType();
                 boolean isNoAuth = (authTypes == null || authTypes.isEmpty()) || 
                                   (authTypes.contains(ApiInfo.AuthType.UNAUTHENTICATED));
 
@@ -451,8 +486,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             }
             
             // Group by time period in Java
-            Map<String, Long> testedTimePeriodMap = groupByTimePeriod(testedTimestamps, daysBetween);
-            Map<String, Long> nonTestedTimePeriodMap = groupByTimePeriod(nonTestedTimestamps, daysBetween);
+            Map<String, Long> testedTimePeriodMap = TimePeriodUtils.groupByTimePeriod(testedTimestamps, daysBetween);
+            Map<String, Long> nonTestedTimePeriodMap = TimePeriodUtils.groupByTimePeriod(nonTestedTimestamps, daysBetween);
             
             // Convert to result format
             List<BasicDBObject> testedData = convertTimePeriodMapToResult(testedTimePeriodMap, daysBetween);
@@ -595,8 +630,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             }
             
             // Group by time period in Java
-            Map<String, Long> openTimePeriodMap = groupByTimePeriod(openTimestamps, daysBetween);
-            Map<String, Long> resolvedTimePeriodMap = groupByTimePeriod(resolvedTimestamps, daysBetween);
+            Map<String, Long> openTimePeriodMap = TimePeriodUtils.groupByTimePeriod(openTimestamps, daysBetween);
+            Map<String, Long> resolvedTimePeriodMap = TimePeriodUtils.groupByTimePeriod(resolvedTimestamps, daysBetween);
             
             // Convert to result format
             List<BasicDBObject> openData = convertTimePeriodMapToResult(openTimePeriodMap, daysBetween);
@@ -768,9 +803,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     private List<BasicDBObject> fetchComplianceAtRisksInternal(List<TestingRunIssues> allIssues) {
         List<BasicDBObject> result = new ArrayList<>();
         try {
-            // Map to count issues per compliance standard
-            Map<String, Long> complianceCounts = new HashMap<>();
-            
             // Collect unique testSubCategories to fetch compliance mappings
             Set<String> regularTestSubCategories = new HashSet<>();
             Map<String, String> testSubCategoryToTestCategoryFromSourceConfig = new HashMap<>();
@@ -811,11 +843,16 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 }
             }
             
-            // Count issues per compliance standard
-            int totalIssuesWithCompliance = 0;
+            // Count unique APIs per compliance standard
+            // Map to store unique APIs (by ApiInfoKey) for each compliance standard
+            Map<String, Set<ApiInfo.ApiInfoKey>> complianceToApis = new HashMap<>();
+            // Set to track all unique APIs that have been tested (have any issues)
+            Set<ApiInfo.ApiInfoKey> totalTestedApis = new HashSet<>();
+            
             for (TestingRunIssues issue : allIssues) {
-                if (issue.getId() == null) continue;
+                if (issue.getId() == null || issue.getId().getApiInfoKey() == null) continue;
                 
+                ApiInfo.ApiInfoKey apiInfoKey = issue.getId().getApiInfoKey();
                 String testSubCategory = issue.getId().getTestSubCategory();
                 if (testSubCategory == null || testSubCategory.isEmpty()) continue;
                 
@@ -833,32 +870,36 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 if (complianceMapping != null && complianceMapping.getMapComplianceToListClauses() != null) {
                     Map<String, List<String>> complianceMap = complianceMapping.getMapComplianceToListClauses();
                     if (!complianceMap.isEmpty()) {
-                        totalIssuesWithCompliance++;
-                        // Count this issue for each compliance standard it belongs to
+                        // Track this API as tested
+                        totalTestedApis.add(apiInfoKey);
+                        
+                        // Add this API to each compliance standard it belongs to
                         for (String complianceName : complianceMap.keySet()) {
-                            complianceCounts.put(complianceName, complianceCounts.getOrDefault(complianceName, 0L) + 1);
+                            complianceToApis.computeIfAbsent(complianceName, k -> new HashSet<>()).add(apiInfoKey);
                         }
                     }
                 }
             }
             
-            // Calculate percentages and create result objects
+            // Calculate percentages: (unique APIs with compliance issues / total unique APIs tested) * 100
+            int totalTestedApisCount = totalTestedApis.size();
+            
             // Sort by count descending and take top 4 compliances
-            List<Map.Entry<String, Long>> sortedCompliances = complianceCounts.entrySet().stream()
-                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+            List<Map.Entry<String, Set<ApiInfo.ApiInfoKey>>> sortedCompliances = complianceToApis.entrySet().stream()
+                .sorted(Map.Entry.<String, Set<ApiInfo.ApiInfoKey>>comparingByValue((a, b) -> Integer.compare(b.size(), a.size())))
                 .limit(4)
                 .collect(Collectors.toList());
             
-            for (Map.Entry<String, Long> entry : sortedCompliances) {
+            for (Map.Entry<String, Set<ApiInfo.ApiInfoKey>> entry : sortedCompliances) {
                 BasicDBObject complianceObj = new BasicDBObject();
                 complianceObj.put("name", entry.getKey());
-                long count = entry.getValue();
-                // Calculate percentage: (count / totalIssuesWithCompliance) * 100
-                double percentage = totalIssuesWithCompliance > 0 
-                    ? (count * 100.0 / totalIssuesWithCompliance) 
+                int uniqueApisCount = entry.getValue().size();
+                // Calculate percentage: (unique APIs with compliance issues / total unique APIs tested) * 100
+                double percentage = totalTestedApisCount > 0 
+                    ? (uniqueApisCount * 100.0 / totalTestedApisCount) 
                     : 0.0;
                 complianceObj.put("percentage", Math.round(percentage * 100.0) / 100.0); // Round to 2 decimal places
-                complianceObj.put("count", count);
+                complianceObj.put("count", uniqueApisCount);
                 // Note: color and icon should be handled on frontend based on compliance name
                 result.add(complianceObj);
             }
@@ -936,8 +977,11 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                     if (filterConfig != null && filterConfig.getInfo() != null) {
                         Info info = filterConfig.getInfo();
                         
-                        // Try to get display name from category, fallback to name, then to filterId
-                        if (info.getCategory() != null) {
+                        // Try to get display name from info name first
+                        if (info.getName() != null && !info.getName().isEmpty()) {
+                            filterIdToNameMap.put(filterId, info.getName());
+                        } else if (info.getCategory() != null) {
+                            // Fallback to category display name or category name
                             Category category = info.getCategory();
                             String displayName = category.getDisplayName();
                             String categoryName = category.getName();
@@ -947,10 +991,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                             } else if (categoryName != null && !categoryName.isEmpty()) {
                                 filterIdToNameMap.put(filterId, categoryName);
                             }
-                        }
-                        // If no category, try to get name from info
-                        if (!filterIdToNameMap.containsKey(filterId) && info.getName() != null && !info.getName().isEmpty()) {
-                            filterIdToNameMap.put(filterId, info.getName());
                         }
                     }
                 }
@@ -971,36 +1011,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 // Use display name from FilterYamlTemplate if available
                 String displayName = filterIdToNameMap.get(filterId);
                 
-                // If no mapping found, convert filterId to readable name
-                // e.g., "SSRFInParams" -> "SSRF In Params", "DataExfiltrationInParams" -> "Data Exfiltration In Params"
-                if (displayName == null || displayName.isEmpty()) {
-                    // Insert space before capital letters (except the first one)
-                    String readable = filterId.replaceAll("([a-z])([A-Z])", "$1 $2");
-                    // Replace underscores with spaces
-                    readable = readable.replaceAll("_", " ");
-                    // Capitalize first letter of each word
-                    String[] words = readable.split("\\s+");
-                    StringBuilder resultBuilder = new StringBuilder();
-                    for (int i = 0; i < words.length; i++) {
-                        if (i > 0) {
-                            resultBuilder.append(" ");
-                        }
-                        if (!words[i].isEmpty()) {
-                            // Preserve acronyms (all caps) but capitalize first letter of other words
-                            if (words[i].matches("^[A-Z]+$")) {
-                                resultBuilder.append(words[i]);
-                            } else {
-                                resultBuilder.append(words[i].substring(0, 1).toUpperCase());
-                                if (words[i].length() > 1) {
-                                    resultBuilder.append(words[i].substring(1));
-                                }
-                            }
-                        }
-                    }
-                    displayName = resultBuilder.toString();
-                }
-                
-                doc.put("_id", displayName);
+                // Use displayName if available, otherwise fallback to filterId
+                doc.put("_id", (displayName != null && !displayName.isEmpty()) ? displayName : filterId);
                 doc.put("count", entry.getValue());
                 result.add(doc);
             }
@@ -1022,21 +1034,18 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             for (DashboardMaliciousEvent threat : allThreats) {
                 String host = threat.getHost();
                 if (host != null && !host.isEmpty()) {
-                    hostCounts.put(host, hostCounts.getOrDefault(host, 0L) + 1);
+                    // Validate that it's a hostname (contains a dot or is a valid hostname format)
+                    if (isValidHostname(host)) {
+                        hostCounts.put(host, hostCounts.getOrDefault(host, 0L) + 1);
+                    }
                 } else {
                     // Fallback to url if host is not available
                     String endpoint = threat.getUrl();
                     if (endpoint != null && !endpoint.isEmpty()) {
                         // Extract hostname from URL if possible
-                        try {
-                            java.net.URL url = new java.net.URL(endpoint);
-                            String hostname = url.getHost();
-                            if (hostname != null && !hostname.isEmpty()) {
-                                hostCounts.put(hostname, hostCounts.getOrDefault(hostname, 0L) + 1);
-                            }
-                        } catch (Exception e) {
-                            // If URL parsing fails, use endpoint as-is
-                            hostCounts.put(endpoint, hostCounts.getOrDefault(endpoint, 0L) + 1);
+                        String hostname = extractHostnameFromUrl(endpoint);
+                        if (hostname != null && !hostname.isEmpty() && isValidHostname(hostname)) {
+                            hostCounts.put(hostname, hostCounts.getOrDefault(hostname, 0L) + 1);
                         }
                     }
                 }
@@ -1061,18 +1070,73 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     }
 
     /**
+     * Helper method to validate if a string is a valid hostname (not a path)
+     * Rejects paths (starting with '/') and validates hostname format
+     */
+    private boolean isValidHostname(String hostname) {
+        if (hostname == null || hostname.isEmpty()) {
+            return false;
+        }
+        // Reject paths (starting with /)
+        if (hostname.startsWith("/")) {
+            return false;
+        }
+        // Reject if it looks like a path (contains slashes but no protocol)
+        if (hostname.contains("/") && !hostname.contains("://")) {
+            return false;
+        }
+        // Hostnames typically contain a dot (for domain names) or are localhost/ip addresses
+        return hostname.contains(".") || hostname.equals("localhost") || hostname.matches("^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$");
+    }
+
+    /**
+     * Helper method to extract hostname from URL
+     * Uses Java's standard URL class for parsing
+     * Returns null if URL parsing fails (e.g., if it's just a path)
+     */
+    private String extractHostnameFromUrl(String url) {
+        if (url == null || url.isEmpty()) {
+            return null;
+        }
+        try {
+            // If URL doesn't start with http:// or https://, try to add it
+            String urlToParse = url;
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                urlToParse = "https://" + url;
+            }
+            java.net.URL parsedUrl = new java.net.URL(urlToParse);
+            String host = parsedUrl.getHost();
+            // Return null if host is empty (e.g., for paths like "/path")
+            return (host != null && !host.isEmpty()) ? host : null;
+        } catch (Exception e) {
+            // If URL parsing fails (e.g., for paths), return null
+            return null;
+        }
+    }
+
+    /**
      * Internal method: Fetch top 5 bad actors by threats
      * Collection: MaliciousEventDao
      */
     private List<BasicDBObject> fetchTopBadActorsInternal(List<DashboardMaliciousEvent> allThreats) {
         List<BasicDBObject> result = new ArrayList<>();
         try {
-            // Group by actor in Java
+            // Group by actor in Java, tracking count and most common country
             Map<String, Long> actorCounts = new HashMap<>();
+            Map<String, Map<String, Long>> actorCountryCounts = new HashMap<>();
+            
             for (DashboardMaliciousEvent threat : allThreats) {
                 String actor = threat.getActor();
                 if (actor != null && !actor.isEmpty()) {
                     actorCounts.put(actor, actorCounts.getOrDefault(actor, 0L) + 1);
+                    
+                    // Track country for this actor
+                    String country = threat.getCountry();
+                    if (country != null && !country.isEmpty()) {
+                        actorCountryCounts.putIfAbsent(actor, new HashMap<>());
+                        Map<String, Long> countryCounts = actorCountryCounts.get(actor);
+                        countryCounts.put(country, countryCounts.getOrDefault(country, 0L) + 1);
+                    }
                 }
             }
             
@@ -1086,6 +1150,19 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 BasicDBObject doc = new BasicDBObject();
                 doc.put("actor", entry.getKey());
                 doc.put("count", entry.getValue());
+                
+                // Get the most common country for this actor
+                Map<String, Long> countryCounts = actorCountryCounts.get(entry.getKey());
+                if (countryCounts != null && !countryCounts.isEmpty()) {
+                    String mostCommonCountry = countryCounts.entrySet().stream()
+                        .max(Map.Entry.comparingByValue())
+                        .map(Map.Entry::getKey)
+                        .orElse(null);
+                    if (mostCommonCountry != null) {
+                        doc.put("country", mostCommonCountry);
+                    }
+                }
+                
                 result.add(doc);
             }
         } catch (Exception e) {
@@ -1126,8 +1203,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             }
             
             // Group by time period in Java
-            Map<String, Long> openTimePeriodMap = groupByTimePeriod(openTimestamps, daysBetween);
-            Map<String, Long> resolvedTimePeriodMap = groupByTimePeriod(resolvedTimestamps, daysBetween);
+            Map<String, Long> openTimePeriodMap = TimePeriodUtils.groupByTimePeriod(openTimestamps, daysBetween);
+            Map<String, Long> resolvedTimePeriodMap = TimePeriodUtils.groupByTimePeriod(resolvedTimestamps, daysBetween);
             
             // Convert to result format
             List<BasicDBObject> openData = convertTimePeriodMapToResult(openTimePeriodMap, daysBetween);
@@ -1142,6 +1219,7 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
         }
         return result;
     }
+
 
 
     // ========== Helper Methods ==========
@@ -1269,43 +1347,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     }
 
     // ========== Java-based Time Grouping Utilities ==========
-
-    /**
-     * Get time period key for grouping (day/week/month based on daysBetween)
-     */
-    private String getTimePeriodKey(int timestamp, long daysBetween) {
-        LocalDate date = Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault()).toLocalDate();
-        
-        if (daysBetween <= 15) {
-            // Day grouping: return "D_YYYY-MM-DD" to explicitly indicate day type
-            return "D_" + date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-        } else if (daysBetween <= 105) {
-            // Week grouping: return "W_YYYY_W" to explicitly indicate week type
-            WeekFields weekFields = WeekFields.of(Locale.getDefault());
-            int week = date.get(weekFields.weekOfWeekBasedYear());
-            int year = date.get(weekFields.weekBasedYear());
-            return "W_" + year + "_" + week;
-        } else {
-            // Month grouping: return "M_YYYY_M" to explicitly indicate month type
-            int year = date.getYear();
-            int month = date.getMonthValue();
-            return "M_" + year + "_" + month;
-        }
-    }
-
-    /**
-     * Group data by time period in Java
-     */
-    private Map<String, Long> groupByTimePeriod(List<Integer> timestamps, long daysBetween) {
-        Map<String, Long> result = new HashMap<>();
-        for (Integer timestamp : timestamps) {
-            if (timestamp != null && timestamp > 0) {
-                String key = getTimePeriodKey(timestamp, daysBetween);
-                result.put(key, result.getOrDefault(key, 0L) + 1);
-            }
-        }
-        return result;
-    }
 
     /**
      * Convert time period map to BasicDBObject list format

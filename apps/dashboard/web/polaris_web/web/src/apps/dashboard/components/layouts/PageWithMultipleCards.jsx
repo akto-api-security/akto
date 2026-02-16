@@ -64,9 +64,19 @@ const PageWithMultipleCards = (props) => {
     const categoryKey = category?.toLowerCase().replace(/ /g, '_')
 
     let learnMoreObj = null
-    if (learnMoreObject?.[pathKey]) {
-        const pageData = learnMoreObject[pathKey]
+    let pageData = learnMoreObject?.[pathKey]
 
+    // Fallback for sensitive data types - if specific type not found, use generic datatype config
+    if (!pageData && pathKey.startsWith('dashboard_observe_sensitive_') && pathKey !== 'dashboard_observe_sensitive') {
+        pageData = learnMoreObject?.['dashboard_observe_sensitive_datatype']
+    }
+
+    // Fallback for DAST: use API Security docs if DAST docs don't exist
+    if (pageData && categoryKey === 'dast' && !pageData[categoryKey] && pageData['api_security']) {
+        pageData = { ...pageData, dast: pageData['api_security'] };
+    }
+
+    if (pageData) {
         // Check if category-specific data exists
         if (pageData[categoryKey] && typeof pageData[categoryKey] === 'object') {
             // Use ONLY category-specific data (no merge with root-level)

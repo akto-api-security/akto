@@ -44,17 +44,26 @@ public class IconUtils {
         }
 
         IconCache iconCache = IconCache.getInstance();
+        Set<String> processedRootDomains = new HashSet<>();
 
         // Process each hostname with cache-first approach
         for (ApiCollection collection : apiCollections) {
-            // First check cache (includes domain-stripping logic)
             String hostname = collection.getHostName();
+            if (hostname == null || hostname.trim().isEmpty()) continue;
+
+            // Extract root domain (last 2 parts) to deduplicate
+            String[] parts = hostname.trim().toLowerCase().split("\\.");
+            String rootDomain = parts.length >= 2 ? parts[parts.length - 2] + "." + parts[parts.length - 1] : hostname;
+
+            if (processedRootDomains.contains(rootDomain)) continue;
+
             IconCache.IconData cachedIcon = iconCache.getIconData(hostname);
             if (cachedIcon != null) {
+                processedRootDomains.add(rootDomain);
                 continue;
             }
 
-            // Not in cache, submit for async fetching from Google Favicon API
+            processedRootDomains.add(rootDomain);
             executorService.submit(() -> {
                 try {
                     fetchAndStoreIconWithCascade(hostname);
@@ -83,7 +92,7 @@ public class IconUtils {
             tryFetchAndStoreIcon(cleanHostName, cleanHostName);
             return;
         }
-        
+
         // Try from full hostname down to main domain (last 2 parts)
         for (int i = 0; i <= parts.length - 2; i++) {
             StringBuilder domainBuilder = new StringBuilder();
@@ -92,13 +101,13 @@ public class IconUtils {
                 domainBuilder.append(parts[j]);
             }
             String candidateDomain = domainBuilder.toString();
-            
+
             // Try to fetch icon for this domain level
             if (tryFetchAndStoreIcon(candidateDomain, fullHostname)) {
                 return; // Success - stop trying other levels
             }
         }
-        
+
         loggerMaker.infoAndAddToDb("Failed to fetch icon for hostname: " + fullHostname + " after trying all domain levels", LogDb.DASHBOARD);
     }
 

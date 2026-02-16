@@ -254,6 +254,7 @@ public class UserDetailsFilter implements Filter {
                 redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
                 return;
             }
+            session = httpServletRequest.getSession(true);
             setSession(session, username, signedUp);
             logger.debug("New session created");
         }

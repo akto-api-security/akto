@@ -47,6 +47,32 @@ public class AIAgentConnectorImportAction extends UserAction {
     private String dataverseClientId;
     private String dataverseClientSecret;
 
+    // Snowflake-specific parameters
+    private String snowflakeAccountUrl;
+    private String snowflakeAuthType;
+    private String snowflakeUsername;
+    private String snowflakePassword;
+    private String snowflakeToken;
+    private String snowflakePrivateKey;
+    private String snowflakePrivateKeyPassphrase;
+    private String snowflakeWarehouse;
+    private String snowflakeDatabase;
+    private String snowflakeSchema;
+
+    // Databricks-specific parameters
+    private String databricksHost;
+    private String databricksClientId;
+    private String databricksClientSecret;
+    private String databricksCatalog;
+    private String databricksSchema;
+    private String databricksPrefix;
+
+    // Vertex AI Custom Deployed Model-specific parameters
+    private String vertexAIProjectId;
+    private String vertexAIBigQueryDataset;
+    private String vertexAIBigQueryTable;
+    private String vertexAIJsonAuthFilePath;
+
     /**
      * Unified method to initiate import for any AI Agent Connector.
      * The connector type is determined by the connectorType parameter.
@@ -72,6 +98,8 @@ public class AIAgentConnectorImportAction extends UserAction {
                 ? recurringIntervalSeconds
                 : DEFAULT_RECURRING_INTERVAL_SECONDS;
 
+            String jobType = getJobTypeForConnector(connectorType);
+
             // Create entry in per-account jobs collection
             // Convert Map<String, String> config to Map<String, Object> for generic storage
             Map<String, Object> jobConfig = new HashMap<>(config);
@@ -79,8 +107,8 @@ public class AIAgentConnectorImportAction extends UserAction {
             int now = Context.now();
             AccountJob accountJob = new AccountJob(
                 Context.accountId.get(),        // accountId
-                "AI_AGENT_CONNECTOR",          // jobType (generic)
-                connectorType,                  // subType (N8N, LANGCHAIN, COPILOT_STUDIO)
+                jobType,                        // jobType
+                connectorType,                  // subType (N8N, LANGCHAIN, COPILOT_STUDIO, VERTEX_AI_CUSTOM_DEPLOYED_MODEL, etc.)
                 jobConfig,                      // flexible config map
                 interval,                       // recurringIntervalSeconds
                 now,                            // createdAt
@@ -111,6 +139,11 @@ public class AIAgentConnectorImportAction extends UserAction {
      * Builds configuration map based on connector type.
      */
     private Map<String, String> buildConfig() {
+        if (dataIngestionUrl == null || dataIngestionUrl.isEmpty()) {
+            loggerMaker.error("Missing required Data Ingestion Service URL", LogDb.DASHBOARD);
+            return null;
+        }
+        
         Map<String, String> config = new HashMap<>();
         config.put(CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
 
@@ -145,6 +178,94 @@ public class AIAgentConnectorImportAction extends UserAction {
                 config.put(CONFIG_DATAVERSE_TENANT_ID, dataverseTenantId);
                 config.put(CONFIG_DATAVERSE_CLIENT_ID, dataverseClientId);
                 config.put(CONFIG_DATAVERSE_CLIENT_SECRET, dataverseClientSecret);
+                break;
+
+            case CONNECTOR_TYPE_SNOWFLAKE:
+                if (snowflakeAccountUrl == null || snowflakeAccountUrl.isEmpty()) {
+                    loggerMaker.error("Missing required Snowflake account URL", LogDb.DASHBOARD);
+                    return null;
+                }
+                config.put(CONFIG_SNOWFLAKE_ACCOUNT_URL, snowflakeAccountUrl);
+
+                // Determine auth type (default to PASSWORD for backward compatibility)
+                String authType = (snowflakeAuthType != null && !snowflakeAuthType.isEmpty())
+                    ? snowflakeAuthType
+                    : SNOWFLAKE_AUTH_TYPE_PASSWORD;
+                config.put(CONFIG_SNOWFLAKE_AUTH_TYPE, authType);
+
+                // Validate and add auth-specific fields
+                if (SNOWFLAKE_AUTH_TYPE_PASSWORD.equals(authType)) {
+                    if (snowflakeUsername == null || snowflakeUsername.isEmpty() ||
+                        snowflakePassword == null || snowflakePassword.isEmpty()) {
+                        loggerMaker.error("Missing required Snowflake username/password for password authentication", LogDb.DASHBOARD);
+                        return null;
+                    }
+                    config.put(CONFIG_SNOWFLAKE_USERNAME, snowflakeUsername);
+                    config.put(CONFIG_SNOWFLAKE_PASSWORD, snowflakePassword);
+                } else if (SNOWFLAKE_AUTH_TYPE_TOKEN.equals(authType)) {
+                    if (snowflakeToken == null || snowflakeToken.isEmpty()) {
+                        loggerMaker.error("Missing required Snowflake OAuth token", LogDb.DASHBOARD);
+                        return null;
+                    }
+                    config.put(CONFIG_SNOWFLAKE_TOKEN, snowflakeToken);
+                } else if (SNOWFLAKE_AUTH_TYPE_KEY_PAIR.equals(authType)) {
+                    if (snowflakeUsername == null || snowflakeUsername.isEmpty() ||
+                        snowflakePrivateKey == null || snowflakePrivateKey.isEmpty()) {
+                        loggerMaker.error("Missing required Snowflake username/private key for key pair authentication", LogDb.DASHBOARD);
+                        return null;
+                    }
+                    config.put(CONFIG_SNOWFLAKE_USERNAME, snowflakeUsername);
+                    config.put(CONFIG_SNOWFLAKE_PRIVATE_KEY, snowflakePrivateKey);
+                    if (snowflakePrivateKeyPassphrase != null && !snowflakePrivateKeyPassphrase.isEmpty()) {
+                        config.put(CONFIG_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE, snowflakePrivateKeyPassphrase);
+                    }
+                } else {
+                    loggerMaker.error("Unsupported Snowflake authentication type: " + authType, LogDb.DASHBOARD);
+                    return null;
+                }
+
+                // Optional fields
+                if (snowflakeWarehouse != null && !snowflakeWarehouse.isEmpty()) {
+                    config.put(CONFIG_SNOWFLAKE_WAREHOUSE, snowflakeWarehouse);
+                }
+                if (snowflakeDatabase != null && !snowflakeDatabase.isEmpty()) {
+                    config.put(CONFIG_SNOWFLAKE_DATABASE, snowflakeDatabase);
+                }
+                if (snowflakeSchema != null && !snowflakeSchema.isEmpty()) {
+                    config.put(CONFIG_SNOWFLAKE_SCHEMA, snowflakeSchema);
+                }
+                break;
+
+            case CONNECTOR_TYPE_DATABRICKS:
+                if (databricksHost == null || databricksHost.isEmpty() ||
+                    databricksClientId == null || databricksClientId.isEmpty() ||
+                    databricksClientSecret == null || databricksClientSecret.isEmpty()) {
+                    loggerMaker.error("Missing required Databricks configuration", LogDb.DASHBOARD);
+                    return null;
+                }
+                config.put(CONFIG_DATABRICKS_HOST, databricksHost);
+                config.put(CONFIG_DATABRICKS_CLIENT_ID, databricksClientId);
+                config.put(CONFIG_DATABRICKS_CLIENT_SECRET, databricksClientSecret);
+                config.put(CONFIG_DATABRICKS_CATALOG, databricksCatalog != null ? databricksCatalog : "main");
+                config.put(CONFIG_DATABRICKS_SCHEMA, databricksSchema != null ? databricksSchema : "default");
+                config.put(CONFIG_DATABRICKS_PREFIX, databricksPrefix != null ? databricksPrefix : "");
+                break;
+
+            case CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL:
+                if (vertexAIProjectId == null || vertexAIProjectId.isEmpty() ||
+                    vertexAIBigQueryDataset == null || vertexAIBigQueryDataset.isEmpty() ||
+                    vertexAIBigQueryTable == null || vertexAIBigQueryTable.isEmpty()) {
+                    loggerMaker.error("Missing required Vertex AI Custom Deployed Model configuration", LogDb.DASHBOARD);
+                    return null;
+                }
+                config.put(CONFIG_VERTEX_AI_PROJECT_ID, vertexAIProjectId);
+                config.put(CONFIG_VERTEX_AI_BIGQUERY_DATASET, vertexAIBigQueryDataset);
+                config.put(CONFIG_VERTEX_AI_BIGQUERY_TABLE, vertexAIBigQueryTable);
+
+                // Optional field
+                if (vertexAIJsonAuthFilePath != null && !vertexAIJsonAuthFilePath.isEmpty()) {
+                    config.put(CONFIG_VERTEX_AI_JSON_AUTH_FILE_PATH, vertexAIJsonAuthFilePath);
+                }
                 break;
 
             default:

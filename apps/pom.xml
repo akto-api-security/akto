@@ -170,5 +170,16 @@
                 <module>threat-detection-backend</module>
             </modules>
         </profile>
+        <profile>
+            <id>akto-gateway</id>
+            <activation>
+                <file>
+                    <exists>akto-gateway/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>akto-gateway</module>
+            </modules>
+        </profile>
     </profiles>
 </project>

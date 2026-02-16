@@ -27,6 +27,12 @@ public class CrawlerRun {
     public static final String OUT_SCOPE_URLS = "outScopeUrls";
     private String outScopeUrls;
 
+    public static final String URL_TEMPLATE_PATTERNS = "urlTemplatePatterns";
+    private String urlTemplatePatterns;
+
+    public static final String APPLICATION_PAGES = "applicationPages";
+    private String applicationPages;
+
     public static final String STATUS = "status";
     private CrawlerRunStatus status;
 
@@ -55,7 +61,7 @@ public class CrawlerRun {
     private String errorMessage;
 
     public static final String COOKIES = "cookies";
-    private Object cookies;
+    private String cookies;
 
     public static final String CRAWLING_TIME = "crawlingTime";
     private Integer crawlingTime;
@@ -63,20 +69,30 @@ public class CrawlerRun {
     public static final String CUSTOM_HEADERS = "customHeaders";
     private Map<String, String> customHeaders;
 
+    public static final String RUN_TEST_AFTER_CRAWLING = "runTestAfterCrawling";
+    private boolean runTestAfterCrawling;
+
+    public static final String SELECTED_MINI_TESTING_SERVICE = "selectedMiniTestingService";
+    private String selectedMiniTestingService;
+
+    public static final String TEST_ROLE_HEX_ID = "testRoleHexId";
+    private String testRoleHexId;
+
     public CrawlerRun() {
     }
 
-    public CrawlerRun(String startedBy, int startTimestamp, int endTimestamp, String crawlId, String hostname, String outScopeUrls) {
+    public CrawlerRun(String startedBy, int startTimestamp, int endTimestamp, String crawlId, String hostname, String outScopeUrls, boolean runTestAfterCrawling) {
         this.startedBy = startedBy;
         this.startTimestamp = startTimestamp;
         this.endTimestamp = endTimestamp;
         this.crawlId = crawlId;
         this.hostname = hostname;
         this.outScopeUrls = outScopeUrls;
+        this.runTestAfterCrawling = runTestAfterCrawling;
     }
 
     public enum CrawlerRunStatus {
-        PENDING, RUNNING, COMPLETED, FAILED
+        PENDING, RUNNING, COMPLETED, FAILED, STOP_REQUESTED, STOPPED
     }
 
     @Override
@@ -90,6 +106,7 @@ public class CrawlerRun {
                 ", outScopeUrls=" + outScopeUrls +
                 ", status='" + status.name() + '\'' +
                 ", moduleName='" + moduleName + '\'' +
+                ", runTestAfterCrawling='" + runTestAfterCrawling + '\'' +
                 '}';
     }
 }

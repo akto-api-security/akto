@@ -34,13 +34,13 @@ public abstract class AfterMongoConnectListener implements ServletContextListene
                         continue;
                     }
 
-                    boolean runJobFunctions = JobUtils.getRunJobFunctions();
+                    int runJobFunctions = JobUtils.getRunJobFunctions();
                     boolean runJobFunctionsAnyway = JobUtils.getRunJobFunctionsAnyway();
 
                     try {
 
                         int now = Context.now();
-                        if (runJobFunctions || runJobFunctionsAnyway) {
+                        if (runJobFunctions > 0 || runJobFunctionsAnyway) {
                             logger.debug("Starting runtime init functions at " + now);
                             runMainFunction();
                             int now2 = Context.now();

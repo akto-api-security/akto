@@ -15,7 +15,12 @@ let quickStartStore = (set)=>({
     yamlContent: null,
     setYamlContent:(yamlContent)=>{
         set({yamlContent: yamlContent})
-    },  
+    },
+
+    duplicateScanData: null,
+    setDuplicateScanData:(duplicateScanData)=>{
+        set({duplicateScanData: duplicateScanData})
+    },
 })
 
 quickStartStore = devtools(quickStartStore)

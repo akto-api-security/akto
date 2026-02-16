@@ -28,6 +28,16 @@ const parentHeaders = [
         showFilter: true,
     },
     {
+        title: "Username",
+        text: "Username",
+        value: "username",
+        filterKey: "username",
+        textValue: 'username',
+        showFilter: true,
+        isText: CellType.TEXT,
+        boxWidth: '100px'
+    },
+    {
         title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of collection is maximum risk score of the endpoints inside this collection</Text>} title="Risk score" />,
         value: 'riskScoreComp',
         textValue: 'riskScore',
@@ -123,14 +133,16 @@ const getChildHeaders = (filterType) => {
 const sortOptions = [
     { label: 'Endpoint ID', value: 'endpointId asc', directionLabel: 'A-Z', sortKey: 'endpointId', columnIndex: 2 },
     { label: 'Endpoint ID', value: 'endpointId desc', directionLabel: 'Z-A', sortKey: 'endpointId', columnIndex: 2 },
-    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 3 },
-    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore', columnIndex: 3 },
+    { label: 'Username', value: 'username asc', directionLabel: 'A-Z', sortKey: 'username', columnIndex: 3 },
+    { label: 'Username', value: 'username desc', directionLabel: 'Z-A', sortKey: 'username', columnIndex: 3 },
+    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 4 },
+    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore', columnIndex: 4 },
     { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'detectedTimestamp' },
     { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'detectedTimestamp' },
-    { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detectedTimestamp', columnIndex: 5 },
-    { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detectedTimestamp', columnIndex: 5 },
-    { label: 'Discovered', value: 'discovered asc', directionLabel: 'Recent first', sortKey: 'startTs', columnIndex: 6 },
-    { label: 'Discovered', value: 'discovered desc', directionLabel: 'Oldest first', sortKey: 'startTs', columnIndex: 6 },
+    { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detectedTimestamp', columnIndex: 6 },
+    { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detectedTimestamp', columnIndex: 6 },
+    { label: 'Discovered', value: 'discovered asc', directionLabel: 'Recent first', sortKey: 'startTs', columnIndex: 7 },
+    { label: 'Discovered', value: 'discovered desc', directionLabel: 'Oldest first', sortKey: 'startTs', columnIndex: 7 },
 ];
 
 const resourceName = {
@@ -158,14 +170,17 @@ const groupByEndpointId = (collections) => {
                 apiCollectionIds: [],
                 // First collection for icon reference
                 firstCollection: null,
+                // Username from first collection (all collections in same endpoint should have same username)
+                username: '-',
             };
         }
         groups[endpointId].children.push(collection);
         groups[endpointId].apiCollectionIds.push(collection.id);
         
-        // Store first collection for icon lookup
+        // Store first collection for icon lookup and username
         if (!groups[endpointId].firstCollection) {
             groups[endpointId].firstCollection = collection;
+            groups[endpointId].username = collection.username || '-';
         }
         
         // Merge values
@@ -210,6 +225,7 @@ const prettifyGroupedData = (groupedData, filterType) => {
                     <Badge size="small" status="new">{childCount}</Badge>
                 </HorizontalStack>
             ),
+            username: group.username || '-',
             riskScoreComp: <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
             sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || []),
             sensitiveSubTypesVal: (group.sensitiveInRespTypes || []).join(' ') || '-',

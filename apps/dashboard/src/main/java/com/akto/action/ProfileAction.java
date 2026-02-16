@@ -19,8 +19,16 @@ import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.Intercom;
+import com.akto.utils.AlertUtils;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
+import com.akto.utils.crons.OrganizationCache;
+import com.akto.util.OrganizationInfo;
+import com.akto.notifications.slack.SlackAlerts;
+import com.akto.notifications.slack.UserBlockedNoPlanAlert;
+import com.akto.notifications.slack.SlackSender;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -36,7 +44,6 @@ import java.util.List;
 public class ProfileAction extends UserAction {
 
     private static final LoggerMaker logger = new LoggerMaker(ProfileAction.class, LogDb.DASHBOARD);
-
 
     private int accountId;
 
@@ -258,10 +265,64 @@ public class ProfileAction extends UserAction {
             userDetails.append("stiggClientKey", OrganizationUtils.fetchClientKey(organizationId, organization.getAdminEmail()));
             userDetails.append("expired", organization.checkExpirationWithAktoSync());
             userDetails.append("hotjarSiteId", organization.getHotjarSiteId());
+            // Note: planType will be resolved later in the method with fallback logic
             userDetails.append("planType", organization.getplanType());
             userDetails.append("trialMsg", organization.gettrialMsg());
             userDetails.append("protectionTrialMsg", organization.getprotectionTrialMsg());
             userDetails.append("agentTrialMsg", organization.getagentTrialMsg());
+
+
+                // Check if plan type is null, empty, or not in allowed list
+                String planType = organization.getplanType();
+                
+                // Enhanced fallback logic with caching to handle background thread race conditions
+                if (planType == null || planType.isEmpty() || "planType".equals(planType)) {
+                    logger.debugAndAddToDb("PlanType not found in organization, attempting fallback resolution for org: " + organization.getId());
+                    
+                    String userDomain = null;
+                    if (organization.getAdminEmail() != null && organization.getAdminEmail().contains("@")) {
+                        userDomain = organization.getAdminEmail().split("@")[1].toLowerCase();
+                        
+                        // Try cache again to avoid missing check in background thread
+                        OrganizationInfo cachedOrgInfo = OrganizationCache.getOrganizationInfoByDomain(userDomain);
+                        if (cachedOrgInfo != null && cachedOrgInfo.getPlanType() != null && 
+                            !cachedOrgInfo.getPlanType().isEmpty() && !"planType".equals(cachedOrgInfo.getPlanType())) {
+                            planType = cachedOrgInfo.getPlanType();
+                            logger.infoAndAddToDb("Retrieved planType from cache recheck: " + planType + " for domain: " + userDomain);
+                        }
+                    }
+                }
+                
+                // Update userDetails with resolved planType (may be different from organization.getplanType())
+                userDetails.replace("planType", planType);
+                
+                boolean isInvalidPlanType = planType == null || planType.isEmpty() ||
+                        !AlertUtils.isValidPlanType(planType);
+
+                if (isInvalidPlanType) {
+
+                    // Send Slack alert for blocked user only if organization is not whitelisted
+                    boolean isWhitelistedOrg = user.getLogin() != null && user.getLogin().contains("@akto.io");
+                    if (!isWhitelistedOrg) {
+                        logger.infoAndAddToDb("Blocking this user " + user.getLogin() + " to access dashboard as invalid plantype '" + planType + "' found for org " + organizationId);
+
+                        // Check if we should send alert
+                        if (AlertUtils.shouldSendAlert(user.getLogin(), organizationId)) {
+                            try {
+                                SlackAlerts userBlockedAlert = new UserBlockedNoPlanAlert(user.getLogin(), organizationId, planType);
+                                SlackSender.sendAlert(sessionAccId, userBlockedAlert, null, true);
+                                logger.infoAndAddToDb("Sent Slack alert for user blocked due to invalid plan type '" + planType + "': " + user.getLogin());
+                            } catch (Exception e) {
+                                logger.errorAndAddToDb(e, "Failed to send Slack alert for blocked user: " + user.getLogin());
+                            }
+                        } else {
+                            logger.infoAndAddToDb("Skipped duplicate Slack alert for user " + user.getLogin() + " (cooldown period active)");
+                        }
+                    } else {
+                        logger.infoAndAddToDb("Skipped Slack alert for whitelisted organization user: " + user.getLogin());
+                    }
+
+            }
         }
 
         if (versions.length > 2) {

@@ -27,7 +27,8 @@ import {
   CustomersMinor,
   PlusMinor,
   SettingsMinor,
-  ViewMajor
+  ViewMajor,
+  CircleAlertMajor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import observeApi from "../../observe/api";
@@ -871,25 +872,28 @@ function SingleTestRunPage() {
   )
 
   const metadataComponent = () => {
-
-    if (!selectedTestRun.metadata) {
-      return undefined
-    }
-
-    return (
-      <LegacyCard title="Metadata" sectioned key="metadata">
-        {
-          selectedTestRun.metadata ? Object.keys(selectedTestRun.metadata).map((key) => {
-            return (
-              <HorizontalStack key={key} spacing="tight">
-                <Text>{key} : {selectedTestRun.metadata[key]}</Text>
-              </HorizontalStack>
-            )
-          }) : ""
-        }
-      </LegacyCard>
-    )
+  if (!selectedTestRun.metadata) {
+    return undefined;
   }
+
+  // Filter out keys with empty string values and the 'error' key
+  const filteredMetadata = Object.keys(selectedTestRun.metadata)
+    .filter(key => key !== 'error' && selectedTestRun.metadata[key] !== '');
+
+  if (filteredMetadata.length === 0) {
+    return undefined;
+  }
+
+  return (
+    <LegacyCard title="Metadata" sectioned key="metadata">
+      {filteredMetadata.map((key) => (
+        <HorizontalStack key={key} spacing="tight">
+          <Text>{key} : {selectedTestRun.metadata[key]}</Text>
+        </HorizontalStack>
+      ))}
+    </LegacyCard>
+  );
+};
 
   const progress = useMemo(() => {
     return currentTestObj.testsInitiated === 0 ? 0 : Math.floor((currentTestObj.testsInsertedInDb * 100) / currentTestObj.testsInitiated);
@@ -1031,6 +1035,15 @@ function SingleTestRunPage() {
             <Box><Icon color="subdued" source={PriceLookupMinor} /></Box>
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
           </HorizontalStack>
+          {selectedTestRun?.authError && (
+            <>
+              <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
+              <HorizontalStack gap={"1"}>
+                <Box><Icon color="critical" source={CircleAlertMajor} /></Box>
+                <Text color="critical" variant="bodyMd" fontWeight="semibold">{selectedTestRun.authError}</Text>
+              </HorizontalStack>
+            </>
+          )}
           {allTestResultsStats.totalCount > 0 && (
             <>
               <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
