@@ -1052,7 +1052,7 @@ function SingleTestRunPage() {
             const ids = selectedTestRun.testingEndpoints.apiCollectionIds;
             const showCount = 2;
             const shown = ids.slice(0, showCount);
-            const hidden = ids.slice(showCount);
+            const hidden = ids.length - showCount;
             return (
               <>
                 {shown.map((cid) => (
@@ -1063,31 +1063,8 @@ function SingleTestRunPage() {
                     </HorizontalStack>
                   </Link>
                 ))}
-                {hidden.length > 0 && (
-                  <Popover
-                    active={secondaryPopover}
-                    preferredAlignment="left"
-                    preferredPosition="below"
-                    fullWidth={false}
-                    autofocusTarget="first-node"
-                    onClose={() => setSecondaryPopover(false)}
-                    activator={
-                      <Badge status="info" onClick={() => setSecondaryPopover(true)} style={{ cursor: 'pointer' }}>+{hidden.length}</Badge>
-                    }
-                  >
-                    <Popover.Pane fixed>
-                      <VerticalStack gap="2" style={{ maxHeight: '200px', overflowY: 'auto', minWidth: '180px' }}>
-                        {hidden.map((cid) => (
-                          <Link key={cid} monochrome target="_blank" url={"/dashboard/observe/inventory/" + cid} removeUnderline>
-                            <HorizontalStack gap={"1"}>
-                              <Box><Icon color="subdued" source={ArchiveMinor} /></Box>
-                              <Text color="subdued" variant="bodyMd">{collectionsMap[cid]}</Text>
-                            </HorizontalStack>
-                          </Link>
-                        ))}
-                      </VerticalStack>
-                    </Popover.Pane>
-                  </Popover>
+                {hidden > 0 && (
+                  <Badge status="info">+{hidden}</Badge>
                 )}
               </>
             );
