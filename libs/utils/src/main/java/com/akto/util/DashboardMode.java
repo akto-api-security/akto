@@ -25,6 +25,9 @@ public enum DashboardMode {
     // modify this and remove getActualDashboardMode method
     public static DashboardMode getDashboardMode(){
         String dashboardMode = System.getenv("DASHBOARD_MODE");
+        if (dashboardMode == null || dashboardMode.isEmpty()) {
+            dashboardMode = System.getProperty("DASHBOARD_MODE");
+        }
         if("on_prem".equalsIgnoreCase(dashboardMode)){
             return ON_PREM;
         }
