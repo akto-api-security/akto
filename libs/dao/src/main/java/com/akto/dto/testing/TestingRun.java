@@ -40,7 +40,6 @@ public class TestingRun {
 
     public static final String _API_COLLECTION_ID = "testingEndpoints.apiCollectionId";
     public static final String _API_COLLECTION_ID_IN_LIST = "testingEndpoints.apisList.apiCollectionId";
-    public static final String _API_COLLECTION_IDS_MULTI = "testingEndpoints.apiCollectionIds";
 
     @BsonIgnore
     private String hexId;
