@@ -2,9 +2,12 @@ package com.akto.jsonrpc;
 
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.HttpResponseParams.Source;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.JsonUtils;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -15,6 +18,8 @@ public final class JsonRpcUtils {
 
     private static final LoggerMaker logger = new LoggerMaker(JsonRpcUtils.class, LogDb.RUNTIME);
     public static final String JSONRPC_KEY = "jsonrpc";
+
+    private static final List<Source> SOURCES_TO_IGNORE = Arrays.asList(Source.OPEN_API, Source.OTHER);
 
     public static HttpResponseParams parseJsonRpcResponse(HttpResponseParams responseParams) {
         String requestPayload = responseParams.getRequestParams().getPayload();
@@ -49,6 +54,6 @@ public final class JsonRpcUtils {
         if (params == null || params.getPayload() == null) {
             return false;
         }
-        return params.getPayload().contains(JSONRPC_KEY);
+        return params.getPayload().contains(JSONRPC_KEY) && !SOURCES_TO_IGNORE.contains(responseParams.getSource());
     }
 }
