@@ -1,10 +1,16 @@
 import { Avatar, Button, Card, Text, VerticalStack, HorizontalStack, Badge, Box } from '@shopify/polaris';
+import quickStartFunc from '../transform';
+import { getDashboardCategory } from '@/apps/main/labelHelper';
 
 function RowCard(props) {
 
     const {cardObj, onButtonClick, buttonText} = props ;
+    const dashboardCategory = getDashboardCategory();
     const goToDocs = () => {
-        window.open(cardObj.docsUrl)
+        const docsUrl = quickStartFunc.getDocsUrl(cardObj, dashboardCategory);
+        if (docsUrl) {
+            window.open(docsUrl);
+        }
     }
 
     const handleAction = () => {

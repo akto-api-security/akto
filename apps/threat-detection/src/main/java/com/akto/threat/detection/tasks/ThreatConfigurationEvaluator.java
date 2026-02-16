@@ -18,6 +18,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ActorId;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.RatelimitConfig;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ParamEnumerationConfig;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.RatelimitConfig.RatelimitConfigItem;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
 import com.akto.testing.ApiExecutor;
@@ -35,6 +36,13 @@ import java.util.concurrent.TimeUnit;
 public class ThreatConfigurationEvaluator {
     private static final LoggerMaker logger = new LoggerMaker(ThreatConfiguration.class, LogDb.THREAT_DETECTION);
     private static float RATE_LIMIT_CONFIDENCE_THRESHOLD = 0.0f;
+
+    // Default param enumeration config
+    private static final ParamEnumerationConfig DEFAULT_PARAM_ENUMERATION_CONFIG = ParamEnumerationConfig.newBuilder()
+            .setUniqueParamThreshold(50)
+            .setWindowSizeMinutes(5)
+            .build();
+
     private static final RatelimitConfigItem DEFAULT_GLOBAL_RATE_LIMIT_RULE = RatelimitConfigItem.newBuilder()
             .setName("Global Rate Limit Rule")
             .setPeriod(5)
@@ -327,5 +335,17 @@ public class ThreatConfigurationEvaluator {
         this.apiCountCacheLayer.setLongWithExpiry(
                 Constants.RATE_LIMIT_CACHE_PREFIX + ipApiCmsKey + ":" + Constants.API_RATE_LIMIT_MITIGATION,
                 rule.getMitigationPeriod(), rule.getMitigationPeriod() * 60);
+    }
+
+    /**
+     * Get the param enumeration config.
+     * Returns the configured value if present, otherwise the default.
+     */
+    public ParamEnumerationConfig getParamEnumerationConfig() {
+        getThreatConfiguration();
+        if (threatConfiguration == null || !threatConfiguration.hasParamEnumerationConfig()) {
+            return DEFAULT_PARAM_ENUMERATION_CONFIG;
+        }
+        return threatConfiguration.getParamEnumerationConfig();
     }
 }

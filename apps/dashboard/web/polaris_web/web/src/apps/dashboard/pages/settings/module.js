@@ -246,9 +246,9 @@ const settingFunctions = {
       })
       return trafficData
     },
-    fetchAllMetricsData: async function(startTime, endTime) {
+    fetchAllMetricsData: async function(startTime, endTime, metricIdPrefix, instanceId) {
       let metricsData = {}
-      await settingRequests.fetchMetrics(startTime, endTime).then((resp) => {
+      await settingRequests.fetchMetrics(startTime, endTime, metricIdPrefix, instanceId).then((resp) => {
         console.log("resp", resp)
         metricsData = resp?.result?.metrics
       })
@@ -351,9 +351,9 @@ const settingFunctions = {
       })
       return devRevInteg
     },
-    fetchDevRevParts: async function(personalAccessToken) {
+    fetchDevRevParts: async function(personalAccessToken, partTypes, partName) {
       let parts = {}
-      await settingRequests.fetchDevRevParts(personalAccessToken).then((resp)=>{
+      await settingRequests.fetchDevRevParts(personalAccessToken, partTypes, partName).then((resp)=>{
         parts = resp.partsIdToNameMap
       })
       return parts

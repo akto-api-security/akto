@@ -30,6 +30,11 @@ public class ModuleInfo {
     private boolean deleteTopicAndReboot;
     public static final String DELETE_TOPIC_AND_REBOOT = "deleteTopicAndReboot";
 
+    public static final String MINI_RUNTIME_NAME = "miniRuntimeName";
+
+    @Getter @Setter
+    private String miniRuntimeName;
+
     public ModuleType getModuleType() {
         return moduleType;
     }
@@ -96,7 +101,10 @@ public class ModuleInfo {
         EBPF,
         THREAT_DETECTION,
         MCP_ENDPOINT_SHIELD,
-        DATA_INGESTION
+        DATA_INGESTION,
+        TRAFFIC_COLLECTOR,
+        AKTO_AGENT_GATEWAY,
+        DAST
     }
 
 }

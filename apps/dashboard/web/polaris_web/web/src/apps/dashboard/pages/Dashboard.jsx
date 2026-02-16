@@ -217,8 +217,10 @@ function Dashboard() {
 
     const shouldShowWelcomeBackModal = window.IS_SAAS === "true" && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
 
+    const isAskAiRoute = location.pathname.includes('/ask-ai')
+
     return (
-        <div className="dashboard">
+        <div className={`dashboard ${isAskAiRoute ? 'ask-ai-route' : ''}`}>
         <Frame>
             <Outlet />
             {shouldShowWelcomeBackModal && <WelcomeBackDetailsModal isAdmin={window.USER_ROLE === 'ADMIN'} />}

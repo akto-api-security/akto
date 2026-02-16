@@ -11,69 +11,95 @@ import dayjs from "dayjs";
 import { flags } from "./flags/index.mjs";
 import { Tooltip } from "@shopify/polaris";
 import { useSearchParams } from "react-router-dom";
-import { isAgenticSecurityCategory, isMCPSecurityCategory } from "../../../../main/labelHelper";
+import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
+import IpReputationScore from "./IpReputationScore";
 
 const resourceName = {
   singular: "actor",
   plural: "actors",
 };
 
-const headers = [
-  {
-    text: "Actor Id",
-    value: "actor",
-    title: "Actor Id",
-  },
-  {
-    text: "Country",
-    title: "Country",
-    value: "country",
-  },
-  {
-    text: "Actor Ip",
-    title: "Actor Ip",
-    value: "latestIp",
-  },
-  {
-    text: "Latest Host",
-    title: "Latest Host",
-    value: "latestHost",
-  },
-  {
-    text: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
-    title: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
-    value: "latestApi",
-  },
-  {
-    text: "Latest Attack",
-    title: "Latest Attack",
-    value: "latestAttack",
-  },
-  {
-    text: "Access Type",
-    title: "Access Type",
-    value: "accessType",
-  },
-  {
-    text: "Sensitive Data",
-    title: "Sensitive Data",
-    value: "sensitiveData",
-  },
-  {
-    text: "Status",
-    title: "Status",
-    value: "status",
-  },
-  {
-    text: "Detected at",
-    title: "Detected at",
-    value: "discoveredAt",
-    type: CellType.TEXT,
-    sortActive: true,
-  },
-];
+const getBaseHeaders = () => {
+  const baseHeaders = [
+    {
+      text: "Actor Id",
+      value: "actor",
+      title: "Actor Id",
+    },
+    {
+      text: "Country",
+      title: "Country",
+      value: "country",
+    },
+    {
+      text: "Actor Ip",
+      title: "Actor Ip",
+      value: "latestIp",
+    },
+  ];
+
+  if (func.shouldShowIpReputation()) {
+    baseHeaders.push({
+      text: "Reputation",
+      title: "IP Reputation",
+      value: "reputationScore",
+    });
+  }
+
+  baseHeaders.push(
+    {
+      text: "Latest Host",
+      title: "Latest Host",
+      value: "latestHost",
+    },
+    {
+      text: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
+      title: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
+      value: "latestApi",
+    },
+    {
+      text: labelMap[PersistStore.getState().dashboardCategory]["Latest Attack"],
+      title: labelMap[PersistStore.getState().dashboardCategory]["Latest Attack"],
+      value: "latestAttack",
+    },
+  );
+  if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+    baseHeaders.push({
+      text: "Rule Violated",
+      title: "Rule Violated",
+      value: "ruleViolated",
+    });
+  }
+
+  baseHeaders.push(
+    {
+      text: "Access Type",
+      title: "Access Type",
+      value: "accessType",
+    },
+    {
+      text: "Sensitive Data",
+      title: "Sensitive Data",
+      value: "sensitiveData",
+    },
+    {
+      text: "Status",
+      title: "Status",
+      value: "status",
+    },
+    {
+      text: "Detected at",
+      title: "Detected at",
+      value: "discoveredAt",
+      type: CellType.TEXT,
+      sortActive: true,
+    }
+  );
+
+  return baseHeaders;
+};
 
 const sortOptions = [
   {
@@ -94,7 +120,38 @@ const sortOptions = [
 
 function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState([]);
+  const [lastCursor, setLastCursor] = useState(null);  // Track last ObjectId for cursor pagination
+  const [filters, setFilters] = useState([
+    {
+      key: 'actorId',
+      label: 'Actor Id',
+      type: 'select',
+      choices: [],
+      multiple: true
+    },
+    {
+      key: 'latestAttack',
+      label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
+      type: 'select',
+      choices: [],
+      multiple: true
+    },
+    {
+      key: 'country',
+      label: 'Country',
+      type: 'select',
+      choices: [],
+      multiple: true
+    },
+    {
+      key: 'host',
+      label: 'Host',
+      title: 'Host',
+      choices: [],
+      multiple: true,
+      type: 'select',
+    }
+  ]);
 
   const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -125,7 +182,10 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     let total = 0;
     let ret = [];
     try {
-      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || [], startTimestamp, endTimestamp, filters.actorId || [], filters.host || []);
+      // Use cursor-based pagination: send lastCursor if skip > 0, otherwise null for first page
+      const cursor = skip > 0 ? lastCursor : null;
+      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || [], startTimestamp, endTimestamp, filters.actorId || [], filters.host || [], cursor);
+      // Always show total for now (will optimize to hide on cursor pagination later)
       total = res.total;
       if (res?.actors?.length === 0) {
         return { value: [], total: 0 };
@@ -165,7 +225,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
         // Get the sensitive data for the endpoint
         const sensitiveData = sensitiveDataMap[x.latestApiEndpoint] || [];
         const accessTypes = accessTypesMap[x.latestApiEndpoint] || [];
-        
+
         const baseData = {
           ...x,
           actor: formatActorId(x.id),
@@ -174,6 +234,9 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
           discoveredAt: x.discoveredAt ? dayjs(x.discoveredAt*1000).format('YYYY-MM-DD, HH:mm:ss A') : "-",
           sensitiveData: sensitiveData && sensitiveData.length > 0 ? observeFunc.prettifySubtypes(sensitiveData, false) : "-",
           latestAttack: x.latestAttack || "-",
+          ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && {
+            ruleViolated: extractRuleViolated(x.latestMetadata)
+          }),
           accessType: accessTypes.length > 0 ? getAccessType(accessTypes) : "-",
           status: "Active",
           country: (
@@ -196,6 +259,10 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
             />
           ),
         };
+
+        if (func.shouldShowIpReputation()) {
+          baseData.reputationScore = <IpReputationScore ipAddress={x.latestApiIp} />;
+        }
 
         // Add actorType only when the column is visible
         if (isMCPSecurityCategory() || isAgenticSecurityCategory()) {
@@ -221,6 +288,13 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
 
         return baseData;
       }));
+
+      // Store last actor's MongoDB ObjectId as cursor for next page
+      if (ret.length > 0) {
+        const lastActor = ret[ret.length - 1];
+        // Use objectId (MongoDB _id) for cursor-based pagination, not id (actorId/IP)
+        setLastCursor(lastActor.objectId);
+      }
     } catch (e) {
       setToast(true, true, "Error fetching threat actors");
     } finally {
@@ -233,18 +307,18 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
 
   async function fillFilters() {
     const res = await api.fetchThreatActorFilters();
-    const attackTypeChoices = res?.latestAttack.map(x => ({
+    const attackTypeChoices = res?.latestAttack?.map(x => ({
       label: x,
       value: x
-    }));
-    const countryChoices = res?.country.map(x => ({
+    })) || [];
+    const countryChoices = res?.country?.map(x => ({
       label: x,
       value: x
-    }));
-    const actorIdChoices = res?.actorId.map(x => ({
+    })) || [];
+    const actorIdChoices = res?.actorId?.map(x => ({
       label: x,
       value: x
-    }));
+    })) || [];
     
     // Extract unique hosts from the fetched data
     let hostChoices = [];
@@ -264,7 +338,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
       },
       {
         key: 'latestAttack',
-        label: 'Latest attack sub-category',
+        label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
         type: 'select',
         choices: attackTypeChoices,
         multiple: true
@@ -291,9 +365,14 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     fillFilters();
   }, []);
 
+  // Reset cursor when date range changes
+  useEffect(() => {
+    setLastCursor(null);
+  }, [startTimestamp, endTimestamp]);
+
   const getHeaders = () => {
-    const baseHeaders = [...headers];
-    
+    const baseHeaders = [...getBaseHeaders()];
+
     if (isMCPSecurityCategory() || isAgenticSecurityCategory()) {
       baseHeaders.unshift({
         text: "Actor Type",

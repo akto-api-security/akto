@@ -689,4 +689,5 @@ public class AdminSettingsAction extends UserAction {
     public void setCompulsoryDescription(Map<String, Boolean> compulsoryDescription) {
         this.compulsoryDescription = compulsoryDescription;
     }
+
 }

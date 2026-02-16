@@ -57,6 +57,13 @@ export default {
             data: {}
         })
     },
+    stopCrawler(crawlId) {
+        return request({
+            url: '/api/stopCrawler',
+            method: 'post',
+            data: { crawlId }
+        })
+    },
     fetchDastScan(crawlId){
         return request({
             url: '/api/fetchDastScan',

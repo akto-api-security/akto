@@ -24,7 +24,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex, method = []) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex, method = [], sortBySeverity = false) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -44,7 +44,8 @@ const threatDetectionRequests = {
                 ...(label ? { label } : {}),
                 ...(hosts && hosts.length > 0 ? { hosts } : {}),
                 ...(latestApiOrigRegex ? { latestApiOrigRegex } : {}),
-                method: method
+                method: method,
+                ...(typeof sortBySeverity === 'boolean' ? { sortBySeverity } : {})
             }
         })
     },
@@ -55,20 +56,25 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs, actorId, host) {
+    fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs, actorId, host, cursor) {
+        const data = {
+            skip: skip,
+            sort: sort,
+            latestAttack: latestAttack,
+            country: country,
+            startTs: startTs,
+            endTs: endTs,
+            actorId: actorId,
+            host: host
+        };
+        // Add cursor if provided (for new cursor-based pagination)
+        if (cursor) {
+            data.cursor = cursor;
+        }
         return request({
             url: '/api/fetchThreatActors',
             method: 'post',
-            data: {
-                skip: skip,
-                sort: sort,
-                latestAttack: latestAttack,
-                country: country,
-                startTs: startTs,
-                endTs: endTs,
-                actorId: actorId,
-                host: host
-            }
+            data: data
         })
     },
     fetchThreatApis(skip, sort, latestAttack) {
@@ -222,6 +228,24 @@ const threatDetectionRequests = {
             data: {}
         })
     },
+    fetchThreatActivityWebhookIntegration() {
+        return request({
+            url: '/api/fetchThreatActivityWebhookIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addThreatActivityWebhookIntegration(webhookUrl, customHeaders, useGzip) {
+        return request({
+            url: '/api/addThreatActivityWebhookIntegration',
+            method: 'post',
+            data: {
+                webhookUrl: webhookUrl,
+                customHeaders: customHeaders || [],
+                useGzip: Boolean(useGzip)
+            }
+        })
+    },
     generateThreatReport(filtersForReport, threatIdsForReport) {
         return request({
             url: '/api/generateThreatReport',
@@ -260,6 +284,27 @@ const threatDetectionRequests = {
             url: '/api/fetchThreatComplianceInfos',
             method: 'post',
             data: {}
+        })
+    },
+    getIpReputationScore(ipAddress) {
+        return request({
+            url: '/api/getIpReputationScore',
+            method: 'post',
+            data: { ipAddress }
+        })
+    },
+    fetchThreatsForActor(actor, limit = 20) {
+        return request({
+            url: '/api/fetchThreatsForActor',
+            method: 'post',
+            data: { actor, limit }
+        })
+    },
+    fetchSessionContext(sessionId) {
+        return request({
+            url: '/api/fetchSessionContext',
+            method: 'post',
+            data: { sessionId }
         })
     }
 }

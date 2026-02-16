@@ -5,11 +5,16 @@ import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import api from '../api';
 import func from "@/util/func"
 import AktoDastOptions from './AktoDastOptions';
+import CustomHeadersInput from './CustomHeadersInput';
 import Dropdown from '../../../components/layouts/Dropdown';
 import testingApi from '../../testing/api'
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
+import QuickStartStore from '../quickStartStore';
 
 const AktoJax = () => {
+    const duplicateScanData = QuickStartStore(state => state.duplicateScanData)
+    const setDuplicateScanData = QuickStartStore(state => state.setDuplicateScanData)
+
     const [loading, setLoading] = useState(false)
 
     const [hostname, setHostname] = useState('')
@@ -22,6 +27,8 @@ const AktoJax = () => {
     const [testRole, setTestRole] = useState("")
 
     const [outscopeUrls, setOutscopeUrls] = useState('');
+    const [urlTemplatePatterns, setUrlTemplatePatterns] = useState('');
+    const [applicationPages, setApplicationPages] = useState('');
     const [maxPageVisits, setMaxPageVisits] = useState('');
     const [domLoadTimeout, setDomLoadTimeout] = useState('');
     const [waitAfterEvent, setWaitAfterEvent] = useState('');
@@ -29,9 +36,39 @@ const AktoJax = () => {
     const [parseSoapServices, setParseSoapServices] = useState(true);
     const [parseRestServices, setParseRestServices] = useState(true);
     const [clickExternalLinks, setClickExternalLinks] = useState(false);
+    const [crawlingTime, setCrawlingTime] = useState(600);
+    const [customHeaders, setCustomHeaders] = useState([]);
+    const [runTestAfterCrawling, setRunTestAfterCrawling] = useState(false);
+    const [selectedMiniTestingService, setSelectedMiniTestingService] = useState('');
+    const [collectionName, setCollectionName] = useState('');
+
+    const [availableModules, setAvailableModules] = useState([])
+    const [selectedModule, setSelectedModule] = useState("")
+    const [loadingModules, setLoadingModules] = useState(true)
 
     const goToDocs = () => {
         window.open("https://docs.akto.io/dast/akto-dast")
+    }
+
+    const fetchAvailableModules = async () => {
+        setLoadingModules(true)
+        try {
+            const response = await api.fetchAvailableDastModules()
+            const modules = response.map(module => ({
+                label: module.displayName,
+                value: module.name
+            }))
+            setAvailableModules(modules)
+
+            const defaultModule = response.find(m => m.isDefault)
+            if (defaultModule) {
+                setSelectedModule(defaultModule.name)
+            } else if (modules.length > 0) {
+                setSelectedModule(modules[0].value)
+            }
+        } catch (err) { } finally {
+            setLoadingModules(false)
+        }
     }
 
     const primaryAction = () => {
@@ -40,11 +77,18 @@ const AktoJax = () => {
             return
         }
 
+        // Convert array to Map for backend
+        const customHeadersMap = {};
+        customHeaders.forEach(header => {
+            if (header.key && header.key.trim()) {
+                customHeadersMap[header.key.trim()] = header.value || "";
+            }
+        });
+
         setLoading(true)
-        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls).then((res) => {
+        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin, testRole, outscopeUrls, crawlingTime, selectedModule, customHeadersMap, runTestAfterCrawling, selectedMiniTestingService, urlTemplatePatterns, applicationPages, collectionName).then((res) => {
             func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
         }).catch((err) => {
-            console.error("Error initiating crawler:", err)
         }).finally(() => {
             setLoading(false)
             setHostname('')
@@ -52,6 +96,12 @@ const AktoJax = () => {
             setEmail('')
             setPassword('')
             setTestRole('')
+            setCustomHeaders([])
+            setRunTestAfterCrawling(false)
+            setSelectedMiniTestingService('')
+            setUrlTemplatePatterns('')
+            setApplicationPages('')
+            setCollectionName('')
         })
     }
 
@@ -68,7 +118,40 @@ const AktoJax = () => {
 
     useEffect(() => {
         fetchTestRoles()
+        fetchAvailableModules()
     }, [])
+
+    // Pre-fill form with duplicate scan data
+    useEffect(() => {
+        if (duplicateScanData) {
+            setHostname(duplicateScanData.hostname || '')
+            setAuthType(duplicateScanData.authType || 'none')
+            setEmail(duplicateScanData.email || '')
+            setPassword(duplicateScanData.password || '')
+            setTestRole(duplicateScanData.testRoleHexId || '')
+            setOutscopeUrls(duplicateScanData.outscopeUrls || '')
+            setCrawlingTime(duplicateScanData.crawlingTime || 600)
+            setSelectedModule(duplicateScanData.selectedModule || '')
+            setUrlTemplatePatterns(duplicateScanData.urlTemplatePatterns || '')
+            setApplicationPages(duplicateScanData.applicationPages || '')
+            setRunTestAfterCrawling(duplicateScanData.runTestAfterCrawling || false)
+            setSelectedMiniTestingService(duplicateScanData.selectedMiniTestingService || '')
+            setApiKey(duplicateScanData.apiKey || '')
+            setCollectionName(duplicateScanData.collectionName || '')
+
+            // Convert custom headers: object → array
+            if (duplicateScanData.customHeaders && Object.keys(duplicateScanData.customHeaders).length > 0) {
+                const headersArray = Object.entries(duplicateScanData.customHeaders).map(([key, value]) => ({
+                    key,
+                    value
+                }))
+                setCustomHeaders(headersArray)
+            }
+
+            // Clear after use
+            setDuplicateScanData(null)
+        }
+    }, [duplicateScanData, setDuplicateScanData])
 
     return (
         <div className='card-items'>
@@ -83,6 +166,10 @@ const AktoJax = () => {
             <AktoDastOptions
                 outscopeUrls={outscopeUrls}
                 setOutscopeUrls={setOutscopeUrls}
+                urlTemplatePatterns={urlTemplatePatterns}
+                setUrlTemplatePatterns={setUrlTemplatePatterns}
+                applicationPages={applicationPages}
+                setApplicationPages={setApplicationPages}
                 maxPageVisits={maxPageVisits}
                 setMaxPageVisits={setMaxPageVisits}
                 domLoadTimeout={domLoadTimeout}
@@ -97,12 +184,32 @@ const AktoJax = () => {
                 setParseRestServices={setParseRestServices}
                 clickExternalLinks={clickExternalLinks}
                 setClickExternalLinks={setClickExternalLinks}
+                crawlingTime={crawlingTime}
+                setCrawlingTime={setCrawlingTime}
+                runTestAfterCrawling={runTestAfterCrawling}
+                setRunTestAfterCrawling={setRunTestAfterCrawling}
+                selectedMiniTestingService={selectedMiniTestingService}
+                setSelectedMiniTestingService={setSelectedMiniTestingService}
+            />
+
+            <Box paddingBlockStart={3}><Divider /></Box>
+
+            <CustomHeadersInput
+                customHeaders={customHeaders}
+                setCustomHeaders={setCustomHeaders}
             />
 
             <Box paddingBlockStart={3}><Divider /></Box>
 
             <VerticalStack gap="2">
                 <TextField label="Enter your website URL" value={hostname} type='url' onChange={(value) => setHostname(value)} placeholder='https://example.com' />
+                <TextField
+                    label="API Collection Name (Optional)"
+                    value={collectionName}
+                    onChange={(value) => setCollectionName(value)}
+                    placeholder='Leave empty to use hostname'
+                    helpText="If not provided, hostname will be used as collection name"
+                />
                 <PasswordTextField label={
                     <HorizontalStack gap={1}>
                         <Text>Enter your</Text>
@@ -140,7 +247,18 @@ const AktoJax = () => {
                         />
                     </>
                 }
-                
+
+                {
+                    availableModules.length > 0 &&
+                    <Dropdown
+                        menuItems={availableModules}
+                        label="Select DAST Module"
+                        initial={selectedModule}
+                        selected={(module) => setSelectedModule(module)}
+                        disabled={loadingModules}
+                    />
+                }
+
                 <div style={{height:"20px"}}></div>
 
                 <ButtonGroup>

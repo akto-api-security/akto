@@ -1,6 +1,15 @@
 package com.akto.kafka;
 
+import java.util.Properties;
+
 public class KafkaConfig {
+  // Kafka authentication configuration constants
+  public static final String SECURITY_PROTOCOL = "security.protocol";
+  public static final String SASL_MECHANISM = "sasl.mechanism";
+  public static final String SASL_JAAS_CONFIG = "sasl.jaas.config";
+  public static final String SECURITY_PROTOCOL_SASL_PLAINTEXT = "SASL_PLAINTEXT";
+  public static final String SASL_MECHANISM_PLAIN = "PLAIN";
+
   private final String bootstrapServers;
   private final String groupId;
   private final KafkaConsumerConfig consumerConfig;
@@ -90,5 +99,22 @@ public class KafkaConfig {
 
   public static Builder newBuilder() {
     return new Builder();
+  }
+
+  /**
+   * Adds Kafka SASL authentication properties to the given Properties object.
+   *
+   * @param properties The Properties object to add authentication to
+   * @param username   Kafka username
+   * @param password   Kafka password
+   */
+  public static void addAuthenticationProperties(Properties properties, String username, String password) {
+    properties.put(SECURITY_PROTOCOL, SECURITY_PROTOCOL_SASL_PLAINTEXT);
+    properties.put(SASL_MECHANISM, SASL_MECHANISM_PLAIN);
+
+    String jaasConfig = String.format(
+        "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
+        username, password);
+    properties.put(SASL_JAAS_CONFIG, jaasConfig);
   }
 }

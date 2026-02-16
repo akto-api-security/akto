@@ -15,7 +15,10 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Bu
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchApiDistributionDataRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchApiDistributionDataResponse;
 import com.akto.threat.backend.db.ApiDistributionDataModel;
+import com.akto.threat.backend.db.ApiRateLimitBucketStatisticsModel;
+import com.akto.utils.ThreatApiDistributionUtils;
 import com.akto.threat.backend.dao.ApiDistributionDataDao;
+import com.akto.threat.backend.dao.ApiRateLimitBucketStatisticsDao;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.BulkWriteOptions;
@@ -36,6 +39,9 @@ public class ApiDistributionDataService {
 
     public ApiDistributionDataResponsePayload saveApiDistributionData(String accountId, ApiDistributionDataRequestPayload payload) {
         List<WriteModel<ApiDistributionDataModel>> bulkUpdates = new ArrayList<>();
+        
+        
+        Map<String, List<ApiDistributionDataRequestPayload.DistributionData>> frequencyBuckets = new HashMap<>();
 
         for (ApiDistributionDataRequestPayload.DistributionData protoData : payload.getDistributionDataList()) {
             Bson filter = Filters.and(
@@ -55,6 +61,12 @@ public class ApiDistributionDataService {
                 Updates.set("windowStart", protoData.getWindowStartEpochMin())
             );
 
+            
+            frequencyBuckets.computeIfAbsent(
+                    ApiRateLimitBucketStatisticsModel.getBucketStatsDocIdForApi(protoData.getApiCollectionId(),
+                            protoData.getMethod(), protoData.getUrl(), protoData.getWindowSize()),
+                    k -> new ArrayList<>()).add(protoData);
+
             UpdateOptions options = new UpdateOptions().upsert(true);
 
             bulkUpdates.add(new UpdateOneModel<>(filter, update, options));
@@ -63,49 +75,41 @@ public class ApiDistributionDataService {
         apiDistributionDataDao.getCollection(accountId)
             .bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
 
+        ApiRateLimitBucketStatisticsModel.calculateStatistics(accountId, ApiRateLimitBucketStatisticsDao.instance, frequencyBuckets);
         return ApiDistributionDataResponsePayload.newBuilder().build();
     }
 
-    public FetchApiDistributionDataResponse getDistributionStats(String accountId, FetchApiDistributionDataRequest fetchApiDistributionDataRequest) {
-
-        MongoCollection<ApiDistributionDataModel> coll = apiDistributionDataDao.getCollection(accountId);
-
-        Bson filter = Filters.and(
-            Filters.eq("apiCollectionId", fetchApiDistributionDataRequest.getApiCollectionId()),
-            Filters.eq("url", fetchApiDistributionDataRequest.getUrl()),
-            Filters.eq("method", fetchApiDistributionDataRequest.getMethod()),
-            Filters.eq("windowSize", 5),
-            Filters.gte("windowStart", fetchApiDistributionDataRequest.getStartWindow()),
-            Filters.lte("windowStart", fetchApiDistributionDataRequest.getEndWindow())
-        );
+    public static List<BucketStats> fetchBucketStats(String accountId, Bson filters, ApiDistributionDataDao dao) {
+        MongoCollection<ApiDistributionDataModel> coll = dao.getCollection(accountId);
 
         Map<String, List<Integer>> bucketToValues = new HashMap<>();
-        try (MongoCursor<ApiDistributionDataModel> cursor = coll.find(filter).iterator()) {
+        try (MongoCursor<ApiDistributionDataModel> cursor = coll.find(filters).iterator()) {
             while (cursor.hasNext()) {
                 ApiDistributionDataModel doc = cursor.next();
-                if (doc.distribution == null) continue;
+                if (doc.distribution == null)
+                    continue;
 
                 for (Map.Entry<String, Integer> entry : doc.distribution.entrySet()) {
                     bucketToValues.computeIfAbsent(entry.getKey(), k -> new ArrayList<>())
-                                  .add(entry.getValue());
+                            .add(entry.getValue());
                 }
             }
         }
         
-        FetchApiDistributionDataResponse.Builder responseBuilder = FetchApiDistributionDataResponse.newBuilder();
+        List<BucketStats> bucketStats = new ArrayList<>();
 
         for (Map.Entry<String, List<Integer>> entry : bucketToValues.entrySet()) {
             String bucket = entry.getKey();
             List<Integer> values = entry.getValue();
             if (values.isEmpty()) continue;
-
+    
             Collections.sort(values);
             int min = values.get(0);
             int max = values.get(values.size() - 1);
-            int p25 = percentile(values, 25);
-            int p50 = percentile(values, 50); // median
-            int p75 = percentile(values, 75);
-
+            int p25 = ThreatApiDistributionUtils.percentile(values, 25);
+            int p50 = ThreatApiDistributionUtils.percentile(values, 50); // median
+            int p75 = ThreatApiDistributionUtils.percentile(values, 75);
+    
             BucketStats stats = BucketStats.newBuilder()
                 .setBucketLabel(bucket)
                 .setMin(min)
@@ -114,17 +118,28 @@ public class ApiDistributionDataService {
                 .setP50(p50)
                 .setP75(p75)
                 .build();
-
-            responseBuilder.addBucketStats(stats);
+    
+            bucketStats.add(stats);
         }
+    
+        return bucketStats;
 
-        return responseBuilder.build();
     }
 
-    private int percentile(List<Integer> sorted, int p) {
-        if (sorted.isEmpty()) return 0;
-        int index = (int) Math.ceil(p / 100.0 * sorted.size()) - 1;
-        return sorted.get(Math.max(0, Math.min(index, sorted.size() - 1)));
+    public FetchApiDistributionDataResponse getDistributionStats(String accountId, FetchApiDistributionDataRequest fetchApiDistributionDataRequest) {
+        Bson filter = Filters.and(
+            Filters.eq("apiCollectionId", fetchApiDistributionDataRequest.getApiCollectionId()),
+            Filters.eq("url", fetchApiDistributionDataRequest.getUrl()),
+            Filters.eq("method", fetchApiDistributionDataRequest.getMethod()),
+            Filters.eq("windowSize", 5),
+            Filters.gte("windowStart", fetchApiDistributionDataRequest.getStartWindow()),
+            Filters.lte("windowStart", fetchApiDistributionDataRequest.getEndWindow())
+        );
+        
+        FetchApiDistributionDataResponse.Builder responseBuilder = FetchApiDistributionDataResponse.newBuilder();
+        responseBuilder.addAllBucketStats(fetchBucketStats(accountId, filter, apiDistributionDataDao));
+
+        return responseBuilder.build();
     }
 
 }

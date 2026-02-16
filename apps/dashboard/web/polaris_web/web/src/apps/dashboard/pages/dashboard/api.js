@@ -212,6 +212,84 @@ const api = {
             method: 'post',
             data
         })
+    },
+
+    saveDashboardLayout: async (screenName, layout) => {
+        return await request({
+            url: '/api/saveDashboardLayout',
+            method: 'post',
+            data: {
+                screenName,
+                layout
+            }
+        })
+    },
+
+    fetchDashboardLayout: async (screenName) => {
+        return await request({
+            url: '/api/fetchDashboardLayout',
+            method: 'post',
+            data: {
+                screenName
+            }
+        })
+    },
+
+
+    // Consolidated APIs
+    fetchEndpointDiscoveryData: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchEndpointDiscoveryData',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    fetchIssuesData: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchIssuesData',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    fetchTestingData: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchTestingData',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    fetchThreatData: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchThreatData',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    fetchGuardrailData: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchGuardrailData',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
     }
 }
 

@@ -77,6 +77,10 @@ public abstract class AccountJobExecutor {
         CyborgApiClient.updateJobStatus(id, JobStatus.COMPLETED, now, null);
         AccountJob job = CyborgApiClient.findById(id);
 
+        if (job == null) {
+            logger.error("Failed to fetch job after completion: jobId={}, cannot reschedule recurring job", id);
+        }
+
         return job;
     }
 
@@ -95,6 +99,10 @@ public abstract class AccountJobExecutor {
 
         CyborgApiClient.updateJobStatus(id, JobStatus.FAILED, now, errorMessage);
         AccountJob job = CyborgApiClient.findById(id);
+
+        if (job == null) {
+            logger.error("Failed to fetch job after failure: jobId={}, cannot reschedule recurring job", id);
+        }
 
         return job;
     }
@@ -143,7 +151,12 @@ public abstract class AccountJobExecutor {
      * @param job The executed job
      */
     private void handleRecurringJob(AccountJob job) {
-        if (job == null || job.getScheduleType() != ScheduleType.RECURRING) {
+        if (job == null) {
+            logger.error("Cannot reschedule recurring job: job object is null");
+            return;
+        }
+
+        if (job.getScheduleType() != ScheduleType.RECURRING) {
             return;
         }
 

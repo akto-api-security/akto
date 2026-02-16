@@ -12,6 +12,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchThreatsForActorResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
@@ -51,12 +52,14 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   List<ThreatActorPerCountry> actorsCountPerCountry;
   List<BasicDBObject> threatComplianceInfos;
   int skip;
+  String cursor;  // ObjectId hex string for cursor-based pagination
   static final int LIMIT = 50;
   long total;
   Map<String, Integer> sort;
   int startTimestamp, endTimestamp;
   String refId;
   List<String> latestAttack;
+  List<ActivityData> actorActivities;
   List<String> country;
   List<String> actorId;
   List<String> host;
@@ -186,6 +189,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             put("filter", filter);
             put("start_ts", startTs);
             put("end_ts", endTs);
+            if (cursor != null && !cursor.isEmpty()) {
+              put("cursor", cursor);
+            }
           }
         };
     String msg = objectMapper.valueToTree(body).toString();
@@ -206,19 +212,66 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                             smr ->
                                 new DashboardThreatActor(
                                     smr.getId(),
+                                    smr.getObjectId(),
                                     smr.getLatestApiEndpoint(),
                                     smr.getLatestApiIp(),
                                     URLMethods.Method.fromString(smr.getLatestApiMethod()),
                                     smr.getDiscoveredAt(),
                                     smr.getCountry(),
                                     smr.getLatestSubcategory(),
-                                    smr.getActivityDataList().stream()
-                                    .map(subData -> new ActivityData(subData.getUrl(), subData.getSeverity(), subData.getSubCategory(), subData.getDetectedAt(), subData.getMethod(), subData.getHost()))
-                                    .collect(Collectors.toList()),
-                                    smr.getLatestApiHost()))
+                                    smr.getLatestApiHost(),
+                                    smr.getLatestMetadata()))
                         .collect(Collectors.toList());
 
                 this.total = m.getTotal();
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  public String fetchThreatsForActor() {
+    HttpPost post =
+        new HttpPost(String.format("%s/api/dashboard/fetch_threats_for_actor", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+    post.addHeader("x-context-source", Context.contextSource.get().toString());
+
+    Map<String, Object> body =
+        new HashMap<String, Object>() {
+          {
+            put("actor", actor);
+            put("limit", 20);
+          }
+        };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<FetchThreatsForActorResponse>toProtoMessage(
+              FetchThreatsForActorResponse.class, responseBody)
+          .ifPresent(
+              m -> {
+                this.actorActivities =
+                    m.getActivitiesList().stream()
+                        .map(
+                            activity ->
+                                new ActivityData(
+                                    activity.getUrl(),
+                                    activity.getSeverity(),
+                                    activity.getSubCategory(),
+                                    activity.getDetectedAt(),
+                                    activity.getMethod(),
+                                    activity.getHost(),
+                                    activity.getMetadata()))
+                        .collect(Collectors.toList());
               });
     } catch (Exception e) {
       e.printStackTrace();
@@ -636,6 +689,14 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     this.skip = skip;
   }
 
+  public String getCursor() {
+    return cursor;
+  }
+
+  public void setCursor(String cursor) {
+    this.cursor = cursor;
+  }
+
   public List<String> getLatestAttack() {
     return latestAttack;
   }
@@ -790,6 +851,14 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setSort(Map<String, Integer> sort) {
     this.sort = sort;
+  }
+
+  public List<ActivityData> getActorActivities() {
+    return actorActivities;
+  }
+
+  public void setActorActivities(List<ActivityData> actorActivities) {
+    this.actorActivities = actorActivities;
   }
 
   public List<BasicDBObject> getThreatComplianceInfos() {

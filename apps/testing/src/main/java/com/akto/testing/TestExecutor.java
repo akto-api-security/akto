@@ -17,6 +17,7 @@ import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
@@ -31,6 +32,7 @@ import com.akto.dto.dependency_flow.KVPair;
 import com.akto.dto.dependency_flow.ReplaceDetail;
 import com.akto.dto.test_editor.Auth;
 import com.akto.dto.test_editor.ExecutorNode;
+import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.SeverityParserResult;
 import com.akto.dto.test_editor.TestConfig;
@@ -60,6 +62,8 @@ import com.akto.dto.testing.WorkflowTestingEndpoints;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.testing.YamlTestResult;
 import com.akto.dto.testing.info.SingleTestPayload;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -82,6 +86,7 @@ import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.LoginFlowEnums;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
@@ -91,6 +96,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import java.net.URI;
@@ -185,6 +191,9 @@ public class TestExecutor {
 
     public void apiWiseInit(TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs, SyncLimit syncLimit, boolean shouldInitOnly) {
 
+        // Clear authStatus hashmap for new test runs (different accounts)
+        authStatus.clear();
+        
         // write producer running here as producer has been initiated now
         int accountId = Context.accountId.get();
 
@@ -194,7 +203,7 @@ public class TestExecutor {
             dbObject.put("CONSUMER_RUNNING", false);
             dbObject.put("accountId", accountId);
             dbObject.put("summaryId", summaryId.toHexString());
-            dbObject.put("testingRunId", testingRun.getId().toHexString()); 
+            dbObject.put("testingRunId", testingRun.getId().toHexString());
             writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
         }
 
@@ -322,6 +331,53 @@ public class TestExecutor {
 
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed());
         TestingUtilsSingleton.init();
+
+        // Pre-fetch auth token before inserting records in Kafka
+        if (testingRun.getTestingRunConfig() != null && testingRun.getTestingRunConfig().getTestRoleId() != null && !testingRun.getTestingRunConfig().getTestRoleId().isEmpty()) {
+            try {
+                TestRoles testRole = Executor.fetchOrFindTestRole(testingRun.getTestingRunConfig().getTestRoleId(), true);
+                if (testRole != null) {
+                    loggerMaker.infoAndAddToDb("Pre-fetching auth token for test role: " + testRole.getName(), LogDb.TESTING);
+                    // Use first API to prefetch auth
+                    RawApi rawApiForAuth = null;
+                    if (apiInfoKeyList != null && !apiInfoKeyList.isEmpty()) {
+                        ApiInfo.ApiInfoKey firstApiKey = apiInfoKeyList.get(0);
+                        List<String> messages = testingUtil.getSampleMessages().get(firstApiKey);
+                        if (messages != null && !messages.isEmpty()) {
+                            try {
+                                rawApiForAuth = RawApi.buildFromMessage(messages.get(messages.size() - 1), true);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb("Error building RawApi for auth prefetch: " + e.getMessage(), LogDb.TESTING);
+                            }
+                        }
+                    }
+                    
+                    if (rawApiForAuth != null && !prefetchAuthWithRetry(testRole, rawApiForAuth, 3)) {
+                        String errorMessage = "Failed to fetch auth token after three retries";
+                        loggerMaker.errorAndAddToDb(errorMessage, LogDb.TESTING);
+                        testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, errorMessage));
+                        
+                        // Store error message in metadata for frontend display
+                        Map<String, String> metadata = new HashMap<>();
+                        metadata.put("error", errorMessage);
+                        
+                        // Mark test run summary as FAILED when auth fails
+                        TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                                Filters.eq(Constants.ID, summaryId),
+                                Updates.combine(
+                                        Updates.set(TestingRunResultSummary.STATE, State.FAILED),
+                                        Updates.set(TestingRunResultSummary.METADATA_STRING, metadata)
+                                )
+                        );
+                        loggerMaker.infoAndAddToDb("Test run marked as FAILED due to auth failure", LogDb.TESTING);
+                        return; // Exit early if auth fails
+                    }
+                    loggerMaker.infoAndAddToDb("Successfully pre-fetched auth token", LogDb.TESTING);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error during auth prefetch: " + e.getMessage(), LogDb.TESTING);
+            }
+        }
 
         if(!shouldInitOnly){
             int maxThreads = Math.min(testingRunSubCategories.size(), 500);
@@ -557,7 +613,21 @@ public class TestExecutor {
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
         options.returnDocument(ReturnDocument.AFTER);
 
-        State updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
+        // Check current state - don't overwrite FAILED (auth failure) with COMPLETED
+        TestingRunResultSummary currentSummary = TestingRunResultSummariesDao.instance.findOne(
+                Filters.eq(Constants.ID, summaryId),
+                Projections.include(TestingRunResultSummary.STATE)
+        );
+        
+        State updatedState;
+        if (currentSummary != null && currentSummary.getState() == State.FAILED) {
+            // Keep FAILED state (auth failed)
+            updatedState = State.FAILED;
+            loggerMaker.infoAndAddToDb("Preserving FAILED state for test run", LogDb.TESTING);
+        } else {
+            updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
+        }
+        
         Map<String,Integer> finalCountMap = Utils.finalCountIssuesMap(summaryId);
         loggerMaker.debugAndAddToDb("Final count map calculated is " + finalCountMap.toString());
         TestingRunResultSummary testingRunResultSummary = TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
@@ -1002,6 +1072,9 @@ public class TestExecutor {
         return false;
     }
 
+    // Track auth status per test run: if auth fails, kill all remaining tests
+    private static final ConcurrentHashMap<String, Boolean> authStatus = new ConcurrentHashMap<>();
+
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
         ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
             RawApi rawApi = TestingConfigurations.getInstance().getRawApi(apiInfoKey);
@@ -1009,6 +1082,8 @@ public class TestExecutor {
                 rawApi = RawApi.buildFromMessage(message, true);
                 TestingConfigurations.getInstance().insertRawApi(apiInfoKey, rawApi);
             }
+            
+            
             TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
             AuthMechanism attackerAuthMechanism = null;
             if (attackerTestRole == null) {
@@ -1092,6 +1167,60 @@ public class TestExecutor {
             Confidence overConfidence = getConfidenceForTests(testConfig, yamlTestTemplate);
             if (overConfidence != null) {
                 testResult.setConfidence(overConfidence);
+            }
+        }
+
+        // Check if user has manually updated severity for this issue in a previous test run
+        // TestingRunIssues collection is the single source of truth - it has one entry per unique issue
+        if (vulnerable) {
+            try {
+                TestingIssuesId issuesId = new TestingIssuesId(
+                    apiInfoKey,
+                    TestErrorSource.AUTOMATED_TESTING,
+                    testSubType
+                );
+
+                // Fetch the existing issue from DB (latest state)
+                TestingRunIssues existingIssue = TestingRunIssuesDao.instance.findOne(
+                    Filters.eq(Constants.ID, issuesId),
+                    Projections.include(
+                        TestingRunIssues.KEY_SEVERITY,
+                        TestingRunIssues.LAST_UPDATED_BY
+                    )
+                );
+
+                // If issue exists and was manually updated by a user, use their preferred severity
+                if (existingIssue != null && existingIssue.getLastUpdatedBy() != null &&
+                    !existingIssue.getLastUpdatedBy().isEmpty() &&
+                    testResults.getTestResults() != null && !testResults.getTestResults().isEmpty()) {
+
+                    // Get the current severity from test result (before applying user preference)
+                    Confidence templateDetectedSeverity = testResults.getTestResults().get(0).getConfidence();
+
+                    Severity userPreferredSeverity = existingIssue.getSeverity();
+                    Confidence userPreferredConfidence = Confidence.valueOf(userPreferredSeverity.toString());
+
+                    // Log the override with details
+                    if (!templateDetectedSeverity.toString().equals(userPreferredSeverity.toString())) {
+                        loggerMaker.infoAndAddToDb(String.format(
+                            "Severity override detected for %s : %s | Template detected: %s, User preference: %s (set by: %s) | Applying user preference: %s",
+                            apiInfoKey, testSubType, templateDetectedSeverity, userPreferredSeverity,
+                            existingIssue.getLastUpdatedBy(), userPreferredSeverity
+                        ), LogDb.TESTING);
+                    } else {
+                        loggerMaker.debugAndAddToDb("User's preferred severity " + userPreferredSeverity +
+                            " matches template severity for " + apiInfoKey + " : " + testSubType, LogDb.TESTING);
+                    }
+
+                    // Apply user's preferred severity to all test results
+                    for (GenericTestResult testResult: testResults.getTestResults()) {
+                        if (testResult != null) {
+                            testResult.setConfidence(userPreferredConfidence);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error checking for manual severity preference: " + e.getMessage(), LogDb.TESTING);
             }
         }
 
@@ -1319,6 +1448,43 @@ public class TestExecutor {
             loggerMaker.errorAndAddToDb("Error while filtering JSON-RPC payload: " + e.getMessage());   
             return false; 
         }
+    }
+
+    private boolean prefetchAuthWithRetry(TestRoles testRole, RawApi rawApi, int maxAttempts) {
+        AuthMechanism authMechanism = testRole.findMatchingAuthMechanism(rawApi);
+        
+        if (authMechanism == null || !LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanism.getType())) {
+            return true; // Not a login request type, no prefetch needed
+        }
+        
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                loggerMaker.infoAndAddToDb("Attempt " + attempt + ": Prefetching auth for role " + testRole.getName(), LogDb.TESTING);
+                
+                LoginFlowResponse response = executeLoginFlow(authMechanism, null, testRole.getName());
+                
+                if (response.getSuccess()) {
+                    loggerMaker.infoAndAddToDb("Attempt " + attempt + ": Auth prefetch succeeded", LogDb.TESTING);
+                    return true;
+                }
+                
+                loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Auth prefetch failed - " + response.getError(), LogDb.TESTING);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Attempt " + attempt + ": Exception during auth prefetch - " + e.getMessage(), LogDb.TESTING);
+            }
+            
+            // Wait 10s before retry (unless last attempt)
+            if (attempt < maxAttempts) {
+                try {
+                    loggerMaker.infoAndAddToDb("Waiting 10 seconds before retry...", LogDb.TESTING);
+                    Thread.sleep(10000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+        
+        return false;
     }
     
 }

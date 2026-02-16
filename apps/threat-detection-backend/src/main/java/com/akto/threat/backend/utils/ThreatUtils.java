@@ -1,7 +1,10 @@
 package com.akto.threat.backend.utils;
 
+import com.akto.ProtoMessageUtils;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.google.protobuf.TextFormat;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.IndexOptions;
@@ -17,13 +20,35 @@ public class ThreatUtils {
         "MCPGuardrails", "AuditPolicy", "MCPMaliciousComponent"
     );
 
+    public static Document buildSimpleContextFilterNew(String contextSource) {
+        if (contextSource == null || contextSource.isEmpty()) {
+            contextSource = CONTEXT_SOURCE.API.name();
+        }
+
+        if ("API".equalsIgnoreCase(contextSource)) {
+            return new Document("contextSource", "API");
+        }
+
+        // For ENDPOINT and AGENTIC, need to include legacy filter for backward compatibility
+        Document contextSourceFilter = new Document("contextSource", contextSource);
+        Document legacyFilter = buildLegacyContextFilter(contextSource);
+
+        return new Document("$or", Arrays.asList(contextSourceFilter, legacyFilter));
+    }
+
     public static Document buildSimpleContextFilter(String contextSource) {
         if (contextSource == null || contextSource.isEmpty()) {
             contextSource = CONTEXT_SOURCE.API.name();
         }
 
-        Document contextSourceFilter = new Document("contextSource", contextSource);
+        // For API context, just return simple equality filter (most common case - 70% of data)
+        // This allows MongoDB to use indexes efficiently
+        // if ("API".equalsIgnoreCase(contextSource)) {
+        //     return new Document("contextSource", "API");
+        // }
 
+        // For ENDPOINT and AGENTIC, need to include legacy filter for backward compatibility
+        Document contextSourceFilter = new Document("contextSource", contextSource);
         Document legacyFilter = buildLegacyContextFilter(contextSource);
 
         return new Document("$or", Arrays.asList(contextSourceFilter, legacyFilter));
@@ -52,6 +77,31 @@ public class ThreatUtils {
         }
 
         return new Document("$and", Arrays.asList(nullOrNotExistsCondition, filterIdCondition));
+    }
+
+    public static boolean isAgenticOrEndpointContext(String contextSource) {
+        if (contextSource == null || contextSource.isEmpty()) {
+            return false;
+        }
+        String contextSourceUpper = contextSource.toUpperCase();
+        return CONTEXT_SOURCE.AGENTIC.name().equals(contextSourceUpper)
+                || CONTEXT_SOURCE.ENDPOINT.name().equals(contextSourceUpper);
+    }
+
+    public static String fetchMetadataString(String metadataStr) {
+        if (metadataStr == null || metadataStr.isEmpty()) {
+            return "";
+        }
+
+        Metadata.Builder metadataBuilder = Metadata.newBuilder();
+        try {
+            TextFormat.getParser().merge(metadataStr, metadataBuilder);
+        } catch (Exception e) {
+            return "";
+        }
+        Metadata metadataProto = metadataBuilder.build();
+        metadataStr = ProtoMessageUtils.toString(metadataProto).orElse("");
+        return metadataStr;
     }
 
     public static void createIndexIfAbsent(String accountId, MaliciousEventDao maliciousEventDao) {

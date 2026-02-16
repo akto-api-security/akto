@@ -16,6 +16,7 @@ import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import com.akto.threat.backend.tasks.FlushMessagesToDB;
+import com.akto.threat.backend.cron.PercentilesCron;
 import com.akto.threat.backend.cron.ArchiveOldMaliciousEventsCron;
 import com.akto.threat.backend.cron.RiskScoreSyncCron;
 import com.mongodb.ConnectionString;
@@ -76,7 +77,6 @@ public class Main {
             .setValueSerializer(Serializer.STRING)
             .build();
 
-
     new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
 
     MaliciousEventService maliciousEventService =
@@ -85,13 +85,25 @@ public class Main {
     ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo, MaliciousEventDao.instance);
     ThreatApiService threatApiService = new ThreatApiService(MaliciousEventDao.instance);
     ApiDistributionDataService apiDistributionDataService = new ApiDistributionDataService(ApiDistributionDataDao.instance);
+    com.akto.log.LoggerMaker logger = new com.akto.log.LoggerMaker(Main.class);
+
+     // Start PercentilesCron (single scheduler for all accounts, runs every 2 hours)
+    try {
+      PercentilesCron percentilesCron = new PercentilesCron(threatProtectionMongo);
+      percentilesCron.startCron();
+      logger.infoAndAddToDb("Started PercentilesCron scheduler (runs every 2 hours for all accounts)", com.akto.log.LoggerMaker.LogDb.RUNTIME);
+    } catch (Exception e) {
+      logger.errorAndAddToDb("Error starting PercentilesCron: " + e.getMessage(), com.akto.log.LoggerMaker.LogDb.RUNTIME);
+    }
 
     new BackendVerticle(maliciousEventService, threatActorService, threatApiService, apiDistributionDataService).start();
 
     ArchiveOldMaliciousEventsCron cron = new ArchiveOldMaliciousEventsCron(threatProtectionMongo);
     cron.cron();
+
     RiskScoreSyncCron riskScoreSyncCron = new RiskScoreSyncCron();
     riskScoreSyncCron.setUpRiskScoreSyncCronScheduler();
+    
   }
 
 }

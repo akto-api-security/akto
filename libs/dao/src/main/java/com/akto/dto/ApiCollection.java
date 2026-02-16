@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -112,6 +113,17 @@ public class ApiCollection {
 
     public static final String DEFAULT_TAG_KEY = "userSetEnvType";
 
+    // Service tag for service-tag based collections
+    String serviceTag;
+    public static final String SERVICE_TAG = "serviceTag";
+
+    // List of hostnames for service-tag based collections
+    List<String> hostNames;
+    public static final String HOST_NAMES = "hostNames";
+
+    Map<String, ServiceGraphEdgeInfo> serviceGraphEdges;
+    public static final String SERVICE_GRAPH_EDGES = "serviceGraphEdges";
+
     public ApiCollection() {
     }
 
@@ -145,6 +157,47 @@ public class ApiCollection {
         this.type = Type.API_GROUP;
         this.startTs = Context.now();
     }
+
+
+    public static class ServiceGraphEdgeInfo {
+        private String sourceService;
+        private String targetService;
+        private Map<String, Object> metadata;   
+
+        public ServiceGraphEdgeInfo() {
+        }
+
+        public ServiceGraphEdgeInfo(String sourceService, String targetService, Map<String, Object> metadata) {
+            this.sourceService = sourceService;
+            this.targetService = targetService;
+            this.metadata = metadata;
+        }
+
+        public String getSourceService() {
+            return sourceService;
+        }
+
+        public void setSourceService(String sourceService) {
+            this.sourceService = sourceService;
+        }
+
+        public String getTargetService() {
+            return targetService;
+        }
+
+        public void setTargetService(String targetService) {
+            this.targetService = targetService;
+        }
+
+        public Map<String, Object> getMetadata() {
+            return metadata;
+        }
+
+        public void setMetadata(Map<String, Object> metadata) {
+            this.metadata = metadata;
+        }
+    }
+
 
     public static boolean useHost = true;
 
@@ -259,7 +312,12 @@ public class ApiCollection {
     // to be used in front end
     public String getDisplayName() {
         String result;
-        if (this.hostName != null) {
+
+        // For service-tag collections, display only the service tag value (name)
+        if (this.serviceTag != null && !this.serviceTag.isEmpty()) {
+            result = this.name;
+        } else if (this.hostName != null) {
+            // For hostname-based collections, display "hostname - name"
             result = this.hostName + " - " + this.name;
         } else {
             result = this.name + "";
@@ -487,5 +545,29 @@ public class ApiCollection {
 
     public void setMcpMaliciousnessLastCheck(int mcpMaliciousnessLastCheck) {
         this.mcpMaliciousnessLastCheck = mcpMaliciousnessLastCheck;
+    }
+
+    public String getServiceTag() {
+        return serviceTag;
+    }
+
+    public void setServiceTag(String serviceTag) {
+        this.serviceTag = serviceTag;
+    }
+
+    public List<String> getHostNames() {
+        return hostNames;
+    }
+
+    public void setHostNames(List<String> hostNames) {
+        this.hostNames = hostNames;
+    }
+
+    public Map<String, ServiceGraphEdgeInfo> getServiceGraphEdges() {
+        return serviceGraphEdges;
+    }
+
+    public void setServiceGraphEdges(Map<String, ServiceGraphEdgeInfo> serviceGraphEdges) {
+        this.serviceGraphEdges = serviceGraphEdges;
     }
 }

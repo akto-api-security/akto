@@ -12,6 +12,7 @@ public class ThreatConfiguration {
     private RatelimitConfig ratelimitConfig;
     private Integer archivalDays;
     private Boolean archivalEnabled;
+    private ParamEnumerationConfig paramEnumerationConfig;
     
     @lombok.Getter
     @lombok.Setter
@@ -64,6 +65,15 @@ public class ThreatConfiguration {
             private String behaviour;
             private float rateLimitConfidence;
         }
+    }
+
+    @lombok.Getter
+    @lombok.Setter
+    @lombok.AllArgsConstructor
+    @lombok.NoArgsConstructor
+    public static class ParamEnumerationConfig {
+        private Integer uniqueParamThreshold;
+        private Integer windowSizeMinutes;
     }
 
 }

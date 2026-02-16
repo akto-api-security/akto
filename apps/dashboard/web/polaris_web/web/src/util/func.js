@@ -48,24 +48,22 @@ const searchResultSections = {
 
 const categoryMapping = {
   "BOLA": { label: "API1:2023 Broken Object Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/" },
-  "Broken Authentication": { label: "API2:2023 Broken Authentication", url: "https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/" },
-  "Broken User Authentication": { label: "API2:2023 Broken Authentication", url: "https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/" },
+  "BUA": { label: "API2:2023 Broken Authentication", url: "https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/" },
+  "EDE": { label: "API3:2023 Broken Object Property Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/" },
+  "MA": { label: "API3:2023 Broken Object Property Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/" },
+  "RL": { label: "API4:2023 Unrestricted Resource Consumption", url: "https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/" },
   "BFLA": { label: "API5:2023 Broken Function Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/" },
+  "UASBF": { label: "API6:2023 Unrestricted Access to Sensitive Business Flows", url: "https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/" },
+  "SSRF": { label: "API7:2023 Server Side Request Forgery", url: "https://owasp.org/API-Security/editions/2023/en/0xa7-server-side-request-forgery/" },
+  "SM": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
   "IAM": { label: "API9:2023 Improper Inventory Management", url: "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/" },
-  "EDE": { label: "API6:2023 Unrestricted Access to Sensitive Business Flows", url: "https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/" },
-  "Lack of Resources & Rate Limiting": { label: "API4:2023 Unrestricted Resource Consumption", url: "https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/" },
-  "Mass Assignment": { label: "API3:2023 Broken Object Property Level Authorization", url: "https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/" },
-  "Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
-  "Security Misconfiguration": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
-  "Misconfiguration": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
-  "Server Side Request Forgery": { label: "API7:2023 Server Side Request Forgery", url: "https://owasp.org/API-Security/editions/2023/en/0xa7-server-side-request-forgery/" },
-  "CORS Misconfiguration": { label: "API8:2023 Security Misconfiguration", url: "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/" },
-  "Command Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
-  "CRLF Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
-  "Server Side Template Injection": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
-  "Local File Inclusion": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
-  "XXS": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
-  "Improper Inventory Management": { label: "API9:2023 Improper Inventory Management", url: "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/" }
+  "IIM": { label: "API9:2023 Improper Inventory Management", url: "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/" },
+  "INJ": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "LFI": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "XSS": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "SSTI": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "CRLF": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" },
+  "CI": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" }
 }
 
 const func = {
@@ -400,19 +398,17 @@ prettifyEpoch(epoch) {
   getRunResultSubCategory(runResult, subCategoryFromSourceConfigMap, subCategoryMap, fieldName) {
     if (subCategoryMap[runResult.testSubType] === undefined) {
       let a = subCategoryFromSourceConfigMap[runResult.testSubType]
-      return a ? a.subcategory : null
-    } else {
-      return subCategoryMap[runResult.testSubType][fieldName]
+      return a ? a.subcategory : (runResult.testSubType ?? null)
     }
+    return subCategoryMap[runResult.testSubType][fieldName]
   },
 
   getRunResultCategory(runResult, subCategoryMap, subCategoryFromSourceConfigMap, fieldName) {
     if (subCategoryMap[runResult.testSubType] === undefined) {
       let a = subCategoryFromSourceConfigMap[runResult.testSubType]
-      return a ? a.category.shortName : null
-    } else {
-      return subCategoryMap[runResult.testSubType].superCategory[fieldName]
+      return a ? a.category.shortName : (runResult.testSuperType ?? null)
     }
+    return subCategoryMap[runResult.testSubType].superCategory[fieldName]
   },
 
   getRunResultSeverity(runResult, subCategoryMap) {
@@ -1074,6 +1070,9 @@ parameterizeUrl(x) {
 mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverityMap) {
   const allCollections = PersistStore.getState().allCollections
   const apiGroupsMap = func.mapCollectionIdToName(allCollections.filter(x => x.type === "API_GROUP"))
+  if(Object.keys(idToName).length === 0){
+    idToName = func.mapCollectionIdToName(allCollections)
+  }
 
   let ret = {}
   let apiInfoMap = {}
@@ -1119,6 +1118,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
+              hostName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               sensitive: x.sensitive,
               tags: x.tags,
               endpoint: x.url,
@@ -1885,7 +1885,7 @@ joinWordsWithUnderscores(input) {
     const segments = transformedString.split('/');
     for (let i = 0; i < segments.length; i++) {
         // Check if the segment is alphanumeric
-        if (/^[0-9a-fA-F]+$/.test(segments[i]) || /^[0-9]+$/.test(segments[i])) {
+        if (/^-?[0-9a-fA-F]+$/.test(segments[i]) || /^-?[0-9]+$/.test(segments[i])) {
         segments[i] = 'id';
         }
     }
@@ -2209,6 +2209,12 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   isDemoAccount(){
      return window.ACTIVE_ACCOUNT === 1669322524
   },
+
+  shouldShowIpReputation() {
+    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409
+  },
+
+  
   isSameDateAsToday (givenDate) {
       const today = new Date();
       return (
@@ -2340,6 +2346,21 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return (nameA || '').localeCompare(nameB || '');
     })
   },
+
+   isWhiteListedOrganization(){
+      return window.USER_NAME.indexOf("@akto.io")>0 || window.USER_NAME.indexOf("@lab.morganstanley.com")>0
+       || window.USER_NAME.indexOf("@blinkrx.com")>0 || window.USER_NAME.indexOf("@testmuai.com")> 0 || window.USER_NAME.indexOf("@aktosecurity.com")>0 ;
+    },
+
+    isTempAccount(){
+      if (!window?.USER_NAME) return false;
+      
+      const userName = window.USER_NAME.toLowerCase();
+      const tempAccountOrganizations = ['chargebee', 'miq', 'whatfix', 'blinkrx' , 'blinkhealth'];
+      
+      return tempAccountOrganizations.some(org => userName.includes(org));
+    },
+
   isLimitedAccount(){
     return window?.ACTIVE_ACCOUNT === 1753372418
   },
@@ -2388,6 +2409,46 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       }
     }
     return placeholders;
+  },
+  /**
+   * Format timestamp for chat messages
+   * @param {number} timestamp - Unix timestamp in seconds
+   * @returns {string} Formatted timestamp string
+   */
+  formatChatTimestamp: (timestamp) => {
+    if (!timestamp) return '';
+    return new Date(timestamp * 1000).toLocaleString('en-US', {
+      month: 'numeric',
+      day: 'numeric',
+      year: '2-digit',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: true
+    });
+  },
+  extractEmailDetails(email) {
+    // Define the regex pattern
+    const pattern = /^(.*?)@([\w.-]+)\.[a-z]{2,}$/;
+  
+    // Match the regex pattern
+    const match = email.match(pattern);
+  
+    if (match) {
+      let rawUsername = match[1]; // Extract username
+      let mailserver = match[2]; // Extract mailserver (including subdomains)
+  
+      let username = rawUsername
+      .split(/[^a-zA-Z]+/) // Split by any non-alphabet character
+      .filter(Boolean) // Remove empty segments
+      .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1)) // Capitalize each segment
+      .join(' '); // Join segments with a space
+          
+      mailserver = mailserver.charAt(0).toUpperCase() + mailserver.slice(1);
+  
+      return { username, mailserver };
+    } else {
+      return { error: "Invalid email format" };
+    }
   }
 }
 

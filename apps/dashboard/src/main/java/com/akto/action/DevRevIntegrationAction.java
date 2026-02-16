@@ -1,6 +1,9 @@
 package com.akto.action;
 
+import com.akto.audit_logs_util.Audit;
 import com.akto.devrev.DevRevIntegrationService;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.devrev_integration.DevRevIntegration;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.log.LoggerMaker;
@@ -26,6 +29,8 @@ public class DevRevIntegrationAction extends UserAction {
     private String workItemType;
     private String errorMessage;
     private String aktoDashboardHost;
+    private List<String> partTypes;
+    private String partName;
 
     public String addDevRevIntegration() {
         try {
@@ -54,7 +59,7 @@ public class DevRevIntegrationAction extends UserAction {
     public String fetchDevRevParts() {
         try {
             DevRevIntegrationService devRevService = new DevRevIntegrationService(null, personalAccessToken);
-            partsIdToNameMap = devRevService.fetchDevrevProjects();
+            partsIdToNameMap = devRevService.fetchDevrevProjects(partTypes, partName);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.errorAndAddToDb("Error fetching DevRev projects: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
@@ -63,6 +68,7 @@ public class DevRevIntegrationAction extends UserAction {
         }
     }
 
+    @Audit(description = "User removed DevRev integration", resource = Resource.DEVREV_INTEGRATION_SERVICE, operation = Operation.DELETE)
     public String removeDevRevIntegration() {
         try {
             DevRevIntegrationService devRevService = new DevRevIntegrationService();

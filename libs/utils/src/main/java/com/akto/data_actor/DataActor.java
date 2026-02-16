@@ -107,4 +107,6 @@ public abstract class DataActor {
 
     public abstract List<ApiCollection> fetchAllApiCollections();
 
+    public abstract List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName);
+
 }
