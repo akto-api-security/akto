@@ -947,7 +947,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                             destructive
                                             onClick={handleRemoveAll}
                                             disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Clear selection</div></Button>
-                                        {fromApiDetails && func.checkForFeatureSaas('AKTO_GPT_AI') && (
+                                        {fromApiDetails && func.checkForFeatureSaas('AKTO_GPT_AI') && func.isDemoAccount() && (
                                             <Tooltip content="Get AI-suggested tests for this API. AI can make mistakes. Consider reviewing suggestions." dismissOnMouseOut>
                                                 <Button
                                                     icon={MagicMajor}
