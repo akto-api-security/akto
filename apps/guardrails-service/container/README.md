@@ -126,8 +126,10 @@ GET /health
 | `AGENT_GUARD_ENGINE_URL` | Agent Guard Engine URL for NLP | `https://akto-agent-guard-engine.billing-53a.workers.dev` |
 | `THREAT_BACKEND_URL` | Threat backend service URL | `https://tbs.akto.io` |
 | `THREAT_BACKEND_TOKEN` | Token for threat reporting | **Required** |
+| `SKIP_THREAT_REPORTING` | Skip forwarding threats to TBS and return response directly | `false` |
 | `LOG_LEVEL` | Logging level (debug, info, warn, error) | `info` |
 | `GIN_MODE` | Gin framework mode (debug, release) | `release` |
+| `KAFKA_ENABLED` | Enable Kafka consumer mode (if false, runs as HTTP server) | `false` |
 
 ### Example Configuration
 
@@ -218,9 +220,10 @@ The validator checks for:
 - Prompt injection attacks
 - Banned substrings and topics
 
-### 4. Report Threats
-When threats are detected (blocked or modified payloads), they are automatically reported to the dashboard:
+### 4. Report Threats (Optional)
+When threats are detected (blocked or modified payloads), they are automatically reported to the dashboard **unless `SKIP_THREAT_REPORTING=true` is set**.
 
+If threat reporting is enabled (default):
 ```go
 threatReporter.ReportThreat(
     ctx,
@@ -237,6 +240,8 @@ threatReporter.ReportThreat(
 ```
 
 Threats are sent to: `https://tbs.akto.io/api/threat_detection/record_malicious_event`
+
+If `SKIP_THREAT_REPORTING=true`, threats are not forwarded to TBS and validation results are returned directly to the caller.
 
 ## Project Structure
 
@@ -331,6 +336,77 @@ guardrails-service/
 - **Purpose**: Receives and displays threat reports in dashboard
 - **Authentication**: Bearer token via `THREAT_BACKEND_TOKEN`
 - **Endpoint**: `https://tbs.akto.io/api/threat_detection/record_malicious_event`
+- **Behavior**: Only used when `SKIP_THREAT_REPORTING=false` (default). When `SKIP_THREAT_REPORTING=true`, threats are not forwarded and validation results are returned directly.
+
+## Calling Guardrail Service Directly
+
+Instead of using Kafka, you can call the guardrail service directly via HTTP:
+
+### HTTP Endpoints
+
+1. **Validate Single Request**:
+```bash
+POST http://localhost:8080/api/validate/request
+Content-Type: application/json
+
+{
+  "payload": "your request payload here",
+  "contextSource": "AGENTIC"  // optional
+}
+```
+
+2. **Validate Single Response**:
+```bash
+POST http://localhost:8080/api/validate/response
+Content-Type: application/json
+
+{
+  "payload": "your response payload here",
+  "contextSource": "AGENTIC"  // optional
+}
+```
+
+3. **Batch Validation** (similar to mini-runtime-service):
+```bash
+POST http://localhost:8080/api/ingestData
+Content-Type: application/json
+
+{
+  "batchData": [
+    {
+      "path": "/api/users",
+      "method": "POST",
+      "requestPayload": "...",
+      "responsePayload": "...",
+      ...
+    }
+  ],
+  "contextSource": "AGENTIC"  // optional
+}
+```
+
+### Example: Direct HTTP Call
+
+```bash
+curl -X POST http://localhost:8080/api/validate/request \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payload": "test input",
+    "contextSource": "AGENTIC"
+  }'
+```
+
+Response:
+```json
+{
+  "allowed": true,
+  "modified": false,
+  "modifiedPayload": "",
+  "reason": ""
+}
+```
+
+**Note**: When `SKIP_THREAT_REPORTING=true`, the service returns validation results immediately without forwarding to TBS, making it suitable for real-time validation scenarios.
 
 ## Development
 

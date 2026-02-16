@@ -48,6 +48,9 @@ type Config struct {
 	// Session management configuration
 	SessionSyncIntervalMin int  // Minutes between cyborg API syncs (default: 5)
 	SessionEnabled         bool // Enable session-based guardrailing (default: true)
+
+	// Threat reporting configuration
+	SkipThreatReporting bool // Skip forwarding threats to TBS and return response directly (default: false)
 }
 
 // LoadConfig loads configuration from environment variables
@@ -76,6 +79,7 @@ func LoadConfig() *Config {
 		FilterPath:               getEnv("FILTER_PATH", ""),
 		SessionSyncIntervalMin:   getEnvAsInt("SESSION_SYNC_INTERVAL_MIN", 5),
 		SessionEnabled:           getEnvAsBool("SESSION_ENABLED", true),
+		SkipThreatReporting:       getEnvAsBool("SKIP_THREAT_REPORTING", false),
 	}
 }
 

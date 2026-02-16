@@ -56,13 +56,19 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 	var sessionMgr mcp.SessionManagerInterface = nil
 
 	// Create processor with validator, ingestor, and sessionManager
+	// skipThreat controls whether threats are reported to TBS
+	// If SkipThreatReporting is true, skip reporting and return response directly
+	skipThreat := cfg.SkipThreatReporting
+	if skipThreat {
+		logger.Info("Threat reporting to TBS is disabled - responses will be returned directly without forwarding")
+	}
 	processor := mcp.NewCommonMCPProcessor(
 		validator,
 		ingestor,
 		sessionMgr,
-		"",    // sessionID - empty for our use case
-		"",    // projectName - empty for our use case
-		false, // skipThreat - false to enable threat reporting
+		"",         // sessionID - empty for our use case
+		"",         // projectName - empty for our use case
+		skipThreat, // skipThreat - true to skip TBS reporting, false to enable threat reporting
 	)
 
 	// Initialize session manager if enabled
