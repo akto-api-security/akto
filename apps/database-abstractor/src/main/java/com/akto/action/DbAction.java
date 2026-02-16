@@ -2794,8 +2794,10 @@ public class DbAction extends ActionSupport {
         if(testingEndpoints != null && testingEndpoints.getType() != null && testingEndpoints.getType().equals(TestingEndpoints.Type.MULTI_COLLECTION)) {
             MultiCollectionTestingEndpoints multiCollectionTestingEndpoints = (MultiCollectionTestingEndpoints) testingEndpoints;
             List<Integer> apiCollectionIds = multiCollectionTestingEndpoints.getApiCollectionIds();
-            ApiCollection apiCollection = DbLayer.fetchApiCollectionMeta(apiCollectionIds.get(0));
-            collectionName = apiCollection.getName();
+            if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+                ApiCollection apiCollection = DbLayer.fetchApiCollectionMeta(apiCollectionIds.get(0));
+                collectionName = apiCollection.getName();
+            }
         }
         
         int newIssues = 0;
