@@ -1338,7 +1338,7 @@ function ApiCollections(props) {
         // Add Run Test button for multi-collection testing
         if (selectedResources.length > 1) {
             actions.push({
-                content: <div id="bulk-run-test-button">Run test</div>,
+                content: <Button id="bulk-run-test-button" primary>Run test</Button>,
                 onAction: () => {
                     setSelectedCollectionIdsForTest(selectedResources);
                     setShowMultiCollectionRunTest(true);

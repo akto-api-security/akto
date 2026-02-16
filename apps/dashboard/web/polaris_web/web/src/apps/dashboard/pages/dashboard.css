@@ -142,6 +142,8 @@
 button:has(#bulk-run-test-button) {
     background: var(--akto-primary) !important;
     color: white !important;
+    height: 28px !important;
+    overflow: hidden !important;
 }
 
 button:has(#bulk-run-test-button):hover {
