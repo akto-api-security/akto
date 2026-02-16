@@ -43,6 +43,9 @@ public class Constants {
         try {
             String mongoURI = System.getenv("AKTO_MONGO_CONN");
             if (mongoURI == null || mongoURI.isEmpty()) {
+                mongoURI = System.getProperty("DASHBOARD_MODE");
+            }
+            if (mongoURI == null || mongoURI.isEmpty()) {
                 return new byte[][] { null, null };
             }
             // Check if DB client is not already initialized

@@ -32,6 +32,7 @@ public class MongoBasedTest {
         mongod = mongodExe.start();
         DaoInit.init(new ConnectionString("mongodb://localhost:27019"));
         Context.accountId.set(ACCOUNT_ID);
+        System.setProperty("DASHBOARD_MODE", "local_deploy");
     }
 
     @AfterClass
