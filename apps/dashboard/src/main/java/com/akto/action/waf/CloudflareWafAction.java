@@ -421,7 +421,7 @@ public class CloudflareWafAction extends UserAction {
     private static BasicDBObject buildBlockRule(String listName) {
         BasicDBObject rule = new BasicDBObject();
         rule.put("action", "block");
-        rule.put("expression", "ip.src in $" + listName);
+        rule.put("expression", "(ip.src in $" + listName + ")");
         rule.put("description", "Akto - Block malicious IPs");
         return rule;
     }
@@ -432,7 +432,7 @@ public class CloudflareWafAction extends UserAction {
             if (result == null) return null;
             BasicDBList rules = (BasicDBList) result.get("rules");
             if (rules == null) return null;
-            String expr = "ip.src in $" + listName;
+            String expr = "(ip.src in $" + listName + ")";
             for (Object item : rules) {
                 BasicDBObject rule = (BasicDBObject) item;
                 if (expr.equals(rule.getString("expression"))) {
