@@ -13,6 +13,7 @@ import com.akto.DaoInit;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.context.Context;
 import com.akto.merging.Cron;
+import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.TagMismatchCron;
 import com.mongodb.ConnectionString;
@@ -27,6 +28,7 @@ public class InitializerListener implements ServletContextListener {
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
+        DictionaryFilter.readDictionaryBinary();
 
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         String triggerMergingCron = System.getenv("TRIGGER_MERGING_CRON");
