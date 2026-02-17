@@ -39,6 +39,10 @@ func (h *ValidationHandler) IngestData(c *gin.Context) {
 		return
 	}
 
+	h.logger.Debug("IngestData - received contextSource from request",
+		zap.String("contextSource", req.ContextSource),
+		zap.Int("batchSize", len(req.BatchData)))
+
 	h.logger.Info("Received batch data",
 		zap.Int("size", len(req.BatchData)),
 		zap.String("contextSource", req.ContextSource))
@@ -98,6 +102,11 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	// Extract session and request IDs from headers
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
 
+	h.logger.Debug("ValidateRequest - received contextSource from request",
+		zap.String("contextSource", req.ContextSource),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
+
 	result, err := h.validatorService.ValidateRequest(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID)
 	if err != nil {
 		h.logger.Error("Failed to validate request", zap.Error(err))
@@ -126,6 +135,11 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 
 	// Extract session and request IDs from headers
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+
+	h.logger.Debug("ValidateResponse - received contextSource from request",
+		zap.String("contextSource", req.ContextSource),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
 
 	result, err := h.validatorService.ValidateResponse(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID)
 	if err != nil {
