@@ -4,11 +4,10 @@ import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.metrics.MetricData;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.OrgUtils;
-import com.mongodb.BasicDBList;
-import com.mongodb.BasicDBObject;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
@@ -23,13 +22,11 @@ import java.util.concurrent.TimeUnit;
 public class AllMetrics {
 
     private String instance_id;
-    private String moduleType;
 
     public void init(LogDb module, boolean pgMetrics, DataActor dataActor, int accountId, String instanceId, String moduleType) {
         this.dataActor = dataActor;
         this.instance_id = instanceId;
         this.accountId = accountId;
-        this.moduleType = moduleType;
 
         Organization organization = OrgUtils.getOrganizationCached(accountId);
         String orgId = organization.getId();
@@ -104,7 +101,6 @@ public class AllMetrics {
                 // Collect infrastructure metrics from MXBeans
                 collectInfraMetrics();
 
-                BasicDBList list = new BasicDBList();
                 List<MetricData> metricDataList = new ArrayList<>();
                 for (Metric m : metrics) {
                     if (m == null) {
@@ -112,13 +108,6 @@ public class AllMetrics {
                     }
                     float metric = m.getMetricAndReset();
 
-                    BasicDBObject metricsData = new BasicDBObject();
-                    metricsData.put("metric_id", m.metricId);
-                    metricsData.put("val", metric);
-                    metricsData.put("org_id", m.orgId);
-                    metricsData.put("instance_id", instance_id);
-                    metricsData.put("account_id", m.accountId);
-                    list.add(metricsData);
                     MetricData.MetricType type = MetricData.MetricType.SUM;
                     switch (m.getMetricType()) {
                         case SUM:
@@ -148,8 +137,8 @@ public class AllMetrics {
                 processAndCleanupTcMetrics(tcCpuUsageMetrics, "TC_CPU_USAGE", _this.orgId, metricDataList);
                 processAndCleanupTcMetrics(tcMemoryUsageMetrics, "TC_MEMORY_USAGE", _this.orgId, metricDataList);
 
-                if(!list.isEmpty() || !metricDataList.isEmpty()) {
-                    _this.sendDataToAkto(list, metricDataList);
+                if(!metricDataList.isEmpty()) {
+                    _this.sendDataToAkto(metricDataList);
                 }
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb("Error while sending metrics to akto: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
@@ -170,7 +159,8 @@ public class AllMetrics {
                 value,
                 orgId,
                 tcInstanceId,
-                MetricData.MetricType.GAUGE
+                MetricData.MetricType.GAUGE,
+                ModuleInfo.ModuleType.TRAFFIC_COLLECTOR.name()
             );
             metricDataList.add(metricData);
 
@@ -656,7 +646,7 @@ public class AllMetrics {
         }
     }
 
-    private void sendDataToAkto(BasicDBList list,List<MetricData> metricDataList){
+    private void sendDataToAkto(List<MetricData> metricDataList){
         try {
             dataActor.ingestMetricData(metricDataList);
         } catch (Exception e) {
