@@ -1044,7 +1044,7 @@ public class DbLayer {
             updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, tags));
         }
 
-        if(accessType != null) {
+        if(accessType != null && !accessType.isEmpty()) {
             updates = Updates.combine(updates, Updates.set(ApiCollection.ACCESS_TYPE, accessType));
         }
 
