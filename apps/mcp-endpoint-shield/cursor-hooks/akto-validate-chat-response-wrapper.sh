@@ -10,6 +10,10 @@ export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="cursor"
 export CONTEXT_SOURCE="ENDPOINT"
 
+# Logging Configuration
+export LOG_LEVEL="INFO"
+export LOG_PAYLOADS="false"
+
 # SSL Configuration
 # Optional: Path to custom CA certificate bundle for SSL verification
 # export SSL_CERT_PATH="/path/to/ca-bundle.crt"

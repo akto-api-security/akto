@@ -141,38 +141,70 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 
 def build_validation_request(prompt: str, attachments: list) -> dict:
     """Build the request body for guardrails validation."""
+    import time
+
     # Build tags based on mode
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
         tags["ai-agent"] = "cursor"
         tags["source"] = CONTEXT_SOURCE
 
-    # Build metadata with attachment info
-    metadata = {
-        "tag": tags,
-        "interaction_type": "chat"
-    }
-
+    # Add attachment info to tags if present
     if attachments:
-        metadata["attachments_count"] = len(attachments)
-        metadata["attachment_types"] = [att.get("type", "unknown") for att in attachments]
+        tags["attachments_count"] = len(attachments)
+        tags["attachment_types"] = ",".join([att.get("type", "unknown") for att in attachments])
+
+    # Get device ID
+    device_id = os.getenv("DEVICE_ID") or get_machine_id()
+
+    # Build host from API_URL
+    host = API_URL.replace("https://", "").replace("http://", "")
+
+    # Build request headers as JSON string
+    request_headers = json.dumps({
+        "host": host,
+        "x-cursor-hook": "beforeSubmitPrompt",
+        "content-type": "application/json"
+    })
+
+    # Build response headers as JSON string
+    response_headers = json.dumps({
+        "x-cursor-hook": "beforeSubmitPrompt"
+    })
+
+    # Build request payload as JSON string
+    request_payload = json.dumps({
+        "body": prompt
+    })
+
+    # Response payload is empty for before hooks
+    response_payload = json.dumps({})
 
     return {
-        "url": API_URL,
         "path": "/v1/messages",
-        "request": {
-            "method": "POST",
-            "headers": {
-                "content-type": "application/json"
-            },
-            "body": {
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            "queryParams": {},
-            "metadata": metadata,
-            "contextSource": CONTEXT_SOURCE
-        },
-        "response": None
+        "requestHeaders": request_headers,
+        "responseHeaders": response_headers,
+        "method": "POST",
+        "requestPayload": request_payload,
+        "responsePayload": response_payload,
+        "ip": "127.0.0.1",
+        "destIp": "127.0.0.1",
+        "time": str(int(time.time() * 1000)),
+        "statusCode": "200",
+        "type": None,
+        "status": "200",
+        "akto_account_id": "1000000",
+        "akto_vxlan_id": device_id,
+        "is_pending": "false",
+        "source": "MIRRORING",
+        "direction": None,
+        "process_id": None,
+        "socket_id": None,
+        "daemonset_id": None,
+        "enabled_graph": None,
+        "tag": json.dumps(tags),
+        "metadata": json.dumps(tags),
+        "contextSource": CONTEXT_SOURCE
     }
 
 
