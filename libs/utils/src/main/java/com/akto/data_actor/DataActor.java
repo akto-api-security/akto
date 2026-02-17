@@ -309,7 +309,7 @@ public abstract class DataActor {
 
     public abstract List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId);
 
-    public abstract TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter);
+    public abstract TestingRunResultSummary findLatestTestingRunResultSummary(String testingRunId);
     public abstract ModuleInfo updateModuleInfo(ModuleInfo moduleInfo);
     public abstract void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList);
 
