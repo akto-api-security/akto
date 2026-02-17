@@ -29,7 +29,7 @@ public class ThreatUtils {
             contextSource = CONTEXT_SOURCE.API.name();
         }
 
-        if (!USE_ACTOR_INFO_TABLE &&"API".equalsIgnoreCase(contextSource)) {
+        if (USE_ACTOR_INFO_TABLE &&"API".equalsIgnoreCase(contextSource)) {
             return new Document("contextSource", "API");
         }
 
