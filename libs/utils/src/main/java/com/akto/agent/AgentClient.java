@@ -6,7 +6,7 @@ import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.GenericAgentConversation;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.GenericAgentConversation.ConversationType;
+
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import okhttp3.*;
@@ -117,7 +117,7 @@ public class AgentClient {
     }
     
     private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, null, ConversationType.TEST_EXECUTION_RESULT, "", "", "");
+        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, null, "", "", "");
         
         try (Response response = agentHttpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
@@ -130,12 +130,11 @@ public class AgentClient {
         }
     }
     
-    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String chatUrl, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString, String userEmail) {
+    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String chatUrl, String accessTokenForRequest, String contextString, String userEmail) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("prompt", prompt);
         requestBody.put("conversationId", conversationId);
         requestBody.put("isLastRequest", isLastRequest);
-        requestBody.put("conversationType", conversationType);
         requestBody.put("contextString", contextString);
 
         // Add user email to request body if available
@@ -289,7 +288,7 @@ public class AgentClient {
 
     // call akto's mcp server (centralized)
     public GenericAgentConversation getResponseFromMcpServer(String prompt, String conversationId, int tokensLimit, String storedTitle, String accessTokenForRequest, String contextString, String userEmail) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, false, "/generic_chat", null, accessTokenForRequest, contextString, userEmail);
+        Request request = buildOkHttpChatRequest(prompt, conversationId, false, "/generic_chat", accessTokenForRequest, contextString, userEmail);
         try (Response response = agentHttpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
