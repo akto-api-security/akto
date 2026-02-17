@@ -2932,7 +2932,7 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionForServiceTag() {
         try {
-            DbLayer.createCollectionForServiceTag(colId, serviceTagValue, hostNames, tagsList, hostName);
+            DbLayer.createCollectionForServiceTag(colId, serviceTagValue, hostNames, tagsList, hostName, accessType);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionForServiceTag " + e.toString());
             return Action.ERROR.toUpperCase();

@@ -1024,7 +1024,7 @@ public class DbLayer {
     }
 
     // Similar to createCollectionForHostAndVpc but for service-tag based collections
-    public static void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName) {
+    public static void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType) {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
 
@@ -1042,6 +1042,10 @@ public class DbLayer {
 
         if(tags != null && !tags.isEmpty()) {
             updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, tags));
+        }
+
+        if(accessType != null) {
+            updates = Updates.combine(updates, Updates.set(ApiCollection.ACCESS_TYPE, accessType));
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(
