@@ -448,7 +448,12 @@ public class Main {
                     testingRun.setTestingRunConfig(baseConfig);
                     testingProducer.initProducer(testingRun, summaryId, true, syncLimit);
                     int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-                    testingConsumer.init(maxRunTime);
+                    // When resuming, use remaining time so total run doesn't exceed original maxRunTime (e.g. restart after 2h of 3h run → run 1h more, not 3h more)
+                    TestingRunResultSummary currentSummary = dataActor.fetchTestingRunResultSummary(testingRunSummaryId);
+                    int elapsedSinceStart = Context.now() - currentSummary.getStartTimestamp();
+                    int remainingRunTime = Math.max(0, maxRunTime - elapsedSinceStart);
+                    loggerMaker.infoAndAddToDb("Resume run time: maxRunTime=" + maxRunTime + "s elapsed=" + elapsedSinceStart + "s remaining=" + remainingRunTime + "s");
+                    testingConsumer.init(remainingRunTime);
 
                     // mark the test completed here
                     testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, System.currentTimeMillis());
