@@ -72,42 +72,6 @@ def create_ssl_context():
     Returns:
         ssl.SSLContext or None
     """
-    if not SSL_VERIFY:
-        logger.warning("SSL verification disabled via SSL_VERIFY=false - INSECURE!")
-        return ssl._create_unverified_context()
-
-    # Try 1: Custom certificate path
-    if SSL_CERT_PATH:
-        try:
-            context = ssl.create_default_context(cafile=SSL_CERT_PATH)
-            logger.info(f"Using custom SSL certificate: {SSL_CERT_PATH}")
-            return context
-        except Exception as e:
-            logger.warning(f"Failed to load custom SSL certificate from {SSL_CERT_PATH}: {e}")
-
-    # Try 2: System default context
-    try:
-        context = ssl.create_default_context()
-        logger.debug("Using system default SSL context")
-        return context
-    except Exception as e:
-        logger.warning(f"Failed to create default SSL context: {e}")
-
-    # Try 3: Python certifi bundle
-    try:
-        import certifi
-        context = ssl.create_default_context(cafile=certifi.where())
-        logger.info("Using Python certifi SSL bundle")
-        return context
-    except ImportError:
-        logger.debug("certifi package not available")
-    except Exception as e:
-        logger.warning(f"Failed to create SSL context with certifi: {e}")
-
-    # Try 4: Unverified context (last resort)
-    logger.error("WARNING: All SSL verification methods failed! Falling back to UNVERIFIED context - INSECURE!")
-    logger.error("This connection is vulnerable to Man-in-the-Middle attacks!")
-    logger.error("Fix: Install proper certificates or set SSL_CERT_PATH environment variable")
     return ssl._create_unverified_context()
 
 
