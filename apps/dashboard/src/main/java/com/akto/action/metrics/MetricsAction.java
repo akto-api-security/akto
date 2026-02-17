@@ -16,6 +16,8 @@ public class MetricsAction extends UserAction {
     private List<MetricData.Name> names;
     private String metricIdPrefix; // Optional: e.g. "TC_" for Traffic Collector metrics
     private String instanceId; // Optional: specific instance ID
+    // String representation of ModuleInfo.ModuleType enum
+    private String moduleType;
 
     public String fetchAllMetricsDesciptions(){
         names = Arrays.asList(MetricData.Name.values());
@@ -28,7 +30,9 @@ public class MetricsAction extends UserAction {
             List<MetricData> metrics;
             if (metricIdPrefix != null || instanceId != null) {
                 metrics = MetricDataDao.instance.getMetricsForTimeRange(startTime, endTime, metricIdPrefix, instanceId);
-            } else {
+            } if (moduleType != null && instanceId != null){
+                metrics = MetricDataDao.instance.getMetricsForModule(startTime, endTime, moduleType, instanceId);
+            }else {
                 metrics = MetricDataDao.instance.getMetricsForTimeRange(startTime, endTime);
             }
 
@@ -101,5 +105,13 @@ public class MetricsAction extends UserAction {
 
     public void setInstanceId(String instanceId) {
         this.instanceId = instanceId;
+    }
+
+    public String moduleType(){
+        return moduleType;
+    }
+
+    public void setModuleType(String moduleType){
+        this.moduleType = moduleType;
     }
 }
