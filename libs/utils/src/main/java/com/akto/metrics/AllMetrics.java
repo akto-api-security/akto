@@ -4,6 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.metrics.MetricData;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.OrgUtils;
@@ -67,9 +68,11 @@ public class AllMetrics {
 
         // sampleDataFetchCount = new SumMetric("SAMPLE_DATA_FETCH_COUNT", 60, accountId, orgId); // tODO: Do we need this?
         // kafkaOffset = new SumMetric("KAFKA_OFFSET", 60, accountId, orgId);
-        cyborgCallLatency = new LatencyMetric("CYBORG_CALL_LATENCY", 60, accountId, orgId, moduleType);
-        cyborgCallCount = new SumMetric("CYBORG_CALL_COUNT", 60, accountId, orgId, moduleType);
-        cyborgDataSize = new SumMetric("CYBORG_DATA_SIZE", 60, accountId, orgId, moduleType);
+        if (!moduleType.equals(ModuleInfo.ModuleType.THREAT_DETECTION.name())) {
+            cyborgCallLatency = new LatencyMetric("CYBORG_CALL_LATENCY", 60, accountId, orgId, moduleType);
+            cyborgCallCount = new SumMetric("CYBORG_CALL_COUNT", 60, accountId, orgId, moduleType);
+            cyborgDataSize = new SumMetric("CYBORG_DATA_SIZE", 60, accountId, orgId, moduleType);
+        }
 
         // Infrastructure metrics - always initialized
         cpuUsagePercent = new GaugeMetric("CPU_USAGE_PERCENT", 60, accountId, orgId, moduleType);
@@ -145,7 +148,7 @@ public class AllMetrics {
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb("Error while sending metrics to akto: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
             }
-        }, 0, 120, TimeUnit.SECONDS);
+        }, 0, 30, TimeUnit.SECONDS);
     }
 
     private AllMetrics(){}
