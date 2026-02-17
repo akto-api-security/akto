@@ -9,6 +9,11 @@ import com.opensymphony.xwork2.ActionSupport;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.stream.Collectors;
+import org.apache.struts2.ServletActionContext;
 
 
 @lombok.Getter
@@ -23,6 +28,7 @@ public class ArcadeWebhookAction extends ActionSupport {
     private static final String HOOK_TYPE_ACCESS = "tool_access";
     private static final String HOOK_TYPE_PRE = "pre_tool_execution";
     private static final String HOOK_TYPE_POST = "post_tool_execution";
+    private static final String AKTO_CONNECTOR = "arcade";
 
     static {
         gateway.setDataPublisher(new KafkaDataPublisher());
@@ -35,12 +41,13 @@ public class ArcadeWebhookAction extends ActionSupport {
     private Map<String, Object> context;   
 
     private Boolean success;
-    private Map<String, Object> output;   
+    private Object output;   // Arcade schema: "any JSON type — string, number, object, array, etc."
+
     private String execution_code;
     private String execution_error;
 
     private String user_id;
-    private Map<String, Object> toolkits;   
+    private Object toolkits;   
 
     private String code;           
     private String error_message;
@@ -51,12 +58,69 @@ public class ArcadeWebhookAction extends ActionSupport {
         try {
             loggerMaker.info("Arcade webhook received");
 
-            String hookType = detectHookType();
-            loggerMaker.info("Detected Arcade hook type: " + hookType);
+            // Detect hook type from request URL path
+            String requestURI = ServletActionContext.getRequest().getRequestURI();
+            String hookType = detectHookTypeFromPath(requestURI);
+            loggerMaker.info("Detected Arcade hook type from path: " + hookType + " (URI: " + requestURI + ")");
+
+            // Manually parse JSON body to bypass Struts JSON interceptor issues with polymorphic types
+            String jsonBody = "";
+            try {
+                InputStream inputStream = ServletActionContext.getRequest().getInputStream();
+                InputStreamReader reader = new InputStreamReader(inputStream);
+                BufferedReader bufferedReader = new BufferedReader(reader);
+                jsonBody = bufferedReader.lines().collect(Collectors.joining("\n"));
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error reading request body: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
+            }
+
+            if (jsonBody != null && !jsonBody.isEmpty()) {
+                try {
+                    Map<String, Object> bodyMap = objectMapper.readValue(jsonBody, Map.class);
+                    
+                    // Manually populate fields
+                    this.tool = (Map<String, Object>) bodyMap.get("tool");
+                    this.inputs = (Map<String, Object>) bodyMap.get("inputs");
+                    this.context = (Map<String, Object>) bodyMap.get("context");
+                    this.execution_id = (String) bodyMap.get("execution_id");
+                    this.toolkits = bodyMap.get("toolkits");
+                    
+                    this.user_id = (String) bodyMap.get("user_id");
+                    
+                    this.success = (Boolean) bodyMap.get("success");
+                    this.output = bodyMap.get("output"); // Can be any type
+                    this.execution_code = (String) bodyMap.get("execution_code");
+                    this.execution_error = (String) bodyMap.get("execution_error");
+
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error parsing JSON body: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
+                    // Continue, as some fields might be missing or null is fine
+                }
+            }
 
             Map<String, Object> proxyData = buildProxyData(hookType);
 
-            data = gateway.processHttpProxy(proxyData);
+            Map<String, Object> gatewayResponse = gateway.processHttpProxy(proxyData);
+
+            // Check guardrails result if guardrails was applied
+            if (gatewayResponse != null && gatewayResponse.containsKey("guardrailsResult")) {
+                Map<String, Object> guardrailsResult = (Map<String, Object>) gatewayResponse.get("guardrailsResult");
+                if (guardrailsResult != null) {
+                    Object allowed = guardrailsResult.get("Allowed");
+                    // Check if request was blocked by guardrails
+                    if (allowed != null && !Boolean.TRUE.equals(allowed) && !"true".equalsIgnoreCase(String.valueOf(allowed))) {
+                        // Request was blocked by guardrails
+                        code = "CHECK_FAILED";
+                        Object reasonObj = guardrailsResult.get("Reason");
+                        String reason = reasonObj != null ? reasonObj.toString() : "Request blocked by guardrails policy";
+                        error_message = reason;
+                        loggerMaker.info("Arcade webhook blocked by guardrails - hookType: " + hookType + ", reason: " + reason);
+                        // Still return HTTP 200 - Arcade expects 200 even for CHECK_FAILED
+                        // The error is communicated via the `code` field, not the HTTP status
+                        return Action.SUCCESS.toUpperCase();
+                    }
+                }
+            }
 
             code = "OK";
             loggerMaker.info("Arcade webhook processed successfully - hookType: " + hookType);
@@ -66,19 +130,23 @@ public class ArcadeWebhookAction extends ActionSupport {
             loggerMaker.errorAndAddToDb("Error processing Arcade webhook: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
             code = "CHECK_FAILED";
             error_message = "Internal processing error: " + e.getMessage();
-            data = new HashMap<>();
-            data.put("error", e.getMessage());
-            return Action.ERROR.toUpperCase();
+            // Return SUCCESS (HTTP 200) — Arcade expects 200 even for CHECK_FAILED.
+            // The error is communicated via the `code` field, not the HTTP status.
+            return Action.SUCCESS.toUpperCase();
         }
     }
 
-    private String detectHookType() {
-        if (toolkits != null && user_id != null) {
-            return HOOK_TYPE_ACCESS;
+    private String detectHookTypeFromPath(String requestURI) {
+        if (requestURI == null) {
+            return HOOK_TYPE_PRE; // Default fallback
         }
-        if (output != null || success != null || execution_code != null || execution_error != null) {
+        
+        if (requestURI.contains("/api/arcade/pre") || requestURI.endsWith("/pre") || requestURI.equals("/pre")) {
+            return HOOK_TYPE_PRE;
+        } else if (requestURI.contains("/api/arcade/post") || requestURI.endsWith("/post") || requestURI.equals("/post")) {
             return HOOK_TYPE_POST;
         }
+        
         return HOOK_TYPE_PRE;
     }
 
@@ -144,6 +212,15 @@ public class ArcadeWebhookAction extends ActionSupport {
         }
 
         Map<String, Object> urlQueryParams = new HashMap<>();
+        
+        // Enable guardrails for pre and post execution hooks
+        if (HOOK_TYPE_PRE.equals(hookType) || HOOK_TYPE_POST.equals(hookType)) {
+            urlQueryParams.put("guardrails", "true");
+            urlQueryParams.put("akto_connector", AKTO_CONNECTOR);
+            loggerMaker.info("Guardrails enabled for hook type: " + hookType);
+        }
+        
+        // Always enable data ingestion
         urlQueryParams.put("ingest_data", "true");
         proxyData.put("urlQueryParams", urlQueryParams);
 
