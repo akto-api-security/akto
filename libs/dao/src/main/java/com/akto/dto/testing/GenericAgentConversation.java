@@ -12,11 +12,9 @@ import lombok.Setter;
 public class GenericAgentConversation {
 
     public enum ConversationType {
-        ASK_AKTO,
         TEST_EXECUTION_RESULT,
         PROMPT_PLAYGROUND,
         ANALYZE_REQUESTS,
-        DOCS_AGENT,
         ANALYZE_DASHBOARD_DATA
     }
 

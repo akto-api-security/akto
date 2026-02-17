@@ -163,7 +163,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
         try {
             setIsLoading(true);
 
-            let res = await sendQuery(query, convId, queryMetadata || metadata);
+            let res = await sendQuery(query, convId, null, queryMetadata || metadata);
             if(res && res.conversationId) {
                 setConversationId(res.conversationId);
             }

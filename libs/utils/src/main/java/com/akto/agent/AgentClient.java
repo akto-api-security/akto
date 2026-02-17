@@ -4,6 +4,7 @@ import com.akto.dao.testing.AgentConversationResultDao;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.GenericAgentConversation;
+import com.akto.dto.testing.GenericAgentConversation.ConversationType;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
 
@@ -117,7 +118,7 @@ public class AgentClient {
     }
     
     private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, null, "", "", "");
+        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, null, ConversationType.TEST_EXECUTION_RESULT, "", "", "");
         
         try (Response response = agentHttpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
@@ -130,11 +131,14 @@ public class AgentClient {
         }
     }
     
-    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String chatUrl, String accessTokenForRequest, String contextString, String userEmail) {
+    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String chatUrl, ConversationType conversationType, String accessTokenForRequest, String contextString, String userEmail) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("prompt", prompt);
         requestBody.put("conversationId", conversationId);
         requestBody.put("isLastRequest", isLastRequest);
+        if (conversationType != null) {
+            requestBody.put("conversationType", conversationType);
+        }
         requestBody.put("contextString", contextString);
 
         // Add user email to request body if available
@@ -287,8 +291,8 @@ public class AgentClient {
     }
 
     // call akto's mcp server (centralized)
-    public GenericAgentConversation getResponseFromMcpServer(String prompt, String conversationId, int tokensLimit, String storedTitle, String accessTokenForRequest, String contextString, String userEmail) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, false, "/generic_chat", accessTokenForRequest, contextString, userEmail);
+    public GenericAgentConversation getResponseFromMcpServer(String prompt, String conversationId, int tokensLimit, String storedTitle, ConversationType conversationType, String accessTokenForRequest, String contextString, String userEmail) throws Exception {
+        Request request = buildOkHttpChatRequest(prompt, conversationId, false, "/generic_chat", conversationType, accessTokenForRequest, contextString, userEmail);
         try (Response response = agentHttpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
@@ -304,7 +308,7 @@ public class AgentClient {
             if(storedTitle != null) {
                 title = storedTitle;
             }
-            return new GenericAgentConversation(title, conversationId, prompt, responseFromMcpServer, finalSentPrompt, timestamp, timestamp, tokensUsed, tokensLimit,null);
+            return new GenericAgentConversation(title, conversationId, prompt, responseFromMcpServer, finalSentPrompt, timestamp, timestamp, tokensUsed, tokensLimit, conversationType);
         } catch (Exception e) {
             throw new Exception("Failed to get response from MCP server: " + e.getMessage());
         }
