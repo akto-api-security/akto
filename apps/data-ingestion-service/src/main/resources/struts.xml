@@ -52,6 +52,27 @@
             </result>
         </action>
 
+        <!-- Arcade Webhook Endpoints -->
+        <action name="api/arcade/pre" class="com.akto.action.ArcadeWebhookAction" method="arcade">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^code,^error_message</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="includeProperties">^code,^error_message</param>
+            </result>
+        </action>
+
+        <action name="api/arcade/post" class="com.akto.action.ArcadeWebhookAction" method="arcade">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^code,^error_message</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="includeProperties">^code,^error_message</param>
+            </result>
+        </action>
+      
         <action name="api/http-proxy/truefoundry" class="com.akto.action.HttpProxyAction" method="truefoundryProxy">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
