@@ -24,6 +24,7 @@ public class McpRequestResponseUtilsTest {
 
         HttpResponseParams responseParams = new HttpResponseParams();
         responseParams.setRequestParams(reqParams);
+        responseParams.setSource(HttpResponseParams.Source.MIRRORING);
 
         return responseParams;
     }
@@ -84,7 +85,7 @@ public class McpRequestResponseUtilsTest {
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
         HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
-        assertTrue(finalUrl.getPath().endsWith("/other/method"));
+        assertTrue(finalUrl.getPath().endsWith("/api"));
         assertEquals("x=1", finalUrl.getQuery());
     }
 
@@ -236,7 +237,7 @@ public class McpRequestResponseUtilsTest {
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
         HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
-        assertTrue(finalUrl.getPath().endsWith("/other/method"));
+        assertTrue(finalUrl.getPath().endsWith("/api"));
         assertEquals("foo=bar&baz=qux", finalUrl.getQuery());
     }
 
