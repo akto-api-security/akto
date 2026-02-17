@@ -8,7 +8,7 @@ export const trafficCollectorConfig = {
     },
     fetchStrategy: 'prefix',
     metricPrefix: 'TC_',
-    enableLegends: true,
+    enableLegends: false,
 
     // Extract system info from moduleInfo.additionalData.profiling
     systemInfoExtractor: (module) => {
