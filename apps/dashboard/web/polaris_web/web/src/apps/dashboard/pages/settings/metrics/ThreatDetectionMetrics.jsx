@@ -4,6 +4,7 @@ import { produce } from "immer"
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter"
 import Dropdown from "../../../components/layouts/Dropdown"
 import settingFunctions from "../module"
+import settingRequests from "../api"
 import GraphMetric from '../../../components/GraphMetric'
 import values from '@/util/values'
 import func from "@/util/func"
@@ -14,6 +15,7 @@ function ThreatDetectionMetrics() {
     const [instanceIds, setInstanceIds] = useState([])
     const [selectedInstanceId, setSelectedInstanceId] = useState(null)
     const [moduleInfoData, setModuleInfoData] = useState({})
+    const [sortedModuleOrder, setSortedModuleOrder] = useState([])
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
     const getTimeEpoch = (key) => {
@@ -43,6 +45,29 @@ function ThreatDetectionMetrics() {
         'NON_HEAP_MEMORY_USED_MB': { title: 'Non-Heap Memory Used', description: 'Non-heap memory used in MB' }
     };
 
+    const fetchModuleInfo = async(startTime, endTime) => {
+        try {
+            const filter = {
+                moduleType: 'THREAT_DETECTION',
+                lastHeartbeatReceived: { $gte: startTime, $lte: endTime }
+            }
+            const response = await settingRequests.fetchModuleInfo(filter)
+            const modules = response?.moduleInfos || []
+
+            const sortedModules = modules.sort((a, b) => {
+                const aTime = a.startedTs || a.lastHeartbeatReceived || 0
+                const bTime = b.startedTs || b.lastHeartbeatReceived || 0
+                return bTime - aTime
+            })
+
+            // Store sorted order of module names for dropdown sorting
+            const sortedOrder = sortedModules.map(module => module.name)
+            setSortedModuleOrder(sortedOrder)
+        } catch (error) {
+            console.error("Error fetching module info:", error)
+        }
+    }
+
     const getTDMetricsData = async(startTime, endTime) => {
         const metricsData = {};
 
@@ -62,7 +87,17 @@ function ThreatDetectionMetrics() {
                 }
             });
 
-            const instanceIdsList = Array.from(uniqueInstanceIds).sort().map(id => ({ label: id, value: id }));
+            // Sort instance IDs based on module start time (sortedModuleOrder)
+            const sortedIds = Array.from(uniqueInstanceIds).sort((a, b) => {
+                const aIndex = sortedModuleOrder.indexOf(a);
+                const bIndex = sortedModuleOrder.indexOf(b);
+                if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+                if (aIndex !== -1) return -1;
+                if (bIndex !== -1) return 1;
+                return 0;
+            });
+
+            const instanceIdsList = sortedIds.map(id => ({ label: id, value: id }));
             setInstanceIds(instanceIdsList);
 
             if (instanceIdsList.length > 0 && !selectedInstanceId) {
@@ -141,6 +176,7 @@ function ThreatDetectionMetrics() {
 
     useEffect(() => {
         const fetchData = async () => {
+            await fetchModuleInfo(startTime, endTime);
             await getGraphData(startTime, endTime);
         };
 
