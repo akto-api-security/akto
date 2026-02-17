@@ -607,7 +607,7 @@ public class ApiCollectionsAction extends UserAction {
         return null;
     }
 
-    public String getEndpointsListFromConditions() {
+    public String fetchEndpointsListFromConditions() {
         try {
             List<TestingEndpoints> conditions = generateConditions(this.conditions);
             List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE,  new ArrayList<>(deactivatedCollections));
