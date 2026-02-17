@@ -185,7 +185,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             Context.accountId.set(ClientActor.getAccountId());
           } catch (Exception e) {
               Context.accountId.set(1000000);
-            e.printStackTrace();
+              e.printStackTrace();
           }
           while (true) {
             ConsumerRecords<String, byte[]> records =

@@ -51,7 +51,7 @@ public class Main {
   public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
 
-    public static void main(String[] args) throws Exception {
+  public static void main(String[] args) throws Exception {
 
     boolean isHybridDeployment = RuntimeMode.isHybridDeployment();
     validateAndInitializeDeployment(isHybridDeployment);
@@ -188,15 +188,8 @@ public class Main {
 
   private static void waitForThreatDetectionFeatureAccess() throws Exception {
     while (true) {
-      int accountId = 1000000;
-
-      try {
-        accountId = ClientActor.getAccountId();
-        Context.accountId.set(accountId);
-      } catch (Exception e) {
-        Context.accountId.set(accountId);
-        return;
-      }
+      int accountId = ClientActor.getAccountId();
+      Context.accountId.set(accountId);
 
       Organization organization = dataActor.fetchOrganization(accountId);
       if (organization == null) {
