@@ -320,6 +320,12 @@ public class DbAction extends ActionSupport {
     @lombok.Getter
     @lombok.Setter
     List<CollectionTags> tagsList;
+
+
+    @lombok.Getter
+    @lombok.Setter
+    String accessType;
+    
     private TestingRunPlayground.TestingRunPlaygroundType testingRunPlaygroundType;
     private OriginalHttpResponse originalHttpResponse;
     String metricType;
@@ -2906,7 +2912,7 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionSimpleForVpc() {
         try {
-            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, checkTagsNeedUpdates(tagsList, vxlanId));
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, checkTagsNeedUpdates(tagsList, vxlanId), accessType);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionSimpleForVpc " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -2916,7 +2922,7 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionForHostAndVpc() {
         try {
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, checkTagsNeedUpdates(tagsList, colId));
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, checkTagsNeedUpdates(tagsList, colId), accessType);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHostAndVpc " + e.toString());
             return Action.ERROR.toUpperCase();

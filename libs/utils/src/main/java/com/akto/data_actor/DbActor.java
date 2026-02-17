@@ -590,12 +590,12 @@ public class DbActor extends DataActor {
         return DbLayer.fetchStatusOfTests();
     }
 
-    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
-        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
+        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags, accessType);
     }
 
-    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags) {
-        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags);
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType) {
+        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags, accessType);
     }
 
     public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {

@@ -889,7 +889,7 @@ public class DbLayer {
         return tags;
     }
 
-    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
+    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
 
@@ -929,6 +929,10 @@ public class DbLayer {
             update = Updates.combine(update, Updates.set(ApiCollection.TAGS_STRING, getFilteredTags(apiCollection, tags)));
         }
 
+        if(accessType != null && !accessType.isEmpty()) {
+            update = Updates.combine(update, Updates.set(ApiCollection.ACCESS_TYPE, accessType));
+        }
+
         ApiCollectionsDao.instance.getMCollection().updateOne(
                 filters,
                 update,
@@ -950,7 +954,7 @@ public class DbLayer {
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
 
-    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags) {
+    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags, String accessType) {
 
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -986,6 +990,10 @@ public class DbLayer {
 
         if(tags != null && !tags.isEmpty()) {
             updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, getFilteredTags(apiCollection, tags)));
+        }
+
+        if(accessType != null && !accessType.isEmpty()) {
+            updates = Updates.combine(updates, Updates.set(ApiCollection.ACCESS_TYPE, accessType));
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
