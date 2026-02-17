@@ -6,7 +6,7 @@ function DropdownSearch(props) {
 
     const id = props.id ? props.id : "dropdown-search"
 
-    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal, showSelectedItemLabels=false, searchDisable=false, textfieldRequiredIndicator=false} = props
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal, showSelectedItemLabels=false, searchDisable=false, textfieldRequiredIndicator=false, showSelectAllMinOptions=5} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -203,7 +203,7 @@ function DropdownSearch(props) {
         />
     );
 
-    const showSelectAll = (allowMultiple && optionsList.length > 1)
+    const showSelectAll = (allowMultiple && optionsList.length >= showSelectAllMinOptions)
     const checkboxLabel = checked ? <Link removeUnderline>Deselect all</Link> : <Link removeUnderline>Select all</Link>
 
     const emptyState = (

@@ -68,6 +68,7 @@ const ServerSettingsStep = ({
                     setSelected={setSelectedMcpServers}
                     preSelected={selectedMcpServers}
                     allowMultiple={true}
+                    showSelectAllMinOptions={1}
                     disabled={collectionsLoading}
                 />
 
@@ -78,6 +79,7 @@ const ServerSettingsStep = ({
                     setSelected={setSelectedAgentServers}
                     preSelected={selectedAgentServers}
                     allowMultiple={true}
+                    showSelectAllMinOptions={1}
                     disabled={collectionsLoading}
                 />
 
