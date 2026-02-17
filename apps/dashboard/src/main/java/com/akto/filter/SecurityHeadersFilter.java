@@ -1,13 +1,18 @@
 package com.akto.filter;
 
+import com.akto.util.DashboardMode;
+
 import javax.servlet.*;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpServletResponseWrapper;
+import javax.servlet.http.HttpSession;
 import java.io.IOException;
 
 public class SecurityHeadersFilter implements Filter {
+
+    private static final boolean IS_SAAS = DashboardMode.isSaasDeployment();
 
     private static final String CSP_HEADER_VALUE =
             "default-src 'self'; " +
@@ -28,16 +33,29 @@ public class SecurityHeadersFilter implements Filter {
         HttpServletResponse httpServletResponse = (HttpServletResponse) response;
         HttpServletRequest httpServletRequest = (HttpServletRequest) request;
 
+        // Extend session timeout for on-prem deployments (60 min vs 30 min for SaaS)
+        if (!IS_SAAS) {
+            HttpSession session = httpServletRequest.getSession(false);
+            if (session != null && session.getMaxInactiveInterval() == 1800) { // 30 minutes in seconds
+                session.setMaxInactiveInterval(3600); // 60 minutes in seconds
+            }
+        }
+
         if (!httpServletRequest.getRequestURI().startsWith("/tools/")) {
             httpServletResponse.addHeader("X-Frame-Options", "deny");
         }
         httpServletResponse.addHeader("X-XSS-Protection", "1");
         httpServletResponse.addHeader("X-Content-Type-Options", "nosniff");
         httpServletResponse.addHeader("cache-control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0");
-        httpServletResponse.addHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
-        httpServletResponse.addHeader("Content-Security-Policy", CSP_HEADER_VALUE);
 
-        chain.doFilter(request, new SameSiteCookieResponseWrapper(httpServletResponse));
+        // Apply stricter security headers only for SaaS deployments
+        if (IS_SAAS) {
+            httpServletResponse.addHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+            httpServletResponse.addHeader("Content-Security-Policy", CSP_HEADER_VALUE);
+            chain.doFilter(request, new SameSiteCookieResponseWrapper(httpServletResponse));
+        } else {
+            chain.doFilter(request, response);
+        }
 
     }
 
