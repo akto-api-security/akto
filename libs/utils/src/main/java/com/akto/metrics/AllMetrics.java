@@ -387,13 +387,13 @@ public class AllMetrics {
     // Traffic Collector profiling metrics - per instance
     public void setTcCpuUsage(String instanceId, float val) {
         tcCpuUsageMetrics.computeIfAbsent(instanceId,
-            k -> new GaugeMetric("TC_CPU_USAGE", 60, accountId, orgId))
+            k -> new GaugeMetric("TC_CPU_USAGE", 60, accountId, orgId, ModuleInfo.ModuleType.TRAFFIC_COLLECTOR.name()))
             .record(val);
     }
 
     public void setTcMemoryUsage(String instanceId, float val) {
         tcMemoryUsageMetrics.computeIfAbsent(instanceId,
-            k -> new GaugeMetric("TC_MEMORY_USAGE", 60, accountId, orgId))
+            k -> new GaugeMetric("TC_MEMORY_USAGE", 60, accountId, orgId, ModuleInfo.ModuleType.TRAFFIC_COLLECTOR.name()))
             .record(val);
     }
 
