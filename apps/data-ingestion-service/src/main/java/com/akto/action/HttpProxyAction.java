@@ -38,7 +38,6 @@ public class HttpProxyAction extends ActionSupport {
     private String guardrails;
     private String akto_connector;
     private String ingest_data;
-    private String sync;  // TrueFoundry sync mode parameter
 
     private Map<String, Object> data;
     private boolean success;
@@ -127,19 +126,16 @@ public class HttpProxyAction extends ActionSupport {
 
     /**
      * TrueFoundry-specific endpoint wrapper
-     * Implements sync/async execution based on sync parameter and presence of responseBody:
+     * Always operates in sync mode with two scenarios:
      * 
-     * sync=true & response=null: Synchronous input guardrail check (block if failed)
-     * sync=true & response!=null: Async ingestion only (return 200 immediately)
-     * sync=false & response=null: No-op (return 200)
-     * sync=false & response!=null: Async guardrails + ingestion (return 200 immediately)
+     * response=null: Synchronous input guardrail check (block if failed)
+     * response!=null: Async ingestion only (return 200 immediately for monitoring)
      */
     public String truefoundryProxy() {
         try {
-            boolean isSyncMode = "true".equalsIgnoreCase(sync);
             boolean hasResponse = responseBody != null && !responseBody.isEmpty();
 
-            loggerMaker.info("TrueFoundry Proxy API called - sync: " + isSyncMode + ", hasResponse: " + hasResponse);
+            loggerMaker.info("TrueFoundry Proxy API called - hasResponse: " + hasResponse);
 
             // Validate that at least requestBody is present
             if (requestBody == null || requestBody.isEmpty()) {
@@ -155,28 +151,15 @@ public class HttpProxyAction extends ActionSupport {
             Map<String, Object> tfInput = buildTrueFoundryInput();
             Map<String, Object> aktoFormat = convertTrueFoundryToAktoFormat(tfInput);
 
-            // Scenario 1: sync=true, response=null (Synchronous input guardrail check)
-            if (isSyncMode && !hasResponse) {
+            // Scenario 1: response=null (Synchronous input guardrail check)
+            if (!hasResponse) {
                 loggerMaker.info("TrueFoundry: Synchronous input guardrail check");
                 return executeSyncGuardrailCheck(aktoFormat);
             }
 
-            // Scenario 2: sync=true, response!=null (Async ingestion only)
-            if (isSyncMode && hasResponse) {
-                loggerMaker.info("TrueFoundry: Async ingestion only");
-                executeAsync(aktoFormat, false, true);
-                return Action.SUCCESS.toUpperCase();
-            }
-
-            // Scenario 3: sync=false, response=null (No-op)
-            if (!isSyncMode && !hasResponse) {
-                loggerMaker.info("TrueFoundry: No-op scenario");
-                return Action.SUCCESS.toUpperCase();
-            }
-
-            // Scenario 4: sync=false, response!=null (Async guardrails + ingestion)
-            loggerMaker.info("TrueFoundry: Async guardrails + ingestion");
-            executeAsync(aktoFormat, true, true);
+            // Scenario 2: response!=null (Async ingestion only)
+            loggerMaker.info("TrueFoundry: Async ingestion only");
+            executeAsync(aktoFormat, false, true);
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
@@ -231,7 +214,7 @@ public class HttpProxyAction extends ActionSupport {
                         Map<String, Object> blockedBody = new HashMap<>();
                         blockedBody.put("x-blocked-by", "Akto Proxy");
                         blockedResponse.put("body", blockedBody);
-                        blockedResponse.put("statusCode", 200);
+                        blockedResponse.put("statusCode", 400);
                         blockedResponse.put("status", "forbidden");
                         
                         Map<String, Object> responseHeaders = new HashMap<>();
