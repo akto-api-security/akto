@@ -401,7 +401,7 @@ public class ApiExecutor {
         String url = prepareUrl(request, testingRunConfig);
 
         if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
-            loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("Final url is: " + url, LogDb.TESTING);
         }
         request.setUrl(url);
 
@@ -435,7 +435,7 @@ public class ApiExecutor {
                 throw new Exception("Invalid method name");
         }
         if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
-            loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("Received response from: " + url, LogDb.TESTING);
         }
 
         return response;
