@@ -10951,7 +10951,7 @@
             </result>
         </action>
 
-        <action name="api/fetchAPIInfosForMissingData" class="com.akto.action.DashboardAction" method="fetchAPIInfosForMissingData">
+        <action name="api/getAPIInfosForMissingData" class="com.akto.action.DashboardAction" method="fetchAPIInfosForMissingData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
