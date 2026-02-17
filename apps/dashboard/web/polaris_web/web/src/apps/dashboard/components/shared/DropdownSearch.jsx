@@ -203,7 +203,7 @@ function DropdownSearch(props) {
         />
     );
 
-    const showSelectAll = (allowMultiple && optionsList.length > 5)
+    const showSelectAll = (allowMultiple && optionsList.length > 1)
     const checkboxLabel = checked ? <Link removeUnderline>Deselect all</Link> : <Link removeUnderline>Select all</Link>
 
     const emptyState = (
