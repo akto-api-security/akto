@@ -1373,13 +1373,14 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags) {
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("colId", colId);
         obj.put("host", host);
         obj.put("vpcId", vpcId);
         obj.put("tagsList", tags);
+        obj.put("accessType", accessType);
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForHostAndVpc", "", "POST", objString, headers, "");
         try {
@@ -1394,12 +1395,13 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("vxlanId", vxlanId);
         obj.put("vpcId", vpcId);
         obj.put("tagsList", tags);
+        obj.put("accessType", accessType);
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionSimpleForVpc", "", "POST", objString, headers, "");
         try {
@@ -2897,7 +2899,7 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName) {
+    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("colId", id);
@@ -2905,6 +2907,7 @@ public class ClientActor extends DataActor {
         obj.put("hostNames", hostNames);
         obj.put("tagsList", tags);
         obj.put("hostName", hostName);
+        obj.put("accessType", accessType);
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForServiceTag", "", "POST", objString, headers, "");
         try {

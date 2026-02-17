@@ -63,6 +63,9 @@ public class ApiCollection {
     String sseCallbackUrl;
     public static final String SSE_CALLBACK_URL = "sseCallbackUrl";
 
+    String accessType;
+    public static final String ACCESS_TYPE = "accessType";
+
     public enum Type {
         API_GROUP
     }
@@ -434,6 +437,14 @@ public class ApiCollection {
 
     public void setSseCallbackUrl(String sseCallbackUrl) {
         this.sseCallbackUrl = sseCallbackUrl;
+    }
+
+    public String getAccessType() {
+        return accessType;
+    }
+
+    public void setAccessType(String accessType) {
+        this.accessType = accessType;
     }
 
     public boolean isMcpCollection() {

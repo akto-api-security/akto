@@ -131,18 +131,62 @@ public class HttpCallParser {
         return RuntimeUtil.getHeaderValue(headers, headerKey);
     }
 
+    private static String getAccessTypeFromDirection(String direction) {
+        if (direction == null) {
+            return null;
+        }
+        if ("1".equals(direction)) {
+            return "First party";
+        } else if ("2".equals(direction)) {
+            return "Third party";
+        }
+        return null;
+    }
+
+    private static String computeAccessType(String direction, String existingAccessType) {
+        String newAccessType = getAccessTypeFromDirection(direction);
+
+        if (newAccessType == null) {
+            return existingAccessType; 
+        }
+
+        if (existingAccessType == null) {
+            return newAccessType; 
+        }
+
+        if ("Both".equals(existingAccessType)) {
+            return "Both"; 
+        }
+
+        if (existingAccessType.equals(newAccessType)) {
+            return existingAccessType; 
+        }
+
+        return "Both";
+    }
+
+
+    private String getOrComputeAccessType(String direction, Integer collectionId) {
+        String existingAccessType = null;
+        if (collectionId != null) {
+            ApiCollection existingCollection = apiCollectionsMap.get(collectionId);
+            existingAccessType = existingCollection != null ? existingCollection.getAccessType() : null;
+        }
+        return computeAccessType(direction, existingAccessType);
+    }
+
     public int createCollectionSimple(int vxlanId) {
         dataActor.createCollectionSimple(vxlanId);
         return vxlanId;
     }
 
-    public int createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
-        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
+    public int createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
+        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId, tags, accessType);
         return vxlanId;
     }
 
 
-    public int createCollectionBasedOnHostName(int id, String host, List<CollectionTags> tags)  throws Exception {
+    public int createCollectionBasedOnHostName(int id, String host, List<CollectionTags> tags, String accessType)  throws Exception {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
         String vpcId = System.getenv("VPC_ID");
@@ -154,7 +198,7 @@ public class HttpCallParser {
         for (int i=0;i < 100; i++) {
             id += i;
             try {
-                dataActor.createCollectionForHostAndVpc(host, id, vpcId, tags);
+                dataActor.createCollectionForHostAndVpc(host, id, vpcId, tags, accessType);
                 flag = true;
                 break;
             } catch (Exception e) {
@@ -759,20 +803,21 @@ public class HttpCallParser {
         }
 
         // Sync tags to DB based on collection type
+        String accessType = apiCollection.getAccessType();
         if (isServiceTagCollection) {
             // Service-tag collection - call createCollectionForServiceTag to update tags
             String serviceTag = apiCollection.getServiceTag();
             List<String> hostNames = apiCollection.getHostNames();
             String hostName = apiCollection.getHostName();
-            dataActor.createCollectionForServiceTag(apiCollectionId, serviceTag, hostNames, tagsList, hostName);
+            dataActor.createCollectionForServiceTag(apiCollectionId, serviceTag, hostNames, tagsList, hostName, accessType);
         } else if (hostNameMapKey.contains(NON_HOSTNAME_KEY)) {
             String vpcId = System.getenv("VPC_ID");
             createCollectionSimpleForVpc(
-                    httpResponseParams.requestParams.getApiCollectionId(), vpcId, tagsList);
+                    httpResponseParams.requestParams.getApiCollectionId(), vpcId, tagsList, accessType);
         } else {
             try {
                 createCollectionBasedOnHostName(hostNameMapKey.hashCode(), hostNameMapKey,
-                        tagsList);
+                        tagsList, accessType);
             } catch (Exception e) {
                 loggerMaker.error(
                         "Error while updating api collection tags for host: " + hostNameMapKey + " " + e.getMessage());
@@ -809,6 +854,8 @@ public class HttpCallParser {
     public int createApiCollectionId(HttpResponseParams httpResponseParam){
         int apiCollectionId;
 
+        String direction = httpResponseParam.getDirection();
+
         // Check if service tag is present in tags - if yes, use service-tag based collection
         String serviceTagValue = extractServiceTag(httpResponseParam.getTags());
         if (serviceTagValue != null && !serviceTagValue.isEmpty()) {
@@ -836,6 +883,13 @@ public class HttpCallParser {
 
             if (hostNameToIdMap.containsKey(key)) {
                 apiCollectionId = hostNameToIdMap.get(key);
+                String accessType = getOrComputeAccessType(direction, apiCollectionId);
+
+                try {
+                    createCollectionBasedOnHostName(key.hashCode(), key, tagList, accessType);
+                } catch (Exception e) {
+                    loggerMaker.debug("Collection already exists, continuing...");
+                }
                 updateApiCollectionTags(key, httpResponseParam);
 
             } else {
@@ -859,10 +913,11 @@ public class HttpCallParser {
                     }
                 }
                 try {
+                    String accessType = getOrComputeAccessType(direction, null);
 
-                    apiCollectionId = createCollectionBasedOnHostName(id, hostName, tagList);
+                    apiCollectionId = createCollectionBasedOnHostName(id, hostName, tagList, accessType);
                     if(Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL()) || (Utils.printDebugHostLog(httpResponseParam) != null)) {
-                        loggerMaker.infoAndAddToDb("Created collection: " + apiCollectionId + " with hostNameMapKey: " + hostName 
+                        loggerMaker.infoAndAddToDb("Created collection: " + apiCollectionId + " with hostNameMapKey: " + hostName
                             + " url: " + httpResponseParam.getRequestParams().getURL() + " and tags: " + httpResponseParam.getTags()
                         );
                     }
@@ -884,7 +939,8 @@ public class HttpCallParser {
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Failed to create collection for host : " + hostName);
-                    createCollectionSimpleForVpc(vxlanId, vpcId, tagList);
+                    String accessType = getOrComputeAccessType(direction, null);
+                    createCollectionSimpleForVpc(vxlanId, vpcId, tagList, accessType);
                     hostNameToIdMap.put(NON_HOSTNAME_KEY + vxlanId, vxlanId);
                     apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
                 }
@@ -893,9 +949,13 @@ public class HttpCallParser {
         } else {
             String key = NON_HOSTNAME_KEY + vxlanId;
             if (!hostNameToIdMap.containsKey(key)) {
-                createCollectionSimpleForVpc(vxlanId, vpcId, tagList);
+                String accessType = getOrComputeAccessType(direction, null);
+                createCollectionSimpleForVpc(vxlanId, vpcId, tagList, accessType);
                 hostNameToIdMap.put(key, vxlanId);
             }else{
+                String accessType = getOrComputeAccessType(direction, vxlanId);
+
+                createCollectionSimpleForVpc(vxlanId, vpcId, tagList, accessType);
                 updateApiCollectionTags(key, httpResponseParam);
             }
 
@@ -908,6 +968,7 @@ public class HttpCallParser {
         int apiCollectionId;
         String hostName = getHostnameForCollection(httpResponseParam);
         String tagsJson = httpResponseParam.getTags();
+        String direction = httpResponseParam.getDirection();
 
         // Generate collection ID from service tag value
         // No need for accountId since each account has its own separate database
@@ -915,8 +976,10 @@ public class HttpCallParser {
 
         // Check if collection already exists in cache
         if (apiCollectionsMap.containsKey(apiCollectionId)) {
-            // Update hostNames list if hostname is new
-            updateServiceTagCollectionHostNames(apiCollectionId, hostName, tagsJson, httpResponseParam);
+            String accessType = getOrComputeAccessType(direction, apiCollectionId);
+
+            // Update hostNames list if hostname is new and update access type
+            updateServiceTagCollectionHostNames(apiCollectionId, hostName, tagsJson, httpResponseParam, accessType);
             return apiCollectionId;
         }
 
@@ -931,6 +994,8 @@ public class HttpCallParser {
             List<CollectionTags> tagsList = CollectionTags.convertTagsFormat(tagsJson);
             tagsList = filterTagsForAccount(tagsList);
 
+            String accessType = getOrComputeAccessType(direction, null);
+
             ApiCollection collection = new ApiCollection(
                 apiCollectionId,
                 serviceTagValue,  // name = service tag value
@@ -944,6 +1009,7 @@ public class HttpCallParser {
             collection.setServiceTag(serviceTagValue);
             collection.setHostNames(hostNamesList);
             collection.setTagsList(tagsList);
+            collection.setAccessType(accessType);
 
             // Add to cache FIRST to prevent redundant calls
             apiCollectionsMap.put(apiCollectionId, collection);
@@ -954,7 +1020,7 @@ public class HttpCallParser {
             serviceTagCollectionHostNamesCache.put(apiCollectionId, cachedHostNames);
 
             // Create collection in DB with initial fields (upsert pattern - safe if already exists)
-            dataActor.createCollectionForServiceTag(apiCollectionId, serviceTagValue, hostNamesList, tagsList, hostName);
+            dataActor.createCollectionForServiceTag(apiCollectionId, serviceTagValue, hostNamesList, tagsList, hostName, accessType);
 
             loggerMaker.infoAndAddToDb("Created service-tag collection: " + serviceTagValue
                 + " (ID: " + apiCollectionId + ") for URL: " + httpResponseParam.getRequestParams().getURL());
@@ -967,7 +1033,7 @@ public class HttpCallParser {
         return apiCollectionId;
     }
 
-    private void updateServiceTagCollectionHostNames(int collectionId, String hostName, String tagsJson, HttpResponseParams httpResponseParam) {
+    private void updateServiceTagCollectionHostNames(int collectionId, String hostName, String tagsJson, HttpResponseParams httpResponseParam, String accessType) {
         if (hostName == null || hostName.isEmpty()) {
             return;
         }
@@ -985,10 +1051,23 @@ public class HttpCallParser {
                 cachedHostNames.add(hostName);
             }
 
-            // Reuse existing tag update logic - pass service tag value as hostNameMapKey
+            // Update access type in cache and DB
             ApiCollection apiCollection = apiCollectionsMap.get(collectionId);
-            if (apiCollection != null && apiCollection.getServiceTag() != null) {
-                updateApiCollectionTags(collectionId, httpResponseParam, apiCollection.getServiceTag(), true);
+            if (apiCollection != null) {
+                String oldAccessType = apiCollection.getAccessType();
+
+                apiCollection.setAccessType(accessType);
+
+                if (accessType != null && !accessType.equals(oldAccessType)) {
+                    String serviceTag = apiCollection.getServiceTag();
+                    List<String> hostNamesList = apiCollection.getHostNames();
+                    List<CollectionTags> tagsList = apiCollection.getTagsList();
+                    dataActor.createCollectionForServiceTag(collectionId, serviceTag, hostNamesList, tagsList, hostName, accessType);
+                }
+
+                if (apiCollection.getServiceTag() != null) {
+                    updateApiCollectionTags(collectionId, httpResponseParam, apiCollection.getServiceTag(), true);
+                }
             }
 
         } catch (Exception e) {

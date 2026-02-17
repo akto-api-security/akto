@@ -224,6 +224,10 @@ public class DbAction extends ActionSupport {
     @lombok.Setter
     List<CollectionTags> tagsList;
 
+    @lombok.Getter
+    @lombok.Setter
+    String accessType;
+
     String metricType;
 
     public String getMetricType() {
@@ -1770,7 +1774,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionSimpleForVpc() {
         try {
             System.out.println("called1 vpcId" + vpcId);
-            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tagsList);
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tagsList, accessType);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -1780,7 +1784,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionForHostAndVpc() {
         try {
             System.out.println("called2 vpcId" + vpcId);
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tagsList);
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tagsList, accessType);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
