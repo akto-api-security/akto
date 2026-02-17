@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Page, VerticalStack, HorizontalStack, Button, ButtonGroup } from '@shopify/polaris';
-import { InfoMinor, MagicMinor } from '@shopify/polaris-icons';
+import { Page, VerticalStack, HorizontalStack } from '@shopify/polaris';
 import AgenticWelcomeHeader from './components/AgenticWelcomeHeader';
 import AgenticSearchInput from './components/AgenticSearchInput';
 import AgenticSuggestions from './components/AgenticSuggestions';
@@ -23,7 +22,6 @@ function AgenticMainPage() {
     const [historySearchQuery, setHistorySearchQuery] = useState('');
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [pendingConversationId, setPendingConversationId] = useState(null);
-    const [conversationType, setConversationType] = useState('ASK_AKTO');
 
     const handleSearchSubmit = useCallback((query) => {
         setCurrentQuery(query);
@@ -54,7 +52,7 @@ function AgenticMainPage() {
         setIsLoadingHistory(true);
         try {
             const conversations = await getConversationsList(limit, searchQuery);
-            if(conversations.history && conversations.history.length > 0) {
+            if (conversations.history && conversations.history.length > 0) {
                 setHistoryItems(conversations.history.map(item => ({
                     ...item,
                     id: item._id._id
@@ -112,60 +110,53 @@ function AgenticMainPage() {
                     setSearchValue(''); // Clear search input when going back
                 }}
                 onLoadConversation={handleHistoryClick}
-                conversationType={conversationType}
             />
         );
     }
 
     return (
         <Page id="agentic-main-page" fullWidth>
-            <div style={{display: 'flex', justifyContent: 'end'}}>
-                <ButtonGroup segmented={true}>
-                    <Button icon={MagicMinor} onClick={() => setConversationType('ASK_AKTO')} pressed={conversationType === 'ASK_AKTO'}>Know About Dashboard</Button>
-                    <Button icon={InfoMinor} onClick={() => setConversationType('DOCS_AGENT')} pressed={conversationType === 'DOCS_AGENT'}>Learn about Akto</Button>
-                </ButtonGroup>
-            </div>
-            <div style={{height: '100vh', display: 'flex', justifyContent: 'center'}}>
-            <HorizontalStack align="center" blockAlign="center">
-                <VerticalStack gap="16" align="center">
-                    <VerticalStack gap={"8"}>
-                        <AgenticWelcomeHeader username={username} />
-                        <AgenticSearchInput
-                            value={searchValue}
-                            onChange={setSearchValue}
-                            onSubmit={handleSearchSubmit}
+            <div style={{ height: '100vh', display: 'flex', justifyContent: 'center' }}>
+                <HorizontalStack align="center" blockAlign="center">
+                    <VerticalStack gap="16" align="center">
+                        <VerticalStack gap={"8"}>
+                            <AgenticWelcomeHeader username={username} />
+                            <AgenticSearchInput
+                                value={searchValue}
+                                onChange={setSearchValue}
+                                onSubmit={handleSearchSubmit}
+                            />
+                            <AgenticSuggestions
+                                onSuggestionClick={handleSuggestionClick}
+                                hide={searchValue.trim().length > 0}
+                            />
+                        </VerticalStack>
+                        <AgenticHistoryCards
+                            historyItems={historyItems.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt).slice(0, 3)}
+                            onHistoryClick={handleHistoryClick}
+                            onViewAllClick={handleViewAllClick}
                         />
-                        <AgenticSuggestions
-                            onSuggestionClick={handleSuggestionClick}
-                            hide={searchValue.trim().length > 0}
-                        />
-                    </VerticalStack>    
-                    <AgenticHistoryCards
-                        historyItems={historyItems.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt).slice(0, 3)}
-                        onHistoryClick={handleHistoryClick}
-                        onViewAllClick={handleViewAllClick}
-                    />
-                </VerticalStack>
-            </HorizontalStack>
-            {/* History Modal */}
-            <AgenticHistoryModal
-                isOpen={showHistoryModal}
-                onClose={() => {
-                    setShowHistoryModal(false);
-                    setHistorySearchQuery(''); // Reset search query when closing
-                }}
-                onHistoryClick={handleHistoryClick}
-                historyItems={historyItems.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt)}
-                searchQuery={historySearchQuery}
-                onSearchQueryChange={setHistorySearchQuery}
-                isLoading={isLoadingHistory}
-                onDelete={(conversationId) => {
-                    setHistoryItems(historyItems.filter(item => item.id !== conversationId).sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt));
-                }}
-            />
+                    </VerticalStack>
+                </HorizontalStack>
+                {/* History Modal */}
+                <AgenticHistoryModal
+                    isOpen={showHistoryModal}
+                    onClose={() => {
+                        setShowHistoryModal(false);
+                        setHistorySearchQuery(''); // Reset search query when closing
+                    }}
+                    onHistoryClick={handleHistoryClick}
+                    historyItems={historyItems.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt)}
+                    searchQuery={historySearchQuery}
+                    onSearchQueryChange={setHistorySearchQuery}
+                    isLoading={isLoadingHistory}
+                    onDelete={(conversationId) => {
+                        setHistoryItems(historyItems.filter(item => item.id !== conversationId).sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt));
+                    }}
+                />
             </div>
         </Page>
-    
+
     );
 }
 
