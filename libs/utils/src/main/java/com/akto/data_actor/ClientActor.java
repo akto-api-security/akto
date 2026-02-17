@@ -1378,6 +1378,9 @@ public class ClientActor extends DataActor {
                     case "COLLECTION_WISE":
                         ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
                         break;
+                    case "MULTI_COLLECTION":
+                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.MultiCollectionTestingEndpoints");
+                        break;
                     case "WORKFLOW":
                         ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
                         break;
@@ -1498,6 +1501,9 @@ public class ClientActor extends DataActor {
                         break;
                     case "COLLECTION_WISE":
                         ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
+                        break;
+                    case "MULTI_COLLECTION":
+                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.MultiCollectionTestingEndpoints");
                         break;
                     case "WORKFLOW":
                         ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
@@ -3007,6 +3013,9 @@ public class ClientActor extends DataActor {
                         break;
                     case "COLLECTION_WISE":
                         ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
+                        break;
+                    case "MULTI_COLLECTION":
+                        ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.MultiCollectionTestingEndpoints");
                         break;
                     case "WORKFLOW":
                         ((Document) endpointLogicalGroup.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");

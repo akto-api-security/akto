@@ -1850,6 +1850,11 @@ public class DbAction extends ActionSupport {
                 CustomTestingEndpoints endpoints = new CustomTestingEndpoints(ts.returnApis());
                 testingRun.setTestingEndpoints(endpoints);
             }
+            else if(testingRun.getTestingEndpoints() instanceof MultiCollectionTestingEndpoints){
+                MultiCollectionTestingEndpoints ts = (MultiCollectionTestingEndpoints) testingRun.getTestingEndpoints();
+                CustomTestingEndpoints endpoints = new CustomTestingEndpoints(ts.returnApis()); 
+                testingRun.setTestingEndpoints(endpoints);
+            }
         }
     }
 
@@ -2799,7 +2804,15 @@ public class DbAction extends ActionSupport {
             ApiCollection apiCollection = DbLayer.fetchApiCollectionMeta(apiCollectionId);
             collectionName = apiCollection.getName();
         }
-
+        if(testingEndpoints != null && testingEndpoints.getType() != null && testingEndpoints.getType().equals(TestingEndpoints.Type.MULTI_COLLECTION)) {
+            MultiCollectionTestingEndpoints multiCollectionTestingEndpoints = (MultiCollectionTestingEndpoints) testingEndpoints;
+            List<Integer> apiCollectionIds = multiCollectionTestingEndpoints.getApiCollectionIds();
+            if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+                ApiCollection apiCollection = DbLayer.fetchApiCollectionMeta(apiCollectionIds.get(0));
+                collectionName = apiCollection.getName();
+            }
+        }
+        
         int newIssues = 0;
         List<TestingRunIssues> testingRunIssuesList = DbLayer.fetchOpenIssues(summaryId);
         Map<String, Integer> apisAffectedCount = new HashMap<>();

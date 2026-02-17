@@ -171,6 +171,8 @@ public class DaoInit {
                 .enableDiscriminator(true).build();
         ClassModel<CustomTestingEndpoints> customTestingEndpointsClassModel = ClassModel
                 .builder(CustomTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<MultiCollectionTestingEndpoints> multiCollectionTestingEndpointsClassModel = ClassModel
+                .builder(MultiCollectionTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<AllTestingEndpoints> allTestingEndpointsClassModel = ClassModel
                 .builder(AllTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<CollectionWiseTestingEndpoints> collectionWiseTestingEndpointsClassModel = ClassModel
@@ -287,7 +289,7 @@ public class DaoInit {
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel,
                 testingRunResultClassModel, testResultClassModel, genericTestResultClassModel,
                 authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel, sampleDataAuthParamClassModel,
-                testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
+                testingEndpointsClassModel, customTestingEndpointsClassModel, multiCollectionTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel, CustomWebhookClassModel, WorkflowNodeDetailsClassModel, CustomWebhookResultClassModel,
                 nodeResultClassModel, awsResourcesModel, AktoDataTypeClassModel, testingRunIssuesClassModel,
