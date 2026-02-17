@@ -7,6 +7,7 @@ NOTE: Cursor afterMCPExecution hooks cannot block responses, only log/ingest.
 import json
 import logging
 import os
+import ssl
 import sys
 import urllib.request
 from typing import Any, Dict, Union
@@ -44,6 +45,10 @@ AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = "claude_code_cli" # todo: update connector name to cursor
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 
+# SSL Configuration
+SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
+SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
+
 # Configure API_URL based on mode
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
@@ -52,6 +57,58 @@ if MODE == "atlas":
 else:
     API_URL = os.getenv("API_URL", "https://api.anthropic.com")
     logger.info(f"MODE: {MODE}, API_URL: {API_URL}")
+
+
+def create_ssl_context():
+    """
+    Create SSL context with graceful fallback strategy.
+
+    Attempts in order:
+    1. Custom SSL_CERT_PATH if provided
+    2. System default SSL context
+    3. Python certifi bundle (if available)
+    4. Unverified context (last resort)
+
+    Returns:
+        ssl.SSLContext or None
+    """
+    if not SSL_VERIFY:
+        logger.warning("SSL verification disabled via SSL_VERIFY=false - INSECURE!")
+        return ssl._create_unverified_context()
+
+    # Try 1: Custom certificate path
+    if SSL_CERT_PATH:
+        try:
+            context = ssl.create_default_context(cafile=SSL_CERT_PATH)
+            logger.info(f"Using custom SSL certificate: {SSL_CERT_PATH}")
+            return context
+        except Exception as e:
+            logger.warning(f"Failed to load custom SSL certificate from {SSL_CERT_PATH}: {e}")
+
+    # Try 2: System default context
+    try:
+        context = ssl.create_default_context()
+        logger.debug("Using system default SSL context")
+        return context
+    except Exception as e:
+        logger.warning(f"Failed to create default SSL context: {e}")
+
+    # Try 3: Python certifi bundle
+    try:
+        import certifi
+        context = ssl.create_default_context(cafile=certifi.where())
+        logger.info("Using Python certifi SSL bundle")
+        return context
+    except ImportError:
+        logger.debug("certifi package not available")
+    except Exception as e:
+        logger.warning(f"Failed to create SSL context with certifi: {e}")
+
+    # Try 4: Unverified context (last resort)
+    logger.error("WARNING: All SSL verification methods failed! Falling back to UNVERIFIED context - INSECURE!")
+    logger.error("This connection is vulnerable to Man-in-the-Middle attacks!")
+    logger.error("Fix: Install proper certificates or set SSL_CERT_PATH environment variable")
+    return ssl._create_unverified_context()
 
 
 def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
@@ -97,7 +154,8 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 
     start_time = time.time()
     try:
-        with urllib.request.urlopen(request, timeout=AKTO_TIMEOUT) as response:
+        ssl_context = create_ssl_context()
+        with urllib.request.urlopen(request, context=ssl_context, timeout=AKTO_TIMEOUT) as response:
             duration_ms = int((time.time() - start_time) * 1000)
             status_code = response.getcode()
             raw = response.read().decode("utf-8")

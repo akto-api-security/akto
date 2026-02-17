@@ -39,6 +39,10 @@ export DEVICE_ID="" # Optional: Custom device ID for atlas mode (auto-generated 
 export LOG_DIR="~/.cursor/akto/mcp-logs" # Default: ~/.cursor/akto/mcp-logs (MCP tools), ~/.cursor/akto/chat-logs (chat)
 export LOG_LEVEL="INFO" # Options: DEBUG, INFO, WARNING, ERROR (default: INFO)
 export LOG_PAYLOADS="false" # Set to "true" to log request/response payloads (default: false)
+
+# Optional SSL configuration
+# export SSL_CERT_PATH="/path/to/ca-bundle.crt" # Custom CA certificate bundle
+# export SSL_VERIFY="true" # Enable SSL verification (default: true)
 ```
 
 #### Mode Configuration
@@ -188,8 +192,70 @@ Close and reopen Cursor for the hooks to take effect.
 | `LOG_DIR` | `~/.cursor/akto/mcp-logs` or `~/.cursor/akto/chat-logs` | Directory for log files (auto-set per hook type) |
 | `LOG_LEVEL` | `INFO` | Logging verbosity: DEBUG, INFO, WARNING, ERROR |
 | `LOG_PAYLOADS` | `false` | Log request/response payloads (privacy-sensitive) |
+| `SSL_CERT_PATH` | (none) | Path to custom CA certificate bundle for SSL verification |
+| `SSL_VERIFY` | `true` | Enable/disable SSL certificate verification |
 
 ## Troubleshooting
+
+### SSL Certificate Verification Errors
+
+If you encounter `[SSL: CERTIFICATE_VERIFY_FAILED]` errors, the hooks implement a graceful fallback strategy:
+
+**Automatic Fallback Order:**
+1. **Custom certificate** (if `SSL_CERT_PATH` is set)
+2. **System default** certificates
+3. **Python certifi** bundle (if installed)
+4. **Unverified context** (last resort - logs WARNING)
+
+**Solutions by scenario:**
+
+**Corporate Proxy/Self-Signed Certificates:**
+```bash
+# Option 1: Set custom certificate path in wrapper scripts
+export SSL_CERT_PATH="/path/to/corporate-ca-bundle.crt"
+
+# Option 2: Install certificates system-wide (recommended)
+# macOS
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /path/to/cert.crt
+
+# Linux (Ubuntu/Debian)
+sudo cp /path/to/cert.crt /usr/local/share/ca-certificates/
+sudo update-ca-certificates
+```
+
+**Missing CA Certificates:**
+```bash
+# Install Python certifi package (recommended)
+pip3 install certifi
+
+# Or update system certificates
+# macOS
+brew install ca-certificates
+
+# Linux
+sudo apt-get install ca-certificates  # Debian/Ubuntu
+sudo yum install ca-certificates      # RHEL/CentOS
+```
+
+**Find Your Certificate Path:**
+```bash
+# Check Python's default
+python3 -c "import ssl; print(ssl.get_default_verify_paths())"
+
+# Check with certifi (if installed)
+python3 -c "import certifi; print(certifi.where())"
+
+# Check OpenSSL
+openssl version -d
+```
+
+**Testing/Development Only:**
+```bash
+# Disable SSL verification (INSECURE - use only for testing!)
+export SSL_VERIFY="false"
+```
+
+⚠️ **Security Warning:** The hooks will automatically fall back to unverified SSL context if all verification methods fail. This is logged with ERROR level warnings. Monitor logs to ensure proper certificates are configured in production.
 
 ### Hooks not executing
 

@@ -10,5 +10,11 @@ export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="cursor"
 export CONTEXT_SOURCE="ENDPOINT"
 
+# SSL Configuration
+# Optional: Path to custom CA certificate bundle for SSL verification
+# export SSL_CERT_PATH="/path/to/ca-bundle.crt"
+# Optional: Disable SSL verification (INSECURE - use only for testing)
+# export SSL_VERIFY="false"
+
 # Execute Python hook script
 exec python3 "$HOME/.cursor/hooks/akto/akto-validate-chat-response.py" "$@"
