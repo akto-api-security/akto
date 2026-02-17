@@ -85,7 +85,7 @@ public class LiteLLMAdapter implements GuardrailsAdapter {
      */
     private String extractContextSource(Map<String, Object> request) {
         if (request == null) {
-            return "AGENTIC";
+            return "ENDPOINT";
         }
 
         Object contextSource = request.get("contextSource");
@@ -93,6 +93,6 @@ public class LiteLLMAdapter implements GuardrailsAdapter {
             return (String) contextSource;
         }
 
-        return "AGENTIC";
+        return "ENDPOINT";
     }
 }
