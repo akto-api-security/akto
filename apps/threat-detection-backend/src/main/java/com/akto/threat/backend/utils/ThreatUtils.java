@@ -16,6 +16,10 @@ import java.util.*;
 
 public class ThreatUtils {
 
+    private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
+      System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
+    );
+
     private static final List<String> ENDPOINT_POLICY_FILTER_IDS = Arrays.asList(
         "MCPGuardrails", "AuditPolicy", "MCPMaliciousComponent"
     );
@@ -25,7 +29,7 @@ public class ThreatUtils {
             contextSource = CONTEXT_SOURCE.API.name();
         }
 
-        if ("API".equalsIgnoreCase(contextSource)) {
+        if (!USE_ACTOR_INFO_TABLE &&"API".equalsIgnoreCase(contextSource)) {
             return new Document("contextSource", "API");
         }
 
