@@ -303,7 +303,6 @@ public class ProfileAction extends UserAction {
 
                     // Send Slack alert for blocked user only if organization is not whitelisted
                     boolean isWhitelistedOrg = user.getLogin() != null && user.getLogin().contains("@akto.io");
-
                     if (!isWhitelistedOrg) {
                         logger.infoAndAddToDb("Blocking this user " + user.getLogin() + " to access dashboard as invalid plantype '" + planType + "' found for org " + organizationId);
 
