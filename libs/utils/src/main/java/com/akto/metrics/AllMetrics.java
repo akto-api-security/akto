@@ -4,11 +4,10 @@ import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.metrics.MetricData;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.OrgUtils;
-import com.mongodb.BasicDBList;
-import com.mongodb.BasicDBObject;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
@@ -24,7 +23,7 @@ public class AllMetrics {
 
     private String instance_id;
 
-    public void init(LogDb module, boolean pgMetrics, DataActor dataActor, int accountId, String instanceId) {
+    public void init(LogDb module, boolean pgMetrics, DataActor dataActor, int accountId, String instanceId, String moduleType) {
         this.dataActor = dataActor;
         this.instance_id = instanceId;
         this.accountId = accountId;
@@ -34,54 +33,54 @@ public class AllMetrics {
         this.orgId = orgId;
 
         if(LogDb.RUNTIME.equals(module)){
-            runtimeKafkaRecordCount = new SumMetric("RT_KAFKA_RECORD_COUNT", 60, accountId, orgId);
-            runtimeKafkaRecordSize = new SumMetric("RT_KAFKA_RECORD_SIZE", 60, accountId, orgId);
-            runtimeProcessLatency = new LatencyMetric("RT_KAFKA_LATENCY", 60, accountId, orgId);
-            runtimeApiReceivedCount = new SumMetric("RT_API_RECEIVED_COUNT", 60, accountId, orgId);
-            kafkaRecordsLagMax = new MaxMetric("KAFKA_RECORDS_LAG_MAX", 60, accountId, orgId);
-            kafkaRecordsConsumedRate = new GaugeMetric("KAFKA_RECORDS_CONSUMED_RATE", 60, accountId, orgId);
-            kafkaFetchAvgLatency = new GaugeMetric("KAFKA_FETCH_AVG_LATENCY", 60, accountId, orgId);
-            kafkaBytesConsumedRate = new GaugeMetric("KAFKA_BYTES_CONSUMED_RATE", 60, accountId, orgId);
-            cyborgNewApiCount = new SumMetric("CYBORG_NEW_API_COUNT", 60, accountId, orgId);
-            cyborgTotalApiCount = new SumMetric("CYBORG_TOTAL_API_COUNT", 60, accountId, orgId);
-            deltaCatalogTotalCount = new SumMetric("DELTA_CATALOG_TOTAL_COUNT", 60, accountId, orgId);
-            deltaCatalogNewCount = new SumMetric("DELTA_CATALOG_NEW_COUNT", 60, accountId, orgId);
-            cyborgApiPayloadSize = new SumMetric("CYBORG_API_PAYLOAD_SIZE", 60, accountId, orgId);
+            runtimeKafkaRecordCount = new SumMetric("RT_KAFKA_RECORD_COUNT", 60, accountId, orgId, moduleType);
+            runtimeKafkaRecordSize = new SumMetric("RT_KAFKA_RECORD_SIZE", 60, accountId, orgId, moduleType);
+            runtimeProcessLatency = new LatencyMetric("RT_KAFKA_LATENCY", 60, accountId, orgId, moduleType);
+            runtimeApiReceivedCount = new SumMetric("RT_API_RECEIVED_COUNT", 60, accountId, orgId, moduleType);
+            kafkaRecordsLagMax = new MaxMetric("KAFKA_RECORDS_LAG_MAX", 60, accountId, orgId, moduleType);
+            kafkaRecordsConsumedRate = new GaugeMetric("KAFKA_RECORDS_CONSUMED_RATE", 60, accountId, orgId, moduleType);
+            kafkaFetchAvgLatency = new GaugeMetric("KAFKA_FETCH_AVG_LATENCY", 60, accountId, orgId, moduleType);
+            kafkaBytesConsumedRate = new GaugeMetric("KAFKA_BYTES_CONSUMED_RATE", 60, accountId, orgId, moduleType);
+            cyborgNewApiCount = new SumMetric("CYBORG_NEW_API_COUNT", 60, accountId, orgId, moduleType);
+            cyborgTotalApiCount = new SumMetric("CYBORG_TOTAL_API_COUNT", 60, accountId, orgId, moduleType);
+            deltaCatalogTotalCount = new SumMetric("DELTA_CATALOG_TOTAL_COUNT", 60, accountId, orgId, moduleType);
+            deltaCatalogNewCount = new SumMetric("DELTA_CATALOG_NEW_COUNT", 60, accountId, orgId, moduleType);
+            cyborgApiPayloadSize = new SumMetric("CYBORG_API_PAYLOAD_SIZE", 60, accountId, orgId, moduleType);
         }
 
         if(pgMetrics){
-            postgreSampleDataInsertedCount = new SumMetric("PG_SAMPLE_DATA_INSERT_COUNT", 60, accountId, orgId);
-            postgreSampleDataInsertLatency = new LatencyMetric("PG_SAMPLE_DATA_INSERT_LATENCY", 60, accountId, orgId);
-            mergingJobLatency = new LatencyMetric("MERGING_JOB_LATENCY", 60, accountId, orgId);
-            mergingJobUrlsUpdatedCount = new SumMetric("MERGING_JOB_URLS_UPDATED_COUNT", 60, accountId, orgId);
-            staleSampleDataCleanupJobLatency = new LatencyMetric("STALE_SAMPLE_DATA_CLEANUP_JOB_LATENCY", 60, accountId, orgId);
-            staleSampleDataDeletedCount = new SumMetric("STALE_SAMPLE_DATA_DELETED_COUNT", 60, accountId, orgId);
-            mergingJobUrlUpdateLatency = new LatencyMetric("MERGING_JOB_URL_UPDATE_LATENCY", 60, accountId, orgId);
-            totalSampleDataCount = new SumMetric("TOTAL_SAMPLE_DATA_COUNT", 60, accountId, orgId);
-            pgDataSizeInMb = new SumMetric("PG_DATA_SIZE_IN_MB", 60, accountId, orgId);
+            postgreSampleDataInsertedCount = new SumMetric("PG_SAMPLE_DATA_INSERT_COUNT", 60, accountId, orgId, moduleType);
+            postgreSampleDataInsertLatency = new LatencyMetric("PG_SAMPLE_DATA_INSERT_LATENCY", 60, accountId, orgId, moduleType);
+            mergingJobLatency = new LatencyMetric("MERGING_JOB_LATENCY", 60, accountId, orgId, moduleType);
+            mergingJobUrlsUpdatedCount = new SumMetric("MERGING_JOB_URLS_UPDATED_COUNT", 60, accountId, orgId, moduleType);
+            staleSampleDataCleanupJobLatency = new LatencyMetric("STALE_SAMPLE_DATA_CLEANUP_JOB_LATENCY", 60, accountId, orgId, moduleType);
+            staleSampleDataDeletedCount = new SumMetric("STALE_SAMPLE_DATA_DELETED_COUNT", 60, accountId, orgId, moduleType);
+            mergingJobUrlUpdateLatency = new LatencyMetric("MERGING_JOB_URL_UPDATE_LATENCY", 60, accountId, orgId, moduleType);
+            totalSampleDataCount = new SumMetric("TOTAL_SAMPLE_DATA_COUNT", 60, accountId, orgId, moduleType);
+            pgDataSizeInMb = new SumMetric("PG_DATA_SIZE_IN_MB", 60, accountId, orgId, moduleType);
         }
 
         if(LogDb.TESTING.equals(module)){
-            testingRunCount = new SumMetric("TESTING_RUN_COUNT", 60, accountId, orgId);
-            testingRunLatency = new LatencyMetric("TESTING_RUN_LATENCY", 60, accountId, orgId);
-            sampleDataFetchLatency = new LatencyMetric("SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId);
-            multipleSampleDataFetchLatency = new LatencyMetric("MULTIPLE_SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId);
+            testingRunCount = new SumMetric("TESTING_RUN_COUNT", 60, accountId, orgId, moduleType);
+            testingRunLatency = new LatencyMetric("TESTING_RUN_LATENCY", 60, accountId, orgId, moduleType);
+            sampleDataFetchLatency = new LatencyMetric("SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId, moduleType);
+            multipleSampleDataFetchLatency = new LatencyMetric("MULTIPLE_SAMPLE_DATA_FETCH_LATENCY", 60, accountId, orgId, moduleType);
         }
 
         // sampleDataFetchCount = new SumMetric("SAMPLE_DATA_FETCH_COUNT", 60, accountId, orgId); // tODO: Do we need this?
         // kafkaOffset = new SumMetric("KAFKA_OFFSET", 60, accountId, orgId);
-        cyborgCallLatency = new LatencyMetric("CYBORG_CALL_LATENCY", 60, accountId, orgId);
-        cyborgCallCount = new SumMetric("CYBORG_CALL_COUNT", 60, accountId, orgId);
-        cyborgDataSize = new SumMetric("CYBORG_DATA_SIZE", 60, accountId, orgId);
+        cyborgCallLatency = new LatencyMetric("CYBORG_CALL_LATENCY", 60, accountId, orgId, moduleType);
+        cyborgCallCount = new SumMetric("CYBORG_CALL_COUNT", 60, accountId, orgId, moduleType);
+        cyborgDataSize = new SumMetric("CYBORG_DATA_SIZE", 60, accountId, orgId, moduleType);
 
         // Infrastructure metrics - always initialized
-        cpuUsagePercent = new GaugeMetric("CPU_USAGE_PERCENT", 60, accountId, orgId);
-        heapMemoryUsedMb = new GaugeMetric("HEAP_MEMORY_USED_MB", 60, accountId, orgId);
-        heapMemoryMaxMb = new GaugeMetric("HEAP_MEMORY_MAX_MB", 60, accountId, orgId);
-        nonHeapMemoryUsedMb = new GaugeMetric("NON_HEAP_MEMORY_USED_MB", 60, accountId, orgId);
-        threadCount = new GaugeMetric("THREAD_COUNT", 60, accountId, orgId);
-        availableProcessors = new GaugeMetric("AVAILABLE_PROCESSORS", 60, accountId, orgId);
-        totalPhysicalMemoryMb = new GaugeMetric("TOTAL_PHYSICAL_MEMORY_MB", 60, accountId, orgId);
+        cpuUsagePercent = new GaugeMetric("CPU_USAGE_PERCENT", 60, accountId, orgId, moduleType);
+        heapMemoryUsedMb = new GaugeMetric("HEAP_MEMORY_USED_MB", 60, accountId, orgId, moduleType);
+        heapMemoryMaxMb = new GaugeMetric("HEAP_MEMORY_MAX_MB", 60, accountId, orgId, moduleType);
+        nonHeapMemoryUsedMb = new GaugeMetric("NON_HEAP_MEMORY_USED_MB", 60, accountId, orgId, moduleType);
+        threadCount = new GaugeMetric("THREAD_COUNT", 60, accountId, orgId, moduleType);
+        availableProcessors = new GaugeMetric("AVAILABLE_PROCESSORS", 60, accountId, orgId, moduleType);
+        totalPhysicalMemoryMb = new GaugeMetric("TOTAL_PHYSICAL_MEMORY_MB", 60, accountId, orgId, moduleType);
 
         // Any new metric needs to be added here as well.
         metrics = Arrays.asList(runtimeKafkaRecordCount, runtimeKafkaRecordSize, runtimeProcessLatency,
@@ -102,7 +101,6 @@ public class AllMetrics {
                 // Collect infrastructure metrics from MXBeans
                 collectInfraMetrics();
 
-                BasicDBList list = new BasicDBList();
                 List<MetricData> metricDataList = new ArrayList<>();
                 for (Metric m : metrics) {
                     if (m == null) {
@@ -110,13 +108,6 @@ public class AllMetrics {
                     }
                     float metric = m.getMetricAndReset();
 
-                    BasicDBObject metricsData = new BasicDBObject();
-                    metricsData.put("metric_id", m.metricId);
-                    metricsData.put("val", metric);
-                    metricsData.put("org_id", m.orgId);
-                    metricsData.put("instance_id", instance_id);
-                    metricsData.put("account_id", m.accountId);
-                    list.add(metricsData);
                     MetricData.MetricType type = MetricData.MetricType.SUM;
                     switch (m.getMetricType()) {
                         case SUM:
@@ -137,7 +128,8 @@ public class AllMetrics {
                             metric,
                             m.orgId,
                             instance_id,
-                            type
+                            type,
+                            m.moduleType
                     );
                     metricDataList.add(metricData);
                 }
@@ -145,8 +137,8 @@ public class AllMetrics {
                 processAndCleanupTcMetrics(tcCpuUsageMetrics, "TC_CPU_USAGE", _this.orgId, metricDataList);
                 processAndCleanupTcMetrics(tcMemoryUsageMetrics, "TC_MEMORY_USAGE", _this.orgId, metricDataList);
 
-                if(!list.isEmpty() || !metricDataList.isEmpty()) {
-                    _this.sendDataToAkto(list, metricDataList);
+                if(!metricDataList.isEmpty()) {
+                    _this.sendDataToAkto(metricDataList);
                 }
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb("Error while sending metrics to akto: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
@@ -167,7 +159,8 @@ public class AllMetrics {
                 value,
                 orgId,
                 tcInstanceId,
-                MetricData.MetricType.GAUGE
+                MetricData.MetricType.GAUGE,
+                ModuleInfo.ModuleType.TRAFFIC_COLLECTOR.name()
             );
             metricDataList.add(metricData);
 
@@ -417,6 +410,16 @@ public class AllMetrics {
         int periodInSecs;
         String orgId;
         int accountId;
+        String moduleType;
+
+        public Metric(String metricId, int periodInSecs, int accountId, String orgId, String moduleType){
+            this.metricId = metricId;
+            this.periodInSecs = periodInSecs;
+            this.timestamp = Context.now();
+            this.accountId = accountId;
+            this.orgId = orgId;
+            this.moduleType = moduleType;
+        }
 
         public Metric(String metricId, int periodInSecs, int accountId, String orgId){
             this.metricId = metricId;
@@ -453,6 +456,10 @@ public class AllMetrics {
 
         public LatencyMetric(String metricId, int periodInSecs, int accountId, String orgId) {
             super(metricId, periodInSecs, accountId, orgId);
+        }
+
+        public LatencyMetric(String metricId, int periodInSecs, int accountId, String orgId, String moduleType) {
+            super(metricId, periodInSecs, accountId, orgId, moduleType);
         }
 
         @Override
@@ -494,6 +501,10 @@ public class AllMetrics {
             super(metricId, periodInSecs, accountId, orgId);
         }
 
+        public SumMetric(String metricId, int periodInSecs, int accountId, String orgId, String moduleType) {
+            super(metricId, periodInSecs, accountId, orgId, moduleType);
+        }
+
         @Override
         public void record(float val) {
             sum+= val;
@@ -526,6 +537,10 @@ public class AllMetrics {
 
         public MaxMetric(String metricId, int periodInSecs, int accountId, String orgId) {
             super(metricId, periodInSecs, accountId, orgId);
+        }
+
+        public MaxMetric(String metricId, int periodInSecs, int accountId, String orgId, String moduleType) {
+            super(metricId, periodInSecs, accountId, orgId, moduleType);
         }
 
         @Override
@@ -562,6 +577,10 @@ public class AllMetrics {
 
         public GaugeMetric(String metricId, int periodInSecs, int accountId, String orgId) {
             super(metricId, periodInSecs, accountId, orgId);
+        }
+
+        public GaugeMetric(String metricId, int periodInSecs, int accountId, String orgId, String moduleType) {
+            super(metricId, periodInSecs, accountId, orgId, moduleType);
         }
 
         @Override
@@ -627,7 +646,7 @@ public class AllMetrics {
         }
     }
 
-    private void sendDataToAkto(BasicDBList list,List<MetricData> metricDataList){
+    private void sendDataToAkto(List<MetricData> metricDataList){
         try {
             dataActor.ingestMetricData(metricDataList);
         } catch (Exception e) {
