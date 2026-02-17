@@ -119,6 +119,30 @@ public class ArcadeWebhookAction extends ActionSupport {
                         String reason = reasonObj != null ? reasonObj.toString() : "Request blocked by guardrails policy";
                         error_message = "Blocked by Akto Guardrails " + reason;
                         loggerMaker.info("Arcade webhook blocked by guardrails - hookType: " + hookType + ", reason: " + reason);
+
+                        // Ingest blocked request into Kafka
+                        try {
+                            Map<String, Object> blockedResponse = new HashMap<>();
+                            blockedResponse.put("statusCode", 403);
+                            blockedResponse.put("status", "BLOCKED");
+                            Map<String, Object> blockedBody = new HashMap<>();
+                            blockedBody.put("code", "CHECK_FAILED");
+                            blockedBody.put("error_message", error_message);
+                            blockedResponse.put("body", objectMapper.writeValueAsString(blockedBody));
+                            blockedResponse.put("headers", new HashMap<>());
+                            proxyData.put("response", blockedResponse);
+
+                            Map<String, Object> blockedQueryParams = new HashMap<>();
+                            blockedQueryParams.put("ingest_data", "true");
+                            blockedQueryParams.put("akto_connector", AKTO_CONNECTOR);
+                            proxyData.put("urlQueryParams", blockedQueryParams);
+
+                            gateway.processHttpProxy(proxyData);
+                            loggerMaker.info("Blocked request ingested into Kafka");
+                        } catch (Exception ingestEx) {
+                            loggerMaker.errorAndAddToDb("Error ingesting blocked request: " + ingestEx.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
+                        }
+
                         // Still return HTTP 200 - Arcade expects 200 even for CHECK_FAILED
                         // The error is communicated via the `code` field, not the HTTP status
                         return Action.SUCCESS.toUpperCase();
