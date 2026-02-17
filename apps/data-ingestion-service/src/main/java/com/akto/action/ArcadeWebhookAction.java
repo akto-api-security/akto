@@ -24,7 +24,7 @@ public class ArcadeWebhookAction extends ActionSupport {
     private static final Gateway gateway = Gateway.getInstance();
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    private static final String ARCADE_HOST = "arcade.gateway";
+    private static final String ARCADE_HOST = "arcade.dev";
     private static final String HOOK_TYPE_ACCESS = "tool_access";
     private static final String HOOK_TYPE_PRE = "pre_tool_execution";
     private static final String HOOK_TYPE_POST = "post_tool_execution";
@@ -117,7 +117,7 @@ public class ArcadeWebhookAction extends ActionSupport {
                         code = "CHECK_FAILED";
                         Object reasonObj = guardrailsResult.get("Reason");
                         String reason = reasonObj != null ? reasonObj.toString() : "Request blocked by guardrails policy";
-                        error_message = reason;
+                        error_message = "Blocked by Akto Guardrails " + reason;
                         loggerMaker.info("Arcade webhook blocked by guardrails - hookType: " + hookType + ", reason: " + reason);
                         // Still return HTTP 200 - Arcade expects 200 even for CHECK_FAILED
                         // The error is communicated via the `code` field, not the HTTP status
@@ -180,30 +180,24 @@ public class ArcadeWebhookAction extends ActionSupport {
                 path = "/tools/" + toolName;
                 requestMap.put("method", "POST");
                 requestMap.put("headers", buildRequestHeaders(hookType, toolName));
-                // For POST hooks, include inputs in the request body for data ingestion
                 Map<String, Object> postRequestBody = new HashMap<>();
-                if (inputs != null && !inputs.isEmpty()) {
-                    postRequestBody.putAll(inputs);
-                } else {
-                    postRequestBody = new HashMap<>();
+                if (tool != null) {
+                    postRequestBody.put("tool", tool);
+                }
+                if (inputs != null) {
+                    postRequestBody.put("inputs", inputs);
                 }
                 requestMap.put("body", postRequestBody);
                 loggerMaker.info("POST hook - inputs: " + (inputs != null ? inputs.toString() : "null"));
-                
+
                 responseMap = new HashMap<>();
                 responseMap.put("statusCode", success != null && success ? 200 : 500);
                 responseMap.put("status", success != null && success ? "SUCCESS" : "ERROR");
-                Map<String, Object> responseBody = new HashMap<>();
                 if (output != null) {
-                    responseBody.put("output", output);
+                    responseMap.put("body", objectMapper.writeValueAsString(output));
+                } else {
+                    responseMap.put("body", "{}");
                 }
-                if (execution_error != null) {
-                    responseBody.put("error", execution_error);
-                }
-                if (execution_code != null) {
-                    responseBody.put("execution_code", execution_code);
-                }
-                responseMap.put("body", objectMapper.writeValueAsString(responseBody));
                 responseMap.put("headers", new HashMap<>());
                 break;
 
@@ -212,17 +206,23 @@ public class ArcadeWebhookAction extends ActionSupport {
                 path = "/tools/" + toolName;
                 requestMap.put("method", "POST");
                 requestMap.put("headers", buildRequestHeaders(hookType, toolName));
-                // For PRE hooks, include inputs in the request body for guardrails validation
                 Map<String, Object> preRequestBody = new HashMap<>();
-                if (inputs != null && !inputs.isEmpty()) {
-                    preRequestBody.putAll(inputs);
-                } else {
-                    preRequestBody = new HashMap<>();
+                if (tool != null) {
+                    preRequestBody.put("tool", tool);
+                }
+                if (inputs != null) {
+                    preRequestBody.put("inputs", inputs);
                 }
                 requestMap.put("body", preRequestBody);
                 loggerMaker.info("PRE hook - inputs: " + (inputs != null ? inputs.toString() : "null"));
                 break;
         }
+
+        Map<String, Object> metadata = new HashMap<>();
+        Map<String, String> tag = new HashMap<>();
+        tag.put("gen-ai", "Gen AI");
+        metadata.put("tag", tag);
+        requestMap.put("metadata", metadata);
 
         String url = "https://" + ARCADE_HOST + path;
         proxyData.put("url", url);
@@ -263,12 +263,27 @@ public class ArcadeWebhookAction extends ActionSupport {
         if (toolName != null) {
             headers.put("x-arcade-tool", toolName);
         }
+
+        // Add all context data to headers
         if (context != null) {
-            Object userId = context.get("user_id");
-            if (userId != null) {
-                headers.put("x-arcade-user-id", userId.toString());
+            for (Map.Entry<String, Object> entry : context.entrySet()) {
+                String key = entry.getKey();
+                Object value = entry.getValue();
+                if (value == null) continue;
+                String headerKey = "x-arcade-context-" + key;
+                if (value instanceof String) {
+                    headers.put(headerKey, value);
+                } else {
+                    try {
+                        headers.put(headerKey, objectMapper.writeValueAsString(value));
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error serializing context field " + key + ": " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
+                        headers.put(headerKey, value.toString());
+                    }
+                }
             }
         }
+
         if (tool != null) {
             Object toolkit = tool.get("toolkit");
             if (toolkit != null) {
