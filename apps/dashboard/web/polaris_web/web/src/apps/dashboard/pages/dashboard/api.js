@@ -89,7 +89,7 @@ const api = {
 
     getApiInfoForMissingData: async (startTimeStamp, endTimeStamp) => {
         return request({
-            url: '/api/getAPIInfosForMissingData',
+            url: '/api/fetchAPIInfosForMissingData',
             method: 'post',
             data: {
                 startTimeStamp,
