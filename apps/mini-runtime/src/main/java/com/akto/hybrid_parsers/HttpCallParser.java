@@ -276,7 +276,9 @@ public class HttpCallParser {
             if (source == null || (!source.equals(Constants.AI_AGENT_SOURCE_N8N)
                     && !source.equals(Constants.AI_AGENT_SOURCE_LANGCHAIN)
                     && !source.equals(Constants.AI_AGENT_SOURCE_COPILOT_STUDIO)
-                    && !source.equals(Constants.AI_AGENT_SOURCE_DATABRICS))) {
+                    && !source.equals(Constants.AI_AGENT_SOURCE_DATABRICS)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_SNOWFLAKE)
+                    )) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
             }

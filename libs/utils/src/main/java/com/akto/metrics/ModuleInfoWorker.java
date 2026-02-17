@@ -48,6 +48,7 @@ public class ModuleInfoWorker {
         moduleInfo.setName(this.moduleName);
 
         scheduler.scheduleWithFixedDelay(() -> {
+            try {
             moduleInfo.setLastHeartbeatReceived(Context.now());
             assert _this.dataActor != null;
             ModuleInfo moduleInfoFromService = _this.dataActor.updateModuleInfo(moduleInfo);
@@ -75,6 +76,9 @@ public class ModuleInfoWorker {
                 System.exit(0);
                 return;
             }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error sending heartbeat");
+        }
         }, 0, 30, TimeUnit.SECONDS);
     }
 

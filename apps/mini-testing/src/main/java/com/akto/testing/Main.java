@@ -235,8 +235,7 @@ public class Main {
             if(testingRunResultSummary == null || testingRunResultSummary.getState() == null ||  testingRunResultSummary.getState() != State.RUNNING){
                 return null;
             }
-            Bson filterQ = Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, new ObjectId(testingRunId));
-            TestingRunResultSummary latestSummary = dataActor.findLatestTestingRunResultSummary(filterQ);
+            TestingRunResultSummary latestSummary = dataActor.findLatestTestingRunResultSummary(testingRunId);
             if(latestSummary.getHexId().equals(testingRunSummaryId)){
                 return currentTestInfo;
             }else{
@@ -431,46 +430,33 @@ public class Main {
 
         if(currentTestInfo != null){
             try {
-                loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId, LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId);
                 Organization organization = OrgUtils.getOrganizationCached(accountId);
                 FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
                 String testingRunSummaryId = currentTestInfo.getString("summaryId");
+                String testingRunId = currentTestInfo.getString("testingRunId");
                 //check if currently running testrun is part of rerun
                 ObjectId summaryId = new ObjectId(testingRunSummaryId);
 
                 TestingRunResultSummary rerunTestingRunResultSummary = dataActor.fetchRerunTestingRunResultSummary(testingRunSummaryId);
                 //fill testingRunResult in TestingConfigurations
                 if(!handleRerunTestingRunResult(rerunTestingRunResultSummary)) {
-                    TestingRun testingRun = dataActor.findTestingRun(testingRunSummaryId);
+                    loggerMaker.infoAndAddToDb("Resuming test for account: " + accountId + " testingRunId: " + testingRunId + " testingRunSummaryId: " + testingRunSummaryId);
+                    TestingRun testingRun = dataActor.findTestingRun(testingRunId);
                     TestingRunConfig baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
                     testingRun.setTestingRunConfig(baseConfig);
                     testingProducer.initProducer(testingRun, summaryId, true, syncLimit);
                     int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-                    testingConsumer.init(maxRunTime);
+                    // When resuming, use remaining time so total run doesn't exceed original maxRunTime (e.g. restart after 2h of 3h run → run 1h more, not 3h more)
+                    TestingRunResultSummary currentSummary = dataActor.fetchTestingRunResultSummary(testingRunSummaryId);
+                    int elapsedSinceStart = Context.now() - currentSummary.getStartTimestamp();
+                    int remainingRunTime = Math.max(0, maxRunTime - elapsedSinceStart);
+                    loggerMaker.infoAndAddToDb("Resume run time: maxRunTime=" + maxRunTime + "s elapsed=" + elapsedSinceStart + "s remaining=" + remainingRunTime + "s");
+                    testingConsumer.init(remainingRunTime);
 
                     // mark the test completed here
                     testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, System.currentTimeMillis());
-
-                    // if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
-                    //     try {
-                    //         CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
-                    //         SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
-                    //     } catch (Exception e) {
-                    //         loggerMaker.error("Error sending slack alert for completion of test", e);
-                    //     }
-
-                    // }
-
-                    // deleteScheduler.execute(() -> {
-                    //     Context.accountId.set(accountId);
-                    //     try {
-                    //         deleteNonVulnerableResults();
-
-                    //     } catch (Exception e) {
-                    //         loggerMaker.errorAndAddToDb(e, "Error in deleting testing run results");
-                    //     }
-                    // });
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in running failed tests from file.");
