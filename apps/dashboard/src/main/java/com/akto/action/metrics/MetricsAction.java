@@ -28,11 +28,15 @@ public class MetricsAction extends UserAction {
     public String getMetrics() {
         try {
             List<MetricData> metrics;
-            if (metricIdPrefix != null || instanceId != null) {
+            if (moduleType != null) {
+                if (instanceId != null) {
+                    metrics = MetricDataDao.instance.getMetricsForModule(startTime, endTime, moduleType, instanceId);
+                } else {
+                    metrics = MetricDataDao.instance.getMetricsForModule(startTime, endTime, moduleType);
+                }
+            } else if (metricIdPrefix != null || instanceId != null) {
                 metrics = MetricDataDao.instance.getMetricsForTimeRange(startTime, endTime, metricIdPrefix, instanceId);
-            } if (moduleType != null && instanceId != null){
-                metrics = MetricDataDao.instance.getMetricsForModule(startTime, endTime, moduleType, instanceId);
-            }else {
+            } else {
                 metrics = MetricDataDao.instance.getMetricsForTimeRange(startTime, endTime);
             }
 
