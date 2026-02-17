@@ -43,8 +43,8 @@ export default function Header() {
     const resetSession = SessionStore(state => state.resetStore)
     const resetFields = IssuesStore(state => state.resetStore)
 
-    const dashboardCategory = PersistStore.getState().dashboardCategory;
-    const setDashboardCategory = PersistStore.getState().setDashboardCategory
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
+    const setDashboardCategory = PersistStore((state) => state.setDashboardCategory);
 
     useEffect(() => {
         if (window.beamer_config) {
