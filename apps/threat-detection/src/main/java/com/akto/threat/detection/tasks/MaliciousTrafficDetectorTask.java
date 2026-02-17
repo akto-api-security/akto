@@ -32,6 +32,7 @@ import com.akto.IPLookupClient;
 import com.akto.RawApiMetadataFactory;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.data_actor.ClientActor;
 import com.akto.data_actor.DataActor;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.data_actor.DataActorFactory;
@@ -126,6 +127,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled) throws Exception {
     this.kafkaConfig = trafficConfig;
 
+    Context.accountId.set(ClientActor.getAccountId());
     Properties properties = new Properties();
     properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, trafficConfig.getBootstrapServers());
     properties.put(
@@ -179,6 +181,12 @@ public class MaliciousTrafficDetectorTask implements Task {
         () -> {
           // Poll data from Kafka topic
           logger.warnAndAddToDb("Kafka polling started");
+          try {
+            Context.accountId.set(ClientActor.getAccountId());
+          } catch (Exception e) {
+              Context.accountId.set(1000000);
+            e.printStackTrace();
+          }
           while (true) {
             ConsumerRecords<String, byte[]> records =
                 kafkaConsumer.poll(
@@ -201,10 +209,8 @@ public class MaliciousTrafficDetectorTask implements Task {
               AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
               if (config == null) {
                 Context.isRedactPayload.set(false);
-                Context.accountId.set(1000000);
               } else {
                 Context.isRedactPayload.set(config.isRedacted());
-                Context.accountId.set(config.getAccountId());
               }
 
               for (ConsumerRecord<String, byte[]> record : records) {
