@@ -12,6 +12,8 @@ import lombok.Setter;
 public class GenericAgentConversation {
 
     public enum ConversationType {
+        ASK_AKTO,          // deprecated, kept for backward compatibility with existing DB documents
+        DOCS_AGENT,        // deprecated, kept for backward compatibility with existing DB documents
         TEST_EXECUTION_RESULT,
         PROMPT_PLAYGROUND,
         ANALYZE_REQUESTS,
