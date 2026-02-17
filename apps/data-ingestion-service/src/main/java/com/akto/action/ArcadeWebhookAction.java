@@ -91,6 +91,10 @@ public class ArcadeWebhookAction extends ActionSupport {
                     this.output = bodyMap.get("output"); // Can be any type
                     this.execution_code = (String) bodyMap.get("execution_code");
                     this.execution_error = (String) bodyMap.get("execution_error");
+                    
+                    // Log inputs for debugging
+                    loggerMaker.info("Parsed inputs from webhook: " + (this.inputs != null ? this.inputs.toString() : "null"));
+                    loggerMaker.info("Inputs size: " + (this.inputs != null ? this.inputs.size() : 0));
 
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Error parsing JSON body: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
@@ -176,7 +180,16 @@ public class ArcadeWebhookAction extends ActionSupport {
                 path = "/tools/" + toolName;
                 requestMap.put("method", "POST");
                 requestMap.put("headers", buildRequestHeaders(hookType, toolName));
-                requestMap.put("body", inputs != null ? inputs : new HashMap<>());
+                // For POST hooks, include inputs in the request body for data ingestion
+                Map<String, Object> postRequestBody = new HashMap<>();
+                if (inputs != null && !inputs.isEmpty()) {
+                    postRequestBody.putAll(inputs);
+                } else {
+                    postRequestBody = new HashMap<>();
+                }
+                requestMap.put("body", postRequestBody);
+                loggerMaker.info("POST hook - inputs: " + (inputs != null ? inputs.toString() : "null"));
+                
                 responseMap = new HashMap<>();
                 responseMap.put("statusCode", success != null && success ? 200 : 500);
                 responseMap.put("status", success != null && success ? "SUCCESS" : "ERROR");
@@ -199,7 +212,15 @@ public class ArcadeWebhookAction extends ActionSupport {
                 path = "/tools/" + toolName;
                 requestMap.put("method", "POST");
                 requestMap.put("headers", buildRequestHeaders(hookType, toolName));
-                requestMap.put("body", inputs != null ? inputs : new HashMap<>());
+                // For PRE hooks, include inputs in the request body for guardrails validation
+                Map<String, Object> preRequestBody = new HashMap<>();
+                if (inputs != null && !inputs.isEmpty()) {
+                    preRequestBody.putAll(inputs);
+                } else {
+                    preRequestBody = new HashMap<>();
+                }
+                requestMap.put("body", preRequestBody);
+                loggerMaker.info("PRE hook - inputs: " + (inputs != null ? inputs.toString() : "null"));
                 break;
         }
 
@@ -213,15 +234,19 @@ public class ArcadeWebhookAction extends ActionSupport {
 
         Map<String, Object> urlQueryParams = new HashMap<>();
         
-        // Enable guardrails for pre and post execution hooks
-        if (HOOK_TYPE_PRE.equals(hookType) || HOOK_TYPE_POST.equals(hookType)) {
+        // Configure query params based on hook type
+        if (HOOK_TYPE_PRE.equals(hookType)) {
+            // Pre-execution: enable guardrails validation
             urlQueryParams.put("guardrails", "true");
             urlQueryParams.put("akto_connector", AKTO_CONNECTOR);
-            loggerMaker.info("Guardrails enabled for hook type: " + hookType);
+            loggerMaker.info("Guardrails enabled for pre-execution hook");
+        } else if (HOOK_TYPE_POST.equals(hookType)) {
+            // Post-execution: enable data ingestion only
+            urlQueryParams.put("akto_connector", AKTO_CONNECTOR);
+            urlQueryParams.put("ingest_data", "true");
+            loggerMaker.info("Data ingestion enabled for post-execution hook");
         }
         
-        // Always enable data ingestion
-        urlQueryParams.put("ingest_data", "true");
         proxyData.put("urlQueryParams", urlQueryParams);
 
         return proxyData;

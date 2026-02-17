@@ -53,7 +53,7 @@
         </action>
 
         <!-- Arcade Webhook Endpoints -->
-        <action name="api/arcade/pre" class="com.akto.action.ArcadeWebhookAction" method="arcade">
+        <action name="pre" class="com.akto.action.ArcadeWebhookAction" method="arcade">
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^code,^error_message</param>
@@ -63,7 +63,7 @@
             </result>
         </action>
 
-        <action name="api/arcade/post" class="com.akto.action.ArcadeWebhookAction" method="arcade">
+        <action name="post" class="com.akto.action.ArcadeWebhookAction" method="arcade">
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^code,^error_message</param>
