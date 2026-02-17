@@ -198,8 +198,12 @@ def call_guardrails(prompt: str, attachments: list) -> Tuple[bool, str]:
             request_body,
         )
 
-        if isinstance(response, dict) and response.get("blocked"):
-            reason = response.get("reason", "Policy violation")
+        data = response.get("data", {}) if isinstance(response, dict) else {}
+        guardrails_result = data.get("guardrailsResult", {})
+        allowed = guardrails_result.get("Allowed", True)
+        reason = guardrails_result.get("Reason", "")
+
+        if not allowed:
             logger.warning(f"Prompt BLOCKED: {reason}")
             return False, reason
 
