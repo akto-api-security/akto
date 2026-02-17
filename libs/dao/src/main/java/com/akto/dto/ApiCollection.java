@@ -76,6 +76,10 @@ public class ApiCollection {
     int mcpMaliciousnessLastCheck;
     public static final String MCP_MALICIOUSNESS_LAST_CHECK = "mcpMaliciousnessLastCheck";
 
+
+    String accessType;
+    public static final String ACCESS_TYPE = "accessType";
+
     private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
         "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
         "localhost", "local", "intranet", "lan", "example", "invalid", 
@@ -521,6 +525,14 @@ public class ApiCollection {
 
     public void setSseCallbackUrl(String sseCallbackUrl) {
         this.sseCallbackUrl = sseCallbackUrl;
+    }
+
+     public String getAccessType() {
+        return accessType;
+    }
+
+    public void setAccessType(String accessType) {
+        this.accessType = accessType;
     }
 
     public String getMcpTransportType() {

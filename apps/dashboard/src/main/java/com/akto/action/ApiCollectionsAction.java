@@ -1738,4 +1738,122 @@ public class ApiCollectionsAction extends UserAction {
         }
     }
 
+    
+    public String resetCollectionAccessTypes() {
+        try {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb("Starting resetCollectionAccessTypes for account: " + accountId + " (background)", LogDb.DASHBOARD);
+
+            Runnable r = () -> {
+                Context.accountId.set(accountId);
+                try {
+                    doResetCollectionAccessTypes();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error in resetCollectionAccessTypes (background)", LogDb.DASHBOARD);
+                }
+            };
+            new Thread(r).start();
+
+            if (this.response == null) {
+                this.response = new BasicDBObject();
+            }
+            this.response.put("started", true);
+            this.response.put("message", "Reset started in the background. This may take a few minutes. Refresh the inventory page to see updated access types.");
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error starting resetCollectionAccessTypes", LogDb.DASHBOARD);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    private void doResetCollectionAccessTypes() {
+        loggerMaker.infoAndAddToDb("Running resetCollectionAccessTypes for account: " + Context.accountId.get(), LogDb.DASHBOARD);
+
+        List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        int totalCollections = collections.size();
+        int updatedCollections = 0;
+
+        loggerMaker.infoAndAddToDb("Found " + totalCollections + " collections to process", LogDb.DASHBOARD);
+
+        for (ApiCollection collection : collections) {
+            try {
+                int collectionId = collection.getId();
+
+                Bson filter = Filters.eq(ApiInfo.ID_API_COLLECTION_ID, collectionId);
+                List<ApiInfo> apis = ApiInfoDao.instance.findAll(filter);
+
+                if (apis.isEmpty()) {
+                    loggerMaker.infoAndAddToDb("Collection " + collectionId + " has no APIs, skipping", LogDb.DASHBOARD);
+                    continue;
+                }
+
+                boolean hasPublic = false;
+                boolean hasPrivateOrThirdParty = false;
+
+                for (ApiInfo api : apis) {
+                    Set<ApiInfo.ApiAccessType> accessTypes = api.getApiAccessTypes();
+
+                    if (accessTypes == null || accessTypes.isEmpty()) {
+                        continue;
+                    }
+
+                    if (accessTypes.contains(ApiInfo.ApiAccessType.PUBLIC)) {
+                        hasPublic = true;
+                    }
+
+                    if (accessTypes.contains(ApiInfo.ApiAccessType.PRIVATE) ||
+                            accessTypes.contains(ApiInfo.ApiAccessType.THIRD_PARTY)) {
+                        hasPrivateOrThirdParty = true;
+                    }
+
+                    if (hasPublic && hasPrivateOrThirdParty) {
+                        break;
+                    }
+                }
+
+                String collectionAccessType = null;
+
+                if (hasPublic && hasPrivateOrThirdParty) {
+                    collectionAccessType = "Both";
+                } else if (hasPublic && !hasPrivateOrThirdParty) {
+                    collectionAccessType = "First Party";
+                } else if (!hasPublic && hasPrivateOrThirdParty) {
+                    collectionAccessType = "Third Party";
+                }
+
+                if (collectionAccessType != null) {
+                    Bson collectionFilter = Filters.eq(ApiCollection.ID, collectionId);
+                    Bson update = Updates.set(ApiCollection.ACCESS_TYPE, collectionAccessType);
+
+                    ApiCollectionsDao.instance.updateOne(collectionFilter, update);
+                    updatedCollections++;
+
+                    loggerMaker.infoAndAddToDb(
+                            "Updated collection " + collectionId + " (" + collection.getName() + ") " +
+                                    "with accessType: " + collectionAccessType +
+                                    " (APIs: " + apis.size() + ", hasPublic: " + hasPublic +
+                                    ", hasPrivate/ThirdParty: " + hasPrivateOrThirdParty + ")",
+                            LogDb.DASHBOARD
+                    );
+                } else {
+                    loggerMaker.infoAndAddToDb(
+                            "No access type determined for collection " + collectionId +
+                                    " (no API access types found)",
+                            LogDb.DASHBOARD
+                    );
+                }
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error processing collection " + collection.getId(), LogDb.DASHBOARD);
+            }
+        }
+
+        loggerMaker.infoAndAddToDb(
+                "Completed resetCollectionAccessTypes. Total: " + totalCollections +
+                        ", Updated: " + updatedCollections,
+                LogDb.DASHBOARD
+        );
+    }
+
 }
