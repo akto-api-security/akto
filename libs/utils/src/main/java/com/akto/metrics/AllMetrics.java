@@ -563,7 +563,7 @@ public class AllMetrics {
         }
     }
 
-    private void collectInfraMetrics() {
+    public void collectInfraMetrics() {
         try {
             // CPU metrics
             OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
@@ -603,8 +603,8 @@ public class AllMetrics {
             }
 
             // Log infrastructure metrics
-            loggerMaker.info(String.format("CPU: %.2f%%, Memory: %.2f MB / %.2f MB (Heap: %.2f / %.2f MB)",
-                cpuPercent, heapUsedMb, totalMemoryMb, heapUsedMb, heapMaxMb));
+            loggerMaker.info(String.format("instanceId: %s CPU: %.2f%%, Memory: %.2f MB / %.2f MB (Heap: %.2f / %.2f MB)",
+                this.instance_id, cpuPercent, heapUsedMb, totalMemoryMb, heapUsedMb, heapMaxMb));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error collecting infra metrics: " + e.getMessage(), LogDb.RUNTIME);
         }
