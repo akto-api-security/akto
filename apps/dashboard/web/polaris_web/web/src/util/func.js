@@ -262,6 +262,18 @@ prettifyEpoch(epoch) {
     });
     saveAs(blob, (selectedTestRun.name || "file") + ".csv");
   },
+  exportTableAsCSV(headers, data, fileName) {
+    const cols = headers.filter(x => x.text?.length > 0)
+    const csv = [
+      cols.map(x => x.text).join(","),
+      ...data.map(row => cols.map(x => {
+        const val = row[x.textValue || x.value]
+        return `"${val == null ? '-' : String(val).replace(/"/g, '""')}"`
+      }).join(","))
+    ].join("\r\n")
+    saveAs(new Blob([csv], { type: "text/csv;charset=UTF-8" }), `${fileName}.csv`)
+    this.setToast(true, false, "CSV exported successfully")
+  },
   flattenObject(obj, prefix = '') {
     return obj && Object.keys(obj).reduce((acc, k) => {
 
