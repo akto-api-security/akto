@@ -3088,7 +3088,7 @@
             </result>
         </action>
 
-        <action name="api/getEndpointsListFromConditions" class="com.akto.action.ApiCollectionsAction" method="getEndpointsListFromConditions">
+        <action name="api/getEndpointsListFromConditions" class="com.akto.action.ApiCollectionsAction" method="fetchEndpointsListFromConditions">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
