@@ -6,7 +6,10 @@ import com.akto.dto.type.URLMethods;
 import com.akto.sql.SampleDataAltDb;
 import com.mongodb.BasicDBList;
 import com.opensymphony.xwork2.ActionSupport;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -38,6 +41,14 @@ public class DbLayerAction extends ActionSupport {
     private static final int fetchLimit = 1000;
 
     private static final Logger logger = LoggerFactory.getLogger(DbLayerAction.class);
+
+    // Bloom filter to track unique APIs across all bulk insert calls
+    // Expected insertions: 1 million APIs, false positive probability: 0.01
+    private static final BloomFilter<CharSequence> apiBloomFilter = BloomFilter.create(
+        Funnels.stringFunnel(StandardCharsets.UTF_8),
+        1_000_000,
+        0.01
+    );
 
     public String fetchSamples() {
         try {
@@ -88,17 +99,44 @@ public class DbLayerAction extends ActionSupport {
         }
         try {
             List<SampleDataAlt> sampleDataList = new ArrayList<>();
+
+            int totalSamples = samplesCopy.size();
+            int duplicatesSkipped = 0;
+
             for (SampleDataAltCopy sampleDataAltCopy: samplesCopy) {
-                sampleDataList.add(new SampleDataAlt(UUID.fromString(sampleDataAltCopy.getId()), 
-                sampleDataAltCopy.getSample(), sampleDataAltCopy.getApiCollectionId(), 
-                sampleDataAltCopy.getMethod(), sampleDataAltCopy.getUrl(), 
-                sampleDataAltCopy.getResponseCode(), sampleDataAltCopy.getTimestamp(), 
+                String apiKey = sampleDataAltCopy.getApiCollectionId() + ":" +
+                               sampleDataAltCopy.getMethod() + ":" +
+                               sampleDataAltCopy.getUrl();
+
+                // Check if this API has already been seen across all calls
+                if (apiBloomFilter.mightContain(apiKey)) {
+                    duplicatesSkipped++;
+                    continue;
+                }
+
+                // Add to Bloom filter
+                apiBloomFilter.put(apiKey);
+
+                // Add to insertion list
+                sampleDataList.add(new SampleDataAlt(UUID.fromString(sampleDataAltCopy.getId()),
+                sampleDataAltCopy.getSample(), sampleDataAltCopy.getApiCollectionId(),
+                sampleDataAltCopy.getMethod(), sampleDataAltCopy.getUrl(),
+                sampleDataAltCopy.getResponseCode(), sampleDataAltCopy.getTimestamp(),
                 sampleDataAltCopy.getAccountId()));
             }
-            SampleDataAltDb.bulkInsert(sampleDataList);
+
+            logger.info("bulkInsertSamples: total samples processed={}, unique samples to insert={}, duplicates skipped={}",
+                       totalSamples, sampleDataList.size(), duplicatesSkipped);
+
+            if (!sampleDataList.isEmpty()) {
+                SampleDataAltDb.bulkInsert(sampleDataList);
+                logger.info("bulkInsertSamples: successfully inserted {} unique samples", sampleDataList.size());
+            } else {
+                logger.info("bulkInsertSamples: no unique samples to insert");
+            }
         } catch (Exception e) {
             e.printStackTrace();
-            logger.error("error in deleteOldRecords " + e.getMessage());
+            logger.error("error in bulkInsertSamples " + e.getMessage());
         }
         return SUCCESS.toUpperCase();
     }
