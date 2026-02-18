@@ -441,6 +441,14 @@ export default {
         })
         return resp
     },
+    async bulkAgentProxyGuardrail(apiInfoIds, enabled) {
+        const resp = await request({
+            url: '/api/apiInfo/bulkAgentProxyGuardrail',
+            method: 'post',
+            data: { apiInfoIds, enabled }
+        })
+        return resp
+    },
     async fetchFilters() {
         const resp = await request({
             url: '/api/fetchFilters',
