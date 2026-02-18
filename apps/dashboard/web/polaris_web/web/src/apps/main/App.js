@@ -32,6 +32,7 @@ import About from "../dashboard/pages/settings/about/About";
 import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TrafficCollectorsMetrics from "../dashboard/pages/settings/metrics/TrafficCollectorsMetrics";
+import ThreatDetectionMetrics from "../dashboard/pages/settings/metrics/ThreatDetectionMetrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import PromptHardening from "../dashboard/pages/prompt_hardening/PromptHardening";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
@@ -386,6 +387,10 @@ const router = createBrowserRouter([
                     {
                         path: "traffic-collectors-metrics",
                         element: <TrafficCollectorsMetrics/>,
+                    },
+                    {
+                        path: "threat-detection-metrics",
+                        element: <ThreatDetectionMetrics/>,
                     },
                     {
                         path: "integrations/burp",
