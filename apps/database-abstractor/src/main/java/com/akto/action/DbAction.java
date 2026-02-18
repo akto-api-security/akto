@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -4782,6 +4783,8 @@ public class DbAction extends ActionSupport {
         throw new Exception("Unable to create collection for host: " + hostName);
     }
 
+    private static final long OPENAPI_IMPORT_TIMEOUT_MINUTES = 5;
+
     public String importOpenApiSpec() {
         int accountId = Context.accountId.get();
 
@@ -4790,88 +4793,110 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
 
-        service.schedule(new Runnable() {
+        // Submit task to a separate executor with timeout
+        new Thread(new Runnable() {
             public void run() {
-                Context.accountId.set(accountId);
+                ExecutorService openApiExecutor = Executors.newSingleThreadExecutor();
                 try {
-                    // Parse OpenAPI spec
-                    ParseOptions options = new ParseOptions();
-                    options.setResolve(true);
-                    options.setResolveFully(true);
-                    SwaggerParseResult result = new OpenAPIParser().readContents(openApiSchema, null, options);
-                    OpenAPI openAPI = result.getOpenAPI();
-                    if (openAPI == null) {
-                        loggerMaker.errorAndAddToDb("Failed to parse OpenAPI spec in importOpenApiSpec");
-                        return;
+                    // Submit the actual work
+                    openApiExecutor.submit(new Runnable() {
+                        public void run() {
+                            Context.accountId.set(accountId);
+                            try {
+                                // Parse OpenAPI spec
+                                ParseOptions options = new ParseOptions();
+                                options.setResolve(true);
+                                options.setResolveFully(true);
+                                SwaggerParseResult result = new OpenAPIParser().readContents(openApiSchema, null, options);
+                                OpenAPI openAPI = result.getOpenAPI();
+                                if (openAPI == null) {
+                                    loggerMaker.errorAndAddToDb("Failed to parse OpenAPI spec in importOpenApiSpec");
+                                    return;
+                                }
+
+                                // Extract title
+                                String title = "OpenAPI ";
+                                if (openAPI.getInfo() != null && openAPI.getInfo().getTitle() != null) {
+                                    title += openAPI.getInfo().getTitle();
+                                } else {
+                                    title += Context.now();
+                                }
+
+                                // Parse into Akto format with useHost=true
+                                ParserResult parsedResult = Parser.convertOpenApiToAkto(openAPI, null, true, new ArrayList<>());
+                                List<SwaggerUploadLog> uploadLogs = parsedResult.getUploadLogs();
+
+                                // Filter based on importType
+                                if ("ONLY_SUCCESSFUL_APIS".equals(importType)) {
+                                    uploadLogs = uploadLogs.stream()
+                                        .filter(log -> log.getErrors() == null || log.getErrors().isEmpty())
+                                        .collect(Collectors.toList());
+                                }
+
+                                // Collect aktoFormat messages
+                                List<String> msgs = uploadLogs.stream()
+                                    .filter(log -> log.getAktoFormat() != null)
+                                    .map(SwaggerUploadLog::getAktoFormat)
+                                    .collect(Collectors.toList());
+
+                                if (msgs.isEmpty()) {
+                                    loggerMaker.infoAndAddToDb("No valid APIs found in OpenAPI spec");
+                                    return;
+                                }
+
+                                // Extract hostName from OpenAPI servers section
+                                String extractedHost = extractHostFromServers(openAPI);
+                                if (extractedHost == null || extractedHost.isEmpty()) {
+                                    extractedHost = title;
+                                }
+
+                                // Create collection using hostName.hashCode() pattern
+                                int colId = createCollectionForOpenApi(extractedHost);
+
+                                // Process through HttpCallParser (same as dashboard's skipKafka=true path)
+                                List<HttpResponseParams> responses = new ArrayList<>();
+                                for (String message : msgs) {
+                                    HttpResponseParams responseParams = HttpCallParser.parseKafkaMessage(message);
+                                    responseParams.getRequestParams().setApiCollectionId(colId);
+                                    responses.add(responseParams);
+                                }
+
+                                SingleTypeInfo.fetchCustomDataTypes(accountId);
+                                HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                                    AccountSettingsDao.generateFilter());
+                                responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, accountSettings);
+                                callParser.syncFunction(responses, true, false, accountSettings);
+                                APICatalogSync.mergeUrlsAndSave(colId, true, false,
+                                    callParser.apiCatalogSync.existingAPIsInDb);
+                                callParser.apiCatalogSync.buildFromDB(false, false);
+                                APICatalogSync.updateApiCollectionCount(
+                                    callParser.apiCatalogSync.getDbState(colId), colId);
+
+                                loggerMaker.infoAndAddToDb("Successfully imported " + msgs.size() +
+                                    " APIs from OpenAPI spec into collection " + colId);
+
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in importOpenApiSpec: " + e.toString());
+                            }
+                        }
+                    });
+
+                    // Wait with timeout
+                    boolean completed = openApiExecutor.awaitTermination(OPENAPI_IMPORT_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+                    if (!completed) {
+                        loggerMaker.errorAndAddToDb("importOpenApiSpec timeout - took longer than " + OPENAPI_IMPORT_TIMEOUT_MINUTES +
+                            " minutes, task cancelled");
+                        openApiExecutor.shutdownNow();
                     }
-
-                    // Extract title
-                    String title = "OpenAPI ";
-                    if (openAPI.getInfo() != null && openAPI.getInfo().getTitle() != null) {
-                        title += openAPI.getInfo().getTitle();
-                    } else {
-                        title += Context.now();
-                    }
-
-                    // Parse into Akto format with useHost=true
-                    ParserResult parsedResult = Parser.convertOpenApiToAkto(openAPI, null, true, new ArrayList<>());
-                    List<SwaggerUploadLog> uploadLogs = parsedResult.getUploadLogs();
-
-                    // Filter based on importType
-                    if ("ONLY_SUCCESSFUL_APIS".equals(importType)) {
-                        uploadLogs = uploadLogs.stream()
-                            .filter(log -> log.getErrors() == null || log.getErrors().isEmpty())
-                            .collect(Collectors.toList());
-                    }
-
-                    // Collect aktoFormat messages
-                    List<String> msgs = uploadLogs.stream()
-                        .filter(log -> log.getAktoFormat() != null)
-                        .map(SwaggerUploadLog::getAktoFormat)
-                        .collect(Collectors.toList());
-
-                    if (msgs.isEmpty()) {
-                        loggerMaker.infoAndAddToDb("No valid APIs found in OpenAPI spec");
-                        return;
-                    }
-
-                    // Extract hostName from OpenAPI servers section
-                    String extractedHost = extractHostFromServers(openAPI);
-                    if (extractedHost == null || extractedHost.isEmpty()) {
-                        extractedHost = title;
-                    }
-
-                    // Create collection using hostName.hashCode() pattern
-                    int colId = createCollectionForOpenApi(extractedHost);
-
-                    // Process through HttpCallParser (same as dashboard's skipKafka=true path)
-                    List<HttpResponseParams> responses = new ArrayList<>();
-                    for (String message : msgs) {
-                        HttpResponseParams responseParams = HttpCallParser.parseKafkaMessage(message);
-                        responseParams.getRequestParams().setApiCollectionId(colId);
-                        responses.add(responseParams);
-                    }
-
-                    SingleTypeInfo.fetchCustomDataTypes(accountId);
-                    HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
-                    AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
-                        AccountSettingsDao.generateFilter());
-                    responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, accountSettings);
-                    callParser.syncFunction(responses, true, false, accountSettings);
-                    APICatalogSync.mergeUrlsAndSave(colId, true, false,
-                        callParser.apiCatalogSync.existingAPIsInDb);
-                    callParser.apiCatalogSync.buildFromDB(false, false);
-                    APICatalogSync.updateApiCollectionCount(
-                        callParser.apiCatalogSync.getDbState(colId), colId);
-
-                    loggerMaker.infoAndAddToDb("Successfully imported " + msgs.size() +
-                        " APIs from OpenAPI spec into collection " + colId);
-
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error in importOpenApiSpec background: " + e.toString());
+                } catch (InterruptedException e) {
+                    loggerMaker.errorAndAddToDb(e, "importOpenApiSpec interrupted: " + e.toString());
+                    openApiExecutor.shutdownNow();
+                } finally {
+                    openApiExecutor.shutdown();
                 }
             }
-        }, 0, TimeUnit.SECONDS);
+        }).start();
 
         return Action.SUCCESS.toUpperCase();
     }
