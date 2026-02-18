@@ -8,6 +8,7 @@ import com.akto.threat.backend.cache.IgnoredEventCache;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.threat.backend.dao.ActorInfoDao;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.service.MaliciousEventService;
@@ -19,6 +20,8 @@ import com.google.gson.Gson;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.UpdateOptions;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -42,6 +45,10 @@ public class FlushMessagesToDB {
   private static int lastSplunkConfigFetched = 0;
   SplunkIntegrationModel splunkConfig = null;
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
+
+  private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
+      System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
+  );
 
   public FlushMessagesToDB(KafkaConfig kafkaConfig, MongoClient mongoClient) {
     String kafkaBrokerUrl = kafkaConfig.getBootstrapServers();
@@ -134,6 +141,9 @@ public class FlushMessagesToDB {
         } else {
             // No ignored event exists, safe to insert
             MaliciousEventDao.instance.insertOne(accountId, event);
+
+            // Upsert actor_info table for optimized listThreatActors queries
+            upsertActorInfo(accountId, event);
         }
         break;
       default:
@@ -161,5 +171,74 @@ public class FlushMessagesToDB {
     }
     SplunkEvent.sendEvent(event, splunkConfig);
 
+  }
+
+  private void upsertActorInfo(String accountId, MaliciousEventDto event) {
+    if (!USE_ACTOR_INFO_TABLE) {
+      return;
+    }
+
+    try {
+      String actor = event.getActor();
+      if (actor == null || actor.isEmpty()) {
+        return;
+      }
+
+      // Get contextSource, default to "API" if null or empty
+      String contextSource = event.getContextSource();
+      if (contextSource == null || contextSource.isEmpty()) {
+        contextSource = "API";
+      }
+
+      // Use compound filter (actorId, contextSource) for upsert
+      // This allows same actor to have separate entries per context
+      Bson filter = Filters.and(
+          Filters.eq("actorId", actor),
+          Filters.eq("contextSource", contextSource)
+      );
+
+      // Check if this event is critical (HIGH or CRITICAL severity)
+      String severity = event.getSeverity();
+      boolean isCriticalEvent = "CRITICAL".equalsIgnoreCase(severity) || "HIGH".equalsIgnoreCase(severity);
+
+      // Build update document - update latest attack details
+      // Use $max for lastAttackTs to only update if new event is newer
+      // Use $min for discoveredAt to keep the earliest timestamp
+      java.util.List<Bson> updatesList = new java.util.ArrayList<>();
+      updatesList.add(Updates.set("filterId", event.getFilterId()));
+      updatesList.add(Updates.set("category", event.getCategory()));
+      updatesList.add(Updates.set("apiCollectionId", event.getLatestApiCollectionId()));
+      updatesList.add(Updates.set("url", event.getLatestApiEndpoint()));
+      updatesList.add(Updates.set("method", event.getLatestApiMethod() != null ? event.getLatestApiMethod().name() : ""));
+      updatesList.add(Updates.set("country", event.getCountry() != null ? event.getCountry() : ""));
+      updatesList.add(Updates.set("severity", severity != null ? severity : ""));
+      updatesList.add(Updates.set("host", event.getHost() != null ? event.getHost() : ""));
+      updatesList.add(Updates.set("latestMetadata", event.getMetadata() != null ? event.getMetadata() : ""));
+      updatesList.add(Updates.max("lastAttackTs", event.getDetectedAt()));
+      updatesList.add(Updates.min("discoveredAt", event.getDetectedAt()));
+      updatesList.add(Updates.set("updatedAt", Context.now()));
+      updatesList.add(Updates.setOnInsert("actorId", actor));
+      updatesList.add(Updates.setOnInsert("contextSource", contextSource));  // Set on insert
+      updatesList.add(Updates.setOnInsert("status", "ACTIVE"));
+      updatesList.add(Updates.inc("totalAttacks", 1));
+
+      // Only set isCritical to true if this event is HIGH/CRITICAL
+      // Never set to false - missing/null field is treated as false when reading
+      // Once set to true, stays true forever
+      if (isCriticalEvent) {
+        updatesList.add(Updates.set("isCritical", true));
+      }
+
+      Bson updates = Updates.combine(updatesList);
+
+      UpdateOptions options = new UpdateOptions().upsert(true);
+
+      ActorInfoDao.instance.getCollection(accountId).updateOne(filter, updates, options);
+
+      logger.debug("Upserted actor_info for actor: " + actor);
+    } catch (Exception e) {
+      logger.error("Error upserting actor_info: " + e.getMessage(), e);
+      // Don't throw - actor_info is supplementary, shouldn't block malicious event insertion
+    }
   }
 }

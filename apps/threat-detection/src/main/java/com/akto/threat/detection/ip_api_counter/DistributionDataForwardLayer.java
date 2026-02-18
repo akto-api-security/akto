@@ -50,7 +50,7 @@ public class DistributionDataForwardLayer {
 
     public void buildPayloadAndForwardData() {
         try {
-            logger.info("sendLastFiveMinuteDistributionData cron started {}", Context.now());
+            logger.debug("sendLastFiveMinuteDistributionData cron started {}", Context.now());
 
             List<Integer> windowSizes = Arrays.asList(5, 15, 30);
 
@@ -137,7 +137,7 @@ public class DistributionDataForwardLayer {
                 }
 
                 // Log summary for this window size
-                logger.infoAndAddToDb(String.format("WindowSize=%d summary: totalWindows=%d alreadySent=%d emptyApiToBuckets=%d emptyBatch=%d successfulSends=%d failedSends=%d",
+                logger.debugAndAddToDb(String.format("WindowSize=%d summary: totalWindows=%d alreadySent=%d emptyApiToBuckets=%d emptyBatch=%d successfulSends=%d failedSends=%d",
                     windowSize, totalWindows, alreadySentWindows, emptyApiToBucketsWindows, emptyBatchWindows, successfulSends, failedSends));
             }
         } catch (Exception e) {

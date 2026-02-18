@@ -16,6 +16,7 @@ import ObserveStore from "../observeStore"
 import WorkflowTests from "./WorkflowTests"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import PersistStore from "../../../../main/PersistStore"
+import { CollectionIcon } from "../../../components/shared/CollectionIcon"
 import transform from "../transform"
 import { CellType } from "../../../components/tables/rows/GithubRow"
 import {ApiGroupModal, Operation} from "./ApiGroupModal"
@@ -1817,7 +1818,10 @@ function ApiEndpoints(props) {
                         title={(
                             <Box maxWidth="35vw">
                                 <VerticalStack gap={2}>
-                                    <HorizontalStack gap={2}>
+                                    <HorizontalStack gap={2} blockAlign="center">
+                                        {(isHostnameCollection || collectionsObj?.hostName) && (
+                                            <CollectionIcon hostName={collectionsObj?.hostName} displayName={pageTitle} tagsList={collectionsObj?.tagsList} />
+                                        )}
                                         <>
                                             {isEditing ? (
                                                 <InlineEditableText textValue={editableTitle} setTextValue={handleTitleChange} handleSaveClick={handleSaveClick} setIsEditing={setIsEditing} maxLength={24} />

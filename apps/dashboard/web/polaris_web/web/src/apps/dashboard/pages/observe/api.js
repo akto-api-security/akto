@@ -614,6 +614,15 @@ export default {
             return resp
         })
     },
+    scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed) {
+        return request({
+            url: '/api/startTest',
+            method: 'post',
+            data: { apiCollectionIds, type: "MULTI_COLLECTION", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed}
+        }).then((resp) => {
+            return resp
+        })
+    },
     scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed) {
         return request({
             url: '/api/startTest',
@@ -621,7 +630,7 @@ export default {
             data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed}
         }).then((resp) => {
             return resp
-        })        
+        })
     },
     async loadParamsOfEndpoint (apiCollectionId, url, method) {
         const resp = await request({

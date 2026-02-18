@@ -782,6 +782,9 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
     }
 
     public long fetchEndpointsCount(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections, boolean useRbacUserCollections) {
+        long methodStart = System.currentTimeMillis();
+
+        long prep1Start = System.currentTimeMillis();
         List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
         nonHostApiCollectionIds.addAll(deactivatedCollections);
 
@@ -790,6 +793,9 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         List<Integer> existingCollectionIds = existingCollections.stream()
                 .map(ApiCollection::getId)
                 .collect(Collectors.toList());
+        long prep1Time = System.currentTimeMillis() - prep1Start;
+        System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Prep1 (fetch collections): time=" + prep1Time + "ms, nonHostCount=" + nonHostApiCollectionIds.size() + ", existingCount=" + existingCollectionIds.size());
+
         Bson userCollectionFilter = Filters.empty();
         Bson collectionFilter = Filters.in(SingleTypeInfo._API_COLLECTION_ID, existingCollectionIds);
         if (useRbacUserCollections) {
@@ -797,9 +803,13 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
                 List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                         Context.accountId.get());
                 if (collectionIds != null) {
+                    System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] RBAC filter applied: collectionIds size=" + collectionIds.size());
                     userCollectionFilter = Filters.in("collectionIds", collectionIds);
+                } else {
+                    System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] RBAC filter: collectionIds is null");
                 }
             } catch (Exception e) {
+                System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Exception getting RBAC collectionIds: " + e.getMessage());
             }
         }
 
@@ -815,12 +825,16 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
                 collectionFilter
         );
 
+        long query1Start = System.currentTimeMillis();
         long totalCount = 0;
-        if (useRbacUserCollections) {
-            totalCount = SingleTypeInfoDao.instance.count(filterAllWithTs);
-        } else {
-            totalCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterAllWithTs);
-        }
+        totalCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterAllWithTs);
+        // if (useRbacUserCollections) {
+        //     totalCount = SingleTypeInfoDao.instance.count(filterAllWithTs);
+        // } else {
+        //     totalCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterAllWithTs);
+        // }
+        long query1Time = System.currentTimeMillis() - query1Start;
+        System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query1 (count all with ts): time=" + query1Time + "ms, result=" + totalCount + ", useRbac=" + useRbacUserCollections);
 
         // Query 2: Count EXCLUDED collections using $in (much faster than $nin)
         long excludedCount = 0;
@@ -833,11 +847,17 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
                     userCollectionFilter
             );
 
-            if (useRbacUserCollections) {
-                excludedCount = SingleTypeInfoDao.instance.count(filterExcludedWithTs);
-            } else {
-                excludedCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterExcludedWithTs);
-            }
+            long query2Start = System.currentTimeMillis();
+            excludedCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterExcludedWithTs);
+            // if (useRbacUserCollections) {
+            //     excludedCount = SingleTypeInfoDao.instance.count(filterExcludedWithTs);
+            // } else {
+            //     excludedCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterExcludedWithTs);
+            // }
+            long query2Time = System.currentTimeMillis() - query2Start;
+            System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query2 (count excluded): time=" + query2Time + "ms, result=" + excludedCount + ", nonHostCount=" + nonHostApiCollectionIds.size());
+        } else {
+            System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query2 (count excluded): skipped, nonHostApiCollectionIds is empty");
         }
 
         long count = totalCount - excludedCount;
@@ -868,13 +888,22 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
             pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
             pipeline.add(Aggregates.count());
+
+            long query3Start = System.currentTimeMillis();
             MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
             while (endpointsCursor.hasNext()) {
                 count += endpointsCursor.next().getInt(_COUNT);
                 break;
             }
+            long query3Time = System.currentTimeMillis() - query3Start;
+            System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query3 (aggregation non-host): time=" + query3Time + "ms, additionalCount=" + (count - (totalCount - excludedCount)) + ", pipelineStages=" + pipeline.size());
+        } else {
+            System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query3 (aggregation non-host): skipped, nonHostApiCollectionIds is empty after removing deactivated");
         }
+
+        long totalTime = System.currentTimeMillis() - methodStart;
+        System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Total method time: " + totalTime + "ms, finalCount=" + count + ", startTs=" + startTimestamp + ", endTs=" + endTimestamp);
 
         return count;
     }

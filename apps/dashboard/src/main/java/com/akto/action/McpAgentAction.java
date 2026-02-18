@@ -41,6 +41,13 @@ public class McpAgentAction extends UserAction {
 
     public String chatAndStoreConversation() {
         try {
+
+            String userId = getSUser().getLogin();
+            if (userId != null && userId.startsWith("akash+") && userId.endsWith("@akto.io")) {
+                addActionError("You are not allowed to use this feature");
+                return ERROR.toUpperCase();
+            }
+
             // check for conversation type
             if(conversationType == null) {
                 addActionError("Conversation type is required");
