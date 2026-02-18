@@ -142,4 +142,11 @@ export default {
             data: {testingIssuesId}
         })
     },
+    createWizFindings(testingIssuesIdList) {
+        return request({
+            url: 'api/createWizFindings',
+            method: 'post',
+            data: {testingIssuesIdList}
+        })
+    }
 }

@@ -1,7 +1,6 @@
 package com.akto.utils;
 
 import java.net.URL;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -170,7 +169,7 @@ public class WizIntegrationUtils {
         
 
         //todo: remove test endpoint
-        // apiUrl = "http://localhost:8080/graphql";
+        //apiUrl = "http://localhost:8080/graphql";
 
         // Construct GraphQL query
         String graphqlQuery = String.format(
@@ -335,23 +334,39 @@ public class WizIntegrationUtils {
         return assetAttackSurfaceFinding;
     }
 
-    public static String prepareSingleIssueEnrichmentJSON(TestingIssuesId testingIssuesId) throws Exception {
-
-        String testSubCategory = testingIssuesId.getTestSubCategory();
-        ApiInfoKey apiInfoKey = testingIssuesId.getApiInfoKey();
-
+    public static TestingRunResult fetchTestingRunResult(String testSubCategory, ApiInfoKey apiInfoKey) {
         TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
             Filters.in(TestingRunResult.TEST_SUB_TYPE, testSubCategory),
             Filters.in(TestingRunResult.API_INFO_KEY, apiInfoKey)
         ));
 
+        return testingRunResult;
+    }
+
+    public static YamlTemplate fetchYamlTemplate(String testSubCategory) {
         YamlTemplate yamlTemplate = YamlTemplateDao.instance.findOne(
             Filters.in(Constants.ID, testSubCategory),
             Projections.include(YamlTemplate.INFO+".description", YamlTemplate.INFO+".name", YamlTemplate.INFO+".severity", YamlTemplate.INFO+".cve", YamlTemplate.INFO+".cwe")
         );
 
+        return yamlTemplate;
+    }
+
+    public static Remediation fetchRemediation(String testSubCategory) {
         Remediation remediation = RemediationsDao.instance.findOne(
             Filters.eq(Constants.ID, String.format("tests-library-master/remediation/%s.md", testSubCategory)));
+
+        return remediation;
+    }
+
+    public static String prepareSingleIssueEnrichmentJSON(TestingIssuesId testingIssuesId) throws Exception {
+
+        String testSubCategory = testingIssuesId.getTestSubCategory();
+        ApiInfoKey apiInfoKey = testingIssuesId.getApiInfoKey();
+
+        TestingRunResult testingRunResult = fetchTestingRunResult(testSubCategory, apiInfoKey);
+        YamlTemplate yamlTemplate = fetchYamlTemplate(testSubCategory);
+        Remediation remediation = fetchRemediation(testSubCategory);
 
         if (testingRunResult == null || yamlTemplate == null) {
             String errMsg = String.format("Missing data for enrichment JSON. testingRunResult: %s, yamlTemplate: %s, remediation: %s", 
@@ -384,6 +399,80 @@ public class WizIntegrationUtils {
 
         BasicDBList dataSourcesList = new BasicDBList();
         dataSourcesList.add(dataSource);
+
+        // Prepare enrichment JSON
+        BasicDBObject enrichmentJSONObj = new BasicDBObject();
+        enrichmentJSONObj.put("integrationId", "placeholder-integration-id");
+        enrichmentJSONObj.put("dataSources", dataSourcesList);
+
+        String enrichmentJSON = enrichmentJSONObj.toJson();
+
+        return enrichmentJSON;
+    }
+
+    public static String prepareMultipleIssueEnrichmentJSON(List<TestingIssuesId> testingIssuesIdList) throws Exception {
+
+        Map<String, YamlTemplate> yamlTemplateMap = new HashMap<>();
+        Map<String, Remediation> remediationMap = new HashMap<>();
+
+        BasicDBList dataSourcesList = new BasicDBList();
+
+        for (TestingIssuesId testingIssuesId : testingIssuesIdList) {
+            if (testingIssuesId == null) continue;
+
+            try {
+                String testSubCategory = testingIssuesId.getTestSubCategory();
+                ApiInfoKey apiInfoKey = testingIssuesId.getApiInfoKey();
+
+                TestingRunResult testingRunResult = WizIntegrationUtils.fetchTestingRunResult(testSubCategory, apiInfoKey);
+
+                YamlTemplate yamlTemplate;
+                Remediation remediation;
+
+                if (!yamlTemplateMap.containsKey(testSubCategory)) {
+                    yamlTemplate = WizIntegrationUtils.fetchYamlTemplate(testSubCategory);
+                    yamlTemplateMap.put(testSubCategory, yamlTemplate);
+                }
+
+                if (!remediationMap.containsKey(testSubCategory)) {
+                    remediation = WizIntegrationUtils.fetchRemediation(testSubCategory);
+                    remediationMap.put(testSubCategory, remediation);
+                }
+
+                yamlTemplate = yamlTemplateMap.get(testSubCategory);
+                remediation = remediationMap.get(testSubCategory);
+
+                // Prepare asset
+                BasicDBObject asset = new BasicDBObject();
+                BasicDBObject assetDetails = WizIntegrationUtils.buildAssetDetails(apiInfoKey);
+
+                BasicDBObject assetAttackSurfaceFinding = WizIntegrationUtils.buildAssetAttackSurfaceFinding(testingIssuesId, testingRunResult, yamlTemplate, remediation);
+                BasicDBList attackSurfaceFindingsList = new BasicDBList();
+                attackSurfaceFindingsList.add(assetAttackSurfaceFinding);
+
+                asset.put("details", assetDetails);
+                asset.put("attackSurfaceFindings", attackSurfaceFindingsList);
+
+                // Add to assets list
+                BasicDBList assetsList = new BasicDBList();
+                assetsList.add(asset);
+
+                // Prepare datasource
+                BasicDBObject dataSource = new BasicDBObject();
+
+                dataSource.put("id", String.format("akto-testing-run-result-%s", testingRunResult.getHexId()));
+                dataSource.put("assets", assetsList);
+
+                // Add to dataSources list
+                dataSourcesList.add(dataSource);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Missing data for creating enrichment for issue: " + testingIssuesId);
+            }
+        }
+
+        if (dataSourcesList.isEmpty()) {
+            throw new Exception("No valid issues found to create enrichment JSON. Check logs for details.");
+        }
 
         // Prepare enrichment JSON
         BasicDBObject enrichmentJSONObj = new BasicDBObject();
