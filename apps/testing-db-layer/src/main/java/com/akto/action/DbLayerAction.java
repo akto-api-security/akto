@@ -4,12 +4,10 @@ import com.akto.dto.sql.SampleDataAlt;
 import com.akto.dto.sql.SampleDataAltCopy;
 import com.akto.dto.type.URLMethods;
 import com.akto.sql.SampleDataAltDb;
+import com.akto.util.SampleDeduplicationFilter;
 import com.mongodb.BasicDBList;
 import com.opensymphony.xwork2.ActionSupport;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -41,14 +39,6 @@ public class DbLayerAction extends ActionSupport {
     private static final int fetchLimit = 1000;
 
     private static final Logger logger = LoggerFactory.getLogger(DbLayerAction.class);
-
-    // Bloom filter to track unique APIs across all bulk insert calls
-    // Expected insertions: 1 million APIs, false positive probability: 0.01
-    private static final BloomFilter<CharSequence> apiBloomFilter = BloomFilter.create(
-        Funnels.stringFunnel(StandardCharsets.UTF_8),
-        1_000_000,
-        0.01
-    );
 
     public String fetchSamples() {
         try {
@@ -97,61 +87,55 @@ public class DbLayerAction extends ActionSupport {
         if (System.getenv().getOrDefault("SKIP_BULK_INSERT", "false").equals("true")) {
             return SUCCESS.toUpperCase();
         }
+
         try {
             List<SampleDataAlt> sampleDataList = new ArrayList<>();
-
-            int totalSamples = samplesCopy.size();
-            int duplicatesSkipped = 0;
-
-            long thirtyMinutesMs = 30 * 60 * 1000L;
+            int batchDuplicates = 0;
 
             for (SampleDataAltCopy sampleDataAltCopy: samplesCopy) {
-                // Calculate 30-minute time bucket from payload timestamp
-                // Round up to next 30-minute interval
-                long payloadTimestamp = sampleDataAltCopy.getTimestamp();
-                long timeBucket = ((payloadTimestamp / thirtyMinutesMs) + 1) * thirtyMinutesMs;
+                // Check if sample should be inserted using deduplication filter
+                boolean shouldInsert = SampleDeduplicationFilter.shouldInsertSample(
+                    sampleDataAltCopy.getApiCollectionId(),
+                    sampleDataAltCopy.getMethod(),
+                    sampleDataAltCopy.getUrl(),
+                    sampleDataAltCopy.getTimestamp()
+                );
 
-                // Create a unique key for the API with time bucket: collectionId:method:url:timeBucket
-                String apiKey = sampleDataAltCopy.getApiCollectionId() + ":" +
-                               sampleDataAltCopy.getMethod() + ":" +
-                               sampleDataAltCopy.getUrl() + ":" +
-                               timeBucket;
-
-                // Check if this API has already been seen in this 30-minute window
-                if (apiBloomFilter.mightContain(apiKey)) {
-                    duplicatesSkipped++;
-                    logger.debug("Skipping duplicate sample for API in current time bucket: collectionId={}, method={}, url={}, timeBucket={}",
-                                sampleDataAltCopy.getApiCollectionId(),
-                                sampleDataAltCopy.getMethod(),
-                                sampleDataAltCopy.getUrl(),
-                                timeBucket);
+                if (!shouldInsert) {
+                    batchDuplicates++;
                     continue;
                 }
 
-                // Add to Bloom filter
-                apiBloomFilter.put(apiKey);
-
-                // Add to insertion list
-                sampleDataList.add(new SampleDataAlt(UUID.fromString(sampleDataAltCopy.getId()),
-                sampleDataAltCopy.getSample(), sampleDataAltCopy.getApiCollectionId(),
-                sampleDataAltCopy.getMethod(), sampleDataAltCopy.getUrl(),
-                sampleDataAltCopy.getResponseCode(), sampleDataAltCopy.getTimestamp(),
-                sampleDataAltCopy.getAccountId()));
+                // Add to insertion list for database
+                sampleDataList.add(new SampleDataAlt(
+                    UUID.fromString(sampleDataAltCopy.getId()),
+                    sampleDataAltCopy.getSample(),
+                    sampleDataAltCopy.getApiCollectionId(),
+                    sampleDataAltCopy.getMethod(),
+                    sampleDataAltCopy.getUrl(),
+                    sampleDataAltCopy.getResponseCode(),
+                    sampleDataAltCopy.getTimestamp(),
+                    sampleDataAltCopy.getAccountId()
+                ));
             }
 
-            logger.info("bulkInsertSamples: total samples processed={}, unique samples to insert={}, duplicates skipped={}",
-                       totalSamples, sampleDataList.size(), duplicatesSkipped);
+            // Log batch results
+            logger.info("bulkInsertSamples: batch processed={}, unique to insert={}, duplicates skipped={}",
+                       samplesCopy.size(), sampleDataList.size(), batchDuplicates);
 
+            // Insert unique samples into database
             if (!sampleDataList.isEmpty()) {
                 SampleDataAltDb.bulkInsert(sampleDataList);
-                logger.info("bulkInsertSamples: successfully inserted {} unique samples", sampleDataList.size());
+                logger.info("bulkInsertSamples: successfully inserted {} unique samples into database",
+                           sampleDataList.size());
             } else {
-                logger.info("bulkInsertSamples: no unique samples to insert");
+                logger.info("bulkInsertSamples: no unique samples to insert (all duplicates)");
             }
+
         } catch (Exception e) {
-            e.printStackTrace();
-            logger.error("error in bulkInsertSamples " + e.getMessage());
+            logger.error("error in bulkInsertSamples: {}", e.getMessage(), e);
         }
+
         return SUCCESS.toUpperCase();
     }
 
