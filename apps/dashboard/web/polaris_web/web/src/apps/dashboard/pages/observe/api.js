@@ -1034,6 +1034,13 @@ export default {
             url: '/api/getAllIconsCache',
             method: 'get'
         })
+    },
+    getIconsForHostnames(hostnames){
+        return request({
+            url: '/api/getIconsForHostnames',
+            method: 'post',
+            data: { hostnames }
+        })
     }
 
 }

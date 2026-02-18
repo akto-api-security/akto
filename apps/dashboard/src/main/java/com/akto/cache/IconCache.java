@@ -108,6 +108,52 @@ public class IconCache {
     }
 
     /**
+     * Batch lookup method for multiple hostnames - more efficient than multiple single lookups
+     * @param hostnames List of hostnames to lookup
+     * @return Map of hostname to IconData (only contains entries for found icons)
+     */
+    public Map<String, IconData> getIconDataBatch(List<String> hostnames) {
+        if (hostnames == null || hostnames.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        refreshCacheIfExpired();
+        Map<String, IconData> results = new HashMap<>();
+        int hitCount = 0;
+        int missCount = 0;
+        
+        for (String hostname : hostnames) {
+            if (hostname == null || hostname.trim().isEmpty()) {
+                continue;
+            }
+            
+            String cleanHostname = hostname.trim();
+            
+            // First, try to find exact hostname match in cache
+            IconData exactMatch = findExactHostnameMatch(cleanHostname);
+            if (exactMatch != null) {
+                results.put(cleanHostname, exactMatch);
+                hitCount++;
+                continue;
+            }
+
+            // Strip hostname progressively and check for domain matches
+            IconData domainMatch = findDomainMatchByStripping(cleanHostname);
+            if (domainMatch != null) {
+                results.put(cleanHostname, domainMatch);
+                hitCount++;
+            } else {
+                missCount++;
+            }
+        }
+        
+        logger.infoAndAddToDb("Icon cache batch lookup: " + hostnames.size() + " requested, " + 
+                             hitCount + " hits, " + missCount + " misses");
+        
+        return results;
+    }
+
+    /**
      * Find exact hostname match in cache by checking composite keys
      */
     private IconData findExactHostnameMatch(String hostname) {

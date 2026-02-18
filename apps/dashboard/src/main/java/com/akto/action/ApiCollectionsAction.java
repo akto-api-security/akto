@@ -1756,4 +1756,51 @@ public class ApiCollectionsAction extends UserAction {
         }
     }
 
+    // Input parameter for on-demand icon fetching
+    private List<String> hostnames;
+
+    public void setHostnames(List<String> hostnames) {
+        this.hostnames = hostnames;
+    }
+
+    public List<String> getHostnames() {
+        return hostnames;
+    }
+
+    /**
+     * New on-demand endpoint that fetches icons only for specified hostnames
+     * Reduces data exposure and improves performance by loading only required icons
+     */
+    public String getIconsForHostnames() {
+        try {
+            if (hostnames == null || hostnames.isEmpty()) {
+                loggerMaker.infoAndAddToDb("getIconsForHostnames called with empty hostname list", LogDb.DASHBOARD);
+                if(this.response == null) {
+                    this.response = new BasicDBObject();
+                }
+                this.response.put("icons", new HashMap<>());
+                return Action.SUCCESS.toUpperCase();
+            }
+
+            loggerMaker.infoAndAddToDb("getIconsForHostnames called with " + hostnames.size() + " hostnames", LogDb.DASHBOARD);
+            
+            IconCache iconCache = IconCache.getInstance();
+            
+            // Use efficient batch lookup instead of individual lookups
+            Map<String, IconCache.IconData> result = iconCache.getIconDataBatch(hostnames);
+            
+            if(this.response == null) {
+                this.response = new BasicDBObject();
+            }
+            this.response.put("icons", result);
+            
+            loggerMaker.infoAndAddToDb("getIconsForHostnames returning " + result.size() + " icons for " + hostnames.size() + " requested hostnames", LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+            
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching icons for hostnames", LogDb.DASHBOARD);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
 }
