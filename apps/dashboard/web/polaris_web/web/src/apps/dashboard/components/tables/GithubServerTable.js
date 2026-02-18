@@ -34,7 +34,6 @@ import { produce } from 'immer';
 import DateRangePicker from '../layouts/DateRangePicker';
 import SpinnerCentered from '../progress/SpinnerCentered';
 import { ImportMinor } from '@shopify/polaris-icons';
-import { saveAs } from 'file-saver';
 
 function GithubServerTable(props) {
 
@@ -109,13 +108,19 @@ function GithubServerTable(props) {
     // TODO: Support exporting only selected items when rows are selected in the table
     // TODO: Support exporting when filters are enabled
   useEffect(() => {
-    const actionWrap = filtersWrapRef.current?.querySelector('[class*="IndexFilters__ActionWrap"]')
+    if (!filtersWrapRef.current) return
+    const actionWrap = filtersWrapRef.current.querySelector('[class*="ActionWrap"]')
     if (!actionWrap) return
-    const target = document.createElement('span')
-    target.style.display = 'contents'
+
+    const target = document.createElement('div')
+    target.style.display = 'inline-flex'
     actionWrap.insertBefore(target, actionWrap.firstChild)
     setExportPortalTarget(target)
-    return () => { target.remove(); setExportPortalTarget(null) }
+
+    return () => {
+      target.remove()
+      setExportPortalTarget(null)
+    }
   }, [mode])
 
   useEffect(() => {
@@ -655,17 +660,8 @@ function GithubServerTable(props) {
 
   const handleExportCsv = useCallback(() => {
     if (props.onExportCsv) return props.onExportCsv()
-    const cols = props.headers.filter(x => x.text?.length > 0)
-    const csv = [
-      cols.map(x => x.text).join(","),
-      ...data.map(row => cols.map(x => {
-        const val = row[x.textValue || x.value]
-        return `"${extractText(val).replace(/"/g, '""')}"`
-      }).join(","))
-    ].join("\r\n")
     const fileName = props.csvFileName || props.resourceName?.plural || "export"
-    saveAs(new Blob([csv], { type: "text/csv;charset=UTF-8" }), `${fileName}.csv`)
-    func.setToast(true, false, "CSV exported successfully")
+    func.exportTableAsCSV(props.headers, data, fileName)
   }, [props.onExportCsv, props.headers, props.csvFileName, data])
 
   return (
@@ -706,7 +702,8 @@ function GithubServerTable(props) {
               {exportPortalTarget && data.length > 0 && createPortal(
                 <Tooltip content="Export as CSV" dismissOnMouseOut>
                   <Button size="slim" icon={ImportMinor} onClick={handleExportCsv} accessibilityLabel="Export as CSV" />
-                </Tooltip>, exportPortalTarget
+                </Tooltip>,
+                exportPortalTarget
               )}
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               <div className={tableHeightClass}>
