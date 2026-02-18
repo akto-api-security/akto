@@ -17,15 +17,7 @@ public class GenericAgentConversation {
         TEST_EXECUTION_RESULT,
         PROMPT_PLAYGROUND,
         ANALYZE_REQUESTS,
-        ANALYZE_DASHBOARD_DATA;
-
-        public String getExternalName() {
-            switch (this) {
-                case ASK_AKTO: return "API_SEC_CHAT";
-                case DOCS_AGENT: return "AI_SEC_CHAT";
-                default: return this.name();
-            }
-        }
+        ANALYZE_DASHBOARD_DATA
     }
 
     private String title;

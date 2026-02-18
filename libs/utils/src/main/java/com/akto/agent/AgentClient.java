@@ -137,7 +137,7 @@ public class AgentClient {
         requestBody.put("conversationId", conversationId);
         requestBody.put("isLastRequest", isLastRequest);
         if (conversationType != null) {
-            requestBody.put("conversationType", conversationType.getExternalName());
+            requestBody.put("conversationType", conversationType);
         }
         requestBody.put("contextString", contextString);
 
