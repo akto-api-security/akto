@@ -1734,7 +1734,6 @@ function ApiCollections(props) {
     const dynamicHeaders = getModifiedHeaders();
 
     // Get modified sort options based on filter type
-    // CRITICAL: Recalculate columnIndex based on actual modified headers to fix sorting
     const getModifiedSortOptions = () => {
         let modifiedSortOptions = [...sortOptions];
         
@@ -1754,10 +1753,8 @@ function ApiCollections(props) {
             });
         }
         
-        // Also include tempSortOptions for 'groups' tab
         const allSortOptions = selectedTab === 'groups' ? [...tempSortOptions, ...modifiedSortOptions] : modifiedSortOptions;
         
-        // CRITICAL FIX: Recalculate columnIndex based on the actual modified headers
         // This ensures column indices match the actual table structure
         const updatedSortOptions = allSortOptions.map(opt => {
             // Find the actual column index in dynamicHeaders based on sortKey or matching criteria
