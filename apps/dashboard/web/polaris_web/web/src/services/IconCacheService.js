@@ -14,7 +14,7 @@ class IconCacheService {
         this.pendingRequests = new Set(); // hostnames waiting to be fetched
         this.batchTimeout = null;
         this.BATCH_DELAY = 50; // ms - debounce multiple requests
-        this.BATCH_SIZE = 20; // max hostnames per API call
+        this.BATCH_SIZE = 100; // max hostnames per API call
     }
 
     /**
