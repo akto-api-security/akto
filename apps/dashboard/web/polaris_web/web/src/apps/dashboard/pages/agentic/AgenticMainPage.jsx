@@ -8,6 +8,7 @@ import AgenticHistoryModal from './components/AgenticHistoryModal';
 import AgenticConversationPage from './AgenticConversationPage';
 import { getConversationsList } from './services/agenticService';
 import func from '@/util/func';
+import { getDashboardCategory, CATEGORY_API_SECURITY, CATEGORY_DAST } from '@/apps/main/labelHelper';
 
 function AgenticMainPage() {
     // In a real app, this might come from a context or prop
@@ -22,7 +23,11 @@ function AgenticMainPage() {
     const [historySearchQuery, setHistorySearchQuery] = useState('');
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
     const [pendingConversationId, setPendingConversationId] = useState(null);
-  
+
+    const conversationType = [CATEGORY_API_SECURITY, CATEGORY_DAST].includes(getDashboardCategory())
+        ? 'ASK_AKTO'
+        : 'DOCS_AGENT';
+
     const handleSearchSubmit = useCallback((query) => {
         setCurrentQuery(query);
         setLoadConversationId(null); // Clear conversation ID for new search
@@ -110,7 +115,8 @@ function AgenticMainPage() {
                     setSearchValue(''); // Clear search input when going back
                 }}
                 onLoadConversation={handleHistoryClick}
-               />
+                conversationType={conversationType}
+            />
         );
     }
 
