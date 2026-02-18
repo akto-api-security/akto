@@ -10,7 +10,6 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 
-import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -75,6 +74,15 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         IndexOptions sparseIndex = new IndexOptions().sparse(true);
         Bson rateLimitsIndex = Indexes.ascending("rateLimits", "rateLimitConfidence", "_id");
         createIndexIfAbsent(getDBName(), getCollName(), rateLimitsIndex, sparseIndex.name("rateLimits_confidence_id_sparse"));
+        
+        // Indexes for agent proxy guardrail endpoints
+        // Index for filtering by guardrail status with updatedAt for efficient queries
+        fieldNames = new String[]{"agentProxyGuardrailEnabled", ApiInfo.LAST_SEEN};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+        
+        // Index for filtering by collection ID and guardrail status
+        fieldNames = new String[]{ApiInfo.ID_API_COLLECTION_ID, "agentProxyGuardrailEnabled"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
     
 
