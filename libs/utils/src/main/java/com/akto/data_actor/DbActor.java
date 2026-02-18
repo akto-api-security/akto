@@ -214,6 +214,12 @@ public class DbActor extends DataActor {
     public void insertProtectionLog(Log log) {
         DbLayer.insertProtectionLog(log);
     }
+
+    @Override
+    public void insertAgenticTestingLog(Log log) {
+        DbLayer.insertAgenticTestingLog(log);
+    }
+
     @Override
     public List<CodeAnalysisRepo> findReposToRun() {
         return Collections.emptyList();

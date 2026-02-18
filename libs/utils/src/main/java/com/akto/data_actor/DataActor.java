@@ -92,6 +92,9 @@ public abstract class DataActor {
     public abstract void insertTestingLog(Log log);
 
     public abstract void insertProtectionLog(Log log);
+
+    public abstract void insertAgenticTestingLog(Log log);
+
     public abstract List<CodeAnalysisRepo> findReposToRun();
 
     public abstract void syncExtractedAPIs( CodeAnalysisRepo codeAnalysisRepo   , List<CodeAnalysisApi> codeAnalysisApisList, boolean isLastBatch);
