@@ -262,6 +262,14 @@ prettifyEpoch(epoch) {
     });
     saveAs(blob, (selectedTestRun.name || "file") + ".csv");
   },
+  extractCsvText(val) {
+    if (val == null) return '-'
+    if (typeof val === 'string' || typeof val === 'number') return String(val)
+    if (Array.isArray(val)) return val.filter(x => x != null).map(x => this.extractCsvText(x)).filter(x => x && x !== '-').join(', ') || '-'
+    if (typeof val === 'object' && val.props !== undefined) return this.extractCsvText(val.props.children ?? val.props.itemsArr ?? val.props.text)
+    if (typeof val === 'object') return Object.entries(val).map(([k, v]) => `${k}: ${v}`).join(', ')
+    return String(val)
+  },
   exportTableAsCSV(headers, data, fileName) {
     // TODO: Support pagination to export all pages (not just current page)
     // TODO: Support exporting only selected items when rows are selected in the table
@@ -271,7 +279,7 @@ prettifyEpoch(epoch) {
       cols.map(x => x.text).join(","),
       ...data.map(row => cols.map(x => {
         const val = row[x.textValue || x.value]
-        return `"${val == null ? '-' : String(val).replace(/"/g, '""')}"`
+        return `"${this.extractCsvText(val).replace(/"/g, '""')}"`
       }).join(","))
     ].join("\r\n")
     saveAs(new Blob([csv], { type: "text/csv;charset=UTF-8" }), `${fileName}.csv`)
