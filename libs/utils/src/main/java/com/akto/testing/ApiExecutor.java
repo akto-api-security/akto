@@ -314,7 +314,7 @@ public class ApiExecutor {
         }
 
         boolean executeScript = testingRunConfig != null;
-        String tempPayload = ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
+        String tempPayload = ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript, testingRunConfig);
 
         String url = prepareUrl(request, testingRunConfig);
 

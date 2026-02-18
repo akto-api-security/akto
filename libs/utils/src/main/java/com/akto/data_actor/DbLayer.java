@@ -517,6 +517,10 @@ public class DbLayer {
         LogsDao.instance.insertOne(log);
     }
 
+    public static void insertAgenticTestingLog(Log log) {
+        AgenticTestingLogsDao.instance.insertOne(log);
+    }
+
     public static void modifyHybridSaasSetting(boolean isHybridSaas) {
         Integer accountId = Context.accountId.get();
         AccountsDao.instance.updateOne(Filters.eq("_id", accountId), Updates.set(Account.HYBRID_SAAS_ACCOUNT, isHybridSaas));
