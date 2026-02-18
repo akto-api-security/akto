@@ -1990,8 +1990,7 @@ public class StartTestAction extends UserAction {
 
     public enum CallSource {
         TESTING_UI,
-        
-        ;
+        AKTO_GPT;
         public static CallSource getCallSource(String source) {
             if (source == null) {
                 return TESTING_UI;
