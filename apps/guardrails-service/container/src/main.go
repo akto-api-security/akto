@@ -7,6 +7,7 @@ import (
 
 	"github.com/akto-api-security/guardrails-service/handlers"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
+	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/kafka"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
@@ -52,10 +53,9 @@ func main() {
 
 // runHTTPServer starts the HTTP server mode
 func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logger *zap.Logger) {
-	// Initialize handlers
-	validationHandler := handlers.NewValidationHandler(validatorService, logger)
+	fileRegistry := fileprocessor.DefaultRegistry()
+	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry)
 
-	// Setup Gin router
 	router := setupRouter(validationHandler, logger)
 
 	// Start server
@@ -114,6 +114,7 @@ func setupRouter(validationHandler *handlers.ValidationHandler, logger *zap.Logg
 		// Individual validation endpoints
 		api.POST("/validate/request", validationHandler.ValidateRequest)
 		api.POST("/validate/response", validationHandler.ValidateResponse)
+		api.POST("/validate/file", validationHandler.ValidateFile)
 	}
 
 	return router

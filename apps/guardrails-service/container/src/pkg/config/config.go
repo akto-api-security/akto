@@ -48,6 +48,16 @@ type Config struct {
 	// Session management configuration
 	SessionSyncIntervalMin int  // Minutes between cyborg API syncs (default: 5)
 	SessionEnabled         bool // Enable session-based guardrailing (default: true)
+
+	// File validation (validate/file endpoint)
+	FileValidateMaxFiles      int // Max files or URLs per request (default: 5)
+	FileValidateMaxSizeBytes  int // Max upload size in bytes (default: 10 MB)
+	FileValidateChunkSize     int // Max characters per chunk for validation (default: 32000)
+	FileValidateChunkOverlap  int // Chars repeated between adjacent chunks to catch boundary-spanning patterns (default: 200)
+	FileValidateMaxChunks     int // Safety cap on total chunks per file (default: 500)
+	FileValidateMaxRetries    int // Retries per chunk on transient errors (default: 2)
+	FileValidateMaxConcurrent int // Max parallel chunk validations (default: 5)
+	FileValidateURLTimeoutSec int // HTTP timeout for fetching file from URL (default: 30)
 }
 
 // LoadConfig loads configuration from environment variables
@@ -76,6 +86,14 @@ func LoadConfig() *Config {
 		FilterPath:               getEnv("FILTER_PATH", ""),
 		SessionSyncIntervalMin:   getEnvAsInt("SESSION_SYNC_INTERVAL_MIN", 5),
 		SessionEnabled:           getEnvAsBool("SESSION_ENABLED", true),
+		FileValidateMaxFiles:      getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
+		FileValidateMaxSizeBytes:  getEnvAsInt("FILE_VALIDATE_MAX_SIZE_BYTES", 10*1024*1024),
+		FileValidateChunkSize:    getEnvAsInt("FILE_VALIDATE_CHUNK_SIZE", 32000),
+		FileValidateChunkOverlap: getEnvAsInt("FILE_VALIDATE_CHUNK_OVERLAP", 200),
+		FileValidateMaxChunks:    getEnvAsInt("FILE_VALIDATE_MAX_CHUNKS", 500),
+		FileValidateMaxRetries:   getEnvAsInt("FILE_VALIDATE_MAX_RETRIES", 2),
+		FileValidateMaxConcurrent: getEnvAsInt("FILE_VALIDATE_MAX_CONCURRENT", 5),
+		FileValidateURLTimeoutSec: getEnvAsInt("FILE_VALIDATE_URL_TIMEOUT_SEC", 30),
 	}
 }
 

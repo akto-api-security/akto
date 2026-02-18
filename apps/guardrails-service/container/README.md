@@ -109,6 +109,22 @@ Content-Type: application/json
 }
 ```
 
+**Validate File (upload .txt or .pdf):**
+```bash
+POST /api/validate/file
+Content-Type: multipart/form-data
+
+# Form fields:
+#   file (required): .txt or .pdf file
+#   contextSource (optional): e.g. AGENTIC
+
+curl -X POST http://localhost:8080/api/validate/file \
+  -F "file=@sample.txt" \
+  -F "contextSource=AGENTIC"
+```
+
+Response includes `allowed`, `reason`, `totalChunks`, `failedChunkIndex`, and optionally `chunkResults`. See `scripts/test-validate-file.sh` for a quick test script.
+
 ### Health Check
 ```bash
 GET /health
