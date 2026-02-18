@@ -239,10 +239,23 @@ function GithubServerTable(props) {
 
   const handleSort = (col, dir) => {
     let tempSortSelected = props?.sortOptions.filter(x => x.columnIndex === (col + 1))
+    
+    // Guard: If no matching sort option found, try to fallback or return early
+    if (!tempSortSelected || tempSortSelected.length === 0) {
+      console.warn(`No sort option found for column index ${col + 1}. Available sort options:`, props?.sortOptions);
+      return;
+    }
+    
     let sortVal = [tempSortSelected[0].value]
     if(dir.includes("desc")){
-      setSortSelected([tempSortSelected[1].value])
-      sortVal = [tempSortSelected[1].value]
+      // Guard: Check if descending sort option exists (should be at index 1)
+      if (tempSortSelected.length > 1) {
+        setSortSelected([tempSortSelected[1].value])
+        sortVal = [tempSortSelected[1].value]
+      } else {
+        console.warn(`No descending sort option found for column index ${col + 1}`);
+        return;
+      }
     }else{
       setSortSelected([tempSortSelected[0].value])
     }
