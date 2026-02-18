@@ -103,14 +103,28 @@ public class DbLayerAction extends ActionSupport {
             int totalSamples = samplesCopy.size();
             int duplicatesSkipped = 0;
 
+            long thirtyMinutesMs = 30 * 60 * 1000L;
+
             for (SampleDataAltCopy sampleDataAltCopy: samplesCopy) {
+                // Calculate 30-minute time bucket from payload timestamp
+                // Round up to next 30-minute interval
+                long payloadTimestamp = sampleDataAltCopy.getTimestamp();
+                long timeBucket = ((payloadTimestamp / thirtyMinutesMs) + 1) * thirtyMinutesMs;
+
+                // Create a unique key for the API with time bucket: collectionId:method:url:timeBucket
                 String apiKey = sampleDataAltCopy.getApiCollectionId() + ":" +
                                sampleDataAltCopy.getMethod() + ":" +
-                               sampleDataAltCopy.getUrl();
+                               sampleDataAltCopy.getUrl() + ":" +
+                               timeBucket;
 
-                // Check if this API has already been seen across all calls
+                // Check if this API has already been seen in this 30-minute window
                 if (apiBloomFilter.mightContain(apiKey)) {
                     duplicatesSkipped++;
+                    logger.debug("Skipping duplicate sample for API in current time bucket: collectionId={}, method={}, url={}, timeBucket={}",
+                                sampleDataAltCopy.getApiCollectionId(),
+                                sampleDataAltCopy.getMethod(),
+                                sampleDataAltCopy.getUrl(),
+                                timeBucket);
                     continue;
                 }
 
