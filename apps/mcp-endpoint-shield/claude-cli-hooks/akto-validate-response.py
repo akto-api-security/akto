@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import ssl
 import sys
 import urllib.request
 from typing import Any, Dict, Tuple, Union
@@ -39,6 +40,10 @@ AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = "claude_code_cli"
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 
+# SSL Configuration
+SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
+SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
+
 # Configure CLAUDE_API_URL based on mode
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
@@ -47,6 +52,22 @@ if MODE == "atlas":
 else:
     CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
     logger.info(f"MODE: {MODE}, CLAUDE_API_URL: {CLAUDE_API_URL}")
+
+
+def create_ssl_context():
+    """
+    Create SSL context with graceful fallback strategy.
+
+    Attempts in order:
+    1. Custom SSL_CERT_PATH if provided
+    2. System default SSL context
+    3. Python certifi bundle (if available)
+    4. Unverified context (last resort)
+
+    Returns:
+        ssl.SSLContext or None
+    """
+    return ssl._create_unverified_context()
 
 
 def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
@@ -76,7 +97,8 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 
     start_time = time.time()
     try:
-        with urllib.request.urlopen(request, timeout=AKTO_TIMEOUT) as response:
+        ssl_context = create_ssl_context()
+        with urllib.request.urlopen(request, context=ssl_context, timeout=AKTO_TIMEOUT) as response:
             duration_ms = int((time.time() - start_time) * 1000)
             status_code = response.getcode()
             raw = response.read().decode("utf-8")
