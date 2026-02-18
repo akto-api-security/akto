@@ -8,6 +8,11 @@
 
 .react-grid-item {
     box-sizing: border-box;
+    min-width: 0;
+}
+
+.react-grid-layout {
+    min-height: 0;
 }
 
 .react-grid-item.react-draggable-dragging {
@@ -64,4 +69,9 @@
 .component-header-close-button button:hover {
     background-color: rgba(0, 0, 0, 0.05) !important;
     border-radius: 4px;
+}
+
+/* Guardrail policies card: hide duplicate legend title (card header is the only title) */
+.guardrail-policies-chart-wrapper .issues-severity-graph-container [class*="VerticalStack"] > *:first-child {
+    display: none;
 }

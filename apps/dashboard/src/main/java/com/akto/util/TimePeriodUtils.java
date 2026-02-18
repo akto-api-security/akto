@@ -14,6 +14,15 @@ import java.util.stream.Collectors;
 public class TimePeriodUtils {
     private static final LoggerMaker loggerMaker = new LoggerMaker(TimePeriodUtils.class, LogDb.DASHBOARD);
 
+    public static long getBucketSize(long totalDays) {
+        if (totalDays <= 7) {
+            return 1;      
+        } else if (totalDays <= 60) {
+            return 7;      
+        } else {
+            return 10;     
+        }
+    }
 
     public static Map<String, Long> groupByTimePeriod(List<Integer> timestamps, long daysBetween) {
         Map<String, Long> result = new HashMap<>();

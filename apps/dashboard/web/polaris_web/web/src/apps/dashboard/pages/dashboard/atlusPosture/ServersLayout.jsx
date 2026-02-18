@@ -59,7 +59,7 @@ function ServersLayout({ title, itemId, tooltipContent, items, hasItems, emptyMe
                     onRemove={onRemove}
                     tooltipContent={tooltipContent}
                 />
-                <Scrollable style={{maxHeight: boxHeight}} focusable shadow>
+                <Scrollable style={{maxHeight: boxHeight}} focusable>
                     <DataTable headings={[]}
                         columnContentTypes={[
                             'text',
@@ -68,6 +68,7 @@ function ServersLayout({ title, itemId, tooltipContent, items, hasItems, emptyMe
                         rows={tableRows}
                         increasedTableDensity
                         hoverable={false}
+                        hideScrollIndicator={true}
                     />
                 </Scrollable>
             </VerticalStack>

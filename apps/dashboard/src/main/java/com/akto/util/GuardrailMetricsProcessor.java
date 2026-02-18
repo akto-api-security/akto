@@ -242,16 +242,27 @@ public class GuardrailMetricsProcessor {
         return result;
     }
 
+    private static final int SECONDS_PER_DAY = 86400;
+
     private static BasicDBObject buildDataProtectionTrends(
             Map<String, Long> categoryCounts,
             Map<String, List<Integer>> categoryTimestamps,
             long daysBetween
     ) {
+
+        long bucketSizeInDays = TimePeriodUtils.getBucketSize(daysBetween);
+
+
         BasicDBObject result = new BasicDBObject();
         try {
-            // Sort categories by count and take top 3
-            List<String> topCategories = categoryCounts.entrySet().stream()
-                    .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+            // Sort categories by number of distinct days they appeared in (most days first), then take top 3
+            List<String> topCategories = categoryTimestamps.entrySet().stream()
+                    .filter(e -> e.getValue() != null && !e.getValue().isEmpty())
+                    .sorted((e1, e2) -> {
+                        long days1 = e1.getValue().stream().mapToLong(ts -> ts / SECONDS_PER_DAY).distinct().count();
+                        long days2 = e2.getValue().stream().mapToLong(ts -> ts / SECONDS_PER_DAY).distinct().count();
+                        return Long.compare(days2, days1);
+                    })
                     .limit(3)
                     .map(Map.Entry::getKey)
                     .collect(Collectors.toList());
@@ -260,8 +271,8 @@ public class GuardrailMetricsProcessor {
             for (String category : topCategories) {
                 List<Integer> timestamps = categoryTimestamps.get(category);
                 if (timestamps != null && !timestamps.isEmpty()) {
-                    Map<String, Long> timePeriodMap = TimePeriodUtils.groupByTimePeriod(timestamps, daysBetween);
-                    List<List<Object>> timeSeriesData = TimePeriodUtils.convertTimePeriodMapToTimeSeriesData(timePeriodMap, daysBetween);
+                    Map<String, Long> timePeriodMap = TimePeriodUtils.groupByTimePeriod(timestamps, bucketSizeInDays);
+                    List<List<Object>> timeSeriesData = TimePeriodUtils.convertTimePeriodMapToTimeSeriesData(timePeriodMap, bucketSizeInDays);
                     result.put(category, timeSeriesData);
                 }
             }

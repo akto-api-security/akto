@@ -370,6 +370,7 @@ function ThreatCategoryChart({ startTimestamp, endTimestamp, itemId, onRemoveCom
                   gridLineWidth: 0,
                 }}
                 defaultChartOptions={{
+                  legend: { enabled: false },
                   tooltip: {
                     shared: true,
                     useHTML: true,
