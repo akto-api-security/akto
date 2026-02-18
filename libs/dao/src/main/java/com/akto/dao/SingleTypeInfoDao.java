@@ -827,11 +827,12 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
 
         long query1Start = System.currentTimeMillis();
         long totalCount = 0;
-        if (useRbacUserCollections) {
-            totalCount = SingleTypeInfoDao.instance.count(filterAllWithTs);
-        } else {
-            totalCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterAllWithTs);
-        }
+        totalCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterAllWithTs);
+        // if (useRbacUserCollections) {
+        //     totalCount = SingleTypeInfoDao.instance.count(filterAllWithTs);
+        // } else {
+        //     totalCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterAllWithTs);
+        // }
         long query1Time = System.currentTimeMillis() - query1Start;
         System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query1 (count all with ts): time=" + query1Time + "ms, result=" + totalCount + ", useRbac=" + useRbacUserCollections);
 
@@ -847,11 +848,12 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             );
 
             long query2Start = System.currentTimeMillis();
-            if (useRbacUserCollections) {
-                excludedCount = SingleTypeInfoDao.instance.count(filterExcludedWithTs);
-            } else {
-                excludedCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterExcludedWithTs);
-            }
+            excludedCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterExcludedWithTs);
+            // if (useRbacUserCollections) {
+            //     excludedCount = SingleTypeInfoDao.instance.count(filterExcludedWithTs);
+            // } else {
+            //     excludedCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterExcludedWithTs);
+            // }
             long query2Time = System.currentTimeMillis() - query2Start;
             System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query2 (count excluded): time=" + query2Time + "ms, result=" + excludedCount + ", nonHostCount=" + nonHostApiCollectionIds.size());
         } else {
