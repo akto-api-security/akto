@@ -2121,7 +2121,7 @@
         </action>
 
 
-        <action name="api/getCountForHostnameDeactivatedCollections" class="com.akto.action.ApiCollectionsAction" method="getCountForHostnameDeactivatedCollections">
+        <action name="api/getCountForHostnameDeactivatedCollections" class="com.akto.action.ApiCollectionsAction" method="fetchCountForHostnameDeactivatedCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -2143,7 +2143,7 @@
             </result>
         </action>   
 
-        <action name="api/getCountForUningestedApis" class="com.akto.action.ApiCollectionsAction" method="getCountForUningestedApis">
+        <action name="api/getCountForUningestedApis" class="com.akto.action.ApiCollectionsAction" method="fetchCountForUningestedApis">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -3110,7 +3110,7 @@
             </result>
         </action>
 
-        <action name="api/getEndpointsFromConditions" class="com.akto.action.ApiCollectionsAction" method="getEndpointsFromConditions">
+        <action name="api/getEndpointsFromConditions" class="com.akto.action.ApiCollectionsAction" method="fetchEndpointsFromConditions">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -3823,7 +3823,7 @@
             </result>
         </action>
 
-        <action name="api/getAllUsersCollections" class="com.akto.action.ApiCollectionsAction" method="getAllUsersCollections">
+        <action name="api/getAllUsersCollections" class="com.akto.action.ApiCollectionsAction" method="fetchAllUsersCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
