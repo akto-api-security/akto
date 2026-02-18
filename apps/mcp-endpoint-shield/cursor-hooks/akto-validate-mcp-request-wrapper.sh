@@ -9,6 +9,7 @@ export AKTO_TIMEOUT="5"
 # TODO: Change to "cursor" connector once backend support is added
 export AKTO_CONNECTOR="cursor"
 export CONTEXT_SOURCE="ENDPOINT"
+export DEVICE_ID="{{DEVICE_ID (optional)}}"
 
 # Logging Configuration
 export LOG_LEVEL="INFO"
