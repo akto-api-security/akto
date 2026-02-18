@@ -1,5 +1,6 @@
 package com.akto.open_api.parser;
 
+import java.net.URL;
 import java.util.*;
 import javax.ws.rs.core.Response.Status;
 
@@ -7,6 +8,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.upload.FileUploadError;
 import com.akto.dto.upload.SwaggerUploadLog;
 import com.akto.log.LoggerMaker;
@@ -39,7 +41,7 @@ public class Parser {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Parser.class, LogDb.DASHBOARD);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    public static ParserResult convertOpenApiToAkto(OpenAPI openAPI, String uploadId) {
+    public static ParserResult convertOpenApiToAkto(OpenAPI openAPI, String uploadId, boolean useHost, List<String> urlsList ) {
 
         List<FileUploadError> fileLevelErrors = new ArrayList<>();
         List<SwaggerUploadLog> uploadLogs = new ArrayList<>();
@@ -86,7 +88,7 @@ public class Parser {
                 }
             }
         } catch (Exception e) {
-            loggerMaker.infoAndAddToDb("unable to parse security schemes " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "unable to parse security schemes " + e.getMessage());
             fileLevelErrors.add(new FileUploadError("unable to parse security schemes " + e.getMessage(), FileUploadError.ErrorType.WARNING));
         }
 
@@ -96,12 +98,14 @@ public class Parser {
         }
 
         int count = 0;
+
+        loggerMaker.infoAndAddToDb("Parsing " + paths.size() + " paths from the uploaded file");
+
         for (String path : paths.keySet()) {
             String originalPath = String.copyValueOf(path.toCharArray());
             PathItem pathItem = paths.get(path);
             if (pathItem == null)
                 continue;
-
             try {
 
                 List<Server> serversFromPath = pathItem.getServers();
@@ -157,8 +161,7 @@ public class Parser {
                             }
                         }
                     } catch (Exception e) {
-                        loggerMaker.infoAndAddToDb(
-                                "unable to handle request body for " + path + " " + method + " " + e.toString());
+                        loggerMaker.errorAndAddToDb(e, "unable to handle request body for " + path + " " + method + " " + e.toString());
                         apiLevelErrors.add(new FileUploadError("Unable to parse request body: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
                     }
 
@@ -200,18 +203,31 @@ public class Parser {
                             }
                         }
                     } catch (Exception e) {
-                        loggerMaker.infoAndAddToDb("unable to parse security schemes " + e.getMessage());
+                        loggerMaker.errorAndAddToDb(e, "unable to parse security schemes " + e.getMessage());
                         apiLevelErrors.add(new FileUploadError("unable to parse security schemes: " + e.getMessage(), FileUploadError.ErrorType.WARNING));
                     }
 
                     String requestHeadersString = "";
+                    String urlPath = path;
+                    try {
+                        URL url = new URL(path);
+                        // without host/server.
+                        urlPath = url.getPath() + (url.getQuery() != null ? "?" + url.getQuery() : "");
+                        // Get the domain (including scheme)
+                        requestHeaders.putIfAbsent("Host", url.getHost());
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "unable to parse url for " + path + " " + method + " " + e.toString());
+                    }
+
+                    if (requestHeaders == null) {
+                        requestHeaders = new HashMap<>();
+                    }
+
                     if (requestHeaders != null && !requestHeaders.isEmpty()) {
                         try {
                             requestHeadersString = mapper.writeValueAsString(requestHeaders);
                         } catch (JsonProcessingException e) {
-                            loggerMaker.infoAndAddToDb(
-                                    "unable to parse request headers for " + path + " " + method + " "
-                                            + e.getMessage());
+                            loggerMaker.errorAndAddToDb(e, "unable to parse request headers for " + path + " " + method + " " + e.getMessage());
                             apiLevelErrors.add(new FileUploadError("error while converting request headers to string: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
                         }
                     }
@@ -221,7 +237,7 @@ public class Parser {
                     List<Map<String, String>> responseObjectList = new ArrayList<>();
 
                     try {
-                        loggerMaker.infoAndAddToDb("Replaying request for" + path + " " + method + ", replaying request");
+                        loggerMaker.infoAndAddToDb("Replaying request for " + path + " " + method + ", replaying request");
 
                         Map<String, List<String>> modifiedHeaders = new HashMap<>();
                         for (String key : requestHeaders.keySet()) {
@@ -248,7 +264,7 @@ public class Parser {
                             responseObject.put(mKeys.statusCode, statusCode);
                             responseObjectList.add(responseObject);
                         } catch (Exception e) {
-                            loggerMaker.infoAndAddToDb("Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.getMessage(), LogDb.DASHBOARD);
+                            loggerMaker.errorAndAddToDb(e, "Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.getMessage());
                             ApiResponses responses = operation.getResponses();
                             if (responses != null) {
                                 for (String responseCode : responses.keySet()) {
@@ -290,7 +306,7 @@ public class Parser {
                                         try {
                                             responseHeadersString = mapper.writeValueAsString(responseHeaders);
                                         } catch (Exception e1) {
-                                            loggerMaker.infoAndAddToDb("unable to handle response headers for " + path + " "
+                                            loggerMaker.errorAndAddToDb(e1, "unable to handle response headers for " + path + " "
                                                     + method + " " + e1.getMessage());
                                             apiLevelErrors.add(new FileUploadError("Replaying the request failed, reason: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
                                             apiLevelErrors.add(new FileUploadError("Error while converting response headers to string from example: " +e1.getMessage(),FileUploadError.ErrorType.ERROR));
@@ -309,21 +325,49 @@ public class Parser {
                         }
 
                     } catch (Exception e) {
-                        loggerMaker.infoAndAddToDb(
-                                "unable to handle response body for " + path + " " + method + " " + e.toString());
+                        loggerMaker.errorAndAddToDb(e, "unable to handle response body for " + path + " " + method + " " + e.toString());
                         apiLevelErrors.add(new FileUploadError("Error while converting response to Akto format: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
-
                     }
 
                     messageObject.put(mKeys.akto_account_id, Context.accountId.get().toString());
-                    messageObject.put(mKeys.path, path);
+                    if(useHost){
+                        messageObject.put(mKeys.path, path);
+                    } else {
+                        /*
+                         * In case of existing API collection, we need to check if the URL is already
+                         * present in the existing API collection.
+                         * If it is, we need to use the URL from the existing API collection.
+                         * If it is not, we need to use the URL from the uploaded file.
+                         */
+
+                        String matchingUrl = urlPath;
+                        int matchesFound = 0;
+                        for (String collectionUrl : urlsList) {
+                            if (collectionUrl.contains(urlPath)) {
+                                matchesFound++;
+                                matchingUrl = collectionUrl;
+                            }
+                        }
+
+                        /*
+                         * If there is only one match, we use the matching URL.
+                         * If there are multiple matches, we use the URL from the uploaded file, because
+                         * of ambiguity.
+                         */
+                        if (matchesFound == 1) {
+                            messageObject.put(mKeys.path, matchingUrl);
+                        } else {
+                            messageObject.put(mKeys.path, urlPath);
+                        }
+                    }
                     messageObject.put(mKeys.method, method.toString().toUpperCase());
                     messageObject.put(mKeys.requestHeaders, requestHeadersString);
                     messageObject.put(mKeys.requestPayload, requestString);
                     messageObject.put(mKeys.ip, "null");
                     messageObject.put(mKeys.time, Context.now() + "");
                     messageObject.put(mKeys.type, "HTTP");
-                    messageObject.put(mKeys.source, "OTHER");
+                    // swagger uploads are treated as HAR files.
+                    messageObject.put(mKeys.source, Source.OPEN_API.name());
 
                     if (responseObjectList.isEmpty()) {
                         responseObjectList.add(emptyResponseObject);
@@ -341,16 +385,14 @@ public class Parser {
                         fillDummyIfEmptyMessage(messageObject);
                         SwaggerUploadLog log = new SwaggerUploadLog();
                         log.setMethod(method.toString());
-                        log.setUrl(path);
+                        log.setUrl(urlPath);
                         log.setUploadId(uploadId);
-
                         try {
                             String s = mapper.writeValueAsString(messageObject);
                             log.setAktoFormat(s);
 
                         } catch (JsonProcessingException e) {
-                            loggerMaker.infoAndAddToDb("unable to parse message object for " + path + " " + method + " "
-                                    + e.getMessage());
+                            loggerMaker.errorAndAddToDb(e, "unable to parse message object for " + path + " " + method + " " + e.getMessage());
                             apiLevelErrors.add(new FileUploadError("Error while converting message to Akto format: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
                             log.setAktoFormat(null);
                         }
@@ -362,9 +404,13 @@ public class Parser {
                 }
 
             } catch (Exception e) {
-                loggerMaker.infoAndAddToDb("unable to parse path item for " + path + " " + e.toString());
+                loggerMaker.errorAndAddToDb(e, "unable to parse path item for " + path + " " + e.toString());
             }
         }
+
+        loggerMaker.infoAndAddToDb("Parsed " + count + " APIs from the uploaded file");
+        loggerMaker.infoAndAddToDb("Created " + uploadLogs.size() + " entries in akto format");
+        loggerMaker.infoAndAddToDb("Found " + fileLevelErrors.size() + " errors in the uploaded file");
 
         ParserResult parserResult = new ParserResult();
         parserResult.setFileErrors(fileLevelErrors);
@@ -374,7 +420,7 @@ public class Parser {
     }
 
     // message keys for akto format.
-    private interface mKeys {
+    public interface mKeys {
         String akto_account_id = "akto_account_id";
         String path = "path";
         String method = "method";

@@ -6,8 +6,18 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import com.akto.dao.*;
+import com.akto.dto.upload.SwaggerUploadLog;
+import com.akto.open_api.parser.Parser;
+import com.akto.open_api.parser.ParserResult;
+import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.APICatalogSync;
+import io.swagger.parser.OpenAPIParser;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.parser.core.models.ParseOptions;
+import io.swagger.v3.parser.core.models.SwaggerParseResult;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.CommonTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -132,6 +142,8 @@ public class DbAction extends ActionSupport {
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
     String openApiSchema;
+    @Getter @Setter
+    private String importType;
     @Getter @Setter
     McpAuditInfo auditInfo;
     
@@ -4832,6 +4844,140 @@ public class DbAction extends ActionSupport {
 
     public void setOpenApiSchema(String openApiSchema) {
         this.openApiSchema = openApiSchema;
+    }
+
+    private String extractHostFromServers(OpenAPI openAPI) {
+        if (openAPI.getServers() != null && !openAPI.getServers().isEmpty()) {
+            String serverUrl = openAPI.getServers().get(0).getUrl();
+            try {
+                java.net.URL url = new java.net.URL(serverUrl);
+                return url.getHost();
+            } catch (Exception e) {
+                return serverUrl;
+            }
+        }
+        return null;
+    }
+
+    private int createCollectionForOpenApi(String hostName) throws Exception {
+        int id = hostName.hashCode();
+        id = id < 0 ? id * -1 : id;
+        if (id == 0) id = 1;
+
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+
+        for (int i = 0; i < 100; i++) {
+            int candidateId = id + i;
+            try {
+                Bson updates = Updates.combine(
+                    Updates.setOnInsert("_id", candidateId),
+                    Updates.setOnInsert("startTs", Context.now()),
+                    Updates.setOnInsert("urls", new HashSet<>())
+                );
+                ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(
+                    Filters.eq(ApiCollection.HOST_NAME, hostName), updates, updateOptions);
+                loggerMaker.infoAndAddToDb("Using collectionId=" + candidateId + " for " + hostName);
+                return candidateId;
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Collision creating collection for host " + hostName + ", trying " + (i + 1));
+            }
+        }
+        throw new Exception("Unable to create collection for host: " + hostName);
+    }
+
+    public String importOpenApiSpec() {
+        int accountId = Context.accountId.get();
+
+        if (openApiSchema == null || openApiSchema.isEmpty()) {
+            loggerMaker.errorAndAddToDb("openApiSchema is null or empty in importOpenApiSpec");
+            return Action.ERROR.toUpperCase();
+        }
+
+        service.schedule(new Runnable() {
+            public void run() {
+                Context.accountId.set(accountId);
+                try {
+                    // Parse OpenAPI spec
+                    ParseOptions options = new ParseOptions();
+                    options.setResolve(true);
+                    options.setResolveFully(true);
+                    SwaggerParseResult result = new OpenAPIParser().readContents(openApiSchema, null, options);
+                    OpenAPI openAPI = result.getOpenAPI();
+                    if (openAPI == null) {
+                        loggerMaker.errorAndAddToDb("Failed to parse OpenAPI spec in importOpenApiSpec");
+                        return;
+                    }
+
+                    // Extract title
+                    String title = "OpenAPI ";
+                    if (openAPI.getInfo() != null && openAPI.getInfo().getTitle() != null) {
+                        title += openAPI.getInfo().getTitle();
+                    } else {
+                        title += Context.now();
+                    }
+
+                    // Parse into Akto format with useHost=true
+                    ParserResult parsedResult = Parser.convertOpenApiToAkto(openAPI, null, true, new ArrayList<>());
+                    List<SwaggerUploadLog> uploadLogs = parsedResult.getUploadLogs();
+
+                    // Filter based on importType
+                    if ("ONLY_SUCCESSFUL_APIS".equals(importType)) {
+                        uploadLogs = uploadLogs.stream()
+                            .filter(log -> log.getErrors() == null || log.getErrors().isEmpty())
+                            .collect(Collectors.toList());
+                    }
+
+                    // Collect aktoFormat messages
+                    List<String> msgs = uploadLogs.stream()
+                        .filter(log -> log.getAktoFormat() != null)
+                        .map(SwaggerUploadLog::getAktoFormat)
+                        .collect(Collectors.toList());
+
+                    if (msgs.isEmpty()) {
+                        loggerMaker.infoAndAddToDb("No valid APIs found in OpenAPI spec");
+                        return;
+                    }
+
+                    // Extract hostName from OpenAPI servers section
+                    String extractedHost = extractHostFromServers(openAPI);
+                    if (extractedHost == null || extractedHost.isEmpty()) {
+                        extractedHost = title;
+                    }
+
+                    // Create collection using hostName.hashCode() pattern
+                    int colId = createCollectionForOpenApi(extractedHost);
+
+                    // Process through HttpCallParser (same as dashboard's skipKafka=true path)
+                    List<HttpResponseParams> responses = new ArrayList<>();
+                    for (String message : msgs) {
+                        HttpResponseParams responseParams = HttpCallParser.parseKafkaMessage(message);
+                        responseParams.getRequestParams().setApiCollectionId(colId);
+                        responses.add(responseParams);
+                    }
+
+                    SingleTypeInfo.fetchCustomDataTypes(accountId);
+                    HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                    AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                        AccountSettingsDao.generateFilter());
+                    responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, accountSettings);
+                    callParser.syncFunction(responses, true, false, accountSettings);
+                    APICatalogSync.mergeUrlsAndSave(colId, true, false,
+                        callParser.apiCatalogSync.existingAPIsInDb);
+                    callParser.apiCatalogSync.buildFromDB(false, false);
+                    APICatalogSync.updateApiCollectionCount(
+                        callParser.apiCatalogSync.getDbState(colId), colId);
+
+                    loggerMaker.infoAndAddToDb("Successfully imported " + msgs.size() +
+                        " APIs from OpenAPI spec into collection " + colId);
+
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error in importOpenApiSpec background: " + e.toString());
+                }
+            }
+        }, 0, TimeUnit.SECONDS);
+
+        return Action.SUCCESS.toUpperCase();
     }
 
     public TestingRunPlayground.TestingRunPlaygroundType getTestingRunPlaygroundType() {
