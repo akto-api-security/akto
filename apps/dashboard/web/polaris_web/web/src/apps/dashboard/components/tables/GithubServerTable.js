@@ -105,6 +105,9 @@ function GithubServerTable(props) {
 
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.filterKey || e.value] = 'OR'; return map }, {})
 
+    // TODO: Support pagination to export all pages (not just current page)
+    // TODO: Support exporting only selected items when rows are selected in the table
+    // TODO: Support exporting when filters are enabled
   useEffect(() => {
     const actionWrap = filtersWrapRef.current?.querySelector('[class*="IndexFilters__ActionWrap"]')
     if (!actionWrap) return
@@ -641,6 +644,15 @@ function GithubServerTable(props) {
     }
   }, [bulkActionResources, props.setSelectedResourcesForPrimaryAction])
 
+  const extractText = (val) => {
+    if (val == null) return '-'
+    if (typeof val === 'string' || typeof val === 'number') return String(val)
+    if (Array.isArray(val)) return val.filter(x => x != null).map(extractText).filter(x => x && x !== '-').join(', ') || '-'
+    if (typeof val === 'object' && val.props !== undefined) return extractText(val.props.children ?? val.props.itemsArr ?? val.props.text)
+    if (typeof val === 'object') return Object.entries(val).map(([k, v]) => `${k}: ${v}`).join(', ')
+    return String(val)
+  }
+
   const handleExportCsv = useCallback(() => {
     if (props.onExportCsv) return props.onExportCsv()
     const cols = props.headers.filter(x => x.text?.length > 0)
@@ -648,7 +660,7 @@ function GithubServerTable(props) {
       cols.map(x => x.text).join(","),
       ...data.map(row => cols.map(x => {
         const val = row[x.textValue || x.value]
-        return `"${val == null ? '-' : String(val).replace(/"/g, '""')}"`
+        return `"${extractText(val).replace(/"/g, '""')}"`
       }).join(","))
     ].join("\r\n")
     const fileName = props.csvFileName || props.resourceName?.plural || "export"
