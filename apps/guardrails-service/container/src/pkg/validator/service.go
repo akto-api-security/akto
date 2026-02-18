@@ -313,12 +313,12 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
-
 // ValidateRequest validates a request payload against guardrail policies with session tracking
 func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSource string, sessionID string, requestID string, skipThreat bool) (*mcp.ValidationResult, error) {
 	s.logger.Info("Validating request payload",
 		zap.String("sessionID", sessionID),
-		zap.String("requestID", requestID))
+		zap.String("requestID", requestID),
+		zap.String("payload", payload))
 
 	// Check if session is already malicious
 	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
@@ -424,6 +424,134 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 	}
 
 	s.logger.Info("Response validation completed",
+		zap.Bool("allowed", result.Allowed),
+		zap.Bool("modified", result.Modified),
+		zap.String("sessionID", sessionID))
+
+	return result, nil
+}
+
+// ValidateRequestWithPolicy validates a request payload with an optional provided policy
+// The provided policy is merged with cached policies (provided policy takes precedence)
+func (s *Service) ValidateRequestWithPolicy(
+	ctx context.Context,
+	payload string,
+	contextSource string,
+	sessionID string,
+	requestID string,
+	skipThreat bool,
+	providedPolicy *mcp.GuardrailsPolicy,
+) (*mcp.ValidationResult, error) {
+	s.logger.Info("Validating request payload with provided policy",
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID),
+		zap.String("policyName", providedPolicy.Name))
+
+	// Check if session is already malicious
+	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
+		return result, nil
+	}
+
+	// Track request and generate summary asynchronously
+	session.TrackRequestAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload)
+
+	// Inject session summary into payload if available
+	payloadToValidate := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID)
+
+	// Log the provided policy structure before conversion
+	policyJSON, _ := json.Marshal(providedPolicy)
+	s.logger.Info("Provided policy before conversion",
+		zap.String("policyName", providedPolicy.Name),
+		zap.String("policyJSON", string(policyJSON)),
+		zap.Any("piiTypes", providedPolicy.PIITypes),
+		zap.Bool("active", providedPolicy.Active),
+		zap.Bool("applyOnRequest", providedPolicy.ApplyOnRequest),
+		zap.Bool("applyOnResponse", providedPolicy.ApplyOnResponse))
+
+	// Convert provided policy to types.Policy
+	providedPolicyConverted := mcp.ConvertGuardrailsToPolicy(providedPolicy)
+
+	// Log the converted policy structure
+	convertedPolicyJSON, _ := json.Marshal(providedPolicyConverted)
+	s.logger.Info("Converted policy after conversion",
+		zap.String("policyName", providedPolicy.Name),
+		zap.String("convertedPolicyJSON", string(convertedPolicyJSON)),
+		zap.Int("requestPayloadFilters", len(providedPolicyConverted.Filters.RequestPayload)),
+		zap.Int("responsePayloadFilters", len(providedPolicyConverted.Filters.ResponsePayload)))
+
+	// Use only the provided policy (no cached policies)
+	policies := []types.Policy{providedPolicyConverted}
+	auditPolicies := make(map[string]*types.AuditPolicy)
+	hasAuditRules := false
+
+	s.logger.Info("Using only provided policy (no cached policies)",
+		zap.String("policyName", providedPolicy.Name),
+		zap.Int("totalPolicies", len(policies)))
+
+	// Create validation context with skipThreat flag
+	valCtx := &mcp.ValidationContext{
+		ContextSource: types.ContextSource(contextSource),
+		SessionID:     sessionID,
+		SkipThreat:    skipThreat,
+	}
+
+	// Log detailed filter information
+	if len(providedPolicyConverted.Filters.RequestPayload) > 0 {
+		s.logger.Info("Request payload filters in converted policy",
+			zap.Int("count", len(providedPolicyConverted.Filters.RequestPayload)))
+		for i, filter := range providedPolicyConverted.Filters.RequestPayload {
+			// Log full filter details including Config
+			filterJSON, _ := json.Marshal(filter)
+			s.logger.Info("Request filter details",
+				zap.Int("index", i),
+				zap.String("type", filter.Type),
+				zap.String("pattern", filter.Pattern),
+				zap.String("action", filter.Action),
+				zap.String("description", filter.Description),
+				zap.Bool("caseSensitive", filter.CaseSensitive),
+				zap.String("replacement", filter.Replacement),
+				zap.Any("config", filter.Config),
+				zap.String("fullFilterJSON", string(filterJSON)))
+		}
+	} else {
+		s.logger.Warn("No request payload filters found in converted policy - this might be why guardrails aren't working!")
+	}
+
+	s.logger.Info("Calling ProcessRequest with provided policy only",
+		zap.Int("policiesCount", len(policies)),
+		zap.Int("auditPoliciesCount", len(auditPolicies)),
+		zap.Bool("hasAuditRules", hasAuditRules),
+		zap.Bool("skipThreat", skipThreat),
+		zap.String("payload", payloadToValidate),
+		zap.Int("requestFiltersCount", len(providedPolicyConverted.Filters.RequestPayload)),
+		zap.Int("responseFiltersCount", len(providedPolicyConverted.Filters.ResponsePayload)))
+
+	// Use the default processor - skipThreat is passed via ValidationContext
+	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+	if err != nil {
+		s.logger.Error("ProcessRequest failed", zap.Error(err))
+		return nil, fmt.Errorf("failed to process request: %w", err)
+	}
+
+	// Log detailed ProcessRequest result
+	processResultJSON, _ := json.Marshal(processResult)
+	s.logger.Info("ProcessRequest result",
+		zap.Bool("isBlocked", processResult.IsBlocked),
+		zap.Bool("shouldForward", processResult.ShouldForward),
+		zap.String("modifiedPayload", processResult.ModifiedPayload),
+		zap.Any("blockedResponse", processResult.BlockedResponse),
+		zap.String("fullProcessResultJSON", string(processResultJSON)))
+
+	// Convert ProcessResult to ValidationResult
+	result := &mcp.ValidationResult{
+		Allowed:         !processResult.IsBlocked,
+		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payloadToValidate,
+		ModifiedPayload: processResult.ModifiedPayload,
+		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
+		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
+	}
+
+	s.logger.Info("Request validation completed with provided policy",
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
 		zap.String("sessionID", sessionID))

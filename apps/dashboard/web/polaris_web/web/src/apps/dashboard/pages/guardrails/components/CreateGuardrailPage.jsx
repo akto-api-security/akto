@@ -5,7 +5,8 @@ import {
     VerticalStack,
     Box,
     Icon,
-    Button
+    Button,
+    Badge
 } from "@shopify/polaris";
 import {
     CancelMajor,
@@ -13,6 +14,7 @@ import {
 } from "@shopify/polaris-icons";
 import PersistStore from '../../../../main/PersistStore';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
+import guardrailApi from '../api';
 import {
     PolicyDetailsStep,
     PolicyDetailsConfig,
@@ -731,42 +733,184 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     };
 
-    const handlePlaygroundTest = () => {
+    // Helper function to build detection config object
+    const buildDetectionConfig = (enabled, confidenceScore) => ({
+        enabled,
+        confidenceScore
+    });
+
+    // Helper function to build policy data for playground testing
+    const buildPlaygroundPolicyData = () => {
+        const regexPatternsV2 = regexPatterns
+            .filter(r => r && r.pattern && r.behavior)
+            .map(r => ({
+                pattern: r.pattern,
+                behavior: r.behavior.toLowerCase()
+            }));
+
+        return {
+            name: name || "Playground Test Policy",
+            description: description || "",
+            blockedMessage: blockedMessage || "",
+            applyToResponses: applyToResponses,
+            contentFilters: {
+                harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
+                promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
+                code: enableCodeFilter ? { level: codeFilterLevel.toUpperCase() } : null
+            },
+            deniedTopics: deniedTopics,
+            wordFilters: wordFilters,
+            piiFilters: piiTypes,
+            regexPatterns: regexPatterns
+                .filter(r => r && r.pattern)
+                .map(r => r.pattern),
+            regexPatternsV2,
+            ...(enableLlmPrompt && llmPrompt?.trim() ? {
+                llmRule: {
+                    enabled: true,
+                    userPrompt: llmPrompt.trim(),
+                    confidenceScore: llmConfidenceScore
+                }
+            } : {}),
+            ...(enableBasePromptRule ? {
+                basePromptRule: {
+                    enabled: true,
+                    confidenceScore: basePromptConfidenceScore
+                }
+            } : {}),
+            gibberishDetection: buildDetectionConfig(enableGibberishDetection, gibberishConfidenceScore),
+            anonymizeDetection: buildDetectionConfig(enableAnonymize, anonymizeConfidenceScore),
+            banCodeDetection: buildDetectionConfig(enableBanCode, banCodeConfidenceScore),
+            secretsDetection: buildDetectionConfig(enableSecrets, secretsConfidenceScore),
+            sentimentDetection: buildDetectionConfig(enableSentiment, sentimentConfidenceScore),
+            tokenLimitDetection: buildDetectionConfig(enableTokenLimit, tokenLimitConfidenceScore),
+            url: enableExternalModel ? (url || null) : null,
+            confidenceScore: enableExternalModel ? confidenceScore : null,
+            selectedMcpServers: selectedMcpServers,
+            selectedAgentServers: selectedAgentServers,
+            applyOnResponse: applyOnResponse,
+            applyOnRequest: applyOnRequest
+        };
+    };
+
+    // Helper function to normalize response keys (handle both capitalized and lowercase)
+    const getResponseValue = (obj, ...keys) => {
+        for (const key of keys) {
+            if (obj?.[key] !== undefined) {
+                return obj[key];
+            }
+        }
+        return null;
+    };
+
+    // Helper function to transform playground response to UI format
+    const transformPlaygroundResponse = (result, userPrompt) => {
+        const baseResponse = { userPrompt };
+        
+        // Extract playground result from response (handle both old and new formats)
+        const playgroundResult = result?.result?.playgroundResult || result?.playgroundResult;
+        
+        if (!playgroundResult) {
+            return {
+                ...baseResponse,
+                action: 'Passed',
+                aiResponse: 'Guardrail validation completed. Request passed all checks.'
+            };
+        }
+
+        // Normalize response values (handle both capitalized and lowercase keys)
+        const allowed = getResponseValue(playgroundResult, 'Allowed', 'allowed') !== false;
+        const reason = getResponseValue(playgroundResult, 'Reason', 'reason') || "";
+        const modified = getResponseValue(playgroundResult, 'Modified', 'modified') === true;
+        const modifiedPayload = getResponseValue(playgroundResult, 'ModifiedPayload', 'modifiedPayload');
+        const metadata = getResponseValue(playgroundResult, 'Metadata', 'metadata') || {};
+        const policyName = getResponseValue(metadata, 'policy_name', 'policyName') || "";
+        const ruleViolated = getResponseValue(metadata, 'rule_violated', 'ruleViolated') || "";
+
+        if (!allowed) {
+            return {
+                ...baseResponse,
+                action: 'Blocked',
+                reason: reason || ruleViolated || 'Guardrail Policy Violation',
+                message: reason || ruleViolated || 'This request was blocked by the guardrail policy.',
+                policyName: policyName || undefined,
+                ruleViolated: ruleViolated || undefined
+            };
+        }
+
+        return {
+            ...baseResponse,
+            action: modified ? 'Modified' : 'Passed',
+            reason: modified ? 'Request Modified' : '',
+            message: modified
+                ? (modifiedPayload ? `Request was modified. Modified payload: ${modifiedPayload}` : 'Request was modified by guardrail policy.')
+                : 'Request passed all guardrail checks.',
+            aiResponse: modified && modifiedPayload
+                ? `Modified request: ${modifiedPayload}`
+                : 'This request passed all guardrail validations. Your AI model would process this input normally.',
+            policyName: policyName || undefined,
+            ruleViolated: ruleViolated || undefined
+        };
+    };
+
+    // Sample payload templates for quick testing
+    const samplePayloads = [
+        {
+            label: "Email Test",
+            payload: "Send an email to joe@example.com with sensitive information"
+        },
+        {
+            label: "PII Test",
+            payload: "My credit card number is 4532-1234-5678-9010 and my SSN is 123-45-6789"
+        },
+        {
+            label: "Code Test",
+            payload: "Here's some code: function executeQuery(sql) { return database.query(sql); }"
+        }
+    ];
+
+    const handleSamplePayloadClick = (payload) => {
+        setPlaygroundInput(payload);
+        // Focus the input field after setting the value
+        setTimeout(() => {
+            const inputElement = document.querySelector('.playground-input-wrapper input, .playground-input-wrapper textarea');
+            if (inputElement) {
+                inputElement.focus();
+            }
+        }, 0);
+    };
+
+    const handlePlaygroundTest = async () => {
         if (!playgroundInput.trim()) return;
 
         setPlaygroundLoading(true);
         const inputToTest = playgroundInput;
         setPlaygroundInput("");
 
-        setTimeout(() => {
-            const input = inputToTest.toLowerCase();
-            let response = { userPrompt: inputToTest };
+        try {
+            // Prepare policy data from current form state
+            const policyData = buildPlaygroundPolicyData();
 
-            if (input.includes('hack') || input.includes('exploit') || input.includes('attack')) {
-                response = {
-                    ...response,
-                    action: 'Blocked',
-                    reason: 'Prompt Attack Detected',
-                    message: 'This request was blocked because it contains potential prompt injection or jailbreak attempts.'
-                };
-            } else if (input.includes('hate') || input.includes('violence') || input.includes('harmful')) {
-                response = {
-                    ...response,
-                    action: 'Blocked',
-                    reason: 'Harmful Content Detected',
-                    message: 'This request was blocked due to harmful content categories.'
-                };
-            } else {
-                response = {
-                    ...response,
-                    action: 'Passed',
-                    aiResponse: 'This is a sample response based on your guardrail settings. Your actual AI model would respond here based on the input prompt.'
-                };
-            }
+            const result = await guardrailApi.guardrailPlayground(
+                inputToTest,
+                policyData
+            );
 
+            // Transform the response from guardrail service to match UI format
+            const response = transformPlaygroundResponse(result, inputToTest);
             setPlaygroundMessages(prev => [...prev, response]);
+        } catch (error) {
+            console.error("Error testing guardrail:", error);
+            const errorResponse = {
+                userPrompt: inputToTest,
+                action: 'Error',
+                reason: 'Validation Failed',
+                message: error.response?.data?.actionErrors?.[0] || error.message || 'Failed to test guardrail. Please ensure the guardrail service is running.'
+            };
+            setPlaygroundMessages(prev => [...prev, errorResponse]);
+        } finally {
             setPlaygroundLoading(false);
-        }, 1500);
+        }
     };
 
     const allStepsValid = steps.every(step => step.isValid);
@@ -937,12 +1081,55 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                 )}
                         </div>
                         <div className="playground-input-wrapper">
+                            {/* Sample Payload Templates */}
+                            <Box paddingBlockEnd="3">
+                                <VerticalStack gap="2">
+                                    <Text variant="bodySm" color="subdued" fontWeight="medium">
+                                        Quick Test Templates
+                                    </Text>
+                                    <VerticalStack gap="2">
+                                        {samplePayloads.map((sample, index) => (
+                                            <Box 
+                                                key={index} 
+                                                as="span" 
+                                                display="inlineBlock"
+                                                onClick={() => {
+                                                    if (allStepsValid && !playgroundLoading) {
+                                                        handleSamplePayloadClick(sample.payload);
+                                                    }
+                                                }}
+                                                style={{ 
+                                                    cursor: (!allStepsValid || playgroundLoading) ? 'not-allowed' : 'pointer',
+                                                    opacity: (!allStepsValid || playgroundLoading) ? 0.5 : 1
+                                                }}
+                                            >
+                                                <Box
+                                                    as="span"
+                                                    paddingInlineStart="3"
+                                                    paddingInlineEnd="3"
+                                                    paddingBlockStart="1"
+                                                    paddingBlockEnd="1"
+                                                    borderRadius="2"
+                                                    borderWidth="1"
+                                                    borderColor="border"
+                                                    background="transparent"
+                                                >
+                                                    <Text variant="bodySm" color="subdued" as="span" fontWeight="regular">
+                                                        {sample.payload}
+                                                    </Text>
+                                                </Box>
+                                            </Box>
+                                        ))}
+                                    </VerticalStack>
+                                </VerticalStack>
+                            </Box>
                             <AgenticSearchInput
                                 value={playgroundInput}
                                 onChange={setPlaygroundInput}
                                 onSubmit={handlePlaygroundTest}
                                 placeholder="Test your guardrail policy..."
                                 isStreaming={playgroundLoading}
+                                disabled={!allStepsValid}
                             />
                         </div>
                 </div>

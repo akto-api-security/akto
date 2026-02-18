@@ -169,7 +169,10 @@
 .playground-input-wrapper {
     padding: 20px 20px 24px;
     flex-shrink: 0;
+    border-top: 1px solid #E1E3E5;
+    background: white;
 }
+
 
 /* Responsive adjustments */
 @media (max-width: 1400px) {
