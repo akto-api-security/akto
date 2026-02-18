@@ -135,14 +135,6 @@ public class HttpProxyAction extends ActionSupport {
      * response!=null: Async ingestion only (return 200 immediately for monitoring)
      */
     public String truefoundryProxy() {
-
-        //print all the data we recieve
-        System.out.println("Received TrueFoundry Proxy request:");
-        System.out.println("requestBody: " + requestBody);
-        System.out.println("responseBody: " + responseBody);
-        System.out.println("config: " + config);
-        System.out.println("context: " + context);
-
         try {
             boolean isStreaming = "true".equalsIgnoreCase(streaming);
             boolean hasResponse = responseBody != null && !responseBody.isEmpty();
