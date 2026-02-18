@@ -41,6 +41,13 @@ public class McpAgentAction extends UserAction {
 
     public String chatAndStoreConversation() {
         try {
+
+            String userId = getSUser().getLogin();
+            if (userId != null && userId.startsWith("akash+") && userId.endsWith("@akto.io")) {
+                addActionError("You are not allowed to use this feature");
+                return ERROR.toUpperCase();
+            }
+
             // check for conversation type
             if(conversationType == null) {
                 addActionError("Conversation type is required");
@@ -72,6 +79,7 @@ public class McpAgentAction extends UserAction {
             }
             AgentClient agentClient = new AgentClient(Constants.AKTO_MCP_SERVER_URL);
             String contextString = "";
+            int tokensLimit = 20000;
 
             if(metaData != null) {
                 String type = (String) metaData.get("type");
@@ -89,10 +97,23 @@ public class McpAgentAction extends UserAction {
                             contextString = "Current context: " + latestSampleData;
                         }
                     }
+                } else if(StringUtils.isNotEmpty(type) && type.equals("dashboard_collections")) {
+                    // Dashboard collections data sent from UI
+                    Object data = metaData.get("data");
+                    if(data != null && data instanceof List) {
+                        List<Map<String, Object>> collections = (List<Map<String, Object>>) data;
+                        contextString = "Dashboard API Collections Data:\n" +
+                            "Total collections analyzed: " + collections.size() + "\n" +
+                            "Collections with their metrics (endpoints count and risk scores):\n" +
+                            collections.toString();
+                        // Increase timeout for large data
+                        tokensLimit = 60000; // 60 seconds
+                    }
                 }
             }
 
-            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, 20000, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString);
+            String userEmail = getSUser() != null ? getSUser().getLogin() : null;
+            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail);
             if(responseFromMcpServer != null) {
                 responseFromMcpServer.setCreatedAt(timeNow);
                 AgentConversationDao.instance.insertOne(responseFromMcpServer);

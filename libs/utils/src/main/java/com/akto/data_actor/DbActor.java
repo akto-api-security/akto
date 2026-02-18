@@ -4,6 +4,7 @@ import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.metrics.MetricData;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
@@ -235,8 +236,10 @@ public class DbActor extends DataActor {
     public void bulkInsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception {
         DbLayer.bulkinsertApiHitCount(apiHitCountInfoList);
     }
+    
+    @Override
     public void updateModuleInfo(ModuleInfo moduleInfo) {
-        return;
+        DbLayer.updateModuleInfo(moduleInfo);
     }
 
     public String fetchOpenApiSchema(int apiCollectionId) {
@@ -251,5 +254,14 @@ public class DbActor extends DataActor {
         return DbLayer.fetchAllApiCollections();
     }
 
+    @Override
+    public List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
+        return DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName);
+    }
+
+    @Override
+    public void ingestMetricData(List<MetricData> metricData) {
+        DbLayer.ingestMetric(metricData);
+    }
 
 }

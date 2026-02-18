@@ -11,7 +11,7 @@ import AgenticHistoryModal from './components/AgenticHistoryModal';
 import './AgenticConversationPage.css';
 import { sendQuery, getConversationsList } from './services/agenticService';
 
-function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [], onLoadConversation, conversationType }) {
+function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [], onLoadConversation, conversationType, metadata }) {
     // Conversation state
     const [conversationId, setConversationId] = useState(existingConversationId || null);
     const [messages, setMessages] = useState([]);
@@ -137,6 +137,11 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                 return;
             }
 
+            // Ignore if any modifier keys are being held (keyboard shortcuts)
+            if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) {
+                return;
+            }
+
             // Ignore special keys
             const ignoredKeys = ['Escape', 'Tab', 'Enter', 'Shift', 'Control', 'Alt', 'Meta', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
             if (ignoredKeys.includes(e.key)) {
@@ -154,11 +159,11 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
     }, []);
 
     // Process a query and handle streaming
-    const processQuery = async (query, convId, conversationType) => {
+    const processQuery = async (query, convId, conversationType, queryMetadata) => {
         try {
             setIsLoading(true);
 
-            let res = await sendQuery(query, convId, conversationType);
+            let res = await sendQuery(query, convId, conversationType, queryMetadata || metadata);
             if(res && res.conversationId) {
                 setConversationId(res.conversationId);
             }

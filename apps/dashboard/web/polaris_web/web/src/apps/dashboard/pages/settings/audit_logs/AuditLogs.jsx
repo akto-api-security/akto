@@ -10,6 +10,7 @@ import values from "@/util/values";
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import { CellType } from '../../../components/tables/rows/GithubRow'
 import { saveAs } from 'file-saver'
+import AuditLogDetails from './AuditLogDetails'
 
 const headers = [
     {
@@ -146,24 +147,33 @@ const AuditLogs = () => {
             condensedHeight={true}
             disambiguateLabel={disambiguateLabel}
             mode={IndexFiltersMode.Filtering}
-            onRowClick={(data) => {}}
+            onRowClick={(data) => { 
+                setShowDetails(true); 
+                setAuditLog(data);
+            }}
             showFooter={false}
             loading={tableLoading}
         />
     )
 
+    const [showDetails, setShowDetails] = useState(false)
+    const [auditLog, setAuditLog] = useState(null)
+
     return (
-        <PageWithMultipleCards
-            title={
-                <TitleWithInfo 
-                    titleText={"Audit logs"} 
-                />
-            }
-            primaryAction={<Button loading={loading} primary onClick={exportAuditLogsCSV}>Export as CSV</Button>}
-            secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
-            isFirstPage={true}
-            components={[auditLogsTable]}
-        />
+        <>
+            <PageWithMultipleCards
+                title={
+                    <TitleWithInfo 
+                        titleText={"Audit logs"} 
+                    />
+                }
+                primaryAction={<Button loading={loading} primary onClick={exportAuditLogsCSV}>Export as CSV</Button>}
+                secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+                isFirstPage={true}
+                components={[auditLogsTable]}
+            />
+            <AuditLogDetails showDetails={showDetails} setShowDetails={setShowDetails} auditLog={auditLog} />
+        </>
     )
 }
 

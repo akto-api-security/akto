@@ -2,7 +2,7 @@ import { VerticalStack, Text, FormLayout, Box, Checkbox } from "@shopify/polaris
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
 
 export const ServerSettingsConfig = {
-    number: 8,
+    number: 9,
     title: "Server and application settings",
 
     validate: () => {
@@ -68,6 +68,7 @@ const ServerSettingsStep = ({
                     setSelected={setSelectedMcpServers}
                     preSelected={selectedMcpServers}
                     allowMultiple={true}
+                    showSelectAllMinOptions={1}
                     disabled={collectionsLoading}
                 />
 
@@ -78,6 +79,7 @@ const ServerSettingsStep = ({
                     setSelected={setSelectedAgentServers}
                     preSelected={selectedAgentServers}
                     allowMultiple={true}
+                    showSelectAllMinOptions={1}
                     disabled={collectionsLoading}
                 />
 

@@ -30,6 +30,7 @@ import java.util.zip.ZipInputStream;
 import javax.servlet.ServletContextListener;
 
 import com.akto.DaoInit;
+import com.akto.action.AdxIntegrationAction;
 import com.akto.action.AdminSettingsAction;
 import com.akto.action.ApiCollectionsAction;
 import com.akto.action.CustomDataTypeAction;
@@ -1453,6 +1454,26 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 1, TimeUnit.HOURS);
     }
 
+    /**
+     * Every 15 minutes: sync threat activity to webhook integration (per account with integration configured).
+     */
+    public void setUpThreatActivityWebhookSyncScheduler() {
+        scheduler.scheduleWithFixedDelay(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        try {
+                            AdxIntegrationAction.runThreatActivityWebhookSyncForAccount(t.getId());
+                        } catch (Exception e) {
+                            logger.errorAndAddToDb("Threat-activity webhook sync error for account " + t.getId() + ": " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }, "threat-activity-webhook-sync");
+            }
+        }, 0, 15, TimeUnit.MINUTES);
+    }
+
     static class ChangesInfo {
         public Map<String, String> newSensitiveParams = new HashMap<>();
         public List<BasicDBObject> newSensitiveParamsObject = new ArrayList<>();
@@ -2523,6 +2544,7 @@ public class InitializerListener implements ServletContextListener {
                         logger.warn("Starting CATEGORY 1 job schedulers", LogDb.DASHBOARD);
                         logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
                         setUpWebhookScheduler();
+                        setUpThreatActivityWebhookSyncScheduler();
                         logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
                         setUpTrafficAlertScheduler();
                         logger.warn("Started daily schedulers", LogDb.DASHBOARD);
@@ -2869,8 +2891,20 @@ public class InitializerListener implements ServletContextListener {
     public static Organization fetchAndSaveFeatureWiseAllowed(Organization organization) {
 
         int lastFeatureMapUpdate = organization.getLastFeatureMapUpdate();
-        if((lastFeatureMapUpdate + REFRESH_INTERVAL) >= Context.now()){
+        
+        // Check if planType is missing or invalid - if so, force refresh regardless of time interval
+        String currentPlanType = organization.getplanType();
+        boolean planTypeMissing = currentPlanType == null || currentPlanType.isEmpty() || "planType".equals(currentPlanType);
+        
+        if((lastFeatureMapUpdate + REFRESH_INTERVAL) >= Context.now() && !planTypeMissing){
+            logger.debugAndAddToDb("Skipping refresh for organization " + organization.getId() + 
+                " - recent update and planType exists: " + currentPlanType, LogDb.DASHBOARD);
             return organization;
+        }
+        
+        if (planTypeMissing) {
+            logger.debugAndAddToDb("Forcing refresh for organization " + organization.getId() + 
+                " - planType missing/invalid: " + currentPlanType, LogDb.DASHBOARD);
         }
         HashMap<String, FeatureAccess> featureWiseAllowed = new HashMap<>();
 
@@ -4236,6 +4270,15 @@ public class InitializerListener implements ServletContextListener {
                                     updates.add(Updates.set(YamlTemplate.INACTIVE, inactive));
                                 }
                             } catch (Exception e) {
+                            }
+
+                            try {
+                                Object estimatedTokensObj = TestConfigYamlParser.getFieldIfExists(templateContent, YamlTemplate.ESTIMATED_TOKENS);
+                                if (estimatedTokensObj != null && estimatedTokensObj instanceof Integer) {
+                                    updates.add(Updates.set(YamlTemplate.ESTIMATED_TOKENS, (int) estimatedTokensObj));
+                                }
+                            } catch (Exception e) {
+                                logger.errorAndAddToDb("Error parsing estimatedTokens for template " + id + ": " + e.getMessage(), LogDb.DASHBOARD);
                             }
 
                             if (Constants._AKTO.equals(author)) {

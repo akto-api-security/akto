@@ -1,7 +1,8 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import RegistryBadge from "../../../components/shared/RegistryBadge";
+import RunTest from "./RunTest";
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
@@ -31,13 +32,16 @@ import { useNavigate } from "react-router-dom";
 import ReactFlow, {
     Background,  useNodesState,
     useEdgesState,
-  
+
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
-import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../../main/labelHelper";
 import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
 import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
+import { sendQuery } from "../../agentic/services/agenticService";
+import AgenticThinkingBox from "../../agentic/components/AgenticThinkingBox";
+import ConversationHistory from "../../testing/TestRunResultPage/components/ConversationHistory";
   
 const CenterViewType = {
     Table: 0,
@@ -49,7 +53,7 @@ const API_COLLECTIONS_CACHE_DURATION_SECONDS = 5 * 60; // 5 minutes
 const COLLECTIONS_LAZY_RENDER_THRESHOLD = 100; // Collections count above which we use lazy rendering optimization
 
 const headers = [
-    ...((isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? [{
+    ...((isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory() || isApiSecurityCategory() || isDastCategory()) ? [{
         title: "",
         text: "",
         value: "iconComp",
@@ -316,11 +320,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             descriptionComp: (<Box maxWidth="350px"><Text>{c.description}</Text></Box>),
             outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
             username: getUsernameForCollection(c, usernameMap),
-        ...((tagsList.includes("mcp-server")) ? {
-            iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
-        } : (tagsList.includes("gen-ai")) ? {
-            iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
-        } : (tagsList.includes("browser-llm")) ? {
+        ...((tagsList.includes("mcp-server") || tagsList.includes("gen-ai") || tagsList.includes("browser-llm") || ((isApiSecurityCategory() || isDastCategory()) && c.hostName)) ? {
             iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>)
         } : {})
         };
@@ -510,6 +510,12 @@ function ApiCollections(props) {
     const [normalData, setNormalData] = useState([])
     const [centerView, setCenterView] = useState(CenterViewType.Table);
     const [moreActions, setMoreActions] = useState(false);
+    const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+    const [analysisConversations, setAnalysisConversations] = useState([]);
+    const [analysisLoading, setAnalysisLoading] = useState(false);
+    const [analysisConversationId, setAnalysisConversationId] = useState(null);
+    const [showMultiCollectionRunTest, setShowMultiCollectionRunTest] = useState(false);
+    const [selectedCollectionIdsForTest, setSelectedCollectionIdsForTest] = useState([]);
 
     // const dummyData = dummyJson;
 
@@ -1324,6 +1330,18 @@ function ApiCollections(props) {
                 }
             )
         }
+
+        // Add Run Test button for multi-collection testing
+        if (selectedResources.length > 1) {
+            actions.push({
+                content: <Button id="bulk-run-test-button" primary>Run test</Button>,
+                onAction: () => {
+                    setSelectedCollectionIdsForTest(selectedResources);
+                    setShowMultiCollectionRunTest(true);
+                }
+            })
+        }
+
         const bulkActionsOptions = [...actions];
         bulkActionsOptions.push(toggleEnvType)
         return bulkActionsOptions
@@ -1493,6 +1511,94 @@ function ApiCollections(props) {
         fetchSvcToSvcGraphData()
     }
 
+    const processAnalysisQuery = async (query, metadata) => {
+        try {
+            setAnalysisLoading(true);
+
+            // Add user message to conversation history
+            const userMessage = {
+                _id: 'user_' + Date.now(),
+                role: 'user',
+                message: query,
+                creationTimestamp: func.timeNow()
+            };
+            setAnalysisConversations(prev => [...prev, userMessage]);
+
+            // Call API
+            const res = await sendQuery(query, analysisConversationId, "ANALYZE_DASHBOARD_DATA", metadata);
+
+            if(res?.conversationId) {
+                setAnalysisConversationId(res.conversationId);
+            }
+
+            // Add AI response to conversation history
+            if(res?.response) {
+                const aiMessage = {
+                    _id: "assistant_" + Date.now(),
+                    role: 'assistant',
+                    message: res.response,
+                    creationTimestamp: func.timeNow()
+                };
+                setAnalysisConversations(prev => [...prev, aiMessage]);
+            }
+
+            setAnalysisLoading(false);
+
+        } catch (err) {
+            console.error('Error processing query:', err);
+            setAnalysisLoading(false);
+        }
+    };
+
+    const handleAnalyzeDashboard = () => {
+        // Get all collections from current data, filter out deactivated and API_GROUP types
+        const allColl = (data['all'] || []).filter(c => !c.deactivated && c.type !== "API_GROUP" && c.urlsCount > 0 && c.displayName !== "juice_shop_demo" && c.displayName !== "vulnerable_apis" && c.displayName !== "Default");
+
+        const preparedCollections = allColl.map(c => ({
+            id: c.id,
+            name: c.displayName,
+            totalEndpoints: c.urlsCount || 0,
+            riskScore: c.riskScore,
+            sensitiveData: c.sensitiveSubTypesVal,
+            issues: c.issuesArrVal,
+        }));
+
+        // Sort by endpoints and risk score, get top 50 each
+        const topByEndpoints = [...preparedCollections]
+            .sort((a, b) => b.totalEndpoints - a.totalEndpoints)
+            .slice(0, 25);
+
+        const topByRiskScore = [...preparedCollections]
+            .sort((a, b) => b.riskScore - a.riskScore)
+            .slice(0, 25);
+
+        // Combine and deduplicate
+        const seenIds = new Set();
+        const combinedCollections = [];
+
+        [...topByEndpoints, ...topByRiskScore].forEach(col => {
+            if (!seenIds.has(col.id)) {
+                seenIds.add(col.id);
+                combinedCollections.push(col);
+            }
+        });
+
+        // Prepare metadata for API call
+        const metadata = {
+            type: "dashboard_collections",
+            data: combinedCollections
+        };
+
+        // Reset state and open modal
+        setAnalysisConversations([]);
+        setAnalysisConversationId(null);
+        setShowAnalysisModal(true);
+
+        // Process initial query
+        const initialQuery = "Analyze the dashboard data provided above. Focus on risk distribution, endpoint coverage, sensitive data exposure, issues count data with severity, and provide actionable recommendations, review and provide insight purely from the data provided above.";
+        processAnalysisQuery(initialQuery, metadata);
+    }
+
     const secondaryActionsComp = (
         <HorizontalStack gap={2}>
             <Popover
@@ -1540,6 +1646,7 @@ function ApiCollections(props) {
                     />
                 </Popover.Pane>
             </Popover>
+            <Button onClick={handleAnalyzeDashboard}>Analyze Inventory</Button>
             {!activeFilterType && <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
         </HorizontalStack>
     )
@@ -1616,6 +1723,12 @@ function ApiCollections(props) {
             // Move source column after Endpoint ID
             modifiedHeaders = moveSourceColumnAfterEndpointId(modifiedHeaders);
         }
+
+        // For API Security and DAST, only show icons column on hostname tab
+        if ((isApiSecurityCategory() || isDastCategory()) && selectedTab !== 'hostname') {
+            modifiedHeaders = modifiedHeaders.filter(h => h.value !== 'iconComp');
+        }
+
         return modifiedHeaders;
     };
     const dynamicHeaders = getModifiedHeaders();
@@ -1640,7 +1753,37 @@ function ApiCollections(props) {
             });
         }
         
-        return modifiedSortOptions;
+        const allSortOptions = selectedTab === 'groups' ? [...tempSortOptions, ...modifiedSortOptions] : modifiedSortOptions;
+        
+        // This ensures column indices match the actual table structure
+        const updatedSortOptions = allSortOptions.map(opt => {
+            // Find the actual column index in dynamicHeaders based on sortKey or matching criteria
+            let actualColumnIndex = -1;
+            
+            // Map sortKey to the header value field
+            const sortKeyToValueMap = {
+                'urlsCount': 'urlsCount',
+                'riskScore': 'riskScoreComp',
+                'startTs': 'discovered',
+                'detectedTimestamp': 'lastTraffic',
+                'customGroupsSort': 'displayNameComp'
+            };
+            
+            const headerValue = sortKeyToValueMap[opt.sortKey];
+            if (headerValue) {
+                actualColumnIndex = dynamicHeaders.findIndex(h => h.value === headerValue);
+            }
+            
+            // If found, use the actual index + 1 (1-based indexing for Polaris)
+            if (actualColumnIndex !== -1) {
+                return { ...opt, columnIndex: actualColumnIndex + 1 };
+            }
+            
+            // Otherwise keep the original columnIndex (fallback)
+            return opt;
+        });
+        
+        return updatedSortOptions;
     };
     const dynamicSortOptions = getModifiedSortOptions();
 
@@ -1707,7 +1850,7 @@ function ApiCollections(props) {
                 filterStateUrl={"/dashboard/observe/inventory/"}
                 pageLimit={100}
                 data={data[selectedTab]}
-                sortOptions={selectedTab === 'groups' ? [...tempSortOptions, ...dynamicSortOptions] : dynamicSortOptions}
+                sortOptions={dynamicSortOptions}
                 resourceName={resourceName}
                 filters={[]}
                 disambiguateLabel={disambiguateLabel}
@@ -1761,22 +1904,58 @@ function ApiCollections(props) {
     const pageTitle = getFilteredPageTitle();
 
     return(
-        <PageWithMultipleCards
-            title={
-                <TitleWithInfo 
-                    tooltipContent={activeFilterTitle 
-                        ? `Viewing collections filtered by ${activeFilterTitle}`
-                        : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
-                    titleText={pageTitle} 
-                    docsUrl={"https://docs.akto.io/api-inventory/concepts"}
+        <>
+            <PageWithMultipleCards
+                title={
+                    <TitleWithInfo
+                        tooltipContent={activeFilterTitle
+                            ? `Viewing collections filtered by ${activeFilterTitle}`
+                            : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
+                        titleText={pageTitle}
+                        docsUrl={"https://docs.akto.io/api-inventory/concepts"}
+                    />
+                }
+                primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
+                isFirstPage={!isFromEndpoints}
+                backUrl={isFromEndpoints ? "/dashboard/observe/agentic-assets" : undefined}
+                components={components}
+                secondaryActions={secondaryActionsComp}
+            />
+            {showAnalysisModal && (
+                <Modal
+                    open={showAnalysisModal}
+                    onClose={() => setShowAnalysisModal(false)}
+                    title="Dashboard Analysis"
+                    large
+                >
+                    <Modal.Section>
+                        <Box style={{ minHeight: '400px', maxHeight: '60vh', overflowY: 'auto' }}>
+                            {analysisLoading && analysisConversations.length === 0 ? (
+                                <AgenticThinkingBox />
+                            ) : (
+                                <VerticalStack gap="4">
+                                    <ConversationHistory conversations={analysisConversations} isInventory={true}/>
+                                    {analysisLoading && <AgenticThinkingBox />}
+                                </VerticalStack>
+                            )}
+                        </Box>
+                    </Modal.Section>
+                </Modal>
+            )}
+            {showMultiCollectionRunTest && (
+                <RunTest
+                    apiCollectionIds={selectedCollectionIdsForTest}
+                    endpoints={[]}
+                    filtered={false}
+                    runTestFromOutside={true}
+                    closeRunTest={() => {
+                        setShowMultiCollectionRunTest(false);
+                        resetResourcesSelected();
+                    }}
+                    disabled={false}
                 />
-            }
-            primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
-            isFirstPage={!isFromEndpoints}
-            backUrl={isFromEndpoints ? "/dashboard/observe/agentic-assets" : undefined}
-            components={components}
-            secondaryActions={secondaryActionsComp}
-        />
+            )}
+        </>
     )
 }
 

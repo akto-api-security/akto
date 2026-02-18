@@ -124,6 +124,7 @@ public class AbstractThreatDetectionAction extends UserAction {
                   smr.getApiCollectionId(),
                   smr.getIp(),
                   smr.getCountry(),
+                  smr.getDestCountry(),
                   smr.getDetectedAt(),
                   smr.getType(),
                   smr.getRefId(),
@@ -137,7 +138,8 @@ public class AbstractThreatDetectionAction extends UserAction {
                   smr.getLabel(),
                   smr.getHost(),
                   smr.getJiraTicketUrl(),
-                  smr.getSeverity()
+                  smr.getSeverity(),
+                  smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : ""
               ))
               .collect(Collectors.toList())
           );

@@ -284,6 +284,8 @@ const transform = {
         apiCollectionId = data?.testingEndpoints?.apiCollectionId
       } else if (data?.testingEndpoints?.workflowTest?.apiCollectionId !== undefined) {
         apiCollectionId = data?.testingEndpoints?.workflowTest?.apiCollectionId
+      } else if (data?.testingEndpoints?.apiCollectionIds !== undefined && Array.isArray(data?.testingEndpoints?.apiCollectionIds) && data?.testingEndpoints?.apiCollectionIds.length > 0) {
+        apiCollectionId = data?.testingEndpoints?.apiCollectionIds[0]
       } else {
         apiCollectionId = data?.testingEndpoints?.apisList[0]?.apiCollectionId
       }
@@ -298,24 +300,33 @@ const transform = {
     obj['name'] = data.name || "Test"
     obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount, state)
     obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
-    obj['run_time_epoch'] = Math.max(data.scheduleTimestamp, (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp))
+    obj['run_time_epoch'] = Math.max(data.scheduleTimestamp, (cicd ? (testingRunResultSummary?.endTimestamp) : (data.endTimestamp)))
     obj['scheduleTimestamp'] = data.scheduleTimestamp
     obj['pickedUpTimestamp'] = data.pickedUpTimestamp
-    obj['run_time'] = getRuntime(data.scheduleTimestamp, (cicd ? testingRunResultSummary.endTimestamp : getStatus(state) === "SCHEDULED" ? data.scheduledTimestamp : data.endTimestamp), state)
-    obj['severity'] = func.getSeverity(testingRunResultSummary.countIssues)
-    obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
-    obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
+    obj['run_time'] = getRuntime(data.scheduleTimestamp, (cicd ? (testingRunResultSummary?.endTimestamp) : (getStatus(state) === "SCHEDULED" ? data.scheduledTimestamp : data.endTimestamp)), state)
+    obj['severity'] = func.getSeverity(testingRunResultSummary?.countIssues)
+    obj['total_severity'] = getTotalSeverity(testingRunResultSummary?.countIssues);
+    obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary?.countIssues)
     obj['runTypeStatus'] = [obj['run_type']]
     obj['nextUrl'] = "/dashboard/testing/" + data.hexId
     obj['testRunState'] = state
-    obj['summaryState'] = testingRunResultSummary.state
+    obj['summaryState'] = testingRunResultSummary?.state
     obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
     obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
-    obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
+    
+    // Extract auth error for clean display at the top, filter it from metadata section
+    const authError = testingRunResultSummary?.metadata?.error;
+    const filteredMetadata = testingRunResultSummary?.metadata ? Object.fromEntries(
+      Object.entries(testingRunResultSummary.metadata).filter(([key]) => key !== 'error')
+    ) : testingRunResultSummary?.metadata;
+    
+    obj['authError'] = authError; // For clean display near title/created by
+    obj['metadata'] = func.flattenObject(filteredMetadata)
     obj['apiCollectionId'] = apiCollectionId
+    obj['testingEndpoints'] = data?.testingEndpoints
     obj['userEmail'] = data.userEmail
     obj['scan_frequency'] = getScanFrequency(data.periodInSeconds)
-    obj['total_apis'] = testingRunResultSummary.totalApis
+    obj['total_apis'] = testingRunResultSummary?.totalApis
     obj['miniTestingServiceName'] = data?.miniTestingServiceName
     if (prettified) {
 
@@ -1463,8 +1474,13 @@ const transform = {
           }
         }
   
-        if (conversation?.validationMessage !== null && conversation?.validationMessage !== undefined && conversation?.validationMessage?.length > 0) {
-          systemMessage += ("\n\n### VALIDATION MESSAGE ###\n" + conversation?.validationMessage);
+        const validationMessage = conversation?.validationMessage;
+        const hasValidValidationMessage = validationMessage &&
+          typeof validationMessage === 'string' &&
+          validationMessage.trim().length > 0 &&
+          validationMessage.toLowerCase() !== 'null';
+        if (hasValidValidationMessage) {
+          systemMessage += ("\n\n### VALIDATION MESSAGE ###\n" + validationMessage);
         }
       }
       

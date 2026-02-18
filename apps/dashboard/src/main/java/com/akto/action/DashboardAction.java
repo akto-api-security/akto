@@ -61,30 +61,62 @@ public class DashboardAction extends UserAction {
     public String findTotalIssues() {
         Set<Integer> demoCollections = new HashSet<>();
         demoCollections.addAll(deactivatedCollections);
-//        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
-//        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
-//
-//        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-//        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
-
 
         if (startTimeStamp == 0) startTimeStamp = Context.now() - 24 * 1 * 60 * 60;
-        // totoal issues count = issues that were created before endtimestamp and are either still open or fixed but last updated is after endTimestamp
+
+        // Query 1: OPEN issues before endTimeStamp excluding deactivated
+        // Optimized: (total OPEN with timestamp) - (deactivated OPEN with timestamp)
+        long query1Start = System.currentTimeMillis();
         totalIssuesCount = TestingRunIssuesDao.instance.count(
             Filters.and(
-                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
-                Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.OPEN))       
-            );
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
+            )
+        );
+        long query1Time = System.currentTimeMillis() - query1Start;
+        loggerMaker.warnAndAddToDb("Query1 (OPEN issues count): result=" + totalIssuesCount + ", time=" + query1Time + "ms, endTimeStamp=" + endTimeStamp, LogDb.DASHBOARD);
 
-        // issues that have been created till start timestamp
+        if (!demoCollections.isEmpty()) {
+            long query2Start = System.currentTimeMillis();
+            long excluded = TestingRunIssuesDao.instance.count(
+                Filters.and(
+                    Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                    Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
+                    Filters.in("_id.apiInfoKey.apiCollectionId", demoCollections)
+                )
+            );
+            long query2Time = System.currentTimeMillis() - query2Start;
+            loggerMaker.warnAndAddToDb("Query2 (OPEN deactivated count): result=" + excluded + ", time=" + query2Time + "ms, demoCollectionsSize=" + demoCollections.size(), LogDb.DASHBOARD);
+            totalIssuesCount -= excluded;
+        }
+
+        // Query 2: NOT IGNORED issues (OPEN + FIXED) before startTimeStamp excluding deactivated
+        // Optimized: (total OPEN+FIXED with timestamp) - (deactivated OPEN+FIXED with timestamp)
+        long query3Start = System.currentTimeMillis();
         oldOpenCount = TestingRunIssuesDao.instance.count(
                 Filters.and(
-                        Filters.nin("_id.apiInfoKey.apiCollectionId", demoCollections),
-                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
-                        Filters.ne(TestingRunIssues.TEST_RUN_ISSUES_STATUS,  GlobalEnums.TestRunIssueStatus.IGNORED)
+                        Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
+                            Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
+                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp)
                 )
         );
+        long query3Time = System.currentTimeMillis() - query3Start;
+        loggerMaker.warnAndAddToDb("Query3 (OPEN+FIXED issues count): result=" + oldOpenCount + ", time=" + query3Time + "ms, startTimeStamp=" + startTimeStamp, LogDb.DASHBOARD);
+
+        if (!demoCollections.isEmpty()) {
+            long query4Start = System.currentTimeMillis();
+            long excluded = TestingRunIssuesDao.instance.count(
+                Filters.and(
+                        Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
+                            Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
+                        Filters.lte(TestingRunIssues.CREATION_TIME, startTimeStamp),
+                        Filters.in("_id.apiInfoKey.apiCollectionId", demoCollections)
+                )
+        );
+            long query4Time = System.currentTimeMillis() - query4Start;
+            loggerMaker.warnAndAddToDb("Query4 (OPEN+FIXED deactivated count): result=" + excluded + ", time=" + query4Time + "ms, demoCollectionsSize=" + demoCollections.size(), LogDb.DASHBOARD);
+            oldOpenCount -= excluded;
+        }
 
         return SUCCESS.toUpperCase();
     }
@@ -450,7 +482,7 @@ public class DashboardAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String getAPIInfosForMissingData(){
+    public String fetchAPIInfosForMissingData(){
         Bson filter = UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID);
         // this map get the detailed count of missing api info keys in the api info dao with respect to the api collection id
         Map<Integer, BasicDBObject> missingInfoMap = ApiInfoDao.instance.getApisListMissingInApiInfoDao(filter, this.startTimeStamp, this.endTimeStamp);    

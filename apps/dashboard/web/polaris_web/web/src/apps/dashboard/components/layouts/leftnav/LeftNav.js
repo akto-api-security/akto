@@ -1,4 +1,4 @@
-import {Box, Navigation, Text} from "@shopify/polaris";
+import {Badge, Box, Navigation, Text} from "@shopify/polaris";
 import {
     AppsFilledMajor,
     InventoryFilledMajor,
@@ -147,6 +147,17 @@ export default function LeftNav() {
                     setActive("normal");
                 }
             }] : []),
+            // ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
+            //     label: "Endpoint Security Posture",
+            //     icon: ReportFilledMinor,
+            //     onClick: () => {
+            //         handleSelect("dashboard_endpoint_posture");
+            //         navigate("/dashboard/endpoint-dashboard");
+            //         setActive("normal");
+            //     },
+            //     selected: leftNavSelected === "dashboard_endpoint_posture",
+            //     key: "2a",
+            // }] : []),
             ...(dashboardCategory !== "Endpoint Security" ? [{
                 label: mapLabel("API Security Posture", dashboardCategory),
                 icon: ReportFilledMinor,
@@ -583,9 +594,10 @@ export default function LeftNav() {
 
         // Add Ask AI navigation item
         const askAiExists = items.find(item => item.key === "ask_ai")
-        if (!askAiExists && window.USER_NAME.indexOf("@akto.io")) {
+        if (!askAiExists) {
             items.splice(1, 0, {
                 label: "Ask Akto",
+                badge: <Badge status="info">Beta</Badge>,
                 icon: MagicMinor,
                 onClick: () => {
                     handleSelect("dashboard_ask_ai")

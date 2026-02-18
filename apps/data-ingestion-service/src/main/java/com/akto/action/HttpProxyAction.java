@@ -307,9 +307,7 @@ public class HttpProxyAction extends ActionSupport {
         }, threadName).start();
     }
 
-    /**
-     * Helper method to build TrueFoundry input map from individual fields
-     */
+    @SuppressWarnings("unchecked")
     private Map<String, Object> buildTrueFoundryInput() {
         Map<String, Object> tfInput = new HashMap<>();
         if (requestBody != null) {

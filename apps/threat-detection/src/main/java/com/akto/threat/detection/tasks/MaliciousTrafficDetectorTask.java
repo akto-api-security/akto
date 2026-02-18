@@ -2,6 +2,7 @@ package com.akto.threat.detection.tasks;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,7 +32,9 @@ import com.akto.IPLookupClient;
 import com.akto.RawApiMetadataFactory;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.data_actor.ClientActor;
 import com.akto.data_actor.DataActor;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Rule;
@@ -45,6 +48,7 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
@@ -115,15 +119,19 @@ public class MaliciousTrafficDetectorTask implements Task {
   // Kafka records per minute tracking
   private int recordsReadCount = 0;
   private long lastRecordCountLogTime = System.currentTimeMillis();
+  private String instanceId;
 
   // Valid hostname tracking (non-IP, not localhost, no port)
   private int validHostnameCount = 0;
   private long lastValidHostnameLogTime = System.currentTimeMillis();
 
     public MaliciousTrafficDetectorTask(
-      KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled) throws Exception {
+      KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled, String instanceId) throws Exception {
     this.kafkaConfig = trafficConfig;
 
+    this.instanceId = instanceId;
+
+    Context.accountId.set(ClientActor.getAccountId());
     Properties properties = new Properties();
     properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, trafficConfig.getBootstrapServers());
     properties.put(
@@ -170,13 +178,25 @@ public class MaliciousTrafficDetectorTask implements Task {
   }
 
   private int MAX_KAFKA_DEBUG_MSGS = 100;
+  private static boolean kafkaPollingEnabled = System.getenv().getOrDefault("KAFKA_POLL_ENABLED", "true").equals("true");
+
   public void run() {
     this.kafkaConsumer.subscribe(Collections.singletonList("akto.api.logs2"));
     ExecutorService pollingExecutor = Executors.newSingleThreadExecutor();
     pollingExecutor.execute(
         () -> {
           // Poll data from Kafka topic
-          while (true) {
+          try {
+            Context.accountId.set(ClientActor.getAccountId());
+          } catch (Exception e) {
+              Context.accountId.set(1000000);
+              e.printStackTrace();
+          }
+          
+          logger.warnAndAddToDb(this.instanceId + ": Starting Kafka polling loop");
+          AllMetrics.instance.collectInfraMetrics();
+
+          while (kafkaPollingEnabled) {
             ConsumerRecords<String, byte[]> records =
                 kafkaConsumer.poll(
                     Duration.ofMillis(kafkaConfig.getConsumerConfig().getPollDurationMilli()));
@@ -189,7 +209,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               long currentTime = System.currentTimeMillis();
               long timeDiff = currentTime - lastRecordCountLogTime;
               if (timeDiff >= 60000) { // 60 seconds = 1 minute
-                logger.warnAndAddToDb("Kafka records read in last minute: " + recordsReadCount +
+                logger.warnAndAddToDb(this.instanceId + ": Kafka records read in last minute: " + recordsReadCount +
                                       " (avg " + String.format("%.2f", recordsReadCount / (timeDiff / 1000.0)) + " records/sec)");
                 recordsReadCount = 0;
                 lastRecordCountLogTime = currentTime;
@@ -435,7 +455,6 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
-    Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     String actor = this.threatConfigEvaluator.getActorId(responseParam);
     if (actor == null || actor.isEmpty()) {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
@@ -541,19 +560,18 @@ public class MaliciousTrafficDetectorTask implements Task {
 
       // Evaluate filter first (ignore and filter are independent conditions)
       // SchemaConform check is disabled
-      if(Context.accountId.get() == 1758179941 && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
+      List<Integer> accountIds = Arrays.asList(1758179941, 1763355072);
+      if(accountIds.contains(Context.accountId.get()) && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
-        vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
+        // vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
         
-        // String apiSchema = getApiSchema(apiCollectionId);
+        String apiSchema = getApiSchema(apiCollectionId);
 
-        // if (apiSchema == null || apiSchema.isEmpty()) {
+        if (apiSchema == null || apiSchema.isEmpty()) {
+          continue;
+        }
 
-        //   continue;
-
-        // }
-
-        // vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
+        vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
         hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
       }else {
@@ -678,6 +696,11 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (requestHeaders != null && requestHeaders.containsKey("host") && !requestHeaders.get("host").isEmpty()) {
       host = requestHeaders.get("host").get(0);
     }
+
+    // TODO: Extract sessionId from cookies or headers when needed
+    String sessionId = "";
+
+    String contextSourceValue = CONTEXT_SOURCE.API.name();
     
     MaliciousEventMessage maliciousEvent =
         MaliciousEventMessage.newBuilder()
@@ -699,6 +722,8 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setSuccessfulExploit(maliciousReq.getSuccessfulExploit())
             .setStatus(maliciousReq.getStatus())
             .setHost(host != null ? host : "")
+            .setContextSource(contextSourceValue)
+            .setSessionId(sessionId != null ? sessionId : "")
             .build();
     MaliciousEventKafkaEnvelope envelope =
         MaliciousEventKafkaEnvelope.newBuilder()

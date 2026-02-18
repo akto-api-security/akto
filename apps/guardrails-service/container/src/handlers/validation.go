@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/akto-api-security/guardrails-service/models"
+	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -37,6 +38,10 @@ func (h *ValidationHandler) IngestData(c *gin.Context) {
 		})
 		return
 	}
+
+	h.logger.Debug("IngestData - received contextSource from request",
+		zap.String("contextSource", req.ContextSource),
+		zap.Int("batchSize", len(req.BatchData)))
 
 	h.logger.Info("Received batch data",
 		zap.Int("size", len(req.BatchData)),
@@ -94,7 +99,15 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		return
 	}
 
-	result, err := h.validatorService.ValidateRequest(c.Request.Context(), req.Payload, req.ContextSource)
+	// Extract session and request IDs from headers
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+
+	h.logger.Debug("ValidateRequest - received contextSource from request",
+		zap.String("contextSource", req.ContextSource),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
+
+	result, err := h.validatorService.ValidateRequest(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID)
 	if err != nil {
 		h.logger.Error("Failed to validate request", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -120,7 +133,15 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		return
 	}
 
-	result, err := h.validatorService.ValidateResponse(c.Request.Context(), req.Payload, req.ContextSource)
+	// Extract session and request IDs from headers
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+
+	h.logger.Debug("ValidateResponse - received contextSource from request",
+		zap.String("contextSource", req.ContextSource),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
+
+	result, err := h.validatorService.ValidateResponse(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID)
 	if err != nil {
 		h.logger.Error("Failed to validate response", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
