@@ -83,6 +83,14 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] {ApiInfo.SEVERITY_SCORE }, false);
+
+        // Indexes for agent proxy guardrail endpoints
+        // Note: host is stored in ApiCollection, not ApiInfo, so we index by apiCollectionId
+        fieldNames = new String[]{ApiInfo.ID_API_COLLECTION_ID, ApiInfo.AGENT_PROXY_GUARDRAIL_ENABLED, ApiInfo.LAST_SEEN};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{ApiInfo.AGENT_PROXY_GUARDRAIL_ENABLED, ApiInfo.LAST_SEEN};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
                 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] {ApiInfo.RISK_SCORE }, false);
