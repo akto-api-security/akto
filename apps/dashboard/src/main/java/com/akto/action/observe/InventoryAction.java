@@ -435,7 +435,7 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String getAccessTypes() {
+    public String fetchAccessTypes() {
         response = new BasicDBObject();
         if (urls == null || urls.size() == 0 ){
             return Action.SUCCESS.toUpperCase();
@@ -446,7 +446,7 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String getSummaryInfoForChanges(){
+    public String fetchSummaryInfoForChanges(){
         long countEndpoints = SingleTypeInfoDao.instance.fetchEndpointsCount(startTimestamp, endTimestamp, deactivatedCollections);
         int countSensitiveApis = SingleTypeInfoDao.instance.getSensitiveApisCount(new ArrayList<>(), false, (
                 Filters.and(
@@ -1122,7 +1122,7 @@ public class InventoryAction extends UserAction {
 
     Map<ApiInfoKey, Map<String, Integer>> severityMapForCollection;
 
-    public String getSeveritiesCountPerCollection(){
+    public String fetchSeveritiesCountPerCollection(){
         if(apiCollectionId == -1){
             return ERROR.toUpperCase();
         }
@@ -1153,7 +1153,7 @@ public class InventoryAction extends UserAction {
     }
 
     private Set<MergedUrls> mergedUrls;
-    public String getDeMergedApis() {
+    public String fetchDeMergedApis() {
         mergedUrls = MergedUrlsDao.instance.getMergedUrls();
         return SUCCESS.toUpperCase();
     }
