@@ -33,7 +33,7 @@ import IssuesApi from "../../issues/api"
 import SequencesFlow from "./SequencesFlow"
 import SwaggerDependenciesFlow from "./SwaggerDependenciesFlow"
 import SchemaView from "./SchemaView"
-import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper"
+import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel, isEndpointSecurityCategory, isAgenticSecurityCategory } from "../../../../main/labelHelper"
 import McpToolsGraph from "./McpToolsGraph"
 import { findTypeTag, TYPE_TAG_KEYS } from "../agentic/mcpClientHelper"
 import AgentDiscoverGraphWithDummyData from "./AgentDiscoveryGraphWithDummyData"
@@ -1433,15 +1433,17 @@ function ApiEndpoints(props) {
             onAction: () => handleBulkDeMerge(selectedResources)
         })
 
-        // Add bulk guardrail actions
-        ret.push({
-            content: 'Enable guardrails',
-            onAction: () => handleBulkGuardrail(selectedResources, true)
-        })
-        ret.push({
-            content: 'Disable guardrails',
-            onAction: () => handleBulkGuardrail(selectedResources, false)
-        })
+        // Add bulk guardrail actions (only for Argus dashboard)
+        if (isAgenticSecurityCategory()) {
+            ret.push({
+                content: 'Enable guardrails',
+                onAction: () => handleBulkGuardrail(selectedResources, true)
+            })
+            ret.push({
+                content: 'Disable guardrails',
+                onAction: () => handleBulkGuardrail(selectedResources, false)
+            })
+        }
 
         if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
             ret.push({
@@ -1493,7 +1495,7 @@ function ApiEndpoints(props) {
     async function handleToggleGuardrail(apiInfoId, enabled, event) {
         event?.stopPropagation() // Prevent row click
         try {
-            await api.updateAgentProxyGuardrail(apiInfoId, enabled)
+            await api.bulkAgentProxyGuardrail([apiInfoId], enabled)
             func.setToast(true, false, `Guardrails ${enabled ? 'enabled' : 'disabled'} successfully`)
             // Refresh data to show updated guardrail status
             setTimeout(() => {
@@ -1612,21 +1614,23 @@ function ApiEndpoints(props) {
         
         const actions = []
         
-        // Add guardrail actions
-        if (guardrailEnabled) {
-            actions.push({
-                content: 'Disable guardrails for this endpoint',
-                onAction: async () => {
-                    handleToggleGuardrail(apiInfoId, false, null)
-                }
-            })
-        } else {
-            actions.push({
-                content: 'Enable guardrails for this endpoint',
-                onAction: async () => {
-                    handleToggleGuardrail(apiInfoId, true, null)
-                }
-            })
+        // Add guardrail actions (only for Argus dashboard)
+        if (isAgenticSecurityCategory()) {
+            if (guardrailEnabled) {
+                actions.push({
+                    content: 'Disable guardrails for this endpoint',
+                    onAction: async () => {
+                        handleToggleGuardrail(apiInfoId, false, null)
+                    }
+                })
+            } else {
+                actions.push({
+                    content: 'Enable guardrails for this endpoint',
+                    onAction: async () => {
+                        handleToggleGuardrail(apiInfoId, true, null)
+                    }
+                })
+            }
         }
         
         return actions.length > 0 ? [{ items: actions }] : []

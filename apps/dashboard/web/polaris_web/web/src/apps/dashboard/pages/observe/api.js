@@ -441,27 +441,11 @@ export default {
         })
         return resp
     },
-    async updateAgentProxyGuardrail(apiInfoId, enabled) {
-        const resp = await request({
-            url: `/api/apiInfo/${encodeURIComponent(apiInfoId)}/agentProxyGuardrail`,
-            method: 'put',
-            data: { enabled }
-        })
-        return resp
-    },
     async bulkAgentProxyGuardrail(apiInfoIds, enabled) {
         const resp = await request({
             url: '/api/apiInfo/bulkAgentProxyGuardrail',
             method: 'post',
             data: { apiInfoIds, enabled }
-        })
-        return resp
-    },
-    async fetchAgentProxyGuardrailEndpoints(filters = {}) {
-        const resp = await request({
-            url: '/api/apiInfo/agentProxyGuardrailEndpoints',
-            method: 'get',
-            params: filters
         })
         return resp
     },
