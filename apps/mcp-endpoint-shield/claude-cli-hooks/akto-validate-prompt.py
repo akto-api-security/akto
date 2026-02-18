@@ -96,32 +96,72 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         raise
 
 
+def uuid_to_ipv6_simple(uuid_str):
+    hex_str = uuid_str.replace("-", "").lower()
+    return ":".join(hex_str[i:i+4] for i in range(0, 32, 4))
+
+
 def build_validation_request(query: str) -> dict:
     """Build the request body for guardrails validation."""
+    import time
+
     # Build tags based on mode
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
         tags["ai-agent"] = "claudecli"
-        tags["source"] = "ENDPOINT"
+        tags["source"] = CONTEXT_SOURCE
+
+    # Get device ID
+    device_id = os.getenv("DEVICE_ID") or get_machine_id()
+
+    # Build host from CLAUDE_API_URL
+    host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
+
+    # Build request headers as JSON string
+    request_headers = json.dumps({
+        "host": host,
+        "x-claude-hook": "PreToolUse",
+        "content-type": "application/json"
+    })
+
+    # Build response headers as JSON string
+    response_headers = json.dumps({
+        "x-claude-hook": "PreToolUse"
+    })
+
+    # Build request payload as JSON string
+    request_payload = json.dumps({
+        "body": query.strip()
+    })
+
+    # Response payload is empty for before hooks
+    response_payload = json.dumps({})
 
     return {
-        "url": CLAUDE_API_URL,
         "path": "/v1/messages",
-        "request": {
-            "method": "POST",
-            "headers": {
-                "content-type": "application/json"
-            },
-            "body": {
-                "query": query.strip(),
-            },
-            "queryParams": {},
-            "metadata": {
-                "tag": tags
-            },
-            "contextSource": CONTEXT_SOURCE
-        },
-        "response": None
+        "requestHeaders": request_headers,
+        "responseHeaders": response_headers,
+        "method": "POST",
+        "requestPayload": request_payload,
+        "responsePayload": response_payload,
+        "ip": uuid_to_ipv6_simple(device_id),
+        "destIp": "127.0.0.1",
+        "time": str(int(time.time() * 1000)),
+        "statusCode": "200",
+        "type": None,
+        "status": "200",
+        "akto_account_id": "1000000",
+        "akto_vxlan_id": device_id,
+        "is_pending": "false",
+        "source": "MIRRORING",
+        "direction": None,
+        "process_id": None,
+        "socket_id": None,
+        "daemonset_id": None,
+        "enabled_graph": None,
+        "tag": json.dumps(tags),
+        "metadata": json.dumps(tags),
+        "contextSource": CONTEXT_SOURCE
     }
 
 
