@@ -325,7 +325,7 @@ public class TestExecutor {
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
 
-        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed());
+        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getMaxAgentTokens());
         TestingUtilsSingleton.init();
 
         if(!shouldInitOnly){
@@ -466,12 +466,17 @@ public class TestExecutor {
             for (String testSubCategory: testingRunSubCategories) {
                 if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
                     loggerMaker.debugAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId) );
-                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
+                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)
+                            && !TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
                         insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit,
                                 apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun,
                                 isApiInfoTested, new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
                     }else{
-                        loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+                        if(TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
+                            loggerMaker.infoAndAddToDb("Agent token limit reached, stopping further tests for run: " + testingRun.getHexId(), LogDb.TESTING);
+                        } else {
+                            loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+                        }
                         break;
                     }
                 }
@@ -855,6 +860,7 @@ public class TestExecutor {
                     }
                 }
                 loggerMaker.infoAndAddToDb("TestExecutor TOTAL tokens to add to summary: " + totalExternalApiTokens, LogDb.TESTING);
+                TestingConfigurations.getInstance().addAgentTokens(totalExternalApiTokens);
 
                 // Update summary with test count and cumulative external API tokens
                 TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
