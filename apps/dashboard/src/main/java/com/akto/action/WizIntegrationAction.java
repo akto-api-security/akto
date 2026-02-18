@@ -13,15 +13,10 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+
+import java.util.List;
 import java.util.Map;
 
-import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.testing.TestingRunResult;
-import com.akto.util.Constants;
-import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 
 import lombok.Getter;
@@ -137,6 +132,54 @@ public class WizIntegrationAction extends UserAction {
             String signedS3Url = securityScanUploadResult.get("url");
             WizIntegrationUtils.uploadEnrichmentJSONToS3(enrichmentJSON, signedS3Url);
             WizIntegrationUtils.updateWizFindingUrl(testingIssuesId);
+        } catch (Exception e) {
+            String errString = "Error uploading enrichment JSON to Wiz: " + e.getMessage();
+            logger.errorAndAddToDb(errString);
+            addActionError(errString);
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    @Getter
+    @Setter
+    private List<TestingIssuesId> testingIssuesIdList;
+
+    public String createWizFindings() {
+        WizIntegration wizIntegration = WizIntegrationDao.instance.findOne(new BasicDBObject());
+        if(wizIntegration == null) {
+            logger.errorAndAddToDb("Wiz not not integrated for this account: " + Context.accountId.get());
+            addActionError("Wiz is not integrated.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        // check if list is null or empty
+        if (this.testingIssuesIdList == null || this.testingIssuesIdList.isEmpty()) {
+            logger.errorAndAddToDb("Testing Issues Id list is null or empty");
+            addActionError("Testing Issues Id list cannot be null or empty.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        String enrichmentJSON;
+        try {
+            enrichmentJSON = WizIntegrationUtils.prepareMultipleIssueEnrichmentJSON(testingIssuesIdList);
+        } catch (Exception e) {
+            String errString = "Error preparing enrichment JSON for Wiz: " + e.getMessage();
+            logger.errorAndAddToDb(e, errString);
+            addActionError("Error creating wiz findings.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        try {
+            Map<String, String> securityScanUploadResult = WizIntegrationUtils.requestSecurityScanUpload("akto-testing-issue.json");
+            String signedS3Url = securityScanUploadResult.get("url");
+            WizIntegrationUtils.uploadEnrichmentJSONToS3(enrichmentJSON, signedS3Url);
+
+            // todo: update finding url for each issue
+            for (TestingIssuesId testingIssuesId : testingIssuesIdList) {
+                WizIntegrationUtils.updateWizFindingUrl(testingIssuesId);
+            }
         } catch (Exception e) {
             String errString = "Error uploading enrichment JSON to Wiz: " + e.getMessage();
             logger.errorAndAddToDb(errString);
