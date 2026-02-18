@@ -6,7 +6,9 @@ import com.akto.publisher.KafkaDataPublisher;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -38,6 +40,7 @@ public class HttpProxyAction extends ActionSupport {
     private String guardrails;
     private String akto_connector;
     private String ingest_data;
+    private String streaming;
 
     private Map<String, Object> data;
     private boolean success;
@@ -132,10 +135,19 @@ public class HttpProxyAction extends ActionSupport {
      * response!=null: Async ingestion only (return 200 immediately for monitoring)
      */
     public String truefoundryProxy() {
+
+        //print all the data we recieve
+        System.out.println("Received TrueFoundry Proxy request:");
+        System.out.println("requestBody: " + requestBody);
+        System.out.println("responseBody: " + responseBody);
+        System.out.println("config: " + config);
+        System.out.println("context: " + context);
+
         try {
+            boolean isStreaming = "true".equalsIgnoreCase(streaming);
             boolean hasResponse = responseBody != null && !responseBody.isEmpty();
 
-            loggerMaker.info("TrueFoundry Proxy API called - hasResponse: " + hasResponse);
+            loggerMaker.info("TrueFoundry Proxy API called - hasResponse: " + hasResponse + ", streaming: " + isStreaming);
 
             // Validate that at least requestBody is present
             if (requestBody == null || requestBody.isEmpty()) {
@@ -145,6 +157,12 @@ public class HttpProxyAction extends ActionSupport {
                 data = new HashMap<>();
                 data.put("error", "requestBody is required");
                 return Action.ERROR.toUpperCase();
+            }
+
+            // Streaming mode: extract last prompt-response pair from messages and ingest
+            if (isStreaming) {
+                loggerMaker.info("TrueFoundry: Streaming mode - extracting last prompt-response pair for ingestion");
+                handleStreamingIngestion();
             }
 
             // Convert to Akto format ONCE at the beginning
@@ -303,7 +321,9 @@ public class HttpProxyAction extends ActionSupport {
     private Map<String, Object> buildTrueFoundryInput() {
         Map<String, Object> tfInput = new HashMap<>();
         if (requestBody != null) {
-            tfInput.put("requestBody", requestBody);
+            Map<String, Object> body = new HashMap<>(requestBody);
+            extractLastUserMessage(body);
+            tfInput.put("requestBody", body);
         }
         if (responseBody != null) {
             tfInput.put("responseBody", responseBody);
@@ -315,6 +335,94 @@ public class HttpProxyAction extends ActionSupport {
             tfInput.put("context", context);
         }
         return tfInput;
+    }
+
+    /**
+     * Handle streaming mode: extract the last complete prompt-response pair
+     * from the messages array and ingest it as response data.
+     * The normal flow continues after this to process the latest prompt.
+     */
+    @SuppressWarnings("unchecked")
+    private void handleStreamingIngestion() {
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) requestBody.get("messages");
+        if (messages == null || messages.size() < 2) {
+            loggerMaker.info("TrueFoundry streaming: Not enough messages to extract prompt-response pair, skipping");
+            return;
+        }
+
+        // Find the last assistant message
+        Map<String, Object> lastAssistantMessage = null;
+        int lastAssistantIndex = -1;
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            if ("assistant".equals(messages.get(i).get("role"))) {
+                lastAssistantMessage = messages.get(i);
+                lastAssistantIndex = i;
+                break;
+            }
+        }
+
+        if (lastAssistantMessage == null || lastAssistantIndex == 0) {
+            loggerMaker.info("TrueFoundry streaming: No complete prompt-response pair found, skipping");
+            return;
+        }
+
+        // Find the user message preceding the last assistant message
+        Map<String, Object> lastUserMessage = null;
+        for (int i = lastAssistantIndex - 1; i >= 0; i--) {
+            if ("user".equals(messages.get(i).get("role"))) {
+                lastUserMessage = messages.get(i);
+                break;
+            }
+        }
+
+        if (lastUserMessage == null) {
+            loggerMaker.info("TrueFoundry streaming: No user message found before assistant message, skipping");
+            return;
+        }
+
+        // Build synthetic requestBody with just the user message
+        Map<String, Object> syntheticRequestBody = new HashMap<>(requestBody);
+        syntheticRequestBody.put("messages", Collections.singletonList(lastUserMessage));
+
+        // Build synthetic responseBody from the assistant message
+        Map<String, Object> syntheticResponseBody = new HashMap<>();
+        Map<String, Object> choice = new HashMap<>();
+        Map<String, Object> choiceMessage = new HashMap<>();
+        choiceMessage.put("role", "assistant");
+        choiceMessage.put("content", lastAssistantMessage.get("content"));
+        choice.put("message", choiceMessage);
+        syntheticResponseBody.put("choices", Collections.singletonList(choice));
+
+        // Build tfInput with synthetic data
+        Map<String, Object> tfInput = new HashMap<>();
+        tfInput.put("requestBody", syntheticRequestBody);
+        tfInput.put("responseBody", syntheticResponseBody);
+        if (config != null) {
+            tfInput.put("config", config);
+        }
+        if (context != null) {
+            tfInput.put("context", context);
+        }
+
+        // Convert to Akto format and ingest
+        Map<String, Object> aktoFormat = convertTrueFoundryToAktoFormat(tfInput);
+        executeAsync(aktoFormat, false, true);
+
+        loggerMaker.info("TrueFoundry streaming: Last prompt-response pair ingested successfully");
+    }
+
+    @SuppressWarnings("unchecked")
+    private void extractLastUserMessage(Map<String, Object> body) {
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) body.get("messages");
+        if (messages == null || messages.isEmpty()) {
+            return;
+        }
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            if ("user".equals(messages.get(i).get("role"))) {
+                body.put("messages", Collections.singletonList(messages.get(i)));
+                return;
+            }
+        }
     }
 
     /**
