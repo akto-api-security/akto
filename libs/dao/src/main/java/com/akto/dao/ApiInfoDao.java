@@ -240,6 +240,7 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
     }
 
     public Pair<ApiStats,ApiStats> fetchApiInfoStats(Bson collectionFilter, Bson apiFilter, int startTimestamp, int endTimestamp) {
+        long methodStart = System.currentTimeMillis();
         ApiStats apiStatsStart = new ApiStats(startTimestamp);
         ApiStats apiStatsEnd = new ApiStats(endTimestamp);
 
@@ -248,11 +249,14 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         float totalRiskScore = 0;
         int apisInScopeForTesting = 0;
 
+        long query1Start = System.currentTimeMillis();
         Map<Integer,Boolean> collectionsMap = ApiCollectionsDao.instance.findAll(collectionFilter, Projections.include(ApiCollection.ID, ApiCollection.IS_OUT_OF_TESTING_SCOPE))
             .stream()
             .collect(Collectors.toMap(ApiCollection::getId, ApiCollection::getIsOutOfTestingScope));
+        long query1Time = System.currentTimeMillis() - query1Start;
+        System.out.println("[ApiInfoDao.fetchApiInfoStats] Query1 (ApiCollections findAll): time=" + query1Time + "ms, collections=" + collectionsMap.size());
 
-        // we need only end timestamp filter because data needs to be till end timestamp while start timestamp is for calculating 
+        // we need only end timestamp filter because data needs to be till end timestamp while start timestamp is for calculating
         Bson filter = Filters.and(apiFilter,
             Filters.or(
                 Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp),
@@ -265,11 +269,21 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),Context.accountId.get());
             if (collectionIds != null) {
+                System.out.println("[ApiInfoDao.fetchApiInfoStats] RBAC filter applied: collectionIds size=" + collectionIds.size() + ", ids=" + collectionIds);
                 filter = Filters.and(filter, Filters.in("collectionIds", collectionIds));
+            } else {
+                System.out.println("[ApiInfoDao.fetchApiInfoStats] RBAC filter: collectionIds is null, no RBAC filtering applied");
             }
         } catch (Exception e){
+            System.out.println("[ApiInfoDao.fetchApiInfoStats] Exception getting collectionIds: " + e.getMessage());
         }
+
+        long query2Start = System.currentTimeMillis();
         MongoCursor<ApiInfo> cursor = instance.getMCollection().find(filter).cursor();
+        long query2Time = System.currentTimeMillis() - query2Start;
+        System.out.println("[ApiInfoDao.fetchApiInfoStats] Query2 (api_info find cursor init): time=" + query2Time + "ms, startTs=" + startTimestamp + ", endTs=" + endTimestamp);
+
+        long iterationStart = System.currentTimeMillis();
         boolean isOutOfTestingScope = false;
         while(cursor.hasNext()) {
             ApiInfo apiInfo = cursor.next();
@@ -291,11 +305,16 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
             apiStatsEnd.addSeverityCount(severity);
         }
         cursor.close();
+        long iterationTime = System.currentTimeMillis() - iterationStart;
+        System.out.println("[ApiInfoDao.fetchApiInfoStats] Cursor iteration: time=" + iterationTime + "ms, docsProcessed=" + totalApis);
 
         apiStatsEnd.setTotalAPIs(totalApis);
         apiStatsEnd.setApisTestedInLookBackPeriod(apisTestedInLookBackPeriod);
         apiStatsEnd.setTotalRiskScore(totalRiskScore);
         apiStatsEnd.setTotalInScopeForTestingApis(apisInScopeForTesting);
+
+        long totalTime = System.currentTimeMillis() - methodStart;
+        System.out.println("[ApiInfoDao.fetchApiInfoStats] Total method time: " + totalTime + "ms (query1=" + query1Time + "ms, query2=" + query2Time + "ms, iteration=" + iterationTime + "ms)");
 
         return new Pair<>(apiStatsStart, apiStatsEnd);
     }

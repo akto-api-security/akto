@@ -109,6 +109,10 @@ public class GuardrailsClient {
             String jsonRequest = objectMapper.writeValueAsString(requestBody);
             logger.debug("Sending request to guardrails service: {}", jsonRequest);
 
+            // Log equivalent curl command for debugging
+            String curlCommand = buildCurlCommand(guardrailsServiceUrl + "/api/validate/request", jsonRequest);
+            logger.debug("Equivalent curl command:\n{}", curlCommand);
+
             // Create request body
             RequestBody body = RequestBody.create(jsonRequest, JSON);
 
@@ -161,6 +165,18 @@ public class GuardrailsClient {
         error.put("error", errorMessage);
         error.put("timestamp", System.currentTimeMillis());
         return error;
+    }
+
+    /**
+     * Build a curl command equivalent for debugging
+     */
+    private String buildCurlCommand(String url, String jsonBody) {
+        StringBuilder curl = new StringBuilder();
+        curl.append("curl -X POST '").append(url).append("' \\\n");
+        curl.append("  -H 'Content-Type: application/json' \\\n");
+        curl.append("  -H 'Accept: application/json' \\\n");
+        curl.append("  -d '").append(jsonBody.replace("'", "'\\''")).append("'");
+        return curl.toString();
     }
 
     private static String loadServiceUrlFromEnv() {
