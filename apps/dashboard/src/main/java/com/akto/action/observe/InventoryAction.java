@@ -103,6 +103,8 @@ public class InventoryAction extends UserAction {
     long newCount = 0;
     long oldCount = 0;
     public String fetchEndpointsCount() {
+        long startTime = System.currentTimeMillis();
+
         if (endTimestamp == 0) endTimestamp = Context.now();
 
         Set<Integer> demoCollections = new HashSet<>();
@@ -113,8 +115,17 @@ public class InventoryAction extends UserAction {
         ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
         if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
 
+        long beforeNewCount = System.currentTimeMillis();
         newCount = SingleTypeInfoDao.instance.fetchEndpointsCount(0, endTimestamp, demoCollections);
+        long newCountTime = System.currentTimeMillis() - beforeNewCount;
+
+        long beforeOldCount = System.currentTimeMillis();
         oldCount = SingleTypeInfoDao.instance.fetchEndpointsCount(0, startTimestamp, demoCollections);
+        long oldCountTime = System.currentTimeMillis() - beforeOldCount;
+
+        long totalTime = System.currentTimeMillis() - startTime;
+        loggerMaker.warnAndAddToDb("fetchEndpointsCount: totalTime=" + totalTime + "ms (newCount=" + newCountTime + "ms, oldCount=" + oldCountTime + "ms), results: newCount=" + newCount + ", oldCount=" + oldCount, LogDb.DASHBOARD);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -538,7 +549,7 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private void getResponseForTrendApis(List<Bson> pipeline){
+    private void fetchResponseForTrendApis(List<Bson> pipeline){
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
         List<BasicDBObject> endpoints = new ArrayList<>();
@@ -567,7 +578,7 @@ public class InventoryAction extends UserAction {
         } catch(Exception e){
         }
         pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
-        getResponseForTrendApis(pipeline);
+        fetchResponseForTrendApis(pipeline);
 
         return SUCCESS.toUpperCase();
     }
@@ -599,7 +610,7 @@ public class InventoryAction extends UserAction {
 
         pipeline.add(Aggregates.group(_id, Accumulators.last(SingleTypeInfo._TIMESTAMP, "$" + SingleTypeInfo._TIMESTAMP)));
         pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
-        getResponseForTrendApis(pipeline);
+        fetchResponseForTrendApis(pipeline);
         return SUCCESS.toUpperCase();
     }
 
@@ -619,7 +630,7 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.limit(100_000));
         pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
 
-        getResponseForTrendApis(pipeline);
+        fetchResponseForTrendApis(pipeline);
 
         return Action.SUCCESS.toUpperCase();
 
@@ -868,7 +879,7 @@ public class InventoryAction extends UserAction {
     }
 
     private String searchString;
-    private List<SingleTypeInfo> getMongoResults(String searchKey) {
+    private List<SingleTypeInfo> fetchMongoResults(String searchKey) {
 
         List<String> sortFields = new ArrayList<>();
         sortFields.add(sortKey);
@@ -890,17 +901,17 @@ public class InventoryAction extends UserAction {
         return list;
     }
 
-    private long getTotalParams(String searchKey) {
+    private long fetchTotalParams(String searchKey) {
         return SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.and(prepareFilters("STI"), getSearchFilters(searchKey)));
     }
 
     public String fetchChanges() {
         response = new BasicDBObject();
 
-        long totalParams = getTotalParams(SingleTypeInfo._URL);
+        long totalParams = fetchTotalParams(SingleTypeInfo._URL);
         loggerMaker.debugAndAddToDb("Total params: " + totalParams, LogDb.DASHBOARD);
 
-        List<SingleTypeInfo> singleTypeInfos = getMongoResults(SingleTypeInfo._URL);
+        List<SingleTypeInfo> singleTypeInfos = fetchMongoResults(SingleTypeInfo._URL);
         loggerMaker.debugAndAddToDb("STI count: " + singleTypeInfos.size(), LogDb.DASHBOARD);
 
         response.put("data", new BasicDBObject("endpoints", singleTypeInfos ).append("total", totalParams));
