@@ -15,6 +15,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.testing.ComplianceMapping;
+import com.akto.dto.threat_detection.ThreatComplianceInfo;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.listener.RuntimeListener;
@@ -22,6 +23,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
+import com.akto.util.TimePeriodUtils;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
@@ -33,12 +35,6 @@ import lombok.Setter;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.WeekFields;
-import java.util.Locale;
 
 public class AgenticDashboardAction extends AbstractThreatDetectionAction {
 
@@ -210,6 +206,45 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
         }
     }
 
+    /**
+     * Fetch guardrail/posture dashboard specific metrics
+     */
+    public String fetchGuardrailData() {
+        try {
+            if (endTimestamp == 0) {
+                endTimestamp = Context.now();
+            }
+            long daysBetween = (endTimestamp - startTimestamp) / Constants.ONE_DAY_TIMESTAMP;
+            Set<Integer> demoCollections = getDemoCollections();
+
+            // Fetch all malicious events once within the time range
+            List<DashboardMaliciousEvent> allThreats = fetchAllMaliciousEvents(startTimestamp, endTimestamp, demoCollections);
+
+            // Fetch threat compliance data
+            Map<String, ThreatComplianceInfo> threatComplianceMap =
+                    com.akto.util.GuardrailMetricsProcessor.fetchThreatComplianceMap();
+
+            // Process all guardrail metrics in a single optimized pass
+            com.akto.util.GuardrailMetricsProcessor.GuardrailMetrics metrics =
+                    com.akto.util.GuardrailMetricsProcessor.processGuardrailMetrics(
+                            allThreats, startTimestamp, endTimestamp, daysBetween, threatComplianceMap);
+
+            response.put("topGuardrailPolicies", metrics.topGuardrailPolicies);
+            response.put("dataProtectionTrends", metrics.dataProtectionTrends);
+            response.put("avgThreatScore", metrics.avgThreatScore);
+            response.put("sensitiveCount", metrics.sensitiveCount);
+            response.put("successfulExploits", metrics.successfulExploits);
+            response.put("complianceAtRisks", metrics.complianceAtRisks);
+            response.put("attackFlows", metrics.attackFlows);
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching guardrail data: " + e.getMessage());
+            addActionError("Error fetching guardrail data: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
 
 
     private List<BasicDBObject> fetchIssuesOverTime(int startTimestamp, int endTimestamp, long daysBetween, List<TestingRunIssues> allIssues) {
@@ -224,7 +259,7 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 .collect(Collectors.toList());
             
             // Group by time period in Java
-            Map<String, Long> timePeriodMap = groupByTimePeriod(creationTimestamps, daysBetween);
+            Map<String, Long> timePeriodMap = TimePeriodUtils.groupByTimePeriod(creationTimestamps, daysBetween);
             
             // Convert to result format
             result = convertTimePeriodMapToResult(timePeriodMap, daysBetween);
@@ -380,7 +415,7 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 
                 // No-Auth: actualAuthType is null/empty OR contains UNAUTHENTICATED
                 // Matches frontend: obj.auth_type === undefined || obj.auth_type.toLowerCase() === "unauthenticated"
-                List<ApiInfo.AuthType> authTypes = api.getActualAuthType();
+                List<String> authTypes = api.getActualAuthType();
                 boolean isNoAuth = (authTypes == null || authTypes.isEmpty()) || 
                                   (authTypes.contains(ApiInfo.AuthType.UNAUTHENTICATED));
 
@@ -451,8 +486,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             }
             
             // Group by time period in Java
-            Map<String, Long> testedTimePeriodMap = groupByTimePeriod(testedTimestamps, daysBetween);
-            Map<String, Long> nonTestedTimePeriodMap = groupByTimePeriod(nonTestedTimestamps, daysBetween);
+            Map<String, Long> testedTimePeriodMap = TimePeriodUtils.groupByTimePeriod(testedTimestamps, daysBetween);
+            Map<String, Long> nonTestedTimePeriodMap = TimePeriodUtils.groupByTimePeriod(nonTestedTimestamps, daysBetween);
             
             // Convert to result format
             List<BasicDBObject> testedData = convertTimePeriodMapToResult(testedTimePeriodMap, daysBetween);
@@ -595,8 +630,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             }
             
             // Group by time period in Java
-            Map<String, Long> openTimePeriodMap = groupByTimePeriod(openTimestamps, daysBetween);
-            Map<String, Long> resolvedTimePeriodMap = groupByTimePeriod(resolvedTimestamps, daysBetween);
+            Map<String, Long> openTimePeriodMap = TimePeriodUtils.groupByTimePeriod(openTimestamps, daysBetween);
+            Map<String, Long> resolvedTimePeriodMap = TimePeriodUtils.groupByTimePeriod(resolvedTimestamps, daysBetween);
             
             // Convert to result format
             List<BasicDBObject> openData = convertTimePeriodMapToResult(openTimePeriodMap, daysBetween);
@@ -733,13 +768,14 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 }
             }
             
-            // Sort by count descending and take top 5
+            // Sort by count descending; take more candidates so we can filter to collections with hostnames only
             List<Map.Entry<Integer, Long>> sortedCollections = collectionCounts.entrySet().stream()
                 .sorted(Map.Entry.<Integer, Long>comparingByValue().reversed())
-                .limit(5)
+                .limit(20)
                 .collect(Collectors.toList());
             
             for (Map.Entry<Integer, Long> entry : sortedCollections) {
+                if (result.size() >= 5) break;
                 int collectionId = entry.getKey();
                 long count = entry.getValue();
                 
@@ -747,11 +783,14 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                     Filters.eq(Constants.ID, collectionId),
                     Projections.include(ApiCollection.HOST_NAME, ApiCollection.NAME)
                 );
+                // Only include collections that have a hostname (exclude collection name / Unknown)
+                String hostname = collection != null && collection.getHostName() != null && !collection.getHostName().trim().isEmpty()
+                    ? collection.getHostName()
+                    : null;
+                if (hostname == null) continue;
                 
                 BasicDBObject hostnameResult = new BasicDBObject();
-                hostnameResult.put("hostname", collection != null ? 
-                    (collection.getHostName() != null ? collection.getHostName() : collection.getName()) : 
-                    "Unknown");
+                hostnameResult.put("hostname", hostname);
                 hostnameResult.put("count", count);
                 result.add(hostnameResult);
             }
@@ -1168,8 +1207,8 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
             }
             
             // Group by time period in Java
-            Map<String, Long> openTimePeriodMap = groupByTimePeriod(openTimestamps, daysBetween);
-            Map<String, Long> resolvedTimePeriodMap = groupByTimePeriod(resolvedTimestamps, daysBetween);
+            Map<String, Long> openTimePeriodMap = TimePeriodUtils.groupByTimePeriod(openTimestamps, daysBetween);
+            Map<String, Long> resolvedTimePeriodMap = TimePeriodUtils.groupByTimePeriod(resolvedTimestamps, daysBetween);
             
             // Convert to result format
             List<BasicDBObject> openData = convertTimePeriodMapToResult(openTimePeriodMap, daysBetween);
@@ -1184,6 +1223,7 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
         }
         return result;
     }
+
 
 
     // ========== Helper Methods ==========
@@ -1311,43 +1351,6 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
     }
 
     // ========== Java-based Time Grouping Utilities ==========
-
-    /**
-     * Get time period key for grouping (day/week/month based on daysBetween)
-     */
-    private String getTimePeriodKey(int timestamp, long daysBetween) {
-        LocalDate date = Instant.ofEpochSecond(timestamp).atZone(ZoneId.systemDefault()).toLocalDate();
-        
-        if (daysBetween <= 15) {
-            // Day grouping: return "D_YYYY-MM-DD" to explicitly indicate day type
-            return "D_" + date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-        } else if (daysBetween <= 105) {
-            // Week grouping: return "W_YYYY_W" to explicitly indicate week type
-            WeekFields weekFields = WeekFields.of(Locale.getDefault());
-            int week = date.get(weekFields.weekOfWeekBasedYear());
-            int year = date.get(weekFields.weekBasedYear());
-            return "W_" + year + "_" + week;
-        } else {
-            // Month grouping: return "M_YYYY_M" to explicitly indicate month type
-            int year = date.getYear();
-            int month = date.getMonthValue();
-            return "M_" + year + "_" + month;
-        }
-    }
-
-    /**
-     * Group data by time period in Java
-     */
-    private Map<String, Long> groupByTimePeriod(List<Integer> timestamps, long daysBetween) {
-        Map<String, Long> result = new HashMap<>();
-        for (Integer timestamp : timestamps) {
-            if (timestamp != null && timestamp > 0) {
-                String key = getTimePeriodKey(timestamp, daysBetween);
-                result.put(key, result.getOrDefault(key, 0L) + 1);
-            }
-        }
-        return result;
-    }
 
     /**
      * Convert time period map to BasicDBObject list format

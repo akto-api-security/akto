@@ -1,10 +1,13 @@
 package com.akto.dto.testing;
 
 import com.akto.dao.ApiInfoDao;
+import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.MCollection;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.CustomAuthType;
 import com.akto.dto.type.SingleTypeInfo;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -43,19 +46,12 @@ public class AuthTypeTestingEndpoints extends TestingEndpoints {
             return false;
         }
         
-        // Check if any of the selected auth types exist in the API's auth types
-        Set<ApiInfo.AuthType> selectedAuthTypes = new HashSet<>();
-        for (String authTypeStr : authTypes) {
-            try {
-                selectedAuthTypes.add(ApiInfo.AuthType.valueOf(authTypeStr));
-            } catch (IllegalArgumentException e) {
-                // Skip invalid auth types
-            }
-        }
+        // Expand CUSTOM to include all custom auth type names
+        Set<String> selectedAuthTypes = expandAuthTypes(authTypes);
         
         // Check if any set in allAuthTypesFound contains any of our selected auth types
-        for (Set<ApiInfo.AuthType> authTypeSet : apiInfo.getAllAuthTypesFound()) {
-            for (ApiInfo.AuthType authType : authTypeSet) {
+        for (Set<String> authTypeSet : apiInfo.getAllAuthTypesFound()) {
+            for (String authType : authTypeSet) {
                 if (selectedAuthTypes.contains(authType)) {
                     return true;
                 }
@@ -63,6 +59,38 @@ public class AuthTypeTestingEndpoints extends TestingEndpoints {
         }
         
         return false;
+    }
+
+    /**
+     * Expands auth types list. If CUSTOM is selected, fetches all custom auth type names
+     * from the custom_auth_type collection and adds them to the set.
+     */
+    private Set<String> expandAuthTypes(List<String> authTypes) {
+        Set<String> expandedAuthTypes = new HashSet<>();
+        boolean hasCustom = false;
+        
+        for (String authType : authTypes) {
+            if (ApiInfo.AuthType.CUSTOM.equals(authType)) {
+                hasCustom = true;
+            } else {
+                expandedAuthTypes.add(authType);
+            }
+        }
+        
+        // If CUSTOM is selected, fetch all custom auth type names from DB
+        if (hasCustom) {
+            expandedAuthTypes.add(ApiInfo.AuthType.CUSTOM); // Include CUSTOM itself for fallback cases
+            List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(
+                Filters.eq(CustomAuthType.ACTIVE, true)
+            );
+            for (CustomAuthType customAuthType : customAuthTypes) {
+                if (customAuthType.getName() != null && !customAuthType.getName().trim().isEmpty()) {
+                    expandedAuthTypes.add(customAuthType.getName());
+                }
+            }
+        }
+        
+        return expandedAuthTypes;
     }
 
     private static Bson createApiFilters(ApiCollectionUsers.CollectionType type, ApiInfo.ApiInfoKey apiKey) {
@@ -81,29 +109,23 @@ public class AuthTypeTestingEndpoints extends TestingEndpoints {
             return MCollection.noMatchFilter;
         }
 
-        // Convert string auth types to AuthType enum
-        List<ApiInfo.AuthType> authTypeEnums = new ArrayList<>();
-        for (String authTypeStr : authTypes) {
-            try {
-                authTypeEnums.add(ApiInfo.AuthType.valueOf(authTypeStr));
-            } catch (IllegalArgumentException e) {
-                // Skip invalid auth types
-            }
-        }
+        // Expand CUSTOM to include all custom auth type names
+        Set<String> expandedAuthTypes = expandAuthTypes(authTypes);
+        List<String> authTypeList = new ArrayList<>(expandedAuthTypes);
 
-        if (authTypeEnums.isEmpty()) {
+        if (authTypeList.isEmpty()) {
             return MCollection.noMatchFilter;
         }
 
         List<Bson> authTypeFilters = new ArrayList<>();
-        for (ApiInfo.AuthType authType : authTypeEnums) {
+        for (String authType : authTypeList) {
             // Nested elemMatch: outer for array-of-arrays, inner for elements in sub-array
             // Java Filters API doesn't support nested elemMatch, so use Document
             authTypeFilters.add(
                 new Document(ApiInfo.ALL_AUTH_TYPES_FOUND,
                     new Document("$elemMatch",
                         new Document("$elemMatch",
-                            new Document("$eq", authType.name())
+                            new Document("$eq", authType)
                         )
                     )
                 )

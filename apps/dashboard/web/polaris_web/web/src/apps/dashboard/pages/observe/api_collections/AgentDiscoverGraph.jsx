@@ -1,45 +1,18 @@
 
-import { useState, useEffect } from 'react';
-import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Button, Icon, Avatar } from '@shopify/polaris';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Icon, Avatar, Spinner } from '@shopify/polaris';
 import ReactFlow, { Background, Handle, Position, getBezierPath } from 'react-flow-renderer';
 import TooltipText from '../../../components/shared/TooltipText';
-import { CustomersMinor, AutomationMajor, MagicMajor } from "@shopify/polaris-icons";
-import agentDiscoveryData from './AgentDiscoveryDummyData';
-import MCPIcon from "@/assets/MCP_Icon.svg"
+import api from './api';
+import {
+  getNodeCategoryFromType,
+  getComponentColors,
+  getComponentIcon
+} from './agentGraphUtils';
 
-// Custom Node Component following ApiDependencyNode pattern
-function AgentNode({ data }) {
+// Custom Node Component following ApiDependencyNode pattern - memoized to prevent re-renders
+const AgentNode = memo(function AgentNode({ data }) {
   const { component, onNodeClick } = data;
-
-  const getComponentColors = (category) => {
-    switch (category) {
-      case 'external':
-        return { borderColor: '#3b82f6', backgroundColor: '#eff6ff' }; // Blue
-      case 'agent':
-        return { borderColor: '#f97316', backgroundColor: '#fff7ed' }; // Orange
-      case 'ai-model':
-        return { borderColor: '#ec4899', backgroundColor: '#fdf2f8' }; // Pink
-      case 'mcp':
-        return { borderColor: '#4cbebbff', backgroundColor: '#ecfdf5' }; // Yellow-Green
-      default:
-        return { borderColor: '#6b7280', backgroundColor: '#f9fafb' }; // Gray
-    }
-  };
-
-  const getComponentIcon = (category) => {
-    switch (category) {
-      case 'external':
-        return CustomersMinor; // User icon
-      case 'agent':
-        return AutomationMajor; // AI Agent icon - automation/intelligent systems
-      case 'ai-model':
-        return MagicMajor; // LLM/AI Model icon - AI magic/processing
-      case "mcp":
-        return MCPIcon; // Custom MCP icon
-      default:
-        return CustomersMinor;
-    }
-  };
 
   const colors = getComponentColors(component.category);
   const IconComponent = getComponentIcon(component.category);
@@ -83,22 +56,22 @@ function AgentNode({ data }) {
       <Handle type="source" position={Position.Right} id="b" />
     </>
   );
-}
+});
 
-// Custom Edge Component following ApiDependencyEdge pattern
-function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
-  const [show, setShow] = useState(false);
-  const { connectionType, isExternal } = data || {};
+// Custom Edge Component following ApiDependencyEdge pattern - memoized to prevent re-renders
+const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
+  const { edgeParam } = data || {};
 
   // Use getBezierPath for proper edge rendering
   const edgePath = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
 
+  // Calculate midpoint for label
+  const midX = (sourceX + targetX) / 2;
+  const midY = (sourceY + targetY) / 2;
+
   return (
     <>
-      <g
-        onMouseEnter={() => setShow(true)}
-        onMouseLeave={() => setShow(false)}
-      >
+      <g>
         <defs>
           <marker
             id={`arrow-${id}`}
@@ -109,78 +82,60 @@ function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, tar
             orient="auto"
             markerUnits="strokeWidth"
           >
-            <path d="M0,0 L6,4 L0,8" fill='none' stroke={isExternal ? '#dc2626' : '#6b7280'} />
+            <path d="M0,0 L6,4 L0,8" fill='none' stroke='#6b7280' />
           </marker>
         </defs>
-        <path 
-          id={id} 
-          style={{ 
-            ...style, 
-            stroke: isExternal ? '#dc2626' : '#6b7280',
-            strokeWidth: isExternal ? '3' : '2',
-            strokeDasharray: isExternal ? '5,5' : 'none',
+        <path
+          id={id}
+          style={{
+            ...style,
+            stroke: '#6b7280',
+            strokeWidth: '2',
             fill: 'none'
-          }} 
-          className="react-flow__edge-path" 
-          d={edgePath} 
-          markerEnd={`url(#arrow-${id})`} 
+          }}
+          className="react-flow__edge-path"
+          d={edgePath}
+          markerEnd={`url(#arrow-${id})`}
         />
-        {show && (
+        {edgeParam && (
           <foreignObject
-            x={sourceX - 75}
-            y={sourceY - 30}
-            width={150}
-            height={60}
+            x={midX - 60}
+            y={midY - 15}
+            width={120}
+            height={30}
           >
-            <div xmlns="http://www.w3.org/1999/xhtml" style={{
+            <div style={{
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
-              height: '100%',
-              width: '100%'
             }}>
-              <Card padding={3}>
-                <VerticalStack gap={1}>
-                  <Box width='150px'>
-                    <Text color='subdued' variant='bodySm'>
-                      Connection
-                    </Text>
-                  </Box>
-                  <Box width='150px'>
-                    <Text variant='bodySm'>
-                      {connectionType || 'Data Flow'}
-                    </Text>
-                  </Box>
-                </VerticalStack>
-              </Card>
+              <Badge size='small' status="new">
+                <TooltipText tooltip={edgeParam} text={edgeParam} />
+              </Badge>
             </div>
           </foreignObject>
         )}
       </g>
     </>
   );
-}
+});
 
 function AgentDiscoverGraph({ apiCollectionId }) {
-
-  // Simplified dummy data with only 3 components
-  const dummyData = agentDiscoveryData[apiCollectionId + ""] || {};
-
-  if (dummyData?.components == undefined ||
-    dummyData?.components.length === 0) {
-    return <></>
-  }
 
   const [selectedComponent, setSelectedComponent] = useState(null);
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [collectionData, setCollectionData] = useState(null);
+  const [serviceGraphEdges, setServiceGraphEdges] = useState({});
 
-  const nodeTypes = { agentNode: AgentNode };
-  const edgeTypes = { agentEdge: AgentEdge };
+  // Memoize node and edge types to prevent re-creation on each render
+  const nodeTypes = useMemo(() => ({ agentNode: AgentNode }), []);
+  const edgeTypes = useMemo(() => ({ agentEdge: AgentEdge }), []);
 
-  const handleNodeClick = (component) => {
-    setSelectedComponent(selectedComponent?.id === component.id ? null : component);
-  };
+  const handleNodeClick = useCallback((component) => {
+    setSelectedComponent(prev => prev?.id === component.id ? null : component);
+  }, []);
 
   const getStatusBadge = (status) => {
     const statusColors = {
@@ -191,85 +146,282 @@ function AgentDiscoverGraph({ apiCollectionId }) {
     return <Badge status={statusColors[status] || 'info'}>{status}</Badge>;
   };
 
-  const getCategoryStats = () => {
-    const stats = {};
-    dummyData.components.forEach(component => {
-      stats[component.type] = (stats[component.type] || 0) + 1;
-    });
-    return stats;
-  };
+  // Memoize category stats calculation
+  const categoryStats = useMemo(() => {
+    if (!serviceGraphEdges || Object.keys(serviceGraphEdges).length === 0) {
+      return {};
+    }
 
-  const formatNodesAndEdges = () => {
-    const formattedNodes = [];
-    const formattedEdges = [];
+    const stats = {
+      'AI Agents': 1, // Source service
+      'MCP Servers': 0,
+      'AI Models': 0,
+      'Agentic Components': 0
+    };
 
-    // Add all component nodes with fixed positions
-    dummyData.components.forEach(component => {
-      formattedNodes.push({
-        id: component.id,
-        type: 'agentNode',
-        data: { 
-          component: component, 
-          onNodeClick: handleNodeClick 
-        },
-        position: { x: component.x, y: component.y },
-        draggable: false // Make nodes non-draggable for fixed positioning
-      });
-    });
+    Object.values(serviceGraphEdges).forEach((edgeInfo) => {
+      const metadataType = edgeInfo?.metadata?.type || 'default';
+      const nodeInfo = getNodeCategoryFromType(metadataType);
 
-    // Create simple linear connections: User -> AI Agent -> LLM Call
-    formattedEdges.push({
-      id: 'user-to-ai',
-      source: 'user',
-      target: 'ai-agent',
-      type: 'agentEdge',
-      data: {
-        connectionType: 'User Request',
-        isExternal: false
+      if (nodeInfo.category === 'mcp') {
+        stats['MCP Servers']++;
+      } else if (nodeInfo.category === 'ai-model') {
+        stats['AI Models']++;
+      } else if (nodeInfo.category === 'external') {
+        stats['Agentic Components']++;
       }
     });
 
-    formattedEdges.push({
-      id: 'ai-to-llm',
-      source: 'ai-agent',
-      target: 'llm-call',
-      type: 'agentEdge',
-      data: {
-        connectionType: 'LLM Request',
-        isExternal: false
-      }
-    });
+    // Filter out zero counts
+    return Object.fromEntries(Object.entries(stats).filter(([_, count]) => count > 0));
+  }, [serviceGraphEdges]);
 
-    formattedEdges.push({
-      id: 'ai-to-mcp',
-      source: 'ai-agent',
-      target: 'mcp',
-      type: 'agentEdge',
-      data: {
-        connectionType: 'MCP',
-        isExternal: false
-      }
-    });
-
-    formattedEdges.push({
-      id: 'mcp-to-api',
-      source: 'mcp',
-      target: 'external',
-      type: 'agentEdge',
-      data: {
-        connectionType: 'MCP',
-        isExternal: false
-      }
-    });
-
-    return { nodes: formattedNodes, edges: formattedEdges };
-  };
-
+  // Fetch collection data
   useEffect(() => {
-    const { nodes: formattedNodes, edges: formattedEdges } = formatNodesAndEdges();
+    const fetchCollectionData = async () => {
+      setLoading(true);
+      try {
+        const response = await api.getCollection(apiCollectionId);
+        if (response && response.length > 0) {
+          const apiCollection = response[0];
+          setCollectionData(apiCollection);
+          setServiceGraphEdges(apiCollection.serviceGraphEdges || {});
+        }
+      } catch (error) {
+        console.error('Error fetching collection data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (apiCollectionId) {
+      fetchCollectionData();
+    }
+  }, [apiCollectionId]);
+
+  // Memoize nodes and edges transformation to prevent unnecessary re-renders
+  const { nodes: formattedNodes, edges: formattedEdges } = useMemo(() => {
+    const nodes = [];
+    const edges = [];
+
+    if (collectionData && serviceGraphEdges && Object.keys(serviceGraphEdges).length > 0) {
+      const edgeKeys = Object.keys(serviceGraphEdges);
+
+      // Collect all unique services (sources and targets) and map keys to service names
+      const allServices = new Set();
+      const serviceInfo = {}; // Store info about each service
+      const serviceToKey = {}; // Map service name to key name (for display)
+
+      // First pass: collect all services and map targetServices to keys
+      const targetServices = new Set();
+      Object.entries(serviceGraphEdges).forEach(([key, edgeInfo]) => {
+        const source = edgeInfo.sourceService;
+        const target = edgeInfo.targetService;
+
+        allServices.add(source);
+        allServices.add(target);
+
+        // If key matches target, it's a direct mapping
+        if (key === target) {
+          targetServices.add(target);
+          serviceToKey[target] = key;
+
+          const metadataType = edgeInfo?.metadata?.type || 'default';
+          serviceInfo[target] = {
+            ...getNodeCategoryFromType(metadataType),
+            displayName: key,
+            isKey: true,
+            requestCount: edgeInfo.requestCount,
+            lastSeen: edgeInfo.lastSeenTimestamp
+          };
+        }
+      });
+
+      // Second pass: map sourceServices to keys if they're not targetServices elsewhere
+      Object.entries(serviceGraphEdges).forEach(([key, edgeInfo]) => {
+        const source = edgeInfo.sourceService;
+        const target = edgeInfo.targetService;
+
+        // If source is not a targetService anywhere and not already mapped, map it to this key
+        if (!targetServices.has(source) && !serviceToKey[source] && key !== target) {
+          serviceToKey[source] = key;
+
+          const metadataType = edgeInfo?.metadata?.type || 'default';
+          serviceInfo[source] = {
+            ...getNodeCategoryFromType(metadataType),
+            displayName: key,
+            isKey: true,
+            requestCount: edgeInfo.requestCount,
+            lastSeen: edgeInfo.lastSeenTimestamp
+          };
+        }
+      });
+
+      // Build adjacency lists
+      const outgoingEdges = {};
+      const incomingEdges = {};
+
+      Object.values(serviceGraphEdges).forEach((edgeInfo) => {
+        const source = edgeInfo.sourceService;
+        const target = edgeInfo.targetService;
+
+        if (!outgoingEdges[source]) outgoingEdges[source] = [];
+        if (!incomingEdges[target]) incomingEdges[target] = [];
+
+        outgoingEdges[source].push(target);
+        incomingEdges[target].push(source);
+      });
+
+      // Find central agent (not in keys, has both incoming and outgoing edges)
+      const centralAgent = Array.from(allServices).find(service =>
+        !edgeKeys.includes(service) &&
+        incomingEdges[service]?.length > 0 &&
+        outgoingEdges[service]?.length > 0
+      ) || collectionData.name || 'AI Agent';
+
+      // Organize services into three columns
+      const leftNodes = [];  // Services that feed into agent
+      const centerNodes = []; // Agent
+      const rightNodes = []; // Services agent calls
+
+      const serviceToNodeId = {};
+      let nodeIndex = 0;
+
+      // Process all services
+      Array.from(allServices).forEach((service) => {
+        const info = serviceInfo[service] || {
+          category: 'internal',
+          type: 'Internal Service',
+          description: 'Internal Service',
+          displayName: service,
+          isKey: false
+        };
+
+        const nodeData = {
+          serviceName: service,
+          displayName: info.displayName || service,
+          info,
+          isAgent: service === centralAgent
+        };
+
+        if (service === centralAgent) {
+          centerNodes.push(nodeData);
+        } else if (outgoingEdges[service]?.includes(centralAgent)) {
+          leftNodes.push(nodeData); // Feeds into agent
+        } else {
+          rightNodes.push(nodeData); // Agent calls this
+        }
+      });
+
+      // Layout configuration
+      const COLUMN_WIDTH = 250;
+      const NODE_HEIGHT = 140;
+      const VERTICAL_SPACING = 40;
+
+      // Calculate positions for each column
+      const createNodesForColumn = (columnNodes, xPosition, startY) => {
+        columnNodes.forEach((nodeData, index) => {
+          const { serviceName, displayName, info, isAgent } = nodeData;
+          const nodeId = isAgent ? 'agent-0' : `node-${nodeIndex++}`;
+          serviceToNodeId[serviceName] = nodeId;
+
+          const label = displayName.length > 30 ? displayName.substring(0, 27) + '...' : displayName;
+          const yPosition = startY + (index * (NODE_HEIGHT + VERTICAL_SPACING));
+
+          nodes.push({
+            id: nodeId,
+            type: 'agentNode',
+            data: {
+              component: {
+                id: nodeId,
+                label: label,
+                type: isAgent ? 'AI Agent' : info.type,
+                category: isAgent ? 'agent' : info.category,
+                description: isAgent ? 'Central AI agent processing requests' : info.description,
+                status: isAgent ? 'active' : 'connected',
+                requestCount: info.requestCount,
+                lastSeen: info.lastSeen
+              },
+              onNodeClick: handleNodeClick
+            },
+            position: { x: xPosition, y: yPosition },
+            draggable: false
+          });
+        });
+      };
+
+      // Calculate starting Y positions to center each column
+      const containerHeight = 400;
+      const leftHeight = leftNodes.length * (NODE_HEIGHT + VERTICAL_SPACING) - VERTICAL_SPACING;
+      const centerHeight = NODE_HEIGHT;
+      const rightHeight = rightNodes.length * (NODE_HEIGHT + VERTICAL_SPACING) - VERTICAL_SPACING;
+
+      const leftStartY = Math.max(40, (containerHeight - leftHeight) / 2);
+      const centerStartY = Math.max(40, (containerHeight - centerHeight) / 2);
+      const rightStartY = Math.max(40, (containerHeight - rightHeight) / 2);
+
+      // Create nodes in three columns
+      createNodesForColumn(leftNodes, 80, leftStartY);           // Left column
+      createNodesForColumn(centerNodes, 80 + COLUMN_WIDTH, centerStartY);  // Center column (agent)
+      createNodesForColumn(rightNodes, 80 + (COLUMN_WIDTH * 2), rightStartY); // Right column
+
+      // Create edges based on sourceService -> targetService relationships
+      let edgeIndex = 0;
+      Object.values(serviceGraphEdges).forEach((edgeInfo) => {
+        const sourceService = edgeInfo.sourceService;
+        const targetService = edgeInfo.targetService;
+
+        const sourceNodeId = serviceToNodeId[sourceService];
+        const targetNodeId = serviceToNodeId[targetService];
+
+        if (sourceNodeId && targetNodeId) {
+          edges.push({
+            id: `edge-${edgeIndex}`,
+            source: sourceNodeId,
+            target: targetNodeId,
+            type: 'agentEdge',
+            data: {
+              connectionType: edgeInfo?.metadata?.type || 'default',
+              edgeParam: edgeInfo?.metadata?.edgeParam,
+              requestCount: edgeInfo.requestCount
+            }
+          });
+          edgeIndex++;
+        }
+      });
+    }
+
+    return { nodes, edges };
+  }, [serviceGraphEdges, collectionData, handleNodeClick]);
+
+  // Update state only when memoized values change
+  useEffect(() => {
     setNodes(formattedNodes);
     setEdges(formattedEdges);
-  }, []);
+  }, [formattedNodes, formattedEdges]);
+
+  // Show loading spinner
+  if (loading) {
+    return (
+      <Card>
+        <Box padding="4">
+          <HorizontalStack align="center" blockAlign="center">
+            <Spinner size="large" />
+            <Text variant="bodyMd" color="subdued">Loading service graph...</Text>
+          </HorizontalStack>
+        </Box>
+      </Card>
+    );
+  }
+
+  // Don't render if no serviceGraphEdges data
+  if (!serviceGraphEdges || Object.keys(serviceGraphEdges).length === 0) {
+    return null;
+  }
+
+  // Calculate dynamic height based on number of services
+  const serviceCount = Object.keys(serviceGraphEdges).length;
+  const dynamicHeight = Math.max(500, Math.min(800, serviceCount * 120 + 200));
 
   return (
     <Card>
@@ -278,16 +430,16 @@ function AgentDiscoverGraph({ apiCollectionId }) {
           <HorizontalStack align="space-between">
             <Text variant="headingMd">Architecture</Text>
             <HorizontalStack gap="2">
-              {Object.entries(getCategoryStats()).map(([category, count]) => (
+              {Object.entries(categoryStats).map(([category, count]) => (
                 <Badge key={category} status="info">
-                  {count} {category.replace('-', ' ')}
+                  {count} {category}
                 </Badge>
               ))}
             </HorizontalStack>
           </HorizontalStack>
 
           <VerticalStack gap="2">
-            <div style={{ height: "400px", border: '1px solid #e1e5e9', borderRadius: '8px', position: 'relative' }}>
+            <div style={{ height: `${dynamicHeight}px`, border: '1px solid #e1e5e9', borderRadius: '8px', position: 'relative' }}>
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -308,22 +460,33 @@ function AgentDiscoverGraph({ apiCollectionId }) {
                 defaultViewport={{ x: 0, y: 0, zoom: 1 }}
               >
                 <Background color="#e1e5e9" gap={16} />
-                
-                {/* Internal System Boundary */}
-                <div 
-                  style={{
-                    position: 'absolute',
-                    left: '300px',
-                    top: '130px',
-                    right: '500px',
-                    bottom: '150px',
-                    border: '2px dashed #7c3aed',
-                    borderRadius: '8px',
-                    pointerEvents: 'none',
-                    opacity: 0.8,
-                    zIndex: 1
-                  }}
-                />
+
+                {/* Internal System Boundary - wraps around the AI Agent */}
+                {nodes.some(n => n.data?.component?.category === 'agent') && (() => {
+                  const agentNode = nodes.find(n => n.data?.component?.category === 'agent');
+                  if (!agentNode) return null;
+
+                  const agentX = agentNode.position.x;
+                  const agentY = agentNode.position.y;
+
+                  return (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: `${agentX - 30}px`,
+                        top: `${Math.max(20, agentY - 30)}px`,
+                        width: '260px',
+                        height: '200px',
+                        border: '2px dashed #7c3aed',
+                        borderRadius: '12px',
+                        pointerEvents: 'none',
+                        opacity: 0.5,
+                        zIndex: 0,
+                        backgroundColor: 'rgba(124, 58, 237, 0.05)'
+                      }}
+                    />
+                  );
+                })()}
 
               </ReactFlow>
             </div>

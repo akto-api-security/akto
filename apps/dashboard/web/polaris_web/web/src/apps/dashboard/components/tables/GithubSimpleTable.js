@@ -54,10 +54,12 @@ function GithubSimpleTable(props) {
         showFooter={props?.showFooter}
         setSelectedResourcesForPrimaryAction={props?.setSelectedResourcesForPrimaryAction}
         lastColumnSticky = {props?.lastColumnSticky}
+        preventRowClickOnActions={props?.preventRowClickOnActions}
         isMultipleItemsSelected={props?.isMultipleItemsSelected}
         emptyStateMarkup={props?.emptyStateMarkup}
         calendarFilterKeys={props?.calendarFilterKeys}
         supportsNegationFilter={true}
+        onExportCsv={props?.onExportCsv}
     />
 
 }

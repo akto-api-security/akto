@@ -27,4 +27,16 @@ export default {
         return resp
     },
 
+    async guardrailPlayground(testInput, policyData) {
+        const resp = await request({
+            url: '/api/guardrailPlayground',
+            method: 'post',
+            data: {
+                testInput,
+                policy: policyData
+            }
+        })
+        return resp
+    },
+
 }

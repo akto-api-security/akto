@@ -113,6 +113,7 @@ func setupRouter(validationHandler *handlers.ValidationHandler, logger *zap.Logg
 
 		// Individual validation endpoints
 		api.POST("/validate/request", validationHandler.ValidateRequest)
+		api.POST("/validate/requestWithPolicy", validationHandler.ValidateRequestWithPolicy)
 		api.POST("/validate/response", validationHandler.ValidateResponse)
 	}
 

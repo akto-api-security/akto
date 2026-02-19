@@ -3,6 +3,7 @@ package com.akto.metrics;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.monitoring.ModuleInfoConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.util.VersionUtil;
 
@@ -43,14 +44,29 @@ public class ModuleInfoWorker {
     private Map<String, Object> collectEnvironmentVariables(ModuleInfo.ModuleType moduleType) {
         Map<String, Object> envMap = new HashMap<>();
 
-        // Collect all environment variables to see any extra variables
-        Map<String, String> systemEnv = System.getenv();
-
-        for (Map.Entry<String, String> entry : systemEnv.entrySet()) {
-            envMap.put(entry.getKey(), entry.getValue());
-        }
+        envMap.putAll(System.getenv());
 
         return envMap;
+    }
+
+    public static Map<String, Object> filterWhitelistedEnvVariables(Map<String, Object> allEnvVariables, ModuleInfo.ModuleType moduleType) {
+        Map<String, Object> filteredEnvMap = new HashMap<>();
+
+        // Get whitelisted keys for this module type
+        Map<String, String> allowedKeys = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.get(moduleType);
+
+        if (allowedKeys == null || allowedKeys.isEmpty()) {
+            return filteredEnvMap;
+        }
+
+        // Only include whitelisted environment variables
+        for (String allowedKey : allowedKeys.keySet()) {
+            if (allEnvVariables.containsKey(allowedKey)) {
+                filteredEnvMap.put(allowedKey, allEnvVariables.get(allowedKey));
+            }
+        }
+
+        return filteredEnvMap;
     }
 
     public static String getModuleName(ModuleInfo.ModuleType moduleType) {
@@ -77,20 +93,19 @@ public class ModuleInfoWorker {
         moduleInfo.setId(moduleInfo.getId());//Setting new uuid for id
         moduleInfo.setName(this.moduleName);
 
-        //Collect environment variables once at initialization
-        Map<String, Object> envVariables = collectEnvironmentVariables(this.moduleType);
-        Map<String, Object> additionalData = new HashMap<>();
-        if (!envVariables.isEmpty()) {
-            additionalData.put("env", envVariables);
-        }
-        moduleInfo.setAdditionalData(additionalData);
-
         scheduler.scheduleWithFixedDelay(() -> {
+            Map<String, Object> envVariables = collectEnvironmentVariables(_this.moduleType);
+            Map<String, Object> additionalData = new HashMap<>();
+            if (!envVariables.isEmpty()) {
+                additionalData.put("env", envVariables);
+            }
+            moduleInfo.setAdditionalData(additionalData);
+            
             moduleInfo.setLastHeartbeatReceived(Context.now());
             assert _this.dataActor != null;
             _this.dataActor.updateModuleInfo(moduleInfo);
-            loggerMaker.info("Sending heartbeat at :" + moduleInfo.getLastHeartbeatReceived() + " for module:" + moduleInfo.getModuleType().name());
-        }, 0, 30, TimeUnit.SECONDS);
+            loggerMaker.debug("Sending heartbeat at :" + moduleInfo.getLastHeartbeatReceived() + " for module:" + moduleInfo.getModuleType().name());
+        }, 0, 60, TimeUnit.SECONDS);
     }
 
     public static void init(ModuleInfo.ModuleType moduleType, DataActor dataActor) {

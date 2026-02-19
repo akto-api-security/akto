@@ -2,7 +2,7 @@ package com.akto.action;
 
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
-import com.akto.publisher.KafkaDataPublisher;
+import com.akto.utils.KafkaUtils;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
@@ -42,88 +42,99 @@ public class HttpProxyAction extends ActionSupport {
     private String ingest_data;
     private String streaming;
 
+    private String path;
+    private String requestHeaders;
+    private String responseHeaders;
+    private String method;
+    private String requestPayload;
+    private String responsePayload;
+    private String ip;
+    private String destIp;
+    private String time;
+    private String statusCode;
+    private String type;
+    private String status;
+    private String akto_account_id;
+    private String akto_vxlan_id;
+    private String is_pending;
+    private String source;
+    private String direction;
+    private String tag;
+    private String metadata;
+    private String process_id;
+    private String socket_id;
+    private String daemonset_id;
+    private String enabled_graph;
+    private String contextSource;
+
     private Map<String, Object> data;
     private boolean success;
     private String message;
 
-    
     public String httpProxy() {
         try {
-            loggerMaker.info("HTTP Proxy API called");
+            loggerMaker.info("HTTP Proxy API called - path: " + path + ", method: " + method);
 
-            // Validate input
-            if (url == null || url.isEmpty()) {
-                loggerMaker.warn("Missing required field: url");
-                success = false;
-                message = "Missing required field: url";
-                data = new HashMap<>();
-                data.put("error", "URL is required");
-                return Action.ERROR.toUpperCase();
-            }
+            Gateway gateway = Gateway.getInstance();
+            ensureDataPublisher(gateway);
 
-            if (path == null || path.isEmpty()) {
-                loggerMaker.warn("Missing required field: path");
-                success = false;
-                message = "Missing required field: path";
-                data = new HashMap<>();
-                data.put("error", "Path is required");
-                return Action.ERROR.toUpperCase();
-            }
+            Map<String, Object> requestData = buildRequestData();
+            Map<String, Object> result = gateway.processHttpProxy(requestData);
 
-            if (request == null || request.isEmpty()) {
-                loggerMaker.warn("Missing required field: request");
-                success = false;
-                message = "Missing required field: request";
-                data = new HashMap<>();
-                data.put("error", "Request object is required");
-                return Action.ERROR.toUpperCase();
-            }
-
-            Map<String, Object> urlQueryParams = new HashMap<>();
-            if (guardrails != null && !guardrails.isEmpty()) {
-                urlQueryParams.put("guardrails", guardrails);
-            }
-            if (akto_connector != null && !akto_connector.isEmpty()) {
-                urlQueryParams.put("akto_connector", akto_connector);
-            }
-            if (ingest_data != null && !ingest_data.isEmpty()) {
-                urlQueryParams.put("ingest_data", ingest_data);
-            }
-
-            loggerMaker.info("URL Query Params - guardrails: " + guardrails +
-                ", akto_connector: " + akto_connector + ", ingest_data: " + ingest_data);
-
-            Map<String, Object> proxyData = new HashMap<>();
-            proxyData.put("url", url);
-            proxyData.put("path", path);
-            proxyData.put("request", request);
-            if (response != null) {
-                proxyData.put("response", response);
-            }
-            proxyData.put("urlQueryParams", urlQueryParams);
-
-            data = gateway.processHttpProxy(proxyData);
-
-            success = data != null;
-            if (success) {
-                message = "Request processed successfully";
-            } else {
-                message = "Request processing failed";
-            }
-
-            loggerMaker.info("HTTP Proxy processed - success: " + success);
+            success = Boolean.TRUE.equals(result.get("success"));
+            message = (String) result.get("message");
+            data = result;
 
             return success ? Action.SUCCESS.toUpperCase() : Action.ERROR.toUpperCase();
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in HTTP Proxy action: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
-
             success = false;
             message = "Unexpected error: " + e.getMessage();
             data = new HashMap<>();
             data.put("error", e.getMessage());
-
             return Action.ERROR.toUpperCase();
+        }
+    }
+
+    private Map<String, Object> buildRequestData() {
+        Map<String, Object> requestData = new HashMap<>();
+
+        requestData.put("guardrails", guardrails);
+        requestData.put("akto_connector", akto_connector);
+        requestData.put("ingest_data", ingest_data);
+
+        requestData.put("path", path);
+        requestData.put("requestHeaders", requestHeaders);
+        requestData.put("responseHeaders", responseHeaders);
+        requestData.put("method", method);
+        requestData.put("requestPayload", requestPayload);
+        requestData.put("responsePayload", responsePayload);
+        requestData.put("ip", ip);
+        requestData.put("destIp", destIp);
+        requestData.put("time", time);
+        requestData.put("statusCode", statusCode);
+        requestData.put("type", type);
+        requestData.put("status", status);
+        requestData.put("akto_account_id", akto_account_id);
+        requestData.put("akto_vxlan_id", akto_vxlan_id);
+        requestData.put("is_pending", is_pending);
+        requestData.put("source", source);
+        requestData.put("direction", direction);
+        requestData.put("tag", tag);
+        requestData.put("metadata", metadata);
+        requestData.put("process_id", process_id);
+        requestData.put("socket_id", socket_id);
+        requestData.put("daemonset_id", daemonset_id);
+        requestData.put("enabled_graph", enabled_graph);
+        requestData.put("contextSource", contextSource);
+
+        return requestData;
+    }
+
+    private void ensureDataPublisher(Gateway gateway) {
+        if (gateway.getDataPublisher() == null) {
+            gateway.setDataPublisher(batch -> KafkaUtils.insertData(batch));
         }
     }
 
