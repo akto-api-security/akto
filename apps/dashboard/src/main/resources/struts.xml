@@ -2068,8 +2068,7 @@
             </result>
         </action>
 
-
-        <action name="api/getAllIconsCache" class="com.akto.action.ApiCollectionsAction" method="fetchAllIconsCache">
+        <action name="api/fetchIconsForHostnames" class="com.akto.action.ApiCollectionsAction" method="fetchIconsForHostnames">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">

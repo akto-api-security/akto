@@ -1037,10 +1037,11 @@ export default {
         return resp
     },
 
-    getAllIconsCache(){
+    fetchIconsForHostnames(hostnames){
         return request({
-            url: '/api/getAllIconsCache',
-            method: 'get'
+            url: '/api/fetchIconsForHostnames',
+            method: 'post',
+            data: { hostnames }
         })
     }
 
