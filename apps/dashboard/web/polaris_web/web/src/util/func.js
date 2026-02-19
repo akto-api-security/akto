@@ -271,9 +271,6 @@ prettifyEpoch(epoch) {
     return String(val)
   },
   exportTableAsCSV(headers, data, fileName) {
-    // TODO: Support pagination to export all pages (not just current page)
-    // TODO: Support exporting only selected items when rows are selected in the table
-    // TODO: Support exporting when filters are enabled
     const cols = headers.filter(x => x.text?.length > 0)
     const csv = [
       cols.map(x => x.text).join(","),
