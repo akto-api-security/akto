@@ -1154,6 +1154,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
               lastTested: apiInfoMap[key] ? apiInfoMap[key]["lastTested"] : 0,
               isThreatEnabled: apiInfoMap[key] ? apiInfoMap[key]["threatScore"] > 0 : false,
+              agentProxyGuardrailEnabled: apiInfoMap[key] ? (apiInfoMap[key]["agentProxyGuardrailEnabled"] || false) : false,
           }
 
       }
@@ -2349,7 +2350,8 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
 
    isWhiteListedOrganization(){
       return window.USER_NAME.indexOf("@akto.io")>0 || window.USER_NAME.indexOf("@lab.morganstanley.com")>0
-       || window.USER_NAME.indexOf("@blinkrx.com")>0 || window.USER_NAME.indexOf("@testmuai.com")> 0 || window.USER_NAME.indexOf("@aktosecurity.com")>0 ;
+       || window.USER_NAME.indexOf("@blinkrx.com")>0 || window.USER_NAME.indexOf("@testmuai.com")> 0 || window.USER_NAME.indexOf("@aktosecurity.com")>0
+        || window.USER_NAME.indexOf("@razorpay.com")>0;
     },
 
     isTempAccount(){

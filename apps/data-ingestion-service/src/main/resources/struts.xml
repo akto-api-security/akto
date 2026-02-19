@@ -48,7 +48,7 @@
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
+                <param name="includeProperties">^success,^message,^data.*</param>
             </result>
         </action>
 
@@ -70,24 +70,6 @@
             </result>
             <result name="ERROR" type="json">
                 <param name="includeProperties">^code,^error_message</param>
-            </result>
-        </action>
-      
-        <action name="api/http-proxy/truefoundry" class="com.akto.action.HttpProxyAction" method="truefoundryProxy">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json">
-                <param name="excludeProperties">.*</param>
-            </result>
-            <result name="BLOCKED" type="json">
-                <param name="statusCode">400</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="excludeProperties">.*</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 

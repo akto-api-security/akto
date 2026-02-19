@@ -745,13 +745,15 @@ const transform = {
             }else{
                 lastTestedText = func.prettifyEpoch(url?.lastTested)
             }
+            // Check both camelCase and snake_case field names
+            const guardrailEnabled = url.agentProxyGuardrailEnabled || url.agent_proxy_guardrail_enabled || false
             return{
                 ...url,
                 last_seen: url.last_seen,
                 hostName: (hostNameMap[url.apiCollectionId] !== null ? hostNameMap[url.apiCollectionId] : this.getHostName(url.endpoint)),
                 access_type: url.access_type,
                 auth_type: url.auth_type,
-                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} isNew={this.isNewEndpoint(url.lastSeenTs)} />,
+                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} isNew={this.isNewEndpoint(url.lastSeenTs)} guardrailEnabled={guardrailEnabled} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
                 riskScoreComp: <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
                 isNew: this.isNewEndpoint(url.lastSeenTs),
@@ -761,6 +763,7 @@ const transform = {
                 severity: url.severityObj? Object.keys(url.severityObj):[],
                 description: url.description,
                 lastTestedComp: <Text variant="bodyMd" fontWeight={this.isNewEndpoint(url?.lastTested) ? "regular" : "semibold"} color={this.isNewEndpoint(url?.lastTested) ? "" : "subdued"}>{lastTestedText}</Text>,
+                agentProxyGuardrailEnabled: guardrailEnabled,
             }
         })
 
