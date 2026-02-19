@@ -1867,6 +1867,7 @@ function ApiCollections(props) {
                 csvFileName={"Inventory"}
                 prettifyPageData={(pageData) => selectedTab === 'untracked' ? transform.prettifyUntrackedCollectionsData(pageData) : transform.prettifyCollectionsData(pageData, false, selectedTab, activeFilterType)}
                 transformRawData={transformRawCollectionData}
+                onExportCsv={() => exportCsv()}
             />
         );
     };
