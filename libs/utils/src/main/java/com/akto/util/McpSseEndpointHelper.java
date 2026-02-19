@@ -28,7 +28,6 @@ public class McpSseEndpointHelper {
      */
     public static void addSseEndpointHeader(OriginalHttpRequest request, int apiCollectionId) {
         if (request == null) {
-            loggerMaker.debug("Request is null, skipping SSE endpoint header addition");
             return;
         }
 
@@ -56,10 +55,7 @@ public class McpSseEndpointHelper {
                     request.setHeaders(new HashMap<>());
                 }
                 request.getHeaders().put("x-akto-sse-endpoint", Collections.singletonList(sseEndpoint));
-
                 loggerMaker.debug("Added SSE endpoint header: {} for collection: {}", sseEndpoint, apiCollectionId);
-            } else {
-                loggerMaker.debug("Collection {} is not an MCP collection or has no SSE callback URL", apiCollectionId);
             }
         } catch (Exception e) {
             loggerMaker.warn("Failed to add SSE endpoint header for collection {}: {}", apiCollectionId, e.getMessage());
