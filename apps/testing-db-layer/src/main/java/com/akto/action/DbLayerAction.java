@@ -97,8 +97,7 @@ public class DbLayerAction extends ActionSupport {
                 boolean shouldInsert = SampleDeduplicationFilter.shouldInsertSample(
                     sampleDataAltCopy.getApiCollectionId(),
                     sampleDataAltCopy.getMethod(),
-                    sampleDataAltCopy.getUrl(),
-                    sampleDataAltCopy.getTimestamp()
+                    sampleDataAltCopy.getUrl()
                 );
 
                 if (!shouldInsert) {

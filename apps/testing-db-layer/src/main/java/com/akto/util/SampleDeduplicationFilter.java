@@ -49,14 +49,15 @@ public class SampleDeduplicationFilter {
     /**
      * Checks if an API sample should be inserted based on deduplication logic.
      * Also handles filter rotation and maintains the sliding window.
+     * The time-based window is handled by filter rotation (every 15 minutes),
+     * not by the timestamp parameter.
      *
      * @param apiCollectionId The API collection ID
      * @param method The HTTP method
      * @param url The API URL
-     * @param timestamp The sample timestamp (in milliseconds)
      * @return true if the sample is new and should be inserted, false if it's a duplicate
      */
-    public static boolean shouldInsertSample(int apiCollectionId, String method, String url, long timestamp) {
+    public static boolean shouldInsertSample(int apiCollectionId, String method, String url) {
         // Refresh filter list - rotates if needed
         refreshFilterList();
 
