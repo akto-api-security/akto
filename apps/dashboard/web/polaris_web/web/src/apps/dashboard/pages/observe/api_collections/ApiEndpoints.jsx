@@ -954,7 +954,7 @@ function ApiEndpoints(props) {
         }
     }
 
-    function uploadOpenFileWithSource(source, file, isAiAgent = false) {
+    function uploadOpenFileWithSource(source, file, isAiAgent = false, skipLiveReplay = false) {
         const reader = new FileReader();
         if (!file) {
             file = openAPIfile
@@ -966,6 +966,7 @@ function ApiEndpoints(props) {
             formData.append("openAPIString", reader.result)
             formData.append("apiCollectionId", apiCollectionId);
             formData.append("triggeredWithAIAgent", isAiAgent);
+            formData.append("skipLiveReplay", skipLiveReplay);
             if (source) {
                 formData.append("source", source)
             }
@@ -1332,7 +1333,7 @@ function ApiEndpoints(props) {
             <SelectSource
                 show={showSourceDialog}
                 setShow={(val) => setShowSourceDialog(val)}
-                primaryAction={(val) => uploadOpenFileWithSource(val)}
+                primaryAction={(val, skipLiveReplay) => uploadOpenFileWithSource(val, null, false, skipLiveReplay)}
             />
         </HorizontalStack>
     )
