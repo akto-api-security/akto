@@ -131,38 +131,31 @@ public class HttpCallParser {
         return RuntimeUtil.getHeaderValue(headers, headerKey);
     }
 
-    private static String getAccessTypeFromDirection(String direction) {
-        if (direction == null) {
-            return null;
-        }
-        if ("1".equals(direction)) {
-            return "First party";
-        } else if ("2".equals(direction)) {
-            return "Third party";
-        }
+    /** Direction "1" = incoming (first party), "2" = outgoing (third party). */
+    private static ApiCollection.AccessType getAccessTypeFromDirection(String direction) {
+        if (direction == null) return null;
+        if ("1".equals(direction)) return ApiCollection.AccessType.FIRST_PARTY;
+        if ("2".equals(direction)) return ApiCollection.AccessType.THIRD_PARTY;
         return null;
     }
 
-    private static String computeAccessType(String direction, String existingAccessType) {
-        String newAccessType = getAccessTypeFromDirection(direction);
+    private static String computeAccessType(String direction, String existingAccessTypeStr) {
+        ApiCollection.AccessType newType = getAccessTypeFromDirection(direction);
+        ApiCollection.AccessType existingType = ApiCollection.AccessType.fromDisplayName(existingAccessTypeStr);
 
-        if (newAccessType == null) {
-            return existingAccessType; 
+        if (newType == null) {
+            return existingAccessTypeStr;
         }
-
-        if (existingAccessType == null) {
-            return newAccessType; 
+        if (existingType == null) {
+            return newType.getDisplayName();
         }
-
-        if ("Both".equals(existingAccessType)) {
-            return "Both"; 
+        if (existingType == ApiCollection.AccessType.BOTH) {
+            return ApiCollection.AccessType.BOTH.getDisplayName();
         }
-
-        if (existingAccessType.equals(newAccessType)) {
-            return existingAccessType; 
+        if (existingType == newType) {
+            return existingType.getDisplayName();
         }
-
-        return "Both";
+        return ApiCollection.AccessType.BOTH.getDisplayName();
     }
 
 
@@ -736,19 +729,26 @@ public class HttpCallParser {
      *                           collections based on host names.
      * @param httpResponseParams
      */
-    public void updateApiCollectionTags(String hostNameMapKey, HttpResponseParams httpResponseParams) {
+    public void updateApiCollectionTags(String hostNameMapKey, HttpResponseParams httpResponseParams, String accessType) {
         int apiCollectionId = hostNameToIdMap.get(hostNameMapKey);
-        updateApiCollectionTags(apiCollectionId, httpResponseParams, hostNameMapKey, false);
+        updateApiCollectionTags(apiCollectionId, httpResponseParams, hostNameMapKey, false, accessType);
     }
 
     // Overloaded version for service-tag collections where we already have the apiCollectionId
-    public void updateApiCollectionTags(int apiCollectionId, HttpResponseParams httpResponseParams, String hostNameMapKey, boolean isServiceTagCollection) {
+    public void updateApiCollectionTags(int apiCollectionId, HttpResponseParams httpResponseParams, String hostNameMapKey, boolean isServiceTagCollection, String accessType) {
         ApiCollection apiCollection = apiCollectionsMap.get(apiCollectionId);
 
         if( apiCollection == null) {
             loggerMaker.debug("No tags updated. ApiCollection not found for id: " + apiCollectionId);
             return;
         }
+
+        boolean accessTypeChanged = false;
+        if (accessType != null && !accessType.equals(apiCollection.getAccessType())) {
+            apiCollection.setAccessType(accessType);
+            accessTypeChanged = true;
+        }
+
 
         // Update the tags in-memory for the apiCollection
         if(Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL()) || (Utils.printDebugHostLog(httpResponseParams) != null)) {
@@ -764,7 +764,7 @@ public class HttpCallParser {
         
 
         int lastSynctime = this.apiCollectionIdTagsSyncTimestampMap.getOrDefault(apiCollectionId, 0);
-        if (Context.now() - lastSynctime < this.sync_threshold_time) {
+        if (!accessTypeChanged && Context.now() - lastSynctime < this.sync_threshold_time) {
             // Avoid updating tags too frequently
             return;
         }
@@ -798,12 +798,11 @@ public class HttpCallParser {
             }
         }
 
-        if (tagsList == null || tagsList.isEmpty()) {
+        if (!accessTypeChanged && (tagsList == null || tagsList.isEmpty())) {
             return;
         }
 
         // Sync tags to DB based on collection type
-        String accessType = apiCollection.getAccessType();
         if (isServiceTagCollection) {
             // Service-tag collection - call createCollectionForServiceTag to update tags
             String serviceTag = apiCollection.getServiceTag();
@@ -884,13 +883,7 @@ public class HttpCallParser {
             if (hostNameToIdMap.containsKey(key)) {
                 apiCollectionId = hostNameToIdMap.get(key);
                 String accessType = getOrComputeAccessType(direction, apiCollectionId);
-
-                try {
-                    createCollectionBasedOnHostName(key.hashCode(), key, tagList, accessType);
-                } catch (Exception e) {
-                    loggerMaker.debug("Collection already exists, continuing...");
-                }
-                updateApiCollectionTags(key, httpResponseParam);
+                updateApiCollectionTags(key, httpResponseParam, accessType);
 
             } else {
                 int id = hostName.hashCode();
@@ -955,8 +948,7 @@ public class HttpCallParser {
             }else{
                 String accessType = getOrComputeAccessType(direction, vxlanId);
 
-                createCollectionSimpleForVpc(vxlanId, vpcId, tagList, accessType);
-                updateApiCollectionTags(key, httpResponseParam);
+                updateApiCollectionTags(key, httpResponseParam, accessType);
             }
 
             apiCollectionId = vxlanId;
@@ -1066,7 +1058,7 @@ public class HttpCallParser {
                 }
 
                 if (apiCollection.getServiceTag() != null) {
-                    updateApiCollectionTags(collectionId, httpResponseParam, apiCollection.getServiceTag(), true);
+                    updateApiCollectionTags(collectionId, httpResponseParam, apiCollection.getServiceTag(), true, accessType);
                 }
             }
 
