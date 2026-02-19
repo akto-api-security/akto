@@ -7,9 +7,10 @@ import sys
 import time
 import urllib.request
 from typing import Any, Dict, Union
+from akto_machine_id import get_machine_id
 
 # Configuration
-LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "./.github/akto/copilot/logs"))
+LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/akto-main/akto/.github/akto/copilot/logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 
@@ -18,6 +19,12 @@ AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 GITHUB_COPILOT_API_URL = os.getenv("GITHUB_COPILOT_API_URL", "https://api.github.com")
 AKTO_CONNECTOR = "github_copilot_cli"
+CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
+MODE = os.getenv("MODE", "argus").lower()
+
+if MODE == "atlas":
+    device_id = os.getenv("DEVICE_ID") or get_machine_id()
+    GITHUB_COPILOT_API_URL = f"https://{device_id}.ai-agent.copilot" if device_id else GITHUB_COPILOT_API_URL
 
 # Setup logging
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -25,13 +32,18 @@ logger = logging.getLogger(__name__)
 logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
 if not logger.handlers:
-    file_handler = logging.FileHandler(os.path.join(LOG_DIR, "pre-tool-hook.log"))
+    file_handler = logging.FileHandler(os.path.join(LOG_DIR, "validate-pre-tool.log"))
     file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
     logger.addHandler(file_handler)
-    
+
     console_handler = logging.StreamHandler(sys.stderr)
     console_handler.setLevel(logging.ERROR)
     logger.addHandler(console_handler)
+
+if MODE == "atlas":
+    logger.info(f"MODE: {MODE}, Device ID: {device_id}, GITHUB_COPILOT_API_URL: {GITHUB_COPILOT_API_URL}")
+else:
+    logger.info(f"MODE: {MODE}, GITHUB_COPILOT_API_URL: {GITHUB_COPILOT_API_URL}")
 
 
 def build_http_proxy_url(guardrails: bool, ingest_data: bool) -> str:
@@ -75,23 +87,62 @@ def post_to_akto(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str
         raise
 
 
+def uuid_to_ipv6_simple(uuid_str):
+    hex_str = uuid_str.replace("-", "").lower()
+    return ":".join(hex_str[i:i+4] for i in range(0, 32, 4))
+
+
 def build_akto_request(tool_name: str, tool_args: str, cwd: str, timestamp: int) -> Dict[str, Any]:
     """Build request payload for Akto guardrails validation."""
+    tags = {"gen-ai": "Gen AI", "tool-use": "Tool Execution"}
+    if MODE == "atlas":
+        tags["ai-agent"] = "copilotcli"
+        tags["source"] = CONTEXT_SOURCE
+
+    device_id = os.getenv("DEVICE_ID") or get_machine_id()
+    host = GITHUB_COPILOT_API_URL.replace("https://", "").replace("http://", "")
+
+    request_headers = json.dumps({
+        "host": host,
+        "x-copilot-hook": "PreToolUse",
+        "content-type": "application/json"
+    })
+
+    response_headers = json.dumps({
+        "x-copilot-hook": "PreToolUse"
+    })
+
+    request_payload = json.dumps({
+        "body": json.dumps({"toolName": tool_name, "toolArgs": tool_args})
+    })
+
+    response_payload = json.dumps({})
+
     return {
-        "url": GITHUB_COPILOT_API_URL,
         "path": f"/copilot/tool/{tool_name}",
-        "request": {
-            "method": "POST",
-            "headers": {"content-type": "application/json"},
-            "body": {"toolName": tool_name, "toolArgs": tool_args},
-            "queryParams": {},
-            "metadata": {
-                "tag": {"gen-ai": "Gen AI", "tool-use": "Tool Execution"},
-                "cwd": cwd,
-                "timestamp": timestamp
-            }
-        },
-        "response": None
+        "requestHeaders": request_headers,
+        "responseHeaders": response_headers,
+        "method": "POST",
+        "requestPayload": request_payload,
+        "responsePayload": response_payload,
+        "ip": uuid_to_ipv6_simple(device_id),
+        "destIp": "127.0.0.1",
+        "time": str(timestamp),
+        "statusCode": "200",
+        "type": None,
+        "status": "200",
+        "akto_account_id": "1000000",
+        "akto_vxlan_id": device_id,
+        "is_pending": "false",
+        "source": "MIRRORING",
+        "direction": None,
+        "process_id": None,
+        "socket_id": None,
+        "daemonset_id": None,
+        "enabled_graph": None,
+        "tag": json.dumps(tags),
+        "metadata": json.dumps(tags),
+        "contextSource": CONTEXT_SOURCE
     }
 
 
@@ -135,12 +186,11 @@ def ingest_blocked_tool_use(tool_name: str, tool_args: str, cwd: str, timestamp:
     logger.info("Ingesting blocked tool use")
     try:
         request_body = build_akto_request(tool_name, tool_args, cwd, timestamp)
-        request_body["response"] = {
-            "body": {"x-blocked-by": "Akto Guardrails", "reason": reason},
-            "headers": {"content-type": "application/json"},
-            "statusCode": 403,
-            "status": "forbidden"
-        }
+        request_body["responsePayload"] = json.dumps({
+            "body": json.dumps({"x-blocked-by": "Akto Proxy", "reason": reason})
+        })
+        request_body["statusCode"] = "403"
+        request_body["status"] = "403"
         
         post_to_akto(
             build_http_proxy_url(guardrails=False, ingest_data=True),
@@ -152,7 +202,7 @@ def ingest_blocked_tool_use(tool_name: str, tool_args: str, cwd: str, timestamp:
 
 
 def main():
-    logger.info("=== Pre-Tool Use Hook ===")
+    logger.info(f"=== Pre-Tool Use Hook - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
     
     try:
         input_data = json.load(sys.stdin)
@@ -196,3 +246,17 @@ def main():
 
 if __name__ == "__main__":
     main()
+# #!/usr/bin/env python3
+# """
+# TESTING MODE: This hook always denies all tool executions.
+# Uncomment the code above to restore full functionality.
+# """
+# # Always deny for testing
+# output = {
+#     "permissionDecision": "deny",
+#     "permissionDecisionReason": "🧪 TEST MODE: All tools blocked by Akto Guardrails"
+# }
+# logger.info("TEST MODE: Blocking all tool executions 1")
+# sys.stdout.write(json.dumps(output))
+# sys.stdout.flush()
+# sys.exit(0)
