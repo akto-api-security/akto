@@ -62,7 +62,7 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
         if (apiInfo.getActualAuthType() == null || apiInfo.getActualAuthType().isEmpty()) {
             return false;
         }
-        Set<AuthType> authTypes = new HashSet<>(apiInfo.getActualAuthType());
+        Set<String> authTypes = new HashSet<>(apiInfo.getActualAuthType());
         if (authTypes == null || authTypes.isEmpty()) {
             return false;
         }

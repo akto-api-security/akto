@@ -6,7 +6,7 @@ function DropdownSearch(props) {
 
     const id = props.id ? props.id : "dropdown-search"
 
-    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal, showSelectedItemLabels=false, searchDisable=false, textfieldRequiredIndicator=false} = props
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal, showSelectedItemLabels=false, searchDisable=false, textfieldRequiredIndicator=false, showSelectAllMinOptions=5} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -188,7 +188,14 @@ function DropdownSearch(props) {
                     </div>
                 ) 
             } : {})}
-            suffix={<Icon source={ChevronDownMinor} color="base" />}
+            suffix={
+                <span
+                    onClick={() => document.getElementById(id)?.focus()}
+                    style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                >
+                    <Icon source={ChevronDownMinor} color="base" />
+                </span>
+            }
             placeholder={placeholder}
             autoComplete="off"
             requiredIndicator={textfieldRequiredIndicator}
@@ -196,7 +203,7 @@ function DropdownSearch(props) {
         />
     );
 
-    const showSelectAll = (allowMultiple && optionsList.length > 5)
+    const showSelectAll = (allowMultiple && optionsList.length >= showSelectAllMinOptions)
     const checkboxLabel = checked ? <Link removeUnderline>Deselect all</Link> : <Link removeUnderline>Select all</Link>
 
     const emptyState = (
@@ -209,21 +216,24 @@ function DropdownSearch(props) {
     );
 
     return (
-            <Autocomplete
-                {...(allowMultiple ? {allowMultiple:true} : {} )}
-                options={options.slice(0,sliceMaxVal || 20)}
-                selected={selectedOptions}
-                onSelect={updateSelection}
-                emptyState={emptyState}
-                loading={loading}
-                textField={textField}
-                preferredPosition='below'
-                {...(showSelectAll ? {actionBefore:{
-                    content: checkboxLabel,
-                    onAction: () => selectAllFunc(),
-                }} : {})}
-            >
-            </Autocomplete>
+            <>
+                <style>{`#${id} { cursor: pointer; }`}</style>
+                <Autocomplete
+                    {...(allowMultiple ? {allowMultiple:true} : {} )}
+                    options={options.slice(0,sliceMaxVal || 20)}
+                    selected={selectedOptions}
+                    onSelect={updateSelection}
+                    emptyState={emptyState}
+                    loading={loading}
+                    textField={textField}
+                    preferredPosition='below'
+                    {...(showSelectAll ? {actionBefore:{
+                        content: checkboxLabel,
+                        onAction: () => selectAllFunc(),
+                    }} : {})}
+                >
+                </Autocomplete>
+            </>
     );
 }
 

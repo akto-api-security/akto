@@ -31,17 +31,23 @@ import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.log.LoggerMaker;
+import com.akto.test_editor.execution.Executor;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
+
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import org.bson.conversions.Bson;
 
 public class TestRolesAction extends UserAction {
@@ -55,6 +61,8 @@ public class TestRolesAction extends UserAction {
     private String roleName;
     private List<AuthParamData> authParamData;
     private Map<String, String> apiCond;
+    @Getter @Setter
+    private String urlRegex;
     private String authAutomationType;
     private ArrayList<RequestData> reqData;
     private RecordedLoginFlowInput recordedLoginFlowInput;
@@ -139,11 +147,11 @@ public class TestRolesAction extends UserAction {
                         param = new HardcodedAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
                             authParamDataElem.getValue(), true);
                         break;
-                    
+
                     case LOGIN_REQUEST:
                         param = new LoginRequestAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
                             authParamDataElem.getValue(), authParamDataElem.getShowHeader());
-                        break;    
+                        break;
 
                     case TLS_AUTH:
                         param = new TLSAuthParam(authParamDataElem.getCertAuthorityCertificate(),
@@ -153,7 +161,7 @@ public class TestRolesAction extends UserAction {
                     case SAMPLE_DATA:
                         param = new SampleDataAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
                             authParamDataElem.getValue(), true);
-                        break;        
+                        break;
                     default:
                         break;
                 }
@@ -161,8 +169,28 @@ public class TestRolesAction extends UserAction {
                 authParams.add(param);
             }
 
+            // Extract otpRefUuid from fetchOtpData URLs
+            if (this.reqData != null) {
+                for (RequestData rd : this.reqData) {
+                    if (rd.getUrl() != null && rd.getUrl().contains("/fetchOtpData/")) {
+                        // Extract UUID from URL pattern: /fetchOtpData/{uuid}
+                        String url = rd.getUrl();
+                        int lastSlashIndex = url.lastIndexOf('/');
+                        if (lastSlashIndex != -1 && lastSlashIndex < url.length() - 1) {
+                            String extractedUuid = url.substring(lastSlashIndex + 1);
+                            // Remove query params if any
+                            int queryIndex = extractedUuid.indexOf('?');
+                            if (queryIndex != -1) {
+                                extractedUuid = extractedUuid.substring(0, queryIndex);
+                            }
+                            rd.setOtpRefUuid(extractedUuid);
+                        }
+                    }
+                }
+            }
+
             AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType, null);
-            AuthWithCond authWithCond = new AuthWithCond(authM, apiCond, recordedLoginFlowInput);
+            AuthWithCond authWithCond = new AuthWithCond(authM, apiCond, recordedLoginFlowInput, urlRegex);
             return authWithCond;
         } else {
             return null;
@@ -191,6 +219,19 @@ public class TestRolesAction extends UserAction {
         }
 
         return role;
+    }
+
+    private boolean validateUrlRegex() {
+        if (urlRegex == null || urlRegex.trim().isEmpty()) {
+            return true;
+        }
+        try {
+            Pattern.compile(urlRegex.trim());
+            return true;
+        } catch (PatternSyntaxException e) {
+            addActionError("Invalid URL path regex");
+            return false;
+        }
     }
 
     @Audit(description = "User deleted a test role", resource = Resource.TEST_ROLE, operation = Operation.DELETE, metadataGenerators = {"getRoleName"})
@@ -231,6 +272,7 @@ public class TestRolesAction extends UserAction {
         accessMatrixTaskAction.setRoleName(roleName);
         accessMatrixTaskAction.deleteAccessMatrix();
 
+        Executor.clearRoleCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -281,6 +323,7 @@ public class TestRolesAction extends UserAction {
         }
 
         TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.combine(Updates.set(TestRoles.LAST_UPDATED_TS, Context.now()), Updates.set(TestRoles.LAST_UPDATED_BY, sUser.getLogin())));
+        Executor.clearRoleCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -294,8 +337,9 @@ public class TestRolesAction extends UserAction {
             }
             Bson roleFilter = Filters.eq(Constants.ID, role.getId());
             TestRolesDao.instance.updateOne(roleFilter,  Updates.set(TestRoles.SCOPE_ROLES, scopeRoles));
+            Executor.clearRoleCache();
             return SUCCESS.toUpperCase();
-        } 
+        }
         addActionError("Scope roles are empty");
         return ERROR.toUpperCase();
     }
@@ -329,6 +373,7 @@ public class TestRolesAction extends UserAction {
                 createLogicalGroup(logicalGroupName, andConditions,orConditions,this.getSUser().getLogin());
         selectedRole = TestRolesDao.instance.createTestRole(roleName, logicalGroup.getId(), this.getSUser().getLogin());
         selectedRole.setEndpointLogicalGroup(logicalGroup);
+        Executor.clearRoleCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -357,6 +402,7 @@ public class TestRolesAction extends UserAction {
         TestRolesDao.instance.updateOne(roleFilter, removeFromArr);
         TestRolesDao.instance.updateOne(roleFilter, removeNull);
         this.selectedRole = getRole();
+        Executor.clearRoleCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -365,12 +411,16 @@ public class TestRolesAction extends UserAction {
         if (role == null) {
             return ERROR.toUpperCase();
         }
+        if (!validateUrlRegex()) {
+            return ERROR.toUpperCase();
+        }
         Bson roleFilter = Filters.eq(TestRoles.NAME, roleName);
         AuthWithCond authWithCond = makeAuthWithConditionFromParamData(role);
         TestRolesDao.instance.updateOne(roleFilter,
             Updates.set(TestRoles.AUTH_WITH_COND_LIST+"."+index, authWithCond)
         );
         this.selectedRole = getRole();
+        Executor.clearRoleCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -379,9 +429,13 @@ public class TestRolesAction extends UserAction {
         if (role == null) {
             return ERROR.toUpperCase();
         }
+        if (!validateUrlRegex()) {
+            return ERROR.toUpperCase();
+        }
 
         addAuthMechanism(role);
         this.selectedRole = getRole();
+        Executor.clearRoleCache();
         return SUCCESS.toUpperCase();
     }
 

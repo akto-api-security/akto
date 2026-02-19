@@ -2,6 +2,7 @@ import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import { 
     ASSET_TAG_KEYS, 
     ROW_TYPES,
+    TYPE_TAG_KEYS,
     formatDisplayName, 
     getTypeFromTags, 
     findAssetTag,
@@ -173,7 +174,9 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         if (c.deactivated) return;
         const typeTag = findTypeTag(c.envType);
         if (!typeTag) return; // Skip collections without type tag
-        
+        // For gen-ai, the agent is the service — show only under agent grouping
+        if (typeTag.keyName === TYPE_TAG_KEYS.GEN_AI) return;
+
         const hostName = c.hostName || c.displayName || c.name;
         if (!hostName) return;
         

@@ -11,6 +11,7 @@ import com.akto.dto.webhook_integration.WebhookIntegration;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
@@ -38,7 +39,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
-
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import org.apache.http.HttpHeaders;
@@ -147,7 +147,7 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
     private WebhookIntegration webhookIntegration;
     private String webhookUrl;
     private List<Map<String, Object>> customHeaders;
-    private List<String> contextSources;
+    private Boolean useGzip;
 
     // Export fields
     private List<String> ips;
@@ -254,21 +254,31 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
     }
 
     /**
-     * Fetch stored threat-activity webhook integration configuration
+     * Fetch stored threat-activity webhook integration for the current context source (from x-context-source header).
      */
     public String fetchThreatActivityWebhookIntegration() {
-        webhookIntegration = WebhookIntegrationDao.instance.findOne(new BasicDBObject());
+        CONTEXT_SOURCE cs = Context.contextSource.get();
+        if (cs == null) {
+            cs = CONTEXT_SOURCE.API;
+        }
+        webhookIntegration = WebhookIntegrationDao.instance.findByContextSource(cs.name());
         return Action.SUCCESS.toUpperCase();
     }
 
     /**
-     * Add or update threat-activity webhook integration configuration
+     * Add or update threat-activity webhook integration for the current context source (from x-context-source header).
+     * One record per context source per account.
      */
     public String addThreatActivityWebhookIntegration() {
         if (webhookUrl == null || webhookUrl.trim().isEmpty()) {
             addActionError("Please enter a valid webhook URL.");
             return Action.ERROR.toUpperCase();
         }
+        CONTEXT_SOURCE cs = Context.contextSource.get();
+        if (cs == null) {
+            cs = CONTEXT_SOURCE.API;
+        }
+        String contextSourceStr = cs.name();
         String url = webhookUrl.trim();
         Map<String, String> headersMap = new HashMap<>();
         if (customHeaders != null) {
@@ -282,17 +292,17 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
                 }
             }
         }
-        List<String> contextSourcesToSave = (contextSources != null && !contextSources.isEmpty())
-            ? contextSources
-            : java.util.Collections.singletonList(CONTEXT_SOURCE.API.name());
+        boolean useGzipBool = Boolean.TRUE.equals(useGzip);
+        Bson filter = Filters.eq(WebhookIntegration.CONTEXT_SOURCE, contextSourceStr);
         Bson updates = Updates.combine(
             Updates.set(WebhookIntegration.URL, url),
             Updates.set(WebhookIntegration.CUSTOM_HEADERS, headersMap),
-            Updates.set(WebhookIntegration.CONTEXT_SOURCES, contextSourcesToSave),
-            Updates.set(WebhookIntegration.LAST_SYNC_TIME, 0)
+            Updates.set(WebhookIntegration.CONTEXT_SOURCE, contextSourceStr),
+            Updates.set(WebhookIntegration.LAST_SYNC_TIME, 0),
+            Updates.set(WebhookIntegration.USE_GZIP, useGzipBool)
         );
-        WebhookIntegrationDao.instance.updateOne(new BasicDBObject(), updates);
-        logger.infoAndAddToDb("Threat-activity webhook integration saved successfully for URL: " + url, LogDb.DASHBOARD);
+        WebhookIntegrationDao.instance.updateOne(filter, updates);
+        logger.infoAndAddToDb("Threat-activity webhook integration saved for context " + contextSourceStr + ", URL: " + url, LogDb.DASHBOARD);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -547,9 +557,6 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    /**
-     * Gzip compress bytes.
-     */
     private static byte[] gzipBytes(byte[] input) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (GZIPOutputStream gzipOut = new GZIPOutputStream(baos)) {
@@ -577,57 +584,62 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
     }
 
     /**
-     * Sync threat activity to webhook integration: for each saved context source, fetch events in window; combine and send in 5000 batches (gzip); update lastSyncTime.
+     * Sync threat activity to webhook integration: fetch events for this integration's context source, send in 5000 batches (JSON), update lastSyncTime for this record.
      */
     private void syncThreatActivityToWebhookIntegration(WebhookIntegration integration) throws Exception {
         String webhookUrl = integration.getUrl();
         if (webhookUrl == null || webhookUrl.trim().isEmpty()) {
+            logger.infoAndAddToDb("Threat-activity webhook sync: skipping, empty URL");
             return;
         }
-        Map<String, String> customHeaders = integration.getCustomHeaders() != null ? integration.getCustomHeaders() : new HashMap<>();
-        List<String> contextSourceNames = integration.getContextSources();
-        if (contextSourceNames == null || contextSourceNames.isEmpty()) {
-            contextSourceNames = java.util.Collections.singletonList(CONTEXT_SOURCE.API.name());
+        String contextSourceStr = integration.getContextSource();
+        if (contextSourceStr == null || contextSourceStr.trim().isEmpty()) {
+            logger.infoAndAddToDb("Threat-activity webhook sync: skipping, empty contextSource for url=" + webhookUrl);
+            return;
         }
+        CONTEXT_SOURCE cs;
+        try {
+            cs = CONTEXT_SOURCE.valueOf(contextSourceStr.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            logger.warnAndAddToDb("Threat-activity webhook sync: unknown context source " + contextSourceStr + ", skipping");
+            return;
+        }
+        Context.contextSource.set(cs);
+        Map<String, String> customHeaders = integration.getCustomHeaders() != null ? integration.getCustomHeaders() : new HashMap<>();
         int now = Context.now();
         int lastSync = integration.getLastSyncTime();
         int startTs = lastSync <= 0 ? now - FIRST_TIME_SYNC_WINDOW_SECONDS : lastSync;
         int endTs = now;
+        logger.infoAndAddToDb("Threat-activity webhook sync (" + contextSourceStr + "): starting, url=" + webhookUrl + ", timeWindow=" + startTs + "-" + endTs + ", useGzip=" + integration.isUseGzip());
 
-        List<DashboardMaliciousEvent> events = new ArrayList<>();
-        for (String name : contextSourceNames) {
-            if (name == null || name.trim().isEmpty()) continue;
-            CONTEXT_SOURCE cs;
-            try {
-                cs = CONTEXT_SOURCE.valueOf(name.trim().toUpperCase());
-            } catch (IllegalArgumentException e) {
-                logger.warnAndAddToDb("Threat-activity webhook sync: unknown context source " + name + ", skipping", LogDb.DASHBOARD);
-                continue;
-            }
-            Context.contextSource.set(cs);
-            events.addAll(fetchAllMaliciousEventsInRange(startTs, endTs));
-        }
+        List<DashboardMaliciousEvent> events = fetchAllMaliciousEventsInRange(startTs, endTs);
+        Bson filterForThisIntegration = Filters.eq(WebhookIntegration.CONTEXT_SOURCE, contextSourceStr);
         if (events == null || events.isEmpty()) {
-            WebhookIntegrationDao.instance.updateOne(
-                new BasicDBObject(),
-                Updates.set(WebhookIntegration.LAST_SYNC_TIME, now)
-            );
-            logger.infoAndAddToDb("Threat-activity webhook sync: no events in window, updated lastSyncTime", LogDb.DASHBOARD);
+            WebhookIntegrationDao.instance.updateOne(filterForThisIntegration, Updates.set(WebhookIntegration.LAST_SYNC_TIME, now));
+            logger.infoAndAddToDb("Threat-activity webhook sync (" + contextSourceStr + "): no events in window, updated lastSyncTime");
             return;
         }
 
         List<Map<String, Object>> records = transformEventsToAdxFormat(events);
+        boolean useGzip = integration.isUseGzip();
+        int batchCount = (records.size() + WEBHOOK_EXPORT_BATCH_SIZE - 1) / WEBHOOK_EXPORT_BATCH_SIZE;
+        logger.infoAndAddToDb("Threat-activity webhook sync (" + contextSourceStr + "): sending " + records.size() + " records in " + batchCount + " batch(es)");
         for (int i = 0; i < records.size(); i += WEBHOOK_EXPORT_BATCH_SIZE) {
             int end = Math.min(i + WEBHOOK_EXPORT_BATCH_SIZE, records.size());
             List<Map<String, Object>> batch = records.subList(i, end);
             String json = objectMapper.writeValueAsString(batch);
-            byte[] gzipBytes = gzipBytes(json.getBytes(StandardCharsets.UTF_8));
+            byte[] body = json.getBytes(StandardCharsets.UTF_8);
+            if (useGzip) {
+                body = gzipBytes(body);
+            }
 
             Request.Builder requestBuilder = new Request.Builder()
                 .url(webhookUrl)
-                .post(RequestBody.create(gzipBytes, MediaType.parse("application/json")))
-                .addHeader("Content-Type", "application/json")
-                .addHeader("Content-Encoding", "gzip");
+                .post(RequestBody.create(body, MediaType.parse("application/json")))
+                .addHeader("Content-Type", "application/json");
+            if (useGzip) {
+                requestBuilder.addHeader("Content-Encoding", "gzip");
+            }
             for (Map.Entry<String, String> h : customHeaders.entrySet()) {
                 if (h.getKey() != null && !h.getKey().trim().isEmpty()) {
                     requestBuilder.addHeader(h.getKey().trim(), h.getValue() != null ? h.getValue() : "");
@@ -638,35 +650,43 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
             try (Response resp = httpClient.newCall(request).execute()) {
                 if (!resp.isSuccessful()) {
                     String msg = resp.body() != null ? resp.body().string() : "";
+                    String logMsg = String.format("Threat-activity webhook sync (%s): webhook returned error, url=%s, code=%d, body=%s", contextSourceStr, webhookUrl, resp.code(), msg.length() > 500 ? msg.substring(0, 500) + "..." : msg);
+                    logger.errorAndAddToDb(logMsg);
                     throw new IOException("Webhook returned " + resp.code() + ": " + msg);
                 }
             }
         }
 
-        WebhookIntegrationDao.instance.updateOne(
-            new BasicDBObject(),
-            Updates.set(WebhookIntegration.LAST_SYNC_TIME, now)
-        );
+        WebhookIntegrationDao.instance.updateOne(filterForThisIntegration, Updates.set(WebhookIntegration.LAST_SYNC_TIME, now));
         logger.infoAndAddToDb(
-            String.format("Threat-activity webhook sync: sent %d records to %s", records.size(), webhookUrl),
-            LogDb.DASHBOARD
+            String.format("Threat-activity webhook sync (%s): sent %d records to %s", contextSourceStr, records.size(), webhookUrl)
         );
     }
 
     /**
      * Entry point for dashboard job: run threat-activity webhook sync for the given account.
+     * Loops over all webhook integration records (one per context source) and syncs each.
      */
     public static void runThreatActivityWebhookSyncForAccount(int accountId) {
+        logger.infoAndAddToDb("Threat-activity webhook sync cron started for accountId=" + accountId);
         Context.accountId.set(accountId);
-        WebhookIntegration integration = WebhookIntegrationDao.instance.findOne(new BasicDBObject());
-        if (integration == null || integration.getUrl() == null || integration.getUrl().trim().isEmpty()) {
+        List<WebhookIntegration> integrations = WebhookIntegrationDao.instance.findAllForAccount();
+        if (integrations == null || integrations.isEmpty()) {
+            logger.infoAndAddToDb("Threat-activity webhook sync cron: no webhook integrations for accountId=" + accountId);
             return;
         }
-        try {
-            AdxIntegrationAction action = new AdxIntegrationAction();
-            action.syncThreatActivityToWebhookIntegration(integration);
-        } catch (Exception e) {
-            logger.errorAndAddToDb("Threat-activity webhook sync failed: " + e.getMessage(), LogDb.DASHBOARD);
+        for (WebhookIntegration integration : integrations) {
+            if (integration.getUrl() == null || integration.getUrl().trim().isEmpty()) {
+                logger.infoAndAddToDb("Threat-activity webhook sync cron: skipping integration with empty URL, accountId=" + accountId + ", contextSource=" + integration.getContextSource());  
+                continue;
+            }
+            try {
+                logger.infoAndAddToDb("Threat-activity webhook sync cron: syncing accountId=" + accountId + ", contextSource=" + integration.getContextSource());
+                AdxIntegrationAction action = new AdxIntegrationAction();
+                action.syncThreatActivityToWebhookIntegration(integration);
+            } catch (Exception e) {
+                logger.errorAndAddToDb("Threat-activity webhook sync failed for accountId=" + accountId + ", contextSource=" + integration.getContextSource() + ": " + e.getMessage());
+            }
         }
     }
 
@@ -763,6 +783,7 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
                         smr.getApiCollectionId(),
                         smr.getIp(),
                         smr.getCountry(),
+                        smr.getDestCountry(),
                         smr.getDetectedAt(),
                         smr.getType(),
                         smr.getRefId(),
@@ -776,7 +797,8 @@ public class AdxIntegrationAction extends AbstractThreatDetectionAction {
                         smr.getLabel(),
                         smr.getHost(),
                         smr.getJiraTicketUrl(),
-                        smr.getSeverity()
+                        smr.getSeverity(),
+                        smr.getSessionId() != null && !smr.getSessionId().isEmpty() ? smr.getSessionId() : ""
                     ))
                     .collect(Collectors.toList())
                 );

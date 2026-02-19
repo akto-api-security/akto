@@ -56,7 +56,13 @@ import {
     DESCRIPTION_SNOWFLAKE,
     DOCS_URL_SNOWFLAKE,
     INTERVAL_SNOWFLAKE,
-    SNOWFLAKE_FIELDS
+    SNOWFLAKE_FIELDS,
+    CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
+    CONNECTOR_NAME_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
+    DESCRIPTION_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
+    DOCS_URL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
+    INTERVAL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
+    VERTEX_AI_CUSTOM_DEPLOYED_MODEL_FIELDS
 } from "./constants/aiAgentConnectorConstants"
 import DataDogConnector from "./components/DataDogConnector"
 
@@ -1027,6 +1033,22 @@ const databricksImportObj = {
     />
 }
 
+const vertexAICustomDeployedModelImportObj = {
+    icon: '/public/vertex_ai.svg',
+    label: "Vertex AI Custom Deployed Model",
+    text: "Import your Vertex AI Custom Deployed Model traffic seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/vertex-ai-custom-deployed-model',
+    key: "VERTEX_AI_CUSTOM_DEPLOYED_MODEL_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL}
+        connectorName={CONNECTOR_NAME_VERTEX_AI_CUSTOM_DEPLOYED_MODEL}
+        description={DESCRIPTION_VERTEX_AI_CUSTOM_DEPLOYED_MODEL}
+        fields={VERTEX_AI_CUSTOM_DEPLOYED_MODEL_FIELDS}
+        docsUrl={DOCS_URL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL}
+        recurringIntervalSeconds={INTERVAL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL}
+    />
+}
+
 const litellmImportObj = {
     icon: '/public/litellm.svg',
     label: "LiteLLM",
@@ -1039,15 +1061,27 @@ const litellmImportObj = {
     />
 }
 
-const claudeCodeCliImportObj = {
+const claudeCodeCliHookObj = {
     icon: '/public/claudeCodeCli.svg',
-    label: "Claude Code CLI",
+    label: "Claude Code CLI Hook",
     text: "Import your Claude Code CLI proxy traffic, seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/claude-code-cli',
-    key: "CLAUDECODECLI",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-code-cli-hook',
+    key: "CLAUDE_CODE_CLI_HOOK",
     component: <BannerComponent
         content="Import your Claude Code CLI proxy traffic, seamlessly in AKTO."
-        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/claude-code-cli'
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-code-cli-hook'
+    />
+}
+
+const geminiCliHookObj = {
+    icon: '/public/gemini-cli.svg',
+    label: "Gemini CLI Hook",
+    text: "Import your Gemini CLI proxy traffic, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/gemini-cli-hooks',
+    key: "GEMINI_CLI_HOOK",
+    component: <BannerComponent
+        content="Import your Gemini CLI proxy traffic, seamlessly in AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/gemini-cli-hooks'
     />
 }
 
@@ -1057,6 +1091,30 @@ const dataDogConnectorObj = {
     text: "Connect your Datadog account to Akto to visualize your traces in the dashboard.",
     key: "DATA_DOG_CONNECTOR",
     component: <DataDogConnector />
+}
+
+const trueFoundryImportObj = {
+    icon: '/public/trueFoundry.svg',
+    label: "TrueFoundry",
+    text: "Import your TrueFoundry proxy traffic, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/truefoundry',
+    key: "TRUEFOUNDRY",
+    component: <BannerComponent
+        content="Import your TrueFoundry proxy traffic, seamlessly in AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/truefoundry'
+    />
+}
+
+const arcadeImportObj = {
+    icon: '/public/arcade.svg',
+    label: "Arcade",
+    text: "Secure your Arcade AI agent tool calls with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/arcade',
+    key: "ARCADE",
+    component: <BannerComponent
+        content="Secure your Arcade AI agent tool calls with Akto guardrails."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/arcade'
+    />
 }
 
 
@@ -1713,7 +1771,8 @@ const quickStartFunc = {
 
         const aiAgentConnectors = [
             awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
-            n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, snowflakeObj
+            n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, snowflakeObj,
+            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj
         ]
 
         // MCP Scan
@@ -1737,7 +1796,7 @@ const quickStartFunc = {
 
         // Endpoint Agents
         const endpointAgents = [
-            cursorHookObj
+            cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj
         ]
 
        if(func.checkLocal() || func.isLimitedAccount()){
@@ -1802,13 +1861,13 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, databricksImportObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, databricksImportObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, databricksImportObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
@@ -1818,8 +1877,8 @@ const quickStartFunc = {
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
-                awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
+                awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, trueFoundryImportObj, arcadeImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
             ])
         }

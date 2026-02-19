@@ -74,6 +74,9 @@ public final class McpRequestResponseUtils {
         if (!JsonRpcUtils.isJsonRpcRequest(responseParams)) {
             return new Pair<>(false, null);
         }
+        if (!JsonRpcUtils.isMcpPath(responseParams.getRequestParams().getURL())) {
+            return new Pair<>(false, null);
+        }
 
         McpJsonRpcModel mcpJsonRpcModel = JsonUtils.fromJson(requestPayload, McpJsonRpcModel.class);
 
