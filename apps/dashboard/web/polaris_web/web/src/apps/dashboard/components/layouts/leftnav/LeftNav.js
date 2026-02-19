@@ -128,7 +128,7 @@ export default function LeftNav() {
                     navigate("/dashboard/agentic-dashboard");
                     setActive("normal");
                 },
-                selected: leftNavSelected === "dashboard_agentic_dashboard",
+                selected: leftNavSelected === "dashboard_agentic_dashboard" || currPathString === "dashboard_agentic_dashboard",
                 key: "1",
             }] : isAllowedDashboardUser && dashboardCategory === CATEGORY_API_SECURITY ? [{
                 label: "Dashboard",
@@ -137,7 +137,9 @@ export default function LeftNav() {
                     handleSelect("dashboard_api_dashboard");
                     navigate("/dashboard/view");
                     setActive("normal");
-                }
+                },
+                selected: leftNavSelected === "dashboard_api_dashboard" || currPathString === "dashboard_view",
+                key: "1",
             }] : isAllowedDashboardUser && dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
                 label: "Dashboard",
                 icon: ReportFilledMinor,
@@ -145,7 +147,9 @@ export default function LeftNav() {
                     handleSelect("dashboard_endpoint_security_dashboard");
                     navigate("/dashboard/endpoint-dashboard");
                     setActive("normal");
-                }
+                },
+                selected: leftNavSelected === "dashboard_endpoint_security_dashboard" || currPathString === "dashboard_endpoint_dashboard",
+                key: "1",
             }] : []),
             // ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
             //     label: "Endpoint Security Posture",
@@ -641,7 +645,7 @@ export default function LeftNav() {
         }
 
         return items
-    }, [dashboardCategory, leftNavSelected])
+    }, [dashboardCategory, leftNavSelected, currPathString])
 
     const navigationMarkup = (
         <div className={`${active} ${dashboardCategory === "Agentic Security" ? "agentic-security-nav" : ""}`}>

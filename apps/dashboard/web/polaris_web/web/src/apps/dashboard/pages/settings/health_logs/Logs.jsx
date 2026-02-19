@@ -23,6 +23,7 @@ const Logs = () => {
         { label: "Runtime", value: "RUNTIME" },
         { label: "Dashboard", value: "DASHBOARD" },
         { label: "Testing", value: "TESTING" },
+        { label: "Agentic Testing", value: "AGENTIC_TESTING" },
         { label: "Puppeteer", value: "PUPPETEER" },
         { label: "Threat", value: "THREAT_DETECTION" },
         { label: "Data Ingestion", value: "DATA_INGESTION" },

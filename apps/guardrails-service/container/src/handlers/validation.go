@@ -40,6 +40,10 @@ func (h *ValidationHandler) IngestData(c *gin.Context) {
 		return
 	}
 
+	h.logger.Debug("IngestData - received contextSource from request",
+		zap.String("contextSource", req.ContextSource),
+		zap.Int("batchSize", len(req.BatchData)))
+
 	h.logger.Info("Received batch data",
 		zap.Int("size", len(req.BatchData)),
 		zap.String("contextSource", req.ContextSource))
@@ -90,11 +94,7 @@ func (h *ValidationHandler) IngestData(c *gin.Context) {
 
 // ValidateRequest validates a single request payload
 func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
-	var req struct {
-		Payload       string `json:"payload" binding:"required"`
-		ContextSource string `json:"contextSource,omitempty"` // Optional context source
-		SkipThreat    *bool  `json:"skipThreat,omitempty"`    // Optional: skip threat reporting to TBS (default: false)
-	}
+	var req models.ValidateRequestParams
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -106,13 +106,26 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	// Extract session and request IDs from headers
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
 
-	// Default skipThreat to false if not provided
-	skipThreat := false
-	if req.SkipThreat != nil {
-		skipThreat = *req.SkipThreat
-	}
+	h.logger.Debug("ValidateRequest - received request params",
+		zap.String("contextSource", req.ContextSource),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID),
+		zap.String("ip", req.IP),
+		zap.String("destIp", req.DestIP),
+		zap.String("path", req.Path),
+		zap.String("method", req.Method),
+		zap.String("statusCode", req.StatusCode),
+		zap.String("source", req.Source),
+		zap.String("direction", req.Direction),
+		zap.String("tag", req.Tag),
+		zap.String("aktoAccountId", req.AktoAccountID),
+		zap.String("aktoVxlanId", req.AktoVxlanID),
+		zap.Bool("hasRequestHeaders", req.RequestHeaders != ""),
+		zap.Bool("hasResponseHeaders", req.ResponseHeaders != ""),
+		zap.Bool("hasResponsePayload", req.ResponsePayload != ""),
+		zap.Bool("hasMetadata", req.Metadata != ""))
 
-	result, err := h.validatorService.ValidateRequest(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID, skipThreat)
+	result, err := h.validatorService.ValidateRequest(c.Request.Context(), &req, sessionID, requestID)
 	if err != nil {
 		h.logger.Error("Failed to validate request", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -192,6 +205,11 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 	if req.SkipThreat != nil {
 		skipThreat = *req.SkipThreat
 	}
+
+	h.logger.Debug("ValidateResponse - received contextSource from request",
+		zap.String("contextSource", req.ContextSource),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
 
 	result, err := h.validatorService.ValidateResponse(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID, skipThreat)
 	if err != nil {
