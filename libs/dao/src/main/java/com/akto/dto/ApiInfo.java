@@ -79,6 +79,9 @@ public class ApiInfo {
     private float threatScore;
     public static final String THREAT_SCORE = "threatScore";
 
+    public static final String AGENT_PROXY_GUARDRAIL_ENABLED = "agentProxyGuardrailEnabled";
+    private boolean agentProxyGuardrailEnabled;
+
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP
     }
@@ -226,6 +229,7 @@ public class ApiInfo {
         this.severityScore = 0;
         this.riskScore = 0 ;
         this.lastCalculatedTime = 0;
+        this.agentProxyGuardrailEnabled = false;
         if(apiInfoKey != null){
             this.collectionIds = Arrays.asList(apiInfoKey.getApiCollectionId());
         }
@@ -649,5 +653,13 @@ public class ApiInfo {
 
     public float getThreatScore() {
         return threatScore;
+    }
+
+    public boolean isAgentProxyGuardrailEnabled() {
+        return agentProxyGuardrailEnabled;
+    }
+
+    public void setAgentProxyGuardrailEnabled(boolean agentProxyGuardrailEnabled) {
+        this.agentProxyGuardrailEnabled = agentProxyGuardrailEnabled;
     }
 }

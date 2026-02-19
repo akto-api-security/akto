@@ -5,7 +5,10 @@ import java.util.*;
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
 import com.akto.dao.filter.MergedUrlsDao;
+import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.metrics.MetricData;
+
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -434,6 +437,10 @@ public class DbLayer {
         ProtectionLogsDao.instance.insertOne(log);
     }
 
+    public static void insertAgenticTestingLog(Log log) {
+        AgenticTestingLogsDao.instance.insertOne(log);
+    }
+
     public static Set<MergedUrls> fetchMergedUrls() {
         return MergedUrlsDao.instance.getMergedUrls();
     }
@@ -543,5 +550,9 @@ public class DbLayer {
         }
 
         return moduleInfoList != null ? moduleInfoList : new ArrayList<>();
+    }
+
+    public static void ingestMetric(List<MetricData> metricData) {
+        MetricDataDao.instance.insertMany(metricData);
     }
 }

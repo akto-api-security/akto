@@ -26,7 +26,7 @@ const initialAutoTicketingDetails = {
     issueType: "",
 }
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable, fromApiDetails }) {
+function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
 
     const initialState = {
         categories: [],
@@ -113,14 +113,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             setParentActivator(true);
         }
     }, [testMode])
-
-    useEffect(() => {
-        if (runTestFromOutside && testIdConfig?.testingRunConfig?.testSubCategoryList) {
-            setShouldRuntestConfig(true);
-        }
-    }, [runTestFromOutside, testIdConfig])
-
-    const apiCollectionName = collectionsMap[apiCollectionId]
+    const isMultiCollection = apiCollectionIds && apiCollectionIds.length > 0;
+    const apiCollectionName = isMultiCollection
+        ? `${apiCollectionIds.length} collections`
+        : collectionsMap[apiCollectionId]
 
     async function fetchData() {
         setLoading(true)
@@ -619,6 +615,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         let {testName} = testRun;
         const autoTicketingDetails = jiraProjectMap ? testRun.autoTicketingDetails : null;
         const collectionId = parseInt(apiCollectionId)
+        const isMultiCollection = apiCollectionIds && apiCollectionIds.length > 0;
 
         const tests = testRun.tests
 
@@ -664,6 +661,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
             await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value) ,autoTicketingDetails, doNotMarkIssuesAsFixed)
+        } else if (isMultiCollection) {
+            await observeApi.scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed)
         } else {
             await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed)
         }
@@ -864,7 +863,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     return (
         <div>
-            {!parentActivator ? activator : null}
+            {!parentActivator && !runTestFromOutside ? activator : null}
             {showEditableSettings ? editableConfigsComp : null}
             <Modal
 

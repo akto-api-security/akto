@@ -179,7 +179,7 @@ public class ApiCollectionsAction extends UserAction {
     private Map<Integer, Integer> uningestedApiCountMap;
     private List<UningestedApiOverage> uningestedApiList;
 
-    public String getCountForHostnameDeactivatedCollections(){
+    public String fetchCountForHostnameDeactivatedCollections(){
         this.deactivatedHostnameCountMap = new HashMap<>();
         if(deactivatedCollections == null || deactivatedCollections.isEmpty()){
             return SUCCESS.toUpperCase();
@@ -203,7 +203,7 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String getCountForUningestedApis(){
+    public String fetchCountForUningestedApis(){
         this.uningestedApiCountMap = new HashMap<>();
         try {
             this.uningestedApiCountMap = UningestedApiOverageDao.instance.getCountByCollection();
@@ -607,7 +607,7 @@ public class ApiCollectionsAction extends UserAction {
         return null;
     }
 
-    public String getEndpointsListFromConditions() {
+    public String fetchEndpointsListFromConditions() {
         try {
             List<TestingEndpoints> conditions = generateConditions(this.conditions);
             List<BasicDBObject> list = ApiCollectionUsers.getSingleTypeInfoListFromConditions(conditions, 0, 200, Utils.DELTA_PERIOD_VALUE,  new ArrayList<>(deactivatedCollections));
@@ -637,7 +637,7 @@ public class ApiCollectionsAction extends UserAction {
         }
     }
 
-    public String getEndpointsFromConditions(){
+    public String fetchEndpointsFromConditions(){
         try {
             List<TestingEndpoints> conditions = generateConditions(this.conditions);
 
@@ -1099,7 +1099,7 @@ public class ApiCollectionsAction extends UserAction {
 
 
     HashMap<Integer, List<Integer>> usersCollectionList;
-    public String getAllUsersCollections() {
+    public String fetchAllUsersCollections() {
         int accountId = Context.accountId.get();
         this.usersCollectionList = RBACDao.instance.getAllUsersCollections(accountId);
 

@@ -161,6 +161,19 @@ const settingRequests = {
             data
         })
     },
+    fetchMetricsByModule(startTimestamp, endTimestamp, moduleType, instanceId) {
+        const data = {
+            startTime: startTimestamp,
+            endTime: endTimestamp,
+            moduleType: moduleType
+        }
+        if (instanceId) data.instanceId = instanceId
+        return request({
+            url: '/api/metrics',
+            method: 'post',
+            data
+        })
+    },
 
     addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, webhookType, sendInstantly) {
         return request({

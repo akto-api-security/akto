@@ -336,11 +336,24 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 }
 
 // ValidateRequest validates a request payload against guardrail policies with session tracking
-func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSource string, sessionID string, requestID string) (*mcp.ValidationResult, error) {
+func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRequestParams, sessionID string, requestID string) (*mcp.ValidationResult, error) {
+	payload := params.RequestPayload
+	contextSource := params.ContextSource
+
 	s.logger.Debug("ValidateRequest - starting validation",
 		zap.String("contextSource", contextSource),
 		zap.String("sessionID", sessionID),
-		zap.String("requestID", requestID))
+		zap.String("requestID", requestID),
+		zap.String("ip", params.IP),
+		zap.String("destIp", params.DestIP),
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("statusCode", params.StatusCode),
+		zap.String("source", params.Source),
+		zap.String("direction", params.Direction),
+		zap.String("tag", params.Tag),
+		zap.String("aktoAccountId", params.AktoAccountID),
+		zap.String("aktoVxlanId", params.AktoVxlanID))
 
 	s.logger.Info("Validating request payload",
 		zap.String("sessionID", sessionID),
@@ -368,15 +381,52 @@ func (s *Service) ValidateRequest(ctx context.Context, payload string, contextSo
 		zap.Int("policiesCount", len(policies)),
 		zap.Strings("policyNames", policyNames(policies)))
 
-	// Create validation context
+	// Parse headers and status code
+	reqHeaders := make(map[string]string)
+	respHeaders := make(map[string]string)
+	if params.RequestHeaders != "" {
+		json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders)
+	}
+	if params.ResponseHeaders != "" {
+		json.Unmarshal([]byte(params.ResponseHeaders), &respHeaders)
+	}
+
+	statusCode := 0
+	if params.StatusCode != "" {
+		fmt.Sscanf(params.StatusCode, "%d", &statusCode)
+	}
+
+	// Extract host header for McpServerName
+	mcpServerName := extractHostHeader(reqHeaders)
+
+	// Create validation context with full request metadata (matching batch flow)
 	valCtx := &mcp.ValidationContext{
-		ContextSource: types.ContextSource(contextSource),
-		SessionID:     sessionID,
+		IP:              params.IP,
+		DestIP:          params.DestIP,
+		Endpoint:        params.Path,
+		Method:          params.Method,
+		RequestHeaders:  reqHeaders,
+		ResponseHeaders: respHeaders,
+		StatusCode:      statusCode,
+		RequestPayload:  payloadToValidate,
+		ResponsePayload: params.ResponsePayload,
+		ContextSource:   types.ContextSource(contextSource),
+		McpServerName:   mcpServerName,
+		SessionID:       sessionID,
 	}
 
 	s.logger.Debug("ValidateRequest - created validation context",
 		zap.String("contextSource", string(valCtx.ContextSource)),
-		zap.String("sessionID", valCtx.SessionID))
+		zap.String("sessionID", valCtx.SessionID),
+		zap.String("ip", valCtx.IP),
+		zap.String("destIp", valCtx.DestIP),
+		zap.String("endpoint", valCtx.Endpoint),
+		zap.String("method", valCtx.Method),
+		zap.Int("statusCode", valCtx.StatusCode),
+		zap.String("mcpServerName", valCtx.McpServerName),
+		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
+		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)),
+		zap.Bool("hasRequestPayload", valCtx.RequestPayload != ""))
 
 	s.logger.Debug("Calling ProcessRequest",
 		zap.Int("policiesCount", len(policies)),
