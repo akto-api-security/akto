@@ -10016,17 +10016,13 @@
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">THREAT_DETECTION</param>
+                <param name="featureLabel">API_COLLECTIONS</param>
             </interceptor-ref>
             <result name="UNAUTHORIZED" type="json">
                  <param name="statusCode">403</param>
                  <param name="ignoreHierarchy">false</param>
                  <param name="includeProperties">^actionErrors.*</param>
             </result>
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">THREAT_PROTECTION</param>
-                <param name="accessType">READ_WRITE</param>
-            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>

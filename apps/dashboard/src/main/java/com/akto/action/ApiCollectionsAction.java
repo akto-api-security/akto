@@ -26,6 +26,7 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.CollectionTags.TagSource;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -1767,93 +1768,140 @@ public class ApiCollectionsAction extends UserAction {
         }
     }
 
+    private static final int BATCH_SIZE = 200;
+
     private void doResetCollectionAccessTypes() {
-        loggerMaker.infoAndAddToDb("Running resetCollectionAccessTypes for account: " + Context.accountId.get(), LogDb.DASHBOARD);
 
-        List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
-        int totalCollections = collections.size();
-        int updatedCollections = 0;
+        Integer lastId = null;
+        int totalProcessed = 0;
+        int totalUpdated = 0;
+        int batchNumber = 0;
 
-        loggerMaker.infoAndAddToDb("Found " + totalCollections + " collections to process", LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb(
+                "Starting scalable resetCollectionAccessTypes for account: " + Context.accountId.get(),
+                LogDb.DASHBOARD
+        );
 
-        for (ApiCollection collection : collections) {
-            try {
-                int collectionId = collection.getId();
+        while (true) {
 
-                Bson filter = Filters.eq(ApiInfo.ID_API_COLLECTION_ID, collectionId);
-                List<ApiInfo> apis = ApiInfoDao.instance.findAll(filter);
+            batchNumber++;
 
-                if (apis.isEmpty()) {
-                    loggerMaker.infoAndAddToDb("Collection " + collectionId + " has no APIs, skipping", LogDb.DASHBOARD);
-                    continue;
-                }
+            loggerMaker.infoAndAddToDb(
+                    "Starting batch #" + batchNumber +
+                            " | lastId: " + lastId,
+                    LogDb.DASHBOARD
+            );
 
-                boolean hasPublic = false;
-                boolean hasPrivateOrThirdParty = false;
+            Bson filter = lastId == null
+                    ? new BasicDBObject()
+                    : Filters.gt("_id", lastId);
 
-                for (ApiInfo api : apis) {
-                    Set<ApiInfo.ApiAccessType> accessTypes = api.getApiAccessTypes();
+            List<ApiCollection> collections = ApiCollectionsDao.instance.getMCollection()
+                    .find(filter)
+                    .sort(Sorts.ascending("_id"))
+                    .limit(BATCH_SIZE)
+                    .projection(Projections.include("_id", "name"))
+                    .into(new ArrayList<>());
 
-                    if (accessTypes == null || accessTypes.isEmpty()) {
-                        continue;
-                    }
-
-                    if (accessTypes.contains(ApiInfo.ApiAccessType.PUBLIC)) {
-                        hasPublic = true;
-                    }
-
-                    if (accessTypes.contains(ApiInfo.ApiAccessType.PRIVATE) ||
-                            accessTypes.contains(ApiInfo.ApiAccessType.THIRD_PARTY)) {
-                        hasPrivateOrThirdParty = true;
-                    }
-
-                    if (hasPublic && hasPrivateOrThirdParty) {
-                        break;
-                    }
-                }
-
-                String collectionAccessType = null;
-
-                if (hasPublic && hasPrivateOrThirdParty) {
-                    collectionAccessType = "Both";
-                } else if (hasPublic && !hasPrivateOrThirdParty) {
-                    collectionAccessType = "First Party";
-                } else if (!hasPublic && hasPrivateOrThirdParty) {
-                    collectionAccessType = "Third Party";
-                }
-
-                if (collectionAccessType != null) {
-                    Bson collectionFilter = Filters.eq(ApiCollection.ID, collectionId);
-                    Bson update = Updates.set(ApiCollection.ACCESS_TYPE, collectionAccessType);
-
-                    ApiCollectionsDao.instance.updateOne(collectionFilter, update);
-                    updatedCollections++;
-
-                    loggerMaker.infoAndAddToDb(
-                            "Updated collection " + collectionId + " (" + collection.getName() + ") " +
-                                    "with accessType: " + collectionAccessType +
-                                    " (APIs: " + apis.size() + ", hasPublic: " + hasPublic +
-                                    ", hasPrivate/ThirdParty: " + hasPrivateOrThirdParty + ")",
-                            LogDb.DASHBOARD
-                    );
-                } else {
-                    loggerMaker.infoAndAddToDb(
-                            "No access type determined for collection " + collectionId +
-                                    " (no API access types found)",
-                            LogDb.DASHBOARD
-                    );
-                }
-
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error processing collection " + collection.getId(), LogDb.DASHBOARD);
+            if (collections.isEmpty()) {
+                loggerMaker.infoAndAddToDb(
+                        "No more collections found. Ending processing.",
+                        LogDb.DASHBOARD
+                );
+                break;
             }
+
+            int batchProcessed = 0;
+            int batchUpdated = 0;
+
+            for (ApiCollection collection : collections) {
+
+                lastId = collection.getId();
+                totalProcessed++;
+                batchProcessed++;
+
+                loggerMaker.infoAndAddToDb(
+                        "Starting collection processing | id: " +
+                                collection.getId() + " | name: " + collection.getName(),
+                        LogDb.DASHBOARD
+                );
+
+                String accessType = computeAccessTypeOptimized(collection.getId());
+
+                loggerMaker.infoAndAddToDb(
+                        "Computed accessType for collection " +
+                                collection.getId() + " : " + accessType,
+                        LogDb.DASHBOARD
+                );
+
+                if (accessType != null) {
+                    ApiCollectionsDao.instance.updateOne(
+                            Filters.eq("_id", collection.getId()),
+                            Updates.set("accessType", accessType)
+                    );
+
+                    totalUpdated++;
+                    batchUpdated++;
+                }
+
+                loggerMaker.infoAndAddToDb(
+                        "Finished collection processing | id: " +
+                                collection.getId(),
+                        LogDb.DASHBOARD
+                );
+            }
+
+            loggerMaker.infoAndAddToDb(
+                    "Finished batch #" + batchNumber +
+                            " | batchProcessed: " + batchProcessed +
+                            " | batchUpdated: " + batchUpdated +
+                            " | totalProcessed: " + totalProcessed +
+                            " | totalUpdated: " + totalUpdated,
+                    LogDb.DASHBOARD
+            );
         }
 
         loggerMaker.infoAndAddToDb(
-                "Completed resetCollectionAccessTypes. Total: " + totalCollections +
-                        ", Updated: " + updatedCollections,
+                "Completed resetCollectionAccessTypes | totalProcessed: " +
+                        totalProcessed + " | totalUpdated: " + totalUpdated,
                 LogDb.DASHBOARD
         );
+    }
+
+
+    private String computeAccessTypeOptimized(int collectionId) {
+        Bson filter = Filters.eq(ApiInfo.ID_API_COLLECTION_ID, collectionId);
+
+        FindIterable<ApiInfo> cursor = ApiInfoDao.instance.getMCollection()
+                .find(filter)
+                .projection(Projections.include("apiAccessTypes"));
+
+        boolean hasPublic = false;
+        boolean hasPrivateOrThirdParty = false;
+
+        for (ApiInfo api : cursor) {
+
+            Set<ApiInfo.ApiAccessType> accessTypes = api.getApiAccessTypes();
+            if (accessTypes == null) continue;
+
+            if (accessTypes.contains(ApiInfo.ApiAccessType.PUBLIC)) {
+                hasPublic = true;
+            }
+
+            if (accessTypes.contains(ApiInfo.ApiAccessType.PRIVATE)
+                    || accessTypes.contains(ApiInfo.ApiAccessType.THIRD_PARTY)) {
+                hasPrivateOrThirdParty = true;
+            }
+
+            if (hasPublic && hasPrivateOrThirdParty) {
+                return "Both";
+            }
+        }
+
+        if (hasPublic) return "First Party";
+        if (hasPrivateOrThirdParty) return "Third Party";
+
+        return null;
     }
 
 }
