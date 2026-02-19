@@ -49,7 +49,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
 
         HttpCallParser httpCallParser = new HttpCallParser("", 0, 0, 0, false);
         httpCallParser.syncFunction(httpResponseParamsList, true,true, null);
-        APICatalogSync.mergeUrlsAndSave(1000, true, true, httpCallParser.apiCatalogSync.existingAPIsInDb, false, false);
+        APICatalogSync.mergeUrlsAndSave(1000, true, true, httpCallParser.apiCatalogSync.existingAPIsInDb, false, false, false);
 
         List<DependencyNode> nodes = DependencyNodeDao.instance.findAll(new BasicDBObject());
         assertEquals(expectedNodes, nodes.size());

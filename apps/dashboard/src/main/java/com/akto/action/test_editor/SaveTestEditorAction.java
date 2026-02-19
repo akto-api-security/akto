@@ -48,6 +48,7 @@ import com.akto.rules.RequiredConfigs;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.TestingUtilsSingleton;
+import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
@@ -260,6 +261,15 @@ public class SaveTestEditorAction extends UserAction {
             } catch (Exception e) {
             }
 
+            try {
+                Object estimatedTokensObj = TestConfigYamlParser.getFieldIfExists(content, YamlTemplate.ESTIMATED_TOKENS);
+                if (estimatedTokensObj != null && estimatedTokensObj instanceof Integer) {
+                    updates.add(Updates.set(YamlTemplate.ESTIMATED_TOKENS, (int) estimatedTokensObj));
+                }
+            } catch (Exception e) {
+                logger.errorAndAddToDb("Error parsing estimatedTokens for template " + id + ": " + e.getMessage(), LogDb.DASHBOARD);
+            }
+
             YamlTemplateDao.instance.updateOne(
                     Filters.eq(Constants.ID, id),
                     Updates.combine(updates));
@@ -277,6 +287,10 @@ public class SaveTestEditorAction extends UserAction {
     List<AgentConversationResult> agentConversationResults;
 
     public String runTestForGivenTemplate() {
+        // Role cache is static and shared across accounts; clear at entry point so this request
+        // does not use a role cached from a previous request (possibly another account).
+        Executor.clearRoleCache();
+
         TestExecutor executor = new TestExecutor();
         TestConfig testConfig;
         try {

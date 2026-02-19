@@ -4,13 +4,14 @@ import ComponentHeader from './ComponentHeader'
 const ComplianceAtRisksCard = ({ complianceData = [], itemId = "", onRemoveComponent, tooltipContent = "" }) => {
     return (
         <Card>
-            <VerticalStack gap={4}>
-                <ComponentHeader title='Compliance at Risks' itemId={itemId} onRemove={onRemoveComponent} tooltipContent={tooltipContent} />
+            <Box paddingBlockEnd="500">
+                <VerticalStack gap="500">
+                    <ComponentHeader title='Compliance at Risks' itemId={itemId} onRemove={onRemoveComponent} tooltipContent={tooltipContent} />
 
-                <Box width='100%'>
-                    <HorizontalGrid columns={4} gap={3}>
+                    <Box width='100%' paddingBlockStart="200">
+                        <HorizontalGrid columns={4} gap="400">
                         {complianceData.map((compliance, idx) => (
-                            <VerticalStack key={idx} gap={2} align='center' inlineAlign='center'>
+                            <VerticalStack key={idx} gap="300" align='center' inlineAlign='center'>
                                 <Box width='100%' height='80px' display='flex' alignItems='center' justifyContent='center'>
                                     <div style={{
                                         width: '100px',
@@ -68,9 +69,10 @@ const ComplianceAtRisksCard = ({ complianceData = [], itemId = "", onRemoveCompo
                                 </Box>
                             </VerticalStack>
                         ))}
-                    </HorizontalGrid>
-                </Box>
-            </VerticalStack>
+                        </HorizontalGrid>
+                    </Box>
+                </VerticalStack>
+            </Box>
         </Card>
     )
 }

@@ -1,0 +1,182 @@
+.guardrail-page-wrapper {
+    position: fixed;
+    inset: 0;
+    background: white;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.guardrail-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid #E1E3E5;
+    min-height: 65px;
+}
+
+.guardrail-page-header svg {
+    width: 20px;
+    height: 20px;
+}
+
+.guardrail-page-container {
+    display: flex;
+    height: calc(100vh - 65px);
+    overflow: hidden;
+}
+
+.guardrail-sidebar {
+    width: 300px;
+    background: #FAFBFC;
+    border-right: 1px solid #E1E3E5;
+    overflow-y: auto;
+}
+
+.guardrail-nav-item {
+    padding: 8px 16px;
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.guardrail-nav-item:hover {
+    background-color: #F3F4F6;
+}
+
+.guardrail-nav-item:not(:last-child)::before {
+    content: '';
+    position: absolute;
+    left: 25px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #E1E3E5;
+}
+
+.guardrail-nav-item:first-child::before {
+    top: 50%;
+}
+
+.guardrail-nav-item[data-completed="true"]::before,
+.guardrail-nav-item[data-completed="true"] + .guardrail-nav-item::before {
+    background-color: #6D3BEF;
+}
+
+.guardrail-nav-item.active::before {
+    display: none;
+}
+
+.guardrail-nav-item.active {
+    background-color: transparent;
+}
+
+.guardrail-nav-item.active .Polaris-Text {
+    color: #6D3BEF !important;
+    font-weight: 500;
+}
+
+.guardrail-nav-item:not(.active) .Polaris-Text {
+    color: #6D7175;
+}
+
+.guardrail-nav-item .Polaris-Text {
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.step-indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+    margin-right: 12px;
+    background-color: white;
+}
+
+.step-indicator.current,
+.step-indicator.completed {
+    background: #6D3BEF;
+    color: white;
+}
+
+.step-indicator.error {
+    background: #EF4444;
+    color: white;
+}
+
+.step-indicator.pending {
+    border: 2px solid #E1E3E5;
+    color: #8C9196;
+}
+
+.guardrail-nav-item.active .step-indicator.pending {
+    border-color: #6D3BEF;
+}
+
+.guardrail-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.guardrail-content-inner {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.guardrail-content-footer {
+    border-top: 1px solid #E1E3E5;
+    padding: 24px 20px;
+}
+
+.guardrail-content-footer > * {
+    width: 100%;
+}
+
+.guardrail-playground {
+    width: 550px;
+    border-left: 1px solid #E1E3E5;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 65px);
+    overflow: hidden;
+}
+
+.playground-input-wrapper {
+    padding: 20px 20px 24px;
+    flex-shrink: 0;
+    border-top: 1px solid #E1E3E5;
+}
+
+/* Polaris Combobox doesn't pass fixed=true to Popover, so the overlay
+   uses position: absolute with no z-index — invisible behind the wrapper. */
+.Polaris-PositionedOverlay {
+    position: fixed !important;
+    z-index: 1001 !important;
+}
+
+@media (max-width: 1400px) {
+    .guardrail-playground {
+        width: 400px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .guardrail-sidebar {
+        width: 260px;
+    }
+
+    .guardrail-playground {
+        width: 350px;
+    }
+}

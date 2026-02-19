@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { EmptySearchResult, VerticalStack, Button, Badge, Text } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailModal from "./components/CreateGuardrailModal";
+import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
@@ -9,6 +10,7 @@ import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import api from "./api";
+import { transformPolicyForBackend } from "./utils";
 
 const resourceName = {
   singular: "policy",
@@ -429,6 +431,9 @@ function GuardrailPolicies() {
             }
 
             // Prepare GuardrailPolicies object for backend
+            // Transform field names using shared utility (same as playground)
+            guardrailData = transformPolicyForBackend(guardrailData);
+            
             const guardrailPolicyObject = {
                 name: guardrailData.name,
                 description: guardrailData.description || '',
@@ -440,11 +445,12 @@ function GuardrailPolicies() {
                 selectedMcpServersV2: guardrailData.selectedMcpServersV2 || [],
                 selectedAgentServersV2: guardrailData.selectedAgentServersV2 || [],
                 deniedTopics: guardrailData.deniedTopics || [],
-                piiTypes: guardrailData.piiFilters || [],
                 regexPatterns: guardrailData.regexPatterns || [],
                 // Add V2 field for enhanced regex data
                 regexPatternsV2: guardrailData.regexPatternsV2 || [],
-                contentFiltering: guardrailData.contentFilters || {},
+                // Use transformed field names from shared utility
+                piiTypes: guardrailData.piiTypes,
+                contentFiltering: guardrailData.contentFiltering,
                 // Add LLM policy if present
                 ...(guardrailData.llmRule ? { llmRule: guardrailData.llmRule } : {}),
                 // Add Base Prompt Rule if present
@@ -509,7 +515,23 @@ function GuardrailPolicies() {
     };
 
 
-      const components = [
+    // If showing create/edit page, render the full page component
+    if (showCreateModal) {
+        return (
+            <CreateGuardrailPage
+                onClose={() => {
+                    setShowCreateModal(false);
+                    setEditingPolicy(null);
+                    setIsEditMode(false);
+                }}
+                onSave={handleCreateGuardrail}
+                editingPolicy={editingPolicy}
+                isEditMode={isEditMode}
+            />
+        );
+    }
+
+    const components = [
         <GithubSimpleTable
             key={`policies-table-${policyData.length}`}
             resourceName={resourceName}
@@ -531,18 +553,6 @@ function GuardrailPolicies() {
             selectable={true}
             promotedBulkActions={promotedBulkActions}
 
-        />,   
-        <CreateGuardrailModal
-            key={2}
-            isOpen={showCreateModal}
-            onClose={() => {
-                setShowCreateModal(false);
-                setEditingPolicy(null);
-                setIsEditMode(false);
-            }}
-            onSave={handleCreateGuardrail}
-            editingPolicy={editingPolicy}
-            isEditMode={isEditMode}
         />
     ];
 

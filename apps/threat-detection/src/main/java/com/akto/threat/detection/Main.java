@@ -1,20 +1,20 @@
 package com.akto.threat.detection;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.HashMap;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
+import com.akto.data_actor.ClientActor;
 import com.akto.DaoInit;
 import com.akto.RuntimeMode;
 import com.akto.dao.context.Context;
-import com.akto.data_actor.ClientActor;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
-import com.akto.dto.billing.FeatureAccess;
-import com.akto.dto.billing.Organization;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.kafka.KafkaConfig;
@@ -23,18 +23,22 @@ import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.ip_api_counter.DistributionDataForwardLayer;
+import com.akto.threat.detection.tasks.ConfigPoller;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
 import com.akto.threat.detection.utils.Utils;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.Organization;
 
 public class Main {
 
@@ -47,43 +51,20 @@ public class Main {
   public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
 
-    public static void main(String[] args) throws Exception {
+  public static void main(String[] args) throws Exception {
 
     boolean isHybridDeployment = RuntimeMode.isHybridDeployment();
-
-     if (isHybridDeployment) {
-       while (true) {
-
-         int accountId = ClientActor.getAccountId();
-
-         Organization organization = dataActor.fetchOrganization(accountId);
-         if (organization == null) {
-           logger.errorAndAddToDb("Organization not found for account id: " + accountId);
-           Thread.sleep(30000);
-           continue;
-         }
-         HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
-         if(featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
-            // case for on-prem customers without internet access
-            break;
-         }
-
-         FeatureAccess allowed = featureWiseAllowed.getOrDefault("THREAT_DETECTION", FeatureAccess.noAccess);
-         if (allowed.getIsGranted()) {
-           break;
-         }
-
-         Thread.sleep(30000);
-       }
-     }
+    validateAndInitializeDeployment(isHybridDeployment);
 
     RedisClient localRedis = null;
 
     logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
     ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
-    if (!isHybridDeployment) {
-        DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
-    }
+
+    int accountId = ClientActor.getAccountId();
+    Context.accountId.set(accountId);
+    String instanceId = ModuleInfoWorker.getModuleName(ModuleInfo.ModuleType.THREAT_DETECTION); 
+    AllMetrics.instance.init(LogDb.THREAT_DETECTION, false, dataActor, accountId, instanceId, ModuleInfo.ModuleType.THREAT_DETECTION.name());
 
     if (aggregationRulesEnabled) {
         localRedis = createLocalRedisClient();
@@ -92,35 +73,10 @@ public class Main {
         }
     }
 
-    KafkaConfig trafficKafka =
-        KafkaConfig.newBuilder()
-            .setGroupId(CONSUMER_GROUP_ID)
-            .setBootstrapServers(System.getenv("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER"))
-            .setConsumerConfig(
-                KafkaConsumerConfig.newBuilder()
-                    .setMaxPollRecords(500)
-                    .setPollDurationMilli(100)
-                    .build())
-            .setProducerConfig(
-                KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
-            .setKeySerializer(Serializer.STRING)
-            .setValueSerializer(Serializer.BYTE_ARRAY)
-            .build();
+    KafkaConfig trafficKafka = createKafkaConfig("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER", 500, 100);
+    KafkaConfig internalKafka = createKafkaConfig("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER", 100, 100);
 
-    KafkaConfig internalKafka =
-        KafkaConfig.newBuilder()
-            .setGroupId(CONSUMER_GROUP_ID)
-            .setBootstrapServers(System.getenv("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER"))
-            .setConsumerConfig(
-                KafkaConsumerConfig.newBuilder()
-                    .setMaxPollRecords(100)
-                    .setPollDurationMilli(100)
-                    .build())
-            .setProducerConfig(
-                KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
-            .setKeySerializer(Serializer.STRING)
-            .setValueSerializer(Serializer.BYTE_ARRAY)
-            .build();
+    startModuleConfigPoller();
 
     initCustomDataTypeScheduler();
     CmsCounterLayer.initialize(localRedis);
@@ -131,11 +87,27 @@ public class Main {
 
     triggerDistributionDataForwardCron(apiDistributionEnabled, distributionDataForwardLayer);
 
-    new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis, distributionCalculator, apiDistributionEnabled).run();
+    String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss"));
+    logger.warnAndAddToDb("Initialization finished starting DetectorTask at " + currentTime);
+    new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis, distributionCalculator, apiDistributionEnabled, instanceId).run();
 
     new SendMaliciousEventsToBackend(internalKafka, KafkaTopic.ThreatDetection.ALERTS).run();
 
   }
+
+    private static void startModuleConfigPoller() {
+      // Start config poller (polls Cyborg for env updates and restarts on changes)
+      logger.infoAndAddToDb("Starting ConfigPoller for threat-detection");
+      new Thread(() -> {
+          try {
+              ConfigPoller configPoller = new ConfigPoller();
+              configPoller.run();
+          } catch (Exception e) {
+              logger.errorAndAddToDb(e, "Error in ConfigPoller");
+          }
+      }).start();
+      logger.infoAndAddToDb("Started ConfigPoller for threat-detection");
+    }
 
   public static void triggerApiInfoRelayCron(RedisClient localRedis) {
     if (localRedis == null) {
@@ -146,7 +118,7 @@ public class Main {
         logger.info("Scheduling relayApiCountInfoCron at " + Context.now());
         apiCountInfoRelayCron.relayApiCountInfo();
     } catch (Exception e) {
-        logger.error("Error scheduling relayApiCountInfoCron : {} ", e);
+        logger.errorAndAddToDb(e,"Error scheduling relayApiCountInfoCron : {} ");
     }
   }
 
@@ -157,7 +129,7 @@ public class Main {
     try {
         distributionDataForwardLayer.sendLastFiveMinuteDistributionData();
     } catch (Exception e) {
-        logger.error("Error scheduling relayApiCountInfoCron : {} ", e);
+        logger.errorAndAddToDb(e,"Error scheduling relayApiCountInfoCron : {} ");
     }
   }
 
@@ -177,16 +149,68 @@ public class Main {
     return redisClient;
   }
 
-    public static void initCustomDataTypeScheduler(){
-        Account account = dataActor.fetchActiveAccount();
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
-                logger.info("customData type " + customDataTypes.size());
-                List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
-                SingleTypeInfo.fetchCustomDataTypes(account.getId(),customDataTypes,aktoDataTypes);
+  public static void initCustomDataTypeScheduler() {
+    Account account = dataActor.fetchActiveAccount();
+    scheduler.scheduleAtFixedRate(new Runnable() {
+      public void run() {
+        List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
+        logger.info("customData type " + customDataTypes.size());
+        List<AktoDataType> aktoDataTypes = dataActor.fetchAktoDataTypes();
+        SingleTypeInfo.fetchCustomDataTypes(account.getId(), customDataTypes, aktoDataTypes);
 
-            }
-        }, 0, 5, TimeUnit.MINUTES);
+      }
+    }, 0, 5, TimeUnit.MINUTES);
+  }
+
+  private static KafkaConfig createKafkaConfig(String bootstrapServerEnvVar, int maxPollRecords, int pollDurationMilli) {
+    return KafkaConfig.newBuilder()
+        .setGroupId(CONSUMER_GROUP_ID)
+        .setBootstrapServers(System.getenv(bootstrapServerEnvVar))
+        .setConsumerConfig(
+            KafkaConsumerConfig.newBuilder()
+                .setMaxPollRecords(maxPollRecords)
+                .setPollDurationMilli(pollDurationMilli)
+                .build())
+        .setProducerConfig(
+            KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
+        .setKeySerializer(Serializer.STRING)
+        .setValueSerializer(Serializer.BYTE_ARRAY)
+        .build();
+  }
+
+  private static void validateAndInitializeDeployment(boolean isHybridDeployment) throws Exception {
+    if (isHybridDeployment) {
+      waitForThreatDetectionFeatureAccess();
+    } else {
+      DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
     }
+  }
+
+  private static void waitForThreatDetectionFeatureAccess() throws Exception {
+    while (true) {
+      int accountId = ClientActor.getAccountId();
+      Context.accountId.set(accountId);
+
+      Organization organization = dataActor.fetchOrganization(accountId);
+      if (organization == null) {
+        logger.errorAndAddToDb("Organization not found for account id: " + accountId);
+        Thread.sleep(30000);
+        continue;
+      }
+
+      HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+      if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
+        // case for on-prem customers without internet access
+        break;
+      }
+
+      FeatureAccess allowed = featureWiseAllowed.getOrDefault("THREAT_DETECTION", FeatureAccess.noAccess);
+      if (allowed.getIsGranted()) {
+        break;
+      }
+
+      Thread.sleep(30000);
+    }
+  }
+
 }

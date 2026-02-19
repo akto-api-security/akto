@@ -183,9 +183,14 @@ function Dashboard() {
             return;
         }
         if(document.visibilityState === 'hidden'){
+            const currentCategory = PersistStore.getState().dashboardCategory;
             PersistStore.getState().resetAll();
             LocalStore.getState().resetStore();
-            navigate("/dashboard/observe/inventory")
+            PersistStore.getState().setDashboardCategory(currentCategory);
+            const targetPath = currentCategory === "Endpoint Security"
+                ? "/dashboard/observe/agentic-assets"
+                : "/dashboard/observe/inventory";
+            navigate(targetPath);
             window.location.reload();
         }
     }

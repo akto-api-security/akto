@@ -4,7 +4,9 @@ import (
 	"net/http"
 
 	"github.com/akto-api-security/guardrails-service/models"
+	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
+	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -38,12 +40,22 @@ func (h *ValidationHandler) IngestData(c *gin.Context) {
 		return
 	}
 
+	h.logger.Debug("IngestData - received contextSource from request",
+		zap.String("contextSource", req.ContextSource),
+		zap.Int("batchSize", len(req.BatchData)))
+
 	h.logger.Info("Received batch data",
 		zap.Int("size", len(req.BatchData)),
 		zap.String("contextSource", req.ContextSource))
 
-	// Validate the batch with optional contextSource
-	results, err := h.validatorService.ValidateBatch(c.Request.Context(), req.BatchData, req.ContextSource)
+	// Default skipThreat to false if not provided
+	skipThreat := false
+	if req.SkipThreat != nil {
+		skipThreat = *req.SkipThreat
+	}
+
+	// Validate the batch with optional contextSource and skipThreat
+	results, err := h.validatorService.ValidateBatch(c.Request.Context(), req.BatchData, req.ContextSource, skipThreat)
 	if err != nil {
 		h.logger.Error("Failed to validate batch", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, models.ValidationResponse{
@@ -82,9 +94,56 @@ func (h *ValidationHandler) IngestData(c *gin.Context) {
 
 // ValidateRequest validates a single request payload
 func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
+	var req models.ValidateRequestParams
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request format",
+		})
+		return
+	}
+
+	// Extract session and request IDs from headers
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+
+	h.logger.Debug("ValidateRequest - received request params",
+		zap.String("contextSource", req.ContextSource),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID),
+		zap.String("ip", req.IP),
+		zap.String("destIp", req.DestIP),
+		zap.String("path", req.Path),
+		zap.String("method", req.Method),
+		zap.String("statusCode", req.StatusCode),
+		zap.String("source", req.Source),
+		zap.String("direction", req.Direction),
+		zap.String("tag", req.Tag),
+		zap.String("aktoAccountId", req.AktoAccountID),
+		zap.String("aktoVxlanId", req.AktoVxlanID),
+		zap.Bool("hasRequestHeaders", req.RequestHeaders != ""),
+		zap.Bool("hasResponseHeaders", req.ResponseHeaders != ""),
+		zap.Bool("hasResponsePayload", req.ResponsePayload != ""),
+		zap.Bool("hasMetadata", req.Metadata != ""))
+
+	result, err := h.validatorService.ValidateRequest(c.Request.Context(), &req, sessionID, requestID)
+	if err != nil {
+		h.logger.Error("Failed to validate request", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Validation failed",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ValidateRequestWithPolicy validates a single request payload with a provided policy (for playground testing)
+func (h *ValidationHandler) ValidateRequestWithPolicy(c *gin.Context) {
 	var req struct {
-		Payload       string `json:"payload" binding:"required"`
-		ContextSource string `json:"contextSource,omitempty"` // Optional context source
+		Payload       string                 `json:"payload" binding:"required"`
+		ContextSource string                 `json:"contextSource,omitempty"` // Optional context source
+		SkipThreat    *bool                  `json:"skipThreat,omitempty"`    // Optional: skip threat reporting to TBS (default: false)
+		Policy        *mcp.GuardrailsPolicy  `json:"policy" binding:"required"` // Required: policy for playground testing
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -94,9 +153,26 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		return
 	}
 
-	result, err := h.validatorService.ValidateRequest(c.Request.Context(), req.Payload, req.ContextSource)
+	// Extract session and request IDs from headers
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+
+	// Default skipThreat to false if not provided
+	skipThreat := false
+	if req.SkipThreat != nil {
+		skipThreat = *req.SkipThreat
+	}
+
+	result, err := h.validatorService.ValidateRequestWithPolicy(
+		c.Request.Context(),
+		req.Payload,
+		req.ContextSource,
+		sessionID,
+		requestID,
+		skipThreat,
+		req.Policy,
+	)
 	if err != nil {
-		h.logger.Error("Failed to validate request", zap.Error(err))
+		h.logger.Error("Failed to validate request with policy", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Validation failed",
 		})
@@ -111,6 +187,7 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 	var req struct {
 		Payload       string `json:"payload" binding:"required"`
 		ContextSource string `json:"contextSource,omitempty"` // Optional context source
+		SkipThreat    *bool  `json:"skipThreat,omitempty"`    // Optional: skip threat reporting to TBS (default: false)
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -120,7 +197,21 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		return
 	}
 
-	result, err := h.validatorService.ValidateResponse(c.Request.Context(), req.Payload, req.ContextSource)
+	// Extract session and request IDs from headers
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+
+	// Default skipThreat to false if not provided
+	skipThreat := false
+	if req.SkipThreat != nil {
+		skipThreat = *req.SkipThreat
+	}
+
+	h.logger.Debug("ValidateResponse - received contextSource from request",
+		zap.String("contextSource", req.ContextSource),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
+
+	result, err := h.validatorService.ValidateResponse(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID, skipThreat)
 	if err != nil {
 		h.logger.Error("Failed to validate response", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{

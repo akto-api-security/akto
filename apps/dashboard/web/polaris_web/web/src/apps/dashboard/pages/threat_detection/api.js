@@ -56,20 +56,25 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs, actorId, host) {
+    fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs, actorId, host, cursor) {
+        const data = {
+            skip: skip,
+            sort: sort,
+            latestAttack: latestAttack,
+            country: country,
+            startTs: startTs,
+            endTs: endTs,
+            actorId: actorId,
+            host: host
+        };
+        // Add cursor if provided (for new cursor-based pagination)
+        if (cursor) {
+            data.cursor = cursor;
+        }
         return request({
             url: '/api/fetchThreatActors',
             method: 'post',
-            data: {
-                skip: skip,
-                sort: sort,
-                latestAttack: latestAttack,
-                country: country,
-                startTs: startTs,
-                endTs: endTs,
-                actorId: actorId,
-                host: host
-            }
+            data: data
         })
     },
     fetchThreatApis(skip, sort, latestAttack) {
@@ -230,14 +235,14 @@ const threatDetectionRequests = {
             data: {}
         })
     },
-    addThreatActivityWebhookIntegration(webhookUrl, customHeaders, contextSources) {
+    addThreatActivityWebhookIntegration(webhookUrl, customHeaders, useGzip) {
         return request({
             url: '/api/addThreatActivityWebhookIntegration',
             method: 'post',
             data: {
                 webhookUrl: webhookUrl,
                 customHeaders: customHeaders || [],
-                ...(contextSources && contextSources.length > 0 ? { contextSources } : {})
+                useGzip: Boolean(useGzip)
             }
         })
     },
@@ -286,6 +291,20 @@ const threatDetectionRequests = {
             url: '/api/getIpReputationScore',
             method: 'post',
             data: { ipAddress }
+        })
+    },
+    fetchThreatsForActor(actor, limit = 20) {
+        return request({
+            url: '/api/fetchThreatsForActor',
+            method: 'post',
+            data: { actor, limit }
+        })
+    },
+    fetchSessionContext(sessionId) {
+        return request({
+            url: '/api/fetchSessionContext',
+            method: 'post',
+            data: { sessionId }
         })
     }
 }

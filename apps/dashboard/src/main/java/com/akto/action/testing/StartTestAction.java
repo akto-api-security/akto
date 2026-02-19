@@ -69,6 +69,7 @@ public class StartTestAction extends UserAction {
 
     private TestingEndpoints.Type type;
     private int apiCollectionId;
+    private List<Integer> apiCollectionIds;
     private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
     private int testIdConfig;
     private int workflowTestId;
@@ -142,7 +143,13 @@ public class StartTestAction extends UserAction {
     }
 
     public List<ObjectId> getCicdTests(){
-        return getTestingRunListFromSummary(Filters.exists(TestingRunResultSummary.METADATA_STRING));
+        // Include documents with metadata string, but exclude those where metadata.error exists 
+        // CICD issues with error field will not be shown in CICD 
+        Bson filter = Filters.and(
+        Filters.exists(TestingRunResultSummary.METADATA_STRING, true),
+        Filters.exists(TestingRunResultSummary.METADATA_STRING + ".error", false)
+        );
+        return getTestingRunListFromSummary(filter);
     }
 
     private static List<ObjectId> getTestsWithSeverity(List<String> severities) {
@@ -190,6 +197,13 @@ public class StartTestAction extends UserAction {
             case COLLECTION_WISE:
                 testingEndpoints = new CollectionWiseTestingEndpoints(apiCollectionId);
                 break;
+            case MULTI_COLLECTION:
+                if (this.apiCollectionIds == null || this.apiCollectionIds.isEmpty()) {
+                    addActionError("API Collection IDs list can't be empty");
+                    return null;
+                }
+                testingEndpoints = new MultiCollectionTestingEndpoints(this.apiCollectionIds);
+                break;  
             case WORKFLOW:
                 WorkflowTest workflowTest = WorkflowTestsDao.instance.findOne(Filters.eq("_id", this.workflowTestId));
                 if (workflowTest == null) {
@@ -555,7 +569,8 @@ public class StartTestAction extends UserAction {
             filterList.add(
                 Filters.or(
                     Filters.in(TestingRun._API_COLLECTION_ID, apiCollectionIds),
-                    Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, apiCollectionIds)
+                    Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, apiCollectionIds),
+                    Filters.in(TestingRun._API_COLLECTION_IDS_MULTI, apiCollectionIds)
                 )
             );
         }
@@ -1692,6 +1707,14 @@ public class StartTestAction extends UserAction {
 
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
+    }
+
+    public void setApiCollectionIds(List<Integer> apiCollectionIds) {
+        this.apiCollectionIds = apiCollectionIds;
+    }
+
+    public List<Integer> getApiCollectionIds() {
+        return apiCollectionIds;
     }
 
     public void setApiInfoKeyList(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {

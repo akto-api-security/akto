@@ -5,6 +5,7 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.JsonUtils;
+import java.net.URL;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -49,6 +50,16 @@ public final class JsonRpcUtils {
         if (params == null || params.getPayload() == null) {
             return false;
         }
-        return params.getPayload().contains(JSONRPC_KEY);
+        if (!params.getPayload().contains(JSONRPC_KEY)) {
+            return false;
+        }
+        return isMcpPath(params.getURL());
+    }
+
+    public static boolean isMcpPath(String url) {
+        if (StringUtils.isNoneBlank(url)) {
+            return url.contains("mcp");
+        }
+        return false;
     }
 }
