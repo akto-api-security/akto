@@ -4,11 +4,14 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.WizIntegrationDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.RemediationsDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -325,7 +328,7 @@ public class WizIntegrationUtils {
                         dashboardUrl = aktoUrlConfig.getHostUrl();
                     }
                 }
-                assetAttackSurfaceFinding.put("externalFindingLink", String.format("%s/reports/issues?=%s", dashboardUrl, testingRunResult.getHexId()));
+                assetAttackSurfaceFinding.put("externalFindingLink", String.format("%s/reports/issues?result=%s", dashboardUrl, testingRunResult.getHexId()));
             } catch (Exception e) {
                 throw new Exception("Error building asset attack surface finding: " + e.getMessage());
             }
@@ -344,11 +347,8 @@ public class WizIntegrationUtils {
     }
 
     public static YamlTemplate fetchYamlTemplate(String testSubCategory) {
-        YamlTemplate yamlTemplate = YamlTemplateDao.instance.findOne(
-            Filters.in(Constants.ID, testSubCategory),
-            Projections.include(YamlTemplate.INFO+".description", YamlTemplate.INFO+".name", YamlTemplate.INFO+".severity", YamlTemplate.INFO+".cve", YamlTemplate.INFO+".cwe")
-        );
-
+        Bson filter = Filters.in(Constants.ID, testSubCategory);
+        YamlTemplate yamlTemplate = YamlTemplateDao.instance.findOne(filter, Projections.include(YamlTemplate.INFO));
         return yamlTemplate;
     }
 
@@ -357,6 +357,64 @@ public class WizIntegrationUtils {
             Filters.eq(Constants.ID, String.format("tests-library-master/remediation/%s.md", testSubCategory)));
 
         return remediation;
+    }
+
+    public static Map<TestingIssuesId,TestingRunResult> fetchTestingRunResultMap(List<TestingIssuesId> testingIssuesIdList) {
+        Map<TestingIssuesId, TestingRunResult> testingRunResultMap = new HashMap<>();
+
+        for (TestingIssuesId testingIssuesId: testingIssuesIdList) {
+            try {
+                Bson filter = Filters.and(
+                    Filters.in(TestingRunResult.TEST_SUB_TYPE, testingIssuesId.getTestSubCategory()),
+                    Filters.in(TestingRunResult.API_INFO_KEY, testingIssuesId.getApiInfoKey())
+                );
+                TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(filter);
+                if (testingRunResult != null) {
+                    testingRunResultMap.put(testingIssuesId, testingRunResult);
+                }
+            } catch (Exception e) {
+                // do nothing
+            }
+        }
+
+        return testingRunResultMap;
+    }
+
+    public static Map<String, YamlTemplate> fetchYamlTemplateMap(Set<String> testSubCategorySet) {
+        Map<String, YamlTemplate> yamlTemplateMap = new HashMap<>();
+
+        if (testSubCategorySet != null) {
+            Bson filter = Filters.in(Constants.ID, testSubCategorySet);
+            List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(filter, Projections.include(YamlTemplate.INFO));
+            for (YamlTemplate yamlTemplate : yamlTemplates) {
+                yamlTemplateMap.put(yamlTemplate.getId(), yamlTemplate);
+            }
+        }
+
+        return yamlTemplateMap;
+    }
+
+    public static Map<String, Remediation> fetchRemediationMap(Set<String> testSubCategorySet) {
+        Map<String, Remediation> remediationMap = new HashMap<>();
+
+        if (testSubCategorySet != null) {
+            Map<String, String> remediationIdMap = new HashMap<>();
+            for(String testSubCategory : testSubCategorySet) {
+                String remediationId = String.format("tests-library-master/remediation/%s.md", testSubCategory);
+                remediationIdMap.put(remediationId, testSubCategory);
+            }
+
+            Bson filter = Filters.in(Constants.ID, remediationIdMap.keySet());
+            List<Remediation> remediations = RemediationsDao.instance.findAll(filter);
+
+            for (Remediation remediation : remediations) {
+                String remediationId = remediation.getid();
+                String testSubCategory = remediationIdMap.get(remediationId);
+                remediationMap.put(testSubCategory, remediation);
+            }
+        }
+
+        return remediationMap;
     }
 
     public static String prepareSingleIssueEnrichmentJSON(TestingIssuesId testingIssuesId) throws Exception {
@@ -412,75 +470,86 @@ public class WizIntegrationUtils {
 
     public static String prepareMultipleIssueEnrichmentJSON(List<TestingIssuesId> testingIssuesIdList) throws Exception {
 
-        Map<String, YamlTemplate> yamlTemplateMap = new HashMap<>();
-        Map<String, Remediation> remediationMap = new HashMap<>();
+        Set<String> testSubCategorySet = new HashSet<>();
+        Map<ApiInfoKey, Set<TestingIssuesId>> apiTestingIssuesIdMap = new HashMap<>();
 
-        BasicDBList dataSourcesList = new BasicDBList();
-
-        for (TestingIssuesId testingIssuesId : testingIssuesIdList) {
-            if (testingIssuesId == null) continue;
-
+        for (TestingIssuesId testingIssuesId: testingIssuesIdList) {
             try {
                 String testSubCategory = testingIssuesId.getTestSubCategory();
+                testSubCategorySet.add(testSubCategory);
+
                 ApiInfoKey apiInfoKey = testingIssuesId.getApiInfoKey();
-
-                TestingRunResult testingRunResult = WizIntegrationUtils.fetchTestingRunResult(testSubCategory, apiInfoKey);
-
-                YamlTemplate yamlTemplate;
-                Remediation remediation;
-
-                if (!yamlTemplateMap.containsKey(testSubCategory)) {
-                    yamlTemplate = WizIntegrationUtils.fetchYamlTemplate(testSubCategory);
-                    yamlTemplateMap.put(testSubCategory, yamlTemplate);
+                Set<TestingIssuesId> apiTestingIssuesIdSet;
+                if (!apiTestingIssuesIdMap.containsKey(apiInfoKey)) {
+                    apiTestingIssuesIdSet = new HashSet<>();
+                    apiTestingIssuesIdMap.put(apiInfoKey, apiTestingIssuesIdSet);
+                } else {
+                    apiTestingIssuesIdSet = apiTestingIssuesIdMap.get(apiInfoKey);
                 }
-
-                if (!remediationMap.containsKey(testSubCategory)) {
-                    remediation = WizIntegrationUtils.fetchRemediation(testSubCategory);
-                    remediationMap.put(testSubCategory, remediation);
-                }
-
-                yamlTemplate = yamlTemplateMap.get(testSubCategory);
-                remediation = remediationMap.get(testSubCategory);
-
-                // Prepare asset
-                BasicDBObject asset = new BasicDBObject();
-                BasicDBObject assetDetails = WizIntegrationUtils.buildAssetDetails(apiInfoKey);
-
-                BasicDBObject assetAttackSurfaceFinding = WizIntegrationUtils.buildAssetAttackSurfaceFinding(testingIssuesId, testingRunResult, yamlTemplate, remediation);
-                BasicDBList attackSurfaceFindingsList = new BasicDBList();
-                attackSurfaceFindingsList.add(assetAttackSurfaceFinding);
-
-                asset.put("details", assetDetails);
-                asset.put("attackSurfaceFindings", attackSurfaceFindingsList);
-
-                // Add to assets list
-                BasicDBList assetsList = new BasicDBList();
-                assetsList.add(asset);
-
-                // Prepare datasource
-                BasicDBObject dataSource = new BasicDBObject();
-
-                dataSource.put("id", String.format("akto-testing-run-result-%s", testingRunResult.getHexId()));
-                dataSource.put("assets", assetsList);
-
-                // Add to dataSources list
-                dataSourcesList.add(dataSource);
+                apiTestingIssuesIdSet.add(testingIssuesId);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Missing data for creating enrichment for issue: " + testingIssuesId);
+                // do nothing
             }
         }
 
-        if (dataSourcesList.isEmpty()) {
-            throw new Exception("No valid issues found to create enrichment JSON. Check logs for details.");
+        Map<TestingIssuesId, TestingRunResult> testingRunResultMap = fetchTestingRunResultMap(testingIssuesIdList);
+        Map<String, YamlTemplate> yamlTemplateMap = fetchYamlTemplateMap(testSubCategorySet);
+        Map<String, Remediation> remediationMap = fetchRemediationMap(testSubCategorySet);
+
+        Map<ApiInfoKey, List<BasicDBObject>> attackSurfaceFindingMap = new HashMap<>();
+        for (Map.Entry<ApiInfoKey, Set<TestingIssuesId>> entry : apiTestingIssuesIdMap.entrySet()) {
+            ApiInfoKey apiInfoKey = entry.getKey();
+            Set<TestingIssuesId> apiTestingIssuesIdSet = entry.getValue();
+
+            List<BasicDBObject> findingList = new ArrayList<>();
+
+            for (TestingIssuesId testingIssuesId: apiTestingIssuesIdSet) {
+                try {
+                    TestingRunResult testingRunResult = testingRunResultMap.get(testingIssuesId);
+                    YamlTemplate yamlTemplate = yamlTemplateMap.get(testingIssuesId.getTestSubCategory());
+                    Remediation remediation = remediationMap.get(testingIssuesId.getTestSubCategory());
+                    BasicDBObject finding = WizIntegrationUtils.buildAssetAttackSurfaceFinding(testingIssuesId, testingRunResult, yamlTemplate, remediation);
+                    findingList.add(finding);
+                } catch (Exception e) {
+                    // do nothing
+                }
+            }
+
+            if (!findingList.isEmpty()) {
+                attackSurfaceFindingMap.put(apiInfoKey, findingList);
+            }
         }
 
-        // Prepare enrichment JSON
+        List<BasicDBObject> assetList = new ArrayList<>();
+        for (Map.Entry<ApiInfoKey, List<BasicDBObject>> entry : attackSurfaceFindingMap.entrySet()) {
+            ApiInfoKey apiInfoKey = entry.getKey();
+            List<BasicDBObject> findingList = entry.getValue();
+
+            try {
+                BasicDBObject assetDetails = WizIntegrationUtils.buildAssetDetails(apiInfoKey);
+
+                BasicDBObject asset = new BasicDBObject();
+                asset.put("details", assetDetails);
+                asset.put("attackSurfaceFindings", findingList);
+
+                assetList.add(asset);
+            } catch (Exception e) {
+                // do nothing
+            }
+        }
+
+        BasicDBObject dataSource = new BasicDBObject();
+        int accountId = Context.accountId.get();
+        dataSource.put("id", String.format("akto-%d", accountId));
+        dataSource.put("assets", assetList);
+
         BasicDBObject enrichmentJSONObj = new BasicDBObject();
         enrichmentJSONObj.put("integrationId", "placeholder-integration-id");
-        enrichmentJSONObj.put("dataSources", dataSourcesList);
+        enrichmentJSONObj.put("dataSources", Collections.singletonList(dataSource));
 
         String enrichmentJSON = enrichmentJSONObj.toJson();
 
         return enrichmentJSON;
     }
 }
+
