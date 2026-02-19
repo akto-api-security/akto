@@ -1006,14 +1006,17 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                             flex: 1,
                             overflowY: 'auto',
                             padding: '0 20px 20px',
-                            minHeight: 0
+                            minHeight: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            ...( playgroundMessages.length === 0 ? { justifyContent: 'center', alignItems: 'center' } : {})
                         }}
                     >
-                                {playgroundMessages.length === 0 ? (
-                                    <Text variant="bodyMd" color="subdued">
-                                        Test your guardrail policy by entering a prompt below.
+                                {playgroundMessages.length === 0 && !steps[0]?.isValid ? (
+                                    <Text variant="bodyMd" color="subdued" alignment="center">
+                                        Please fill in all required fields (*) to start testing your guardrail policy.
                                     </Text>
-                                ) : (
+                                ) : playgroundMessages.length > 0 && (
                                     <VerticalStack gap="5">
                                         {playgroundMessages.map((message, index) => (
                                             <VerticalStack key={index} gap="3">
@@ -1085,7 +1088,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                             <Box paddingBlockEnd="3">
                                 <VerticalStack gap="2">
                                     <Text variant="bodySm" color="subdued" fontWeight="medium">
-                                        Quick Test Templates
+                                        Quick Test Prompts
                                     </Text>
                                     <VerticalStack gap="2">
                                         {samplePayloads.map((sample, index) => (
