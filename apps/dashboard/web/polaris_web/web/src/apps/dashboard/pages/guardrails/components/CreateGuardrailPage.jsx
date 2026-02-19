@@ -30,6 +30,8 @@ import {
     CustomGuardrailsConfig,
     UsageGuardrailsStep,
     UsageGuardrailsConfig,
+    AnomalyDetectionStep,
+    AnomalyDetectionConfig,
     ServerSettingsStep,
     ServerSettingsConfig
 } from './steps';
@@ -222,6 +224,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 title: UsageGuardrailsConfig.title,
                 summary: UsageGuardrailsConfig.getSummary(storedStateData),
                 ...UsageGuardrailsConfig.validate(storedStateData)
+            },
+            {
+                number: AnomalyDetectionConfig.number,
+                title: AnomalyDetectionConfig.title,
+                summary: AnomalyDetectionConfig.getSummary(storedStateData),
+                ...AnomalyDetectionConfig.validate(storedStateData)
             },
             {
                 number: ServerSettingsConfig.number,
@@ -713,6 +721,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     />
                 );
             case 8:
+                return (
+                    <AnomalyDetectionStep />
+                );
+            case 9:
                 return (
                     <ServerSettingsStep
                         selectedMcpServers={selectedMcpServers}
