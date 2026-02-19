@@ -12,19 +12,23 @@ import java.util.List;
 /**
  * Utility class for deduplicating API samples using a sliding window of Bloom filters.
  *
- * Uses a circular buffer of 2 Bloom filters, each covering 15 minutes, to provide
- * a 30-minute sliding window for deduplication. This ensures:
- * - Only one sample per API per 30-minute window is inserted
+ * Uses a circular buffer of 2 Bloom filters to provide a sliding window for deduplication.
+ * The time window per filter is configurable via SAMPLE_DEDUP_FILTER_TIME_SECONDS env var
+ * (default: 30 minutes = 1800 seconds).
+ *
+ * This ensures:
+ * - Only one sample per API per time window is inserted
  * - Bounded memory usage (constant number of filters)
  * - No sudden insertion spikes (gradual filter expiry)
  * - Thread-safe filter rotation
+ * - Configurable time window for different deployment scenarios
  */
 public class SampleDeduplicationFilter {
     private static final Logger logger = LoggerFactory.getLogger(SampleDeduplicationFilter.class);
 
     // Configuration constants
-    private static final int FILTER_TIME_LIMIT_SECONDS = 15 * 60; // 15 minutes per filter
-    private static final int FILTER_COUNT = 2; // 2 filters × 15 min = 30 min total coverage
+    private static final int FILTER_TIME_LIMIT_SECONDS = getFilterTimeLimitFromEnv();
+    private static final int FILTER_COUNT = 2; // 2 filters for sliding window
     private static final int EXPECTED_INSERTIONS = 10_000_000;
     private static final double FALSE_POSITIVE_PROBABILITY = 0.001;
     private static final String KEY_DELIMITER = ":";
@@ -45,6 +49,27 @@ public class SampleDeduplicationFilter {
     // Track current filter index and when it started filling
     private static int currentFilterIndex = -1;
     private static long filterFillStartTime = 0;
+
+    /**
+     * Reads the filter time limit from environment variable.
+     * Defaults to 30 minutes (1800 seconds) if not set or invalid.
+     *
+     * @return Filter time limit in seconds
+     */
+    private static int getFilterTimeLimitFromEnv() {
+        try {
+            String envValue = System.getenv("SAMPLE_DEDUP_FILTER_TIME_SECONDS");
+            if (envValue != null && !envValue.isEmpty()) {
+                int seconds = Integer.parseInt(envValue);
+                if (seconds > 0) {
+                    return seconds;
+                }
+            }
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid SAMPLE_DEDUP_FILTER_TIME_SECONDS env var, using default 30 minutes");
+        }
+        return 30 * 60; // Default: 30 minutes
+    }
 
     /**
      * Checks if an API sample should be inserted based on deduplication logic.
