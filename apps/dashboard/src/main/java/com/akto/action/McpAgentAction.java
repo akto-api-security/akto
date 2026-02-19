@@ -18,6 +18,7 @@ import com.mongodb.client.model.Sorts;
 import org.bson.conversions.Bson;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.struts2.ServletActionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,7 +114,8 @@ public class McpAgentAction extends UserAction {
             }
 
             String userEmail = getSUser() != null ? getSUser().getLogin() : null;
-            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail);
+            String contentSource = ServletActionContext.getRequest().getHeader("x-content-source");
+            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail, contentSource);
             if(responseFromMcpServer != null) {
                 responseFromMcpServer.setCreatedAt(timeNow);
                 AgentConversationDao.instance.insertOne(responseFromMcpServer);

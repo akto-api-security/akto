@@ -117,7 +117,7 @@ public class AgentClient {
     }
     
     private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, null, ConversationType.TEST_EXECUTION_RESULT, "", "", "");
+        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, null, ConversationType.TEST_EXECUTION_RESULT, "", "", "", null);
         
         try (Response response = agentHttpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
@@ -130,7 +130,7 @@ public class AgentClient {
         }
     }
     
-    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String chatUrl, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString, String userEmail) {
+    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String chatUrl, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString, String userEmail, String contentSource) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("prompt", prompt);
         requestBody.put("conversationId", conversationId);
@@ -144,7 +144,7 @@ public class AgentClient {
         }
 
         String url = agentBaseUrl + (chatUrl != null ? chatUrl :  "/chat");
-        
+
         String body;
         try {
             body = objectMapper.writeValueAsString(requestBody);
@@ -152,16 +152,21 @@ public class AgentClient {
             loggerMaker.errorAndAddToDb("Error serializing request body: " + e.getMessage());
             body = "{\"prompt\":\"" + prompt.replace("\"", "\\\"") + "\"}";
         }
-        
+
         RequestBody requestBodyObj = RequestBody.create(body, MediaType.parse("application/json"));
-        
-        return new Request.Builder()
+
+        Request.Builder builder = new Request.Builder()
                 .url(url)
                 .post(requestBodyObj)
                 .addHeader("Content-Type", "application/json")
                 .addHeader("Accept", "application/json")
-                .addHeader("x-akto-token", accessTokenForRequest)
-                .build();
+                .addHeader("x-akto-token", accessTokenForRequest);
+
+        if (contentSource != null && !contentSource.isEmpty()) {
+            builder.addHeader("x-content-source", contentSource);
+        }
+
+        return builder.build();
     }
     
     
@@ -288,8 +293,8 @@ public class AgentClient {
     }
 
     // call akto's mcp server (centralized)
-    public GenericAgentConversation getResponseFromMcpServer(String prompt, String conversationId, int tokensLimit, String storedTitle, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString, String userEmail) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, false, "/generic_chat", conversationType, accessTokenForRequest, contextString, userEmail);
+    public GenericAgentConversation getResponseFromMcpServer(String prompt, String conversationId, int tokensLimit, String storedTitle, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString, String userEmail, String contentSource) throws Exception {
+        Request request = buildOkHttpChatRequest(prompt, conversationId, false, "/generic_chat", conversationType, accessTokenForRequest, contextString, userEmail, contentSource);
         try (Response response = agentHttpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
