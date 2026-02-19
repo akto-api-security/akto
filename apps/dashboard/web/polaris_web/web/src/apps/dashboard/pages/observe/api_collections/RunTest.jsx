@@ -26,7 +26,7 @@ const initialAutoTicketingDetails = {
     issueType: "",
 }
 
-function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
+function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable, fromApiDetails }) {
 
     const initialState = {
         categories: [],
