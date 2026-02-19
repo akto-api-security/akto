@@ -1029,12 +1029,6 @@ export default {
         return resp
     },
 
-    getAllIconsCache(){
-        return request({
-            url: '/api/getAllIconsCache',
-            method: 'get'
-        })
-    },
     fetchIconsForHostnames(hostnames){
         return request({
             url: '/api/fetchIconsForHostnames',
