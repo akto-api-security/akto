@@ -908,9 +908,17 @@ public class DbLayer {
             }
         }
 
+        boolean accessTypeChanged = false;
+        if (apiCollection != null && accessType != null) {
+            String existingAccessType = apiCollection.getAccessType();
+            if (!accessType.equals(existingAccessType)) {
+                accessTypeChanged = true;
+            }
+        }
+
         // Skip update for existing apiCollection if vpc and tags are same.
-        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty())) {
-            loggerMaker.info("No new tags or vpcId, Updates skipped for collectionId: " + vxlanId);
+        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty()) && !accessTypeChanged) {
+            loggerMaker.info("No new tags or vpcId or accessType, Updates skipped for collectionId: " + vxlanId);
             return;
         }
 
@@ -971,9 +979,17 @@ public class DbLayer {
             }
         }
 
+        boolean accessTypeChanged = false;
+        if (apiCollection != null && accessType != null) {
+            String existingAccessType = apiCollection.getAccessType();
+            if (!accessType.equals(existingAccessType)) {
+                accessTypeChanged = true;
+            }
+        }
+
         // Skip update for existing apiCollection if vpc and tags are same.
-        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty())) {
-            loggerMaker.info("No new tags or vpcId, Updates skipped for collectionId: " + id);
+        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty()) && !accessTypeChanged) {
+            loggerMaker.info("No new tags or vpcId or accessType, Updates skipped for collectionId: " + id);
             return;
         }
 
