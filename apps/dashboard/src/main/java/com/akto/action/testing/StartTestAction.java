@@ -142,7 +142,13 @@ public class StartTestAction extends UserAction {
     }
 
     public List<ObjectId> getCicdTests(){
-        return getTestingRunListFromSummary(Filters.exists(TestingRunResultSummary.METADATA_STRING));
+        // Include documents with metadata string, but exclude those where metadata.error exists 
+        // CICD issues with error field will not be shown in CICD TAB
+        Bson filter = Filters.and(
+            Filters.exists(TestingRunResultSummary.METADATA_STRING),
+            Filters.not(Filters.exists(TestingRunResultSummary.METADATA_STRING + ".error"))
+        );
+        return getTestingRunListFromSummary(filter);
     }
 
     private static List<ObjectId> getTestsWithSeverity(List<String> severities) {
