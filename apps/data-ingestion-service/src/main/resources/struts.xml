@@ -52,6 +52,27 @@
             </result>
         </action>
 
+        <!-- Arcade Webhook Endpoints -->
+        <action name="pre" class="com.akto.action.ArcadeWebhookAction" method="arcade">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^code,^error_message</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="includeProperties">^code,^error_message</param>
+            </result>
+        </action>
+
+        <action name="post" class="com.akto.action.ArcadeWebhookAction" method="arcade">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^code,^error_message</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="includeProperties">^code,^error_message</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>
