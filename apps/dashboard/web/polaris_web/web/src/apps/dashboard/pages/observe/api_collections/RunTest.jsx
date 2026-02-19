@@ -529,6 +529,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
 
     const maxAgentTokensOptions = [
         { label: "No limit", value: "-1" },
+        { label: "1K", value: "1000" },
+        { label: "2K", value: "2000" },
+        { label: "3K", value: "3000" },
         { label: "10K", value: "10000" },
         { label: "50K", value: "50000" },
         { label: "100K", value: "100000" },
