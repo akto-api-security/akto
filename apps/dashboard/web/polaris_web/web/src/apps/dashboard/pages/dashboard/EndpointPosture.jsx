@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useReducer } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { HorizontalStack, Box, Text, Spinner, Button, Card, VerticalStack, HorizontalGrid } from '@shopify/polaris'
 import { produce } from 'immer'
 import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCards'
@@ -16,7 +17,7 @@ import dashboardApi from './api'
 import api from '../observe/api'
 import func from '@/util/func'
 import values from '@/util/values'
-import { getTypeFromTags, CLIENT_TYPES, getDomainForFavicon, formatDisplayName } from '../observe/agentic/mcpClientHelper'
+import { getTypeFromTags, CLIENT_TYPES, getDomainForFavicon, formatDisplayName, getMcpServerDisplayName, getFriendlyLlmName } from '../observe/agentic/mcpClientHelper'
 import { extractEndpointId } from '../observe/agentic/constants'
 import { GridLayout, verticalCompactor } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
@@ -86,7 +87,7 @@ const processAgenticCollections = (collections, topN = 10) => {
 
     const ensureGroup = (group, key, displayLabel) => {
         if (!group[key]) {
-            group[key] = { name: displayLabel ?? key, count: 0, endpoints: new Set() }
+            group[key] = { name: displayLabel ?? key, count: 0, endpoints: new Set(), hostNames: new Set(), domain: key }
         }
         return group[key]
     }
@@ -106,9 +107,10 @@ const processAgenticCollections = (collections, topN = 10) => {
 
         if (clientType === CLIENT_TYPES.MCP_SERVER) {
             const mcpServerName = getMcpServerName(displayName)
-            const g = ensureGroup(typeGroups[CLIENT_TYPES.MCP_SERVER], mcpServerName, mcpServerName)
+            const g = ensureGroup(typeGroups[CLIENT_TYPES.MCP_SERVER], mcpServerName, getMcpServerDisplayName(mcpServerName))
             g.count++
             if (endpointId) g.endpoints.add(endpointId)
+            g.hostNames.add(hostName)
 
             const agentName = getAgentNameFromMcpDisplayName(displayName)
             if (agentName) {
@@ -116,33 +118,48 @@ const processAgenticCollections = (collections, topN = 10) => {
                 const gAgent = ensureGroup(typeGroups.agentNames, agentName, label)
                 gAgent.count++
                 if (endpointId) gAgent.endpoints.add(endpointId)
+                gAgent.hostNames.add(hostName)
             }
         } else if (clientType === CLIENT_TYPES.LLM) {
             const llmName = getLlmName(displayName)
-            const g = ensureGroup(typeGroups[CLIENT_TYPES.LLM], llmName, llmName)
+            const g = ensureGroup(typeGroups[CLIENT_TYPES.LLM], llmName, getFriendlyLlmName(llmName))
             g.count++
             if (endpointId) g.endpoints.add(endpointId)
+            g.hostNames.add(hostName)
         } else if (clientType === CLIENT_TYPES.AI_AGENT) {
             const g = ensureGroup(typeGroups[CLIENT_TYPES.AI_AGENT], displayName, displayName)
             g.count++
             if (endpointId) g.endpoints.add(endpointId)
+            g.hostNames.add(hostName)
         }
     })
 
-    const processGroup = (group) =>
+    const processGroup = (group, groupType) =>
         Object.values(group)
             .map(g => {
-                const domain = getDomainForFavicon(g.name)
-                const icon = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : undefined
-                return { name: g.name, value: g.endpoints.size || g.count, icon }
+                const domainForIcon = getDomainForFavicon(g.name) || (g.domain && g.domain.includes('.') ? g.domain : null)
+                const icon = domainForIcon ? `https://www.google.com/s2/favicons?domain=${domainForIcon}&sz=32` : undefined
+                const matches = (hostName) => {
+                    if (!hostName || typeof hostName !== 'string') return false
+                    if (groupType === CLIENT_TYPES.MCP_SERVER || groupType === CLIENT_TYPES.LLM) {
+                        return hostName === g.domain || hostName.endsWith('.' + g.domain)
+                    }
+                    if (groupType === 'aiAgent') {
+                        return hostName.includes('.' + g.domain + '.')
+                    }
+                    return true
+                }
+                const hostNamesList = [...g.hostNames].filter(matches)
+                const url = null
+                return { name: g.name, value: g.endpoints.size || g.count, icon, url, hostNames: hostNamesList }
             })
             .sort((a, b) => b.value - a.value)
             .slice(0, topN)
 
     return {
-        mcpServers: processGroup(typeGroups[CLIENT_TYPES.MCP_SERVER]),
-        llms: processGroup(typeGroups[CLIENT_TYPES.LLM]),
-        aiAgents: processGroup(typeGroups.agentNames).length > 0 ? processGroup(typeGroups.agentNames) : processGroup(typeGroups[CLIENT_TYPES.AI_AGENT]),
+        mcpServers: processGroup(typeGroups[CLIENT_TYPES.MCP_SERVER], CLIENT_TYPES.MCP_SERVER),
+        llms: processGroup(typeGroups[CLIENT_TYPES.LLM], CLIENT_TYPES.LLM),
+        aiAgents: processGroup(typeGroups.agentNames).length > 0 ? processGroup(typeGroups.agentNames, 'aiAgent') : processGroup(typeGroups[CLIENT_TYPES.AI_AGENT], 'aiAgent'),
         totalEndpoints: uniqueEndpointIds.size
     }
 }
@@ -162,6 +179,7 @@ const defaultLayout = [
 ]
 
 function EndpointPosture() {
+    const navigate = useNavigate()
     const [summaryInfoData, setSummaryInfoData] = useState([])
     const [commonMcpServers, setCommonMcpServers] = useState([])
     const [commonLlmsInBrowsers, setCommonLlmsInBrowsers] = useState([])
@@ -309,12 +327,19 @@ function EndpointPosture() {
                         .replace(/\b\w/g, l => l.toUpperCase())
                 }
 
-                // Convert dynamic category keys to chart data
-                const trendsChartData = Object.keys(dataProtectionTrends).map((category, index) => ({
-                    name: formatCategoryName(category),
-                    color: categoryColors[index] || '#9ca3af', // Use gray as fallback
-                    data: dataProtectionTrends[category] || []
-                }))
+                // Convert dynamic category keys to chart data (support both { data, filterId } and legacy array format)
+                const trendsChartData = Object.keys(dataProtectionTrends).map((category, index) => {
+                    const raw = dataProtectionTrends[category]
+                    const isObj = raw && typeof raw === 'object' && !Array.isArray(raw)
+                    const data = isObj ? (raw.data || []) : (raw || [])
+                    const filterId = isObj ? raw.filterId : null
+                    return {
+                        name: formatCategoryName(category),
+                        color: categoryColors[index] || '#9ca3af',
+                        data,
+                        filterId
+                    }
+                })
 
                 setDataProtectionTrendsData(trendsChartData)
 
@@ -325,7 +350,8 @@ function EndpointPosture() {
                 topGuardrailPolicies.forEach((policy, index) => {
                     guardrailPoliciesObject[policy.name] = {
                         text: policy.count,
-                        color: guardrailColors[index % guardrailColors.length]
+                        color: guardrailColors[index % guardrailColors.length],
+                        filterValue: policy.filterId
                     }
                 })
                 setGuardrailPoliciesData(guardrailPoliciesObject)
@@ -412,13 +438,33 @@ function EndpointPosture() {
     const hasLlms = commonLlmsInBrowsers && commonLlmsInBrowsers.length > 0
     const hasAiAgents = commonAiAgents && commonAiAgents.length > 0
 
+    const handleSummaryCardClick = (index) => {
+        if (index === 0) {
+            navigate('/dashboard/observe/agentic-assets')
+        } else if (index === 1) {
+            navigate('/dashboard/protection/threat-activity?filters=successfulExploit__true#active', {
+                state: { period: { since: currDateRange.period.since, until: currDateRange.period.until } }
+            })
+        } else {
+            navigate('/dashboard/protection/threat-activity?filters=#active', {
+                state: { period: { since: currDateRange.period.since, until: currDateRange.period.until } }
+            })
+        }
+    }
+
     const summaryHeader = (
         <Card>
             <VerticalStack gap={4}>
                 <ComponentHeader title='Endpoint Summary' itemId='summary' onRemove={hideWidget} tooltipContent="Overview of key endpoint security metrics" />
                 <HorizontalGrid columns={summaryInfoData.length} gap={4}>
                     {summaryInfoData.map((item, index) => (
-                        <Box borderInlineEndWidth={index < (summaryInfoData.length - 1) ? "1" : ""} key={index} borderColor="transparent">
+                        <Box
+                            borderInlineEndWidth={index < (summaryInfoData.length - 1) ? "1" : ""}
+                            key={index}
+                            borderColor="transparent"
+                            cursor="pointer"
+                            onClick={() => handleSummaryCardClick(index)}
+                        >
                             <HorizontalStack>
                                 <VerticalStack gap="4">
                                     <TitleWithInfo
@@ -543,7 +589,8 @@ function EndpointPosture() {
 
     const dataProtectionTrendsLabels = dataProtectionTrendsData.map(item => ({
         label: item.name,
-        color: item.color
+        color: item.color,
+        filterId: item.filterId
     }))
 
     const hasDataProtectionTrends = dataProtectionTrendsData && dataProtectionTrendsData.length > 0 &&

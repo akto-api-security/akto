@@ -27,16 +27,22 @@ function ServersLayout({ title, itemId, tooltipContent, items, hasItems, emptyMe
         totalServers += item.value
     })
 
-    let tableRows = [] 
-    items.forEach((item, index) =>{ 
-        const row1 = [
-            (
-                <HorizontalStack gap={"2"} wrap={false} key={index}>
-                    <Avatar size='extraSmall' source={item.icon}/>
-                    <Text variant='bodyMd' fontWeight='medium'>{item.name}</Text>
+    let tableRows = []
+    items.forEach((item, index) => {
+        const nameContent = item.url ? (
+            <a href={item.url} className="servers-layout-item-link" style={{ color: 'inherit', textDecoration: 'none' }}>
+                <HorizontalStack gap="2" wrap={false}>
+                    <Avatar size="extraSmall" source={item.icon} />
+                    <Text variant="bodyMd" fontWeight="medium" as="span">{item.name}</Text>
                 </HorizontalStack>
-            )
-        ]
+            </a>
+        ) : (
+            <HorizontalStack gap="2" wrap={false}>
+                <Avatar size="extraSmall" source={item.icon} />
+                <Text variant="bodyMd" fontWeight="medium">{item.name}</Text>
+            </HorizontalStack>
+        )
+        const row1 = [(<Box key={index}>{nameContent}</Box>)]
         const row2 = [
             (
                 <HorizontalStack gap={"2"} wrap={false} key={index} align='end'>

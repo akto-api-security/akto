@@ -75,3 +75,16 @@
 .guardrail-policies-chart-wrapper .issues-severity-graph-container [class*="VerticalStack"] > *:first-child {
     display: none;
 }
+
+/* Common MCP Servers / LLMs / AI Agents: clickable row hover */
+.servers-layout-item-link {
+    cursor: pointer;
+    display: inline-block;
+    border-radius: 4px;
+    padding: 2px 4px;
+    margin: -2px -4px;
+    transition: background-color 0.15s ease;
+}
+.servers-layout-item-link:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
