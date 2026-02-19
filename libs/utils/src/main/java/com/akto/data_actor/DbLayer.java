@@ -1127,6 +1127,10 @@ public class DbLayer {
         LogsDao.instance.insertOne(log);
     }
 
+    public static void insertAgenticTestingLog(Log log) {
+        AgenticTestingLogsDao.instance.insertOne(log);
+    }
+
     public static void insertProtectionLog(Log log) {
         ProtectionLogsDao.instance.insertOne(log);
     }

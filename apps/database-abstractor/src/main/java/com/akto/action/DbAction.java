@@ -1,13 +1,24 @@
 package com.akto.action;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import com.akto.dao.*;
+import com.akto.dto.upload.SwaggerUploadLog;
+import com.akto.open_api.parser.Parser;
+import com.akto.open_api.parser.ParserResult;
+import com.akto.parsers.HttpCallParser;
+import com.akto.runtime.APICatalogSync;
+import io.swagger.parser.OpenAPIParser;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.parser.core.models.ParseOptions;
+import io.swagger.v3.parser.core.models.SwaggerParseResult;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.CommonTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -82,6 +93,7 @@ import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
+
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -123,6 +135,8 @@ public class DbAction extends ActionSupport {
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
     String openApiSchema;
+    @Getter @Setter
+    private String importType;
     @Getter @Setter
     McpAuditInfo auditInfo;
     
@@ -311,6 +325,12 @@ public class DbAction extends ActionSupport {
     int scheduleTs;
     TestingRunPlayground testingRunPlayground;
     private String testingRunPlaygroundId;
+    @Getter @Setter
+    List<Map<String, Object>> agentProxyGuardrailEndpoints;
+    
+    // Fields for agent proxy guardrail endpoints (reusing updatedAfter from MCP)
+    @Getter @Setter
+    String appServerName;
 
     private static final Gson gson = new Gson();
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
@@ -2621,6 +2641,18 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String insertAgenticTestingLog() {
+        try {
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            DbLayer.insertAgenticTestingLog(dbLog);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertAgenticTestingLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
     public String insertProtectionLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
@@ -3486,6 +3518,95 @@ public class DbAction extends ActionSupport {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateServiceGraphEdges: " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchAgentProxyGuardrailEndpoints() {
+        try {
+            // Validate updatedAfter (must be >= 0) - reusing existing MCP updatedAfter field
+            if (updatedAfter != null && updatedAfter < 0) {
+                loggerMaker.errorAndAddToDb("Invalid updatedAfter parameter: " + updatedAfter);
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Build query for ApiInfo where guardrails are enabled
+            List<Bson> filters = new ArrayList<>();
+            filters.add(Filters.eq(ApiInfo.AGENT_PROXY_GUARDRAIL_ENABLED, true));
+
+            // Filter by updatedAt (lastSeen field in ApiInfo)
+            // updatedAfter is in milliseconds from request, convert to seconds for ApiInfo.lastSeen
+            if (updatedAfter != null && updatedAfter > 0) {
+                // Convert milliseconds to seconds (ApiInfo.lastSeen is in seconds)
+                int updatedAfterSeconds = (int) (updatedAfter / 1000);
+                filters.add(Filters.gt(ApiInfo.LAST_SEEN, updatedAfterSeconds));
+            }
+
+            // Each agent proxy instance filters by its own host (appServerName), which uniquely identifies it
+
+            Bson query = Filters.and(filters);
+
+            // Fetch ApiInfo records
+            List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(query, 0, Integer.MAX_VALUE, Sorts.ascending(ApiInfo.LAST_SEEN));
+
+            // Transform ApiInfo records to response format (return API info records directly)
+            List<Map<String, Object>> results = new ArrayList<>();
+            Set<Integer> collectionIds = new HashSet<>();
+            
+            // Collect unique collection IDs for batch lookup
+            for (ApiInfo apiInfo : apiInfoList) {
+                if (apiInfo.getId() != null && apiInfo.getId().getApiCollectionId() != 0) {
+                    collectionIds.add(apiInfo.getId().getApiCollectionId());
+                }
+            }
+
+            // Batch fetch ApiCollections for host names
+            Map<Integer, String> collectionIdToHostName = new HashMap<>();
+            if (!collectionIds.isEmpty()) {
+                List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+                    Filters.in("_id", new ArrayList<>(collectionIds)),
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)
+                );
+                for (ApiCollection collection : apiCollections) {
+                    collectionIdToHostName.put(collection.getId(), collection.getHostName());
+                }
+            }
+
+            // Filter by appServerName if provided (after fetching host names)
+            for (ApiInfo apiInfo : apiInfoList) {
+                if (apiInfo.getId() == null) continue;
+
+                String hostName = collectionIdToHostName.get(apiInfo.getId().getApiCollectionId());
+                
+                // Filter by appServerName if provided
+                if (appServerName != null && !appServerName.isEmpty()) {
+                    if (hostName == null || !hostName.equals(appServerName)) {
+                        continue;
+                    }
+                }
+
+                // Return API info record directly as map
+                ApiInfo.ApiInfoKey apiInfoKey = apiInfo.getId();
+                Map<String, Object> apiInfoMap = new HashMap<>();
+                // Use ApiInfoKey string representation as ID
+                String idString = apiInfoKey.getApiCollectionId() + " " + apiInfoKey.getUrl() + " " + apiInfoKey.getMethod().name();
+                apiInfoMap.put("id", idString);
+                apiInfoMap.put("_id", idString); // Same as id for compatibility
+                apiInfoMap.put("method", apiInfoKey.getMethod().name());
+                apiInfoMap.put("url", apiInfoKey.getUrl());
+                apiInfoMap.put("host", hostName != null ? hostName : ""); // Ensure host is always present
+                apiInfoMap.put("updatedAt", apiInfo.getLastSeen() * 1000L); // Convert seconds to milliseconds
+                apiInfoMap.put("isDeleted", false); // ApiInfo doesn't have isDeleted field, default to false
+                apiInfoMap.put("apiCollectionId", apiInfoKey.getApiCollectionId()); // Include collection ID
+
+                results.add(apiInfoMap);
+            }
+
+            agentProxyGuardrailEndpoints = results;
+            loggerMaker.infoAndAddToDb("Fetched " + agentProxyGuardrailEndpoints.size() + " agent proxy guardrail endpoint selections from api_info");
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching agent proxy guardrail endpoints: " + e.toString());
             return Action.ERROR.toUpperCase();
         }
     }
@@ -4734,6 +4855,164 @@ public class DbAction extends ActionSupport {
 
     public void setOpenApiSchema(String openApiSchema) {
         this.openApiSchema = openApiSchema;
+    }
+
+    private String extractHostFromServers(OpenAPI openAPI) {
+        if (openAPI.getServers() != null && !openAPI.getServers().isEmpty()) {
+            String serverUrl = openAPI.getServers().get(0).getUrl();
+            try {
+                java.net.URL url = new java.net.URL(serverUrl);
+                return url.getHost();
+            } catch (Exception e) {
+                return serverUrl;
+            }
+        }
+        return null;
+    }
+
+    private int createCollectionForOpenApi(String hostName) throws Exception {
+        int id = hostName.hashCode();
+        id = id < 0 ? id * -1 : id;
+        if (id == 0) id = 1;
+
+        FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
+        updateOptions.upsert(true);
+
+        for (int i = 0; i < 100; i++) {
+            int candidateId = id + i;
+            try {
+                Bson updates = Updates.combine(
+                    Updates.setOnInsert("_id", candidateId),
+                    Updates.setOnInsert("startTs", Context.now()),
+                    Updates.setOnInsert("urls", new HashSet<>())
+                );
+                ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(
+                    Filters.eq(ApiCollection.HOST_NAME, hostName), updates, updateOptions);
+                loggerMaker.infoAndAddToDb("Using collectionId=" + candidateId + " for " + hostName);
+                return candidateId;
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Collision creating collection for host " + hostName + ", trying " + (i + 1));
+            }
+        }
+        throw new Exception("Unable to create collection for host: " + hostName);
+    }
+
+    private static final long OPENAPI_IMPORT_TIMEOUT_MINUTES = 5;
+
+    public String importOpenApiSpec() {
+        int accountId = Context.accountId.get();
+
+        if (openApiSchema == null || openApiSchema.isEmpty()) {
+            loggerMaker.errorAndAddToDb("openApiSchema is null or empty in importOpenApiSpec");
+            return Action.ERROR.toUpperCase();
+        }
+
+        // Submit task to a separate executor with timeout
+        new Thread(new Runnable() {
+            public void run() {
+                ExecutorService openApiExecutor = Executors.newSingleThreadExecutor();
+                try {
+                    // Submit the actual work
+                    openApiExecutor.submit(new Runnable() {
+                        public void run() {
+                            Context.accountId.set(accountId);
+                            try {
+                                // Parse OpenAPI spec
+                                ParseOptions options = new ParseOptions();
+                                options.setResolve(true);
+                                options.setResolveFully(true);
+                                SwaggerParseResult result = new OpenAPIParser().readContents(openApiSchema, null, options);
+                                OpenAPI openAPI = result.getOpenAPI();
+                                if (openAPI == null) {
+                                    loggerMaker.errorAndAddToDb("Failed to parse OpenAPI spec in importOpenApiSpec");
+                                    return;
+                                }
+
+                                // Extract title
+                                String title = "OpenAPI ";
+                                if (openAPI.getInfo() != null && openAPI.getInfo().getTitle() != null) {
+                                    title += openAPI.getInfo().getTitle();
+                                } else {
+                                    title += Context.now();
+                                }
+
+                                // Parse into Akto format with useHost=true
+                                ParserResult parsedResult = Parser.convertOpenApiToAkto(openAPI, null, true, new ArrayList<>());
+                                List<SwaggerUploadLog> uploadLogs = parsedResult.getUploadLogs();
+
+                                // Filter based on importType
+                                if ("ONLY_SUCCESSFUL_APIS".equals(importType)) {
+                                    uploadLogs = uploadLogs.stream()
+                                        .filter(log -> log.getErrors() == null || log.getErrors().isEmpty())
+                                        .collect(Collectors.toList());
+                                }
+
+                                // Collect aktoFormat messages
+                                List<String> msgs = uploadLogs.stream()
+                                    .filter(log -> log.getAktoFormat() != null)
+                                    .map(SwaggerUploadLog::getAktoFormat)
+                                    .collect(Collectors.toList());
+
+                                if (msgs.isEmpty()) {
+                                    loggerMaker.infoAndAddToDb("No valid APIs found in OpenAPI spec");
+                                    return;
+                                }
+
+                                // Extract hostName from OpenAPI servers section
+                                String extractedHost = extractHostFromServers(openAPI);
+                                if (extractedHost == null || extractedHost.isEmpty()) {
+                                    extractedHost = title;
+                                }
+
+                                // Create collection using hostName.hashCode() pattern
+                                int colId = createCollectionForOpenApi(extractedHost);
+
+                                // Process through HttpCallParser (same as dashboard's skipKafka=true path)
+                                List<HttpResponseParams> responses = new ArrayList<>();
+                                for (String message : msgs) {
+                                    HttpResponseParams responseParams = HttpCallParser.parseKafkaMessage(message);
+                                    responseParams.getRequestParams().setApiCollectionId(colId);
+                                    responses.add(responseParams);
+                                }
+
+                                SingleTypeInfo.fetchCustomDataTypes(accountId);
+                                HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                                    AccountSettingsDao.generateFilter());
+                                responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, accountSettings);
+                                callParser.syncFunction(responses, true, false, accountSettings);
+                                APICatalogSync.mergeUrlsAndSave(colId, true, false,
+                                    callParser.apiCatalogSync.existingAPIsInDb);
+                                callParser.apiCatalogSync.buildFromDB(false, false);
+                                APICatalogSync.updateApiCollectionCount(
+                                    callParser.apiCatalogSync.getDbState(colId), colId);
+
+                                loggerMaker.infoAndAddToDb("Successfully imported " + msgs.size() +
+                                    " APIs from OpenAPI spec into collection " + colId);
+
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in importOpenApiSpec: " + e.toString());
+                            }
+                        }
+                    });
+
+                    // Wait with timeout
+                    boolean completed = openApiExecutor.awaitTermination(OPENAPI_IMPORT_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+                    if (!completed) {
+                        loggerMaker.errorAndAddToDb("importOpenApiSpec timeout - took longer than " + OPENAPI_IMPORT_TIMEOUT_MINUTES +
+                            " minutes, task cancelled");
+                        openApiExecutor.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    loggerMaker.errorAndAddToDb(e, "importOpenApiSpec interrupted: " + e.toString());
+                    openApiExecutor.shutdownNow();
+                } finally {
+                    openApiExecutor.shutdown();
+                }
+            }
+        }).start();
+
+        return Action.SUCCESS.toUpperCase();
     }
 
     public TestingRunPlayground.TestingRunPlaygroundType getTestingRunPlaygroundType() {

@@ -254,6 +254,8 @@ public abstract class DataActor {
 
     public abstract void insertTestingLog(Log log);
 
+    public abstract void insertAgenticTestingLog(Log log);
+
     public abstract EndpointLogicalGroup fetchEndpointLogicalGroupById(String endpointLogicalGroupId);
 
     public abstract DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand);

@@ -216,6 +216,7 @@ public class MergingLogic {
 
             bulkUpdatesForSti.add(new DeleteManyModel<>(filterQ));
             bulkUpdatesForSampleData.add(new DeleteManyModel<>(filterQSampleData));
+            bulkUpdatesForApiInfo.add(new DeleteManyModel<>(filterQSampleData)); // FIX: Delete from api_info too
             // SingleTypeInfoDao.instance.deleteAll(filterQ);
             // SampleDataDao.instance.deleteAll(filterQSampleData);
         }

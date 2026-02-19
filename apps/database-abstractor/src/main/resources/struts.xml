@@ -437,6 +437,17 @@
             </result>
         </action>
 
+        <action name="api/insertAgenticTestingLog" class="com.akto.action.DbAction" method="insertAgenticTestingLog">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchAllSingleTypeInfo" class="com.akto.action.DbAction" method="fetchAllSingleTypeInfo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1923,7 +1934,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
+        
         <action name="api/insertDataIngestionLog" class="com.akto.action.DbAction" method="insertDataIngestionLog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2230,7 +2241,30 @@
             </result>
         </action>
 
-        <action name="api/updateServiceGraphEdges" class="com.akto.action.DbAction" method="updateServiceGraphEdges">
+        <action name="api/updateServiceGraphEdges" class="com.akto.action.DbAction" method="updateServiceGraphEdges">            
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAgentProxyGuardrailEndpoints" class="com.akto.action.DbAction" method="fetchAgentProxyGuardrailEndpoints">            
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/importOpenApiSpec" class="com.akto.action.DbAction" method="importOpenApiSpec">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

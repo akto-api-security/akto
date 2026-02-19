@@ -164,7 +164,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                     } else {
                         title += Context.now();
                     }
-                    ParserResult parsedSwagger = Parser.convertOpenApiToAkto(openAPI, fileUploadId);
+                    ParserResult parsedSwagger = Parser.convertOpenApiToAkto(openAPI, fileUploadId, true, new ArrayList<>());
                     List<FileUploadError> fileErrors = parsedSwagger.getFileErrors();
 
                     List<SwaggerUploadLog> messages = parsedSwagger.getUploadLogs();

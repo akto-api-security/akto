@@ -67,6 +67,9 @@ public class ApiInfo {
     public static final String DETECTED_BASE_PROMPT = "detectedBasePrompt";
     private String detectedBasePrompt;
 
+    public static final String AGENT_PROXY_GUARDRAIL_ENABLED = "agentProxyGuardrailEnabled";
+    private boolean agentProxyGuardrailEnabled;
+
     public static class AuthType {
         public static final String UNAUTHENTICATED = "UNAUTHENTICATED";
         public static final String BASIC = "BASIC";
@@ -227,6 +230,7 @@ public class ApiInfo {
         this.severityScore = 0;
         this.riskScore = 0 ;
         this.lastCalculatedTime = 0;
+        this.agentProxyGuardrailEnabled = false;
         if(apiInfoKey != null){
             this.collectionIds = Arrays.asList(apiInfoKey.getApiCollectionId());
         }
@@ -504,5 +508,13 @@ public class ApiInfo {
 
     public void setDetectedBasePrompt(String detectedBasePrompt) {
         this.detectedBasePrompt = detectedBasePrompt;
+    }
+
+    public boolean isAgentProxyGuardrailEnabled() {
+        return agentProxyGuardrailEnabled;
+    }
+
+    public void setAgentProxyGuardrailEnabled(boolean agentProxyGuardrailEnabled) {
+        this.agentProxyGuardrailEnabled = agentProxyGuardrailEnabled;
     }
 }
