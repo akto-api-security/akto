@@ -1034,7 +1034,7 @@
                  <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-        <action name="api/getSeveritiesCountPerCollection" class="com.akto.action.observe.InventoryAction" method="getSeveritiesCountPerCollection">
+        <action name="api/getSeveritiesCountPerCollection" class="com.akto.action.observe.InventoryAction" method="fetchSeveritiesCountPerCollection">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="collectionInterceptor"/>
@@ -1121,7 +1121,7 @@
             </result>
         </action>
 
-        <action name="api/getAccessTypes" class="com.akto.action.observe.InventoryAction" method="getAccessTypes">
+        <action name="api/getAccessTypes" class="com.akto.action.observe.InventoryAction" method="fetchAccessTypes">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="collectionInterceptor"/>
@@ -1220,7 +1220,7 @@
             </result>
         </action>
 
-        <action name="api/getSummaryInfoForChanges" class="com.akto.action.observe.InventoryAction" method="getSummaryInfoForChanges">
+        <action name="api/getSummaryInfoForChanges" class="com.akto.action.observe.InventoryAction" method="fetchSummaryInfoForChanges">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -1484,6 +1484,28 @@
             </result>
         </action>
 
+        <action name="api/apiInfo/bulkAgentProxyGuardrail" class="com.akto.action.AgentProxyGuardrailEndpointsAction" method="bulkUpdateAgentProxyGuardrail">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">SENSITIVE_DATA</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/guardrailPlayground" class="com.akto.action.GuardrailPoliciesAction" method="guardrailPlayground">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1491,7 +1513,6 @@
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
-
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -2143,7 +2164,7 @@
         </action>
 
 
-        <action name="api/getCountForHostnameDeactivatedCollections" class="com.akto.action.ApiCollectionsAction" method="getCountForHostnameDeactivatedCollections">
+        <action name="api/getCountForHostnameDeactivatedCollections" class="com.akto.action.ApiCollectionsAction" method="fetchCountForHostnameDeactivatedCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -2165,7 +2186,7 @@
             </result>
         </action>   
 
-        <action name="api/getCountForUningestedApis" class="com.akto.action.ApiCollectionsAction" method="getCountForUningestedApis">
+        <action name="api/getCountForUningestedApis" class="com.akto.action.ApiCollectionsAction" method="fetchCountForUningestedApis">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -3110,7 +3131,7 @@
             </result>
         </action>
 
-        <action name="api/getEndpointsListFromConditions" class="com.akto.action.ApiCollectionsAction" method="getEndpointsListFromConditions">
+        <action name="api/getEndpointsListFromConditions" class="com.akto.action.ApiCollectionsAction" method="fetchEndpointsListFromConditions">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -3132,7 +3153,7 @@
             </result>
         </action>
 
-        <action name="api/getEndpointsFromConditions" class="com.akto.action.ApiCollectionsAction" method="getEndpointsFromConditions">
+        <action name="api/getEndpointsFromConditions" class="com.akto.action.ApiCollectionsAction" method="fetchEndpointsFromConditions">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -3845,7 +3866,7 @@
             </result>
         </action>
 
-        <action name="api/getAllUsersCollections" class="com.akto.action.ApiCollectionsAction" method="getAllUsersCollections">
+        <action name="api/getAllUsersCollections" class="com.akto.action.ApiCollectionsAction" method="fetchAllUsersCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -10973,7 +10994,7 @@
             </result>
         </action>
 
-        <action name="api/getAPIInfosForMissingData" class="com.akto.action.DashboardAction" method="getAPIInfosForMissingData">
+        <action name="api/getAPIInfosForMissingData" class="com.akto.action.DashboardAction" method="fetchAPIInfosForMissingData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -13353,7 +13374,7 @@
             </result>
         </action>
 
-        <action name="api/getDeMergedApis" class="com.akto.action.observe.InventoryAction" method="getDeMergedApis">
+        <action name="api/getDeMergedApis" class="com.akto.action.observe.InventoryAction" method="fetchDeMergedApis">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">

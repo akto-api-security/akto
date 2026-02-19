@@ -13,6 +13,9 @@
 
     <package name="user2" namespace="" extends="struts-default, json-default">
 
+        <!-- Default action for root path (/) - redirects to healthCheck -->
+        <default-action-ref name="healthCheck" />
+
         <action name="api/ingestData" class="com.akto.action.IngestionAction" method="ingestData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -45,9 +48,10 @@
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
+                <param name="includeProperties">^success,^message,^data.*</param>
             </result>
         </action>
+
     </package>
 
 </struts>

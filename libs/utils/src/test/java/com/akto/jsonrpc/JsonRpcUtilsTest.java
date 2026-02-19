@@ -22,7 +22,7 @@ public class JsonRpcUtilsTest {
     @Test
     public void testValidJsonRpcRequestWithMethod() {
         String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"testMethod\", \"id\": 1 }";
-        String url = "http://localhost:8080/api";
+        String url = "http://localhost:8080/mcp";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams result = JsonRpcUtils.parseJsonRpcResponse(responseParams);
         assertTrue(result.getRequestParams().getURL().contains("testMethod"));
@@ -31,7 +31,7 @@ public class JsonRpcUtilsTest {
     @Test
     public void testValidJsonRpcRequestWithEmptyMethod() throws Exception {
         String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"\", \"id\": 1 }";
-        String url = "http://localhost:8080/api";
+        String url = "http://localhost:8080/mcp";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams result = JsonRpcUtils.parseJsonRpcResponse(responseParams);
         URL originalUrl = new URL(url);
@@ -42,7 +42,7 @@ public class JsonRpcUtilsTest {
     @Test
     public void testValidJsonRpcRequestWithNoMethodKey() throws Exception {
         String payload = "{ \"jsonrpc\": \"2.0\", \"id\": 1 }";
-        String url = "http://localhost:8080/api";
+        String url = "http://localhost:8080/mcp";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams result = JsonRpcUtils.parseJsonRpcResponse(responseParams);
         URL originalUrl = new URL(url);
@@ -82,7 +82,7 @@ public class JsonRpcUtilsTest {
     @Test
     public void testIsJsonRpcRequestTrue() {
         String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"foo\" }";
-        HttpResponseParams responseParams = createHttpResponseParams(payload, "http://localhost:8080/api");
+        HttpResponseParams responseParams = createHttpResponseParams(payload, "http://localhost:8080/mcp");
         assertTrue(JsonRpcUtils.isJsonRpcRequest(responseParams));
     }
 
@@ -94,9 +94,16 @@ public class JsonRpcUtilsTest {
     }
 
     @Test
+    public void testIsJsonRpcRequestFalseForNonMcpPath() {
+        String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"foo\" }";
+        HttpResponseParams responseParams = createHttpResponseParams(payload, "http://localhost:8080/api");
+        assertFalse(JsonRpcUtils.isJsonRpcRequest(responseParams));
+    }
+
+    @Test
     public void testJsonRpcRequestWithMethodAndQueryParams() throws Exception {
         String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"testMethod\", \"id\": 1 }";
-        String url = "http://localhost:8080/api?foo=bar&baz=qux";
+        String url = "http://localhost:8080/mcp?foo=bar&baz=qux";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams result = JsonRpcUtils.parseJsonRpcResponse(responseParams);
         URL finalUrl = new URL(result.getRequestParams().getURL());
@@ -107,7 +114,7 @@ public class JsonRpcUtilsTest {
     @Test
     public void testJsonRpcRequestWithEmptyMethodAndQueryParams() throws Exception {
         String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"\", \"id\": 1 }";
-        String url = "http://localhost:8080/api?foo=bar&baz=qux";
+        String url = "http://localhost:8080/mcp?foo=bar&baz=qux";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams result = JsonRpcUtils.parseJsonRpcResponse(responseParams);
         URL originalUrl = new URL(url);

@@ -42,6 +42,7 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.CollectionWiseTestingEndpoints;
 import com.akto.dto.testing.CustomTestingEndpoints;
+import com.akto.dto.testing.MultiCollectionTestingEndpoints;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestResult.Confidence;
@@ -718,6 +719,18 @@ public class Utils {
                 CollectionWiseTestingEndpoints testingEndpoints = (CollectionWiseTestingEndpoints) endpoints;
                 int apiCollectionId = testingEndpoints.getApiCollectionId();
                 return isCollectionDemo(apiCollectionId);
+            } else if(endpoints.getType().equals(TestingEndpoints.Type.MULTI_COLLECTION)){
+                MultiCollectionTestingEndpoints testingEndpoints = (MultiCollectionTestingEndpoints) endpoints;
+                List<Integer> apiCollectionIds = testingEndpoints.getApiCollectionIds();
+                if(apiCollectionIds == null || apiCollectionIds.isEmpty()){
+                    return false;
+                }
+                for(Integer apiCollectionId : apiCollectionIds){
+                    if(isCollectionDemo(apiCollectionId)){
+                        return true;
+                    }
+                }
+                return false;
             }else{
                 int apiCollectionId = -1;
                 CustomTestingEndpoints testingEndpoints = (CustomTestingEndpoints) endpoints;
