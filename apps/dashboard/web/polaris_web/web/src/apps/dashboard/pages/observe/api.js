@@ -1035,9 +1035,9 @@ export default {
             method: 'get'
         })
     },
-    getIconsForHostnames(hostnames){
+    fetchIconsForHostnames(hostnames){
         return request({
-            url: '/api/getIconsForHostnames',
+            url: '/api/fetchIconsForHostnames',
             method: 'post',
             data: { hostnames }
         })
