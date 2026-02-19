@@ -122,22 +122,19 @@ public class SampleDeduplicationFilter {
 
     /**
      * Checks if an API key exists in any of the Bloom filters.
-     * Searches from newest to oldest filter for efficiency.
      *
      * @param apiKey The API key to check
      * @return true if the key might exist in any filter, false otherwise
      */
     private static boolean isKeyInFilters(String apiKey) {
-        // Check all filters from newest to oldest
-        for (int i = FILTER_COUNT; i > 0; i--) {
-            int filterIndex = (currentFilterIndex + i) % FILTER_COUNT;
-            try {
-                BloomFilter<CharSequence> filter = filterList.get(filterIndex);
-                if (filter.mightContain(apiKey)) {
-                    return true;
-                }
-            } catch (Exception e) {
-                logger.warn("Error checking filter at index {}: {}", filterIndex, e.getMessage());
+        if (apiKey == null) {
+            return false;
+        }
+
+        // Check all filters (both current and previous)
+        for (BloomFilter<CharSequence> filter : filterList) {
+            if (filter != null && filter.mightContain(apiKey)) {
+                return true;
             }
         }
         return false;
