@@ -198,6 +198,7 @@ public class ArcadeWebhookAction extends ActionSupport {
         tag.put("gen-ai", "Gen AI");
         requestData.put("tag", objectMapper.writeValueAsString(tag));
 
+        requestData.put("contextSource", "AGENTIC");
         requestData.put("ip", DEFAULT_IP);
         requestData.put("time", String.valueOf(System.currentTimeMillis() / 1000));
         requestData.put("type", "HTTP/1.1");
