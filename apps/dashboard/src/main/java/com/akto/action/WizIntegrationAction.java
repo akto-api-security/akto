@@ -177,9 +177,9 @@ public class WizIntegrationAction extends UserAction {
             WizIntegrationUtils.uploadEnrichmentJSONToS3(enrichmentJSON, signedS3Url);
 
             // todo: update finding url for each issue
-            for (TestingIssuesId testingIssuesId : testingIssuesIdList) {
-                WizIntegrationUtils.updateWizFindingUrl(testingIssuesId);
-            }
+            // for (TestingIssuesId testingIssuesId : testingIssuesIdList) {
+            //     WizIntegrationUtils.updateWizFindingUrl(testingIssuesId);
+            // }
         } catch (Exception e) {
             String errString = "Error uploading enrichment JSON to Wiz: " + e.getMessage();
             logger.errorAndAddToDb(errString);
