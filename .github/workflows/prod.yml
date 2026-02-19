@@ -149,6 +149,7 @@ jobs:
           fi
 
       - name: Send Github release notification to Slack - Mini-Runtime
+        id: slack-mini-runtime
         if: ${{ github.event.inputs.mini-runtime == 'true' }}
         uses: slackapi/slack-github-action@v1.23.0
         with:
@@ -161,6 +162,7 @@ jobs:
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       - name: Send Github release notification to Slack - Mini-Testing
+        id: slack-mini-testing
         if: ${{ github.event.inputs.mini-testing == 'true' }}
         uses: slackapi/slack-github-action@v1.23.0
         with:
@@ -173,6 +175,7 @@ jobs:
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       - name: Send Github release notification to Slack - Testing-Db-Layer
+        id: slack-testing-db-layer
         if: ${{ github.event.inputs.testing-db-layer == 'true' }}
         uses: slackapi/slack-github-action@v1.23.0
         with:
@@ -185,6 +188,7 @@ jobs:
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       - name: Send Github release notification to Slack - Mini-Runtime-Service
+        id: slack-mini-runtime-service
         if: ${{ github.event.inputs.mini-runtime-service == 'true' }}
         uses: slackapi/slack-github-action@v1.23.0
         with:
