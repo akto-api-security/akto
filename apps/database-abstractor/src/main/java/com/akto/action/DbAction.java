@@ -99,14 +99,6 @@ import org.bson.types.ObjectId;
 
 import lombok.Getter;
 import lombok.Setter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 public class DbAction extends ActionSupport {
     static final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
@@ -2642,6 +2634,18 @@ public class DbAction extends ActionSupport {
         }
         return Action.SUCCESS.toUpperCase();
     }
+
+    public String insertAgenticTestingLog() {
+        try {
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            DbLayer.insertAgenticTestingLog(dbLog);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertAgenticTestingLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
 
     public String insertProtectionLog() {
         try {
