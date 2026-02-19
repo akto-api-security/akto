@@ -3487,6 +3487,28 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void insertAgenticTestingLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertAgenticTestingLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.info("non 2xx response in insertAgenticTestingLog");
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.error("error in insertAgenticTestingLog " + e);
+            return;
+        }
+    }
+
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("dependencyNodeList", dependencyNodeList);
