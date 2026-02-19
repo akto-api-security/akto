@@ -1,6 +1,6 @@
 package com.akto.testing;
 
-import java.io.IOException;
+import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -65,7 +65,7 @@ public class HostValidator {
         Response response = null;
         try {
             response = call.execute();
-        } catch (IOException e) {
+        } catch (ConnectException e) {
             if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
                 loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
             } else {
