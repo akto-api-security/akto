@@ -243,7 +243,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     const steps = getStepsWithSummary();
 
-    // Filter collections when component mounts or allCollections changes
+    useEffect(() => {
+        document.body.classList.add('guardrail-page-open');
+        return () => document.body.classList.remove('guardrail-page-open');
+    }, []);
+
     useEffect(() => {
         if (allCollections && allCollections.length > 0) {
             filterCollections();

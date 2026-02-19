@@ -158,9 +158,7 @@
     border-top: 1px solid #E1E3E5;
 }
 
-/* Polaris Combobox doesn't pass fixed=true to Popover, so the overlay
-   uses position: absolute with no z-index — invisible behind the wrapper. */
-.Polaris-PositionedOverlay {
+body.guardrail-page-open .Polaris-PositionedOverlay {
     position: fixed !important;
     z-index: 1001 !important;
 }
