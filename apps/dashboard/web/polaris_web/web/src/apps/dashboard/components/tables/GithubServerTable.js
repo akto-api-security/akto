@@ -104,9 +104,6 @@ function GithubServerTable(props) {
 
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.filterKey || e.value] = 'OR'; return map }, {})
 
-    // TODO: Support pagination to export all pages (not just current page)
-    // TODO: Support exporting only selected items when rows are selected in the table
-    // TODO: Support exporting when filters are enabled
   useEffect(() => {
     if (!filtersWrapRef.current) return
     const actionWrap = filtersWrapRef.current.querySelector('[class*="ActionWrap"]')
@@ -658,11 +655,29 @@ function GithubServerTable(props) {
     return String(val)
   }
 
-  const handleExportCsv = useCallback(() => {
+  const handleExportCsv = useCallback(async () => {
     if (props.onExportCsv) return props.onExportCsv()
     const fileName = props.csvFileName || props.resourceName?.plural || "export"
-    func.exportTableAsCSV(props.headers, data, fileName)
-  }, [props.onExportCsv, props.headers, props.csvFileName, data])
+
+    // Fetch all data (not just current page) for export
+    let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
+    let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
+    appliedFilters.forEach((filter) => {
+      const value = filter.value;
+      if (value && typeof value === 'object' && value.values !== undefined) {
+        filters[filter.key] = props.supportsNegationFilter ? value : value.values;
+      } else if (Array.isArray(value)) {
+        filters[filter.key] = props.supportsNegationFilter ? { values: value, negated: false } : value;
+      } else {
+        filters[filter.key] = value;
+      }
+    });
+
+    func.setToast(true, false, "Exporting CSV, please wait...")
+    const exportLimit = Math.max(total || 0, 10000);
+    const allData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, 0, exportLimit, filters, filterOperators, queryValue);
+    func.exportTableAsCSV(props.headers, allData?.value || data, fileName)
+  }, [props.onExportCsv, props.headers, props.csvFileName, data, sortSelected, appliedFilters, total, queryValue, props.fetchData])
 
   return (
     <div className={tableClass} style={{display: "flex", flexDirection: "column", gap: "20px"}}>
