@@ -3,8 +3,11 @@ package com.akto.action;
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
 import com.akto.utils.KafkaUtils;
+import com.akto.publisher.KafkaDataPublisher;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -18,6 +21,7 @@ public class HttpProxyAction extends ActionSupport {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpProxyAction.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final Gateway gateway = Gateway.getInstance();
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     // Initialize Gateway with KafkaDataPublisher
     static {
@@ -26,7 +30,6 @@ public class HttpProxyAction extends ActionSupport {
     }
 
     private String url;
-    private String path;
     private Map<String, Object> request;
     private Map<String, Object> response;
 
@@ -202,51 +205,36 @@ public class HttpProxyAction extends ActionSupport {
     @SuppressWarnings("unchecked")
     private String executeSyncGuardrailCheck(Map<String, Object> aktoFormat) {
         try {
-            // Set class properties from aktoFormat
-            this.url = (String) aktoFormat.get("url");
-            this.path = (String) aktoFormat.get("path");
-            this.request = (Map<String, Object>) aktoFormat.get("request");
-            this.response = null;  // No response in input guardrail check
+            // Build flat request map with guardrails enabled, no ingestion
+            Map<String, Object> requestData = new HashMap<>(aktoFormat);
+            requestData.put("guardrails", "true");
+            requestData.putIfAbsent("akto_connector", "truefoundry");
 
-            // Force guardrails validation
-            this.guardrails = "true";
-            this.ingest_data = null;  // No ingestion
-
-            // Default connector name
-            if (this.akto_connector == null || this.akto_connector.isEmpty()) {
-                this.akto_connector = "truefoundry";
-            }
-
-            // Call httpProxy synchronously
-            String result = httpProxy();
+            // Call gateway directly with the flat format
+            Map<String, Object> result = gateway.processHttpProxy(requestData);
 
             // Check if guardrails blocked the request
-            if (Action.SUCCESS.toUpperCase().equals(result) && data != null) {
-                Map<String, Object> guardrailsResult = (Map<String, Object>) data.get("guardrailsResult");
+            // GuardrailsClient returns lowercase "allowed" and "reason" keys
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                Map<String, Object> guardrailsResult = (Map<String, Object>) result.get("guardrailsResult");
                 if (guardrailsResult != null) {
-                    Boolean allowed = (Boolean) guardrailsResult.get("Allowed");
+                    Boolean allowed = (Boolean) guardrailsResult.get("allowed");
                     if (allowed != null && !allowed) {
-                        // Request blocked - return HTTP 400
-                        String reason = (String) guardrailsResult.get("Reason");
+                        String reason = (String) guardrailsResult.get("reason");
                         loggerMaker.warn("TrueFoundry sync request blocked by guardrails: " + reason);
 
-                        // Create blocked response for ingestion
-                        Map<String, Object> blockedResponse = new HashMap<>();
+                        // Build flat blocked-response fields for async ingestion
                         Map<String, Object> blockedBody = new HashMap<>();
                         blockedBody.put("x-blocked-by", "Akto Proxy");
-                        blockedResponse.put("body", blockedBody);
-                        blockedResponse.put("statusCode", 400);
-                        blockedResponse.put("status", "forbidden");
-                        
-                        Map<String, Object> responseHeaders = new HashMap<>();
-                        responseHeaders.put("content-type", "application/json");
-                        blockedResponse.put("headers", responseHeaders);
-                        
-                        // Create modified aktoFormat with blocked response
-                        Map<String, Object> aktoFormatWithResponse = new HashMap<>(aktoFormat);
-                        aktoFormatWithResponse.put("response", blockedResponse);
+                        Map<String, String> respHeaders = new HashMap<>();
+                        respHeaders.put("content-type", "application/json");
 
-                        // Ingest data on separate thread with blocked response
+                        Map<String, Object> aktoFormatWithResponse = new HashMap<>(aktoFormat);
+                        aktoFormatWithResponse.put("responsePayload", toJsonString(blockedBody));
+                        aktoFormatWithResponse.put("responseHeaders", toJsonString(respHeaders));
+                        aktoFormatWithResponse.put("statusCode", "400");
+                        aktoFormatWithResponse.put("status", "forbidden");
+
                         loggerMaker.info("TrueFoundry: Spawning async ingestion for blocked request");
                         executeAsync(aktoFormatWithResponse, false, true);
 
@@ -272,43 +260,31 @@ public class HttpProxyAction extends ActionSupport {
     }
 
     /**
-     * Execute guardrails validation and/or data ingestion asynchronously
-     * @param aktoFormat The data in Akto format
+     * Execute guardrails validation and/or data ingestion asynchronously.
+     * @param aktoFormat The data in flat Akto format (as returned by convertTrueFoundryToAktoFormat)
      * @param enableGuardrails Whether to enable guardrails validation
      * @param enableIngestion Whether to enable data ingestion
      */
     private void executeAsync(Map<String, Object> aktoFormat, boolean enableGuardrails, boolean enableIngestion) {
-        // Build thread name based on enabled features
-        String threadName = "truefoundry-async-" + 
-                           (enableGuardrails ? "guardrails-" : "") + 
+        String threadName = "truefoundry-async-" +
+                           (enableGuardrails ? "guardrails-" : "") +
                            (enableIngestion ? "ingestion" : "");
-        
-        // Spawn background thread
+
         new Thread(() -> {
             try {
                 loggerMaker.info("TrueFoundry: Starting " + threadName);
 
-                // Build proxy data
-                Map<String, Object> proxyData = new HashMap<>();
-                proxyData.put("url", aktoFormat.get("url"));
-                proxyData.put("path", aktoFormat.get("path"));
-                proxyData.put("request", aktoFormat.get("request"));
-                proxyData.put("response", aktoFormat.get("response"));
-                proxyData.put("akto_connector", "truefoundry"); 
-
-                // Set URL query params based on flags
-                Map<String, Object> urlQueryParams = new HashMap<>();
+                // Copy all flat fields and add control flags directly on the map
+                Map<String, Object> requestData = new HashMap<>(aktoFormat);
+                requestData.put("akto_connector", "truefoundry");
                 if (enableGuardrails) {
-                    urlQueryParams.put("guardrails", "true");
+                    requestData.put("guardrails", "true");
                 }
                 if (enableIngestion) {
-                    urlQueryParams.put("ingest_data", "true");
+                    requestData.put("ingest_data", "true");
                 }
-                urlQueryParams.put("akto_connector", "truefoundry");
-                proxyData.put("urlQueryParams", urlQueryParams);
 
-                // Process guardrails and/or ingestion
-                gateway.processHttpProxy(proxyData);
+                gateway.processHttpProxy(requestData);
 
                 loggerMaker.info("TrueFoundry: " + threadName + " completed");
 
@@ -429,130 +405,109 @@ public class HttpProxyAction extends ActionSupport {
     }
 
     /**
-     * Convert TrueFoundry format to Akto format
-     * 
-     * TrueFoundry format:
+     * Convert TrueFoundry format to the flat Akto format expected by gateway.processHttpProxy().
+     *
+     * TrueFoundry input format:
      * {
      *   "requestBody": { "messages": [...], "model": "...", ... },
      *   "responseBody": { "choices": [...], ... },  // optional
      *   "config": { "check_content": true },
-     *   "context": { "user": {...}, "metadata": {...} }
+     *   "context": { "user": {...}, "metadata": { "ip_address": "..." } }
      * }
-     * 
-     * Akto format:
+     *
+     * Flat Akto format (what processHttpProxy expects):
      * {
-     *   "url": "...",
-     *   "path": "...",
-     *   "request": {
-     *     "method": "POST",
-     *     "headers": { "content-type": "application/json" },
-     *     "body": { "messages": [...] },
-     *     "queryParams": {},
-     *     "metadata": { "tag": { "gen-ai": "Gen AI" } }
-     *   },
-     *   "response": { ... } // optional
+     *   "path": "/api/llm/chat/completions",
+     *   "method": "POST",
+     *   "requestHeaders": "{\"content-type\":\"application/json\"}",
+     *   "requestPayload": "<JSON string of requestBody>",
+     *   "responseHeaders": "{\"content-type\":\"application/json\"}",  // if response present
+     *   "responsePayload": "<JSON string of responseBody>",            // if response present
+     *   "statusCode": "200",                                           // if response present
+     *   "status": "OK",                                                // if response present
+     *   "ip": "<extracted from context.metadata.ip_address>",
+     *   "tag": "truefoundry",
+     *   "source": "TRUEFOUNDRY",
+     *   "contextSource": "truefoundry",
+     *   "metadata": "<JSON string with truefoundry_context, truefoundry_config, tag>"
      * }
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> convertTrueFoundryToAktoFormat(Map<String, Object> tfInput) {
-        Map<String, Object> aktoFormat = new HashMap<>();
+        Map<String, Object> flatMap = new HashMap<>();
 
-        // Set URL and path (using defaults for TrueFoundry)
-        aktoFormat.put("url", "https://app.truefoundry.com");
-        aktoFormat.put("path", "/api/llm/chat/completions");
+        flatMap.put("path", "/api/llm/chat/completions");
+        flatMap.put("method", "POST");
 
-        // Extract IP address from TrueFoundry context for later use
+        // Request headers
+        Map<String, String> reqHeaders = new HashMap<>();
+        reqHeaders.put("content-type", "application/json");
+        flatMap.put("requestHeaders", toJsonString(reqHeaders));
+
+        // Request payload — serialise requestBody map to JSON string
+        Map<String, Object> requestBody = (Map<String, Object>) tfInput.get("requestBody");
+        flatMap.put("requestPayload", requestBody != null ? toJsonString(requestBody) : "{}");
+
+        // Extract IP from context.metadata.ip_address
         String extractedIp = null;
         if (tfInput.containsKey("context")) {
             Map<String, Object> context = (Map<String, Object>) tfInput.get("context");
             if (context != null && context.containsKey("metadata")) {
                 Map<String, Object> contextMetadata = (Map<String, Object>) context.get("metadata");
                 if (contextMetadata != null && contextMetadata.containsKey("ip_address")) {
-                    extractedIp = (String) contextMetadata.get("ip_address");
-                    if (extractedIp != null && !extractedIp.isEmpty()) {
+                    Object ip = contextMetadata.get("ip_address");
+                    if (ip != null && !ip.toString().isEmpty()) {
+                        extractedIp = ip.toString();
                         loggerMaker.info("Extracted IP address from TrueFoundry context: " + extractedIp);
                     }
                 }
             }
         }
-
-        // Build request object
-        Map<String, Object> aktoRequest = new HashMap<>();
-        aktoRequest.put("method", "POST");
-
-        // Set headers
-        Map<String, Object> headers = new HashMap<>();
-        headers.put("content-type", "application/json");
-        aktoRequest.put("headers", headers);
-
-        // Extract requestBody from TrueFoundry format
-        Map<String, Object> requestBody = (Map<String, Object>) tfInput.get("requestBody");
-        if (requestBody != null) {
-            aktoRequest.put("body", new HashMap<>(requestBody));
-        } else {
-            aktoRequest.put("body", new HashMap<>());
+        if (extractedIp != null) {
+            flatMap.put("ip", extractedIp);
         }
 
-        // Set queryParams
-        aktoRequest.put("queryParams", new HashMap<>());
+        // Response fields — only populate when a responseBody is present
+        Map<String, Object> responseBody = (Map<String, Object>) tfInput.get("responseBody");
+        if (responseBody != null && !responseBody.isEmpty()) {
+            Map<String, String> respHeaders = new HashMap<>();
+            respHeaders.put("content-type", "application/json");
+            flatMap.put("responseHeaders", toJsonString(respHeaders));
+            flatMap.put("responsePayload", toJsonString(responseBody));
+            flatMap.put("statusCode", "200");
+            flatMap.put("status", "OK");
+        }
 
-        // Build metadata
-        Map<String, Object> metadata = new HashMap<>();
+        // Metadata — serialise as JSON string
+        Map<String, Object> metadataMap = new HashMap<>();
         Map<String, Object> tags = new HashMap<>();
         tags.put("gen-ai", "Gen AI");
-        metadata.put("tag", tags);
-
-        // Add IP address to metadata if extracted
-        if (extractedIp != null && !extractedIp.isEmpty()) {
-            metadata.put("ip", extractedIp);
+        metadataMap.put("tag", tags);
+        if (extractedIp != null) {
+            metadataMap.put("ip", extractedIp);
         }
-
-        // Add TrueFoundry context to metadata
-        if (tfInput.containsKey("context")) {
-            Map<String, Object> context = (Map<String, Object>) tfInput.get("context");
-            if (context != null) {
-                metadata.put("truefoundry_context", context);
-            }
+        if (tfInput.containsKey("context") && tfInput.get("context") != null) {
+            metadataMap.put("truefoundry_context", tfInput.get("context"));
         }
-
-        // Add TrueFoundry config to metadata if available
-        if (tfInput.containsKey("config")) {
-            Map<String, Object> config = (Map<String, Object>) tfInput.get("config");
-            if (config != null) {
-                metadata.put("truefoundry_config", config);
-            }
+        if (tfInput.containsKey("config") && tfInput.get("config") != null) {
+            metadataMap.put("truefoundry_config", tfInput.get("config"));
         }
+        flatMap.put("metadata", toJsonString(metadataMap));
 
-        aktoRequest.put("metadata", metadata);
-        aktoFormat.put("request", aktoRequest);
+        flatMap.put("tag", "truefoundry");
+        flatMap.put("source", "TRUEFOUNDRY");
+        flatMap.put("contextSource", "truefoundry");
 
-        // Handle response if present
-        if (tfInput.containsKey("responseBody")) {
-            Map<String, Object> responseBody = (Map<String, Object>) tfInput.get("responseBody");
-            if (responseBody != null && !responseBody.isEmpty()) {
-                Map<String, Object> aktoResponse = new HashMap<>();
-                
-                // Set response body
-                aktoResponse.put("body", new HashMap<>(responseBody));
-                
-                // Set response headers
-                Map<String, Object> responseHeaders = new HashMap<>();
-                responseHeaders.put("content-type", "application/json");
-                aktoResponse.put("headers", responseHeaders);
-                
-                // Set status code and status
-                aktoResponse.put("statusCode", 200);
-                aktoResponse.put("status", "OK");
-                
-                aktoFormat.put("response", aktoResponse);
-            } else {
-                aktoFormat.put("response", null);
-            }
-        } else {
-            aktoFormat.put("response", null);
+        loggerMaker.info("Converted TrueFoundry format to flat Akto format");
+        return flatMap;
+    }
+
+    private String toJsonString(Object obj) {
+        try {
+            return objectMapper.writeValueAsString(obj);
+        } catch (Exception e) {
+            loggerMaker.error("Failed to serialize to JSON: " + e.getMessage(), e);
+            return "{}";
         }
-
-        loggerMaker.info("Converted TrueFoundry format to Akto format");
-        return aktoFormat;
     }
 }
