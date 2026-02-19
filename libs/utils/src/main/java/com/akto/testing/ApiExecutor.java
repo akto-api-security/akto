@@ -47,7 +47,7 @@ public class ApiExecutor {
             boolean rateLimitHit = true;
             while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
                 if(rateLimitHit){
-                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
                         loggerMaker.infoAndAddToDb("Rate limit hit, sleeping");
                     }else {
                         System.out.println("Rate limit hit, sleeping");
@@ -58,7 +58,7 @@ public class ApiExecutor {
                 i++;
 
                 if (i%30 == 0) {
-                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
                         loggerMaker.infoAndAddToDb("waiting for rate limit availability");
                     }else{
                         System.out.println("waiting for rate limit availability");
@@ -113,13 +113,13 @@ public class ApiExecutor {
                     for (byte b : grpcBody) {
                         builder.append(b).append(",");
                     }
-                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
                         loggerMaker.infoAndAddToDb(builder.toString());
                     }else {
                         System.out.println(builder.toString());
                     }
                     String responseBase64Encoded = Base64.getEncoder().encodeToString(grpcBody);
-                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
                         loggerMaker.infoAndAddToDb("grpc response base64 encoded:" + responseBase64Encoded);
                     }else {
                         System.out.println("grpc response base64 encoded:" + responseBase64Encoded);
@@ -140,7 +140,7 @@ public class ApiExecutor {
                     }
                 }
             } catch (IOException e) {
-                if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
                     loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
                 } else {
                     System.out.println("Error while parsing response body: " + e);
@@ -148,7 +148,7 @@ public class ApiExecutor {
                 body = "{}";
             }
         } catch (IOException e) {
-            if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+            if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
                 loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
             } else {
                 System.out.println("Error while executing request " + request.url() + ": " + e);
@@ -400,7 +400,7 @@ public class ApiExecutor {
 
         String url = prepareUrl(request, testingRunConfig);
 
-        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
+        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog") || url.contains("insertAgenticTestingLog"))) {
             loggerMaker.debugAndAddToDb("Final url is: " + url, LogDb.TESTING);
         }
         request.setUrl(url);
@@ -434,7 +434,7 @@ public class ApiExecutor {
             case OTHER:
                 throw new Exception("Invalid method name");
         }
-        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
+        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog") || url.contains("insertAgenticTestingLog"))) {
             loggerMaker.debugAndAddToDb("Received response from: " + url, LogDb.TESTING);
         }
 
