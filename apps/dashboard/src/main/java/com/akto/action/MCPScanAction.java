@@ -67,8 +67,7 @@ public class MCPScanAction extends UserAction {
                     McpAuditInfo auditInfo = new McpAuditInfo(
                             Context.now(), "", AKTO_MCP_SERVER_TAG , 0,
                             hostName, "", null,
-                            collectionId,
-                            null
+                            collectionId
                     );
 
                     setAuditData(auditInfo);

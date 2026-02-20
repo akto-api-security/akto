@@ -40,7 +40,7 @@ public class McpAuditInfo {
         return this.id != null ? this.id.toHexString() : null;
     }
 
-    public McpAuditInfo(int lastDetected, String markedBy, String type, int updatedTimestamp, String resourceName, String remarks, Set<ApiInfo.ApiAccessType> apiAccessTypes, int hostCollectionId, ComponentRiskAnalysis componentRiskAnalysis) {
+    public McpAuditInfo(int lastDetected, String markedBy, String type, int updatedTimestamp, String resourceName, String remarks, Set<ApiInfo.ApiAccessType> apiAccessTypes, int hostCollectionId) {
         this.lastDetected = lastDetected;
         this.markedBy = markedBy;
         this.type = type;
@@ -49,6 +49,5 @@ public class McpAuditInfo {
         this.remarks = remarks;
         this.apiAccessTypes = apiAccessTypes;
         this.hostCollectionId = hostCollectionId;
-        this.componentRiskAnalysis = componentRiskAnalysis;
     }
 }
