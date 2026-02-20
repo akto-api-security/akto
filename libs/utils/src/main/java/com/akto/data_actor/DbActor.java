@@ -715,6 +715,10 @@ public class DbActor extends DataActor {
         return DbLayer.fetchMcpAuditInfo(updatedAfter, remarksList);
     }
 
+    public void updateMcpAuditInfo(String componentType, String componentName, ComponentRiskAnalysis componentRiskAnalysis) {
+        DbLayer.updateMcpAuditInfo(componentType, componentName, componentRiskAnalysis);
+    }
+
     public List<SlackWebhook> fetchSlackWebhooks() {
         return DbLayer.fetchSlackWebhooks();
     }

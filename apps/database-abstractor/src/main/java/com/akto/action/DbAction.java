@@ -139,6 +139,15 @@ public class DbAction extends ActionSupport {
     private String importType;
     @Getter @Setter
     McpAuditInfo auditInfo;
+
+    @Getter @Setter
+    private String componentType;
+
+    @Getter @Setter
+    private String componentName;
+
+    @Getter @Setter
+    private ComponentRiskAnalysis componentRiskAnalysis;
     
     // MCP Recon fields
     @Getter @Setter
@@ -3294,6 +3303,16 @@ public class DbAction extends ActionSupport {
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error insertMCPAuditDataLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateMcpAuditInfo() {
+        try {
+            DbLayer.updateMcpAuditInfo(componentType, componentName, componentRiskAnalysis);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateMcpAuditInfo " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();

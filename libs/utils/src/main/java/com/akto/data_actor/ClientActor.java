@@ -4352,6 +4352,11 @@ public class ClientActor extends DataActor {
     }
 
     @Override
+    public void updateMcpAuditInfo(String type, String resourceName, ComponentRiskAnalysis componentRiskAnalysis) {
+
+    }
+
+    @Override
     public void storeConversationResults(List<AgentConversationResult> conversationResults) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();

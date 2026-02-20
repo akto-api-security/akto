@@ -2503,6 +2503,21 @@ public class DbLayer {
         }
     }
 
+    public static void updateMcpAuditInfo(String componentType, String componentName, ComponentRiskAnalysis componentRiskAnalysis) {
+        if (componentType == null || componentName == null || componentRiskAnalysis == null) {
+            return;
+        }
+        Bson filter = Filters.and(
+                Filters.eq("type", componentType),
+                Filters.eq("resourceName", componentName)
+        );
+        Bson updates = Updates.combine(
+                Updates.set("componentRiskAnalysis", componentRiskAnalysis),
+                Updates.set("updatedTimestamp", Context.now())
+        );
+        McpAuditInfoDao.instance.updateOneNoUpsert(filter, updates);
+    }
+
     public static List<GuardrailPolicies> fetchGuardrailPolicies(Integer updatedAfter, CONTEXT_SOURCE contextSource) {
         try {
             List<Bson> filters = new ArrayList<>();
