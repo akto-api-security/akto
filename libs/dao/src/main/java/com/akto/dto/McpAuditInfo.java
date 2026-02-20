@@ -28,8 +28,7 @@ public class McpAuditInfo {
     private String remarks;
     private Set<ApiInfo.ApiAccessType> apiAccessTypes;
     private int hostCollectionId;
-    private Set<String> flaggedWords;
-    private Severity severity;
+    private ComponentRiskAnalysis componentRiskAnalysis;
 
     // Conditional approval fields
     private Map<String, Object> approvalConditions;
@@ -48,7 +47,7 @@ public class McpAuditInfo {
         String remarks,
         Set<ApiInfo.ApiAccessType> apiAccessTypes,
         int hostCollectionId,
-        Set<String> flaggedWords) {
+        ComponentRiskAnalysis componentRiskAnalysis) {
         this.lastDetected = lastDetected;
         this.markedBy = markedBy;
         this.type = type;
@@ -57,8 +56,7 @@ public class McpAuditInfo {
         this.remarks = remarks;
         this.apiAccessTypes = apiAccessTypes;
         this.hostCollectionId = hostCollectionId;
-        this.flaggedWords = flaggedWords;
-        this.severity = (CollectionUtils.isNotEmpty(flaggedWords) ? Severity.HIGH : null);
+        this.componentRiskAnalysis = componentRiskAnalysis;
     }
 
 }
