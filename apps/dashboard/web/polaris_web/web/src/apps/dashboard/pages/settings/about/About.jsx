@@ -401,7 +401,7 @@ function About() {
             } else {
                 const totalCollections = res?.totalCollections || 0
                 const updatedCollections = res?.updatedCollections || 0
-                func.setToast(true, false, `Collection access types reset successfully. Updated ${updatedCollections} out of ${totalCollections} collections.`)
+                func.setToast(true, false, `Collection access types reset successfully.`)
             }
             setDisableResetAccessTypeButton(false)
         }).catch(() => {

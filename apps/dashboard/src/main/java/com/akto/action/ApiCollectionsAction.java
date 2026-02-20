@@ -65,6 +65,7 @@ import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
 import com.akto.cache.IconCache;
+import com.akto.utils.scripts.AcesssTypeCollectionLevel;
 
 public class ApiCollectionsAction extends UserAction {
 
@@ -1748,7 +1749,7 @@ public class ApiCollectionsAction extends UserAction {
             Runnable r = () -> {
                 Context.accountId.set(accountId);
                 try {
-                    doResetCollectionAccessTypes();
+                    AcesssTypeCollectionLevel.doResetCollectionAccessTypesOptimized();
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in resetCollectionAccessTypes (background)", LogDb.DASHBOARD);
                 }
@@ -1768,140 +1769,5 @@ public class ApiCollectionsAction extends UserAction {
         }
     }
 
-    private static final int BATCH_SIZE = 200;
-
-    private void doResetCollectionAccessTypes() {
-
-        Integer lastId = null;
-        int totalProcessed = 0;
-        int totalUpdated = 0;
-        int batchNumber = 0;
-
-        loggerMaker.infoAndAddToDb(
-                "Starting scalable resetCollectionAccessTypes for account: " + Context.accountId.get(),
-                LogDb.DASHBOARD
-        );
-
-        while (true) {
-
-            batchNumber++;
-
-            loggerMaker.infoAndAddToDb(
-                    "Starting batch #" + batchNumber +
-                            " | lastId: " + lastId,
-                    LogDb.DASHBOARD
-            );
-
-            Bson filter = lastId == null
-                    ? new BasicDBObject()
-                    : Filters.gt("_id", lastId);
-
-            List<ApiCollection> collections = ApiCollectionsDao.instance.getMCollection()
-                    .find(filter)
-                    .sort(Sorts.ascending("_id"))
-                    .limit(BATCH_SIZE)
-                    .projection(Projections.include("_id", "name"))
-                    .into(new ArrayList<>());
-
-            if (collections.isEmpty()) {
-                loggerMaker.infoAndAddToDb(
-                        "No more collections found. Ending processing.",
-                        LogDb.DASHBOARD
-                );
-                break;
-            }
-
-            int batchProcessed = 0;
-            int batchUpdated = 0;
-
-            for (ApiCollection collection : collections) {
-
-                lastId = collection.getId();
-                totalProcessed++;
-                batchProcessed++;
-
-                loggerMaker.infoAndAddToDb(
-                        "Starting collection processing | id: " +
-                                collection.getId() + " | name: " + collection.getName(),
-                        LogDb.DASHBOARD
-                );
-
-                String accessType = computeAccessTypeOptimized(collection.getId());
-
-                loggerMaker.infoAndAddToDb(
-                        "Computed accessType for collection " +
-                                collection.getId() + " : " + accessType,
-                        LogDb.DASHBOARD
-                );
-
-                if (accessType != null) {
-                    ApiCollectionsDao.instance.updateOne(
-                            Filters.eq("_id", collection.getId()),
-                            Updates.set("accessType", accessType)
-                    );
-
-                    totalUpdated++;
-                    batchUpdated++;
-                }
-
-                loggerMaker.infoAndAddToDb(
-                        "Finished collection processing | id: " +
-                                collection.getId(),
-                        LogDb.DASHBOARD
-                );
-            }
-
-            loggerMaker.infoAndAddToDb(
-                    "Finished batch #" + batchNumber +
-                            " | batchProcessed: " + batchProcessed +
-                            " | batchUpdated: " + batchUpdated +
-                            " | totalProcessed: " + totalProcessed +
-                            " | totalUpdated: " + totalUpdated,
-                    LogDb.DASHBOARD
-            );
-        }
-
-        loggerMaker.infoAndAddToDb(
-                "Completed resetCollectionAccessTypes | totalProcessed: " +
-                        totalProcessed + " | totalUpdated: " + totalUpdated,
-                LogDb.DASHBOARD
-        );
-    }
-
-
-    private String computeAccessTypeOptimized(int collectionId) {
-        Bson filter = Filters.eq(ApiInfo.ID_API_COLLECTION_ID, collectionId);
-
-        FindIterable<ApiInfo> cursor = ApiInfoDao.instance.getMCollection()
-                .find(filter)
-                .projection(Projections.include("apiAccessTypes"));
-
-        boolean hasPublic = false;
-        boolean hasPrivateOrThirdParty = false;
-
-        for (ApiInfo api : cursor) {
-
-            Set<ApiInfo.ApiAccessType> accessTypes = api.getApiAccessTypes();
-            if (accessTypes == null) continue;
-
-            if (accessTypes.contains(ApiInfo.ApiAccessType.PUBLIC)) {
-                hasPublic = true;
-            }
-
-            if (accessTypes.contains(ApiInfo.ApiAccessType.PRIVATE)
-                    || accessTypes.contains(ApiInfo.ApiAccessType.THIRD_PARTY)) {
-                hasPrivateOrThirdParty = true;
-            }
-
-            if (hasPublic && hasPrivateOrThirdParty) {
-                return "Both";
-            }
-        }
-
-        if (hasPublic) return "First Party";
-        if (hasPrivateOrThirdParty) return "Third Party";
-
-        return null;
-    }
 
 }
