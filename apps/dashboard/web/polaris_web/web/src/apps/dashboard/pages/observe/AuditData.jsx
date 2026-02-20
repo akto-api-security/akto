@@ -1,5 +1,5 @@
 
-import { Text, HorizontalStack, VerticalStack, Box } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box, Tooltip, Badge } from "@shopify/polaris"
 import { useEffect, useReducer, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
@@ -22,6 +22,11 @@ const headings = [
         title: 'Type',
         value: 'typeComp',
         text: 'Type',
+    },
+    {
+        title: 'Severity',
+        value: 'severityComp',
+        text: 'Severity',
     },
     {
         text: "Agentic Component name",
@@ -157,7 +162,25 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     temp['typeComp'] = (
         <MethodBox method={""} url={auditRecord?.type.toLowerCase() || "TOOL"}/>
     )
-    
+
+    const severityValue = auditRecord?.severity ?? null;
+    const flaggedWords = auditRecord?.flaggedWords && Array.isArray(auditRecord.flaggedWords) ? auditRecord.flaggedWords : [];
+    const severityDisplay = severityValue ? func.toSentenceCase(severityValue) : '-';
+    const severityBadge = severityValue ? (
+        <div className={`badge-wrapper-${(severityValue + '').toUpperCase()}`}>
+            <Badge size="small">{severityDisplay}</Badge>
+        </div>
+    ) : (
+        <Text as="span">{severityDisplay}</Text>
+    );
+    temp['severityComp'] = flaggedWords.length > 0 ? (
+        <Tooltip content={`Flagged words: ${flaggedWords.join(', ')}`} dismissOnMouseOut width="wide">
+            {severityBadge}
+        </Tooltip>
+    ) : (
+        severityBadge
+    );
+
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
     temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, allCollections, temp?.hostCollectionId);
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
