@@ -164,11 +164,11 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     )
 
     const riskAnalysis = auditRecord?.componentRiskAnalysis;
-    const isComponentNameRisky = riskAnalysis && (riskAnalysis.isComponentNameRisky)
-    const isComponentMalicious = riskAnalysis && (riskAnalysis.isComponentMalicious)
+    const isComponentNameSuspicious = riskAnalysis && (riskAnalysis.isComponentNameSuspicious);
+    const isComponentMalicious = riskAnalysis && (riskAnalysis.isComponentMalicious);
     const severityValue = isComponentMalicious
       ? 'CRITICAL'
-      : isComponentNameRisky
+      : isComponentNameSuspicious
         ? 'HIGH'
         : null;
     const evidence = riskAnalysis?.evidence;
