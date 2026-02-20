@@ -1,10 +1,12 @@
 package com.akto.dto;
 
 import com.akto.util.enums.GlobalEnums.Severity;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
+
 import lombok.NoArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,6 +17,7 @@ import lombok.Setter;
 public class McpAuditInfo {
 
     private ObjectId id;
+
     @BsonIgnore
     private String hexId;
     private int lastDetected;
@@ -28,9 +31,14 @@ public class McpAuditInfo {
     private Set<String> flaggedWords;
     private Severity severity;
 
+    // Conditional approval fields
+    private Map<String, Object> approvalConditions;
+
+    // Approval timestamp - set when item is approved or conditionally approved
+    private Integer approvedAt;
 
     public String getHexId() {
-        return this.id.toHexString();
+        return this.id != null ? this.id.toHexString() : null;
     }
     public McpAuditInfo(int lastDetected,
         String markedBy,
