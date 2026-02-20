@@ -965,7 +965,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                 >
                                     <div className={`step-indicator ${
                                         step.number === currentStep ? 'current' :
-                                        step.number < currentStep ? (step.isValid ? 'completed' : 'error') : 'pending'
+                                        !step.isValid ? 'error' :
+                                        (step.summary && step.summary !== 'Coming soon') ? 'configured' : 'pending'
                                     }`} />
                                     <div style={{ flex: 1, paddingTop: '4px' }}>
                                         <Text
