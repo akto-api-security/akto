@@ -45,11 +45,6 @@ public final class McpRequestResponseUtils {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    private static final Pattern RISKY_PATTERN = Pattern.compile(
-        "(?i)(?:^|[^a-zA-Z0-9])(delete|drop|admin|execute|root|overwrite|scan|shell|cmd|grant)(?:[^a-zA-Z0-9]|$)"
-    );
-
-
     public static HttpResponseParams parseMcpResponseParams(HttpResponseParams responseParams) {
         String requestPayload = responseParams.getRequestParams().getPayload();
 
