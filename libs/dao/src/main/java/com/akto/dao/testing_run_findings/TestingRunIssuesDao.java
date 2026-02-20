@@ -8,6 +8,7 @@ import org.bson.conversions.Bson;
 
 import com.akto.dao.AccountsContextDaoWithRbac;
 import com.akto.dao.MCollection;
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
@@ -89,10 +90,17 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         }
 
         try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null && !collectionIds.isEmpty()) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            // Check if user is Admin first - Admin users should see ALL issues
+            if (!RBACDao.isAdminUser()) {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if(collectionIds != null && !collectionIds.isEmpty()) {
+                    pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                } else if(collectionIds != null && collectionIds.isEmpty()) {
+                    // Empty list means no access - return empty result
+                    pipeline.add(Aggregates.match(Filters.empty()));
+                }
             }
+            // Admin users: no additional filtering - show all issues
         } catch(Exception e){
         }
 
@@ -194,10 +202,17 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         ));
 
         try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null && !collectionIds.isEmpty()) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            // Check if user is Admin first - Admin users should see ALL issues
+            if (!RBACDao.isAdminUser()) {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if(collectionIds != null && !collectionIds.isEmpty()) {
+                    pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                } else if(collectionIds != null && collectionIds.isEmpty()) {
+                    // Empty list means no access - return empty result
+                    pipeline.add(Aggregates.match(Filters.empty()));
+                }
             }
+            // Admin users: no additional filtering - show all issues
         } catch(Exception e){
         }
 
@@ -226,10 +241,17 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         pipeline.add(Aggregates.match(Filters.gte(TestingRunIssues.LAST_SEEN, startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte(TestingRunIssues.LAST_SEEN, endTimestamp)));
         try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null && !collectionIds.isEmpty()) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            // Check if user is Admin first - Admin users should see ALL issues
+            if (!RBACDao.isAdminUser()) {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if(collectionIds != null && !collectionIds.isEmpty()) {
+                    pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                } else if(collectionIds != null && collectionIds.isEmpty()) {
+                    // Empty list means no access - return empty result
+                    pipeline.add(Aggregates.match(Filters.empty()));
+                }
             }
+            // Admin users: no additional filtering - show all issues
         } catch(Exception e){
         }
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$lastSeen", 86400}))));
@@ -315,5 +337,33 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
     @Override
     public String getFilterKeyString(){
         return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.Id_ApiInfoKey_ApiCollectionId) + ApiInfoKey.API_COLLECTION_ID;
+    }
+
+    /**
+     * Override addRbacFilter to add Admin check for issues.
+     * Admin users should see ALL issues.
+     */
+    @Override
+    protected Bson addRbacFilter(Bson originalQuery) {
+        // Check if user is Admin first - Admin users should see ALL issues
+        if (RBACDao.isAdminUser()) {
+            return originalQuery;
+        }
+        // For non-Admin users, use parent's RBAC filtering
+        return super.addRbacFilter(originalQuery);
+    }
+
+    /**
+     * Override countRbacFilter to add Admin check for issues count.
+     * Admin users should see ALL issues.
+     */
+    @Override
+    protected Bson countRbacFilter(Bson originalQuery) {
+        // Check if user is Admin first - Admin users should see ALL issues
+        if (RBACDao.isAdminUser()) {
+            return originalQuery;
+        }
+        // For non-Admin users, use parent's RBAC filtering
+        return super.countRbacFilter(originalQuery);
     }
 }

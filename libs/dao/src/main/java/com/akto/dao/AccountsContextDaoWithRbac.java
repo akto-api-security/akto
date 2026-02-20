@@ -3,7 +3,6 @@ package com.akto.dao;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.akto.dao.RBACDao;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.type.SingleTypeInfo;
@@ -43,38 +42,20 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
     protected Bson modifyFilters(Bson originalQuery, boolean ignoreGroupFilter){
         try {
             if ((Context.userId.get() != null || Context.contextSource.get() != null) && Context.accountId.get() != null) {
-                // Check if user is Admin first - Admin users should see ALL data
-                if (RBACDao.isAdminUser()) {
-                    return originalQuery;
-                }
-                
-                // For non-Admin users, apply RBAC filtering based on accessible collections
-                // This includes collections the user has access to, even if they are deleted
                 List<Integer> apiCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                         Context.accountId.get());
-                
-                // For RBAC disabled case, apiCollectionIds is null - show all data
-                if (apiCollectionIds == null) {
-                    return originalQuery;
+                if (apiCollectionIds != null) {
+                    List<Bson> filters = new ArrayList<>();
+                    filters.add(Filters.and(Filters.exists(getFilterKeyString()),
+                            Filters.in(getFilterKeyString(), apiCollectionIds)));
+                    if(!ignoreGroupFilter){
+                        filters.add(Filters.and(Filters.exists(SingleTypeInfo._COLLECTION_IDS),
+                            Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds)));
+                    }
+                    
+                    Bson rbacFilter = Filters.or(filters);
+                    return Filters.and(originalQuery, rbacFilter);
                 }
-                
-                // If empty list, no collections accessible - return empty filter
-                if (apiCollectionIds.isEmpty()) {
-                    return Filters.and(originalQuery, Filters.empty());
-                }
-                
-                // Apply RBAC filtering with user's accessible collection list
-                // This will show data for collections the user has access to, including deleted ones
-                List<Bson> filters = new ArrayList<>();
-                filters.add(Filters.and(Filters.exists(getFilterKeyString()),
-                        Filters.in(getFilterKeyString(), apiCollectionIds)));
-                if(!ignoreGroupFilter){
-                    filters.add(Filters.and(Filters.exists(SingleTypeInfo._COLLECTION_IDS),
-                        Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds)));
-                }
-                
-                Bson rbacFilter = Filters.or(filters);
-                return Filters.and(originalQuery, rbacFilter);
             }
         } catch (Exception e) {
         }
