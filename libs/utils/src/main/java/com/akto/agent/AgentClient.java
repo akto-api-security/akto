@@ -310,7 +310,17 @@ public class AgentClient {
             if(storedTitle != null) {
                 title = storedTitle;
             }
-            return new GenericAgentConversation(title, conversationId, prompt, responseFromMcpServer, finalSentPrompt, timestamp, timestamp, tokensUsed, tokensLimit, conversationType);
+            List<String> thinkingBlocks = null;
+            if (jsonNode.has("thinkingBlocks") && jsonNode.get("thinkingBlocks").isArray()) {
+                thinkingBlocks = new ArrayList<>();
+                for (JsonNode block : jsonNode.get("thinkingBlocks")) {
+                    thinkingBlocks.add(block.asText());
+                }
+                loggerMaker.infoAndAddToDb("✓ ThinkingBlocks received from MCP server: " + thinkingBlocks.size() + " blocks");
+            } else {
+                loggerMaker.infoAndAddToDb("✗ ThinkingBlocks NOT found in MCP response. jsonNode.has('thinkingBlocks'): " + jsonNode.has("thinkingBlocks"));
+            }
+            return new GenericAgentConversation(title, conversationId, prompt, responseFromMcpServer, finalSentPrompt, timestamp, timestamp, tokensUsed, tokensLimit, conversationType, thinkingBlocks);
         } catch (Exception e) {
             throw new Exception("Failed to get response from MCP server: " + e.getMessage());
         }

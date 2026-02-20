@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { Box, Text, VerticalStack } from '@shopify/polaris';
+import { Box, Button, Collapsible, Text, VerticalStack } from '@shopify/polaris';
 import MarkdownViewer from '../../../components/shared/MarkdownViewer';
 
-function AgenticStreamingResponse({ content, timeTaken, onStreamingComplete, skipStreaming = false }) {
+function AgenticStreamingResponse({ content, timeTaken, thinkingBlocks, onStreamingComplete, skipStreaming = false }) {
     const [displayedContent, setDisplayedContent] = useState('');
+    const [thoughtsOpen, setThoughtsOpen] = useState(false);
     const hasCalledComplete = useRef(false);
 
     useEffect(() => {
@@ -44,8 +45,51 @@ function AgenticStreamingResponse({ content, timeTaken, onStreamingComplete, ski
         return () => clearInterval(streamInterval);
     }, [content, skipStreaming]);
 
+    const hasThoughts = thinkingBlocks && thinkingBlocks.length > 0;
+
     return (
         <VerticalStack gap="2" align="start">
+            {/* Chain of Thoughts — collapsible, collapsed by default */}
+            {hasThoughts && (
+                <Box>
+                    <Button
+                        plain
+                        disclosure={thoughtsOpen ? 'up' : 'down'}
+                        onClick={() => setThoughtsOpen(prev => !prev)}
+                        ariaControls="chain-of-thoughts"
+                    >
+                        <Text variant="bodySm" tone="subdued">
+                            Chain of Thoughts ({thinkingBlocks.length} steps)
+                        </Text>
+                    </Button>
+                    <Collapsible
+                        open={thoughtsOpen}
+                        id="chain-of-thoughts"
+                        transition={{ duration: '200ms', timingFunction: 'ease-in-out' }}
+                    >
+                        <Box
+                            padding="3"
+                            paddingInlineStart="4"
+                            paddingInlineEnd="4"
+                            background="bg-transparent-active-experimental"
+                            borderRadius="3"
+                            borderRadiusEndStart="0"
+                        >
+                            <VerticalStack gap="3">
+                                {thinkingBlocks.map((block, index) => (
+                                    <Box key={index}>
+                                        <Text variant="bodySm" as="p" tone="subdued">
+                                            Step {index + 1}
+                                        </Text>
+                                        <MarkdownViewer markdown={block} />
+                                    </Box>
+                                ))}
+                            </VerticalStack>
+                        </Box>
+                    </Collapsible>
+                </Box>
+            )}
+
             {/* Time taken */}
             {timeTaken && (
                 <Box paddingInlineStart="5">
