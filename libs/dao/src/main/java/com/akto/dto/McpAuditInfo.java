@@ -1,11 +1,10 @@
 package com.akto.dto;
 
-import java.util.Map;
+import com.akto.util.enums.GlobalEnums.Severity;
 import java.util.Set;
-
+import org.apache.commons.collections.CollectionUtils;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
-
 import lombok.NoArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -16,7 +15,6 @@ import lombok.Setter;
 public class McpAuditInfo {
 
     private ObjectId id;
-
     @BsonIgnore
     private String hexId;
     private int lastDetected;
@@ -27,18 +25,22 @@ public class McpAuditInfo {
     private String remarks;
     private Set<ApiInfo.ApiAccessType> apiAccessTypes;
     private int hostCollectionId;
+    private Set<String> flaggedWords;
+    private Severity severity;
 
-    // Conditional approval fields
-    private Map<String, Object> approvalConditions;
-
-    // Approval timestamp - set when item is approved or conditionally approved
-    private Integer approvedAt;
 
     public String getHexId() {
-        return this.id != null ? this.id.toHexString() : null;
+        return this.id.toHexString();
     }
-
-    public McpAuditInfo(int lastDetected, String markedBy, String type, int updatedTimestamp, String resourceName, String remarks, Set<ApiInfo.ApiAccessType> apiAccessTypes, int hostCollectionId) {
+    public McpAuditInfo(int lastDetected,
+        String markedBy,
+        String type,
+        int updatedTimestamp,
+        String resourceName,
+        String remarks,
+        Set<ApiInfo.ApiAccessType> apiAccessTypes,
+        int hostCollectionId,
+        Set<String> flaggedWords) {
         this.lastDetected = lastDetected;
         this.markedBy = markedBy;
         this.type = type;
@@ -47,6 +49,8 @@ public class McpAuditInfo {
         this.remarks = remarks;
         this.apiAccessTypes = apiAccessTypes;
         this.hostCollectionId = hostCollectionId;
+        this.flaggedWords = flaggedWords;
+        this.severity = (CollectionUtils.isNotEmpty(flaggedWords) ? Severity.HIGH : null);
     }
 
 }
