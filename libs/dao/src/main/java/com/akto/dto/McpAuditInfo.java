@@ -6,8 +6,6 @@ import java.util.Set;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
-import com.akto.util.enums.GlobalEnums.Severity;
-
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -36,14 +34,13 @@ public class McpAuditInfo {
     // Approval timestamp - set when item is approved or conditionally approved
     private Integer approvedAt;
 
-    private Set<String> flaggedWords;
-    private Severity severity;
+    private ComponentRiskAnalysis componentRiskAnalysis;
 
     public String getHexId() {
         return this.id != null ? this.id.toHexString() : null;
     }
 
-    public McpAuditInfo(int lastDetected, String markedBy, String type, int updatedTimestamp, String resourceName, String remarks, Set<ApiInfo.ApiAccessType> apiAccessTypes, int hostCollectionId, Set<String> flaggedWords) {
+    public McpAuditInfo(int lastDetected, String markedBy, String type, int updatedTimestamp, String resourceName, String remarks, Set<ApiInfo.ApiAccessType> apiAccessTypes, int hostCollectionId, ComponentRiskAnalysis componentRiskAnalysis) {
         this.lastDetected = lastDetected;
         this.markedBy = markedBy;
         this.type = type;
@@ -52,7 +49,6 @@ public class McpAuditInfo {
         this.remarks = remarks;
         this.apiAccessTypes = apiAccessTypes;
         this.hostCollectionId = hostCollectionId;
-        this.flaggedWords = flaggedWords;
-        this.severity = (flaggedWords != null && !flaggedWords.isEmpty()) ? Severity.HIGH : null;
+        this.componentRiskAnalysis = componentRiskAnalysis;
     }
 }

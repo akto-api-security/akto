@@ -163,8 +163,10 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
         <MethodBox method={""} url={auditRecord?.type.toLowerCase() || "TOOL"}/>
     )
 
-    const severityValue = auditRecord?.severity ?? null;
-    const flaggedWords = auditRecord?.flaggedWords && Array.isArray(auditRecord.flaggedWords) ? auditRecord.flaggedWords : [];
+    const riskAnalysis = auditRecord?.componentRiskAnalysis;
+    const hasRisk = riskAnalysis && (riskAnalysis.isComponentNameRisky || riskAnalysis.isComponentMalicious);
+    const severityValue = hasRisk ? 'HIGH' : null;
+    const evidence = riskAnalysis?.evidence;
     const severityDisplay = severityValue ? func.toSentenceCase(severityValue) : '-';
     const severityBadge = severityValue ? (
         <div className={`badge-wrapper-${(severityValue + '').toUpperCase()}`}>
@@ -173,8 +175,8 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     ) : (
         <Text as="span">{severityDisplay}</Text>
     );
-    temp['severityComp'] = flaggedWords.length > 0 ? (
-        <Tooltip content={`Flagged words: ${flaggedWords.join(', ')}`} dismissOnMouseOut width="wide">
+    temp['severityComp'] = evidence ? (
+        <Tooltip content={evidence} dismissOnMouseOut width="wide">
             {severityBadge}
         </Tooltip>
     ) : (

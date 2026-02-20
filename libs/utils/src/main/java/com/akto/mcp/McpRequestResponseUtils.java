@@ -5,6 +5,7 @@ import com.akto.dao.MCollection;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ComponentRiskAnalysis;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.RawApi;
@@ -210,7 +211,7 @@ public final class McpRequestResponseUtils {
                             Context.now(), "", AKTO_MCP_TOOLS_TAG, 0,
                             params.getName(), "", null,
                             responseParams.getRequestParams().getApiCollectionId(),
-                            scanForRiskyWords(params.getName())
+                            buildComponentRiskAnalysis(params.getName())
                     );
                 }
                 break;
@@ -224,7 +225,7 @@ public final class McpRequestResponseUtils {
                             Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
                             params.getName(), "", null,
                             responseParams.getRequestParams().getApiCollectionId(),
-                            scanForRiskyWords(params.getName())
+                            buildComponentRiskAnalysis(params.getName())
                     );
                 }
                 break;
@@ -238,7 +239,7 @@ public final class McpRequestResponseUtils {
                             Context.now(), "", AKTO_MCP_PROMPTS_TAG, 0,
                             params.getName(), "", null,
                             responseParams.getRequestParams().getApiCollectionId(),
-                            scanForRiskyWords(params.getName())
+                            buildComponentRiskAnalysis(params.getName())
                     );
                 }
                 break;
@@ -441,20 +442,21 @@ public final class McpRequestResponseUtils {
         return new BasicDBObject().append("events", events).toJson();
     }
 
-    private static Set<String> scanForRiskyWords(String mcpComponentName) {
+    private static ComponentRiskAnalysis buildComponentRiskAnalysis(String mcpComponentName) {
+        Set<String> foundRiskyWords = scanForRiskyWords(mcpComponentName);
+        boolean isRisky = !foundRiskyWords.isEmpty();
+        return new ComponentRiskAnalysis(isRisky, false, null);
+    }
 
+    private static Set<String> scanForRiskyWords(String mcpComponentName) {
         if (mcpComponentName == null || mcpComponentName.trim().isEmpty()) {
             return Collections.emptySet();
         }
-
         Set<String> foundRiskyWords = new HashSet<>();
-
         Matcher matcher = RISKY_PATTERN.matcher(mcpComponentName);
-
         while (matcher.find()) {
             foundRiskyWords.add(matcher.group(1).toLowerCase());
         }
-
         return foundRiskyWords;
     }
 
