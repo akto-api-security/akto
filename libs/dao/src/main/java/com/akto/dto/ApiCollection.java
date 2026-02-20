@@ -67,9 +67,10 @@ public class ApiCollection {
     public static final String ACCESS_TYPE = "accessType";
 
     public enum AccessType {
-        FIRST_PARTY("First party"),
+        INTERNAL("Internal"),
         THIRD_PARTY("Third party"),
-        BOTH("Both");
+        BOTH("Both"),
+        UNKNOWN("Unknown");
 
         private final String displayName;
 

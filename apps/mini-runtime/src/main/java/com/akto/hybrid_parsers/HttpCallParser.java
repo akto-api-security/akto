@@ -134,7 +134,7 @@ public class HttpCallParser {
     /** Direction "1" = incoming (first party), "2" = outgoing (third party). */
     private static ApiCollection.AccessType getAccessTypeFromDirection(String direction) {
         if (direction == null) return null;
-        if ("1".equals(direction)) return ApiCollection.AccessType.FIRST_PARTY;
+        if ("1".equals(direction)) return ApiCollection.AccessType.INTERNAL;
         if ("2".equals(direction)) return ApiCollection.AccessType.THIRD_PARTY;
         return null;
     }
@@ -143,19 +143,23 @@ public class HttpCallParser {
         ApiCollection.AccessType newType = getAccessTypeFromDirection(direction);
         ApiCollection.AccessType existingType = ApiCollection.AccessType.fromDisplayName(existingAccessTypeStr);
 
+        if (newType == null && existingType == null){
+            return ApiCollection.AccessType.UNKNOWN.getDisplayName();
+        }
+
         if (newType == null) {
             return existingAccessTypeStr;
         }
         if (existingType == null) {
             return newType.getDisplayName();
         }
-        if (existingType == ApiCollection.AccessType.BOTH) {
-            return ApiCollection.AccessType.BOTH.getDisplayName();
+        if (existingType == ApiCollection.AccessType.INTERNAL) {
+            return ApiCollection.AccessType.INTERNAL.getDisplayName();
         }
         if (existingType == newType) {
             return existingType.getDisplayName();
         }
-        return ApiCollection.AccessType.BOTH.getDisplayName();
+        return ApiCollection.AccessType.INTERNAL.getDisplayName();
     }
 
 
