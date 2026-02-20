@@ -1057,7 +1057,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                         borderRadius='3'
                                                         borderRadiusStartEnd='1'
                                                     >
-                                                        <Text variant="bodyMd" color="subdued">
+                                                        <Text variant="bodyMd">
                                                             {message.userPrompt}
                                                         </Text>
                                                     </Box>
@@ -1066,7 +1066,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                 <Box paddingBlockStart="1">
                                                     <Text
                                                         variant="bodyMd"
-                                                        color={message.action === 'Blocked' ? 'success' : 'subdued'}
+                                                        color={message.action === 'Blocked' || message.action === 'Error' ? 'critical' : 'success'}
                                                     >
                                                         {message.action}
                                                         {message.reason && ` - ${message.reason}`}
