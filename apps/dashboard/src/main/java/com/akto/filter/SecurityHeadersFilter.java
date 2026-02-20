@@ -19,16 +19,17 @@ public class SecurityHeadersFilter implements Filter {
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' " +
                 "ajax.googleapis.com apis.google.com " +       // Google
                 "*.intercom.io *.intercomcdn.com " +            // Intercom
-                "cdn.mxpnl.com clarity.ms " +                   // Analytics
+                "cdn.mxpnl.com *.clarity.ms " +                 // Analytics
                 "unpkg.com d1hvi6xs55woen.cloudfront.net " +    // CDNs
-                "app.getbeamer.com js.stripe.com; " +           // Third-party
+                "*.getbeamer.com js.stripe.com; " +             // Third-party
             "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net unpkg.com; " +
             "connect-src 'self' " +
                 "*.akto.io " +                                   // Akto
-                "*.intercom.io " +                               // Intercom
-                "cdn.mxpnl.com clarity.ms " +                    // Analytics
+                "*.intercom.io wss://*.intercom.io " +           // Intercom (HTTPS + WebSocket)
+                "cdn.mxpnl.com *.mixpanel.com *.clarity.ms " +  // Analytics
                 "cdn.jsdelivr.net d1hvi6xs55woen.cloudfront.net " + // CDNs
-                "app.getbeamer.com *.stigg.io *.api.stigg.io; " +  // Third-party
+                "*.getbeamer.com *.stigg.io *.api.stigg.io; " + // Third-party
+            "frame-src js.stripe.com; " +                        // Stripe iframe
             "img-src 'self' data: blob: www.google.com; " +
             "font-src 'self' data: fonts.googleapis.com cdn.jsdelivr.net d1hvi6xs55woen.cloudfront.net; " +
             "frame-ancestors 'self'; " +
