@@ -106,6 +106,8 @@ public class SaveTestEditorAction extends UserAction {
     private State testingRunPlaygroundStatus;
     @Getter @Setter
     private String testRoleId;
+    @Getter @Setter
+    private String miniTestingName;
 
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
@@ -341,6 +343,9 @@ public class SaveTestEditorAction extends UserAction {
                     testingRunPlayground.setSamples(sampleDataList.get(0).getSamples());
                     testingRunPlayground.setApiInfoKey(infoKey);
                     testingRunPlayground.setCreatedAt(Context.now());
+                    if (StringUtils.isNotBlank(miniTestingName)) {
+                        testingRunPlayground.setMiniTestingName(miniTestingName);
+                    }
 
                     InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(testingRunPlayground);
                     if (insertOne.wasAcknowledged()) {

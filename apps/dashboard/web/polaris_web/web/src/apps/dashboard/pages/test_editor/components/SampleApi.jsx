@@ -4,6 +4,7 @@ import { ChevronUpMinor } from "@shopify/polaris-icons"
 import { useEffect, useRef, useState } from "react";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import TitleWithInfo from "../../../components/shared/TitleWithInfo";
+import Dropdown from "../../../components/layouts/Dropdown";
 import api from "../../testing/api"
 import testEditorRequests from "../api";
 import func from "@/util/func";
@@ -58,6 +59,8 @@ const SampleApi = () => {
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
     const [testRoles, setTestRoles] = useState([])
     const [testRolesOptions, setTestRolesOptions] = useState([])
+    const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([])
+    const [selectedMiniTestingServiceName, setSelectedMiniTestingServiceName] = useState(null)
 
     useEffect(() => {
         const fetchRoles = async () => {
@@ -78,6 +81,16 @@ const SampleApi = () => {
         }
         fetchRoles()
     }, [])
+
+    useEffect(() => {
+        api.fetchMiniTestingServiceNames().then(({ miniTestingServiceNames: names }) => {
+            const options = (names || []).map(name => ({ label: name, value: name }));
+            setMiniTestingServiceNames(options);
+            if (options.length > 0 && selectedMiniTestingServiceName == null) {
+                setSelectedMiniTestingServiceName(options[0].value);
+            }
+        });
+    }, []);
 
     useEffect(()=>{
         if(showEmptyLayout) return
@@ -287,7 +300,7 @@ const SampleApi = () => {
 
 
         try {
-            let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList,selectedRole)
+            let resp = await testEditorRequests.runTestForTemplate(currentContent, apiKeyInfo, sampleDataList, selectedRole, selectedMiniTestingServiceName)
             if(resp.testingRunPlaygroundHexId !== null && resp?.testingRunPlaygroundHexId !== undefined) {
                 await new Promise((resolve) => {
                     let maxAttempts = 100;
@@ -516,6 +529,18 @@ const SampleApi = () => {
                         })()}
                         preSelected={selectedRole ? [selectedRole] : []}
                     />
+
+                    {miniTestingServiceNames?.length > 0 && (
+                        <>
+                            <br />
+                            <Dropdown
+                                label="Select Testing Module"
+                                menuItems={miniTestingServiceNames}
+                                initial={selectedMiniTestingServiceName || miniTestingServiceNames?.[0]?.value}
+                                selected={(value) => setSelectedMiniTestingServiceName(value)}
+                            />
+                        </>
+                    )}
 
                 </Modal.Section>
             </Modal>
