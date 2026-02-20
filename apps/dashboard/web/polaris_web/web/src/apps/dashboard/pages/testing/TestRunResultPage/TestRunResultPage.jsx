@@ -332,12 +332,12 @@ function TestRunResultPage(props) {
         getDescriptionText={getDescriptionText}
         infoState={infoState}
         headerDetails={headerDetails}
-        createJiraTicket={createJiraTicket}
-        jiraIssueUrl={jiraIssueUrl}
         hexId={hexId}
         source={props?.source}
-        setShowDetails={setShowDetails}
-        showDetails={showDetails}
+        remediationSrc={remediation}
+        conversations={conversations}
+        conversationRemediationText={conversationRemediationText}
+        showForbidden={showForbidden}
       />
   )
 }
