@@ -10,7 +10,6 @@ import lombok.Setter;
 public class ComponentRiskAnalysis {
 
     private boolean isComponentNameSuspicious;
-
     private boolean isComponentMalicious;
 
     @Getter
