@@ -22,7 +22,7 @@ public class SecurityHeadersFilter implements Filter {
                 "cdn.mxpnl.com *.clarity.ms " +                 // Analytics
                 "unpkg.com d1hvi6xs55woen.cloudfront.net " +    // CDNs
                 "*.getbeamer.com js.stripe.com; " +             // Third-party
-            "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net unpkg.com; " +
+            "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net unpkg.com *.getbeamer.com; " +
             "connect-src 'self' " +
                 "*.akto.io " +                                   // Akto
                 "*.intercom.io wss://*.intercom.io " +           // Intercom (HTTPS + WebSocket)
