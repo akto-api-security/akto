@@ -39,6 +39,7 @@ import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -2388,8 +2389,18 @@ public class DbLayer {
 
             if (existingRecord != null) {
                 // Update the existing record with new lastDetected timestamp
+                BasicDBObject setFields = new BasicDBObject("lastDetected", Context.now());
+
+                if (auditInfo.getSeverity() != null) {
+                    setFields.put("severity", auditInfo.getSeverity());
+                }
+                if (CollectionUtils.isNotEmpty(auditInfo.getFlaggedWords())) {
+                    setFields.put("flaggedWords", auditInfo.getFlaggedWords());
+                }
+
                 BasicDBObject update = new BasicDBObject();
-                update.put(MCollection.SET, new BasicDBObject("lastDetected", Context.now()));
+                update.put(MCollection.SET, setFields);
+
                 McpAuditInfoDao.instance.updateOne(findQuery, update);
             } else {
                 // Insert new record
