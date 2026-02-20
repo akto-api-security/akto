@@ -90,7 +90,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
 
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
+            if(collectionIds != null && !collectionIds.isEmpty()) {
                 pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
             }
         } catch(Exception e){
@@ -195,7 +195,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
 
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
+            if(collectionIds != null && !collectionIds.isEmpty()) {
                 pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
             }
         } catch(Exception e){
@@ -227,7 +227,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         pipeline.add(Aggregates.match(Filters.lte(TestingRunIssues.LAST_SEEN, endTimestamp)));
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
+            if(collectionIds != null && !collectionIds.isEmpty()) {
                 pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
             }
         } catch(Exception e){

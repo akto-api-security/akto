@@ -88,6 +88,24 @@ public class RBACDao extends CommonContextDao<RBAC> {
         return actualRole;
     }
 
+    /**
+     * Check if the current user (from Context) is an Admin user.
+     * This is a common utility method to be used across the codebase for RBAC filtering.
+     * 
+     * @return true if user is Admin, false otherwise
+     */
+    public static boolean isAdminUser() {
+        try {
+            if (Context.userId.get() == null || Context.accountId.get() == null) {
+                return false;
+            }
+            Role role = getCurrentRoleForUser(Context.userId.get(), Context.accountId.get());
+            return role != null && role.equals(Role.ADMIN);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public static boolean hasAccessToFeature(int userId, int accountId, String featureLabel) {
         Pair<Integer, Integer> key = new Pair<>(userId, accountId);
         RBAC.Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, accountId);

@@ -1009,7 +1009,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                     loading={loading}
                                     disabled={!allStepsValid}
                                 >
-                                    Create policy
+                                    {isEditMode || editingPolicy ? "Update policy" : "Create policy"}
                                 </Button>
                             </HorizontalStack>
                         </HorizontalStack>

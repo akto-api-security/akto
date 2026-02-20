@@ -8,6 +8,7 @@ import org.bson.types.ObjectId;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.TestingRun;
@@ -92,8 +93,28 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
     }
 
     private Bson addCollectionsFilterForIAM(Bson q) {
+        // Check if user is Admin first - Admin users should see ALL test runs
+        if (RBACDao.isAdminUser()) {
+            return q;
+        }
+        
+        // For non-Admin users, apply RBAC filtering based on accessible collections
+        // This includes collections the user has access to, even if they are deleted
         List<Integer> apiCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                 Context.accountId.get());
+        
+        // For RBAC disabled case, apiCollectionIds is null - show all test runs
+        if (apiCollectionIds == null) {
+            return q;
+        }
+        
+        // If empty list, no collections accessible - return empty filter
+        if (apiCollectionIds.isEmpty()) {
+            return Filters.and(q, Filters.empty());
+        }
+        
+        // Apply RBAC filtering with user's accessible collection list
+        // This will show test runs for collections the user has access to, including deleted ones
         Bson collectionFilter = Filters.or(
                 Filters.in(TestingRun._API_COLLECTION_ID, apiCollectionIds),
                 Filters.in(TestingRun._API_COLLECTION_ID_WORK_FLOW, apiCollectionIds),
