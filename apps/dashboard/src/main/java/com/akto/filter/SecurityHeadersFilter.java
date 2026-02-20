@@ -18,9 +18,9 @@ public class SecurityHeadersFilter implements Filter {
             "default-src 'self'; " +
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' ajax.googleapis.com apis.google.com cdn.mxpnl.com clarity.ms widget.intercom.io app.getbeamer.com unpkg.com d1hvi6xs55woen.cloudfront.net; " +
             "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net unpkg.com; " +
-            "connect-src 'self' *.akto.io api.github.com api.bitbucket.org dev.azure.com gitlab.com cdn.mxpnl.com clarity.ms api-iam.intercom.io widget.intercom.io app.getbeamer.com d1hvi6xs55woen.cloudfront.net; " +
-            "img-src 'self' data: blob:; " +
-            "font-src 'self' data:; " +
+            "connect-src 'self' *.akto.io api.github.com api.bitbucket.org dev.azure.com gitlab.com cdn.mxpnl.com clarity.ms api-iam.intercom.io widget.intercom.io app.getbeamer.com d1hvi6xs55woen.cloudfront.net *.stigg.io registry.modelcontextprotocol.io; " +
+            "img-src 'self' data: blob: www.google.com; " +
+            "font-src 'self' data: fonts.googleapis.com; " +
             "frame-ancestors 'self'; " +
             "base-uri 'self'";
 
