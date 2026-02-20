@@ -6,9 +6,7 @@ import (
 	"unicode/utf8"
 )
 
-// SanitizeText removes null bytes and non-printable control characters
-// (except common whitespace) from extracted file content. PDF and Office
-// extractors frequently emit these artifacts.
+// SanitizeText removes null bytes and non-printable control characters (except common whitespace).
 func SanitizeText(text string) string {
 	return strings.Map(func(r rune) rune {
 		if r == '\t' || r == '\n' || r == '\r' {
@@ -21,17 +19,8 @@ func SanitizeText(text string) string {
 	}, text)
 }
 
-// ChunkWordBoundary splits text into chunks of at most chunkSize characters,
-// never splitting in the middle of a word. Break points (in order of preference):
-// paragraph (\n\n), line (\n), word boundary (space/tab). If no boundary found,
-// falls back to a UTF-8-safe hard split.
-//
-// overlap specifies how many characters from the end of each chunk are repeated
-// at the start of the next chunk. This ensures sensitive patterns (emails, SSNs,
-// credit cards, etc.) that span a chunk boundary are fully captured in at least
-// one chunk. Set overlap to 0 to disable.
-//
-// Empty chunks (whitespace-only) are filtered out.
+// ChunkWordBoundary splits text into chunks of at most chunkSize characters on word boundaries.
+// overlap repeats chars between adjacent chunks to catch boundary-spanning patterns.
 func ChunkWordBoundary(text string, chunkSize, overlap int) []string {
 	if chunkSize <= 0 {
 		chunkSize = 32000
@@ -70,12 +59,7 @@ func ChunkWordBoundary(text string, chunkSize, overlap int) []string {
 	return chunks
 }
 
-// findWordBoundary returns the best byte-index at which to split, preferring
-// paragraph (\n\n), then line (\n), then space/tab.
-// Scans backward through the segment in a single pass, recording the
-// first (nearest-to-end) occurrence of each boundary type, then picks
-// the highest-priority one found.
-// Falls back to a UTF-8-safe hard split if no whitespace boundary exists.
+// findWordBoundary scans backward for the best split point: \n\n > \n > space/tab > UTF-8-safe hard split.
 func findWordBoundary(segment string) int {
 	paraSplit := -1
 	lineSplit := -1
@@ -112,8 +96,7 @@ func findWordBoundary(segment string) int {
 	return runeAlignedIndex(segment, len(segment))
 }
 
-// runeAlignedIndex adjusts idx backward so it doesn't land in the middle
-// of a multi-byte UTF-8 rune. Returns idx unchanged if already aligned.
+// runeAlignedIndex adjusts idx backward so it doesn't split a multi-byte UTF-8 rune.
 func runeAlignedIndex(s string, idx int) int {
 	if idx >= len(s) {
 		return len(s)

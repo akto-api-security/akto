@@ -20,8 +20,7 @@ import (
 
 const chunkRetryDelay = 200 * time.Millisecond
 
-// urlFetchClient is a shared HTTP client for fetching files from URLs.
-// Redirects are disabled to prevent SSRF via open-redirect chains.
+// Redirects disabled to prevent SSRF via open-redirect chains.
 var urlFetchClient = &http.Client{
 	CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
@@ -38,7 +37,6 @@ type chunkResult struct {
 	Err    error
 }
 
-// fileResult holds the validation outcome for a single file.
 type fileResult struct {
 	Filename         string
 	Allowed          bool
@@ -49,9 +47,7 @@ type fileResult struct {
 	FailedResult     *mcp.ValidationResult
 }
 
-// ValidateFile handles POST /api/validate/file.
-// Accepts multiple multipart "file" uploads OR multiple "url" form fields (mutually exclusive).
-// Files are processed sequentially with fail-fast: stops on the first blocked file.
+// ValidateFile handles POST /api/validate/file (multipart "file" uploads or "url" fields, mutually exclusive).
 func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	if h.cfg == nil {
 		h.logger.Error("File validation config is nil")
@@ -59,7 +55,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		return
 	}
 
-	maxSize := int64(h.cfg.FileValidateMaxSizeBytes)
+	maxSize := int64(h.cfg.File.MaxSizeBytes)
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxSize)
 
 	contextSource := strings.TrimSpace(c.PostForm("contextSource"))
@@ -94,8 +90,6 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	h.writeMultiFileResponse(c, fileResults, len(inputs))
 }
 
-// validateSingleFile runs the full pipeline (extract, sanitize, chunk, validate)
-// for one file and returns the result.
 func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileInput, contextSource string) *fileResult {
 	fr := &fileResult{Filename: input.Filename, Allowed: true}
 
@@ -123,15 +117,15 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 		return fr
 	}
 
-	chunks := fileprocessor.ChunkWordBoundary(text, h.cfg.FileValidateChunkSize, h.cfg.FileValidateChunkOverlap)
+	chunks := fileprocessor.ChunkWordBoundary(text, h.cfg.File.ChunkSize, h.cfg.File.ChunkOverlap)
 	if len(chunks) == 0 {
 		fr.Allowed = false
 		fr.Reason = "no content to validate"
 		return fr
 	}
-	if len(chunks) > h.cfg.FileValidateMaxChunks {
+	if len(chunks) > h.cfg.File.MaxChunks {
 		fr.Allowed = false
-		fr.Reason = fmt.Sprintf("file content too large: produced %d chunks (max %d)", len(chunks), h.cfg.FileValidateMaxChunks)
+		fr.Reason = fmt.Sprintf("file content too large: produced %d chunks (max %d)", len(chunks), h.cfg.File.MaxChunks)
 		return fr
 	}
 
@@ -139,7 +133,7 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 		zap.String("filename", input.Filename),
 		zap.Int("extractedChars", len(text)),
 		zap.Int("totalChunks", len(chunks)),
-		zap.Int("concurrency", h.cfg.FileValidateMaxConcurrent))
+		zap.Int("concurrency", h.cfg.File.MaxConcurrent))
 
 	if h.logger.Core().Enabled(zap.DebugLevel) {
 		chunkSizes := make([]int, len(chunks))
@@ -152,8 +146,8 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 			zap.String("filename", input.Filename),
 			zap.Int("totalCharsWithOverlap", totalChars),
 			zap.Ints("chunkSizes", chunkSizes),
-			zap.Int("chunkSize", h.cfg.FileValidateChunkSize),
-			zap.Int("chunkOverlap", h.cfg.FileValidateChunkOverlap))
+			zap.Int("chunkSize", h.cfg.File.ChunkSize),
+			zap.Int("chunkOverlap", h.cfg.File.ChunkOverlap))
 	}
 
 	results := h.validateChunks(ctx, chunks, contextSource)
@@ -181,8 +175,6 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 	return fr
 }
 
-// resolveInputs collects all file uploads or URL fields from the request.
-// Files and URLs are mutually exclusive; the total count is capped by config.
 func (h *ValidationHandler) resolveInputs(c *gin.Context) ([]*fileInput, int, error) {
 	form, formErr := c.MultipartForm()
 
@@ -209,12 +201,12 @@ func (h *ValidationHandler) resolveInputs(c *gin.Context) ([]*fileInput, int, er
 
 	if !hasFiles && !hasURLs {
 		if formErr != nil && isBodyTooLarge(formErr) {
-			return nil, http.StatusRequestEntityTooLarge, fmt.Errorf("request body exceeds maximum size of %s", formatBytes(h.cfg.FileValidateMaxSizeBytes))
+			return nil, http.StatusRequestEntityTooLarge, fmt.Errorf("request body exceeds maximum size of %s", fileprocessor.FormatBytes(h.cfg.File.MaxSizeBytes))
 		}
 		return nil, http.StatusBadRequest, fmt.Errorf("provide at least one 'file' upload or 'url' field")
 	}
 
-	maxFiles := h.cfg.FileValidateMaxFiles
+	maxFiles := h.cfg.File.MaxFiles
 	if maxFiles <= 0 {
 		maxFiles = 1
 	}
@@ -289,7 +281,7 @@ func (h *ValidationHandler) fetchFromURL(ctx context.Context, rawURL string) (*f
 		return nil, http.StatusBadRequest, fmt.Errorf("unsupported file type from URL; allowed: %s", strings.Join(h.fileRegistry.SupportedExtensions(), ", "))
 	}
 
-	timeout := time.Duration(h.cfg.FileValidateURLTimeoutSec) * time.Second
+	timeout := time.Duration(h.cfg.File.URLTimeoutSec) * time.Second
 	fetchCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -307,7 +299,7 @@ func (h *ValidationHandler) fetchFromURL(ctx context.Context, rawURL string) (*f
 		return nil, http.StatusBadGateway, fmt.Errorf("URL returned HTTP %d", resp.StatusCode)
 	}
 
-	maxSize := int64(h.cfg.FileValidateMaxSizeBytes)
+	maxSize := int64(h.cfg.File.MaxSizeBytes)
 	body := &sizeLimitedReader{
 		Reader: io.LimitReader(resp.Body, maxSize+1),
 		Closer: resp.Body,
@@ -328,8 +320,7 @@ func filenameFromPath(urlPath, fallbackExt string) string {
 	return urlPath
 }
 
-// sizeLimitedReader wraps an io.LimitReader to produce a clear error when
-// the response body exceeds the configured maximum.
+// sizeLimitedReader wraps an io.LimitReader; returns a clear error on overflow.
 type sizeLimitedReader struct {
 	io.Reader
 	io.Closer
@@ -341,16 +332,15 @@ func (r *sizeLimitedReader) Read(p []byte) (int, error) {
 	n, err := r.Reader.Read(p)
 	r.bytesRead += int64(n)
 	if r.bytesRead > r.limit {
-		return n, fmt.Errorf("file from URL exceeds maximum size of %s", formatBytes(int(r.limit)))
+		return n, fmt.Errorf("file from URL exceeds maximum size of %s", fileprocessor.FormatBytes(int(r.limit)))
 	}
 	return n, err
 }
 
-// validateChunks validates all chunks in parallel with bounded concurrency and per-chunk retry.
 func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string, contextSource string) []*chunkResult {
 	results := make([]*chunkResult, len(chunks))
 	g, gCtx := errgroup.WithContext(ctx)
-	g.SetLimit(h.cfg.FileValidateMaxConcurrent)
+	g.SetLimit(h.cfg.File.MaxConcurrent)
 
 	for i, chunk := range chunks {
 		g.Go(func() error {
@@ -364,7 +354,7 @@ func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string,
 }
 
 func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload, contextSource string) *chunkResult {
-	maxRetries := h.cfg.FileValidateMaxRetries
+	maxRetries := h.cfg.File.MaxRetries
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
@@ -386,7 +376,6 @@ func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload, cont
 	return &chunkResult{Err: lastErr}
 }
 
-// writeMultiFileResponse builds the JSON response with per-file results.
 func (h *ValidationHandler) writeMultiFileResponse(c *gin.Context, results []*fileResult, totalFiles int) {
 	overallAllowed := true
 	failedFileIndex := 0
@@ -450,8 +439,6 @@ func marshalPromptPayload(content string) string {
 	return string(b)
 }
 
-// isBodyTooLarge checks whether the error from multipart parsing indicates the
-// request body exceeded the MaxBytesReader limit.
 func isBodyTooLarge(err error) bool {
 	if err == nil {
 		return false
@@ -459,19 +446,4 @@ func isBodyTooLarge(err error) bool {
 	msg := err.Error()
 	return strings.Contains(msg, "http: request body too large") ||
 		strings.Contains(msg, "max bytes")
-}
-
-func formatBytes(n int) string {
-	const (
-		kb = 1024
-		mb = 1024 * kb
-	)
-	switch {
-	case n >= mb:
-		return fmt.Sprintf("%d MB", n/mb)
-	case n >= kb:
-		return fmt.Sprintf("%d KB", n/kb)
-	default:
-		return fmt.Sprintf("%d bytes", n)
-	}
 }

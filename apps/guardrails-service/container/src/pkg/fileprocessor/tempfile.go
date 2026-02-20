@@ -6,11 +6,7 @@ import (
 	"os"
 )
 
-// withTempFile buffers an io.Reader to a temporary file with the given extension,
-// invokes fn with the file path, and guarantees cleanup regardless of outcome.
-// The extension is required so that format-detecting libraries (e.g. tabula)
-// can identify the file type from the path.
-// Recovers from panics in fn to prevent corrupt files from crashing the process.
+// withTempFile writes r to a temp file (with ext for format detection), calls fn, then cleans up.
 func withTempFile(r io.Reader, ext string, fn func(path string) (string, error)) (result string, err error) {
 	tmp, tmpErr := os.CreateTemp("", "guardrails-*"+ext)
 	if tmpErr != nil {
