@@ -307,7 +307,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             registryStatus: c.registryStatus,
             description: c.description,
             isOutOfTestingScope: c.isOutOfTestingScope,
-            accessType: (c.accessType && c.accessType !== "Both") ? c.accessType : "No Access Type",
+            accessType: (c.accessType && c.accessType !== "Unknown") ? c.accessType : "No Access Type",
             rowStatus: c.rowStatus,
             disableClick: c.disableClick,
             icon: CircleTickMajor,
