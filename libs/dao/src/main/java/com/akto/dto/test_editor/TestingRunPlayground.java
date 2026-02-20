@@ -1,4 +1,5 @@
 package com.akto.dto.test_editor;
+
 import java.util.List;
 
 import com.akto.dto.OriginalHttpRequest;
@@ -7,16 +8,23 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRun.State;
+
+import lombok.Getter;
+import lombok.Setter;
+
 public class TestingRunPlayground {
 
+    public static final String ID = "id";
     public static final String TEST_TEMPLATE = "testTemplate";
     public static final String STATE = "state";
     public static final String SAMPLES = "samples";
     public static final String API_INFO_KEY = "apiInfoKey";
     public static final String CREATED_AT = "createdAt";
     public static final String TESTING_RUN_RESULT = "testingRunResult";
+    public static final String TESTING_RUN_CONFIG = "testingRunConfig";
 
     private ObjectId id;
     private String testTemplate;
@@ -26,6 +34,9 @@ public class TestingRunPlayground {
     private int createdAt;
     private TestingRunResult testingRunResult;
     private String miniTestingName;
+    @Getter
+    @Setter
+    private TestingRunConfig testingRunConfig;
     private OriginalHttpRequest originalHttpRequest;
     private OriginalHttpResponse originalHttpResponse;
     @BsonIgnore
