@@ -24,9 +24,9 @@ const headings = [
         text: 'Type',
     },
     {
-        title: 'Severity',
-        value: 'severityComp',
-        text: 'Severity',
+        title: 'Risk Analysis',
+        value: 'riskAnalysisComp',
+        text: 'Risk Analysis',
     },
     {
         text: "Agentic Component name",
@@ -164,18 +164,23 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     )
 
     const riskAnalysis = auditRecord?.componentRiskAnalysis;
-    const hasRisk = riskAnalysis && (riskAnalysis.isComponentNameRisky || riskAnalysis.isComponentMalicious);
-    const severityValue = hasRisk ? 'HIGH' : null;
+    const isComponentNameRisky = riskAnalysis && (riskAnalysis.isComponentNameRisky)
+    const isComponentMalicious = riskAnalysis && (riskAnalysis.isComponentMalicious)
+    const severityValue = isComponentMalicious
+      ? 'CRITICAL'
+      : isComponentNameRisky
+        ? 'HIGH'
+        : null;
     const evidence = riskAnalysis?.evidence;
-    const severityDisplay = severityValue ? func.toSentenceCase(severityValue) : '-';
+    const riskAnalysisDisplay = severityValue ? func.toSentenceCase(severityValue) : '-';
     const severityBadge = severityValue ? (
         <div className={`badge-wrapper-${(severityValue + '').toUpperCase()}`}>
-            <Badge size="small">{severityDisplay}</Badge>
+            <Badge size="small">{riskAnalysisDisplay}</Badge>
         </div>
     ) : (
-        <Text as="span">{severityDisplay}</Text>
+        <Text as="span">{riskAnalysisDisplay}</Text>
     );
-    temp['severityComp'] = evidence ? (
+    temp['riskAnalysisComp'] = evidence ? (
         <Tooltip content={evidence} dismissOnMouseOut width="wide">
             {severityBadge}
         </Tooltip>
