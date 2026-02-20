@@ -97,6 +97,15 @@ public class Main {
                         return;
                     }
 
+                    String miniTestingName = testingRunPlayground.getMiniTestingName();
+                    if (miniTestingName == null || miniTestingName.isEmpty()) {
+                        miniTestingName = customMiniTestingServiceName;
+                    }
+
+                    if (!miniTestingName.equals(customMiniTestingServiceName)) {
+                        return;
+                    }
+
                     switch (testingRunPlayground.getTestingRunPlaygroundType()) {
                         case TEST_EDITOR_PLAYGROUND:
                             handleTestEditorPlayground(testingRunPlayground);
