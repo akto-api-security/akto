@@ -7,8 +7,12 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRun.State;
+
+import lombok.Getter;
+import lombok.Setter;
 public class TestingRunPlayground {
 
     public static final String TEST_TEMPLATE = "testTemplate";
@@ -17,6 +21,7 @@ public class TestingRunPlayground {
     public static final String API_INFO_KEY = "apiInfoKey";
     public static final String CREATED_AT = "createdAt";
     public static final String TESTING_RUN_RESULT = "testingRunResult";
+    public static final String TESTING_RUN_CONFIG = "testingRunConfig";
 
     private ObjectId id;
     private String testTemplate;
@@ -25,6 +30,9 @@ public class TestingRunPlayground {
     private ApiInfoKey apiInfoKey;
     private int createdAt;
     private TestingRunResult testingRunResult;
+    @Getter
+    @Setter
+    private TestingRunConfig testingRunConfig;
     private String miniTestingName;
     private OriginalHttpRequest originalHttpRequest;
     public static final String ORIGINAL_HTTP_RESPONSE = "originalHttpResponse";
