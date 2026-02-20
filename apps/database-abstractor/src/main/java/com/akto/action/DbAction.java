@@ -687,6 +687,11 @@ public class DbAction extends ActionSupport {
                             }
                         }
 
+                        // Filter out ignored headers
+                        if (isHeader && param != null && com.akto.util.filter.HeaderFilter.shouldIgnoreHeader(param)) {
+                            ignore = true;
+                        }
+
                         // Filter for account 1759386565: ignore template URLs
                         if (accId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID && url != null && APICatalog.isStringTemplateUrl(url)) {
                             loggerMaker.infoAndAddToDb("skipping for 1759386565 " + url);
