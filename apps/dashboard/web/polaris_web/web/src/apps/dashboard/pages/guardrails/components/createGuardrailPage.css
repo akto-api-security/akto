@@ -86,6 +86,15 @@
     line-height: 1.4;
 }
 
+.guardrail-nav-summary {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+    margin-top: 4px;
+}
+
 .step-indicator {
     width: 20px;
     height: 20px;

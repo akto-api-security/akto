@@ -974,6 +974,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                         >
                                             {step.title}
                                         </Text>
+                                        {step.summary && (
+                                            <Text variant="bodySm" color="subdued" truncate>
+                                                <span className="guardrail-nav-summary" title={step.summary}>{step.summary}</span>
+                                            </Text>
+                                        )}
                                     </div>
                                 </div>
                             ))}
