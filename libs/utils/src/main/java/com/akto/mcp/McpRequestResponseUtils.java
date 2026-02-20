@@ -5,7 +5,6 @@ import com.akto.dao.MCollection;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.ComponentRiskAnalysis;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.RawApi;
@@ -25,8 +24,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
