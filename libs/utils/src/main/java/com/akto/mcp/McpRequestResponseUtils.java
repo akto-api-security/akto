@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -41,6 +42,11 @@ public final class McpRequestResponseUtils {
     ));
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    private static final Pattern RISKY_PATTERN = Pattern.compile(
+        "(?i)(?:^|[^a-zA-Z0-9])(delete|drop|admin|execute|root|overwrite|scan|shell|cmd|grant)(?:[^a-zA-Z0-9]|$)"
+    );
+
 
     public static HttpResponseParams parseMcpResponseParams(HttpResponseParams responseParams) {
         String requestPayload = responseParams.getRequestParams().getPayload();
@@ -202,7 +208,8 @@ public final class McpRequestResponseUtils {
                     auditInfo = new McpAuditInfo(
                             Context.now(), "", AKTO_MCP_TOOLS_TAG, 0,
                             params.getName(), "", null,
-                            responseParams.getRequestParams().getApiCollectionId()
+                            responseParams.getRequestParams().getApiCollectionId(),
+                            scanForRiskyWords(params.getName())
                     );
                 }
                 break;
@@ -215,7 +222,8 @@ public final class McpRequestResponseUtils {
                     auditInfo = new McpAuditInfo(
                             Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
                             params.getName(), "", null,
-                            responseParams.getRequestParams().getApiCollectionId()
+                            responseParams.getRequestParams().getApiCollectionId(),
+                            scanForRiskyWords(params.getName())
                     );
                 }
                 break;
@@ -228,7 +236,8 @@ public final class McpRequestResponseUtils {
                     auditInfo = new McpAuditInfo(
                             Context.now(), "", AKTO_MCP_PROMPTS_TAG, 0,
                             params.getName(), "", null,
-                            responseParams.getRequestParams().getApiCollectionId()
+                            responseParams.getRequestParams().getApiCollectionId(),
+                            scanForRiskyWords(params.getName())
                     );
                 }
                 break;
@@ -429,6 +438,23 @@ public final class McpRequestResponseUtils {
         }
 
         return new BasicDBObject().append("events", events).toJson();
+    }
+
+    private static Set<String> scanForRiskyWords(String mcpComponentName) {
+
+        if (mcpComponentName == null || mcpComponentName.trim().isEmpty()) {
+            return Collections.emptySet();
+        }
+
+        Set<String> foundRiskyWords = new HashSet<>();
+
+        Matcher matcher = RISKY_PATTERN.matcher(mcpComponentName);
+
+        while (matcher.find()) {
+            foundRiskyWords.add(matcher.group(1).toLowerCase());
+        }
+
+        return foundRiskyWords;
     }
 
 }
