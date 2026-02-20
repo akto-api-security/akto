@@ -2391,11 +2391,9 @@ public class DbLayer {
                 // Update the existing record with new lastDetected timestamp
                 BasicDBObject setFields = new BasicDBObject("lastDetected", Context.now());
 
-                if (auditInfo.getSeverity() != null) {
-                    setFields.put("severity", auditInfo.getSeverity());
-                }
-                if (CollectionUtils.isNotEmpty(auditInfo.getFlaggedWords())) {
-                    setFields.put("flaggedWords", auditInfo.getFlaggedWords());
+                ComponentRiskAnalysis componentRiskAnalysis = auditInfo.getComponentRiskAnalysis();
+                if (componentRiskAnalysis != null) {
+                    setFields.put("componentRiskAnalysis", componentRiskAnalysis);
                 }
 
                 BasicDBObject update = new BasicDBObject();
