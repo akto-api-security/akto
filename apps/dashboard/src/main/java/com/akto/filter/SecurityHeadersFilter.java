@@ -16,11 +16,21 @@ public class SecurityHeadersFilter implements Filter {
 
     private static final String CSP_HEADER_VALUE =
             "default-src 'self'; " +
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' ajax.googleapis.com apis.google.com cdn.mxpnl.com clarity.ms widget.intercom.io app.getbeamer.com unpkg.com d1hvi6xs55woen.cloudfront.net; " +
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' " +
+                "ajax.googleapis.com apis.google.com " +       // Google
+                "*.intercom.io *.intercomcdn.com " +            // Intercom
+                "cdn.mxpnl.com clarity.ms " +                   // Analytics
+                "unpkg.com d1hvi6xs55woen.cloudfront.net " +    // CDNs
+                "app.getbeamer.com js.stripe.com; " +           // Third-party
             "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net unpkg.com; " +
-            "connect-src 'self' *.akto.io api.github.com api.bitbucket.org dev.azure.com gitlab.com cdn.mxpnl.com clarity.ms api-iam.intercom.io widget.intercom.io app.getbeamer.com d1hvi6xs55woen.cloudfront.net *.stigg.io registry.modelcontextprotocol.io; " +
+            "connect-src 'self' " +
+                "*.akto.io " +                                   // Akto
+                "*.intercom.io " +                               // Intercom
+                "cdn.mxpnl.com clarity.ms " +                    // Analytics
+                "cdn.jsdelivr.net d1hvi6xs55woen.cloudfront.net " + // CDNs
+                "app.getbeamer.com *.stigg.io *.api.stigg.io; " +  // Third-party
             "img-src 'self' data: blob: www.google.com; " +
-            "font-src 'self' data: fonts.googleapis.com; " +
+            "font-src 'self' data: fonts.googleapis.com cdn.jsdelivr.net d1hvi6xs55woen.cloudfront.net; " +
             "frame-ancestors 'self'; " +
             "base-uri 'self'";
 
