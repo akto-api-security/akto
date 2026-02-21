@@ -13,12 +13,15 @@ import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.AuthParam.Location;
 import com.akto.testing.*;
+import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.test_editor.*;
@@ -27,6 +30,7 @@ import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.type.KeyTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.parsers.HttpCallParser;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.OrgUtils;
 import com.akto.test_editor.utils.Utils;
@@ -666,7 +670,7 @@ public class Executor {
             return null;
         }
 
-        boolean eligibleForCachedToken = AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType());
+        boolean eligibleForCachedToken = AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType()) || AuthMechanismTypes.SAMPLE_DATA.toString().equalsIgnoreCase(authMechanismForRole.getType());
         boolean shouldCalculateNewToken = eligibleForCachedToken && authMechanismForRole.isCacheExpired();
 
         if (shouldCalculateNewToken) {
@@ -680,6 +684,63 @@ public class Executor {
                 return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
             }
         }
+
+        if (AuthMechanismTypes.SAMPLE_DATA.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
+
+            String latestSample = "";
+            int latestTimestamp = -1;
+            for (Map.Entry<ApiInfoKey, List<String>> entry: TestingConfigurations.getInstance().getTestingUtil().getSampleMessageStore().getSampleDataMap().entrySet()) {
+                try {
+                    if (entry.getValue().size() > 0) {
+                        String thisSample = entry.getValue().get(entry.getValue().size() - 1);
+                        int thisTimestamp = Integer.parseInt(BasicDBObject.parse(thisSample).getString("time", "0"));
+                        if (thisTimestamp > latestTimestamp) {
+                            latestSample = thisSample;
+                            latestTimestamp = thisTimestamp;
+                        }
+                    }                
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "SAMPLE_DATA: Error parsing sample data for sample_data test auth mechanism " + testRole.getName() + ": " + e.getMessage());
+                }
+            }
+
+            if (latestSample.isEmpty()) 
+                return new ExecutorSingleOperationResp(false, "SAMPLE_DATA: Couldn't find a sample message to replace auth token");
+
+            Map<String, Object> valuesMap = new HashMap<>();
+            try {
+                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(latestSample);
+                String[] urlParts = httpResponseParams.getRequestParams().getURL().split("\\?");
+                String queryParams = urlParts.length > 1 ? urlParts[1] : null;
+                com.akto.testing.Utils.populateValuesMap(valuesMap, httpResponseParams.getRequestParams().getPayload(), "x1", httpResponseParams.getRequestParams().getHeaders(), true, queryParams);
+                com.akto.testing.Utils.populateValuesMap(valuesMap, httpResponseParams.getPayload(), "x1", httpResponseParams.getHeaders(), false, null);
+
+            } catch (Exception e) {
+                return new ExecutorSingleOperationResp(false, "SAMPLE_DATA: Unable to populate values map");
+
+            }
+            
+            List<AuthParam> calculatedAuthParams = new ArrayList<>();
+            for (AuthParam authParam : authParamList) {
+                String key = authParam.getKey();
+                String value;
+                try {
+                    value = com.akto.testing.workflow_node_executor.Utils.executeCode(authParam.getValue(), valuesMap);
+                    if (value == null) {
+                        return new ExecutorSingleOperationResp(false, "SAMPLE_DATA: Unable to find value for key: " + key);
+                    }
+                    calculatedAuthParams.add(new HardcodedAuthParam(authParam.getWhere(), key, value, authParam.getShowHeader()));
+                } catch (Exception e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+                
+            }
+
+            authMechanismForRole.updateCacheExpiryEpoch(Integer.MAX_VALUE);
+            authMechanismForRole.updateAuthParamsCached(calculatedAuthParams);
+        }
+
 
         ExecutorSingleOperationResp ret = authMechanismForRole.addAuthToRequest(rawApi.getRequest(), eligibleForCachedToken);
 
