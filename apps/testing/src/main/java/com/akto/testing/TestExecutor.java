@@ -644,6 +644,14 @@ public class TestExecutor {
                         Updates.set(TestingRunResultSummary.STATE, updatedState)),
                 options);
 
+        if (TestingConfigurations.getInstance().isAgentTokenLimitExceeded()) {
+            TestingRunResultSummariesDao.instance.updateOne(
+                    Filters.eq(Constants.ID, summaryId),
+                    Updates.set(TestingRunResultSummary.METADATA_STRING + ".tokenRateLimited",
+                            TestResult.TestError.TOKEN_RATE_LIMITED.getMessage())
+            );
+        }
+
         if (TestingConfigurations.getInstance().getRerunTestingRunResultSummary() != null) {
             TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummary.ID,
                     TestingConfigurations.getInstance().getRerunTestingRunResultSummary().getId()));
