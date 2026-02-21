@@ -140,6 +140,22 @@ function GithubServerTable(props) {
   }, [props.sortOptions])
 
   useEffect(() => {
+      if (!filtersWrapRef.current) return
+      const actionWrap = filtersWrapRef.current.querySelector('[class*="ActionWrap"]')
+      if (!actionWrap) return
+
+      const target = document.createElement('div')
+      target.style.display = 'inline-flex'
+      actionWrap.insertBefore(target, actionWrap.firstChild)
+      setExportPortalTarget(target)
+
+      return () => {
+        target.remove()
+        setExportPortalTarget(null)
+      }
+    }, [mode])
+
+  useEffect(() => {
     const tempFilters = appliedFilters.filter((filter) => !filter?.key?.includes("dateRange"))
     updateQueryParams("filters",tableFunc.getPrettifiedFilter(tempFilters))
   },[appliedFilters])
