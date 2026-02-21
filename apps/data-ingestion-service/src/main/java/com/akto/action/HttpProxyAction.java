@@ -434,19 +434,15 @@ public class HttpProxyAction extends ActionSupport {
     private Map<String, Object> convertTrueFoundryToAktoFormat(Map<String, Object> tfInput) {
         Map<String, Object> flatMap = new HashMap<>();
 
+        flatMap.put("akto_vxlan_id", "0");
         flatMap.put("path", "/api/llm/chat/completions");
         flatMap.put("method", "POST");
+        flatMap.put("akto_account_id", "1000000");
+        flatMap.put("is_pending", "false");
+        flatMap.put("type", "HTTP/1.1");
+        flatMap.put("time", String.valueOf(System.currentTimeMillis()));
 
-        // Request headers
-        Map<String, String> reqHeaders = new HashMap<>();
-        reqHeaders.put("content-type", "application/json");
-        flatMap.put("requestHeaders", toJsonString(reqHeaders));
-
-        // Request payload — serialise requestBody map to JSON string
-        Map<String, Object> requestBody = (Map<String, Object>) tfInput.get("requestBody");
-        flatMap.put("requestPayload", requestBody != null ? toJsonString(requestBody) : "{}");
-
-        // Extract IP from context.metadata.ip_address
+        // Extract IP from context.metadata.ip_address, fallback to 0.0.0.0
         String extractedIp = null;
         if (tfInput.containsKey("context")) {
             Map<String, Object> context = (Map<String, Object>) tfInput.get("context");
@@ -461,9 +457,17 @@ public class HttpProxyAction extends ActionSupport {
                 }
             }
         }
-        if (extractedIp != null) {
-            flatMap.put("ip", extractedIp);
-        }
+        flatMap.put("ip", extractedIp != null ? extractedIp : "0.0.0.0");
+
+        // Request headers
+        Map<String, String> reqHeaders = new HashMap<>();
+        reqHeaders.put("content-type", "application/json");
+        reqHeaders.put("host", "app.truefoundry.com");
+        flatMap.put("requestHeaders", toJsonString(reqHeaders));
+
+        // Request payload — serialise requestBody map to JSON string
+        Map<String, Object> requestBody = (Map<String, Object>) tfInput.get("requestBody");
+        flatMap.put("requestPayload", requestBody != null ? toJsonString(requestBody) : "{}");
 
         // Response fields — only populate when a responseBody is present
         Map<String, Object> responseBody = (Map<String, Object>) tfInput.get("responseBody");
@@ -476,14 +480,16 @@ public class HttpProxyAction extends ActionSupport {
             flatMap.put("status", "OK");
         }
 
+        // Tag as JSON object
+        Map<String, Object> tagMap = new HashMap<>();
+        tagMap.put("gen-ai", "Gen AI");
+        tagMap.put("ai-agent", "truefoundry");
+        flatMap.put("tag", toJsonString(tagMap));
+
         // Metadata — serialise as JSON string
         Map<String, Object> metadataMap = new HashMap<>();
-        Map<String, Object> tags = new HashMap<>();
-        tags.put("gen-ai", "Gen AI");
-        metadataMap.put("tag", tags);
-        if (extractedIp != null) {
-            metadataMap.put("ip", extractedIp);
-        }
+        metadataMap.put("tag", tagMap);
+        metadataMap.put("ip", flatMap.get("ip"));
         if (tfInput.containsKey("context") && tfInput.get("context") != null) {
             metadataMap.put("truefoundry_context", tfInput.get("context"));
         }
@@ -492,9 +498,8 @@ public class HttpProxyAction extends ActionSupport {
         }
         flatMap.put("metadata", toJsonString(metadataMap));
 
-        flatMap.put("tag", "truefoundry");
-        flatMap.put("source", "TRUEFOUNDRY");
-        flatMap.put("contextSource", "truefoundry");
+        flatMap.put("source", "MIRRORING");
+        flatMap.put("contextSource", "AGENTIC");
 
         loggerMaker.info("Converted TrueFoundry format to flat Akto format");
         return flatMap;
