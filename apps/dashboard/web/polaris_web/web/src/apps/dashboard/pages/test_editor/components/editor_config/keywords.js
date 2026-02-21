@@ -5,7 +5,7 @@ const keywords = [
     "response_code", "method", "url", "request_payload", "response_payload", "request_headers", "response_headers", "query_param", "api_collection_id", "source_ip", "destination_ip", "country_code",
     "regex", "eq", "neq", "gt", "gte", "lt", "lte", 
     "key", "value", "requests", "req", "res",
-    "not_contains", "not_contains_either", "contains_jwt", "contains_all", "contains_either", "contains_either_cidr", "not_contains_cidr", "conform_schema",
+    "not_contains", "not_contains_either", "contains_jwt", "jwt_signing_alg","contains_all", "contains_either", "contains_either_cidr", "not_contains_cidr", "conform_schema",
     "for_one", "or", "and", "extract", 
     "add_body_param", "modify_body_param", "delete_body_param", "add_query_param", "modify_query_param", "delete_query_param", 
     "modify_url", "modify_method", "replace_body", "add_header", "modify_header", "delete_header", "remove_auth_header", "follow_redirect", "replace_auth_header", "attach_file",

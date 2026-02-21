@@ -8,6 +8,7 @@ import com.akto.dto.AktoDataType;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.IgnoreData;
 import com.akto.dto.SensitiveParamInfo;
+import com.akto.dto.test_editor.Util;
 import com.akto.dto.type.SingleTypeInfo.ParamId;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 
@@ -335,18 +336,12 @@ public class KeyTypes {
 
     public static boolean isJWT(String jwt) {
         try {
-            String[] jwtList = jwt.split("\\.");
-            if (jwtList.length != 3) // The JWT is composed of three parts
-                return false;
-            String jsonFirstPart = new String(Base64.getDecoder().decode(jwtList[0]));
-            JSONObject firstPart = new JSONObject(jsonFirstPart); // The first part of the JWT is a JSON
-            if (!firstPart.has("alg")) // The first part has the attribute "alg"
-                return false;
-            String jsonSecondPart = new String(Base64.getDecoder().decode(jwtList[1]));
-            JSONObject secondPart = new JSONObject(jsonSecondPart); // The first part of the JWT is a JSON
-        }catch (Exception err){
+            Util.decodeJWT(jwt);
+        } catch (Exception e) {
+            // not a jwt
             return false;
         }
+        // if decodeJWT does not throw an exception, it is a valid JWT
         return true;
     }
 
