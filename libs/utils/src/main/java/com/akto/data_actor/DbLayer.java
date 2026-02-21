@@ -542,6 +542,12 @@ public class DbLayer {
     }
 
     public static void bulkWriteOverageInfo(List<WriteModel<UningestedApiOverage>> writeModelList) {
+        // Check if the collection has reached the maximum limit
+        if (UningestedApiOverageDao.instance.hasReachedLimit()) {
+            loggerMaker.infoAndAddToDb("OverageInfo collection has reached maximum limit (5000 records). Skipping bulk write.", LogDb.RUNTIME);
+            return;
+        }
+        
         BulkWriteResult result = UningestedApiOverageDao.instance.bulkWrite(writeModelList,
                 new BulkWriteOptions().ordered(false));
         loggerMaker.infoAndAddToDb(String.format("OverageInfo bulk write - Matched: %s, Inserted: %s, Modified: %s",
