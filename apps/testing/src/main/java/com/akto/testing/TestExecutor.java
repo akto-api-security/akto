@@ -515,6 +515,8 @@ public class TestExecutor {
 
             Context.accountId.set(accountId);
             AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
+            boolean tokenLimitLoggedOnce = false;
+            List<TestingRunResult> tokenLimitedResults = new ArrayList<>();
             for (String testSubCategory: testingRunSubCategories) {
                 if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
                     loggerMaker.debugAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId) );
@@ -523,15 +525,36 @@ public class TestExecutor {
                         insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit,
                                 apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun,
                                 isApiInfoTested, new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
-                    }else{
-                        if(TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
-                            loggerMaker.infoAndAddToDb("Agent token limit reached, stopping further tests for run: " + testingRun.getHexId(), LogDb.TESTING);
-                        } else {
-                            loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+                    } else if (TestingConfigurations.getInstance().isAgentTokenLimitExceeded()) {
+                        if (!tokenLimitLoggedOnce) {
+                            loggerMaker.infoAndAddToDb("Agent token limit reached, marking remaining tests as skipped for run: " + testingRun.getHexId(), LogDb.TESTING);
+                            tokenLimitLoggedOnce = true;
                         }
+                        TestConfig testConfig = testConfigMap.get(testSubCategory);
+                        if (testConfig != null) {
+                            String testSuperType = testConfig.getInfo().getCategory().getName();
+                            String testSubType = testConfig.getInfo().getSubCategory();
+                            TestingRunResult skippedResult = Utils.generateFailedRunResultForMessage(
+                                testingRun.getId(), apiInfoKey, testSuperType, testSubType, summaryId, messages,
+                                TestError.TOKEN_RATE_LIMITED.getMessage()
+                            );
+                            if (skippedResult != null) {
+                                trim(skippedResult);
+                                tokenLimitedResults.add(skippedResult);
+                            }
+                        }
+                    } else {
+                        loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
                         break;
                     }
                 }
+            }
+            if (!tokenLimitedResults.isEmpty()) {
+                TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
+                    Filters.eq(Constants.ID, summaryId),
+                    Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, tokenLimitedResults.size())
+                );
+                TestingRunResultDao.instance.insertMany(tokenLimitedResults);
             }
             if(isApiInfoTested.get()){
                 loggerMaker.debug("Api: " + apiInfoKey.toString() + " has been successfully tested");
