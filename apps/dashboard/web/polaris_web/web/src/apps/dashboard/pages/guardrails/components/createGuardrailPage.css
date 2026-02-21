@@ -69,7 +69,7 @@
 }
 
 .guardrail-nav-item.active {
-    background-color: transparent;
+    background-color: #F3EFFE;
 }
 
 .guardrail-nav-item.active .Polaris-Text {
@@ -84,6 +84,15 @@
 .guardrail-nav-item .Polaris-Text {
     font-size: 14px;
     line-height: 1.4;
+}
+
+.guardrail-nav-summary {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+    margin-top: 4px;
 }
 
 .step-indicator {
@@ -103,7 +112,8 @@
 }
 
 .step-indicator.current,
-.step-indicator.completed {
+.step-indicator.completed,
+.step-indicator.configured {
     background: #6D3BEF;
     color: white;
 }
