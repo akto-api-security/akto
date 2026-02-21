@@ -1749,7 +1749,7 @@ public class ApiCollectionsAction extends UserAction {
             Runnable r = () -> {
                 Context.accountId.set(accountId);
                 try {
-                    AcesssTypeCollectionLevel.doResetCollectionAccessTypesOptimized();
+                    AcesssTypeCollectionLevel.doResetCollectionAccessTypes();
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in resetCollectionAccessTypes (background)", LogDb.DASHBOARD);
                 }
