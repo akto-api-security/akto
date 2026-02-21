@@ -1626,7 +1626,7 @@ public class DbLayer {
     }
 
     public static List<ApiCollection> fetchAllApiCollectionsMeta() {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(ApiCollectionsDao.instance.nonApiGroupFilter(), Projections.exclude("urls", "conditions"));
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(ApiCollectionsDao.instance.nonApiGroupFilter(), 0, 1000, null, Projections.exclude("urls", "conditions"));
         return apiCollections;
     }
 
