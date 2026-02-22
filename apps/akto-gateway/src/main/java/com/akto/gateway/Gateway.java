@@ -46,8 +46,14 @@ public class Gateway {
 
             String guardrails = getStringField(requestData, "guardrails");
             if ("true".equalsIgnoreCase(guardrails)) {
-                Map<String, Object> guardrailsResponse = callGuardrails(requestData);
-                result.put("guardrailsResult", guardrailsResponse);
+                try {
+                    Map<String, Object> guardrailsResponse = callGuardrails(requestData);
+                    result.put("guardrailsResult", guardrailsResponse);
+                } catch (Exception e) {
+                    logger.error("Guardrails service call failed, continuing with data ingestion - path: {}, error: {}",
+                        requestData.get("path"), e.getMessage(), e);
+                    result.put("guardrailsError", e.getMessage());
+                }
             }
 
             String ingestData = getStringField(requestData, "ingest_data");

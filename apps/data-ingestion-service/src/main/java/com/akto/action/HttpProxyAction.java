@@ -2,6 +2,8 @@ package com.akto.action;
 
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
+import com.akto.notifications.slack.CustomTextAlert;
+import com.akto.notifications.slack.SlackSender;
 import com.akto.utils.KafkaUtils;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -51,7 +53,8 @@ public class HttpProxyAction extends ActionSupport {
 
     public String httpProxy() {
         try {
-            loggerMaker.info("HTTP Proxy API called - path: " + path + ", method: " + method);
+            loggerMaker.infoAndAddToDb("HTTP Proxy API called - path: " + path + ", method: " + method
+                + ", account: " + akto_account_id + ", source: " + source, LoggerMaker.LogDb.DATA_INGESTION);
 
             Gateway gateway = Gateway.getInstance();
             ensureDataPublisher(gateway);
@@ -63,15 +66,38 @@ public class HttpProxyAction extends ActionSupport {
             message = (String) result.get("message");
             data = result;
 
+            if (!success) {
+                String errorMsg = "[http-proxy] API failed - path: " + path + ", method: " + method
+                    + ", account: " + akto_account_id + ", error: " + message;
+                loggerMaker.errorAndAddToDb(errorMsg, LoggerMaker.LogDb.DATA_INGESTION);
+                sendSlackAlert(errorMsg);
+            }
+
             return success ? Action.SUCCESS.toUpperCase() : Action.ERROR.toUpperCase();
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error in HTTP Proxy action: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
+            String errorMsg = "[http-proxy] Unexpected error - path: " + path + ", method: " + method
+                + ", account: " + akto_account_id + ", error: " + e.getMessage();
+            loggerMaker.errorAndAddToDb(errorMsg, LoggerMaker.LogDb.DATA_INGESTION);
+            sendSlackAlert(errorMsg);
             success = false;
             message = "Unexpected error: " + e.getMessage();
             data = new HashMap<>();
             data.put("error", e.getMessage());
             return Action.ERROR.toUpperCase();
+        }
+    }
+
+    private void sendSlackAlert(String errorMsg) {
+        try {
+            int accountId = 1000000;
+            if (akto_account_id != null && !akto_account_id.isEmpty()) {
+                accountId = Integer.parseInt(akto_account_id);
+            }
+            String alertText = errorMsg + ", requestData: " + buildRequestData().toString();
+            SlackSender.sendAlert(accountId, new CustomTextAlert(alertText), null);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Failed to send Slack alert: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
         }
     }
 
