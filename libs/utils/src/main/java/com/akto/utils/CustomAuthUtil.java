@@ -80,7 +80,7 @@ public class CustomAuthUtil {
         if (customAuthTypes == null) {
             customAuthTypes = new ArrayList<>();
         }
-        loggerMaker.infoAndAddToDb("Read " + apiInfos.size() + " api infos for custom auth types " + customAuthTypes.size(), LogDb.DASHBOARD);
+        //loggerMaker.infoAndAddToDb("Read " + apiInfos.size() + " api infos for custom auth types " + customAuthTypes.size(), LogDb.DASHBOARD);
         for (ApiInfo apiInfo : apiInfos) {
 
             if (apiInfo.getId().getApiCollectionId() == -86954493) {

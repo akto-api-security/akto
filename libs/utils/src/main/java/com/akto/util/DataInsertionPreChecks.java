@@ -28,9 +28,9 @@ public class DataInsertionPreChecks {
                 || responseCode == 302
             );
 
-        if (shouldSkip) {
-            logger.info("Skipping URL for accountId {}: {} with response code {} due to pre checks", accountId, url, responseCode);
-        }
+        // if (shouldSkip) {
+        //     logger.info("Skipping URL for accountId {}: {} with response code {} due to pre checks", accountId, url, responseCode);
+        // }
 
         return shouldSkip;
     }
