@@ -33,8 +33,6 @@ function Dashboard() {
 
     const { selectItems } = useTable()
 
-    const navigate = useNavigate();
-
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
 
@@ -187,10 +185,6 @@ function Dashboard() {
             PersistStore.getState().resetAll();
             LocalStore.getState().resetStore();
             PersistStore.getState().setDashboardCategory(currentCategory);
-            const targetPath = currentCategory === "Endpoint Security"
-                ? "/dashboard/observe/agentic-assets"
-                : "/dashboard/observe/inventory";
-            navigate(targetPath);
             window.location.reload();
         }
     }
