@@ -105,6 +105,13 @@ public class DbAction extends ActionSupport {
     private static final Set<String> IGNORED_SUB_TYPES = new HashSet<>(Arrays.asList(
         "GENERIC", "FLOAT", "NULL", "INTEGER_32", "FALSE", "TRUE", "INTEGER_64", "UUID", "DICT"
     ));
+
+    // Cache for fetchAllApiCollectionsMeta (only for account 1736798101)
+    private static final int CACHED_ACCOUNT_ID = 1736798101;
+    private static final long CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+    private static volatile List<ApiCollection> cachedApiCollections = null;
+    private static volatile long cacheTimestamp = 0;
+    private static final Object cacheLock = new Object();
     long count;
     List<CustomDataTypeMapper> customDataTypes;
     List<AktoDataType> aktoDataTypes;
@@ -1961,8 +1968,50 @@ public class DbAction extends ActionSupport {
 
     public String fetchAllApiCollectionsMeta() {
         try {
-           loggerMaker.error("init fetchAllApiCollectionsMeta account id: " + Context.accountId.get());
-           apiCollections = DbLayer.fetchAllApiCollectionsMeta();
+           int accountId = Context.accountId.get();
+           long startTime = System.currentTimeMillis();
+           loggerMaker.error("init fetchAllApiCollectionsMeta account id: " + accountId);
+
+           // Only cache for specific account
+           if (accountId == CACHED_ACCOUNT_ID) {
+               long currentTime = System.currentTimeMillis();
+
+               // Check if cache is valid (within TTL)
+               if (cachedApiCollections != null && (currentTime - cacheTimestamp) < CACHE_TTL_MS) {
+                   apiCollections = cachedApiCollections;
+                   loggerMaker.error("fetchAllApiCollectionsMeta served from cache for account id: " + accountId +
+                       " cache age: " + (currentTime - cacheTimestamp) + "ms");
+                   return Action.SUCCESS.toUpperCase();
+               }
+
+               // Cache miss or expired - use synchronization to prevent concurrent DB calls
+               synchronized (cacheLock) {
+                   // Double-check after acquiring lock (another thread might have updated cache)
+                   currentTime = System.currentTimeMillis();
+                   if (cachedApiCollections != null && (currentTime - cacheTimestamp) < CACHE_TTL_MS) {
+                       apiCollections = cachedApiCollections;
+                       loggerMaker.error("fetchAllApiCollectionsMeta served from cache (double-check) for account id: " + accountId +
+                           " cache age: " + (currentTime - cacheTimestamp) + "ms");
+                       return Action.SUCCESS.toUpperCase();
+                   }
+
+                   // Fetch from DB and update cache
+                   loggerMaker.error("fetchAllApiCollectionsMeta cache miss/expired, fetching from DB for account id: " + accountId);
+                   apiCollections = DbLayer.fetchAllApiCollectionsMeta();
+                   cachedApiCollections = apiCollections;
+                   cacheTimestamp = System.currentTimeMillis();
+
+                   long endTime = System.currentTimeMillis();
+                   loggerMaker.error("finished fetchAllApiCollectionsMeta (DB fetch + cached) account id: " + accountId +
+                       " duration: " + (endTime - startTime) + "ms");
+               }
+           } else {
+               // For other accounts, fetch directly without caching
+               apiCollections = DbLayer.fetchAllApiCollectionsMeta();
+               long endTime = System.currentTimeMillis();
+               loggerMaker.error("finished fetchAllApiCollectionsMeta (no cache) account id: " + accountId +
+                   " duration: " + (endTime - startTime) + "ms");
+           }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchAllApiCollectionsMeta " + e.toString() + " " + Context.accountId.get());
             return Action.ERROR.toUpperCase();
