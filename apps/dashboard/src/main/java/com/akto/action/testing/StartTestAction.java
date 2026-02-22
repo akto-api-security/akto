@@ -76,6 +76,7 @@ public class StartTestAction extends UserAction {
     private int startTimestamp;
     private int testRunTime;
     private int maxConcurrentRequests;
+    private int maxAgentTokens = -1;
     boolean recurringDaily;
     boolean recurringWeekly;
     boolean recurringMonthly;
@@ -235,6 +236,7 @@ public class StartTestAction extends UserAction {
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
                 this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId);
         testingRun.setDoNotMarkIssuesAsFixed(this.doNotMarkIssuesAsFixed);
+        testingRun.setMaxAgentTokens(this.maxAgentTokens);
         return testingRun;
     }
 
@@ -1841,6 +1843,14 @@ public class StartTestAction extends UserAction {
 
     public void setMaxConcurrentRequests(int maxConcurrentRequests) {
         this.maxConcurrentRequests = maxConcurrentRequests;
+    }
+
+    public int getMaxAgentTokens() {
+        return maxAgentTokens;
+    }
+
+    public void setMaxAgentTokens(int maxAgentTokens) {
+        this.maxAgentTokens = maxAgentTokens;
     }
 
     public Map<String, String> getMetadata() {

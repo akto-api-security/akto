@@ -330,7 +330,7 @@ public class TestExecutor {
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
 
-        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed());
+        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getMaxAgentTokens());
         TestingUtilsSingleton.init();
 
         // Pre-fetch auth token before inserting records in Kafka
@@ -515,18 +515,46 @@ public class TestExecutor {
 
             Context.accountId.set(accountId);
             AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
+            boolean tokenLimitLoggedOnce = false;
+            List<TestingRunResult> tokenLimitedResults = new ArrayList<>();
             for (String testSubCategory: testingRunSubCategories) {
                 if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
                     loggerMaker.debugAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId) );
-                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
+                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)
+                            && !TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
                         insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit,
                                 apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun,
                                 isApiInfoTested, new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
-                    }else{
+                    } else if (TestingConfigurations.getInstance().isAgentTokenLimitExceeded()) {
+                        if (!tokenLimitLoggedOnce) {
+                            loggerMaker.infoAndAddToDb("Agent token limit reached, marking remaining tests as skipped for run: " + testingRun.getHexId(), LogDb.TESTING);
+                            tokenLimitLoggedOnce = true;
+                        }
+                        TestConfig testConfig = testConfigMap.get(testSubCategory);
+                        if (testConfig != null) {
+                            String testSuperType = testConfig.getInfo().getCategory().getName();
+                            String testSubType = testConfig.getInfo().getSubCategory();
+                            TestingRunResult skippedResult = Utils.generateFailedRunResultForMessage(
+                                testingRun.getId(), apiInfoKey, testSuperType, testSubType, summaryId, messages,
+                                TestError.TOKEN_RATE_LIMITED.getMessage()
+                            );
+                            if (skippedResult != null) {
+                                trim(skippedResult);
+                                tokenLimitedResults.add(skippedResult);
+                            }
+                        }
+                    } else {
                         loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
                         break;
                     }
                 }
+            }
+            if (!tokenLimitedResults.isEmpty()) {
+                TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
+                    Filters.eq(Constants.ID, summaryId),
+                    Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, tokenLimitedResults.size())
+                );
+                TestingRunResultDao.instance.insertMany(tokenLimitedResults);
             }
             if(isApiInfoTested.get()){
                 loggerMaker.debug("Api: " + apiInfoKey.toString() + " has been successfully tested");
@@ -638,6 +666,14 @@ public class TestExecutor {
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap),
                         Updates.set(TestingRunResultSummary.STATE, updatedState)),
                 options);
+
+        if (TestingConfigurations.getInstance().isAgentTokenLimitExceeded()) {
+            TestingRunResultSummariesDao.instance.updateOne(
+                    Filters.eq(Constants.ID, summaryId),
+                    Updates.set(TestingRunResultSummary.METADATA_STRING + ".tokenRateLimited",
+                            TestResult.TestError.TOKEN_RATE_LIMITED.getMessage())
+            );
+        }
 
         if (TestingConfigurations.getInstance().getRerunTestingRunResultSummary() != null) {
             TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummary.ID,
@@ -921,6 +957,7 @@ public class TestExecutor {
                     }
                 }
                 loggerMaker.infoAndAddToDb("TestExecutor TOTAL tokens to add to summary: " + totalExternalApiTokens, LogDb.TESTING);
+                TestingConfigurations.getInstance().addAgentTokens(totalExternalApiTokens);
 
                 // Update summary with test count and cumulative external API tokens
                 TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
