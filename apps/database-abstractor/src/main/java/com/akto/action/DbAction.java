@@ -603,9 +603,9 @@ public class DbAction extends ActionSupport {
             List<ApiInfo> apiInfos = new ArrayList<>();
             for (BasicDBObject obj: apiInfoList) {
                 String json = obj.toJson();
-                loggerMaker.infoAndAddToDb("Fast-discovery: Converting JSON to ApiInfo: " + json);
+                //loggerMaker.infoAndAddToDb("Fast-discovery: Converting JSON to ApiInfo: " + json);
                 ApiInfo apiInfo = objectMapper.readValue(json, ApiInfo.class);
-                loggerMaker.infoAndAddToDb("Fast-discovery: ApiInfo after conversion - id=" + apiInfo.getId());
+                //loggerMaker.infoAndAddToDb("Fast-discovery: ApiInfo after conversion - id=" + apiInfo.getId());
                 ApiInfoKey id = apiInfo.getId();
                 
                 // Skip URLs based on validation rules (use 0 for response code as it's not available in ApiInfo)
