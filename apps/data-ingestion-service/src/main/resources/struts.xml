@@ -73,7 +73,7 @@
             </result>
         </action>
 
-        <action name="api/http-proxy/truefoundry" class="com.akto.action.HttpProxyAction" method="truefoundryProxy">
+        <action name="api/http-proxy/truefoundry" class="com.akto.action.TrueFoundryProxyAction" method="truefoundry">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
