@@ -444,9 +444,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             return ERROR.toUpperCase();
         }
 
-        for (String ip : actorIps) {
-            sendModifyThreatActorStatusToBackend(ip);
-        }
+        sendBulkModifyThreatActorStatusToBackend(actorIps);
         return SUCCESS.toUpperCase();
     }
 
@@ -680,6 +678,36 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb("Error sending threat actor status " + e.getMessage());
+            return false;
+        }
+
+        return true;
+    }
+
+    public boolean sendBulkModifyThreatActorStatusToBackend(List<String> ips) {
+        HttpPost post =
+                new HttpPost(String.format("%s/api/dashboard/bulkModifyThreatActorStatus", this.getBackendUrl()));
+        post.addHeader("Authorization", "Bearer " + this.getApiToken());
+        post.addHeader("Content-Type", "application/json");
+
+        Map<String, Object> body =
+                new HashMap<String, Object>() {
+                    {
+                        put("updated_ts", Context.now());
+                        put("ips", ips);
+                        put("status", status);
+                    }
+                };
+        String msg = objectMapper.valueToTree(body).toString();
+
+        StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+        post.setEntity(requestEntity);
+
+        try (CloseableHttpResponse response = this.httpClient.execute(post)) {
+            loggerMaker.debugAndAddToDb("updated threat actor status in bulk");
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("Error sending bulk threat actor status " + e.getMessage());
             return false;
         }
 
