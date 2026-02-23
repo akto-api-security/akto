@@ -317,19 +317,128 @@ public class MaliciousEventService {
         .build();
   }
 
+  private void fetchAlertFilterData(String accountId, Set<String> subCategories, Set<String> urls, Set<String> hosts) {
+    try {
+      // Get distinct filterIds using streaming from malicious_events
+      maliciousEventDao.getCollection(accountId)
+          .distinct("filterId", String.class)
+          .forEach(value -> {
+            if (value != null && !value.isEmpty()) {
+              subCategories.add(value);
+            }
+          });
+    } catch (Exception e) {
+      logger.error("Error fetching distinct filterIds: " + e.getMessage(), e);
+    }
+
+    try {
+      // Get distinct hosts using streaming from malicious_events
+      maliciousEventDao.getCollection(accountId)
+          .distinct("host", String.class)
+          .forEach(value -> {
+            if (value != null && !value.isEmpty()) {
+              hosts.add(value);
+            }
+          });
+    } catch (Exception e) {
+      logger.error("Error fetching distinct hosts: " + e.getMessage(), e);
+    }
+
+    try {
+      // Get distinct latestApiEndpoint using aggregation pipeline with limit
+      // to avoid 16MB result size limit
+      List<Document> pipeline = Arrays.asList(
+          new Document("$group", new Document("_id", "$latestApiEndpoint")),
+          new Document("$sort", new Document("_id", 1)),
+          new Document("$limit", 1000)
+      );
+      maliciousEventDao.aggregateRaw(accountId, pipeline)
+          .forEach(doc -> {
+            String endpoint = doc.getString("_id");
+            if (endpoint != null && !endpoint.isEmpty()) {
+              urls.add(endpoint);
+            }
+          });
+    } catch (Exception e) {
+      logger.error("Error fetching distinct latestApiEndpoint: " + e.getMessage(), e);
+    }
+  }
+
+  private FetchAlertFiltersResponse fetchAlertFiltersFromActorInfo(
+      String accountId, FetchAlertFiltersRequest request) {
+
+    ActorInfoDao actorInfoDao = ActorInfoDao.instance;
+
+    Set<String> actors = new HashSet<>();
+    Set<String> urls = new HashSet<>();
+    Set<String> subCategories = new HashSet<>();
+    Set<String> hosts = new HashSet<>();
+
+    try {
+      // Get distinct actorIds (IPs) from actor_info table only
+      actorInfoDao.getCollection(accountId)
+          .distinct("actorId", String.class)
+          .forEach(value -> {
+            if (value != null && !value.isEmpty()) {
+              actors.add(value);
+            }
+          });
+    } catch (Exception e) {
+      logger.error("Error fetching distinct actors from actor_info: " + e.getMessage(), e);
+    }
+
+    // Fetch remaining filters from malicious_events
+    fetchAlertFilterData(accountId, subCategories, urls, hosts);
+
+    return FetchAlertFiltersResponse.newBuilder()
+        .addAllActors(actors)
+        .addAllUrls(urls)
+        .addAllSubCategory(subCategories)
+        .addAllHosts(hosts)
+        .build();
+  }
+
+  private FetchAlertFiltersResponse fetchAlertFiltersFromMaliciousEvents(
+      String accountId, FetchAlertFiltersRequest request) {
+
+    Set<String> actors = new HashSet<>();
+    Set<String> urls = new HashSet<>();
+    Set<String> subCategories = new HashSet<>();
+    Set<String> hosts = new HashSet<>();
+
+    try {
+      // Get distinct actors using streaming to avoid memory issues
+      maliciousEventDao.getCollection(accountId)
+          .distinct("actor", String.class)
+          .forEach(value -> {
+            if (value != null && !value.isEmpty()) {
+              actors.add(value);
+            }
+          });
+    } catch (Exception e) {
+      logger.error("Error fetching distinct actors: " + e.getMessage(), e);
+    }
+
+    // Fetch remaining filters from malicious_events
+    fetchAlertFilterData(accountId, subCategories, urls, hosts);
+
+    return FetchAlertFiltersResponse.newBuilder()
+        .addAllActors(actors)
+        .addAllUrls(urls)
+        .addAllSubCategory(subCategories)
+        .addAllHosts(hosts)
+        .build();
+  }
+
   public FetchAlertFiltersResponse fetchAlertFilters(
       String accountId, FetchAlertFiltersRequest request) {
 
-    Set<String> actors =
-        this.findDistinctFields(accountId, "actor", String.class, Filters.empty());
-    Set<String> urls =
-        this.findDistinctFields(accountId, "latestApiEndpoint", String.class, Filters.empty());
-    Set<String> subCategories =
-        this.findDistinctFields(accountId, "filterId", String.class, Filters.empty());
-    Set<String> hosts =
-        this.findDistinctFields(accountId, "host", String.class, Filters.empty());
-
-    return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).addAllSubCategory(subCategories).addAllHosts(hosts).build();
+    // Use optimized actor_info table if feature flag is enabled
+    if (USE_ACTOR_INFO_TABLE) {
+      return fetchAlertFiltersFromActorInfo(accountId, request);
+    } else {
+      return fetchAlertFiltersFromMaliciousEvents(accountId, request);
+    }
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
