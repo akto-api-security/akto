@@ -340,6 +340,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 
 // ValidateRequest validates a request payload against guardrail policies with session tracking
 func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRequestParams, sessionID string, requestID string) (*mcp.ValidationResult, error) {
+	start := time.Now()
 	payload := params.RequestPayload
 	contextSource := params.ContextSource
 
@@ -380,6 +381,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	}
 
 	// Get cached policies (refreshes if stale)
+	policiesStart := time.Now()
 	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(contextSource)
 	if err != nil {
 		s.logger.Error("ValidateRequest - failed to load policies",
@@ -388,6 +390,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.String("account", params.AktoAccountID),
 			zap.String("contextSource", contextSource),
 			zap.String("sessionID", sessionID),
+			zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()),
 			zap.Error(err))
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
@@ -395,7 +398,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	s.logger.Info("ValidateRequest - loaded policies",
 		zap.String("contextSource", contextSource),
 		zap.Int("policiesCount", len(policies)),
-		zap.Strings("policyNames", policyNames(policies)))
+		zap.Strings("policyNames", policyNames(policies)),
+		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
 	// Parse headers and status code
 	reqHeaders := make(map[string]string)
@@ -454,6 +458,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int("respHeadersCount", len(respHeaders)))
 
 	// Use the default processor - skipThreat is passed via ValidationContext
+	processStart := time.Now()
 	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
 	if err != nil {
 		s.logger.Error("ValidateRequest - ProcessRequest failed",
@@ -461,6 +466,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.String("method", params.Method),
 			zap.String("account", params.AktoAccountID),
 			zap.String("sessionID", sessionID),
+			zap.Int64("latencyMs", time.Since(processStart).Milliseconds()),
 			zap.Error(err))
 		return nil, fmt.Errorf("failed to process request: %w", err)
 	}
@@ -471,7 +477,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.String("sessionID", sessionID),
 		zap.Bool("isBlocked", processResult.IsBlocked),
 		zap.Bool("shouldForward", processResult.ShouldForward),
-		zap.Bool("payloadModified", processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload))
+		zap.Bool("payloadModified", processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload),
+		zap.Int64("latencyMs", time.Since(processStart).Milliseconds()))
 
 	if processResult.IsBlocked {
 		s.logger.Warn("ValidateRequest - request blocked by guardrails",
@@ -502,7 +509,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.String("sessionID", sessionID),
 		zap.String("requestID", requestID),
 		zap.Bool("allowed", result.Allowed),
-		zap.Bool("modified", result.Modified))
+		zap.Bool("modified", result.Modified),
+		zap.Int64("totalLatencyMs", time.Since(start).Milliseconds()))
 
 	return result, nil
 }

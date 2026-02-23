@@ -31,6 +31,7 @@ public class Gateway {
             requestData.get("path"), requestData.get("method"),
             requestData.get("guardrails"), requestData.get("ingest_data"));
 
+        long start = System.currentTimeMillis();
         try {
             String requestPayload = getStringField(requestData, "requestPayload");
             if (requestPayload == null || requestPayload.isEmpty()) {
@@ -46,21 +47,30 @@ public class Gateway {
 
             String guardrails = getStringField(requestData, "guardrails");
             if ("true".equalsIgnoreCase(guardrails)) {
+                long guardrailsStart = System.currentTimeMillis();
                 Map<String, Object> guardrailsResponse = callGuardrails(requestData);
+                logger.info("Guardrails call completed - path: {}, latencyMs: {}",
+                    requestData.get("path"), System.currentTimeMillis() - guardrailsStart);
                 result.put("guardrailsResult", guardrailsResponse);
             }
 
             String ingestData = getStringField(requestData, "ingest_data");
             if ("true".equalsIgnoreCase(ingestData)) {
+                long kafkaStart = System.currentTimeMillis();
                 ingestData(requestData);
+                logger.info("Kafka ingestion completed - path: {}, latencyMs: {}",
+                    requestData.get("path"), System.currentTimeMillis() - kafkaStart);
             }
 
+            logger.info("processHttpProxy completed - path: {}, method: {}, totalLatencyMs: {}",
+                requestData.get("path"), requestData.get("method"), System.currentTimeMillis() - start);
             result.put("success", true);
             result.put("message", "Request processed successfully");
             return result;
 
         } catch (Exception e) {
-            logger.error("Error processing HTTP proxy request: {}", e.getMessage(), e);
+            logger.error("Error processing HTTP proxy request: {}, latencyMs: {}", e.getMessage(),
+                System.currentTimeMillis() - start, e);
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("message", "Unexpected error: " + e.getMessage());
