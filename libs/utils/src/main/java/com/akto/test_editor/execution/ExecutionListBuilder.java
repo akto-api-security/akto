@@ -63,8 +63,9 @@ public class ExecutionListBuilder {
             return true;
         }
 
-        if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString()) || 
-            node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Validate.toString()) || 
+        if (node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorParentOperands.TYPE.toString()) ||
+            node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.Validate.toString()) ||
+            node.getOperationType().equalsIgnoreCase(TestEditorEnums.ExecutorOperandTypes.ValidateAll.toString()) ||
             node.getNodeType().equalsIgnoreCase(ExecutorOperandTypes.TerminalNonExecutable.toString())) {
                 return true;
         }

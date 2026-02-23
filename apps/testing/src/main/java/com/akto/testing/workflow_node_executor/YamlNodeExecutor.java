@@ -108,9 +108,14 @@ public class YamlNodeExecutor extends NodeExecutor {
         rawApis.add(rawApi.copy());
 
         FilterNode finalValidatorNode = validatorNode;
+        boolean isValidateAll = false;
         for (ExecutorNode execNode: childNodes) {
             if (execNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ValidateExecutorDataOperands.Validate.toString())) {
                 finalValidatorNode = (FilterNode) execNode.getChildNodes().get(0).getValues();
+                isValidateAll = false;
+            } else if (execNode.getNodeType().equalsIgnoreCase(TestEditorEnums.ValidateExecutorDataOperands.ValidateAll.toString())) {
+                finalValidatorNode = (FilterNode) execNode.getChildNodes().get(0).getValues();
+                isValidateAll = true;
             }
         }
 
@@ -145,6 +150,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         final String finalLogId = logId;
         final FilterNode finalValidatorNodeForLambda = finalValidatorNode;
         final ExecutorSingleRequest finalSingleReq = singleReq;
+        final boolean finalIsValidateAll = isValidateAll;
         
         boolean vulnerable;
         List<String> message;
@@ -161,12 +167,12 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<RawApi> requestsToProcess = prepareTestRequests(rawApis, sampleRawApi, node, yamlNodeDetails);
         
         ExecutionContext execContext = (apiCallExecutor != null)
-            ? executeParallel(requestsToProcess, node, yamlNodeDetails, sampleRawApi, executor, varMap, 
-                             finalLogId, finalValidatorNodeForLambda, followRedirect, finalTestingRunConfig, 
-                             debug, testLogs, apiInfoKey, memory, finalSingleReq, apiCallExecutor)
-            : executeSequential(requestsToProcess, node, yamlNodeDetails, sampleRawApi, executor, varMap, 
-                               finalLogId, finalValidatorNodeForLambda, followRedirect, finalTestingRunConfig, 
-                               debug, testLogs, apiInfoKey, memory, finalSingleReq);
+            ? executeParallel(requestsToProcess, node, yamlNodeDetails, sampleRawApi, executor, varMap,
+                             finalLogId, finalValidatorNodeForLambda, followRedirect, finalTestingRunConfig,
+                             debug, testLogs, apiInfoKey, memory, finalSingleReq, apiCallExecutor, finalIsValidateAll)
+            : executeSequential(requestsToProcess, node, yamlNodeDetails, sampleRawApi, executor, varMap,
+                               finalLogId, finalValidatorNodeForLambda, followRedirect, finalTestingRunConfig,
+                               debug, testLogs, apiInfoKey, memory, finalSingleReq, finalIsValidateAll);
         
         // Extract results from context
         vulnerable = execContext.vulnerable;
@@ -179,6 +185,8 @@ public class YamlNodeExecutor extends NodeExecutor {
 
         calcTimeAndLenStats(node.getId(), responseTimeArr, responseLenArr, varMap);
 
+        System.out.println("Saved Responses " + savedResponses);
+
         if (savedResponses != null) {
             varMap.put(node.getId() + ".response.body", savedResponses);
             varMap.put(node.getId() + ".response.status_code", String.valueOf(statusCode));
@@ -188,6 +196,34 @@ public class YamlNodeExecutor extends NodeExecutor {
             varMap.put(node.getId() + ".response.body.eventStream", eventStreamResponse);
         }
 
+        // Run validate_all if specified - now all node variables are in varMap
+        if (isValidateAll && finalValidatorNode != null) {
+            // For validate_all, we don't validate against a specific response
+            // We only use the variables in varMap (like ${x1.response.status_code})
+            // So we pass the last response as context, but validation uses varMap
+            OriginalHttpResponse syntheticResponse = new OriginalHttpResponse();
+            if (savedResponses != null) {
+                syntheticResponse.setBody(savedResponses);
+                syntheticResponse.setStatusCode(statusCode);
+            }
+
+            ExecutionResult validateAllAttempt = new ExecutionResult(
+                true, "",
+                sampleRawApi.getRequest(),
+                syntheticResponse
+            );
+
+            TestResult validateAllResult = executor.validate(
+                validateAllAttempt, sampleRawApi, varMap, logId,
+                finalValidatorNode, yamlNodeDetails.getApiInfoKey()
+            );
+
+            if (validateAllResult != null && validateAllResult.getVulnerable()) {
+                vulnerable = true;
+                message.add(validateAllResult.getMessage());
+            }
+        }
+
         // call executor's build request, which returns all rawapi by taking a rawapi argument
         // valuemap -> use varmap
 
@@ -195,7 +231,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         // call validate node present in node
         // if vulnerable, populate map
 
-        // 
+        //
 
         return new WorkflowTestResult.NodeResult(message.toString(), vulnerable, testErrors);
 
@@ -229,7 +265,8 @@ public class YamlNodeExecutor extends NodeExecutor {
                                             String logId, FilterNode validatorNode, boolean followRedirect,
                                             TestingRunConfig testingRunConfig, boolean debug,
                                             List<TestingRunResult.TestLog> testLogs, ApiInfo.ApiInfoKey apiInfoKey,
-                                            Memory memory, ExecutorSingleRequest singleReq, ExecutorService apiCallExecutor) {
+                                            Memory memory, ExecutorSingleRequest singleReq, ExecutorService apiCallExecutor,
+                                            boolean isValidateAll) {
         
         ExecutionContext context = new ExecutionContext();
         AtomicBoolean vulnerabilityFound = new AtomicBoolean(false);
@@ -237,7 +274,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<CompletableFuture<ApiCallResult>> futures = submitApiCalls(
             requests, node, yamlNodeDetails, sampleRawApi, executor, varMap, logId, validatorNode,
             followRedirect, testingRunConfig, debug, testLogs, apiInfoKey, memory, singleReq,
-            vulnerabilityFound, apiCallExecutor
+            vulnerabilityFound, apiCallExecutor, isValidateAll
         );
         
         collectParallelResults(futures, context, vulnerabilityFound);
@@ -247,7 +284,7 @@ public class YamlNodeExecutor extends NodeExecutor {
     /**
      * Submit all API calls to the executor service
      */
-    private List<CompletableFuture<ApiCallResult>> submitApiCalls(List<RawApi> requests, Node node, 
+    private List<CompletableFuture<ApiCallResult>> submitApiCalls(List<RawApi> requests, Node node,
                                                                    YamlNodeDetails yamlNodeDetails, RawApi sampleRawApi,
                                                                    Executor executor, Map<String, Object> varMap,
                                                                    String logId, FilterNode validatorNode,
@@ -255,7 +292,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                                                                    boolean debug, List<TestingRunResult.TestLog> testLogs,
                                                                    ApiInfo.ApiInfoKey apiInfoKey, Memory memory,
                                                                    ExecutorSingleRequest singleReq, AtomicBoolean vulnerabilityFound,
-                                                                   ExecutorService apiCallExecutor) {
+                                                                   ExecutorService apiCallExecutor, boolean isValidateAll) {
         List<CompletableFuture<ApiCallResult>> futures = new ArrayList<>();
         
         for (RawApi testReq : requests) {
@@ -265,9 +302,9 @@ public class YamlNodeExecutor extends NodeExecutor {
                 }
                 return processSingleApiCall(testReq, node, yamlNodeDetails, sampleRawApi, executor,
                     varMap, logId, validatorNode, followRedirect, testingRunConfig, debug, testLogs,
-                    apiInfoKey, memory, singleReq);
+                    apiInfoKey, memory, singleReq, isValidateAll);
             }, apiCallExecutor);
-            
+
             futures.add(future);
         }
         
@@ -305,7 +342,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                                               String logId, FilterNode validatorNode, boolean followRedirect,
                                               TestingRunConfig testingRunConfig, boolean debug,
                                               List<TestingRunResult.TestLog> testLogs, ApiInfo.ApiInfoKey apiInfoKey,
-                                              Memory memory, ExecutorSingleRequest singleReq) {
+                                              Memory memory, ExecutorSingleRequest singleReq, boolean isValidateAll) {
         ExecutionContext context = new ExecutionContext();
         
         for (RawApi testReq : requests) {
@@ -315,7 +352,7 @@ public class YamlNodeExecutor extends NodeExecutor {
             
             ApiCallResult callResult = processSingleApiCall(testReq, node, yamlNodeDetails, sampleRawApi,
                 executor, varMap, logId, validatorNode, followRedirect, testingRunConfig, debug,
-                testLogs, apiInfoKey, memory, singleReq);
+                testLogs, apiInfoKey, memory, singleReq, isValidateAll);
             
             if (callResult != null) {
                 aggregateResult(callResult, context, null);
@@ -405,12 +442,12 @@ public class YamlNodeExecutor extends NodeExecutor {
      * Abstracted method to process a single API call.
      * This method contains the common logic used in both sequential and parallel execution paths.
      */
-    private ApiCallResult processSingleApiCall(RawApi testReq, Node node, YamlNodeDetails yamlNodeDetails, 
+    private ApiCallResult processSingleApiCall(RawApi testReq, Node node, YamlNodeDetails yamlNodeDetails,
                                                RawApi sampleRawApi, Executor executor, Map<String, Object> varMap,
                                                String logId, FilterNode validatorNode, boolean followRedirect,
-                                               TestingRunConfig testingRunConfig, boolean debug, 
+                                               TestingRunConfig testingRunConfig, boolean debug,
                                                List<TestingRunResult.TestLog> testLogs, ApiInfo.ApiInfoKey apiInfoKey,
-                                               Memory memory, ExecutorSingleRequest singleReq) {
+                                               Memory memory, ExecutorSingleRequest singleReq, boolean isValidateAll) {
         try {
             TestResult res = null;
             String messageStr = null;
@@ -451,9 +488,17 @@ public class YamlNodeExecutor extends NodeExecutor {
                 int tsAfterReq = Context.nowInMillis();
                 responseTime = tsAfterReq - tsBeforeReq;
                 
-                ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), 
+                ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(),
                     testReq.getRequest(), testResponse);
-                res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
+
+                // Skip validation if validate_all is specified - will be run after all requests complete
+                if (!isValidateAll) {
+                    res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
+                } else {
+                    // Create a non-vulnerable result - validation will be done later
+                    String msg = convertOriginalReqRespToString(testReq.getRequest(), testResponse, 0);
+                    res = new TestResult(msg, sampleRawApi.getOriginalMessage(), new ArrayList<>(), 0, false, TestResult.Confidence.HIGH, null);
+                }
                 
                 try {
                     messageStr = convertOriginalReqRespToString(testReq.getRequest(), testResponse, responseTime);

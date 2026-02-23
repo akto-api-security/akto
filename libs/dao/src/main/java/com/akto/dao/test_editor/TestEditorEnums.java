@@ -260,7 +260,8 @@ public class TestEditorEnums {
     }
 
     public enum ValidateExecutorDataOperands {
-        Validate
+        Validate,
+        ValidateAll
     }
 
     public enum LoopExecutorOperands {
@@ -276,6 +277,7 @@ public class TestEditorEnums {
         Data,
         TerminalNonExecutable,
         Validate,
+        ValidateAll,
         Loop,
         Dynamic
     }
