@@ -8,13 +8,19 @@ import org.bson.conversions.Bson;
 
 import com.akto.dao.AccountsContextDaoWithRbac;
 import com.akto.dao.MCollection;
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -22,6 +28,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.MongoDBEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -30,6 +37,8 @@ import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UnwindOptions;
+import org.bson.types.ObjectId;
+import java.util.stream.Collectors;
 
 public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIssues> {
 
@@ -315,5 +324,96 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
     @Override
     public String getFilterKeyString(){
         return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.Id_ApiInfoKey_ApiCollectionId) + ApiInfoKey.API_COLLECTION_ID;
+    }
+
+    /**
+     * Gets filter for issues based on dashboardContext from test runs.
+     * Issues are linked via: latestTestingRunSummaryId -> TestingRunResultSummary.testingRunId -> TestingRun.dashboardContext
+     * Returns Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, matchingSummaryIds) or Filters.empty() if no matches
+     */
+    private Bson getDashboardContextFilterForIssues(CONTEXT_SOURCE contextSource) {
+        // Find all test runs with exact matching dashboardContext
+        List<ObjectId> matchingTestRunIds = TestingRunDao.instance.getMCollection().find(
+            Filters.eq(TestingRun.DASHBOARD_CONTEXT, contextSource)
+        ).projection(Projections.include(Constants.ID))
+        .into(new ArrayList<>())
+        .stream()
+            .map(TestingRun::getId)
+            .collect(Collectors.toList());
+        
+        if (matchingTestRunIds.isEmpty()) {
+            return Filters.empty();
+        }
+        
+        // Find all summaries for those test runs
+        List<ObjectId> matchingSummaryIds = TestingRunResultSummariesDao.instance.getMCollection().find(
+            Filters.in(TestingRunResultSummary.TESTING_RUN_ID, matchingTestRunIds)
+        ).projection(Projections.include(Constants.ID))
+        .into(new ArrayList<>())
+        .stream()
+            .map(TestingRunResultSummary::getId)
+            .collect(Collectors.toList());
+        
+        if (matchingSummaryIds.isEmpty()) {
+            return Filters.empty();
+        }
+        
+        return Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, matchingSummaryIds);
+    }
+
+    /**
+     * Applies RBAC and dashboard context filtering for dashboard queries.
+     * - Shows all issues including deleted/deactivated collections
+     * - If contextSource is set: filters by dashboardContext from test runs
+     * - Admin: can see all issues (filtered by dashboardContext if contextSource is set)
+     * - Non-admin: only accessible collections (filtered by dashboardContext if contextSource is set)
+     * 
+     * Note: contextSource is set by UserDetailsFilter for HTTP requests (defaults to API if not provided).
+     * It may be null in background jobs/async threads, but for dashboard requests it should always be set.
+     */
+    public Bson addCollectionsFilterForDashboard(Bson q) {
+        CONTEXT_SOURCE contextSource = Context.contextSource.get();
+        boolean isAdmin = RBACDao.getCurrentRoleForUser(Context.userId.get(), Context.accountId.get()) == Role.ADMIN;
+        
+        // Admin viewing user-based dashboard (no contextSource): show all
+        if (isAdmin && contextSource == null) {
+            return q;
+        }
+      
+        List<Integer> apiCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
+                Context.accountId.get()); 
+
+        // Filter by dashboardContext only (getCollectionsIdForUser already filtered by context)
+        Bson dashboardContextFilter = getDashboardContextFilterForIssues(contextSource);
+        
+        // RBAC disabled or admin with empty list
+        if (apiCollectionIds == null || (apiCollectionIds.isEmpty() && isAdmin)) {
+            // No contextSource: show all
+            if (contextSource == null) {
+                return q;
+            }
+            return Filters.and(q, dashboardContextFilter);
+        }
+        
+        // Non-admin with empty list: no access
+        if (apiCollectionIds.isEmpty()) {
+            return Filters.and(q, Filters.empty());
+        }
+        
+        // Build filter for accessible collections (already filtered by context via getCollectionsIdForUser)
+        // Only check _id.apiInfoKey.apiCollectionId (primary field) - collectionIds is derived from it
+        Bson accessibleCollectionsFilter = Filters.in(getFilterKeyString(), apiCollectionIds);
+        
+        // Filter by dashboardContext if contextSource is set (for deleted collections)
+        if (contextSource != null && isAdmin) {
+            // Admin: accessible collections OR issues with matching dashboardContext
+            if (dashboardContextFilter.equals(Filters.empty())) {
+                return Filters.and(q, accessibleCollectionsFilter);
+            }
+            return Filters.and(q, Filters.or(accessibleCollectionsFilter, dashboardContextFilter));
+        }
+        
+        // No contextSource: return accessible collections only
+        return Filters.and(q, accessibleCollectionsFilter);
     }
 }

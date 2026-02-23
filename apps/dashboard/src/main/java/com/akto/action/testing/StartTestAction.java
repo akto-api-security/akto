@@ -1111,7 +1111,7 @@ public class StartTestAction extends UserAction {
         Bson filterQ = Filters.and(
                 Filters.eq("testingEndpoints.workflowTest._id", workflowTestId),
                 Filters.eq("state", TestingRun.State.SCHEDULED));
-        this.testingRuns = TestingRunDao.instance.findAll(filterQ);
+        this.testingRuns = TestingRunDao.instance.findAllWithRbacAndContext(filterQ, 0, 0, null);
         return SUCCESS.toUpperCase();
     }
 

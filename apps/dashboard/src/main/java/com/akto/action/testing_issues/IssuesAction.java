@@ -175,16 +175,12 @@ public class IssuesAction extends UserAction {
     int sortOrder;
     public String fetchAllIssues() {
         Bson filters = createFilters(true);
+        
+        // Apply dashboard filtering (RBAC + dashboardContext)
+        Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(filters);
 
         List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(filters));
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
-            }
-        } catch(Exception e){
-        }
+        pipeline.add(Aggregates.match(dashboardFilter));
         if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
             Bson addSeverityValueStage = Aggregates.addFields(
                     new Field<>("severityValue", new BasicDBObject("$switch",
@@ -218,9 +214,14 @@ public class IssuesAction extends UserAction {
                 .into(new ArrayList<>());
 
         Bson countingFilters = createFilters(false);
-        openIssuesCount = TestingRunIssuesDao.instance.count(Filters.and(countingFilters, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name())));
-        fixedIssuesCount = TestingRunIssuesDao.instance.count(Filters.and(countingFilters, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name())));
-        ignoredIssuesCount = TestingRunIssuesDao.instance.count(Filters.and(countingFilters, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED.name())));
+        // Apply dashboard filtering for counts too
+        Bson dashboardCountingFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(countingFilters);
+        openIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
+            Filters.and(dashboardCountingFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name())));
+        fixedIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
+            Filters.and(dashboardCountingFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name())));
+        ignoredIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
+            Filters.and(dashboardCountingFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED.name())));
 
         for (TestingRunIssues runIssue : issues) {
             if (runIssue.getId().getTestSubCategory().startsWith("http")) {
@@ -237,53 +238,43 @@ public class IssuesAction extends UserAction {
     List<Integer> criticalIssuesCountDayWise;
     public String findTotalIssuesByDay() {
         long daysBetween = (endTimeStamp - startEpoch) / ONE_DAY_TIMESTAMP;
-        List<Bson> pipeline = new ArrayList<>();
-
+        
+        // Base filters (excluding deactivated collections for backward compatibility)
         Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
         Bson notIncludedCollections = Filters.nin(ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, deactivatedCollections);
 
-        Bson filters = Filters.and(
+        Bson baseFilters = Filters.and(
                 notIncludedCollections,
                 Filters.gte(TestingRunIssues.CREATION_TIME, startEpoch),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
         );
+        
+        // Apply dashboard filtering
+        Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilters);
 
-        Bson totalIssuesMatchStage = Aggregates.match(filters);
+        Bson totalIssuesMatchStage = Aggregates.match(dashboardFilter);
         Bson openIssuesMatchStage = Aggregates.match(Filters.and(
-                filters,
+                dashboardFilter,
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name())
         ));
         Bson criticalIssuesMatchStage = Aggregates.match(Filters.and(
-                filters,
+                dashboardFilter,
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name()),
                 Filters.in(TestingRunIssues.KEY_SEVERITY, Severity.CRITICAL.name(), Severity.HIGH.name())
         ));
 
+        List<Bson> pipeline = new ArrayList<>();
         pipeline.add(totalIssuesMatchStage);
-        List<Integer> collectionIds = null;
-        try {
-            collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
-            }
-        } catch(Exception e){
-        }
         totalIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, totalIssuesCountDayWise);
         pipeline.clear();
 
         pipeline.add(openIssuesMatchStage);
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
-        }
         openIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, openIssuesCountDayWise);
         pipeline.clear();
 
         pipeline.add(criticalIssuesMatchStage);
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
-        }
         criticalIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, criticalIssuesCountDayWise);
         pipeline.clear();
