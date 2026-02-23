@@ -963,7 +963,9 @@ function TestRunResultFlyout(props) {
         />
     )
 
-    const askAktoComp = (
+    const isAktoUser = window.USER_NAME && window.USER_NAME.endsWith('@akto.io')
+
+    const askAktoComp = isAktoUser ? (
         <AskAktoSection
             aiSummary={aiSummary}
             aiSummaryLoading={aiSummaryLoading}
@@ -972,11 +974,11 @@ function TestRunResultFlyout(props) {
             onGenerateAiOverview={onGenerateAiOverview}
             onSendFollowUp={onSendFollowUp}
         />
-    )
+    ) : null
 
     const currentComponents = showForbidden
         ? [<Box padding="4"><ForbiddenRole /></Box>]
-        : [<TitleComponent />, askAktoComp, tabsComponent]
+        : [<TitleComponent />, askAktoComp, tabsComponent].filter(Boolean)
 
     const title = isIssuePage ? "Issue details" : mapLabel('Test result', getDashboardCategory())
 
