@@ -86,7 +86,9 @@ public class ClientActor extends DataActor {
     public static String buildDbAbstractorUrl() {
         String dbAbsHost = ULTRON_URL;
         String dbAbsHostFromEnv = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
-        if (checkAccount() || (dbAbsHostFromEnv != null
+        String overrideDbAbsHost = System.getenv("OVERRIDE_DATABASE_ABSTRACTOR_SERVICE_URL");
+        boolean useOverrideDbAbsHost = overrideDbAbsHost != null && !overrideDbAbsHost.isEmpty() && overrideDbAbsHost.equalsIgnoreCase("true");
+        if (checkAccount() || (useOverrideDbAbsHost && dbAbsHostFromEnv != null
                 && !dbAbsHostFromEnv.isEmpty()
                 && (CYBORG_URL.equals(dbAbsHostFromEnv) || ULTRON_URL.equals(dbAbsHostFromEnv)))) {
             dbAbsHost = dbAbsHostFromEnv;
