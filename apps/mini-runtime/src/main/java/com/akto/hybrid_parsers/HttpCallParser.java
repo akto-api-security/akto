@@ -869,12 +869,13 @@ public class HttpCallParser {
 
                     //New MCP server detected, audit it
                     if(ismcpServer) {
-                        McpAuditInfo auditInfo = null;
+                        McpAuditInfo auditInfo;
                         try {
                             auditInfo = new McpAuditInfo(
-                                    Context.now(), "", AKTO_MCP_SERVER_TAG, 0,
-                                    hostName != null ? hostName : "", "", null,
-                                    apiCollectionId
+                                Context.now(), "", AKTO_MCP_SERVER_TAG, 0,
+                                hostName, "", null,
+                                apiCollectionId,
+                                null
                             );
                             dataActor.insertMCPAuditDataLog(auditInfo);
                         } catch (Exception e) {

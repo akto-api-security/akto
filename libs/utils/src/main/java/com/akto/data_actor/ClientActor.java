@@ -4268,15 +4268,16 @@ public class ClientActor extends DataActor {
 
     public void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
         Map<String, List<String>> headers = buildHeaders();
-            Document d = new Document()
-                    .append("lastDetected", auditInfo.getLastDetected())
-                    .append("markedBy", auditInfo.getMarkedBy())
-                    .append("type", auditInfo.getType())
-                    .append("updatedTimestamp", auditInfo.getUpdatedTimestamp())
-                    .append("resourceName", auditInfo.getResourceName())
-                    .append("remarks",auditInfo.getRemarks())
-                    .append("apiAccessTypes", auditInfo.getApiAccessTypes())
-                    .append("hostCollectionId", auditInfo.getHostCollectionId());
+        Document d = new Document()
+            .append("lastDetected", auditInfo.getLastDetected())
+            .append("markedBy", auditInfo.getMarkedBy())
+            .append("type", auditInfo.getType())
+            .append("updatedTimestamp", auditInfo.getUpdatedTimestamp())
+            .append("resourceName", auditInfo.getResourceName())
+            .append("remarks", auditInfo.getRemarks())
+            .append("apiAccessTypes", auditInfo.getApiAccessTypes())
+            .append("hostCollectionId", auditInfo.getHostCollectionId())
+            .append("mcpHost", auditInfo.getMcpHost());
 
         Document wrapper = new Document("auditInfo", d);
         String jsonBody = wrapper.toJson();
