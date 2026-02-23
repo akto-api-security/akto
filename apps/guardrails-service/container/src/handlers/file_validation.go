@@ -1,0 +1,453 @@
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
+	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
+	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
+	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
+)
+
+const chunkRetryDelay = 200 * time.Millisecond
+
+// Redirects disabled to prevent SSRF via open-redirect chains.
+var urlFetchClient = &http.Client{
+	CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+}
+
+type fileInput struct {
+	Reader   io.ReadCloser
+	Filename string
+}
+
+type chunkResult struct {
+	Result *mcp.ValidationResult
+	Err    error
+}
+
+type fileResult struct {
+	Filename         string
+	Allowed          bool
+	Reason           string
+	TotalChunks      int
+	FailedChunkIndex int
+	ChunkResults     []*chunkResult
+	FailedResult     *mcp.ValidationResult
+}
+
+// ValidateFile handles POST /api/validate/file (multipart "file" uploads or "url" fields, mutually exclusive).
+func (h *ValidationHandler) ValidateFile(c *gin.Context) {
+	if h.cfg == nil {
+		h.logger.Error("File validation config is nil")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "server configuration error"})
+		return
+	}
+
+	maxBody := int64(h.fileRegistry.MaxPerFileBytes()) * int64(h.cfg.File.MaxFiles)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBody)
+
+	contextSource := strings.TrimSpace(c.PostForm("contextSource"))
+
+	inputs, statusCode, err := h.resolveInputs(c)
+	if form := c.Request.MultipartForm; form != nil {
+		defer form.RemoveAll()
+	}
+	if err != nil {
+		h.logger.Warn("Failed to resolve file inputs", zap.Error(err))
+		c.JSON(statusCode, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx := c.Request.Context()
+	var fileResults []*fileResult
+
+	for _, input := range inputs {
+		fr := h.validateSingleFile(ctx, input, contextSource)
+		fileResults = append(fileResults, fr)
+		input.Reader.Close()
+
+		if !fr.Allowed {
+			break
+		}
+	}
+	// Close remaining unprocessed inputs (skipped due to fail-fast).
+	for i := len(fileResults); i < len(inputs); i++ {
+		inputs[i].Reader.Close()
+	}
+
+	h.writeMultiFileResponse(c, fileResults, len(inputs))
+}
+
+func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileInput, contextSource string) *fileResult {
+	fr := &fileResult{Filename: input.Filename, Allowed: true}
+
+	ext := fileprocessor.ExtensionFromFilename(input.Filename)
+	processor := h.fileRegistry.Get(ext)
+	if processor == nil {
+		fr.Allowed = false
+		fr.Reason = "unsupported file type; allowed: " + strings.Join(h.fileRegistry.SupportedExtensions(), ", ")
+		return fr
+	}
+
+	rawText, err := processor.ExtractContent(ctx, input.Reader, ext)
+	if err != nil {
+		h.logger.Warn("Content extraction failed", zap.Error(err), zap.String("file", input.Filename))
+		fr.Allowed = false
+		fr.Reason = "failed to extract content: " + err.Error()
+		return fr
+	}
+
+	text := fileprocessor.SanitizeText(rawText)
+	rawText = "" // allow GC to reclaim the unsanitized copy
+	if strings.TrimSpace(text) == "" {
+		fr.Allowed = false
+		fr.Reason = "no text could be extracted from the file"
+		return fr
+	}
+
+	chunks := fileprocessor.ChunkWordBoundary(text, h.cfg.File.ChunkSize, h.cfg.File.ChunkOverlap)
+	if len(chunks) == 0 {
+		fr.Allowed = false
+		fr.Reason = "no content to validate"
+		return fr
+	}
+	if len(chunks) > h.cfg.File.MaxChunks {
+		fr.Allowed = false
+		fr.Reason = fmt.Sprintf("file content too large: produced %d chunks (max %d)", len(chunks), h.cfg.File.MaxChunks)
+		return fr
+	}
+
+	h.logger.Info("Validating file",
+		zap.String("filename", input.Filename),
+		zap.Int("extractedChars", len(text)),
+		zap.Int("totalChunks", len(chunks)),
+		zap.Int("concurrency", h.cfg.File.MaxConcurrent))
+
+	if h.logger.Core().Enabled(zap.DebugLevel) {
+		chunkSizes := make([]int, len(chunks))
+		totalChars := 0
+		for i, ch := range chunks {
+			chunkSizes[i] = len(ch)
+			totalChars += len(ch)
+		}
+		h.logger.Debug("Chunk details",
+			zap.String("filename", input.Filename),
+			zap.Int("totalCharsWithOverlap", totalChars),
+			zap.Ints("chunkSizes", chunkSizes),
+			zap.Int("chunkSize", h.cfg.File.ChunkSize),
+			zap.Int("chunkOverlap", h.cfg.File.ChunkOverlap))
+	}
+
+	results := h.validateChunks(ctx, chunks, contextSource)
+	fr.TotalChunks = len(chunks)
+	fr.ChunkResults = results
+
+	for i, r := range results {
+		if r == nil {
+			continue
+		}
+		if r.Err != nil {
+			fr.Allowed = false
+			fr.Reason = "validation error after retries: " + r.Err.Error()
+			fr.FailedChunkIndex = i + 1
+			return fr
+		}
+		if !r.Result.Allowed {
+			fr.Allowed = false
+			fr.Reason = r.Result.Reason
+			if fr.Reason == "" {
+				fr.Reason = "content blocked by guardrail policy"
+			}
+			fr.FailedChunkIndex = i + 1
+			fr.FailedResult = r.Result
+			return fr
+		}
+	}
+	return fr
+}
+
+func (h *ValidationHandler) resolveInputs(c *gin.Context) ([]*fileInput, int, error) {
+	form, formErr := c.MultipartForm()
+
+	var fileHeaders []*multipart.FileHeader
+	if form != nil && form.File != nil {
+		fileHeaders = form.File["file"]
+	}
+
+	var rawURLs []string
+	if form != nil && form.Value != nil {
+		for _, u := range form.Value["url"] {
+			if trimmed := strings.TrimSpace(u); trimmed != "" {
+				rawURLs = append(rawURLs, trimmed)
+			}
+		}
+	}
+
+	hasFiles := len(fileHeaders) > 0
+	hasURLs := len(rawURLs) > 0
+
+	if hasFiles && hasURLs {
+		return nil, http.StatusBadRequest, fmt.Errorf("provide either 'file' uploads or 'url' fields, not both")
+	}
+
+	if !hasFiles && !hasURLs {
+		if formErr != nil && isBodyTooLarge(formErr) {
+			return nil, http.StatusRequestEntityTooLarge, fmt.Errorf("request body exceeds maximum allowed size")
+		}
+		return nil, http.StatusBadRequest, fmt.Errorf("provide at least one 'file' upload or 'url' field")
+	}
+
+	maxFiles := h.cfg.File.MaxFiles
+	if maxFiles <= 0 {
+		maxFiles = 1
+	}
+
+	if hasFiles {
+		if len(fileHeaders) > maxFiles {
+			return nil, http.StatusBadRequest, fmt.Errorf("too many files: %d provided (max %d)", len(fileHeaders), maxFiles)
+		}
+		return h.openUploads(fileHeaders)
+	}
+
+	if len(rawURLs) > maxFiles {
+		return nil, http.StatusBadRequest, fmt.Errorf("too many URLs: %d provided (max %d)", len(rawURLs), maxFiles)
+	}
+	return h.fetchFromURLs(c.Request.Context(), rawURLs)
+}
+
+func (h *ValidationHandler) openUploads(headers []*multipart.FileHeader) ([]*fileInput, int, error) {
+	inputs := make([]*fileInput, 0, len(headers))
+	for _, fh := range headers {
+		ext := fileprocessor.ExtensionFromFilename(fh.Filename)
+		limit := h.fileRegistry.MaxBytesForExt(ext)
+		if limit > 0 && fh.Size > int64(limit) {
+			closeInputs(inputs)
+			return nil, http.StatusBadRequest, fmt.Errorf("file %q is too large: %s (max %s)", fh.Filename, fileprocessor.FormatBytes(int(fh.Size)), fileprocessor.FormatBytes(limit))
+		}
+		fi, statusCode, err := openUpload(fh)
+		if err != nil {
+			closeInputs(inputs)
+			return nil, statusCode, err
+		}
+		inputs = append(inputs, fi)
+	}
+	return inputs, 0, nil
+}
+
+func (h *ValidationHandler) fetchFromURLs(ctx context.Context, rawURLs []string) ([]*fileInput, int, error) {
+	inputs := make([]*fileInput, 0, len(rawURLs))
+	for _, rawURL := range rawURLs {
+		fi, statusCode, err := h.fetchFromURL(ctx, rawURL)
+		if err != nil {
+			closeInputs(inputs)
+			return nil, statusCode, err
+		}
+		inputs = append(inputs, fi)
+	}
+	return inputs, 0, nil
+}
+
+func closeInputs(inputs []*fileInput) {
+	for _, fi := range inputs {
+		fi.Reader.Close()
+	}
+}
+
+func openUpload(fh *multipart.FileHeader) (*fileInput, int, error) {
+	src, err := fh.Open()
+	if err != nil {
+		return nil, http.StatusBadRequest, fmt.Errorf("unable to read uploaded file: %w", err)
+	}
+	return &fileInput{Reader: src, Filename: fh.Filename}, 0, nil
+}
+
+func (h *ValidationHandler) fetchFromURL(ctx context.Context, rawURL string) (*fileInput, int, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, http.StatusBadRequest, fmt.Errorf("invalid URL: %w", err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return nil, http.StatusBadRequest, fmt.Errorf("only http and https URLs are supported")
+	}
+
+	ext, err := fileprocessor.ExtensionFromURL(rawURL)
+	if err != nil {
+		return nil, http.StatusBadRequest, err
+	}
+	if h.fileRegistry.Get(ext) == nil {
+		return nil, http.StatusBadRequest, fmt.Errorf("unsupported file type from URL; allowed: %s", strings.Join(h.fileRegistry.SupportedExtensions(), ", "))
+	}
+
+	timeout := time.Duration(h.cfg.File.URLTimeoutSec) * time.Second
+	fetchCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(fetchCtx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, http.StatusBadRequest, fmt.Errorf("invalid URL: %w", err)
+	}
+
+	resp, err := urlFetchClient.Do(req)
+	if err != nil {
+		return nil, http.StatusBadGateway, fmt.Errorf("failed to fetch URL: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, http.StatusBadGateway, fmt.Errorf("URL returned HTTP %d", resp.StatusCode)
+	}
+
+	filename := filenameFromPath(parsed.Path, ext)
+	maxSize := int64(h.fileRegistry.MaxBytesForExt(ext))
+	body := &sizeLimitedReader{
+		Reader: io.LimitReader(resp.Body, maxSize+1),
+		Closer: resp.Body,
+		limit:  maxSize,
+	}
+	return &fileInput{Reader: body, Filename: filename}, 0, nil
+}
+
+func filenameFromPath(urlPath, fallbackExt string) string {
+	if idx := strings.LastIndex(urlPath, "/"); idx >= 0 {
+		urlPath = urlPath[idx+1:]
+	}
+	if urlPath == "" {
+		return "download" + fallbackExt
+	}
+	return urlPath
+}
+
+// sizeLimitedReader wraps an io.LimitReader; returns a clear error on overflow.
+type sizeLimitedReader struct {
+	io.Reader
+	io.Closer
+	limit     int64
+	bytesRead int64
+}
+
+func (r *sizeLimitedReader) Read(p []byte) (int, error) {
+	n, err := r.Reader.Read(p)
+	r.bytesRead += int64(n)
+	if r.bytesRead > r.limit {
+		return n, fmt.Errorf("file from URL exceeds maximum size of %s", fileprocessor.FormatBytes(int(r.limit)))
+	}
+	return n, err
+}
+
+var errChunkBlocked = fmt.Errorf("chunk blocked")
+
+func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string, contextSource string) []*chunkResult {
+	results := make([]*chunkResult, len(chunks))
+	g, gCtx := errgroup.WithContext(ctx)
+	g.SetLimit(h.cfg.File.MaxConcurrent)
+
+	for i, chunk := range chunks {
+		g.Go(func() error {
+			if gCtx.Err() != nil {
+				return nil
+			}
+			payload := marshalPromptPayload(chunk)
+			results[i] = h.validateWithRetry(gCtx, payload, contextSource)
+			if results[i].Err != nil || !results[i].Result.Allowed {
+				return errChunkBlocked
+			}
+			return nil
+		})
+	}
+	_ = g.Wait()
+	return results
+}
+
+func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload, contextSource string) *chunkResult {
+	maxRetries := h.cfg.File.MaxRetries
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			timer := time.NewTimer(chunkRetryDelay)
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				timer.Stop()
+				return &chunkResult{Err: ctx.Err()}
+			}
+		}
+		result, err := h.validatorService.ValidateRequest(ctx, payload, contextSource, "", "")
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		return &chunkResult{Result: result}
+	}
+	return &chunkResult{Err: lastErr}
+}
+
+func (h *ValidationHandler) writeMultiFileResponse(c *gin.Context, results []*fileResult, totalFiles int) {
+	overallAllowed := true
+	var overallReason string
+
+	for _, fr := range results {
+		if !fr.Allowed {
+			overallAllowed = false
+			overallReason = fr.Reason
+			break
+		}
+	}
+
+	resp := gin.H{
+		"allowed": overallAllowed,
+	}
+	if !overallAllowed {
+		resp["reason"] = overallReason
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func buildChunkDetails(results []*chunkResult) []gin.H {
+	var details []gin.H
+	for i, r := range results {
+		if r == nil {
+			continue
+		}
+		entry := gin.H{"chunkIndex": i + 1, "allowed": true}
+		if r.Err != nil {
+			entry["allowed"] = false
+			entry["error"] = r.Err.Error()
+		} else {
+			entry["allowed"] = r.Result.Allowed
+			if r.Result.Reason != "" {
+				entry["reason"] = r.Result.Reason
+			}
+		}
+		details = append(details, entry)
+	}
+	return details
+}
+
+func marshalPromptPayload(content string) string {
+	b, err := json.Marshal(map[string]string{"prompt": content})
+	if err != nil {
+		return content
+	}
+	return string(b)
+}
+
+func isBodyTooLarge(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "http: request body too large") ||
+		strings.Contains(msg, "max bytes")
+}

@@ -463,13 +463,14 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		Allowed:         !processResult.IsBlocked,
 		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
 		ModifiedPayload: processResult.ModifiedPayload,
-		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
-		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
+		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
+		Metadata:        types.ThreatMetadata{},
 	}
 
 	s.logger.Info("Request validation completed",
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
+		zap.String("reason", result.Reason),
 		zap.String("sessionID", sessionID))
 
 	return result, nil
@@ -519,13 +520,14 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 		Allowed:         !processResult.IsBlocked,
 		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
 		ModifiedPayload: processResult.ModifiedPayload,
-		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
-		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
+		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
+		Metadata:        types.ThreatMetadata{},
 	}
 
 	s.logger.Info("Response validation completed",
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
+		zap.String("reason", result.Reason),
 		zap.String("sessionID", sessionID))
 
 	return result, nil
@@ -754,8 +756,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					Allowed:         !processResult.IsBlocked,
 					Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != data.RequestPayload,
 					ModifiedPayload: processResult.ModifiedPayload,
-					Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
-					Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
+					Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
+					Metadata:        types.ThreatMetadata{},
 				}
 				result.RequestAllowed = reqResult.Allowed
 				result.RequestModified = reqResult.Modified
@@ -775,8 +777,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					Allowed:         !processResult.IsBlocked,
 					Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != data.ResponsePayload,
 					ModifiedPayload: processResult.ModifiedPayload,
-					Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
-					Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
+					Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
+					Metadata:        types.ThreatMetadata{},
 				}
 				result.ResponseAllowed = respResult.Allowed
 				result.ResponseModified = respResult.Modified
@@ -855,4 +857,29 @@ type ValidationBatchResult struct {
 	ResponseModifiedPayload string `json:"responseModifiedPayload,omitempty"`
 	ResponseReason          string `json:"responseReason,omitempty"`
 	ResponseError           string `json:"responseError,omitempty"`
+}
+
+// extractReasonFromBlockedResponse drills into the BlockedResponse map
+// produced by mcp-endpoint-shield's CreateBlockedResponse to retrieve the
+// human-readable reason string (e.g. "PII detected", "Blocked by regex policy").
+// Returns "" when the response is nil or the path doesn't exist.
+func extractReasonFromBlockedResponse(blocked map[string]any) string {
+	if blocked == nil {
+		return ""
+	}
+	errObj, ok := blocked["error"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	if msg, ok := errObj["message"].(string); ok && msg != "" {
+		return msg
+	}
+	data, ok := errObj["data"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	if reason, ok := data["reason"].(string); ok {
+		return reason
+	}
+	return ""
 }

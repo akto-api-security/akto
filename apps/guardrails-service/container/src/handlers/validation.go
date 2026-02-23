@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	"github.com/akto-api-security/guardrails-service/models"
+	"github.com/akto-api-security/guardrails-service/pkg/config"
+	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
@@ -15,13 +17,17 @@ import (
 type ValidationHandler struct {
 	validatorService *validator.Service
 	logger           *zap.Logger
+	cfg              *config.Config
+	fileRegistry     *fileprocessor.Registry
 }
 
 // NewValidationHandler creates a new validation handler
-func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger) *ValidationHandler {
+func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger, cfg *config.Config, fileRegistry *fileprocessor.Registry) *ValidationHandler {
 	return &ValidationHandler{
 		validatorService: validatorService,
 		logger:           logger,
+		cfg:              cfg,
+		fileRegistry:     fileRegistry,
 	}
 }
 

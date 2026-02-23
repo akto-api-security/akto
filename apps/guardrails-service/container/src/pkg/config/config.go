@@ -5,26 +5,16 @@ import (
 	"strconv"
 )
 
-// Config holds the application configuration
 type Config struct {
-	// Server configuration
 	ServerPort int
 
-	// Database abstractor service
 	DatabaseAbstractorURL   string
 	DatabaseAbstractorToken string
+	AgentGuardEngineURL     string
+	ThreatBackendURL        string
+	ThreatBackendToken      string
+	LogLevel                string
 
-	// Agent Guard Engine URL for NLP model computations
-	AgentGuardEngineURL string
-
-	// Threat backend service for publishing results to dashboard
-	ThreatBackendURL   string
-	ThreatBackendToken string
-
-	// Logging
-	LogLevel string
-
-	// Kafka configuration
 	KafkaEnabled        bool
 	KafkaBrokerURL      string
 	KafkaTopic          string
@@ -33,24 +23,47 @@ type Config struct {
 	KafkaUsername       string
 	KafkaPassword       string
 	KafkaBatchSize      int
-	KafkaBatchLingerSec int // How long to wait before processing a partial batch (seconds)
-	KafkaMaxWaitSec     int // Kafka fetch.max.wait - max time broker waits before returning data
+	KafkaBatchLingerSec int
+	KafkaMaxWaitSec     int
 
-	// Policy cache configuration
-	PolicyRefreshIntervalMin int // How often to refresh policies from database (minutes)
+	PolicyRefreshIntervalMin int
 
-	// Traffic filter configuration (mutually exclusive)
-	// Supports comma-separated values for multiple matches, e.g., "api.example.com,app.example.com"
-	// Also supports regex patterns by prefixing with "regex:", e.g., "regex:.*\\.example\\.com"
-	FilterHost string // Filter traffic by host header (comma-separated or regex)
-	FilterPath string // Filter traffic by path prefix (comma-separated or regex)
+	// Supports comma-separated or "regex:" prefixed patterns.
+	FilterHost string
+	FilterPath string
 
-	// Session management configuration
-	SessionSyncIntervalMin int  // Minutes between cyborg API syncs (default: 5)
-	SessionEnabled         bool // Enable session-based guardrailing (default: true)
+	SessionSyncIntervalMin int
+	SessionEnabled         bool
+
+	File FileConfig
 }
 
-// LoadConfig loads configuration from environment variables
+type FileConfig struct {
+	MaxFiles         int
+	MaxTextFileBytes int
+	ChunkSize        int
+	ChunkOverlap     int
+	MaxChunks        int
+	MaxRetries       int
+	MaxConcurrent    int
+	URLTimeoutSec    int
+	Media            MediaConfig
+}
+
+
+// MediaConfig holds configuration for external media processing APIs.
+// Vision and Speech have independent key/endpoint pairs for separate Azure resources.
+type MediaConfig struct {
+	Provider      string // "azure" or "" (disabled)
+	VisionAPIKey  string
+	VisionBaseURL string
+	SpeechAPIKey  string
+	SpeechBaseURL string
+	MaxImageBytes int
+	MaxAudioBytes int
+	MaxVideoBytes int
+}
+
 func LoadConfig() *Config {
 	dbAbstractorToken := getEnv("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "")
 	return &Config{
@@ -76,10 +89,29 @@ func LoadConfig() *Config {
 		FilterPath:               getEnv("FILTER_PATH", ""),
 		SessionSyncIntervalMin:   getEnvAsInt("SESSION_SYNC_INTERVAL_MIN", 5),
 		SessionEnabled:           getEnvAsBool("SESSION_ENABLED", true),
+		File: FileConfig{
+			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
+			MaxTextFileBytes: getEnvAsInt("FILE_VALIDATE_MAX_TEXT_FILE_BYTES", 5*1024*1024),
+			ChunkSize:        getEnvAsInt("FILE_VALIDATE_CHUNK_SIZE", 32000),
+			ChunkOverlap:     getEnvAsInt("FILE_VALIDATE_CHUNK_OVERLAP", 200),
+			MaxChunks:        getEnvAsInt("FILE_VALIDATE_MAX_CHUNKS", 500),
+			MaxRetries:       getEnvAsInt("FILE_VALIDATE_MAX_RETRIES", 2),
+			MaxConcurrent:    getEnvAsInt("FILE_VALIDATE_MAX_CONCURRENT", 5),
+			URLTimeoutSec:    getEnvAsInt("FILE_VALIDATE_URL_TIMEOUT_SEC", 30),
+			Media: MediaConfig{
+				Provider:      getEnv("MEDIA_PROVIDER", ""),
+				VisionAPIKey:  getEnv("MEDIA_VISION_API_KEY", ""),
+				VisionBaseURL: getEnv("MEDIA_VISION_BASE_URL", ""),
+				SpeechAPIKey:  getEnv("MEDIA_SPEECH_API_KEY", ""),
+				SpeechBaseURL: getEnv("MEDIA_SPEECH_BASE_URL", ""),
+				MaxImageBytes: getEnvAsInt("MEDIA_MAX_IMAGE_BYTES", 2*1024*1024),
+				MaxAudioBytes: getEnvAsInt("MEDIA_MAX_AUDIO_BYTES", 10*1024*1024),
+				MaxVideoBytes: getEnvAsInt("MEDIA_MAX_VIDEO_BYTES", 25*1024*1024),
+			},
+		},
 	}
 }
 
-// getEnv gets an environment variable or returns a default value
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -87,7 +119,6 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-// getEnvAsInt gets an environment variable as an integer or returns a default value
 func getEnvAsInt(key string, defaultValue int) int {
 	valueStr := os.Getenv(key)
 	if valueStr == "" {
@@ -100,7 +131,6 @@ func getEnvAsInt(key string, defaultValue int) int {
 	return value
 }
 
-// getEnvAsBool gets an environment variable as a boolean or returns a default value
 func getEnvAsBool(key string, defaultValue bool) bool {
 	valueStr := os.Getenv(key)
 	if valueStr == "" {
