@@ -90,7 +90,7 @@ func LoadConfig() *Config {
 		SessionEnabled:           getEnvAsBool("SESSION_ENABLED", true),
 		File: FileConfig{
 			MaxFiles:      getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
-			MaxSizeBytes:  getEnvAsInt("FILE_VALIDATE_MAX_SIZE_BYTES", 10*1024*1024),
+			MaxSizeBytes:  getEnvAsInt("FILE_VALIDATE_MAX_SIZE_BYTES", 2*1024*1024),
 			ChunkSize:     getEnvAsInt("FILE_VALIDATE_CHUNK_SIZE", 32000),
 			ChunkOverlap:  getEnvAsInt("FILE_VALIDATE_CHUNK_OVERLAP", 200),
 			MaxChunks:     getEnvAsInt("FILE_VALIDATE_MAX_CHUNKS", 500),
