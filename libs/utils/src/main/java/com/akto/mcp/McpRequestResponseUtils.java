@@ -327,22 +327,23 @@ public final class McpRequestResponseUtils {
 
         // If x-transport is STDIO, return MCP name; else return parsed host
         if (reqHeaders != null && STDIO_TRANSPORT.equals(HttpRequestResponseUtils.getHeaderValue(reqHeaders, X_TRANSPORT_HEADER))) {
-            return extractMcpNameFromHost(host);
+            return extractServiceNameFromHost(host);
         }
         return host;
     }
 
-    private static String extractMcpNameFromHost(String host) {
+    private static String extractServiceNameFromHost(String host) {
         if (host == null || host.isEmpty()) {
             return null;
         }
         String[] parts = host.split("\\.");
-        if (parts.length >= 3) {
-            return parts[2];
+        if (parts.length < 3) {
+            return null;
         }
-        if (parts.length >= 1) {
-            return parts[parts.length - 1];
+        StringBuilder sb = new StringBuilder(parts[2]);
+        for (int i = 3; i < parts.length; i++) {
+            sb.append(".").append(parts[i]);
         }
-        return host;
+        return sb.toString();
     }
 }
