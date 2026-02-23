@@ -155,6 +155,9 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 	fr.ChunkResults = results
 
 	for i, r := range results {
+		if r == nil {
+			continue
+		}
 		if r.Err != nil {
 			fr.Allowed = false
 			fr.Reason = "validation error after retries: " + r.Err.Error()
@@ -337,6 +340,8 @@ func (r *sizeLimitedReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
+var errChunkBlocked = fmt.Errorf("chunk blocked")
+
 func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string, contextSource string) []*chunkResult {
 	results := make([]*chunkResult, len(chunks))
 	g, gCtx := errgroup.WithContext(ctx)
@@ -344,8 +349,14 @@ func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string,
 
 	for i, chunk := range chunks {
 		g.Go(func() error {
+			if gCtx.Err() != nil {
+				return nil
+			}
 			payload := marshalPromptPayload(chunk)
 			results[i] = h.validateWithRetry(gCtx, payload, contextSource)
+			if results[i].Err != nil || !results[i].Result.Allowed {
+				return errChunkBlocked
+			}
 			return nil
 		})
 	}
@@ -378,44 +389,32 @@ func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload, cont
 
 func (h *ValidationHandler) writeMultiFileResponse(c *gin.Context, results []*fileResult, totalFiles int) {
 	overallAllowed := true
-	failedFileIndex := 0
+	var overallReason string
 
-	fileEntries := make([]gin.H, len(results))
-	for i, fr := range results {
-		entry := gin.H{
-			"filename":         fr.Filename,
-			"allowed":          fr.Allowed,
-			"totalChunks":      fr.TotalChunks,
-			"failedChunkIndex": fr.FailedChunkIndex,
-		}
+	for _, fr := range results {
 		if !fr.Allowed {
-			entry["reason"] = fr.Reason
-			if overallAllowed {
-				overallAllowed = false
-				failedFileIndex = i + 1
-			}
+			overallAllowed = false
+			overallReason = fr.Reason
+			break
 		}
-		if fr.FailedResult != nil {
-			entry["modified"] = fr.FailedResult.Modified
-			entry["modifiedPayload"] = fr.FailedResult.ModifiedPayload
-		}
-		if fr.TotalChunks > 1 && fr.ChunkResults != nil {
-			entry["chunkResults"] = buildChunkDetails(fr.ChunkResults)
-		}
-		fileEntries[i] = entry
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"allowed":         overallAllowed,
-		"totalFiles":      totalFiles,
-		"failedFileIndex": failedFileIndex,
-		"fileResults":     fileEntries,
-	})
+	resp := gin.H{
+		"allowed": overallAllowed,
+	}
+	if !overallAllowed {
+		resp["reason"] = overallReason
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 func buildChunkDetails(results []*chunkResult) []gin.H {
-	details := make([]gin.H, len(results))
+	var details []gin.H
 	for i, r := range results {
+		if r == nil {
+			continue
+		}
 		entry := gin.H{"chunkIndex": i + 1, "allowed": true}
 		if r.Err != nil {
 			entry["allowed"] = false
@@ -426,7 +425,7 @@ func buildChunkDetails(results []*chunkResult) []gin.H {
 				entry["reason"] = r.Result.Reason
 			}
 		}
-		details[i] = entry
+		details = append(details, entry)
 	}
 	return details
 }
