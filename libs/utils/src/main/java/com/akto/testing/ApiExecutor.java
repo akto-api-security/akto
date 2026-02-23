@@ -811,7 +811,7 @@ public class ApiExecutor {
                 body = RequestBody.create(payload, null);
                 request.getHeaders().remove("charset");
             } else {
-                body = RequestBody.create(payload, MediaType.parse(contentType));
+                body = RequestBody.create(payload.getBytes(StandardCharsets.UTF_8), MediaType.parse(contentType));
             }
         }
         builder = builder.method(request.getMethod(), body);
