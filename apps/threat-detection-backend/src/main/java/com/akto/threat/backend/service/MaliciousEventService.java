@@ -317,32 +317,44 @@ public class MaliciousEventService {
         .build();
   }
 
-  private void fetchAlertFilterData(String accountId, Set<String> subCategories, Set<String> urls, Set<String> hosts, Bson timeRangeFilter) {
-    try {
-      // Get distinct filterIds using streaming from malicious_events
-      maliciousEventDao.getCollection(accountId)
-          .distinct("filterId", timeRangeFilter, String.class)
-          .forEach(value -> {
-            if (value != null && !value.isEmpty()) {
-              subCategories.add(value);
-            }
-          });
-    } catch (Exception e) {
-      logger.error("Error fetching distinct filterIds: " + e.getMessage(), e);
+  private Bson buildTimeRangeFilter(TimeRangeFilter timeRange, String dateField) {
+    if (timeRange == null) {
+      return Filters.empty();
     }
+    long start = timeRange.hasStart() ? timeRange.getStart() : 0;
+    long end = timeRange.hasEnd() ? timeRange.getEnd() : Long.MAX_VALUE;
+    return Filters.and(
+        Filters.gte(dateField, start),
+        Filters.lte(dateField, end)
+    );
+  }
 
+  private <T> Set<T> fetchDistinctFieldValues(
+      String accountId, String fieldName, Bson filter, Class<T> tClass) {
+    Set<T> result = new HashSet<>();
     try {
-      // Get distinct hosts using streaming from malicious_events
       maliciousEventDao.getCollection(accountId)
-          .distinct("host", timeRangeFilter, String.class)
+          .distinct(fieldName, filter, tClass)
           .forEach(value -> {
-            if (value != null && !value.isEmpty()) {
-              hosts.add(value);
+            if (value != null && isNotEmpty(value)) {
+              result.add(value);
             }
           });
     } catch (Exception e) {
-      logger.error("Error fetching distinct hosts: " + e.getMessage(), e);
+      logger.error("Error fetching distinct " + fieldName + ": " + e.getMessage(), e);
     }
+    return result;
+  }
+
+  private boolean isNotEmpty(Object value) {
+    if (value == null) return false;
+    if (value instanceof String) return !((String) value).isEmpty();
+    return true;
+  }
+
+  private void fetchAlertFilterData(String accountId, Set<String> subCategories, Set<String> urls, Set<String> hosts, Bson timeRangeFilter) {
+    subCategories.addAll(fetchDistinctFieldValues(accountId, "filterId", timeRangeFilter, String.class));
+    hosts.addAll(fetchDistinctFieldValues(accountId, "host", timeRangeFilter, String.class));
 
     try {
       // Get distinct latestApiEndpoint using aggregation pipeline with limit
@@ -368,63 +380,14 @@ public class MaliciousEventService {
   public FetchAlertFiltersResponse fetchAlertFilters(
       String accountId, FetchAlertFiltersRequest request) {
 
-    Set<String> actors = new HashSet<>();
-    Set<String> urls = new HashSet<>();
     Set<String> subCategories = new HashSet<>();
+    Set<String> urls = new HashSet<>();
     Set<String> hosts = new HashSet<>();
 
-    // Build time range filter from request
-    Bson timeRangeFilter = Filters.empty();
-    if (request.hasDetectedAtTimeRange()) {
-      TimeRangeFilter timeRange = request.getDetectedAtTimeRange();
-      long start = timeRange.hasStart() ? timeRange.getStart() : 0;
-      long end = timeRange.hasEnd() ? timeRange.getEnd() : Long.MAX_VALUE;
-      timeRangeFilter = Filters.and(
-          Filters.gte("detectedAt", start),
-          Filters.lte("detectedAt", end)
-      );
-    }
+    Bson timeRangeFilter = buildTimeRangeFilter(
+        request.getDetectedAtTimeRange(), "detectedAt");
 
-    // Get actors from appropriate source
-    if (USE_ACTOR_INFO_TABLE) {
-      // Use optimized actor_info table for actors
-      ActorInfoDao actorInfoDao = ActorInfoDao.instance;
-      Bson actorTimeRangeFilter = Filters.empty();
-      if (request.hasDetectedAtTimeRange()) {
-        TimeRangeFilter timeRange = request.getDetectedAtTimeRange();
-        long start = timeRange.hasStart() ? timeRange.getStart() : 0;
-        long end = timeRange.hasEnd() ? timeRange.getEnd() : Long.MAX_VALUE;
-        actorTimeRangeFilter = Filters.and(
-            Filters.gte("discoveredAt", start),
-            Filters.lte("discoveredAt", end)
-        );
-      }
-
-      try {
-        actorInfoDao.getCollection(accountId)
-            .distinct("actorId", actorTimeRangeFilter, String.class)
-            .forEach(value -> {
-              if (value != null && !value.isEmpty()) {
-                actors.add(value);
-              }
-            });
-      } catch (Exception e) {
-        logger.error("Error fetching distinct actors from actor_info: " + e.getMessage(), e);
-      }
-    } else {
-      // Get actors from malicious_events
-      try {
-        maliciousEventDao.getCollection(accountId)
-            .distinct("actor", timeRangeFilter, String.class)
-            .forEach(value -> {
-              if (value != null && !value.isEmpty()) {
-                actors.add(value);
-              }
-            });
-      } catch (Exception e) {
-        logger.error("Error fetching distinct actors: " + e.getMessage(), e);
-      }
-    }
+    Set<String> actors = fetchActorsForFilters(accountId, request);
 
     // Fetch remaining filters from malicious_events
     fetchAlertFilterData(accountId, subCategories, urls, hosts, timeRangeFilter);
@@ -435,6 +398,33 @@ public class MaliciousEventService {
         .addAllSubCategory(subCategories)
         .addAllHosts(hosts)
         .build();
+  }
+
+  private Set<String> fetchActorsForFilters(String accountId, FetchAlertFiltersRequest request) {
+    if (USE_ACTOR_INFO_TABLE) {
+      ActorInfoDao actorInfoDao = ActorInfoDao.instance;
+      Bson actorTimeRangeFilter = buildTimeRangeFilter(
+          request.getDetectedAtTimeRange(), "discoveredAt");
+
+      try {
+        Set<String> actors = new HashSet<>();
+        actorInfoDao.getCollection(accountId)
+            .distinct("actorId", actorTimeRangeFilter, String.class)
+            .forEach(value -> {
+              if (value != null && !value.isEmpty()) {
+                actors.add(value);
+              }
+            });
+        return actors;
+      } catch (Exception e) {
+        logger.error("Error fetching distinct actors from actor_info: " + e.getMessage(), e);
+        return new HashSet<>();
+      }
+    } else {
+      Bson timeRangeFilter = buildTimeRangeFilter(
+          request.getDetectedAtTimeRange(), "detectedAt");
+      return fetchDistinctFieldValues(accountId, "actor", timeRangeFilter, String.class);
+    }
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
