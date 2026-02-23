@@ -153,8 +153,8 @@ function TestRunResultPage(props) {
         vulnerable: selectedTestRunResult?.vulnerable,
         severity: issueDetails?.severity,
         url: selectedTestRunResult?.url || "",
-        sampleRequest: selectedTestRunResult?.testResults?.[0]?.originalMessage?.substring(0, 2000) || null,
-        sampleResponse: selectedTestRunResult?.testResults?.[0]?.message?.substring(0, 2000) || null,
+        originalMessage: selectedTestRunResult?.testResults?.[0]?.originalMessage?.substring(0, 2000) || null,
+        attemptMessage: selectedTestRunResult?.testResults?.[0]?.message?.substring(0, 2000) || null,
       }
     };
   }

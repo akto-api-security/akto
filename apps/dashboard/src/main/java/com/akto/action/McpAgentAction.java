@@ -119,15 +119,15 @@ public class McpAgentAction extends UserAction {
                         sb.append("Vulnerable: ").append(dataMap.getOrDefault("vulnerable", false)).append("\n");
                         sb.append("Severity: ").append(dataMap.getOrDefault("severity", "")).append("\n");
                         sb.append("URL: ").append(dataMap.getOrDefault("url", "")).append("\n");
-                        Object sampleReq = dataMap.get("sampleRequest");
-                        if(sampleReq != null) {
-                            String reqStr = sampleReq.toString();
-                            sb.append("Sample Request: ").append(reqStr, 0, Math.min(reqStr.length(), 2000)).append("\n");
+                        Object originalMsg = dataMap.get("originalMessage");
+                        if(originalMsg != null) {
+                            String origStr = originalMsg.toString();
+                            sb.append("Original API Request+Response: ").append(origStr, 0, Math.min(origStr.length(), 2000)).append("\n");
                         }
-                        Object sampleResp = dataMap.get("sampleResponse");
-                        if(sampleResp != null) {
-                            String respStr = sampleResp.toString();
-                            sb.append("Sample Response: ").append(respStr, 0, Math.min(respStr.length(), 2000)).append("\n");
+                        Object attemptMsg = dataMap.get("attemptMessage");
+                        if(attemptMsg != null) {
+                            String attemptStr = attemptMsg.toString();
+                            sb.append("Test Attempt Request+Response: ").append(attemptStr, 0, Math.min(attemptStr.length(), 2000)).append("\n");
                         }
                         contextString = sb.toString();
                         tokensLimit = 40000;
