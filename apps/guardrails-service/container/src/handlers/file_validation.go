@@ -55,8 +55,8 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		return
 	}
 
-	maxSize := int64(h.cfg.File.MaxSizeBytes)
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxSize)
+	maxBody := int64(h.fileRegistry.MaxPerFileBytes()) * int64(h.cfg.File.MaxFiles)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBody)
 
 	contextSource := strings.TrimSpace(c.PostForm("contextSource"))
 
@@ -204,7 +204,7 @@ func (h *ValidationHandler) resolveInputs(c *gin.Context) ([]*fileInput, int, er
 
 	if !hasFiles && !hasURLs {
 		if formErr != nil && isBodyTooLarge(formErr) {
-			return nil, http.StatusRequestEntityTooLarge, fmt.Errorf("request body exceeds maximum size of %s", fileprocessor.FormatBytes(h.cfg.File.MaxSizeBytes))
+			return nil, http.StatusRequestEntityTooLarge, fmt.Errorf("request body exceeds maximum allowed size")
 		}
 		return nil, http.StatusBadRequest, fmt.Errorf("provide at least one 'file' upload or 'url' field")
 	}
@@ -230,6 +230,12 @@ func (h *ValidationHandler) resolveInputs(c *gin.Context) ([]*fileInput, int, er
 func (h *ValidationHandler) openUploads(headers []*multipart.FileHeader) ([]*fileInput, int, error) {
 	inputs := make([]*fileInput, 0, len(headers))
 	for _, fh := range headers {
+		ext := fileprocessor.ExtensionFromFilename(fh.Filename)
+		limit := h.fileRegistry.MaxBytesForExt(ext)
+		if limit > 0 && fh.Size > int64(limit) {
+			closeInputs(inputs)
+			return nil, http.StatusBadRequest, fmt.Errorf("file %q is too large: %s (max %s)", fh.Filename, fileprocessor.FormatBytes(int(fh.Size)), fileprocessor.FormatBytes(limit))
+		}
 		fi, statusCode, err := openUpload(fh)
 		if err != nil {
 			closeInputs(inputs)
@@ -302,14 +308,13 @@ func (h *ValidationHandler) fetchFromURL(ctx context.Context, rawURL string) (*f
 		return nil, http.StatusBadGateway, fmt.Errorf("URL returned HTTP %d", resp.StatusCode)
 	}
 
-	maxSize := int64(h.cfg.File.MaxSizeBytes)
+	filename := filenameFromPath(parsed.Path, ext)
+	maxSize := int64(h.fileRegistry.MaxBytesForExt(ext))
 	body := &sizeLimitedReader{
 		Reader: io.LimitReader(resp.Body, maxSize+1),
 		Closer: resp.Body,
 		limit:  maxSize,
 	}
-
-	filename := filenameFromPath(parsed.Path, ext)
 	return &fileInput{Reader: body, Filename: filename}, 0, nil
 }
 

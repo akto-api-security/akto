@@ -39,16 +39,17 @@ type Config struct {
 }
 
 type FileConfig struct {
-	MaxFiles      int
-	MaxSizeBytes  int
-	ChunkSize     int
-	ChunkOverlap  int
-	MaxChunks     int
-	MaxRetries    int
-	MaxConcurrent int
-	URLTimeoutSec int
-	Media         MediaConfig
+	MaxFiles         int
+	MaxTextFileBytes int
+	ChunkSize        int
+	ChunkOverlap     int
+	MaxChunks        int
+	MaxRetries       int
+	MaxConcurrent    int
+	URLTimeoutSec    int
+	Media            MediaConfig
 }
+
 
 // MediaConfig holds configuration for external media processing APIs.
 // Vision and Speech have independent key/endpoint pairs for separate Azure resources.
@@ -89,14 +90,14 @@ func LoadConfig() *Config {
 		SessionSyncIntervalMin:   getEnvAsInt("SESSION_SYNC_INTERVAL_MIN", 5),
 		SessionEnabled:           getEnvAsBool("SESSION_ENABLED", true),
 		File: FileConfig{
-			MaxFiles:      getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
-			MaxSizeBytes:  getEnvAsInt("FILE_VALIDATE_MAX_SIZE_BYTES", 25*1024*1024),
-			ChunkSize:     getEnvAsInt("FILE_VALIDATE_CHUNK_SIZE", 32000),
-			ChunkOverlap:  getEnvAsInt("FILE_VALIDATE_CHUNK_OVERLAP", 200),
-			MaxChunks:     getEnvAsInt("FILE_VALIDATE_MAX_CHUNKS", 500),
-			MaxRetries:    getEnvAsInt("FILE_VALIDATE_MAX_RETRIES", 2),
-			MaxConcurrent: getEnvAsInt("FILE_VALIDATE_MAX_CONCURRENT", 5),
-			URLTimeoutSec: getEnvAsInt("FILE_VALIDATE_URL_TIMEOUT_SEC", 30),
+			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
+			MaxTextFileBytes: getEnvAsInt("FILE_VALIDATE_MAX_TEXT_FILE_BYTES", 5*1024*1024),
+			ChunkSize:        getEnvAsInt("FILE_VALIDATE_CHUNK_SIZE", 32000),
+			ChunkOverlap:     getEnvAsInt("FILE_VALIDATE_CHUNK_OVERLAP", 200),
+			MaxChunks:        getEnvAsInt("FILE_VALIDATE_MAX_CHUNKS", 500),
+			MaxRetries:       getEnvAsInt("FILE_VALIDATE_MAX_RETRIES", 2),
+			MaxConcurrent:    getEnvAsInt("FILE_VALIDATE_MAX_CONCURRENT", 5),
+			URLTimeoutSec:    getEnvAsInt("FILE_VALIDATE_URL_TIMEOUT_SEC", 30),
 			Media: MediaConfig{
 				Provider:      getEnv("MEDIA_PROVIDER", ""),
 				VisionAPIKey:  getEnv("MEDIA_VISION_API_KEY", ""),

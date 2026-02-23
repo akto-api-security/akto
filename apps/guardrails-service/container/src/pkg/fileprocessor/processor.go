@@ -18,28 +18,43 @@ type FileProcessor interface {
 	ExtractContent(ctx context.Context, r io.Reader, ext string) (string, error)
 }
 
+type registryEntry struct {
+	processor FileProcessor
+	maxBytes  int
+}
+
 // Registry maps file extensions to processors. Concurrent-safe.
 type Registry struct {
 	mu    sync.RWMutex
-	byExt map[string]FileProcessor
+	byExt map[string]registryEntry
 }
 
 func NewRegistry() *Registry {
-	return &Registry{byExt: make(map[string]FileProcessor)}
+	return &Registry{byExt: make(map[string]registryEntry)}
 }
 
-func (r *Registry) Register(p FileProcessor) {
+func (r *Registry) RegisterWithLimit(p FileProcessor, maxBytes int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for _, ext := range p.SupportedExtensions() {
-		r.byExt[normalizeExt(ext)] = p
+		r.byExt[normalizeExt(ext)] = registryEntry{processor: p, maxBytes: maxBytes}
 	}
 }
 
 func (r *Registry) Get(ext string) FileProcessor {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	return r.byExt[normalizeExt(ext)]
+	e, ok := r.byExt[normalizeExt(ext)]
+	if !ok {
+		return nil
+	}
+	return e.processor
+}
+
+func (r *Registry) MaxBytesForExt(ext string) int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.byExt[normalizeExt(ext)].maxBytes
 }
 
 func (r *Registry) SupportedExtensions() []string {
@@ -51,6 +66,18 @@ func (r *Registry) SupportedExtensions() []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func (r *Registry) MaxPerFileBytes() int {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	max := 0
+	for _, e := range r.byExt {
+		if e.maxBytes > max {
+			max = e.maxBytes
+		}
+	}
+	return max
 }
 
 func normalizeExt(ext string) string {
@@ -82,9 +109,9 @@ func ExtensionFromURL(rawURL string) (string, error) {
 	return ext, nil
 }
 
-func DefaultRegistry() *Registry {
+func DefaultRegistry(maxTextFileBytes int) *Registry {
 	r := NewRegistry()
-	r.Register(TxtProcessor{})
-	r.Register(DocumentProcessor{})
+	r.RegisterWithLimit(TxtProcessor{}, maxTextFileBytes)
+	r.RegisterWithLimit(DocumentProcessor{}, maxTextFileBytes)
 	return r
 }

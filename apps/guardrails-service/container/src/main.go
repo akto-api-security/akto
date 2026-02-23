@@ -47,7 +47,7 @@ func main() {
 }
 
 func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logger *zap.Logger) {
-	fileRegistry := fileprocessor.DefaultRegistry()
+	fileRegistry := fileprocessor.DefaultRegistry(cfg.File.MaxTextFileBytes)
 	registerMediaProcessors(fileRegistry, cfg, logger)
 	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry)
 
@@ -138,18 +138,18 @@ func registerMediaProcessors(registry *fileprocessor.Registry, cfg *config.Confi
 	ocr, transcriber := newMediaProviders(mc, logger)
 
 	if ocr != nil {
-		registry.Register(fileprocessor.NewImageProcessor(ocr, mc.MaxImageBytes))
+		registry.RegisterWithLimit(fileprocessor.NewImageProcessor(ocr, mc.MaxImageBytes), mc.MaxImageBytes)
 		logger.Info("Image processing enabled",
 			zap.String("provider", mc.Provider),
 			zap.Int("maxBytes", mc.MaxImageBytes))
 	}
 	if transcriber != nil {
-		registry.Register(fileprocessor.NewAudioProcessor(transcriber, mc.MaxAudioBytes))
+		registry.RegisterWithLimit(fileprocessor.NewAudioProcessor(transcriber, mc.MaxAudioBytes), mc.MaxAudioBytes)
 		logger.Info("Audio processing enabled",
 			zap.String("provider", mc.Provider),
 			zap.Int("maxBytes", mc.MaxAudioBytes))
 
-		registry.Register(fileprocessor.NewVideoProcessor(transcriber, mc.MaxVideoBytes))
+		registry.RegisterWithLimit(fileprocessor.NewVideoProcessor(transcriber, mc.MaxVideoBytes), mc.MaxVideoBytes)
 		logger.Info("Video processing enabled",
 			zap.String("provider", mc.Provider),
 			zap.Int("maxBytes", mc.MaxVideoBytes))
