@@ -64,6 +64,31 @@ public class ApiCollection {
     String accessType;
     public static final String ACCESS_TYPE = "accessType";
 
+    public enum AccessType {
+        INTERNAL("Internal"),
+        THIRD_PARTY("Third party"),
+        UNKNOWN("Unknown");
+
+        private final String displayName;
+
+        AccessType(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        public static AccessType fromDisplayName(String displayName) {
+            if (displayName == null || displayName.isEmpty()) return null;
+            for (AccessType t : values()) {
+                if (t.displayName.equals(displayName)) return t;
+            }
+            return null;
+        }
+    }
+
+
     public enum Type {
         API_GROUP
     }
