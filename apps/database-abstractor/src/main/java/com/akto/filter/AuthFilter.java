@@ -38,11 +38,16 @@ public class AuthFilter implements Filter {
         HttpServletRequest httpServletRequest= (HttpServletRequest) servletRequest;
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
         String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
+        String requestURI = httpServletRequest.getRequestURI();
 
         try {
             Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
             Context.accountId.set((int) claims.getBody().get(ACCOUNT_ID));
         } catch (Exception e) {
+            if (shouldSkipAuth(e, requestURI)) {
+                chain.doFilter(servletRequest, servletResponse);
+                return;
+            }
             logExpiredTokenForTargetAccount(e);
             System.out.println(e.getMessage());
             httpServletResponse.sendError(401);
