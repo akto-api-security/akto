@@ -9,7 +9,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ComponentRiskAnalysis {
 
-    private boolean hasElevatedAccess;
+    private boolean hasPrivilegedAccess;
     private boolean isComponentMalicious;
 
     @Getter
@@ -17,11 +17,11 @@ public class ComponentRiskAnalysis {
     private String evidence;
 
     public boolean getHasElevatedAccess() {
-        return hasElevatedAccess;
+        return hasPrivilegedAccess;
     }
 
-    public void setHasElevatedAccess(boolean hasElevatedAccess) {
-        this.hasElevatedAccess = hasElevatedAccess;
+    public void setHasElevatedAccess(boolean hasPrivilegedAccess) {
+        this.hasPrivilegedAccess = hasPrivilegedAccess;
     }
 
     public boolean getIsComponentMalicious() {
