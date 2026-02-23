@@ -11,14 +11,19 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
-
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.GraphExecutorRequest;
 import com.akto.dto.testing.GraphExecutorResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.WorkflowNodeDetails;
+import com.akto.dto.testing.YamlNodeDetails;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.rules.TestPlugin;
 import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.test_editor.execution.Memory;
 
@@ -51,6 +56,7 @@ public class ParallelGraphExecutor extends GraphExecutor {
         ExecutionContext context = initContext(graphExecutorRequest);
         List<CompletableFuture<Void>> futures = submitAllNodes(allNodes, context, debug, testLogs, memory);
         waitForCompletion(allNodes.size(), futures, context.errors);
+        runPostExecutionValidate(graphExecutorRequest, context);
         return buildResult(graphExecutorRequest, context);
     }
 
@@ -150,6 +156,49 @@ public class ParallelGraphExecutor extends GraphExecutor {
             loggerMaker.infoAndAddToDb("All " + nodeCount + " nodes completed parallel execution");
         } catch (Exception e) {
             recordError("Error waiting for parallel execution to complete: " + e.getMessage(), errors);
+        }
+    }
+
+    /**
+     * Run validate once after all nodes have written their results (x1, x2, etc.) to varMap.
+     * This ensures validate can access ${x1.response.status_code}, ${x2.response.status_code}, etc.
+     */
+    private void runPostExecutionValidate(GraphExecutorRequest graphExecutorRequest, ExecutionContext context) {
+        if (context.valuesMap == null) {
+            return;
+        }
+        Map<String, WorkflowNodeDetails> nodeDetailsMap = graphExecutorRequest.getWorkflowTest() != null
+                ? graphExecutorRequest.getWorkflowTest().getMapNodeIdToWorkflowNodeDetails()
+                : null;
+        if (nodeDetailsMap == null || nodeDetailsMap.isEmpty()) {
+            return;
+        }
+        YamlNodeDetails yamlDetails = null;
+        for (WorkflowNodeDetails details : nodeDetailsMap.values()) {
+            if (details instanceof YamlNodeDetails) {
+                YamlNodeDetails y = (YamlNodeDetails) details;
+                if (y.getValidatorNode() != null) {
+                    yamlDetails = y;
+                    break;
+                }
+            }
+        }
+        if (yamlDetails == null || yamlDetails.getValidatorNode() == null || yamlDetails.getRawApi() == null || yamlDetails.getApiInfoKey() == null) {
+            return;
+        }
+        RawApi rawApi = yamlDetails.getRawApi();
+        OriginalHttpResponse dummyResponse = new OriginalHttpResponse("{}", Collections.emptyMap(), 200);
+        RawApi dummyTestRawApi = new RawApi(new OriginalHttpRequest(), dummyResponse, "");
+        boolean vulnerable = TestPlugin.validateValidator(
+                yamlDetails.getValidatorNode(),
+                rawApi,
+                dummyTestRawApi,
+                yamlDetails.getApiInfoKey(),
+                context.valuesMap,
+                ""
+        );
+        if (vulnerable) {
+            context.overallVulnerable.set(true);
         }
     }
 

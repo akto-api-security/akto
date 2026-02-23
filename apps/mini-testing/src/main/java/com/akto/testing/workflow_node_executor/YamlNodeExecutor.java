@@ -155,7 +155,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                               debug, testLogs, apiInfoKey, memory, singleReq, apiCallExecutor)
             : executeSequential(requestsToProcess, node, yamlNodeDetails, sampleRawApi, executor, varMap,
                                 logId, validatorNode, followRedirect, testingRunConfig,
-                                debug, testLogs, apiInfoKey, memory, singleReq);
+                                debug, testLogs, apiInfoKey, memory, singleReq, false);
 
         vulnerable = execContext.vulnerable;
         message = execContext.messages;
@@ -220,10 +220,11 @@ public class YamlNodeExecutor extends NodeExecutor {
         ExecutionContext context = new ExecutionContext();
         AtomicBoolean vulnerabilityFound = new AtomicBoolean(false);
 
+        boolean deferValidateToGraphLevel = true; // parallel graph: validate after all nodes write to varMap
         List<CompletableFuture<ApiCallResult>> futures = submitApiCalls(
             requests, node, yamlNodeDetails, sampleRawApi, executor, varMap, logId, validatorNode,
             followRedirect, testingRunConfig, debug, testLogs, apiInfoKey, memory, singleReq,
-            vulnerabilityFound, apiCallExecutor
+            vulnerabilityFound, apiCallExecutor, deferValidateToGraphLevel
         );
 
         collectParallelResults(futures, context, vulnerabilityFound);
@@ -241,7 +242,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                                                                   boolean debug, List<TestingRunResult.TestLog> testLogs,
                                                                   ApiInfo.ApiInfoKey apiInfoKey, Memory memory,
                                                                   ExecutorSingleRequest singleReq, AtomicBoolean vulnerabilityFound,
-                                                                  ExecutorService apiCallExecutor) {
+                                                                  ExecutorService apiCallExecutor, boolean deferValidateToGraphLevel) {
         List<CompletableFuture<ApiCallResult>> futures = new ArrayList<>();
 
         for (RawApi testReq : requests) {
@@ -251,7 +252,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                 }
                 return processSingleApiCall(testReq, node, yamlNodeDetails, sampleRawApi, executor,
                         varMap, logId, validatorNode, followRedirect, testingRunConfig, debug,
-                        testLogs, apiInfoKey, memory, singleReq);
+                        testLogs, apiInfoKey, memory, singleReq, deferValidateToGraphLevel);
             }, apiCallExecutor);
             futures.add(future);
         }
@@ -285,13 +286,13 @@ public class YamlNodeExecutor extends NodeExecutor {
                                               String logId, FilterNode validatorNode, boolean followRedirect,
                                               TestingRunConfig testingRunConfig, boolean debug,
                                               List<TestingRunResult.TestLog> testLogs, ApiInfo.ApiInfoKey apiInfoKey,
-                                              Memory memory, ExecutorSingleRequest singleReq) {
+                                              Memory memory, ExecutorSingleRequest singleReq, boolean deferValidateToGraphLevel) {
         ExecutionContext context = new ExecutionContext();
         for (RawApi testReq : requests) {
             if (context.vulnerable) break;
             ApiCallResult callResult = processSingleApiCall(testReq, node, yamlNodeDetails, sampleRawApi,
                     executor, varMap, logId, validatorNode, followRedirect, testingRunConfig, debug,
-                    testLogs, apiInfoKey, memory, singleReq);
+                    testLogs, apiInfoKey, memory, singleReq, deferValidateToGraphLevel);
             if (callResult != null) {
                 aggregateResult(callResult, context, null);
             }
@@ -384,7 +385,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                                                String logId, FilterNode validatorNode, boolean followRedirect,
                                                TestingRunConfig testingRunConfig, boolean debug,
                                                List<TestingRunResult.TestLog> testLogs, ApiInfo.ApiInfoKey apiInfoKey,
-                                               Memory memory, ExecutorSingleRequest singleReq) {
+                                               Memory memory, ExecutorSingleRequest singleReq, boolean deferValidateToGraphLevel) {
         try {
             TestResult res = null;
             String messageStr = null;
@@ -413,7 +414,11 @@ public class YamlNodeExecutor extends NodeExecutor {
 
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(),
                         testReq.getRequest(), testResponse);
-                res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
+                // When parallel graph runs nodes concurrently, validate must run after ALL nodes
+                // have written x1, x2 etc to varMap. Skip per-request validate here; run once in ParallelGraphExecutor.
+                if (!deferValidateToGraphLevel) {
+                    res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
+                }
 
                 try {
                     messageStr = convertOriginalReqRespToString(testReq.getRequest(), testResponse, responseTime);
