@@ -27,7 +27,8 @@ public class McpAuditInfo {
     private String remarks;
     private Set<ApiInfo.ApiAccessType> apiAccessTypes;
     private int hostCollectionId;
-    
+    private String mcpHost;
+
     // Conditional approval fields
     private Map<String, Object> approvalConditions;
     
@@ -40,7 +41,7 @@ public class McpAuditInfo {
         return this.id != null ? this.id.toHexString() : null;
     }
 
-    public McpAuditInfo(int lastDetected, String markedBy, String type, int updatedTimestamp, String resourceName, String remarks, Set<ApiInfo.ApiAccessType> apiAccessTypes, int hostCollectionId) {
+    public McpAuditInfo(int lastDetected, String markedBy, String type, int updatedTimestamp, String resourceName, String remarks, Set<ApiInfo.ApiAccessType> apiAccessTypes, int hostCollectionId, String mcpHost) {
         this.lastDetected = lastDetected;
         this.markedBy = markedBy;
         this.type = type;
@@ -49,5 +50,6 @@ public class McpAuditInfo {
         this.remarks = remarks;
         this.apiAccessTypes = apiAccessTypes;
         this.hostCollectionId = hostCollectionId;
+        this.mcpHost = mcpHost;
     }
 }

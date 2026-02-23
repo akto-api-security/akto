@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 
+import java.net.URI;
 import java.util.*;
 
 import lombok.AccessLevel;
@@ -190,6 +191,7 @@ public final class McpRequestResponseUtils {
         }
 
         String url = responseParams.getRequestParams().getURL();
+        String mcpHost = extractMcpHostFromResponseParams(responseParams);
 
         McpAuditInfo auditInfo = null;
 
@@ -202,7 +204,8 @@ public final class McpRequestResponseUtils {
                     auditInfo = new McpAuditInfo(
                             Context.now(), "", AKTO_MCP_TOOLS_TAG, 0,
                             params.getName(), "", null,
-                            responseParams.getRequestParams().getApiCollectionId()
+                            responseParams.getRequestParams().getApiCollectionId(),
+                            mcpHost
                     );
                 }
                 break;
@@ -215,7 +218,8 @@ public final class McpRequestResponseUtils {
                     auditInfo = new McpAuditInfo(
                             Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
                             params.getName(), "", null,
-                            responseParams.getRequestParams().getApiCollectionId()
+                            responseParams.getRequestParams().getApiCollectionId(),
+                            mcpHost
                     );
                 }
                 break;
@@ -228,7 +232,8 @@ public final class McpRequestResponseUtils {
                     auditInfo = new McpAuditInfo(
                             Context.now(), "", AKTO_MCP_PROMPTS_TAG, 0,
                             params.getName(), "", null,
-                            responseParams.getRequestParams().getApiCollectionId()
+                            responseParams.getRequestParams().getApiCollectionId(),
+                            mcpHost
                     );
                 }
                 break;
@@ -429,5 +434,32 @@ public final class McpRequestResponseUtils {
         }
 
         return new BasicDBObject().append("events", events).toJson();
+    }
+
+    public static String extractMcpHostFromResponseParams(HttpResponseParams responseParams) {
+        if (responseParams == null || responseParams.getRequestParams() == null) {
+            return null;
+        }
+        Map<String, List<String>> reqHeaders = responseParams.getRequestParams().getHeaders();
+
+        String hostRaw = null;
+        String url = responseParams.getRequestParams().getURL();
+        if (StringUtils.isNotBlank(url)) {
+            try {
+                URI uri = new URI(url.trim());
+                if (uri.getHost() != null) {
+                    hostRaw = uri.getHost();
+                }
+            } catch (Exception e) {
+                logger.debug("Failed to parse request URL for host: " + e.getMessage());
+            }
+        }
+        if (StringUtils.isBlank(hostRaw) && reqHeaders != null) {
+            hostRaw = HttpRequestResponseUtils.getHeaderValue(reqHeaders, HOST_HEADER);
+        }
+        if (hostRaw == null || StringUtils.isBlank(hostRaw)) {
+            return null;
+        }
+        return hostRaw.trim();
     }
 }
