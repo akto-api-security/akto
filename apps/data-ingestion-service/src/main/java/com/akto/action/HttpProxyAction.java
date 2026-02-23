@@ -2,8 +2,7 @@ package com.akto.action;
 
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
-import com.akto.notifications.slack.CustomTextAlert;
-import com.akto.notifications.slack.SlackSender;
+import com.akto.utils.SlackUtils;
 import com.akto.utils.KafkaUtils;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -53,8 +52,7 @@ public class HttpProxyAction extends ActionSupport {
 
     public String httpProxy() {
         try {
-            loggerMaker.infoAndAddToDb("HTTP Proxy API called - path: " + path + ", method: " + method
-                + ", account: " + akto_account_id + ", source: " + source, LoggerMaker.LogDb.DATA_INGESTION);
+            loggerMaker.info("HTTP Proxy API called - path: " + path + ", requestHeaders: " + requestHeaders + ", requestPayload: " + requestPayload);
 
             Gateway gateway = Gateway.getInstance();
             ensureDataPublisher(gateway);
@@ -89,16 +87,8 @@ public class HttpProxyAction extends ActionSupport {
     }
 
     private void sendSlackAlert(String errorMsg) {
-        try {
-            int accountId = 1000000;
-            if (akto_account_id != null && !akto_account_id.isEmpty()) {
-                accountId = Integer.parseInt(akto_account_id);
-            }
-            String alertText = errorMsg + ", requestData: " + buildRequestData().toString();
-            SlackSender.sendAlert(accountId, new CustomTextAlert(alertText), null);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Failed to send Slack alert: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
-        }
+        String alertText = errorMsg + ", requestData: " + buildRequestData().toString();
+        SlackUtils.sendAlert(alertText);
     }
 
     private Map<String, Object> buildRequestData() {

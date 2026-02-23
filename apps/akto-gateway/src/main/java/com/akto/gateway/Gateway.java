@@ -1,6 +1,7 @@
 package com.akto.gateway;
 
 import com.akto.dto.IngestDataBatch;
+import com.akto.utils.SlackUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -53,6 +54,11 @@ public class Gateway {
                     logger.error("Guardrails service call failed, continuing with data ingestion - path: {}, error: {}",
                         requestData.get("path"), e.getMessage(), e);
                     result.put("guardrailsError", e.getMessage());
+                    String alertMsg = "[guardrails] Service call failed - path: " + requestData.get("path")
+                        + ", method: " + requestData.get("method")
+                        + ", account: " + requestData.get("akto_account_id")
+                        + ", error: " + e.getMessage();
+                    SlackUtils.sendAlert(alertMsg);
                 }
             }
 
