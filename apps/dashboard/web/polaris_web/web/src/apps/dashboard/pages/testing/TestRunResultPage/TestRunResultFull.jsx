@@ -1,12 +1,15 @@
 import { Box, Button, Collapsible, Divider, HorizontalStack, Icon, LegacyCard, Scrollable, Text, VerticalStack } from '@shopify/polaris'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
-import {ChevronDownMinor ,ChevronUpMinor} from '@shopify/polaris-icons';
+import { ChevronDownMinor, ChevronUpMinor } from '@shopify/polaris-icons';
 import SampleDataList from '../../../components/shared/SampleDataList';
 import { tokens } from "@shopify/polaris-tokens"
 import GithubCell from '../../../components/tables/cells/GithubCell';
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards';
-import func from  "@/util/func"
+import func from "@/util/func"
+import ForbiddenRole from '../../../components/shared/ForbiddenRole';
+import TestRunResultChat from './TestRunResultChat';
+import MarkdownViewer from '../../../components/shared/MarkdownViewer';
 
 function MoreInformationComponent(props) {
     return (
@@ -41,9 +44,23 @@ function MoreInformationComponent(props) {
 
 function TestRunResultFull(props) {
 
-    const { selectedTestRunResult, testingRunResult, loading, issueDetails ,getDescriptionText, infoState, headerDetails, createJiraTicket, jiraIssueUrl, hexId, source} = props
+    const {
+        selectedTestRunResult, testingRunResult, loading, issueDetails, getDescriptionText, infoState, headerDetails,
+        hexId, source,
+        remediationSrc, conversations, conversationRemediationText, showForbidden    } = props
 
     const [fullDescription, setFullDescription] = useState(false)
+    const [remediationText, setRemediationText] = useState("")
+
+    useEffect(() => {
+        if (remediationSrc) {
+            setRemediationText(remediationSrc)
+        } else if (conversationRemediationText) {
+            setRemediationText(conversationRemediationText)
+        } else {
+            setRemediationText("")
+        }
+    }, [remediationSrc, conversationRemediationText])
 
     const testErrorComponent = (
         <LegacyCard title="Errors" sectioned key="test-errors">
@@ -85,19 +102,21 @@ function TestRunResultFull(props) {
       )
 
     const errorsPresent = selectedTestRunResult?.testResults?.some((result) => result.errors && result.errors.length > 0)
-    
-    const components = loading ? [<SpinnerCentered key="loading" />] : [
-          issueDetails.id &&
-          <LegacyCard title="Description" sectioned key="description">
-            {
-              getDescriptionText(fullDescription) 
-            }
-            <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
-          </LegacyCard>
-        ,
-        (testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].length > 0) ?  testLogsComponent : null,
-        (!func.showTestSampleData(selectedTestRunResult)) && testErrorComponent ,
-        (func.showTestSampleData(selectedTestRunResult))&& selectedTestRunResult.testResults &&
+
+    const hasConversations = conversations?.length > 0
+
+    const evidenceCard = hasConversations && (
+        <LegacyCard title="Evidence" sectioned key="evidence">
+            <TestRunResultChat
+                analysis={null}
+                conversations={conversations}
+                onSendMessage={() => {}}
+                isStreaming={false}
+            />
+        </LegacyCard>
+    )
+
+    const attemptCard = !hasConversations && (func.showTestSampleData(selectedTestRunResult) && selectedTestRunResult.testResults) &&
         <SampleDataList
           key={"sampleData"}
           sampleData={selectedTestRunResult?.testResults.map((result) => {
@@ -105,7 +124,6 @@ function TestRunResultFull(props) {
               let errorList = result.errors.join(", ");
               return { errorList: errorList }
             }
-
             if (result.originalMessage || result.message) {
               return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [] }
             }
@@ -116,13 +134,38 @@ function TestRunResultFull(props) {
           vulnerable={selectedTestRunResult?.vulnerable}
           heading={"Attempt"}
           isVulnerable={selectedTestRunResult.vulnerable}
-        />,
+        />
+
+    const remediationCard = remediationText && selectedTestRunResult?.vulnerable && (
+        <LegacyCard title="Remediation" sectioned key="remediation">
+            <MarkdownViewer markdown={remediationText} />
+        </LegacyCard>
+    )
+
+    const mainComponents = [
           issueDetails.id &&
+          <LegacyCard title="Description" sectioned key="description">
+            {getDescriptionText(fullDescription)}
+            <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
+          </LegacyCard>
+        ,
+        (testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].length > 0) ? testLogsComponent : null,
+        !hasConversations && (!func.showTestSampleData(selectedTestRunResult)) && testErrorComponent,
+        attemptCard,
+        evidenceCard,
+        remediationCard,
+        issueDetails.id &&
           <MoreInformationComponent
             key="info"
             sections={infoState}
           />
-      ] 
+      ].filter(Boolean)
+
+    const components = loading
+      ? [<SpinnerCentered key="loading" />]
+      : showForbidden
+        ? [<Box key="forbidden" padding="4"><ForbiddenRole /></Box>]
+        : mainComponents 
 
     return (
         <PageWithMultipleCards

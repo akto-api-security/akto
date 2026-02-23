@@ -16,11 +16,22 @@ public class SecurityHeadersFilter implements Filter {
 
     private static final String CSP_HEADER_VALUE =
             "default-src 'self'; " +
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' ajax.googleapis.com apis.google.com cdn.mxpnl.com clarity.ms widget.intercom.io app.getbeamer.com unpkg.com d1hvi6xs55woen.cloudfront.net; " +
-            "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net unpkg.com; " +
-            "connect-src 'self' *.akto.io api.github.com api.bitbucket.org dev.azure.com gitlab.com cdn.mxpnl.com clarity.ms api-iam.intercom.io widget.intercom.io app.getbeamer.com d1hvi6xs55woen.cloudfront.net; " +
-            "img-src 'self' data: blob:; " +
-            "font-src 'self' data:; " +
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' " +
+                "ajax.googleapis.com apis.google.com " +       // Google
+                "*.intercom.io *.intercomcdn.com " +            // Intercom
+                "cdn.mxpnl.com *.clarity.ms " +                 // Analytics
+                "unpkg.com d1hvi6xs55woen.cloudfront.net " +    // CDNs
+                "*.getbeamer.com js.stripe.com; " +             // Third-party
+            "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net unpkg.com *.getbeamer.com; " +
+            "connect-src 'self' " +
+                "*.akto.io " +                                   // Akto
+                "*.intercom.io wss://*.intercom.io " +           // Intercom (HTTPS + WebSocket)
+                "cdn.mxpnl.com *.mixpanel.com *.clarity.ms " +  // Analytics
+                "cdn.jsdelivr.net d1hvi6xs55woen.cloudfront.net *.highcharts.com " + // CDNs
+                "*.getbeamer.com *.stigg.io *.api.stigg.io; " + // Third-party
+            "frame-src js.stripe.com *.getbeamer.com; " +        // Stripe + Beamer iframes
+            "img-src 'self' data: blob: www.google.com *.youtube.com *.getbeamer.com *.intercomcdn.com d1hvi6xs55woen.cloudfront.net; " +
+            "font-src 'self' data: fonts.googleapis.com fonts.gstatic.com cdn.jsdelivr.net d1hvi6xs55woen.cloudfront.net; " +
             "frame-ancestors 'self'; " +
             "base-uri 'self'";
 

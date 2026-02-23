@@ -1,9 +1,10 @@
-import { Badge, Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Badge, Box, Button, Checkbox, Divider, Frame, HorizontalGrid, HorizontalStack, LegacyTabs, Modal, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
 import { ChevronUpMinor } from "@shopify/polaris-icons"
 
 import { useEffect, useRef, useState } from "react";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import TitleWithInfo from "../../../components/shared/TitleWithInfo";
+import Dropdown from "../../../components/layouts/Dropdown";
 import api from "../../testing/api"
 import testEditorRequests from "../api";
 import func from "@/util/func";
@@ -58,6 +59,10 @@ const SampleApi = () => {
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
     const [testRoles, setTestRoles] = useState([])
     const [testRolesOptions, setTestRolesOptions] = useState([])
+    const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([])
+    const [selectedMiniTestingServiceName, setSelectedMiniTestingServiceName] = useState(null)
+    const [hasOverriddenTestAppUrl, setHasOverriddenTestAppUrl] = useState(false)
+    const [overriddenTestAppUrl, setOverriddenTestAppUrl] = useState("")
 
     useEffect(() => {
         const fetchRoles = async () => {
@@ -78,6 +83,16 @@ const SampleApi = () => {
         }
         fetchRoles()
     }, [])
+
+    useEffect(() => {
+        api.fetchMiniTestingServiceNames().then(({ miniTestingServiceNames: names }) => {
+            const options = (names || []).map(name => ({ label: name, value: name }));
+            setMiniTestingServiceNames(options);
+            if (options.length > 0 && selectedMiniTestingServiceName == null) {
+                setSelectedMiniTestingServiceName(options[0].value);
+            }
+        });
+    }, []);
 
     useEffect(()=>{
         if(showEmptyLayout) return
@@ -287,7 +302,11 @@ const SampleApi = () => {
 
 
         try {
-            let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList,selectedRole)
+            const testingRunConfig = {
+            overriddenTestAppUrl: hasOverriddenTestAppUrl ? overriddenTestAppUrl : "",
+            testRoleId: selectedRole || undefined
+        };
+        let resp = await testEditorRequests.runTestForTemplate(currentContent, apiKeyInfo, sampleDataList, selectedMiniTestingServiceName, testingRunConfig)
             if(resp.testingRunPlaygroundHexId !== null && resp?.testingRunPlaygroundHexId !== undefined) {
                 await new Promise((resolve) => {
                     let maxAttempts = 100;
@@ -456,9 +475,10 @@ const SampleApi = () => {
                 </Frame>
             </Modal>
             <Modal
+                large
                 open={selectApiActive}
                 onClose={toggleSelectApiActive}
-                title="Select sample API and Test Role"
+                title="Test configuration"
                 primaryAction={{
                     id:"save",
                     content: 'Save',
@@ -516,6 +536,40 @@ const SampleApi = () => {
                         })()}
                         preSelected={selectedRole ? [selectedRole] : []}
                     />
+
+                    {miniTestingServiceNames?.length > 0 && (
+                        <>
+                            <br />
+                            <Dropdown
+                                label="Select Testing Module"
+                                menuItems={miniTestingServiceNames}
+                                initial={selectedMiniTestingServiceName || miniTestingServiceNames?.[0]?.value}
+                                selected={(value) => setSelectedMiniTestingServiceName(value)}
+                            />
+                        </>
+                    )}
+
+                    <br />
+                    <HorizontalGrid columns={2}>
+                        <Checkbox
+                            label={"Use different target for " + mapLabel("testing", getDashboardCategory())}
+                            checked={hasOverriddenTestAppUrl}
+                            onChange={() => {
+                                const next = !hasOverriddenTestAppUrl;
+                                setHasOverriddenTestAppUrl(next);
+                                if (!next) setOverriddenTestAppUrl("");
+                            }}
+                        />
+                        {hasOverriddenTestAppUrl && (
+                            <div style={{ width: '400px' }}>
+                                <TextField
+                                    placeholder="Override test app host"
+                                    value={overriddenTestAppUrl}
+                                    onChange={setOverriddenTestAppUrl}
+                                />
+                            </div>
+                        )}
+                    </HorizontalGrid>
 
                 </Modal.Section>
             </Modal>

@@ -187,6 +187,13 @@ const threatDetectionRequests = {
             data: {actorIp, status}
         })
     },
+    bulkModifyThreatActorStatusCloudflare(actorIps, status) {
+        return request({
+            url: '/api/bulkModifyThreatActorStatusCloudflare',
+            method: 'post',
+            data: {actorIps, status}
+        })
+    },
     updateMaliciousEventStatus(data) {
         // Handles all cases: single event (eventId), bulk (eventIds), or filter-based
         return request({

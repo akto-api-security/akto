@@ -1,5 +1,6 @@
 package com.akto.gateway;
 
+import com.akto.utils.SlackUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.*;
 import org.apache.logging.log4j.LogManager;
@@ -67,6 +68,11 @@ public class GuardrailsClient {
 
         } catch (Exception e) {
             logger.error("Error calling guardrails service: {}", e.getMessage(), e);
+            String alertMsg = "[guardrails] Service call failed - path: " + request.get("path")
+                + ", method: " + request.get("method")
+                + ", account: " + request.get("akto_account_id")
+                + ", error: " + e.getMessage();
+            SlackUtils.sendAlert(alertMsg);
             return buildErrorResponse(e.getMessage());
         }
     }
