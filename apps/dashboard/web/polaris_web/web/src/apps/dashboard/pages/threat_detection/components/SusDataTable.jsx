@@ -621,7 +621,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   }
 
   async function fillFilters() {
-    const res = await api.fetchFiltersThreatTable();
+    const res = await api.fetchFiltersThreatTable(startTimestamp, endTimestamp);
     let urlChoices = res?.urls
       .map((x) => {
         const url = x || "/"
@@ -698,7 +698,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   useEffect(() => {
     fillFilters();
-  }, [threatFiltersMap]);
+  }, [threatFiltersMap, startTimestamp, endTimestamp]);
 
   function disambiguateLabel(key, value) {
     switch (key) {
