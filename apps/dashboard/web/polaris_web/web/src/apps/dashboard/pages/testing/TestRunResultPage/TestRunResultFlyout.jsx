@@ -27,11 +27,12 @@ import ApiGroups from '../../../components/shared/ApiGroups'
 import ForbiddenRole from '../../../components/shared/ForbiddenRole'
 import LegendLabel from './LegendLabel.jsx'
 import TestRunResultChat from './TestRunResultChat.jsx'
+import AskAktoSection from './AskAktoSection.jsx'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -962,9 +963,20 @@ function TestRunResultFlyout(props) {
         />
     )
 
+    const askAktoComp = (
+        <AskAktoSection
+            aiSummary={aiSummary}
+            aiSummaryLoading={aiSummaryLoading}
+            aiMessages={aiMessages}
+            aiLoading={aiLoading}
+            onGenerateAiOverview={onGenerateAiOverview}
+            onSendFollowUp={onSendFollowUp}
+        />
+    )
+
     const currentComponents = showForbidden
         ? [<Box padding="4"><ForbiddenRole /></Box>]
-        : [<TitleComponent />, tabsComponent]
+        : [<TitleComponent />, askAktoComp, tabsComponent]
 
     const title = isIssuePage ? "Issue details" : mapLabel('Test result', getDashboardCategory())
 
