@@ -15,7 +15,7 @@ function AskAktoSection({ aiSummary, aiSummaryLoading, aiMessages, aiLoading, on
         if (onGenerateAiOverview && !aiSummary && !aiSummaryLoading) {
             onGenerateAiOverview();
         }
-    }, []);
+    }, [aiSummary, aiSummaryLoading]);
 
     useEffect(() => {
         const el = chatScrollRef.current;

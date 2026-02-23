@@ -165,7 +165,7 @@ function TestRunResultPage(props) {
     try {
       const metaData = buildTestResultMetadata();
       const response = await sendQuery(
-        "Analyze this test result and provide a brief 2-3 sentence overview of the vulnerability found.",
+        "Analyze this test result and provide a plain text summary in 1-2 sentences. No markdown, no headers, no bullet points, no formatting. Just plain sentences.",
         null,
         "TEST_EXECUTION_RESULT",
         metaData
