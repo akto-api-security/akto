@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
+	"github.com/akto-api-security/guardrails-service/pkg/slack"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
 	"github.com/gin-gonic/gin"
@@ -97,6 +99,9 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	var req models.ValidateRequestParams
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Error("ValidateRequest - invalid request format", zap.Error(err))
+		alertMsg := fmt.Sprintf("[guardrails] /validate/request - invalid request format: %s", err.Error())
+		slack.SendAlert(h.logger, alertMsg)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid request format",
 		})
@@ -127,7 +132,16 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 
 	result, err := h.validatorService.ValidateRequest(c.Request.Context(), &req, sessionID, requestID)
 	if err != nil {
-		h.logger.Error("Failed to validate request", zap.Error(err))
+		h.logger.Error("ValidateRequest failed",
+			zap.String("path", req.Path),
+			zap.String("method", req.Method),
+			zap.String("account", req.AktoAccountID),
+			zap.String("contextSource", req.ContextSource),
+			zap.String("sessionID", sessionID),
+			zap.Error(err))
+		alertMsg := fmt.Sprintf("[guardrails] /validate/request failed - path: %s, method: %s, account: %s, contextSource: %s, sessionID: %s, error: %s",
+			req.Path, req.Method, req.AktoAccountID, req.ContextSource, sessionID, err.Error())
+		slack.SendAlert(h.logger, alertMsg)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Validation failed",
 		})
