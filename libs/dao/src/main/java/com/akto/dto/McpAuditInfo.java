@@ -28,6 +28,7 @@ public class McpAuditInfo {
     private String remarks;
     private Set<ApiInfo.ApiAccessType> apiAccessTypes;
     private int hostCollectionId;
+    private String mcpHost;
     private ComponentRiskAnalysis componentRiskAnalysis;
 
     // Conditional approval fields
@@ -47,6 +48,7 @@ public class McpAuditInfo {
         String remarks,
         Set<ApiInfo.ApiAccessType> apiAccessTypes,
         int hostCollectionId,
+        String mcpHost,
         ComponentRiskAnalysis componentRiskAnalysis) {
         this.lastDetected = lastDetected;
         this.markedBy = markedBy;
@@ -56,6 +58,7 @@ public class McpAuditInfo {
         this.remarks = remarks;
         this.apiAccessTypes = apiAccessTypes;
         this.hostCollectionId = hostCollectionId;
+        this.mcpHost = mcpHost;
         this.componentRiskAnalysis = componentRiskAnalysis;
     }
 

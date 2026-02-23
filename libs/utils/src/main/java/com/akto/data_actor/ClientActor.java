@@ -4352,7 +4352,7 @@ public class ClientActor extends DataActor {
     }
 
     @Override
-    public void updateMcpAuditInfo(String type, String resourceName, ComponentRiskAnalysis componentRiskAnalysis) {
+    public void updateMcpAuditInfo(String type, String resourceName, String mcpHost, ComponentRiskAnalysis componentRiskAnalysis) {
 
     }
 

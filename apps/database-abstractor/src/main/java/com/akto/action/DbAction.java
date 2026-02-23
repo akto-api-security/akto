@@ -139,16 +139,6 @@ public class DbAction extends ActionSupport {
     private String importType;
     @Getter @Setter
     McpAuditInfo auditInfo;
-
-    @Getter @Setter
-    private String componentType;
-
-    @Getter @Setter
-    private String componentName;
-
-    @Getter @Setter
-    private ComponentRiskAnalysis componentRiskAnalysis;
-    
     // MCP Recon fields
     @Getter @Setter
     private List<McpReconRequest> mcpReconRequests;
@@ -3310,7 +3300,7 @@ public class DbAction extends ActionSupport {
 
     public String updateMcpAuditInfo() {
         try {
-            DbLayer.updateMcpAuditInfo(componentType, componentName, componentRiskAnalysis);
+            DbLayer.updateMcpAuditInfo(auditInfo.getType(), auditInfo.getResourceName(), auditInfo.getMcpHost(), auditInfo.getComponentRiskAnalysis());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateMcpAuditInfo " + e.toString());
             return Action.ERROR.toUpperCase();

@@ -2379,21 +2379,26 @@ public class DbLayer {
 
     public static void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
 
-            // Check if record with same type, resourceName, and hostCollectionId already exists
             BasicDBObject findQuery = new BasicDBObject();
             findQuery.put("type", auditInfo.getType());
             findQuery.put("resourceName", auditInfo.getResourceName());
-            //findQuery.put("hostCollectionId", auditInfo.getHostCollectionId());
+            if (auditInfo.getMcpHost() != null) {
+                findQuery.put("mcpHost", auditInfo.getMcpHost());
+            } else {
+                findQuery.put("mcpHost", new BasicDBObject("$exists", false));
+            }
 
             McpAuditInfo existingRecord = McpAuditInfoDao.instance.findOne(findQuery);
 
             if (existingRecord != null) {
-                // Update the existing record with new lastDetected timestamp
                 BasicDBObject setFields = new BasicDBObject("lastDetected", Context.now());
 
                 ComponentRiskAnalysis componentRiskAnalysis = auditInfo.getComponentRiskAnalysis();
                 if (componentRiskAnalysis != null) {
                     setFields.put("componentRiskAnalysis", componentRiskAnalysis);
+                }
+                if (auditInfo.getMcpHost() != null) {
+                    setFields.put("mcpHost", auditInfo.getMcpHost());
                 }
 
                 BasicDBObject update = new BasicDBObject();
@@ -2401,7 +2406,6 @@ public class DbLayer {
 
                 McpAuditInfoDao.instance.updateOne(findQuery, update);
             } else {
-                // Insert new record
                 McpAuditInfoDao.instance.insertOne(auditInfo);
             }
 
@@ -2503,14 +2507,19 @@ public class DbLayer {
         }
     }
 
-    public static void updateMcpAuditInfo(String componentType, String componentName, ComponentRiskAnalysis componentRiskAnalysis) {
-        if (componentType == null || componentName == null || componentRiskAnalysis == null) {
+    public static void updateMcpAuditInfo(String componentType, String componentName, String mcpHost, ComponentRiskAnalysis componentRiskAnalysis) {
+        if (componentType == null || componentName == null || componentRiskAnalysis == null || mcpHost == null) {
             return;
         }
-        Bson filter = Filters.and(
-                Filters.eq("type", componentType),
-                Filters.eq("resourceName", componentName)
-        );
+        List<Bson> filterList = new ArrayList<>();
+        filterList.add(Filters.eq("type", componentType));
+        filterList.add(Filters.eq("resourceName", componentName));
+        if (mcpHost != null) {
+            filterList.add(Filters.eq("mcpHost", mcpHost));
+        } else {
+            filterList.add(Filters.exists("mcpHost", false));
+        }
+        Bson filter = Filters.and(filterList);
         Bson updates = Updates.combine(
                 Updates.set("componentRiskAnalysis", componentRiskAnalysis),
                 Updates.set("updatedTimestamp", Context.now())
