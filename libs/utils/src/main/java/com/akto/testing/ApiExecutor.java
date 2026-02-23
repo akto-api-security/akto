@@ -84,7 +84,8 @@ public class ApiExecutor {
         if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
         }
-        boolean isCyborgCall = request.url().toString().contains("cyborg.akto.io");
+        String requestUrl = request.url().toString();
+        boolean isCyborgCall = requestUrl.contains("cyborg.akto.io") || requestUrl.contains("ultron.akto.io");
         long start = System.currentTimeMillis();
 
         if (authParam != null) {
