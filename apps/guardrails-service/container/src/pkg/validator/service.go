@@ -343,28 +343,29 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	payload := params.RequestPayload
 	contextSource := params.ContextSource
 
-	s.logger.Debug("ValidateRequest - starting validation",
+	s.logger.Info("ValidateRequest - starting",
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("account", params.AktoAccountID),
 		zap.String("contextSource", contextSource),
 		zap.String("sessionID", sessionID),
 		zap.String("requestID", requestID),
 		zap.String("ip", params.IP),
 		zap.String("destIp", params.DestIP),
-		zap.String("path", params.Path),
-		zap.String("method", params.Method),
 		zap.String("statusCode", params.StatusCode),
 		zap.String("source", params.Source),
 		zap.String("direction", params.Direction),
 		zap.String("tag", params.Tag),
-		zap.String("aktoAccountId", params.AktoAccountID),
-		zap.String("aktoVxlanId", params.AktoVxlanID))
-
-	s.logger.Info("Validating request payload",
-		zap.String("sessionID", sessionID),
-		zap.String("requestID", requestID),
-		zap.String("payload", payload))
+		zap.String("aktoVxlanId", params.AktoVxlanID),
+		zap.Bool("skipThreat", params.SkipThreat))
 
 	// Check if session is already malicious
 	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
+		s.logger.Info("ValidateRequest - session already malicious, blocking request",
+			zap.String("path", params.Path),
+			zap.String("method", params.Method),
+			zap.String("sessionID", sessionID),
+			zap.String("requestID", requestID))
 		return result, nil
 	}
 
@@ -373,14 +374,25 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	// Inject session summary into payload if available
 	payloadToValidate := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID)
+	if payloadToValidate != payload {
+		s.logger.Info("ValidateRequest - payload modified by session summary injection",
+			zap.String("sessionID", sessionID))
+	}
 
 	// Get cached policies (refreshes if stale)
 	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(contextSource)
 	if err != nil {
+		s.logger.Error("ValidateRequest - failed to load policies",
+			zap.String("path", params.Path),
+			zap.String("method", params.Method),
+			zap.String("account", params.AktoAccountID),
+			zap.String("contextSource", contextSource),
+			zap.String("sessionID", sessionID),
+			zap.Error(err))
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
 
-	s.logger.Debug("ValidateRequest - loaded policies for contextSource",
+	s.logger.Info("ValidateRequest - loaded policies",
 		zap.String("contextSource", contextSource),
 		zap.Int("policiesCount", len(policies)),
 		zap.Strings("policyNames", policyNames(policies)))
@@ -389,10 +401,18 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	reqHeaders := make(map[string]string)
 	respHeaders := make(map[string]string)
 	if params.RequestHeaders != "" {
-		json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders)
+		if err := json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders); err != nil {
+			s.logger.Warn("ValidateRequest - failed to parse request headers, proceeding with empty headers",
+				zap.String("sessionID", sessionID),
+				zap.Error(err))
+		}
 	}
 	if params.ResponseHeaders != "" {
-		json.Unmarshal([]byte(params.ResponseHeaders), &respHeaders)
+		if err := json.Unmarshal([]byte(params.ResponseHeaders), &respHeaders); err != nil {
+			s.logger.Warn("ValidateRequest - failed to parse response headers, proceeding with empty headers",
+				zap.String("sessionID", sessionID),
+				zap.Error(err))
+		}
 	}
 
 	statusCode := 0
@@ -420,40 +440,48 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		SkipThreat:   	 params.SkipThreat, // Set skipThreat directly in context
 	}
 
-	s.logger.Debug("ValidateRequest - created validation context",
-		zap.String("contextSource", string(valCtx.ContextSource)),
-		zap.String("sessionID", valCtx.SessionID),
-		zap.String("ip", valCtx.IP),
-		zap.String("destIp", valCtx.DestIP),
-		zap.String("endpoint", valCtx.Endpoint),
-		zap.String("method", valCtx.Method),
-		zap.Int("statusCode", valCtx.StatusCode),
-		zap.String("mcpServerName", valCtx.McpServerName),
-		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
-		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)),
-		zap.Bool("hasRequestPayload", valCtx.RequestPayload != ""))
-
-	s.logger.Debug("Calling ProcessRequest",
+	s.logger.Info("ValidateRequest - calling ProcessRequest",
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("sessionID", sessionID),
+		zap.String("mcpServerName", mcpServerName),
 		zap.Int("policiesCount", len(policies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
 		zap.Int("compiledRulesCount", len(compiledRules)),
 		zap.Bool("hasAuditRules", hasAuditRules),
 		zap.Bool("skipThreat", params.SkipThreat),
-		zap.String("payload", payloadToValidate))
+		zap.Int("reqHeadersCount", len(reqHeaders)),
+		zap.Int("respHeadersCount", len(respHeaders)))
 
 	// Use the default processor - skipThreat is passed via ValidationContext
 	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
 	if err != nil {
-		s.logger.Error("ProcessRequest failed", zap.Error(err))
+		s.logger.Error("ValidateRequest - ProcessRequest failed",
+			zap.String("path", params.Path),
+			zap.String("method", params.Method),
+			zap.String("account", params.AktoAccountID),
+			zap.String("sessionID", sessionID),
+			zap.Error(err))
 		return nil, fmt.Errorf("failed to process request: %w", err)
 	}
 
-	s.logger.Debug("ProcessRequest result",
+	s.logger.Info("ValidateRequest - ProcessRequest result",
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("sessionID", sessionID),
 		zap.Bool("isBlocked", processResult.IsBlocked),
 		zap.Bool("shouldForward", processResult.ShouldForward),
-		zap.String("modifiedPayload", processResult.ModifiedPayload),
-		zap.Any("blockedResponse", processResult.BlockedResponse),
-		zap.Any("parsedData", processResult.ParsedData))
+		zap.Bool("payloadModified", processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload))
+
+	if processResult.IsBlocked {
+		s.logger.Warn("ValidateRequest - request blocked by guardrails",
+			zap.String("path", params.Path),
+			zap.String("method", params.Method),
+			zap.String("account", params.AktoAccountID),
+			zap.String("contextSource", contextSource),
+			zap.String("sessionID", sessionID),
+			zap.Any("blockedResponse", processResult.BlockedResponse))
+	}
 
 	// Track blocked response if request was blocked
 	session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, requestID, processResult)
@@ -467,10 +495,14 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 	}
 
-	s.logger.Info("Request validation completed",
+	s.logger.Info("ValidateRequest - completed",
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("account", params.AktoAccountID),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID),
 		zap.Bool("allowed", result.Allowed),
-		zap.Bool("modified", result.Modified),
-		zap.String("sessionID", sessionID))
+		zap.Bool("modified", result.Modified))
 
 	return result, nil
 }
