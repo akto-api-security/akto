@@ -51,8 +51,9 @@ public class HttpProxyAction extends ActionSupport {
     private String message;
 
     public String httpProxy() {
+        long start = System.currentTimeMillis();
         try {
-            loggerMaker.info("HTTP Proxy API called - path: " + path + ", requestHeaders: " + requestHeaders + ", requestPayload: " + requestPayload);
+            loggerMaker.info("HTTP Proxy API called - path: " + path + ", method: " + method + ", account: " + akto_account_id);
 
             Gateway gateway = Gateway.getInstance();
             ensureDataPublisher(gateway);
@@ -64,18 +65,23 @@ public class HttpProxyAction extends ActionSupport {
             message = (String) result.get("message");
             data = result;
 
+            long latencyMs = System.currentTimeMillis() - start;
             if (!success) {
                 String errorMsg = "[http-proxy] API failed - path: " + path + ", method: " + method
-                    + ", account: " + akto_account_id + ", error: " + message;
+                    + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + message;
                 loggerMaker.errorAndAddToDb(errorMsg, LoggerMaker.LogDb.DATA_INGESTION);
                 sendSlackAlert(errorMsg);
+            } else {
+                loggerMaker.info("[http-proxy] API completed - path: " + path + ", method: " + method
+                    + ", account: " + akto_account_id + ", latencyMs: " + latencyMs);
             }
 
             return success ? Action.SUCCESS.toUpperCase() : Action.ERROR.toUpperCase();
 
         } catch (Exception e) {
+            long latencyMs = System.currentTimeMillis() - start;
             String errorMsg = "[http-proxy] Unexpected error - path: " + path + ", method: " + method
-                + ", account: " + akto_account_id + ", error: " + e.getMessage();
+                + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + e.getMessage();
             loggerMaker.errorAndAddToDb(errorMsg, LoggerMaker.LogDb.DATA_INGESTION);
             sendSlackAlert(errorMsg);
             success = false;
