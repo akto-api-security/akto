@@ -10,9 +10,16 @@ import "./style.css";
 function AskAktoSection({ aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp }) {
     const [followUpValue, setFollowUpValue] = useState('');
     const chatScrollRef = useRef(null);
+    const hasRequestedOverview = useRef(false);
 
     useEffect(() => {
-        if (onGenerateAiOverview && !aiSummary && !aiSummaryLoading) {
+        // Reset when switching to a new test result (aiSummary goes from truthy back to null)
+        hasRequestedOverview.current = false;
+    }, [onGenerateAiOverview]);
+
+    useEffect(() => {
+        if (onGenerateAiOverview && !aiSummary && !aiSummaryLoading && !hasRequestedOverview.current) {
+            hasRequestedOverview.current = true;
             onGenerateAiOverview();
         }
     }, [aiSummary, aiSummaryLoading]);

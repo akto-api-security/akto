@@ -178,6 +178,7 @@ function TestRunResultPage(props) {
       }
     } catch (err) {
       console.error("Failed to generate AI overview:", err);
+      setAiSummary("Unable to generate AI overview. You can still ask questions below.");
     } finally {
       setAiSummaryLoading(false);
     }
