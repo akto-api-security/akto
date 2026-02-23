@@ -16,11 +16,11 @@ public class ComponentRiskAnalysis {
     @Setter
     private String evidence;
 
-    public boolean getHasElevatedAccess() {
+    public boolean getHasPrivilegedAccess() {
         return hasPrivilegedAccess;
     }
 
-    public void setHasElevatedAccess(boolean hasPrivilegedAccess) {
+    public void setHasPrivilegedAccess(boolean hasPrivilegedAccess) {
         this.hasPrivilegedAccess = hasPrivilegedAccess;
     }
 
