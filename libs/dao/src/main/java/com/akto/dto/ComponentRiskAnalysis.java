@@ -9,19 +9,19 @@ import lombok.Setter;
 @AllArgsConstructor
 public class ComponentRiskAnalysis {
 
-    private boolean isComponentNameSuspicious;
+    private boolean hasPrivilegedAccess;
     private boolean isComponentMalicious;
 
     @Getter
     @Setter
     private String evidence;
 
-    public boolean getIsComponentNameSuspicious() {
-        return isComponentNameSuspicious;
+    public boolean getHasPrivilegedAccess() {
+        return hasPrivilegedAccess;
     }
 
-    public void setIsComponentNameSuspicious(boolean componentNameSuspicious) {
-        isComponentNameSuspicious = componentNameSuspicious;
+    public void setHasPrivilegedAccess(boolean hasPrivilegedAccess) {
+        this.hasPrivilegedAccess = hasPrivilegedAccess;
     }
 
     public boolean getIsComponentMalicious() {

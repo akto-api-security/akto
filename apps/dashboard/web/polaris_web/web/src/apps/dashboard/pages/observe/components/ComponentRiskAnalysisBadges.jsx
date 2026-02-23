@@ -6,14 +6,14 @@ import { Text, VerticalStack, Badge, Tooltip, Box } from "@shopify/polaris";
  */
 function ComponentRiskAnalysisBadges({ componentRiskAnalysis }) {
     if (!componentRiskAnalysis) return <Text as="span">-</Text>;
-    const isComponentNameSuspicious = componentRiskAnalysis.isComponentNameSuspicious;
+    const hasPrivilegedAccess = componentRiskAnalysis.hasPrivilegedAccess;
     const isComponentMalicious = componentRiskAnalysis.isComponentMalicious;
     const evidence = componentRiskAnalysis.evidence;
     const tags = [];
     if (isComponentMalicious) {
         tags.push(<div key="malicious" className="badge-wrapper-HIGH"><Badge size="small">Malicious</Badge></div>);
     }
-    if (isComponentNameSuspicious) {
+    if (hasPrivilegedAccess) {
         tags.push(<div key="privileged" className="badge-wrapper-MEDIUM"><Badge size="small">Privileged Access</Badge></div>);
     }
     const content = tags.length > 0 ? (
