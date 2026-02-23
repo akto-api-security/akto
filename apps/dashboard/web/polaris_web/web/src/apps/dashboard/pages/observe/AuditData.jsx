@@ -1,5 +1,5 @@
 
-import { Text, HorizontalStack, VerticalStack, Box, Tooltip, Badge } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box } from "@shopify/polaris"
 import { useEffect, useReducer, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
@@ -16,6 +16,7 @@ import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
 import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
 import RegistryBadge from "../../components/shared/RegistryBadge";
+import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges";
 
 const headings = [
     {
@@ -163,30 +164,7 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
         <MethodBox method={""} url={auditRecord?.type.toLowerCase() || "TOOL"}/>
     )
 
-    const riskAnalysis = auditRecord?.componentRiskAnalysis;
-    const isComponentNameSuspicious = riskAnalysis && (riskAnalysis.isComponentNameSuspicious);
-    const isComponentMalicious = riskAnalysis && (riskAnalysis.isComponentMalicious);
-    const severityValue = isComponentMalicious
-      ? 'CRITICAL'
-      : isComponentNameSuspicious
-        ? 'HIGH'
-        : null;
-    const evidence = riskAnalysis?.evidence;
-    const riskAnalysisDisplay = severityValue ? func.toSentenceCase(severityValue) : '-';
-    const severityBadge = severityValue ? (
-        <div className={`badge-wrapper-${(severityValue + '').toUpperCase()}`}>
-            <Badge size="small">{riskAnalysisDisplay}</Badge>
-        </div>
-    ) : (
-        <Text as="span">{riskAnalysisDisplay}</Text>
-    );
-    temp['riskAnalysisComp'] = evidence ? (
-        <Tooltip content={evidence} dismissOnMouseOut width="wide">
-            {severityBadge}
-        </Tooltip>
-    ) : (
-        severityBadge
-    );
+    temp['riskAnalysisComp'] = <ComponentRiskAnalysisBadges componentRiskAnalysis={auditRecord?.componentRiskAnalysis} />;
 
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
     temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, allCollections, temp?.hostCollectionId);

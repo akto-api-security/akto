@@ -462,4 +462,20 @@ public final class McpRequestResponseUtils {
         }
         return hostRaw.trim();
     }
+
+    public static String extractServiceNameFromHost(String host) {
+        if (host == null || host.isEmpty()) {
+            return null;
+        }
+        String[] parts = host.split("\\.");
+        if (parts.length < 3) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder(parts[2]);
+        for (int i = 3; i < parts.length; i++) {
+            sb.append(".").append(parts[i]);
+        }
+        return sb.toString();
+    }
+
 }

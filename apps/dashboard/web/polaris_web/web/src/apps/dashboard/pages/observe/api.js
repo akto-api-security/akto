@@ -56,6 +56,16 @@ export default {
         return resp;
     },
 
+    async fetchMcpAuditInfoByCollection(apiCollectionId) {
+        const id = typeof apiCollectionId === 'string' ? parseInt(apiCollectionId, 10) : apiCollectionId;
+        const resp = await request({
+            url: '/api/fetchMcpAuditInfoByCollection',
+            method: 'post',
+            data: { apiCollectionId: id }
+        });
+        return resp?.mcpAuditInfoList || [];
+    },
+
     async fetchDataTypeNames() {
         const resp = await request({
             url: '/api/fetchDataTypeNames',

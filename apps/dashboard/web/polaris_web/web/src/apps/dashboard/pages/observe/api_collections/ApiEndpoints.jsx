@@ -39,6 +39,7 @@ import McpToolsGraph from "./McpToolsGraph"
 import { findTypeTag, TYPE_TAG_KEYS } from "../agentic/mcpClientHelper"
 import AgentDiscoverGraphWithDummyData from "./AgentDiscoveryGraphWithDummyData"
 import AgentDiscoverGraph from "./AgentDiscoverGraph"
+import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges"
 
 const headings = [
     {
@@ -60,6 +61,13 @@ const headings = [
         filterKey: 'riskScore',
         showFilter:true
     },
+    // Component Risk Analysis (Endpoint Security / Atlas only)
+    ...(isEndpointSecurityCategory() ? [{
+        text: "Component Risk Analysis",
+        title: "Component Risk Analysis",
+        value: "componentRiskAnalysisComp",
+        textValue: "componentRiskAnalysis",
+    }] : []),
     // Conditionally include Issues column (skip for Endpoint Security)
     ...(!isEndpointSecurityCategory() ? [{
         text:"Issues",
@@ -193,8 +201,8 @@ headers.push({
 })
 
 
-// Offset for hidden Issues column in Endpoint Security mode
-const columnOffset = isEndpointSecurityCategory() ? -1 : 0;
+// Column index offset for sort options. With Component Risk Analysis column (Endpoint Security), column count matches API Security (Issues column), so no offset.
+const columnOffset = 0;
 
 const sortOptions = [
     { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore', columnIndex: 2},
@@ -209,7 +217,26 @@ const sortOptions = [
     { label: 'Last tested', value: 'lastTested desc', directionLabel: 'Oldest', sortKey: 'lastTested', columnIndex: 10 + columnOffset },
 ];
 
+/** Build once: resourceName -> componentRiskAnalysis. */
+function buildResourceNameToRiskMap(mcpAuditInfoList) {
+    const map = new Map();
+    if (!Array.isArray(mcpAuditInfoList)) return map;
+    for (const audit of mcpAuditInfoList) {
+        const name = audit?.resourceName;
+        if (!name || typeof name !== 'string' || !audit?.componentRiskAnalysis) continue;
+        map.set(name.trim(), audit.componentRiskAnalysis);
+    }
+    return map;
+}
 
+/** Lookup risk for an endpoint: extract component name from path, then map.get(componentName). */
+function getRiskAnalysisForEndpoint(endpointUrl, resourceNameToRiskMap) {
+    if (!endpointUrl || !resourceNameToRiskMap?.size) {
+        return null;
+    }
+    const componentName = transform.extractMcpComponentNameFromPath(endpointUrl);
+    return componentName != null ? (resourceNameToRiskMap.get(componentName) ?? null) : null;
+}
 
 function ApiEndpoints(props) {
     const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
@@ -236,7 +263,6 @@ function ApiEndpoints(props) {
     const [openAPIfile, setOpenAPIfile] = useState(null)
     const [sourcesBackfilled, setSourcesBackfilled] = useState(false)
     const [collectionIssuesData, setCollectionIssuesData] = useState([])
-
     const [endpointData, setEndpointData] = useState({"all":[], 'sensitive': [], 'new': [], 'high_risk': [], 'no_auth': [], 'shadow': [], 'zombie': []})
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
@@ -281,6 +307,7 @@ function ApiEndpoints(props) {
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
+
     async function fetchData() {
         setLoading(true)
         let apiEndpointsInCollection;
@@ -290,6 +317,8 @@ function ApiEndpoints(props) {
         let sourceCodeData = {};
         let apiInfoSeverityMap ;
         let issuesDataResp;
+        let mcpListForRisk = [];
+        let resourceNameToRiskMap = new Map();
         if (isQueryPage) {
             let apiCollectionData = endpointListFromConditions
             if (Object.keys(endpointListFromConditions).length === 0) {
@@ -320,9 +349,10 @@ function ApiEndpoints(props) {
                 api.fetchApiInfosForCollection(apiCollectionId),
                 api.fetchAPIsFromSourceCode(apiCollectionId),
             ];
-
-            // Conditionally add testing-related APIs (skip for Endpoint Security)
-            if (!isEndpointSecurityCategory()) {
+            // MCP audit API only for Endpoint Security (Atlas) – do not call for other collections
+            if (isEndpointSecurityCategory()) {
+                apiPromises.push(api.fetchMcpAuditInfoByCollection(apiCollectionId));
+            } else {
                 apiPromises.push(api.getSeveritiesCountPerCollection(apiCollectionId));
                 apiPromises.push(IssuesApi.fetchIssues(0, 1000, ["OPEN"], [apiCollectionId], null, null, null, null, null, null, true, null));
             }
@@ -332,13 +362,15 @@ function ApiEndpoints(props) {
             let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
             sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
 
-            // Conditionally extract testing-related results (skip for Endpoint Security)
-            if (!isEndpointSecurityCategory()) {
-                apiInfoSeverityMap = results[3].status === 'fulfilled' ? results[3].value : {};
-                issuesDataResp = results[4].status === 'fulfilled' ? results[4].value : {};
-            } else {
+            if (isEndpointSecurityCategory()) {
+                const mcpAuditResult = results[3].status === 'fulfilled' ? (results[3].value || []) : [];
+                mcpListForRisk = mcpAuditResult;
+                resourceNameToRiskMap = buildResourceNameToRiskMap(mcpListForRisk);
                 apiInfoSeverityMap = {};
                 issuesDataResp = {};
+            } else {
+                apiInfoSeverityMap = results[3].status === 'fulfilled' ? results[3].value : {};
+                issuesDataResp = results[4].status === 'fulfilled' ? results[4].value : {};
             }
 
             // Initialize with empty sensitive params for fast UI loading
@@ -459,16 +491,24 @@ function ApiEndpoints(props) {
             }
         })
 
+        const getComponentRiskCompForEndpoint = (endpointUrl) => {
+            if (!isEndpointSecurityCategory() || !resourceNameToRiskMap.size) return null;
+            return <ComponentRiskAnalysisBadges componentRiskAnalysis={getRiskAnalysisForEndpoint(endpointUrl, resourceNameToRiskMap)} />;
+        };
+
         // Step 1: Create lightweight objects for ALL endpoints (for filtering & counting only)
         const allEndpointsLight = allEndpoints.map((obj) => {
             const t = collectionTagsMap[obj.apiCollectionId];
-            return {
+            const base = {
                 ...obj,
                 tagsComp: t?.comp || null,
                 tagsString: t?.str || "",
                 isNew: transform.isNewEndpoint(obj.lastSeenTs),
                 open:  obj.auth_type === undefined || obj.auth_type.toLowerCase() === "unauthenticated" || obj.auth_type.toLowerCase() === "no auth type found",
             };
+            const riskComp = getComponentRiskCompForEndpoint(obj.endpoint);
+            if (riskComp != null) base.componentRiskAnalysisComp = riskComp;
+            return base;
         });
 
         // Single pass through endpoints for all filtering and checks
@@ -547,7 +587,7 @@ function ApiEndpoints(props) {
         const prettifyPageWithTags = (pageData) => {
             const prettified = transform.prettifyEndpointsData(pageData);
 
-            // Re-apply tags after prettify
+            // Re-apply tags and Component Risk Analysis (Endpoint Security) per endpoint after prettify
             prettified.forEach((obj) => {
                 const t = collectionTagsMap[obj.apiCollectionId];
                 if (t) {
@@ -556,6 +596,8 @@ function ApiEndpoints(props) {
                 } else {
                     obj.tagsString = "";
                 }
+                const riskComp = getComponentRiskCompForEndpoint(obj.endpoint);
+                if (riskComp != null) obj.componentRiskAnalysisComp = riskComp;
             });
 
             return prettified;
@@ -571,8 +613,8 @@ function ApiEndpoints(props) {
                 return pageData.map((item) => {
                     // Check if this item is a shadowApi by checking for codeAnalysisEndpoint flag
                     if (item.codeAnalysisEndpoint === true) {
-                        // Already prettified, return as-is
-                        return item;
+                        const riskComp = getComponentRiskCompForEndpoint(item.endpoint);
+                        return riskComp != null ? { ...item, componentRiskAnalysisComp: riskComp } : item;
                     } else {
                         // Raw data, needs prettification
                         return prettifyPageWithTags([item])[0];
@@ -614,6 +656,8 @@ function ApiEndpoints(props) {
                 } else {
                     obj.tagsString = "";
                 }
+                const riskComp = getComponentRiskCompForEndpoint(obj.endpoint);
+                if (riskComp != null) obj.componentRiskAnalysisComp = riskComp;
             });
 
             data['all'] = [...prettifyData, ...shadowApis];
