@@ -3,7 +3,6 @@ package com.akto.action;
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
 import com.akto.utils.KafkaUtils;
-import com.akto.publisher.KafkaDataPublisher;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
@@ -16,19 +15,7 @@ import java.util.Map;
 public class HttpProxyAction extends ActionSupport {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpProxyAction.class, LoggerMaker.LogDb.DATA_INGESTION);
-    private static final Gateway gateway = Gateway.getInstance();
 
-    // Initialize Gateway with KafkaDataPublisher
-    static {
-        gateway.setDataPublisher(new KafkaDataPublisher());
-        loggerMaker.info("Gateway configured with KafkaDataPublisher");
-    }
-
-    private String url;
-    private Map<String, Object> request;
-    private Map<String, Object> response;
-
-    // Query parameters (from URL query string)
     private String guardrails;
     private String akto_connector;
     private String ingest_data;
