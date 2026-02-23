@@ -21,7 +21,7 @@ public class GuardrailsClient {
 
     public GuardrailsClient() {
         this.guardrailsServiceUrl = loadServiceUrlFromEnv();
-        this.httpClient = createHttpClient(5000);
+        this.httpClient = createHttpClient(10000);
         logger.info("GuardrailsClient initialized - URL: {}", guardrailsServiceUrl);
     }
 

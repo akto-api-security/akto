@@ -111,19 +111,19 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	// Extract session and request IDs from headers
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
 
-	h.logger.Debug("ValidateRequest - received request params",
+	h.logger.Info("ValidateRequest - received request",
+		zap.String("path", req.Path),
+		zap.String("method", req.Method),
+		zap.String("account", req.AktoAccountID),
 		zap.String("contextSource", req.ContextSource),
 		zap.String("sessionID", sessionID),
 		zap.String("requestID", requestID),
 		zap.String("ip", req.IP),
 		zap.String("destIp", req.DestIP),
-		zap.String("path", req.Path),
-		zap.String("method", req.Method),
 		zap.String("statusCode", req.StatusCode),
 		zap.String("source", req.Source),
 		zap.String("direction", req.Direction),
 		zap.String("tag", req.Tag),
-		zap.String("aktoAccountId", req.AktoAccountID),
 		zap.String("aktoVxlanId", req.AktoVxlanID),
 		zap.Bool("hasRequestHeaders", req.RequestHeaders != ""),
 		zap.Bool("hasResponseHeaders", req.ResponseHeaders != ""),
@@ -147,6 +147,14 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		})
 		return
 	}
+
+	h.logger.Info("ValidateRequest - completed",
+		zap.String("path", req.Path),
+		zap.String("method", req.Method),
+		zap.String("account", req.AktoAccountID),
+		zap.String("sessionID", sessionID),
+		zap.Bool("allowed", result.Allowed),
+		zap.Bool("modified", result.Modified))
 
 	c.JSON(http.StatusOK, result)
 }
