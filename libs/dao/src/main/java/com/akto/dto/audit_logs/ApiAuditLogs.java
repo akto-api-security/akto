@@ -2,6 +2,11 @@ package com.akto.dto.audit_logs;
 
 import java.util.List;
 
+import com.mongodb.BasicDBObject;
+
+import lombok.Getter;
+import lombok.Setter;
+
 public class ApiAuditLogs {
 
     public static final String TIMESTAMP = "timestamp";
@@ -25,9 +30,24 @@ public class ApiAuditLogs {
     public static final String USER_PROXY_IP_ADDRESSES = "userProxyIpAddresses";
     private List<String> userProxyIpAddresses;
 
+    public static final String RESOURCE = "resource";
+    @Getter
+    @Setter
+    private Resource resource = Resource.NOT_SPECIFIED;
+
+    public static final String OPERATION = "operation";
+    @Getter
+    @Setter
+    private Operation operation = Operation.NOT_SPECIFIED;
+
+    public static final String METADATA = "metadata";
+    @Getter
+    @Setter
+    private BasicDBObject metadata = new BasicDBObject();
+
     public ApiAuditLogs() {}
 
-    public ApiAuditLogs(long timestamp, String apiEndpoint, String actionDescription, String userEmail, String userAgent, String userIpAddress, List<String> userProxyIpAddresses) {
+    public ApiAuditLogs(long timestamp, String apiEndpoint, String actionDescription, String userEmail, String userAgent, String userIpAddress, List<String> userProxyIpAddresses, Resource resource, Operation operation, BasicDBObject metadata) {
         this.timestamp = timestamp;
         this.apiEndpoint = apiEndpoint;
         this.actionDescription = actionDescription;
@@ -35,6 +55,9 @@ public class ApiAuditLogs {
         this.userAgent = userAgent;
         this.userIpAddress = userIpAddress;
         this.userProxyIpAddresses = userProxyIpAddresses;
+        this.resource = resource;
+        this.operation = operation;
+        this.metadata = metadata;
     }
 
     public long getTimestamp() {

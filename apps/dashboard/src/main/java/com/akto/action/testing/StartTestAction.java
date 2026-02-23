@@ -1,6 +1,7 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.audit_logs_util.Audit;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
@@ -13,6 +14,8 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.User;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.monitoring.ModuleInfo;
@@ -66,6 +69,7 @@ public class StartTestAction extends UserAction {
 
     private TestingEndpoints.Type type;
     private int apiCollectionId;
+    private List<Integer> apiCollectionIds;
     private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
     private int testIdConfig;
     private int workflowTestId;
@@ -186,6 +190,13 @@ public class StartTestAction extends UserAction {
             case COLLECTION_WISE:
                 testingEndpoints = new CollectionWiseTestingEndpoints(apiCollectionId);
                 break;
+            case MULTI_COLLECTION:
+                if (this.apiCollectionIds == null || this.apiCollectionIds.isEmpty()) {
+                    addActionError("API Collection IDs list can't be empty");
+                    return null;
+                }
+                testingEndpoints = new MultiCollectionTestingEndpoints(this.apiCollectionIds);
+                break;  
             case WORKFLOW:
                 WorkflowTest workflowTest = WorkflowTestsDao.instance.findOne(Filters.eq("_id", this.workflowTestId));
                 if (workflowTest == null) {
@@ -550,7 +561,8 @@ public class StartTestAction extends UserAction {
             filterList.add(
                 Filters.or(
                     Filters.in(TestingRun._API_COLLECTION_ID, apiCollectionIds),
-                    Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, apiCollectionIds)
+                    Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, apiCollectionIds),
+                    Filters.in(TestingRun._API_COLLECTION_IDS_MULTI, apiCollectionIds)
                 )
             );
         }
@@ -1119,6 +1131,7 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User stopped a test", resource = Resource.TESTING_RUN, operation = Operation.UPDATE, metadataGenerators = {"getTestingRunHexId"})
     public String stopTest() {
         Bson filter = Filters.or(
                 Filters.eq(TestingRun.STATE, State.SCHEDULED),
@@ -1263,6 +1276,7 @@ public class StartTestAction extends UserAction {
         executorService.submit(r);
     }
 
+    @Audit(description = "User deleted test runs", resource = Resource.TEST_RESULTS, operation = Operation.DELETE, metadataGenerators = {"getTestRunIds"})
     public String deleteTestRunsAction() {
         try {
             List<ObjectId> testRunIdsCopy = new ArrayList<>();
@@ -1283,6 +1297,7 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User deleted test runs from summaries", resource = Resource.TESTING_RUN, operation = Operation.DELETE, metadataGenerators = {"getLatestSummaryIds"})
     public String deleteTestDataFromSummaryId(){
         try {
             List<ObjectId> summaryIdsCopy = new ArrayList<>();
@@ -1684,6 +1699,14 @@ public class StartTestAction extends UserAction {
 
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
+    }
+
+    public void setApiCollectionIds(List<Integer> apiCollectionIds) {
+        this.apiCollectionIds = apiCollectionIds;
+    }
+
+    public List<Integer> getApiCollectionIds() {
+        return apiCollectionIds;
     }
 
     public void setApiInfoKeyList(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {

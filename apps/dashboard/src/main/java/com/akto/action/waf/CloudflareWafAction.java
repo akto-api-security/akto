@@ -2,9 +2,12 @@ package com.akto.action.waf;
 
 import com.akto.action.UserAction;
 import com.akto.action.threat_detection.ThreatActorAction;
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
@@ -65,6 +68,7 @@ public class CloudflareWafAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User deleted cloudflare waf integration", resource = Resource.CONFIGS, operation = Operation.DELETE)
     public String deleteCloudflareWafIntegration() {
         Bson filters = Filters.and(
                 Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, Context.accountId.get()),

@@ -2,7 +2,7 @@ import { Button, TextField, Text, VerticalStack, HorizontalStack } from '@shopif
 import { DeleteMajor, CirclePlusMajor } from '@shopify/polaris-icons';
 import React from 'react';
 
-function CustomHeadersInput({ customHeaders, setCustomHeaders }) {
+function CustomHeadersInput({ customHeaders, setCustomHeaders, description }) {
 
     function handleUpdate(targetIndex, field, value) {
         setCustomHeaders(prev => {
@@ -27,7 +27,7 @@ function CustomHeadersInput({ customHeaders, setCustomHeaders }) {
         <VerticalStack gap={3}>
             <Text variant='headingMd'>Custom Headers</Text>
             <Text variant='bodyMd' color='subdued'>
-                Add custom HTTP headers to be sent with all crawler requests
+                {description ?? "Add custom HTTP headers to be sent with all crawler requests"}
             </Text>
 
             {customHeaders.map((header, index) => (

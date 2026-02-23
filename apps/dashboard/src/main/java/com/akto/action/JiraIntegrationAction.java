@@ -17,6 +17,8 @@ import com.akto.dto.Config.ConfigType;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.jira_integration.*;
 import com.akto.dto.jobs.*;
 import com.akto.dto.test_editor.Info;
@@ -68,6 +70,7 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import com.akto.action.threat_detection.SuspectSampleDataAction;
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.AccountSettingsDao;
 
 import static com.akto.utils.jira.Utils.buildAdditionalIssueFieldsForJira;
@@ -546,6 +549,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User deleted Jira project", resource = Resource.JIRA_INTEGRATION, operation = Operation.DELETE, metadataGenerators = {"getProjId"})
     public String deleteProject() {
         if (this.projId == null || this.projId.isEmpty()) {
             addActionError("Project Id cannot be null");

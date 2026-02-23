@@ -277,6 +277,15 @@ export default {
             }
         })
     },
+    fetchOpenApiSchema(apiCollectionId) {
+        return request({
+            url: '/api/fetchOpenApiSchema',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
     exportToPostman(apiCollectionId) {
         return request({
             url: '/api/createPostmanApi',
@@ -429,6 +438,14 @@ export default {
             data: {
                 apiCollectionId
             }
+        })
+        return resp
+    },
+    async bulkAgentProxyGuardrail(apiInfoIds, enabled) {
+        const resp = await request({
+            url: '/api/apiInfo/bulkAgentProxyGuardrail',
+            method: 'post',
+            data: { apiInfoIds, enabled }
         })
         return resp
     },
@@ -597,6 +614,15 @@ export default {
             return resp
         })
     },
+    scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed) {
+        return request({
+            url: '/api/startTest',
+            method: 'post',
+            data: { apiCollectionIds, type: "MULTI_COLLECTION", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed}
+        }).then((resp) => {
+            return resp
+        })
+    },
     scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed) {
         return request({
             url: '/api/startTest',
@@ -604,7 +630,7 @@ export default {
             data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed}
         }).then((resp) => {
             return resp
-        })        
+        })
     },
     async loadParamsOfEndpoint (apiCollectionId, url, method) {
         const resp = await request({
@@ -747,6 +773,26 @@ export default {
             method: 'post',
             data: {
                 apiCollectionId, url, method
+            }
+        })
+    },
+
+    fetchLatestTraces(apiCollectionId) {
+        return request({
+            url: '/api/fetchLatestTraces',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
+
+    fetchSpansForTrace(traceId) {
+        return request({
+            url: '/api/fetchSpansForTrace',
+            method: 'post',
+            data: {
+                traceId
             }
         })
     },
@@ -991,10 +1037,11 @@ export default {
         return resp
     },
 
-    getAllIconsCache(){
+    fetchIconsForHostnames(hostnames){
         return request({
-            url: '/api/getAllIconsCache',
-            method: 'get'
+            url: '/api/fetchIconsForHostnames',
+            method: 'post',
+            data: { hostnames }
         })
     }
 
