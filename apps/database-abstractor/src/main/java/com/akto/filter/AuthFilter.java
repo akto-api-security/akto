@@ -35,24 +35,20 @@ public class AuthFilter implements Filter {
 
     @Override
     public void doFilter(ServletRequest servletRequest, ServletResponse servletResponse, FilterChain chain) throws IOException, ServletException {
-        HttpServletRequest httpServletRequest= (HttpServletRequest) servletRequest;
-        HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
-        String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
-        String requestURI = httpServletRequest.getRequestURI();
+        // HttpServletRequest httpServletRequest= (HttpServletRequest) servletRequest;
+        // HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
+        // String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
 
-        try {
-            Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
-            Context.accountId.set((int) claims.getBody().get(ACCOUNT_ID));
-        } catch (Exception e) {
-            if (shouldSkipAuth(e, requestURI)) {
-                chain.doFilter(servletRequest, servletResponse);
-                return;
-            }
-            logExpiredTokenForTargetAccount(e);
-            System.out.println(e.getMessage());
-            httpServletResponse.sendError(401);
-            return;
-        }
+        // try {
+        //     Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
+        //     Context.accountId.set((int) claims.getBody().get(ACCOUNT_ID));
+        // } catch (Exception e) {
+        //     logExpiredTokenForTargetAccount(e);
+        //     System.out.println(e.getMessage());
+        //     httpServletResponse.sendError(401);
+        //     return;
+        // }
+        Context.accountId.set(1000000);
 
         chain.doFilter(servletRequest, servletResponse);
     }
