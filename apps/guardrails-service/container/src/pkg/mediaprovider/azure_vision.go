@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // AzureVision implements OCRProvider via Azure Computer Vision OCR v3.2.
@@ -21,7 +22,7 @@ func NewAzureVision(apiKey, baseURL string) *AzureVision {
 	return &AzureVision{
 		apiKey:  apiKey,
 		baseURL: strings.TrimRight(baseURL, "/"),
-		client:  &http.Client{},
+		client:  &http.Client{Timeout: 60 * time.Second},
 	}
 }
 
@@ -45,7 +46,8 @@ func (a *AzureVision) ExtractText(ctx context.Context, r io.Reader) (string, err
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	const maxResponseBytes = 5 * 1024 * 1024
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return "", fmt.Errorf("read response: %w", err)
 	}

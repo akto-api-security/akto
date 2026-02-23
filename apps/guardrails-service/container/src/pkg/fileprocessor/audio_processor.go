@@ -28,14 +28,16 @@ func (p *AudioProcessor) ExtractContent(ctx context.Context, r io.Reader, ext st
 }
 
 func transcribeMedia(ctx context.Context, r io.Reader, ext string, maxBytes int, t mediaprovider.TranscriptionProvider, mediaType string) (string, error) {
-	data, err := io.ReadAll(io.LimitReader(r, int64(maxBytes)+1))
+	limited := io.LimitReader(r, int64(maxBytes)+1)
+	var buf bytes.Buffer
+	n, err := io.Copy(&buf, limited)
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", mediaType, err)
 	}
-	if len(data) > maxBytes {
+	if n > int64(maxBytes) {
 		return "", fmt.Errorf("%s too large: exceeds %s limit", mediaType, FormatBytes(maxBytes))
 	}
 
 	format := strings.TrimPrefix(ext, ".")
-	return t.Transcribe(ctx, bytes.NewReader(data), format)
+	return t.Transcribe(ctx, &buf, format)
 }

@@ -90,7 +90,7 @@ func LoadConfig() *Config {
 		SessionEnabled:           getEnvAsBool("SESSION_ENABLED", true),
 		File: FileConfig{
 			MaxFiles:      getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
-			MaxSizeBytes:  getEnvAsInt("FILE_VALIDATE_MAX_SIZE_BYTES", 2*1024*1024),
+			MaxSizeBytes:  getEnvAsInt("FILE_VALIDATE_MAX_SIZE_BYTES", 25*1024*1024),
 			ChunkSize:     getEnvAsInt("FILE_VALIDATE_CHUNK_SIZE", 32000),
 			ChunkOverlap:  getEnvAsInt("FILE_VALIDATE_CHUNK_OVERLAP", 200),
 			MaxChunks:     getEnvAsInt("FILE_VALIDATE_MAX_CHUNKS", 500),
@@ -103,7 +103,7 @@ func LoadConfig() *Config {
 				VisionBaseURL: getEnv("MEDIA_VISION_BASE_URL", ""),
 				SpeechAPIKey:  getEnv("MEDIA_SPEECH_API_KEY", ""),
 				SpeechBaseURL: getEnv("MEDIA_SPEECH_BASE_URL", ""),
-				MaxImageBytes: getEnvAsInt("MEDIA_MAX_IMAGE_BYTES", 4*1024*1024),
+				MaxImageBytes: getEnvAsInt("MEDIA_MAX_IMAGE_BYTES", 2*1024*1024),
 				MaxAudioBytes: getEnvAsInt("MEDIA_MAX_AUDIO_BYTES", 10*1024*1024),
 				MaxVideoBytes: getEnvAsInt("MEDIA_MAX_VIDEO_BYTES", 25*1024*1024),
 			},

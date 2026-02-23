@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // AzureSpeech implements TranscriptionProvider via Azure AI Speech Fast Transcription.
@@ -22,7 +23,7 @@ func NewAzureSpeech(apiKey, baseURL string) *AzureSpeech {
 	return &AzureSpeech{
 		apiKey:  apiKey,
 		baseURL: strings.TrimRight(baseURL, "/"),
-		client:  &http.Client{},
+		client:  &http.Client{Timeout: 120 * time.Second},
 	}
 }
 
@@ -61,7 +62,8 @@ func (a *AzureSpeech) Transcribe(ctx context.Context, r io.Reader, format string
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	const maxResponseBytes = 5 * 1024 * 1024
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return "", fmt.Errorf("read response: %w", err)
 	}

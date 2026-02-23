@@ -18,6 +18,9 @@ import (
 
 const maxImageDimension = 2048
 
+// Reject images whose raw pixel count would exceed this (prevents decompression bombs).
+const maxPixelCount = 4096 * 4096
+
 type ImageProcessor struct {
 	ocr      mediaprovider.OCRProvider
 	maxBytes int
@@ -48,10 +51,15 @@ func (p *ImageProcessor) ExtractContent(ctx context.Context, r io.Reader, _ stri
 }
 
 // downsampleIfNeeded scales images exceeding maxImageDimension, preserving aspect ratio.
+// It validates pixel dimensions before full decode to prevent decompression bombs.
 func downsampleIfNeeded(data []byte) ([]byte, error) {
 	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
 		return data, nil
+	}
+
+	if cfg.Width*cfg.Height > maxPixelCount {
+		return nil, fmt.Errorf("image dimensions too large: %dx%d (%d pixels, max %d)", cfg.Width, cfg.Height, cfg.Width*cfg.Height, maxPixelCount)
 	}
 
 	if cfg.Width <= maxImageDimension && cfg.Height <= maxImageDimension {
