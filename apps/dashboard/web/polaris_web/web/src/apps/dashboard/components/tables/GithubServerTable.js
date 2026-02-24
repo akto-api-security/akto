@@ -113,12 +113,18 @@ function GithubServerTable(props) {
 
   useEffect(()=> {
     let queryFilters
-    if (performance.getEntriesByType('navigation')[0].type === 'reload') {
+    const isSpaFilterNav = sessionStorage.getItem('akto_spaFilterNav') === 'true'
+    if (isSpaFilterNav) {
+      sessionStorage.removeItem('akto_spaFilterNav')
+    }
+    if (!isSpaFilterNav && performance.getEntriesByType('navigation')[0].type === 'reload') {
       queryFilters = []
     }else{
-      queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
+      queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey, isSpaFilterNav)
     }
-    const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
+    const currentFilters = isSpaFilterNav
+      ? queryFilters
+      : tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
     setAppliedFilters((prev) => {
       if(func.deepComparison(prev, currentFilters)){
         return prev

@@ -2,7 +2,7 @@ import { Avatar, Box, Card, DataTable, HorizontalStack, ProgressBar, Scrollable,
 import React from 'react'
 import ComponentHeader from '../new_components/ComponentHeader'
 
-function ServersLayout({ title, itemId, tooltipContent, items, hasItems, emptyMessage, onRemove, boxHeight = "200px" }) {
+function ServersLayout({ title, itemId, tooltipContent, items, hasItems, emptyMessage, onRemove, boxHeight = "200px", onItemClick }) {
     if (!hasItems) {
         return (
             <Card>
@@ -29,6 +29,7 @@ function ServersLayout({ title, itemId, tooltipContent, items, hasItems, emptyMe
 
     let tableRows = []
     items.forEach((item, index) => {
+        const isClickable = !!onItemClick
         const nameContent = item.url ? (
             <a href={item.url} className="servers-layout-item-link" style={{ color: 'inherit', textDecoration: 'none' }}>
                 <HorizontalStack gap="2" wrap={false}>
@@ -42,15 +43,29 @@ function ServersLayout({ title, itemId, tooltipContent, items, hasItems, emptyMe
                 <Text variant="bodyMd" fontWeight="medium">{item.name}</Text>
             </HorizontalStack>
         )
-        const row1 = [(<Box key={index}>{nameContent}</Box>)]
+        const row1 = [(
+            <Box
+                key={index}
+                onClick={isClickable ? () => onItemClick(item.filterGroupName || item.name) : undefined}
+                style={isClickable ? { cursor: 'pointer' } : undefined}
+            >
+                {nameContent}
+            </Box>
+        )]
         const row2 = [
             (
-                <HorizontalStack gap={"2"} wrap={false} key={index} align='end'>
-                    <Text variant='bodyMd' fontWeight='medium'>{item.value}</Text>
-                    <Box width='40px'>
-                        <ProgressBar size='small' progress={item.value*100 / totalServers} animated={false} />
-                    </Box>
-                </HorizontalStack>
+                <Box
+                    key={index}
+                    onClick={isClickable ? () => onItemClick(item.filterGroupName || item.name) : undefined}
+                    style={isClickable ? { cursor: 'pointer' } : undefined}
+                >
+                    <HorizontalStack gap={"2"} wrap={false} align='end'>
+                        <Text variant='bodyMd' fontWeight='medium'>{item.value}</Text>
+                        <Box width='40px'>
+                            <ProgressBar size='small' progress={item.value*100 / totalServers} animated={false} />
+                        </Box>
+                    </HorizontalStack>
+                </Box>
             )
         ]
         tableRows.push([row1, row2])

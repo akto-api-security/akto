@@ -151,7 +151,8 @@ const processAgenticCollections = (collections, topN = 10) => {
                 }
                 const hostNamesList = [...g.hostNames].filter(matches)
                 const url = null
-                return { name: g.name, value: g.endpoints.size || g.count, icon, url, hostNames: hostNamesList }
+                const filterGroupName = groupType === 'aiAgent' ? g.name : g.domain
+                return { name: g.name, value: g.endpoints.size || g.count, icon, url, hostNames: hostNamesList, filterGroupName }
             })
             .sort((a, b) => b.value - a.value)
             .slice(0, topN)
@@ -442,10 +443,12 @@ function EndpointPosture() {
         if (index === 0) {
             navigate('/dashboard/observe/agentic-assets')
         } else if (index === 1) {
+            sessionStorage.setItem('akto_spaFilterNav', 'true')
             navigate('/dashboard/protection/threat-activity?filters=successfulExploit__true#active', {
                 state: { period: { since: currDateRange.period.since, until: currDateRange.period.until } }
             })
         } else {
+            sessionStorage.setItem('akto_spaFilterNav', 'true')
             navigate('/dashboard/protection/threat-activity?filters=#active', {
                 state: { period: { since: currDateRange.period.since, until: currDateRange.period.until } }
             })
@@ -498,6 +501,16 @@ function EndpointPosture() {
         </Card>
     )
 
+
+    const handleAgenticItemClick = (filterGroupName) => {
+        sessionStorage.setItem('akto_spaFilterNav', 'true')
+        if (!filterGroupName) {
+            navigate('/dashboard/observe/agentic-assets')
+            return
+        }
+        navigate(`/dashboard/observe/agentic-assets?filters=groupName__${encodeURIComponent(filterGroupName)}`)
+    }
+
     const mcpServersComponent = (
         <ServersLayout
             title='Common MCP Servers'
@@ -507,6 +520,7 @@ function EndpointPosture() {
             hasItems={hasMcpServers}
             emptyMessage="No MCP servers detected"
             onRemove={hideWidget}
+            onItemClick={handleAgenticItemClick}
         />
     )
 
@@ -519,6 +533,7 @@ function EndpointPosture() {
             hasItems={hasLlms}
             emptyMessage="No LLMs detected"
             onRemove={hideWidget}
+            onItemClick={handleAgenticItemClick}
         />
     )
 
@@ -531,12 +546,42 @@ function EndpointPosture() {
             hasItems={hasAiAgents}
             emptyMessage="No AI agents detected"
             onRemove={hideWidget}
+            onItemClick={handleAgenticItemClick}
         />
     )
+
+    const handleGuardrailPolicyClick = (filterValue) => {
+        navigateToThreatActivityWithFilter(filterValue)
+    }
+
+    const navigateToThreatActivityWithFilter = (filterId) => {
+        if (!filterId) return
+        sessionStorage.setItem('akto_spaFilterNav', 'true')
+        navigate(
+            `/dashboard/protection/threat-activity?filters=latestAttack__${encodeURIComponent(filterId)}#active`,
+            { state: { period: { since: currDateRange.period.since, until: currDateRange.period.until } } }
+        )
+    }
+
+    const handleDataProtectionTrendPointClick = function() {
+        const seriesName = this.series?.name
+        const matchingTrend = dataProtectionTrendsData.find(item => item.name === seriesName)
+        navigateToThreatActivityWithFilter(matchingTrend?.filterId)
+    }
 
     // Attack Flow Map hidden for now - uncomment to re-enable
     // const hasAttackFlowData = attackRequests && attackRequests.length > 0
     const hasComplianceData = complianceData && complianceData.length > 0
+
+    const handleThreatCategoryClick = (rawName) => {
+        if (!rawName || rawName === 'Other') {
+            navigate('/dashboard/protection/threat-activity', {
+                state: { period: { since: currDateRange.period.since, until: currDateRange.period.until } }
+            })
+            return
+        }
+        navigateToThreatActivityWithFilter(rawName)
+    }
 
     const threatCategoryStackedChartComponent = (
         <ThreatCategoryStackedChartWrapper
@@ -544,6 +589,7 @@ function EndpointPosture() {
             endTimestamp={getTimeEpoch("until")}
             itemId='threatCategory'
             onRemoveComponent={hideWidget}
+            onCategoryClick={handleThreatCategoryClick}
         />
     )
 
@@ -605,6 +651,8 @@ function EndpointPosture() {
             itemId='dataProtectionTrends'
             onRemoveComponent={hideWidget}
             tooltipContent="Trends showing how data protection mechanisms are being triggered over time"
+            graphPointClick={handleDataProtectionTrendPointClick}
+            onLabelClick={navigateToThreatActivityWithFilter}
         />
     ) : (
         <CardWithHeader
@@ -636,6 +684,7 @@ function EndpointPosture() {
                     chartOnLeft={true}
                     dataTableWidth="250px"
                     pieInnerSize="50%"
+                    onSliceClick={handleGuardrailPolicyClick}
                 />
             </Box>
         </CardWithHeader>

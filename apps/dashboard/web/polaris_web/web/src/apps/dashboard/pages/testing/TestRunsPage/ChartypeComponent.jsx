@@ -5,7 +5,7 @@ import ConcentricCirclesChart from '../../../components/shared/ConcentricCircles
 import observeFunc from "../../observe/transform"
 import TooltipText from '../../../components/shared/TooltipText'
 
-function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl, isRequest, chartOnLeft, dataTableWidth, boxPadding, pieInnerSize, chartSize, spaceBetween, navUrlBuilder}) {
+function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl, isRequest, chartOnLeft, dataTableWidth, boxPadding, pieInnerSize, chartSize, spaceBetween, navUrlBuilder, onSliceClick}) {
     let tableRows = []
     if(data && Object.keys(data).length > 0)
     {
@@ -44,7 +44,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
 
     const chartComponent = (
 
-        isNormal ? <DonutChart navUrl={navUrl} navUrlBuilder={navUrlBuilder} data={chartData}  title={charTitle}  subtitle={chartSubtitle} type={title} size={chartSize || 210} isRequest={isRequest} pieInnerSize={pieInnerSize}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
+        isNormal ? <DonutChart navUrl={navUrl} navUrlBuilder={navUrlBuilder} onSliceClick={onSliceClick} data={chartData}  title={charTitle}  subtitle={chartSubtitle} type={title} size={chartSize || 210} isRequest={isRequest} pieInnerSize={pieInnerSize}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
     )
 
     return (

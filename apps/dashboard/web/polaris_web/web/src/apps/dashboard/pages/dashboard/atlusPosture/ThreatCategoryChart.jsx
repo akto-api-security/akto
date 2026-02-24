@@ -41,6 +41,7 @@ const toNumber = (val, defaultVal = 0) => Number(val) || defaultVal;
 const formatName = (name) => {
   if (!name) return "Unknown";
   return String(name)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/_/g, " ")
     .toLowerCase()
     .replace(/\b\w/g, (l) => l.toUpperCase());
@@ -184,16 +185,17 @@ const ErrorState = ({ message }) => (
   </div>
 );
 
-const LegendItem = ({ item, onToggle }) => (
+const LegendItem = ({ item, onToggle, onNavigate }) => (
   <div
-    onClick={() => onToggle(item.name)}
-    title={item.visible === false ? "Click to show" : "Click to hide"}
+    onClick={() => onNavigate ? onNavigate(item.rawName) : onToggle(item.name)}
+    title={onNavigate ? `Filter by ${item.name}` : (item.visible === false ? "Click to show" : "Click to hide")}
     style={{
       display: "flex",
-      alignItems: "center",
+      alignItems: "flex-start",
       gap: 8,
       cursor: "pointer",
       opacity: item.visible === false ? 0.45 : 1,
+      maxWidth: 160,
     }}
   >
     <div
@@ -202,38 +204,39 @@ const LegendItem = ({ item, onToggle }) => (
         height: 12,
         background: item.color,
         borderRadius: 2,
+        flexShrink: 0,
+        marginTop: 2,
       }}
     />
-    <Text variant="bodySm" color="subdued">
-      <Text variant="bodySm" fontWeight="bold" color="base">
-        {item.percent}%
-      </Text>{" "}
-      {item.name}
-    </Text>
+    <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.3 }}>
+      <Text variant="bodySm" fontWeight="semibold">{item.name}</Text>
+      <Text variant="bodySm" color="subdued">{item.percent}%</Text>
+    </div>
   </div>
 );
 
-const ChartLegend = ({ items, onToggle }) => {
+const ChartLegend = ({ items, onToggle, onNavigate }) => {
   if (!items || items.length === 0) return null;
 
   return (
     <div
       style={{
         display: "flex",
-        gap: 20,
-        alignItems: "center",
+        flexWrap: "wrap",
+        gap: "10px 20px",
+        alignItems: "flex-start",
         padding: "12px 16px",
         borderBottom: "1px solid #E5E7EB",
       }}
     >
       {items.map((item) => (
-        <LegendItem key={item.name} item={item} onToggle={onToggle} />
+        <LegendItem key={item.name} item={item} onToggle={onToggle} onNavigate={onNavigate} />
       ))}
     </div>
   );
 };
 
-function ThreatCategoryChart({ startTimestamp, endTimestamp, itemId, onRemoveComponent }) {
+function ThreatCategoryChart({ startTimestamp, endTimestamp, itemId, onRemoveComponent, onCategoryClick }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [chartData, setChartData] = useState([]);
@@ -334,6 +337,15 @@ function ThreatCategoryChart({ startTimestamp, endTimestamp, itemId, onRemoveCom
     setVisibleSeries((prev) => ({ ...prev, [name]: !(prev[name] !== false) }));
   }, []);
 
+  const onCategoryClickRef = useRef(onCategoryClick);
+  useEffect(() => { onCategoryClickRef.current = onCategoryClick; }, [onCategoryClick]);
+
+  const handlePointClick = useCallback(function(series) {
+    const seriesName = series?.name;
+    const match = (baseDataRef.current?.seriesData || []).find(s => s.name === seriesName);
+    onCategoryClickRef.current?.(match?.rawName || null);
+  }, []);
+
   return (
     <Card>
       <VerticalStack gap={4}>
@@ -349,12 +361,13 @@ function ThreatCategoryChart({ startTimestamp, endTimestamp, itemId, onRemoveCom
           <ErrorState message={error} />
         ) : (
           <>
-            <ChartLegend items={latestPercents} onToggle={toggleSeries} />
+            <ChartLegend items={latestPercents} onToggle={toggleSeries} onNavigate={onCategoryClick} />
             {chartData.length > 0 ? (
               <StackedAreaChart
                 height={CHART_CONFIG.HEIGHT}
                 backgroundColor="#ffffff"
                 data={chartData}
+                onPointClick={onCategoryClick ? handlePointClick : undefined}
                 yAxisTitle="Percentage"
                 showGridLines={true}
                 customXaxis={{
