@@ -67,7 +67,7 @@ public class AgentClient {
             if (testResults.isEmpty()) {
                 TestResult testResult = new TestResult();
                 testResult.setMessage(null);
-                setAgenticResultFields(testResult, conversationId, isVulnerable, errors, isVulnerable ? 0.0 : 100.0);
+                setAgenticResultFields(testResult, conversationId, isVulnerable, errors, isVulnerable ? 0.0 : 100.0, TestResult.Confidence.HIGH);
                 testResults.add(testResult);
             }
 
@@ -78,8 +78,7 @@ public class AgentClient {
             loggerMaker.errorAndAddToDb("Error executing agentic test: " + e.getMessage());
             TestResult errorResult = new TestResult();
             errorResult.setMessage("Agentic test execution failed: " + e.getMessage());
-            setAgenticResultFields(errorResult, conversationId, false, Arrays.asList(e.getMessage()), 0.0);
-            errorResult.setConfidence(TestResult.Confidence.LOW);
+            setAgenticResultFields(errorResult, conversationId, false, Arrays.asList(e.getMessage()), 0.0, TestResult.Confidence.LOW);
             return Collections.singletonList(errorResult);
         }
     }
@@ -180,11 +179,11 @@ public class AgentClient {
         }
     }
 
-    private static void setAgenticResultFields(TestResult tr, String conversationId, boolean vulnerable, List<String> errors, double percentageMatch) {
+    private static void setAgenticResultFields(TestResult tr, String conversationId, boolean vulnerable, List<String> errors, double percentageMatch, TestResult.Confidence confidence) {
         tr.setConversationId(conversationId);
         tr.setResultTypeAgentic(true);
         tr.setVulnerable(vulnerable);
-        tr.setConfidence(TestResult.Confidence.HIGH);
+        tr.setConfidence(confidence != null ? confidence : TestResult.Confidence.HIGH);
         tr.setErrors(errors != null ? errors : new ArrayList<>());
         tr.setPercentageMatch(percentageMatch);
     }
@@ -206,7 +205,8 @@ public class AgentClient {
                     continue;
                 }
                 TestResult tr = new TestResult();
-                setAgenticResultFields(tr, conversationId, false, new ArrayList<>(), 0.0);
+                double percentageMatch = isVulnerable ? 0.0 : 100.0;
+                setAgenticResultFields(tr, conversationId, isVulnerable, errors != null ? errors : new ArrayList<>(), percentageMatch, TestResult.Confidence.HIGH);
                 if (entry.getStatus() == ApiExecutionJobStore.Status.COMPLETED && entry.getResponse() != null) {
                     OriginalHttpResponse ohr = entry.getResponse();
                     OriginalHttpRequest req = entry.getRequest();
