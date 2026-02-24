@@ -1,5 +1,6 @@
 package com.akto.utility;
 
+import com.akto.agent.ApiExecutionJobStore;
 import com.akto.dao.context.Context;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -79,9 +80,9 @@ public class ExecuteApiHandler implements HttpHandler {
                         false,
                         Collections.emptyList()
                 );
-                jobStore.update(jobId, ApiExecutionJobStore.JobEntry.completed(response, conversationId));
+                jobStore.update(jobId, ApiExecutionJobStore.JobEntry.completed(response, conversationId, request));
             } catch (Throwable t) {
-                jobStore.update(jobId, ApiExecutionJobStore.JobEntry.failed(t.getMessage(), conversationId));
+                jobStore.update(jobId, ApiExecutionJobStore.JobEntry.failed(t.getMessage(), conversationId, request));
             } finally {
                 Context.accountId.remove();
             }

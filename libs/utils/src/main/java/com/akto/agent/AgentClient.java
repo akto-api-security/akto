@@ -2,6 +2,8 @@ package com.akto.agent;
 
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.TestResult;
@@ -15,34 +17,34 @@ import com.akto.util.http_util.CoreHTTPClient;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static com.akto.agent.AgenticUtils.getTestModeFromRole;
+import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 public class AgentClient {
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(AgentClient.class, LogDb.TESTING);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     
-    // Custom HTTP client with 2-minute timeout for agent requests
     private static final OkHttpClient agentHttpClient = CoreHTTPClient.client.newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS) // 2 minutes timeout
+            .readTimeout(120, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .build();
     
     private final String agentBaseUrl;
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
-    
     public AgentClient(String agentBaseUrl) {
-        this.agentBaseUrl = agentBaseUrl.endsWith("/") ? agentBaseUrl.substring(0, agentBaseUrl.length() - 1) : agentBaseUrl;
+        this.agentBaseUrl = agentBaseUrl == null || agentBaseUrl.isEmpty() ? "" : agentBaseUrl.endsWith("/") ? agentBaseUrl.substring(0, agentBaseUrl.length() - 1) : agentBaseUrl;
     }
 
-    public TestResult executeAgenticTest(RawApi rawApi, int apiCollectionId) throws Exception {
+    public List<TestResult> executeAgenticTest(RawApi rawApi, int apiCollectionId) throws Exception {
         String conversationId = UUID.randomUUID().toString();
         List<String> promptsList = rawApi.getConversationsList();
         String testMode = getTestModeFromRole();
@@ -58,38 +60,27 @@ public class AgentClient {
 
         try {
             List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode);
-            
             boolean isVulnerable = conversationResults.get(conversationResults.size() - 1).isValidation();
             List<String> errors = new ArrayList<>();
-            
-            TestResult testResult = new TestResult();
-            // TODO: Fill in message field
-            testResult.setMessage(null);
-            testResult.setConversationId(conversationId);
-            testResult.setResultTypeAgentic(true);
-            testResult.setVulnerable(isVulnerable);
-            testResult.setConfidence(TestResult.Confidence.HIGH);
-            testResult.setErrors(errors);
-            testResult.setPercentageMatch(isVulnerable ? 0.0 : 100.0);
-            
-            // Store conversation results in MongoDB
+
+            List<TestResult> testResults = fetchTestResultsFromUtilityServer(conversationId, isVulnerable, errors);
+            if (testResults.isEmpty()) {
+                TestResult testResult = new TestResult();
+                testResult.setMessage(null);
+                setAgenticResultFields(testResult, conversationId, isVulnerable, errors, isVulnerable ? 0.0 : 100.0);
+                testResults.add(testResult);
+            }
+
             storeConversationResults(conversationResults);
-            
-            return testResult;
-            
+            return testResults;
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error executing agentic test: " + e.getMessage());
-            
             TestResult errorResult = new TestResult();
             errorResult.setMessage("Agentic test execution failed: " + e.getMessage());
-            errorResult.setConversationId(conversationId);
-            errorResult.setResultTypeAgentic(true);
-            errorResult.setVulnerable(false);
+            setAgenticResultFields(errorResult, conversationId, false, Arrays.asList(e.getMessage()), 0.0);
             errorResult.setConfidence(TestResult.Confidence.LOW);
-            errorResult.setErrors(Arrays.asList(e.getMessage()));
-            errorResult.setPercentageMatch(0.0);
-            
-            return errorResult;
+            return Collections.singletonList(errorResult);
         }
     }
     
@@ -186,6 +177,52 @@ public class AgentClient {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error parsing agent response: " + e.getMessage() + ", response body: " + responseBody);
             throw new Exception("Failed to parse agent response: " + e.getMessage(), e);
+        }
+    }
+
+    private static void setAgenticResultFields(TestResult tr, String conversationId, boolean vulnerable, List<String> errors, double percentageMatch) {
+        tr.setConversationId(conversationId);
+        tr.setResultTypeAgentic(true);
+        tr.setVulnerable(vulnerable);
+        tr.setConfidence(TestResult.Confidence.HIGH);
+        tr.setErrors(errors != null ? errors : new ArrayList<>());
+        tr.setPercentageMatch(percentageMatch);
+    }
+
+    private List<TestResult> fetchTestResultsFromUtilityServer(String conversationId, boolean isVulnerable, List<String> errors) {
+        ApiExecutionJobStore store = ApiExecutionJobStoreRegistry.get();
+        if (store == null) {
+            return new ArrayList<>();
+        }
+        try {
+            List<String> jobIds = store.getJobIdsByConversationId(conversationId);
+            List<TestResult> results = new ArrayList<>();
+            for (String jobId : jobIds) {
+                ApiExecutionJobStore.JobEntry entry = store.get(jobId);
+                if (entry == null) {
+                    continue;
+                }
+                if (entry.getStatus() == ApiExecutionJobStore.Status.PENDING) {
+                    continue;
+                }
+                TestResult tr = new TestResult();
+                setAgenticResultFields(tr, conversationId, false, new ArrayList<>(), 0.0);
+                if (entry.getStatus() == ApiExecutionJobStore.Status.COMPLETED && entry.getResponse() != null) {
+                    OriginalHttpResponse ohr = entry.getResponse();
+                    OriginalHttpRequest req = entry.getRequest();
+                    String message = convertOriginalReqRespToString(req, ohr);
+                    tr.setMessage(message);
+                } else if (entry.getStatus() == ApiExecutionJobStore.Status.FAILED) {
+                    tr.setMessage("API execution failed: " + (entry.getErrorMessage() != null ? entry.getErrorMessage() : "Execution failed"));
+                } else {
+                    continue;
+                }
+                results.add(tr);
+            }
+            return results;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error reading conversation results from store: " + e.getMessage());
+            return new ArrayList<>();
         }
     }
 

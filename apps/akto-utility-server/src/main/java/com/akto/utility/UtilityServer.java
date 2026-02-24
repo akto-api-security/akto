@@ -1,5 +1,7 @@
 package com.akto.utility;
 
+import com.akto.agent.ApiExecutionJobStore;
+import com.akto.agent.ApiExecutionJobStoreRegistry;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.log.LoggerMaker;
@@ -41,6 +43,7 @@ public class UtilityServer {
         }
         try {
             jobStore = new ApiExecutionJobStore();
+            ApiExecutionJobStoreRegistry.set(jobStore);
             dataActor = DataActorFactory.fetchInstance();
             executorService = Executors.newCachedThreadPool(r -> {
                 Thread t = new Thread(r, "akto-utility-executor");
@@ -82,8 +85,10 @@ public class UtilityServer {
         } catch (Exception e) {
             logger.error("Error stopping akto-utility-server: " + e.getMessage(), e);
         } finally {
+            ApiExecutionJobStoreRegistry.set(null);
             server = null;
             executorService = null;
+            jobStore = null;
             dataActor = null;
             started = false;
         }
