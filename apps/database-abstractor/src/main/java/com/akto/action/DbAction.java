@@ -689,7 +689,7 @@ public class DbAction extends ActionSupport {
                                 if (ignoreHosts.contains(val)) {
                                     ignore = true;
                                 }
-                                if(UsageMetricCalculator.getDeactivated().contains(apiCollectionId)){
+                                if(accId != 1736798101 && UsageMetricCalculator.getDeactivated().contains(apiCollectionId)){
                                     ignore = true;
                                 }
                                 if(apiCollectionId == 0){
