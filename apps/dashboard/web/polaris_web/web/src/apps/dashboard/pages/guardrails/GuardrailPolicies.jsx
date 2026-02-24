@@ -146,10 +146,10 @@ function GuardrailPolicies() {
                         category: determineCategoryFromPolicy(policy),
                         status: policy.active ? "Active" : "Inactive",
                         statusWithSummary: generateStatusWithSummary(policy),
-                        severity: policy.severity,
+                        severity: policy.severity || "HIGH",
                         severityComp: (
-                            <div className={`badge-wrapper-${policy.severity.toUpperCase()}`}>
-                                <Badge size="small">{policy.severity.toUpperCase()}</Badge>
+                            <div className={`badge-wrapper-${(policy.severity || "HIGH").toUpperCase()}`}>
+                                <Badge size="small">{(policy.severity || "HIGH").toUpperCase()}</Badge>
                             </div>
                         ),
                         createdTs: func.prettifyEpoch(policy.createdTimestamp),
@@ -422,14 +422,6 @@ function GuardrailPolicies() {
         try {
             setLoading(true);
 
-            // Determine severity based on configuration
-            let severity = "Low";
-            if (guardrailData.contentFilters?.harmfulCategories || guardrailData.contentFilters?.promptAttacks || guardrailData.contentFilters?.code) {
-                severity = "High";
-            } else if (guardrailData.deniedTopics?.length > 0 || guardrailData.piiFilters?.length > 0) {
-                severity = "Medium";
-            }
-
             // Prepare GuardrailPolicies object for backend
             // Transform field names using shared utility (same as playground)
             guardrailData = transformPolicyForBackend(guardrailData);
@@ -438,7 +430,7 @@ function GuardrailPolicies() {
                 name: guardrailData.name,
                 description: guardrailData.description || '',
                 blockedMessage: guardrailData.blockedMessage || '',
-                severity: severity.toUpperCase(),
+                severity: guardrailData.severity || "HIGH",
                 selectedMcpServers: guardrailData.selectedMcpServers || [],
                 selectedAgentServers: guardrailData.selectedAgentServers || [],
                 // Add V2 fields for enhanced server data
