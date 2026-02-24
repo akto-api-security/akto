@@ -27,6 +27,7 @@ public class McpAuditInfo {
     public static final String COMPONENT_RISK_ANALYSIS = "componentRiskAnalysis";
     public static final String APPROVAL_CONDITIONS = "approvalConditions";
     public static final String APPROVED_AT = "approvedAt";
+    public static final String CONTEXT_SOURCE = "contextSource";
 
     private ObjectId id;
 
@@ -49,6 +50,8 @@ public class McpAuditInfo {
     private Integer approvedAt;
 
     private ComponentRiskAnalysis componentRiskAnalysis;
+
+    private String contextSource;
 
     public String getHexId() {
         return this.id != null ? this.id.toHexString() : null;

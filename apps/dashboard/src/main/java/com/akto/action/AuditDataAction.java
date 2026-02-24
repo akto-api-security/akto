@@ -111,17 +111,18 @@ public class AuditDataAction extends UserAction {
             List<Integer> collectionsIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                 Context.accountId.get());
 
-            List<Bson> filterList = prepareFilters(filters);
-            
+            Bson filter = Filters.eq(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get().name());
+
             if (collectionsIds != null) {
-                filterList.add(Filters.in("hostCollectionId", collectionsIds));
+                Bson collectionsFilter = Filters.and(Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false),
+                        Filters.in(McpAuditInfo.HOST_COLLECTION_ID, collectionsIds));
+                filter = Filters.or(filter, collectionsFilter);
             }
             
-            Bson finalFilter = filterList.isEmpty() ? new BasicDBObject() : Filters.and(filterList);
             Bson sort = sortOrder == 1 ? Sorts.ascending(sortKey) : Sorts.descending(sortKey);
             
-            this.auditData = McpAuditInfoDao.instance.findAll(finalFilter, skip, limit, sort);   
-            this.total = McpAuditInfoDao.instance.count(finalFilter);          
+            this.auditData = McpAuditInfoDao.instance.findAll(filter, skip, limit, sort);   
+            this.total = McpAuditInfoDao.instance.count(filter);          
             loggerMaker.info("Fetched " + auditData.size() + " audit records out of " + total + " total");
             
             return SUCCESS.toUpperCase();
