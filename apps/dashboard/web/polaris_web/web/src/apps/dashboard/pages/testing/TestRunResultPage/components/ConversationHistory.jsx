@@ -14,7 +14,7 @@ function ConversationHistory({ conversations, isInventory = false }) {
                     const isUser = msg.role === 'user';
                     return (
                         <ChatMessage
-                            key={msg._id || index}
+                            key={msg._id ? `conv-${msg._id}-${index}` : `conv-${index}`}
                             type={isUser ? 'request' : 'response'}
                             content={msg.message}
                             timestamp={msg.creationTimestamp} // Normalize then convert to seconds for ChatMessage
