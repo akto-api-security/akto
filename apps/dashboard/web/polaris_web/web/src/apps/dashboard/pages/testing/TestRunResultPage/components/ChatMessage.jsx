@@ -11,7 +11,7 @@ import func from "@/util/func";
 function extractPrettyJson(content) {
     try {
         if (!content) {
-            return { prettyJson: null, prefix: null };
+            return { prettyJson: null, prefix: null, beforeText: null, afterText: null };
         }
 
         try {
@@ -19,6 +19,8 @@ function extractPrettyJson(content) {
             return {
                 prettyJson: JSON.stringify(parsed, null, 2),
                 prefix: null,
+                beforeText: null,
+                afterText: null,
             };
         } catch {}
 
@@ -69,7 +71,9 @@ function extractPrettyJson(content) {
 
                             return {
                                 prettyJson: JSON.stringify(parsed, null, 2),
-                                prefix: [before, after].filter(Boolean).join('\n\n') || null,
+                                prefix: null,
+                                beforeText: before || null,
+                                afterText: after || null,
                             };
                         } catch {
                             break;
@@ -81,10 +85,10 @@ function extractPrettyJson(content) {
             }
         }
 
-        return { prettyJson: null, prefix: content };
+        return { prettyJson: null, prefix: content, beforeText: null, afterText: null };
     } catch (err) {
         // Global catch: return fallback
-        return { prettyJson: null, prefix: content };
+        return { prettyJson: null, prefix: content, beforeText: null, afterText: null };
     }
 }
 
@@ -105,9 +109,9 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
     const shouldRenderAsCode = isCode !== undefined ? isCode : isRequest;
 
     const [expanded, setExpanded] = useState(false);
-    const { prettyJson, prefix } = useMemo(() => {
+    const { prettyJson, prefix, beforeText, afterText } = useMemo(() => {
         if (shouldRenderAsCode) {
-            return { prettyJson: null, prefix: null };
+            return { prettyJson: null, prefix: null, beforeText: null, afterText: null };
         }
         return extractPrettyJson(content);
     }, [shouldRenderAsCode, content]);
@@ -163,8 +167,9 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                             </Box>
                         ) : prettyJson ? (
                             <VerticalStack gap="2">
-                                {prefix && <MarkdownViewer markdown={prefix} />}
+                                {beforeText && <MarkdownViewer markdown={beforeText} />}
                                 <SampleData data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="200px" />
+                                {afterText && <MarkdownViewer markdown={afterText} />}
                             </VerticalStack>
                         ) : (
                             <MarkdownViewer markdown={prefix || content} />
