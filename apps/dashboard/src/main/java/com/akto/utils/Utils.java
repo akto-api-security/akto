@@ -256,7 +256,7 @@ public class Utils {
                     requestHeadersMap.putIfAbsent("host", host);
                 }
             } catch (Exception e) {
-                // Not a valid absolute URL, no host to extract
+                loggerMaker.error("Not a valid hostname: " + e.getMessage());
             }
             String requestHeadersString = mapper.writeValueAsString(requestHeadersMap);
             result.put("requestHeaders", requestHeadersString);
