@@ -14,6 +14,7 @@ import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../observe/api_collections/endpointShieldHelper";
 import IpReputationScore from "./IpReputationScore";
 
 const resourceName = {
@@ -39,9 +40,9 @@ const getHeaders = () => {
       title: "Host",
     },
     {
-      text: "Threat Actor",
+      text: isEndpointSecurityCategory() ? "Username" : "Threat Actor",
       value: "actorComp",
-      title: "Actor",
+      title: isEndpointSecurityCategory() ? "Username" : "Actor",
       filterKey: 'actor'
     },
   ];
@@ -140,6 +141,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const [selected, setSelected] = useState(0)
   const [currentFilters, setCurrentFilters] = useState({})
   const [totalFilteredCount, setTotalFilteredCount] = useState(0)
+  const [usernameMap, setUsernameMap] = useState({});
+  const [usernameMapLoaded, setUsernameMapLoaded] = useState(!isEndpointSecurityCategory());
+
+  useEffect(() => {
+    if (isEndpointSecurityCategory()) {
+      fetchEndpointShieldUsernameMap().then(map => {
+        setUsernameMap(map);
+        setUsernameMapLoaded(true);
+      });
+    }
+  }, []);
 
   const baseTabs = [
     {
@@ -556,7 +568,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       const rowData = {
         ...x,
         id: x.id,
-        actorComp: formatActorId(x.actor),
+        actorComp: isEndpointSecurityCategory()
+          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap)
+          : formatActorId(x.actor),
         host: x.host || "-",
         endpointComp: (
           <GetPrettifyEndpoint
@@ -709,7 +723,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     }
   }
 
-  const key = startTimestamp + endTimestamp;
+  const key = startTimestamp + endTimestamp + (usernameMapLoaded ? '_u' : '');
   const headers = getHeaders();
 
   return (
