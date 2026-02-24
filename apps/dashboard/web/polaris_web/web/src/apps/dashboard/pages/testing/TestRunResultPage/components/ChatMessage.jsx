@@ -9,28 +9,78 @@ import func from "@/util/func";
 
 // This is done for Hybrid messages -> Markdown + JSON 
 function extractPrettyJson(content) {
+    if (!content) {
+        return { prettyJson: null, prefix: null };
+    }
+
     try {
+        const parsed = JSON.parse(content);
         return {
-            prettyJson: JSON.stringify(JSON.parse(content), null, 2),
+            prettyJson: JSON.stringify(parsed, null, 2),
             prefix: null,
         };
     } catch {}
 
-    const start = content.indexOf('{');
-    const end = content.lastIndexOf('}');
-    if (start === -1 || end <= start) {
-        return { prettyJson: null, prefix: null };
+    const len = content.length;
+
+    // Scan for first valid embedded JSON block: object ({...}) or array ([...])
+    for (let start = 0; start < len; start += 1) {
+        const open = content[start];
+        if (open !== '{' && open !== '[') {
+            continue;
+        }
+
+        const close = open === '{' ? '}' : ']';
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+
+        for (let i = start; i < len; i += 1) {
+            const ch = content[i];
+
+            if (inString) {
+                if (escape) {
+                    escape = false;
+                } else if (ch === '\\') {
+                    escape = true;
+                } else if (ch === '"') {
+                    inString = false;
+                }
+                continue;
+            }
+
+            if (ch === '"') {
+                inString = true;
+                continue;
+            }
+
+            if (ch === open) {
+                depth += 1;
+            } else if (ch === close) {
+                depth -= 1;
+
+                if (depth === 0) {
+                    const embeddedJson = content.slice(start, i + 1);
+                    try {
+                        const parsed = JSON.parse(embeddedJson);
+                        const before = content.slice(0, start).trim();
+                        const after = content.slice(i + 1).trim();
+
+                        return {
+                            prettyJson: JSON.stringify(parsed, null, 2),
+                            prefix: [before, after].filter(Boolean).join('\n\n') || null,
+                        };
+                    } catch {
+                        break;
+                    }
+                } else if (depth < 0) {
+                    break;
+                }
+            }
+        }
     }
- 
-    try {
-        const embeddedJson = content.slice(start, end + 1);
-        return {
-            prettyJson: JSON.stringify(JSON.parse(embeddedJson), null, 2),
-            prefix: content.slice(0, start).trim() || null,
-        };
-    } catch {
-        return { prettyJson: null, prefix: null };
-    }
+
+    return { prettyJson: null, prefix: content };
 }
 
 function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode }) {
@@ -112,7 +162,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                 <SampleData data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="200px" />
                             </VerticalStack>
                         ) : (
-                            <MarkdownViewer markdown={content} />
+                            <MarkdownViewer markdown={prefix || content} />
                         )}
 
                         {/* Vulnerability Badge */}
