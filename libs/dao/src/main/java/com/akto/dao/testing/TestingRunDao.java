@@ -148,15 +148,23 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
     private Bson addCollectionsFilterForDashboard(Bson q) {
         
         CONTEXT_SOURCE contextSource = Context.contextSource.get();
-        boolean isAdmin = RBACDao.getCurrentRoleForUser(Context.userId.get(), Context.accountId.get()) == Role.ADMIN;
+        Integer userId = Context.userId.get();
+        Integer accountId = Context.accountId.get();
+        
+        // Handle test scenarios where userId/accountId might be null
+        if (userId == null || accountId == null) {
+            // In tests/background jobs: no filtering (show all)
+            return q;
+        }
+        
+        boolean isAdmin = RBACDao.getCurrentRoleForUser(userId, accountId) == Role.ADMIN;
         
         // Admin viewing user-based dashboard: show all
         if (isAdmin && contextSource == null) {
             return q;
         }
-      
-        List<Integer> apiCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
-                Context.accountId.get()); 
+         
+        List<Integer> apiCollectionIds = UsersCollectionsList.getCollectionsIdForUser(userId, accountId);
         if (apiCollectionIds == null || (apiCollectionIds.isEmpty() && isAdmin)) {
             // RBAC disabled or admin with empty list: show all if no context, otherwise filter by dashboardContext
             return contextSource == null ? q : Filters.and(q, Filters.eq(TestingRun.DASHBOARD_CONTEXT, contextSource));
