@@ -42,6 +42,8 @@ import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
 import com.opensymphony.xwork2.Action;
@@ -164,7 +166,13 @@ public class IssuesAction extends UserAction {
                         Filters.eq(ID + "." + TestingIssuesId.TEST_SUB_CATEGORY, subCategory),
                         Filters.in(ID + "." + TestingIssuesId.TEST_CATEGORY_FROM_SOURCE_CONFIG, sourceConfigIds)
                 ), Filters.ne(ID, issueId));
-        similarlyAffectedIssues = TestingRunIssuesDao.instance.findAll(filters, 0,3, sort);
+        // Apply dashboard filtering to allow issues from deleted collections
+        Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(filters);
+        similarlyAffectedIssues = TestingRunIssuesDao.instance.getMCollection()
+            .find(dashboardFilter)
+            .sort(sort)
+            .limit(3)
+            .into(new ArrayList<>());
         return SUCCESS.toUpperCase();
     }
 
@@ -348,9 +356,12 @@ public class IssuesAction extends UserAction {
         try {
             List<TestingRunIssues> issues = new ArrayList<>();
             if(issuesIds != null && !issuesIds.isEmpty()){
-                issues =  TestingRunIssuesDao.instance.findAll(Filters.in(Constants.ID, issuesIds));
+                // For specific issue IDs (from dashboard list), bypass RBAC to allow deleted collections
+                issues = TestingRunIssuesDao.instance.getMCollection().find(Filters.in(Constants.ID, issuesIds)).into(new ArrayList<>());
             }else{
-                issues =  TestingRunIssuesDao.instance.findAll(filters, skip, 50, null);
+                // Apply dashboard filtering for list queries
+                Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(filters);
+                issues = TestingRunIssuesDao.instance.getMCollection().find(dashboardFilter).skip(skip).limit(50).into(new ArrayList<>());
             }
             List<Bson> andFilters = new ArrayList<>();
             List<Bson> filtersForNewCollection = new ArrayList<>();
@@ -465,7 +476,13 @@ public class IssuesAction extends UserAction {
 
         Role currentUserRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
 
-        TestingRunIssues issue = TestingRunIssuesDao.instance.findOne(Filters.eq(ID, issueId));
+        // Use findOneNoRbacFilter to allow access to issues from deleted collections
+        // (the issue appeared in the list via dashboard filtering, so user has access)
+        TestingRunIssues issue = TestingRunIssuesDao.instance.findOneNoRbacFilter(Filters.eq(ID, issueId), null);
+        if (issue == null) {
+            addActionError("Issue not found or you don't have access to it");
+            return ERROR.toUpperCase();
+        }
         String testSubType = null;
         // ?? enum stored in db
         String subCategory = issue.getId().getTestSubCategory();
@@ -484,8 +501,12 @@ public class IssuesAction extends UserAction {
             logger.debug("Issue id from db to be marked as read " + issueId);
             Bson update = Updates.combine(Updates.set(TestingRunIssues.UNREAD, false),
                     Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
-            TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(ID, issueId), update);
-            issueId = updatedIssue.getId();
+            // Issue was already verified via findOneNoRbacFilter, so safe to update directly
+            TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.getMCollection()
+                .findOneAndUpdate(Filters.eq(ID, issueId), update, new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
+            if (updatedIssue != null) {
+                issueId = updatedIssue.getId();
+            }
         }
         return SUCCESS.toUpperCase();
     }
@@ -606,10 +627,18 @@ public class IssuesAction extends UserAction {
         } else {
             update = Updates.combine(update, Updates.unset(TestingRunIssues.IGNORE_REASON));
         }
-        TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.updateOne(Filters.eq(ID, issueId), update);
-        issueId = updatedIssue.getId();
-        ignoreReason = updatedIssue.getIgnoreReason();
-        statusToBeUpdated = updatedIssue.getTestRunIssueStatus();
+        // Verify issue exists and user has access (via dashboard filtering) before updating
+        Bson accessFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.eq(ID, issueId));
+        TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.getMCollection()
+            .findOneAndUpdate(accessFilter, update, new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
+        if (updatedIssue != null) {
+            issueId = updatedIssue.getId();
+            ignoreReason = updatedIssue.getIgnoreReason();
+            statusToBeUpdated = updatedIssue.getTestRunIssueStatus();
+        } else {
+            addActionError("Issue not found or you don't have access to it");
+            return ERROR.toUpperCase();
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -637,7 +666,9 @@ public class IssuesAction extends UserAction {
         if(!StringUtils.isEmpty(this.description)) {
             update = Updates.combine(update, Updates.set(TestingRunIssues.DESCRIPTION, this.description));
         }
-        TestingRunIssuesDao.instance.updateMany(Filters.in(ID, issueIdArray), update);
+        // Apply dashboard filtering to ensure user has access to all issues before updating
+        Bson accessFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.in(ID, issueIdArray));
+        TestingRunIssuesDao.instance.getMCollection().updateMany(accessFilter, update);
 
         int accountId = Context.accountId.get();
         executorService.schedule( new Runnable() {
@@ -1115,12 +1146,15 @@ public class IssuesAction extends UserAction {
     List<TestingIssuesId> issuesIds;
 
     public String fetchIssuesFromResultIds(){
-        issues = TestingRunIssuesDao.instance.findAll(
-            Filters.and(
-                Filters.in(Constants.ID, issuesIds),
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery)
-            ), Projections.include("_id", TestingRunIssues.TEST_RUN_ISSUES_STATUS)
+        // For specific issue IDs (from dashboard list), bypass RBAC to allow deleted collections
+        Bson filter = Filters.and(
+            Filters.in(Constants.ID, issuesIds),
+            Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery)
         );
+        issues = TestingRunIssuesDao.instance.getMCollection()
+            .find(filter)
+            .projection(Projections.include("_id", TestingRunIssues.TEST_RUN_ISSUES_STATUS))
+            .into(new ArrayList<>());
         return SUCCESS.toUpperCase();
     }
 
@@ -1212,7 +1246,9 @@ public class IssuesAction extends UserAction {
             return ERROR.toUpperCase();
         }
         
-        TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, issueId), Updates.set(TestingRunIssues.DESCRIPTION, description));
+        // Verify issue exists and user has access (via dashboard filtering) before updating
+        Bson accessFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.eq(Constants.ID, issueId));
+        TestingRunIssuesDao.instance.getMCollection().updateOne(accessFilter, Updates.set(TestingRunIssues.DESCRIPTION, description));
         return SUCCESS.toUpperCase();
     }
 

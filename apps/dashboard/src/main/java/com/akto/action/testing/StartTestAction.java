@@ -1099,7 +1099,8 @@ public class StartTestAction extends UserAction {
                 if (isTestRunByTestEditor) {
                     issuesId.setTestErrorSource(TestErrorSource.TEST_EDITOR);
                 }
-                runIssues = TestingRunIssuesDao.instance.findOne(Filters.eq(Constants.ID, issuesId));
+                // Use findOneNoRbacFilter to allow access to issues from deleted collections
+                runIssues = TestingRunIssuesDao.instance.findOneNoRbacFilter(Filters.eq(Constants.ID, issuesId), null);
             }
         } catch (Exception ignore) {
         }
