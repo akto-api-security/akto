@@ -46,6 +46,8 @@ function About() {
     const [modalOpen, setModalOpen] = useState(false)
     const [deleteMaliciousEventsModal, setDeleteMaliciousEventsModal] = useState(false)
     const [disableMalEventButton, setDisableMalEventButton] = useState(false)
+    const [resetAccessTypeModal, setResetAccessTypeModal] = useState(false)
+    const [disableResetAccessTypeButton, setDisableResetAccessTypeButton] = useState(false)
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
@@ -390,6 +392,24 @@ function About() {
         })
     }
 
+    const handleResetCollectionAccessTypes = async() => {
+        setResetAccessTypeModal(false)
+        setDisableResetAccessTypeButton(true)
+        await settingRequests.resetCollectionAccessTypes().then((res) => {
+            if (res?.started) {
+                func.setToast(true, false, res?.message || "Collection access type reset started in the background. It may take a few minutes; refresh the inventory page to see updates.")
+            } else {
+                const totalCollections = res?.totalCollections || 0
+                const updatedCollections = res?.updatedCollections || 0
+                func.setToast(true, false, `Collection access types reset successfully.`)
+            }
+            setDisableResetAccessTypeButton(false)
+        }).catch(() => {
+            func.setToast(true, true, "Failed to reset collection access types. Please try again.")
+            setDisableResetAccessTypeButton(false)
+        })
+    }
+
     const handleCompulsoryToggle = async (key, checked) => {
         const updated = { ...compulsoryDescription, [key]: checked };
         setCompulsoryDescription(updated);
@@ -547,6 +567,34 @@ function About() {
                         <Text>You are about to permanently delete all malicious events.</Text>
                         <Text>This action cannot be undone and all associated data will be lost forever.</Text>
                         <br/>
+                        <Text>Are you sure you want to proceed?</Text>
+                    </VerticalStack>
+                </Modal.Section>
+            </Modal>
+
+            <VerticalStack gap={2}>
+                <Text color='subdued' variant='bodyMd'>Reset Collection Access Type</Text>
+                <Box width='80px'>
+                    <Button disabled={disableResetAccessTypeButton} onClick={() => setResetAccessTypeModal(true)}>Reset</Button>
+                </Box>
+            </VerticalStack>
+
+            <Modal
+                open={resetAccessTypeModal}
+                primaryAction={{
+                    content: "Yes, Reset",
+                    onAction: handleResetCollectionAccessTypes
+                }}
+                secondaryActions={[{
+                    content: "Cancel",
+                    onAction: () => {setResetAccessTypeModal(false)}
+                }]}
+                title="Reset Collection Access Types"
+                onClose={() => {setResetAccessTypeModal(false)}}
+            >
+                <Modal.Section>
+                    <VerticalStack>
+                        <Text>This will recalculate the access type for all collections based on their APIs.</Text>
                         <Text>Are you sure you want to proceed?</Text>
                     </VerticalStack>
                 </Modal.Section>

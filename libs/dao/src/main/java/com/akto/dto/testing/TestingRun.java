@@ -2,6 +2,7 @@ package com.akto.dto.testing;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 public class TestingRun {
 
@@ -62,6 +63,9 @@ public class TestingRun {
     public static final String DO_NOT_MARK_ISSUES_AS_FIXED = "doNotMarkIssuesAsFixed";
     private boolean doNotMarkIssuesAsFixed = false;
 
+    public static final String DASHBOARD_CONTEXT = "dashboardContext";
+    private CONTEXT_SOURCE dashboardContext;
+
     public TestingRun() { }
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, String triggeredBy, boolean sendSlackAlert) {
@@ -82,12 +86,18 @@ public class TestingRun {
     }
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests, boolean sendSlackAlert, String miniTestingServiceName, int selectedSlackChannelId) {
-        this(scheduleTimestamp, userEmail,testingEndpoints,testIdConfig, state, periodInSeconds, name, testRunTime, maxConcurrentRequests, sendSlackAlert, false, miniTestingServiceName, selectedSlackChannelId);
+        this(scheduleTimestamp, userEmail,testingEndpoints,testIdConfig, state, periodInSeconds, name, testRunTime, maxConcurrentRequests, sendSlackAlert, false, miniTestingServiceName, selectedSlackChannelId, null);
     }
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig,
         State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests,
         boolean sendSlackAlert, boolean sendMsTeamsAlert, String miniTestingServiceName, int selectedSlackChannelId) {
+        this(scheduleTimestamp, userEmail, testingEndpoints, testIdConfig, state, periodInSeconds, name, testRunTime, maxConcurrentRequests, sendSlackAlert, sendMsTeamsAlert, miniTestingServiceName, selectedSlackChannelId, null);
+    }
+
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig,
+        State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests,
+        boolean sendSlackAlert, boolean sendMsTeamsAlert, String miniTestingServiceName, int selectedSlackChannelId, CONTEXT_SOURCE dashboardContext) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.testRunTime = testRunTime;
         this.maxConcurrentRequests = maxConcurrentRequests;
@@ -104,6 +114,7 @@ public class TestingRun {
         this.isNewTestRun = true;
         this.sendMsTeamsAlert = sendMsTeamsAlert;
         this.selectedSlackChannelId = selectedSlackChannelId;
+        this.dashboardContext = dashboardContext;
     }
 
     public TestingRunConfig getTestingRunConfig() {
@@ -277,6 +288,14 @@ public class TestingRun {
 
     public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+    }
+
+    public CONTEXT_SOURCE getDashboardContext() {
+        return dashboardContext;
+    }
+
+    public void setDashboardContext(CONTEXT_SOURCE dashboardContext) {
+        this.dashboardContext = dashboardContext;
     }
 
     @Override

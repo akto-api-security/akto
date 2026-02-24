@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
+	"github.com/akto-api-security/guardrails-service/pkg/slack"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
 	"github.com/gin-gonic/gin"
@@ -94,9 +97,15 @@ func (h *ValidationHandler) IngestData(c *gin.Context) {
 
 // ValidateRequest validates a single request payload
 func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
+	start := time.Now()
 	var req models.ValidateRequestParams
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Error("ValidateRequest - invalid request format",
+			zap.Error(err),
+			zap.Int64("latencyMs", time.Since(start).Milliseconds()))
+		alertMsg := fmt.Sprintf("[guardrails] /validate/request - invalid request format: %s", err.Error())
+		slack.SendAlert(h.logger, alertMsg)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid request format",
 		})
@@ -106,19 +115,19 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	// Extract session and request IDs from headers
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
 
-	h.logger.Debug("ValidateRequest - received request params",
+	h.logger.Info("ValidateRequest - received request",
+		zap.String("path", req.Path),
+		zap.String("method", req.Method),
+		zap.String("account", req.AktoAccountID),
 		zap.String("contextSource", req.ContextSource),
 		zap.String("sessionID", sessionID),
 		zap.String("requestID", requestID),
 		zap.String("ip", req.IP),
 		zap.String("destIp", req.DestIP),
-		zap.String("path", req.Path),
-		zap.String("method", req.Method),
 		zap.String("statusCode", req.StatusCode),
 		zap.String("source", req.Source),
 		zap.String("direction", req.Direction),
 		zap.String("tag", req.Tag),
-		zap.String("aktoAccountId", req.AktoAccountID),
 		zap.String("aktoVxlanId", req.AktoVxlanID),
 		zap.Bool("hasRequestHeaders", req.RequestHeaders != ""),
 		zap.Bool("hasResponseHeaders", req.ResponseHeaders != ""),
@@ -127,12 +136,31 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 
 	result, err := h.validatorService.ValidateRequest(c.Request.Context(), &req, sessionID, requestID)
 	if err != nil {
-		h.logger.Error("Failed to validate request", zap.Error(err))
+		h.logger.Error("ValidateRequest failed",
+			zap.String("path", req.Path),
+			zap.String("method", req.Method),
+			zap.String("account", req.AktoAccountID),
+			zap.String("contextSource", req.ContextSource),
+			zap.String("sessionID", sessionID),
+			zap.Int64("latencyMs", time.Since(start).Milliseconds()),
+			zap.Error(err))
+		alertMsg := fmt.Sprintf("[guardrails] /validate/request failed - path: %s, method: %s, account: %s, contextSource: %s, sessionID: %s, error: %s",
+			req.Path, req.Method, req.AktoAccountID, req.ContextSource, sessionID, err.Error())
+		slack.SendAlert(h.logger, alertMsg)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Validation failed",
 		})
 		return
 	}
+
+	h.logger.Info("ValidateRequest - completed",
+		zap.String("path", req.Path),
+		zap.String("method", req.Method),
+		zap.String("account", req.AktoAccountID),
+		zap.String("sessionID", sessionID),
+		zap.Bool("allowed", result.Allowed),
+		zap.Bool("modified", result.Modified),
+		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
 
 	c.JSON(http.StatusOK, result)
 }

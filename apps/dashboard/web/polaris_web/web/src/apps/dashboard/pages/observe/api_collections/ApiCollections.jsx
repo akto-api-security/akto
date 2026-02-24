@@ -178,6 +178,16 @@ const headers = [
         tooltipContent: (<Text variant="bodySm">Tags for an API collection to describe collection attributes such as environment type (staging, production) and other custom attributes</Text>),
     },
     {   
+        title: "Access Type",
+        text: "Access Type",
+        value: "accessType",
+        textValue: "accessType",
+        filterKey: "accessType",
+        showFilter: true,
+        isText: CellType.TEXT,
+        boxWidth: '120px'
+    },
+    {   
         title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time an endpoint within collection was either discovered for the first time or seen again</Text>} title="Last traffic seen" />, 
         text: 'Last traffic seen', 
         value: 'lastTraffic',
@@ -298,6 +308,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             registryStatus: c.registryStatus,
             description: c.description,
             isOutOfTestingScope: c.isOutOfTestingScope,
+            accessType: (c.accessType && c.accessType !== "Unknown") ? c.accessType : "No Access Type",
             rowStatus: c.rowStatus,
             disableClick: c.disableClick,
             icon: CircleTickMajor,
@@ -406,6 +417,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         registryStatus: rawCollection.registryStatus,
         description: rawCollection.description,
         isOutOfTestingScope: rawCollection.isOutOfTestingScope,
+        accessType: rawCollection.accessType ? rawCollection.accessType : "No Access Type",
         envType,
         envTypeOriginal: rawCollection?.envType,
         testedEndpoints,
