@@ -53,6 +53,7 @@ public class Constants {
     public static final String HOST_HEADER = "Host";
     public static final String X_TRANSPORT_HEADER = "x-transport";
     public static final String STDIO_TRANSPORT = "STDIO";
+    public static final String HTTP_TRANSPORT = "HTTP";
 
     // RAG and Vector Database Tags
     public static final String AKTO_RAG_DATABASE_TAG = "rag-database";

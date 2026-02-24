@@ -39,6 +39,7 @@ import org.apache.commons.lang3.StringUtils;
 import static com.akto.util.Constants.AKTO_MCP_RESOURCES_TAG;
 import static com.akto.util.Constants.AKTO_MCP_TOOLS_TAG;
 import static com.akto.util.Constants.HOST_HEADER;
+import static com.akto.util.Constants.HTTP_TRANSPORT;
 import static com.akto.util.Constants.STDIO_TRANSPORT;
 import static com.akto.util.Constants.X_TRANSPORT_HEADER;
 
@@ -317,16 +318,22 @@ public final class McpRequestResponseUtils {
                 logger.debug("Failed to parse request URL for host: " + e.getMessage());
             }
         }
+
+        boolean fromHost = false;
         if (StringUtils.isBlank(hostRaw) && reqHeaders != null) {
             hostRaw = HttpRequestResponseUtils.getHeaderValue(reqHeaders, HOST_HEADER);
+            fromHost = true;
         }
+
         if (hostRaw == null || StringUtils.isBlank(hostRaw)) {
             return null;
         }
         final String host = hostRaw.trim();
 
-        // If x-transport is STDIO, return MCP name; else return parsed host
-        if (reqHeaders != null && STDIO_TRANSPORT.equals(HttpRequestResponseUtils.getHeaderValue(reqHeaders, X_TRANSPORT_HEADER))) {
+        String headerValue = reqHeaders != null ? HttpRequestResponseUtils.getHeaderValue(reqHeaders, X_TRANSPORT_HEADER) : null;
+
+        // STDIO: always extract service name. HTTP: extract only when host was taken from Host header
+        if (STDIO_TRANSPORT.equals(headerValue) || (fromHost && HTTP_TRANSPORT.equals(headerValue))) {
             return extractServiceNameFromHost(host);
         }
         return host;
@@ -338,7 +345,7 @@ public final class McpRequestResponseUtils {
         }
         String[] parts = host.split("\\.");
         if (parts.length < 3) {
-            return null;
+            return host;
         }
         StringBuilder sb = new StringBuilder(parts[2]);
         for (int i = 3; i < parts.length; i++) {
