@@ -1,5 +1,12 @@
 package com.akto.mcp;
 
+import static com.akto.util.Constants.AKTO_MCP_RESOURCES_TAG;
+import static com.akto.util.Constants.AKTO_MCP_TOOLS_TAG;
+import static com.akto.util.Constants.HOST_HEADER;
+import static com.akto.util.Constants.HTTP_TRANSPORT;
+import static com.akto.util.Constants.STDIO_TRANSPORT;
+import static com.akto.util.Constants.X_TRANSPORT_HEADER;
+
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -35,13 +42,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-
-import static com.akto.util.Constants.AKTO_MCP_RESOURCES_TAG;
-import static com.akto.util.Constants.AKTO_MCP_TOOLS_TAG;
-import static com.akto.util.Constants.HOST_HEADER;
-import static com.akto.util.Constants.HTTP_TRANSPORT;
-import static com.akto.util.Constants.STDIO_TRANSPORT;
-import static com.akto.util.Constants.X_TRANSPORT_HEADER;
 
 
 public final class McpRequestResponseUtils {
