@@ -359,7 +359,7 @@ public final class FilterAction {
             Object val = origPayload;
 
             if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.LENGTH.toString())) {
-                val = origPayload.trim().length() - 2; // todo:
+                val = origPayload != null ? origPayload.trim().length() - 2 : 0;
             } else if (filterActionRequest.getBodyOperand() != null && filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.PERCENTAGE_MATCH.toString())) {
                 RawApi sampleRawApi = filterActionRequest.getRawApi();
                 if (sampleRawApi == null) {
