@@ -469,7 +469,7 @@ public final class McpRequestResponseUtils {
         }
         String[] parts = host.split("\\.");
         if (parts.length < 3) {
-            return null;
+            return host;
         }
         StringBuilder sb = new StringBuilder(parts[2]);
         for (int i = 3; i < parts.length; i++) {
