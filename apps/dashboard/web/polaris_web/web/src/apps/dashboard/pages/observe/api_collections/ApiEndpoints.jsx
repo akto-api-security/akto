@@ -498,16 +498,13 @@ function ApiEndpoints(props) {
             return <ComponentRiskAnalysisBadges componentRiskAnalysis={getRiskAnalysisForEndpoint(endpointUrl, resourceNameToRiskMap)} />;
         };
         const riskCompByEndpoint = new Map();
-        allEndpoints.forEach((obj) => {
-            if (!riskCompByEndpoint.has(obj.endpoint)) {
-                riskCompByEndpoint.set(obj.endpoint, getComponentRiskCompForEndpoint(obj.endpoint));
+        const setRiskCompIfMissing = (item) => {
+            if (item?.endpoint && !riskCompByEndpoint.has(item.endpoint)) {
+                riskCompByEndpoint.set(item.endpoint, getComponentRiskCompForEndpoint(item.endpoint));
             }
-        });
-        shadowApis.forEach((s) => {
-            if (!riskCompByEndpoint.has(s.endpoint)) {
-                riskCompByEndpoint.set(s.endpoint, getComponentRiskCompForEndpoint(s.endpoint));
-            }
-        });
+        };
+        allEndpoints.forEach(setRiskCompIfMissing);
+        shadowApis.forEach(setRiskCompIfMissing);
         shadowApis = shadowApis.map((s) => ({
             ...s,
             componentRiskAnalysisComp: riskCompByEndpoint.get(s.endpoint) ?? null
@@ -516,7 +513,7 @@ function ApiEndpoints(props) {
         // Step 1: Create lightweight objects for ALL endpoints (for filtering & counting only)
         const allEndpointsLight = allEndpoints.map((obj) => {
             const t = collectionTagsMap[obj.apiCollectionId];
-            const base = {
+            return {
                 ...obj,
                 tagsComp: t?.comp || null,
                 tagsString: t?.str || "",
@@ -524,7 +521,6 @@ function ApiEndpoints(props) {
                 open:  obj.auth_type === undefined || obj.auth_type.toLowerCase() === "unauthenticated" || obj.auth_type.toLowerCase() === "no auth type found",
                 componentRiskAnalysisComp: riskCompByEndpoint.get(obj.endpoint) ?? null
             };
-            return base;
         });
 
         // Single pass through endpoints for all filtering and checks
@@ -599,7 +595,7 @@ function ApiEndpoints(props) {
             zombie: zombieEndpoints.length
         };
 
-        // Step 3: Helper function to prettify a page of data with tags applied (componentRiskAnalysisComp preserved from ...url in prettifyEndpointsData)
+        // Step 3: Helper function to prettify a page of data with tags applied
         const prettifyPageWithTags = (pageData) => {
             const prettified = transform.prettifyEndpointsData(pageData);
             prettified.forEach((obj) => {
@@ -648,7 +644,7 @@ function ApiEndpoints(props) {
             data['zombie'] = zombieEndpoints;
             data['zombie']._prettifyPageData = prettifyPageWithTags;
         } else {
-            // Small collection: render all normally (componentRiskAnalysisComp preserved from allEndpointsLight via ...url in prettifyEndpointsData)
+            // Small collection: render all normally
             const prettifyData = transform.prettifyEndpointsData(allEndpointsLight);
             prettifyData.forEach((obj) => {
                 const t = collectionTagsMap[obj.apiCollectionId];
