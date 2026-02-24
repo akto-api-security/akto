@@ -717,6 +717,24 @@ public class Executor {
         }
     }
 
+    private static Object resolveSelfBodyParamValue(RawApi rawApi, Object key, Object value) {
+        if (!(value instanceof String) || key == null) {
+            return value;
+        }
+
+        String valueStr = value.toString();
+        if (!valueStr.contains("${self}")) {
+            return value;
+        }
+
+        List<String> existingValues = Utils.findAllValuesForKey(rawApi.getRequest().getBody(), key.toString(), false);
+        if (existingValues.isEmpty()) {
+            return value;
+        }
+
+        return valueStr.replace("${self}", existingValues.get(0));
+    }
+
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
         switch (operationType.toLowerCase()) {
             case "send_ssrf_req":
@@ -782,6 +800,7 @@ public class Executor {
             case "add_body_param":
                 return Operations.addBody(rawApi, key.toString(), value);
             case "modify_body_param":
+                value = resolveSelfBodyParamValue(rawApi, key, value);
                 return Operations.modifyBodyParam(rawApi, key.toString(), value);
             case "delete_graphql_field":
                 return Operations.deleteGraphqlField(rawApi, key == null ? "": key.toString());
