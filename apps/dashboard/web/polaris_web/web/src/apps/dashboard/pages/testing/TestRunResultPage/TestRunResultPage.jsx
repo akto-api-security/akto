@@ -91,6 +91,7 @@ function TestRunResultPage(props) {
   const [aiSummary, setAiSummary] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false)
+  const [aiSummaryChecked, setAiSummaryChecked] = useState(false)
 
   const useFlyout = location.pathname.includes("test-editor") ? false : true
 
@@ -160,8 +161,9 @@ function TestRunResultPage(props) {
   }
 
   async function handleGenerateAiOverview() {
-    if (aiSummary || aiSummaryLoading) return;
+    if (aiSummary || aiSummaryLoading || aiSummaryChecked) return;
     setAiSummaryLoading(true);
+    setAiSummaryChecked(true);
     try {
       const metaData = buildTestResultMetadata();
       const response = await sendQuery(
@@ -177,7 +179,6 @@ function TestRunResultPage(props) {
         setAiSummary(response.response);
       }
     } catch (err) {
-      console.error("Failed to generate AI overview:", err);
     } finally {
       setAiSummaryLoading(false);
     }
@@ -204,7 +205,6 @@ function TestRunResultPage(props) {
         setAiMessages(prev => [...prev, aiMsg]);
       }
     } catch (err) {
-      console.error("Failed to send follow-up:", err);
     } finally {
       setAiLoading(false);
     }
@@ -373,6 +373,7 @@ function TestRunResultPage(props) {
     setAiSummary(null);
     setAiLoading(false);
     setAiSummaryLoading(false);
+    setAiSummaryChecked(false);
     fetchData();
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props, hexId2])
 
