@@ -252,8 +252,9 @@ public final class McpRequestResponseUtils {
         try {
             // Check if record with same type, resourceName, and hostCollectionId already exists
             BasicDBObject findQuery = new BasicDBObject();
-            findQuery.put("type", auditInfo.getType());
-            findQuery.put("resourceName", auditInfo.getResourceName());
+            findQuery.put(McpAuditInfo.TYPE, auditInfo.getType());
+            findQuery.put(McpAuditInfo.RESOURCE_NAME, auditInfo.getResourceName());
+            findQuery.put(McpAuditInfo.MCP_HOST, auditInfo.getMcpHost());
            // findQuery.put("hostCollectionId", auditInfo.getHostCollectionId());  //removing this check for now to avoid auditing same mcp servers from different hosts
 
             McpAuditInfo existingRecord = McpAuditInfoDao.instance.findOne(findQuery);
