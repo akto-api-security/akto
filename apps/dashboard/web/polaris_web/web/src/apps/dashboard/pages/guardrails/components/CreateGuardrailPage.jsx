@@ -15,7 +15,7 @@ import {
 import PersistStore from '../../../../main/PersistStore';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
 import guardrailApi from '../api';
-import { transformPolicyForBackend } from '../utils';
+import { transformPolicyForBackend, SEVERITY } from '../utils';
 import {
     PolicyDetailsStep,
     PolicyDetailsConfig,
@@ -53,7 +53,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [blockedMessage, setBlockedMessage] = useState("");
-    const [severity, setSeverity] = useState("HIGH");
+    const [severity, setSeverity] = useState(SEVERITY.MEDIUM.value);
     const [applyToResponses, setApplyToResponses] = useState(false);
 
     // Step 2: Content & Policy Guardrails
@@ -317,7 +317,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setName("");
         setDescription("");
         setBlockedMessage("");
-        setSeverity("HIGH");
+        setSeverity(SEVERITY.MEDIUM.value);
         setApplyToResponses(false);
         setPlaygroundMessages([]);
         setEnablePromptAttacks(false);
@@ -375,7 +375,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setName(policy.name || "");
         setDescription(policy.description || "");
         setBlockedMessage(policy.blockedMessage || "");
-        setSeverity(policy.severity ? policy.severity.toUpperCase() : "HIGH");
+        setSeverity(policy.severity ? policy.severity.toUpperCase() : SEVERITY.MEDIUM.value);
         setApplyToResponses(policy.applyToResponses || false);
 
         // Content filters

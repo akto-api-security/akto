@@ -10,7 +10,7 @@ import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import api from "./api";
-import { transformPolicyForBackend } from "./utils";
+import { transformPolicyForBackend, SEVERITY } from "./utils";
 
 const resourceName = {
   singular: "policy",
@@ -146,10 +146,10 @@ function GuardrailPolicies() {
                         category: determineCategoryFromPolicy(policy),
                         status: policy.active ? "Active" : "Inactive",
                         statusWithSummary: generateStatusWithSummary(policy),
-                        severity: policy.severity || "HIGH",
+                        severity: policy.severity || SEVERITY.MEDIUM.value,
                         severityComp: (
-                            <div className={`badge-wrapper-${(policy.severity || "HIGH").toUpperCase()}`}>
-                                <Badge size="small">{(policy.severity || "HIGH").toUpperCase()}</Badge>
+                            <div className={`badge-wrapper-${(policy.severity || SEVERITY.MEDIUM.value).toUpperCase()}`}>
+                                <Badge size="small">{(policy.severity || SEVERITY.MEDIUM.value).toUpperCase()}</Badge>
                             </div>
                         ),
                         createdTs: func.prettifyEpoch(policy.createdTimestamp),
@@ -430,7 +430,7 @@ function GuardrailPolicies() {
                 name: guardrailData.name,
                 description: guardrailData.description || '',
                 blockedMessage: guardrailData.blockedMessage || '',
-                severity: guardrailData.severity || "HIGH",
+                severity: guardrailData.severity || SEVERITY.MEDIUM.value,
                 selectedMcpServers: guardrailData.selectedMcpServers || [],
                 selectedAgentServers: guardrailData.selectedAgentServers || [],
                 // Add V2 fields for enhanced server data
