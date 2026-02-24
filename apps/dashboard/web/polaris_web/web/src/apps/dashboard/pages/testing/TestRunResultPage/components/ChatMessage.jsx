@@ -21,7 +21,7 @@ function extractPrettyJson(content) {
     if (start === -1 || end <= start) {
         return { prettyJson: null, prefix: null };
     }
-
+ 
     try {
         const embeddedJson = content.slice(start, end + 1);
         return {
@@ -109,7 +109,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                         ) : prettyJson ? (
                             <VerticalStack gap="2">
                                 {prefix && <MarkdownViewer markdown={prefix} />}
-                                <SampleData key={content} data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="200px" />
+                                <SampleData data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="200px" />
                             </VerticalStack>
                         ) : (
                             <MarkdownViewer markdown={content} />
@@ -128,7 +128,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
             {prettyJson && expanded && (
                 <Modal open onClose={() => setExpanded(false)} title={label} large>
                     <Modal.Section>
-                        <SampleData key="modal" data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="600px" />
+                        <SampleData data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="600px" />
                     </Modal.Section>
                 </Modal>
             )}
