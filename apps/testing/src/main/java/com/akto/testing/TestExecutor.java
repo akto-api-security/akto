@@ -240,7 +240,8 @@ public class TestExecutor {
 
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.info("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
-        boolean collectionWise = testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE);
+        boolean collectionWise = testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE)
+            || testingEndpoints.getType().equals(TestingEndpoints.Type.MULTI_COLLECTION);
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
 
         if(collectionWise || apiInfoKeyList.size() > 500){
@@ -302,19 +303,19 @@ public class TestExecutor {
         int currentTime = Context.now();
         Map<String, String> hostAndContentType = new HashMap<>();
         try {
-            loggerMaker.info("Starting findAllHosts at: " + currentTime, LogDb.TESTING);
+            loggerMaker.info("Starting findAllHosts at: " + currentTime);
             hostAndContentType = StatusCodeAnalyser.findAllHosts(sampleMessageStore, sampleDataMapForStatusCodeAnalyser);
             loggerMaker.info("Completing findAllHosts in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
         } catch (Exception e){
-            loggerMaker.errorAndAddToDb("Error while running findAllHosts " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb(e, "Error while running findAllHosts " + e.getMessage());
         }
         try {
             currentTime = Context.now();
-            loggerMaker.debugAndAddToDb("Starting HostValidator at: " + currentTime, LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("Starting HostValidator at: " + currentTime);
             HostValidator.compute(hostAndContentType,testingRun.getTestingRunConfig());
-            loggerMaker.debugAndAddToDb("Completing HostValidator in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("Completing HostValidator in: " + (Context.now() -  currentTime) + " at: " + Context.now());
         } catch (Exception e){
-            loggerMaker.errorAndAddToDb("Error while running HostValidator " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb(e, "Error while running HostValidator " + e.getMessage());
         }
         try {
             currentTime = Context.now();
@@ -322,9 +323,9 @@ public class TestExecutor {
             StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig(), hostAndContentType);
             loggerMaker.infoAndAddToDb("Completing StatusCodeAnalyser in: " + (Context.now() -  currentTime) + " at: " + Context.now());
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb(e, "Error while running status code analyser " + e.getMessage());
         }
-        loggerMaker.debugAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result +  " defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
+        loggerMaker.debugAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result +  " defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap);
 
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();

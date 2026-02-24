@@ -41,6 +41,13 @@ public class McpAgentAction extends UserAction {
 
     public String chatAndStoreConversation() {
         try {
+
+            String userId = getSUser().getLogin();
+            if (userId != null && userId.startsWith("akash+") && userId.endsWith("@akto.io")) {
+                addActionError("You are not allowed to use this feature");
+                return ERROR.toUpperCase();
+            }
+
             // check for conversation type
             if(conversationType == null) {
                 addActionError("Conversation type is required");
@@ -102,11 +109,35 @@ public class McpAgentAction extends UserAction {
                         // Increase timeout for large data
                         tokensLimit = 60000; // 60 seconds
                     }
+                } else if(StringUtils.isNotEmpty(type) && type.equals("test_execution_result")) {
+                    Object data = metaData.get("data");
+                    if(data != null && data instanceof Map) {
+                        Map<String, Object> dataMap = (Map<String, Object>) data;
+                        StringBuilder sb = new StringBuilder("Test Execution Result Context:\n");
+                        sb.append("Test Name: ").append(dataMap.getOrDefault("testName", "")).append("\n");
+                        sb.append("Test Category: ").append(dataMap.getOrDefault("testCategory", "")).append("\n");
+                        sb.append("Vulnerable: ").append(dataMap.getOrDefault("vulnerable", false)).append("\n");
+                        sb.append("Severity: ").append(dataMap.getOrDefault("severity", "")).append("\n");
+                        sb.append("URL: ").append(dataMap.getOrDefault("url", "")).append("\n");
+                        Object sampleReq = dataMap.get("sampleRequest");
+                        if(sampleReq != null) {
+                            String reqStr = sampleReq.toString();
+                            sb.append("Sample Request: ").append(reqStr, 0, Math.min(reqStr.length(), 2000)).append("\n");
+                        }
+                        Object sampleResp = dataMap.get("sampleResponse");
+                        if(sampleResp != null) {
+                            String respStr = sampleResp.toString();
+                            sb.append("Sample Response: ").append(respStr, 0, Math.min(respStr.length(), 2000)).append("\n");
+                        }
+                        contextString = sb.toString();
+                        tokensLimit = 40000;
+                    }
                 }
             }
 
             String userEmail = getSUser() != null ? getSUser().getLogin() : null;
-            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail);
+            String contextSource = Context.contextSource.get() != null ? Context.contextSource.get().toString() : null;
+            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail, contextSource);
             if(responseFromMcpServer != null) {
                 responseFromMcpServer.setCreatedAt(timeNow);
                 AgentConversationDao.instance.insertOne(responseFromMcpServer);

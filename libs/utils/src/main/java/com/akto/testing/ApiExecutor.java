@@ -47,7 +47,7 @@ public class ApiExecutor {
             boolean rateLimitHit = true;
             while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
                 if(rateLimitHit){
-                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
                         loggerMaker.infoAndAddToDb("Rate limit hit, sleeping");
                     }else {
                         System.out.println("Rate limit hit, sleeping");
@@ -58,7 +58,7 @@ public class ApiExecutor {
                 i++;
 
                 if (i%30 == 0) {
-                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
                         loggerMaker.infoAndAddToDb("waiting for rate limit availability");
                     }else{
                         System.out.println("waiting for rate limit availability");
@@ -73,9 +73,10 @@ public class ApiExecutor {
             HTTPClientHandler.initHttpClientHandler(isSaasDeployment);
         }
 
+        boolean isHttps = request.url().isHttps();
         OkHttpClient client = debug ?
-                HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol) :
-                HTTPClientHandler.instance.getHTTPClient(followRedirects, requestProtocol);
+                HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol, isHttps) :
+                HTTPClientHandler.instance.getHTTPClient(isHttps, followRedirects, requestProtocol);
 
         if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
@@ -113,13 +114,13 @@ public class ApiExecutor {
                     for (byte b : grpcBody) {
                         builder.append(b).append(",");
                     }
-                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
                         loggerMaker.infoAndAddToDb(builder.toString());
                     }else {
                         System.out.println(builder.toString());
                     }
                     String responseBase64Encoded = Base64.getEncoder().encodeToString(grpcBody);
-                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                    if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
                         loggerMaker.infoAndAddToDb("grpc response base64 encoded:" + responseBase64Encoded);
                     }else {
                         System.out.println("grpc response base64 encoded:" + responseBase64Encoded);
@@ -140,7 +141,7 @@ public class ApiExecutor {
                     }
                 }
             } catch (IOException e) {
-                if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+                if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
                     loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
                 } else {
                     System.out.println("Error while parsing response body: " + e);
@@ -148,7 +149,7 @@ public class ApiExecutor {
                 body = "{}";
             }
         } catch (IOException e) {
-            if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
+            if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
                 loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
             } else {
                 System.out.println("Error while executing request " + request.url() + ": " + e);
@@ -400,8 +401,8 @@ public class ApiExecutor {
 
         String url = prepareUrl(request, testingRunConfig);
 
-        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
-            loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
+        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog") || url.contains("insertAgenticTestingLog"))) {
+            loggerMaker.debugAndAddToDb("Final url is: " + url, LogDb.TESTING);
         }
         request.setUrl(url);
 
@@ -434,8 +435,8 @@ public class ApiExecutor {
             case OTHER:
                 throw new Exception("Invalid method name");
         }
-        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog"))) {
-            loggerMaker.infoAndAddToDb("Received response from: " + url, LogDb.TESTING);
+        if (!(url.contains("insertRuntimeLog") || url.contains("insertTestingLog") || url.contains("insertProtectionLog") || url.contains("insertAgenticTestingLog"))) {
+            loggerMaker.debugAndAddToDb("Received response from: " + url, LogDb.TESTING);
         }
 
         return response;
@@ -697,18 +698,18 @@ public class ApiExecutor {
             }
         } else if (contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
             try {
-                loggerMaker.infoAndAddToDb("encoding to grpc payload:" + payload, LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("encoding to grpc payload:" + payload);
                 payload = ProtoBufUtils.base64EncodedJsonToProtobuf(payload);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Unable to encode grpc payload:" + payload, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Unable to encode grpc payload:" + payload);
                 payload = request.getBody();
             }
             try {// trying decoding payload
                 byte[] payloadByteArray = Base64.getDecoder().decode(payload);
-                loggerMaker.infoAndAddToDb("Final base64 encoded payload:"+ payload, LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Final base64 encoded payload:"+ payload);
                 body = RequestBody.create(payloadByteArray, MediaType.parse(contentType));
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Unable to decode grpc payload:" + payload, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Unable to decode grpc payload:" + payload);
             }
         }else if(contentType.contains(HttpRequestResponseUtils.SOAP) || contentType.contains(HttpRequestResponseUtils.XML)){
             // here we are assuming that the request is in xml format
@@ -810,7 +811,7 @@ public class ApiExecutor {
                 body = RequestBody.create(payload, null);
                 request.getHeaders().remove("charset");
             } else {
-                body = RequestBody.create(payload, MediaType.parse(contentType));
+                body = RequestBody.create(payload.getBytes(StandardCharsets.UTF_8), MediaType.parse(contentType));
             }
         }
         builder = builder.method(request.getMethod(), body);

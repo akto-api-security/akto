@@ -8,8 +8,12 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRun.State;
+
+import lombok.Getter;
+import lombok.Setter;
 
 public class TestingRunPlayground {
 
@@ -27,6 +31,8 @@ public class TestingRunPlayground {
 
     public static final String TESTING_RUN_RESULT = "testingRunResult";
 
+    public static final String TESTING_RUN_CONFIG = "testingRunConfig";
+
     private ObjectId id;
 
     private String testTemplate;
@@ -41,6 +47,9 @@ public class TestingRunPlayground {
 
     private TestingRunResult testingRunResult;
     private String miniTestingName;
+    @Getter
+    @Setter
+    private TestingRunConfig testingRunConfig;
     private OriginalHttpRequest originalHttpRequest;
     private OriginalHttpResponse originalHttpResponse;
     @BsonIgnore

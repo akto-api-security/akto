@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/akto-api-security/guardrails-service/handlers"
@@ -88,6 +89,21 @@ func runKafkaConsumer(cfg *config.Config, validatorService *validator.Service, l
 	logger.Info("Kafka consumer stopped gracefully")
 }
 
+func corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
+	}
+}
+
 func setupRouter(validationHandler *handlers.ValidationHandler, logger *zap.Logger) *gin.Engine {
 	// Set Gin mode based on environment
 	if os.Getenv("GIN_MODE") == "" {
@@ -98,6 +114,7 @@ func setupRouter(validationHandler *handlers.ValidationHandler, logger *zap.Logg
 
 	// Middleware
 	router.Use(gin.Recovery())
+	router.Use(corsMiddleware())
 	router.Use(loggingMiddleware(logger))
 
 	// Health check endpoint
@@ -113,6 +130,7 @@ func setupRouter(validationHandler *handlers.ValidationHandler, logger *zap.Logg
 
 		// Individual validation endpoints
 		api.POST("/validate/request", validationHandler.ValidateRequest)
+		api.POST("/validate/requestWithPolicy", validationHandler.ValidateRequestWithPolicy)
 		api.POST("/validate/response", validationHandler.ValidateResponse)
 	}
 

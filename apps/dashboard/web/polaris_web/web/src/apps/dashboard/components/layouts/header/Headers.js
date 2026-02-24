@@ -43,8 +43,8 @@ export default function Header() {
     const resetSession = SessionStore(state => state.resetStore)
     const resetFields = IssuesStore(state => state.resetStore)
 
-    const dashboardCategory = PersistStore.getState().dashboardCategory;
-    const setDashboardCategory = PersistStore.getState().setDashboardCategory
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
+    const setDashboardCategory = PersistStore((state) => state.setDashboardCategory);
 
     useEffect(() => {
         if (window.beamer_config) {
@@ -93,12 +93,13 @@ export default function Header() {
 
     const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
+    const isRestricted = func.isModuleRestrictedOrg();
     const agenticSecurityGranted =
-        stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || true
+        isRestricted ? false : (stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || true)
     const mcpSecurityGranted =
-        stiggFeatures?.MCP_SECURITY?.isGranted || true;
+        isRestricted ? false : (stiggFeatures?.MCP_SECURITY?.isGranted || true);
     const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
-    const endpointSecurityGranted = stiggFeatures?.ENDPOINT_SECURITY?.isGranted || true
+    const endpointSecurityGranted = isRestricted ? false : (stiggFeatures?.ENDPOINT_SECURITY?.isGranted || true)
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];

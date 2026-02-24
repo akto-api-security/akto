@@ -2,6 +2,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import RegistryBadge from "../../../components/shared/RegistryBadge";
+import RunTest from "./RunTest";
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
@@ -525,6 +526,8 @@ function ApiCollections(props) {
     const [analysisConversations, setAnalysisConversations] = useState([]);
     const [analysisLoading, setAnalysisLoading] = useState(false);
     const [analysisConversationId, setAnalysisConversationId] = useState(null);
+    const [showMultiCollectionRunTest, setShowMultiCollectionRunTest] = useState(false);
+    const [selectedCollectionIdsForTest, setSelectedCollectionIdsForTest] = useState([]);
 
     // const dummyData = dummyJson;
 
@@ -1339,6 +1342,18 @@ function ApiCollections(props) {
                 }
             )
         }
+
+        // Add Run Test button for multi-collection testing
+        if (selectedResources.length > 1) {
+            actions.push({
+                content: <Button id="bulk-run-test-button" primary>Run test</Button>,
+                onAction: () => {
+                    setSelectedCollectionIdsForTest(selectedResources);
+                    setShowMultiCollectionRunTest(true);
+                }
+            })
+        }
+
         const bulkActionsOptions = [...actions];
         bulkActionsOptions.push(toggleEnvType)
         return bulkActionsOptions
@@ -1750,7 +1765,37 @@ function ApiCollections(props) {
             });
         }
         
-        return modifiedSortOptions;
+        const allSortOptions = selectedTab === 'groups' ? [...tempSortOptions, ...modifiedSortOptions] : modifiedSortOptions;
+        
+        // This ensures column indices match the actual table structure
+        const updatedSortOptions = allSortOptions.map(opt => {
+            // Find the actual column index in dynamicHeaders based on sortKey or matching criteria
+            let actualColumnIndex = -1;
+            
+            // Map sortKey to the header value field
+            const sortKeyToValueMap = {
+                'urlsCount': 'urlsCount',
+                'riskScore': 'riskScoreComp',
+                'startTs': 'discovered',
+                'detectedTimestamp': 'lastTraffic',
+                'customGroupsSort': 'displayNameComp'
+            };
+            
+            const headerValue = sortKeyToValueMap[opt.sortKey];
+            if (headerValue) {
+                actualColumnIndex = dynamicHeaders.findIndex(h => h.value === headerValue);
+            }
+            
+            // If found, use the actual index + 1 (1-based indexing for Polaris)
+            if (actualColumnIndex !== -1) {
+                return { ...opt, columnIndex: actualColumnIndex + 1 };
+            }
+            
+            // Otherwise keep the original columnIndex (fallback)
+            return opt;
+        });
+        
+        return updatedSortOptions;
     };
     const dynamicSortOptions = getModifiedSortOptions();
 
@@ -1817,7 +1862,7 @@ function ApiCollections(props) {
                 filterStateUrl={"/dashboard/observe/inventory/"}
                 pageLimit={100}
                 data={data[selectedTab]}
-                sortOptions={selectedTab === 'groups' ? [...tempSortOptions, ...dynamicSortOptions] : dynamicSortOptions}
+                sortOptions={dynamicSortOptions}
                 resourceName={resourceName}
                 filters={[]}
                 disambiguateLabel={disambiguateLabel}
@@ -1834,6 +1879,7 @@ function ApiCollections(props) {
                 csvFileName={"Inventory"}
                 prettifyPageData={(pageData) => selectedTab === 'untracked' ? transform.prettifyUntrackedCollectionsData(pageData) : transform.prettifyCollectionsData(pageData, false, selectedTab, activeFilterType)}
                 transformRawData={transformRawCollectionData}
+                onExportCsv={() => exportCsv()}
             />
         );
     };
@@ -1908,6 +1954,19 @@ function ApiCollections(props) {
                         </Box>
                     </Modal.Section>
                 </Modal>
+            )}
+            {showMultiCollectionRunTest && (
+                <RunTest
+                    apiCollectionIds={selectedCollectionIdsForTest}
+                    endpoints={[]}
+                    filtered={false}
+                    runTestFromOutside={true}
+                    closeRunTest={() => {
+                        setShowMultiCollectionRunTest(false);
+                        resetResourcesSelected();
+                    }}
+                    disabled={false}
+                />
             )}
         </>
     )

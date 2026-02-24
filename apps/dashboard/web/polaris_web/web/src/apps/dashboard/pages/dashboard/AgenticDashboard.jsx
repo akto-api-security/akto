@@ -116,7 +116,7 @@ const AgenticDashboard = () => {
         { i: 'issues-pie', x: 4, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },
         { i: 'threat-detection-pie', x: 8, y: 4, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },
         { i: 'average-issue-age', x: 0, y: 7, w: 4, h: 3, minW: 4, maxW: 4, minH: 3, maxH: 3 },
-        { i: 'compliance-at-risks', x: 4, y: 7, w: 8, h: 2, minW: 6, minH: 2, maxH: 3 },
+        { i: 'compliance-at-risks', x: 4, y: 7, w: 8, h: 3, minW: 6, minH: 3, maxH: 4 },
         { i: 'tested-vs-non-tested', x: 0, y: 10, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },
         { i: 'open-resolved-issues', x: 6, y: 10, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },
         { i: 'threat-requests-chart', x: 0, y: 14, w: 6, h: 4, minW: 4, minH: 4, maxH: 4 },
@@ -248,6 +248,36 @@ const AgenticDashboard = () => {
                 isActive: true,
                 isError: true,
                 message: 'Failed to save dashboard layout'
+            })
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    const resetToDefaultLayout = async () => {
+        setIsSaving(true)
+        setPopoverActive(false)
+        try {
+            const layoutData = {
+                layout: defaultLayout,
+                visibleComponents: defaultVisibleComponents
+            }
+            await api.saveDashboardLayout(SCREEN_NAME, JSON.stringify(layoutData))
+            setLayout(defaultLayout)
+            setVisibleComponents(defaultVisibleComponents)
+            setSavedLayout(defaultLayout)
+            setSavedVisibleComponents(defaultVisibleComponents)
+            setHasUnsavedChanges(false)
+            setToastConfig({
+                isActive: true,
+                isError: false,
+                message: 'Dashboard layout reset to default'
+            })
+        } catch (error) {
+            setToastConfig({
+                isActive: true,
+                isError: true,
+                message: 'Failed to reset dashboard layout'
             })
         } finally {
             setIsSaving(false)
@@ -567,11 +597,13 @@ const AgenticDashboard = () => {
                         color: idx < 3 ? '#E45357' : '#EF864C'
                     })));
 
-                    // Top Hostnames by Issues
-                    setTopHostnamesByIssues((data.topHostnamesByIssues || []).map(item => ({
-                        name: item.hostname || 'Unknown',
-                        value: (item.count || 0).toLocaleString()
-                    })));
+                    // Top Hostnames by Issues – only include entries with a hostname from backend
+                    setTopHostnamesByIssues((data.topHostnamesByIssues || [])
+                        .filter(item => item.hostname != null && String(item.hostname).trim() !== '' && String(item.hostname).toLowerCase() !== 'unknown')
+                        .map(item => ({
+                            name: item.hostname.trim(),
+                            value: (item.count || 0).toLocaleString()
+                        })));
                     
                     // Process Compliance at Risks data - show top 4 only
                     const complianceAtRisks = data.complianceAtRisks || [];
@@ -959,7 +991,7 @@ const AgenticDashboard = () => {
         'threat-requests-chart': `${mapLabel('Threat', dashboardCategory)} Requests over time`,
         'open-resolved-threats': `Open & Resolved ${mapLabel('Threat', dashboardCategory)}s`,
         'weakest-areas': 'Weakest Areas by Failing Percentage',
-        'top-apis-issues': `Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`,
+        'top-apis-issues': 'Top Hostnames with Critical & High Issues',
         'top-requests-by-type': 'Top Requests by Type',
         'top-attacked-apis': 'Top Attacked Hosts by Threats',
         'top-bad-actors': 'Top Bad Actors'
@@ -1181,21 +1213,21 @@ const AgenticDashboard = () => {
         'top-apis-issues': isArrayDataEmpty(topHostnamesByIssues) ? (
             <EmptyCard
                 title={componentNames['top-apis-issues']}
-                subTitleComponent={<Text alignment='center' color='subdued'>No APIs with issues data available for the selected time period</Text>}
+                subTitleComponent={<Text alignment='center' color='subdued'>No hostnames with issues data available for the selected time period</Text>}
                 itemId='top-apis-issues'
                 onRemoveComponent={removeComponent}
-                tooltipContent="APIs with the highest number of critical and high severity security issues"
+                tooltipContent="Hostnames with the highest number of critical and high severity security issues"
             />
         ) : (
             <CustomDataTable
-                title={`Top ${mapLabel('APIs', dashboardCategory)} with Critical & High Issues`}
+                title="Top Hostnames with Critical & High Issues"
                 data={topHostnamesByIssues}
                 showSignalIcon={true}
                 iconType='globe'
                 itemId='top-apis-issues'
                 onRemoveComponent={removeComponent}
-                tooltipContent="APIs with the highest number of critical and high severity security issues"
-                columnHeaders={[mapLabel('APIs', dashboardCategory), 'Issues']}
+                tooltipContent="Hostnames with the highest number of critical and high severity security issues"
+                columnHeaders={['Hostnames', 'Issues']}
             />
         ),
         'top-requests-by-type': isArrayDataEmpty(topThreatsByCategory) ? (
@@ -1280,6 +1312,18 @@ const AgenticDashboard = () => {
                     >
                         Save Layout
                     </Button>
+                    {savedLayout != null && savedVisibleComponents != null && (
+                        JSON.stringify(savedLayout) !== JSON.stringify(defaultLayout) ||
+                        JSON.stringify(savedVisibleComponents) !== JSON.stringify(defaultVisibleComponents)
+                    ) && (
+                        <Button
+                            onClick={resetToDefaultLayout}
+                            disabled={isSaving}
+                            fullWidth
+                        >
+                            Reset to default
+                        </Button>
+                    )}
                     <ActionList
                         items={defaultVisibleComponents.map(itemId => ({
                             content: (
@@ -1311,8 +1355,8 @@ const AgenticDashboard = () => {
                             docsUrl="https://docs.akto.io/agentic-ai/agentic-dashboard"
                         />
                     }
-                    primaryAction={componentsMenu}
-                    secondaryActions={[<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />]}
+                    primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+                    secondaryActions={[componentsMenu]}
                     components={[
                         <div key="grid-container" ref={containerRef} style={{ width: '100%' }}>
                             {layoutLoading ? (

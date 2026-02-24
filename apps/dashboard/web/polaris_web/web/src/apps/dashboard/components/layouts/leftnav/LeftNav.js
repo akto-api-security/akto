@@ -11,7 +11,7 @@ import {
     MagicMinor
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
-
+import DropdownSearch from "../../shared/DropdownSearch";
 import "./LeftNav.css";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -110,12 +110,23 @@ export default function LeftNav() {
             {
                 label: (!func.checkLocal()) ? (
                     <Box paddingBlockEnd={"2"}>
-                        <Dropdown
-                            id={`select-account`}
-                            menuItems={accountOptions}
-                            initial={() => accounts[activeAccount]}
-                            selected={(type) => handleAccountChange(type)}
-                        />
+                        {accountOptions.length > 5 ? (
+                            <DropdownSearch
+                                id={`select-account`}
+                                optionsList={accountOptions}
+                                value={accounts[activeAccount]}
+                                preSelected={[`${activeAccount}`]}
+                                setSelected={(type) => handleAccountChange(type)}
+                                searchDisable={false}
+                            />
+                        ) : (
+                            <Dropdown
+                                id={`select-account`}
+                                menuItems={accountOptions}
+                                initial={() => accounts[activeAccount]}
+                                selected={(type) => handleAccountChange(type)}
+                            />
+                        )}
                     </Box>
 
                 ) : null
@@ -128,7 +139,7 @@ export default function LeftNav() {
                     navigate("/dashboard/agentic-dashboard");
                     setActive("normal");
                 },
-                selected: leftNavSelected === "dashboard_agentic_dashboard",
+                selected: leftNavSelected === "dashboard_agentic_dashboard" || currPathString === "dashboard_agentic_dashboard",
                 key: "1",
             }] : isAllowedDashboardUser && dashboardCategory === CATEGORY_API_SECURITY ? [{
                 label: "Dashboard",
@@ -137,7 +148,9 @@ export default function LeftNav() {
                     handleSelect("dashboard_api_dashboard");
                     navigate("/dashboard/view");
                     setActive("normal");
-                }
+                },
+                selected: leftNavSelected === "dashboard_api_dashboard" || currPathString === "dashboard_view",
+                key: "1",
             }] : isAllowedDashboardUser && dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
                 label: "Dashboard",
                 icon: ReportFilledMinor,
@@ -145,7 +158,9 @@ export default function LeftNav() {
                     handleSelect("dashboard_endpoint_security_dashboard");
                     navigate("/dashboard/endpoint-dashboard");
                     setActive("normal");
-                }
+                },
+                selected: leftNavSelected === "dashboard_endpoint_security_dashboard" || currPathString === "dashboard_endpoint_dashboard",
+                key: "1",
             }] : []),
             // ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
             //     label: "Endpoint Security Posture",
@@ -641,7 +656,7 @@ export default function LeftNav() {
         }
 
         return items
-    }, [dashboardCategory, leftNavSelected])
+    }, [dashboardCategory, leftNavSelected, currPathString])
 
     const navigationMarkup = (
         <div className={`${active} ${dashboardCategory === "Agentic Security" ? "agentic-security-nav" : ""}`}>

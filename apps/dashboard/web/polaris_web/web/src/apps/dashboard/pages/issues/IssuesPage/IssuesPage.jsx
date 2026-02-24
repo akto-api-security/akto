@@ -1028,6 +1028,7 @@ function IssuesPage() {
                 loading={loading || tableLoading}
                 hideQueryField={true}
                 isMultipleItemsSelected={true}
+                onExportCsv={() => exportCsv()}
             />
         </>
     )

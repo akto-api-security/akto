@@ -262,6 +262,26 @@ prettifyEpoch(epoch) {
     });
     saveAs(blob, (selectedTestRun.name || "file") + ".csv");
   },
+  extractCsvText(val) {
+    if (val == null) return '-'
+    if (typeof val === 'string' || typeof val === 'number') return String(val)
+    if (Array.isArray(val)) return val.filter(x => x != null).map(x => this.extractCsvText(x)).filter(x => x && x !== '-').join(', ') || '-'
+    if (typeof val === 'object' && val.props !== undefined) return this.extractCsvText(val.props.children ?? val.props.itemsArr ?? val.props.text)
+    if (typeof val === 'object') return Object.entries(val).map(([k, v]) => `${k}: ${v}`).join(', ')
+    return String(val)
+  },
+  exportTableAsCSV(headers, data, fileName) {
+    const cols = headers.filter(x => x.text?.length > 0)
+    const csv = [
+      cols.map(x => x.text).join(","),
+      ...data.map(row => cols.map(x => {
+        const val = row[x.textValue || x.value]
+        return `"${this.extractCsvText(val).replace(/"/g, '""')}"`
+      }).join(","))
+    ].join("\r\n")
+    saveAs(new Blob([csv], { type: "text/csv;charset=UTF-8" }), `${fileName}.csv`)
+    this.setToast(true, false, "CSV exported successfully")
+  },
   flattenObject(obj, prefix = '') {
     return obj && Object.keys(obj).reduce((acc, k) => {
 
@@ -1154,6 +1174,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
               lastTested: apiInfoMap[key] ? apiInfoMap[key]["lastTested"] : 0,
               isThreatEnabled: apiInfoMap[key] ? apiInfoMap[key]["threatScore"] > 0 : false,
+              agentProxyGuardrailEnabled: apiInfoMap[key] ? (apiInfoMap[key]["agentProxyGuardrailEnabled"] || false) : false,
           }
 
       }
@@ -2349,7 +2370,8 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
 
    isWhiteListedOrganization(){
       return window.USER_NAME.indexOf("@akto.io")>0 || window.USER_NAME.indexOf("@lab.morganstanley.com")>0
-       || window.USER_NAME.indexOf("@blinkrx.com")>0 || window.USER_NAME.indexOf("@testmuai.com")> 0 || window.USER_NAME.indexOf("@aktosecurity.com")>0 ;
+       || window.USER_NAME.indexOf("@blinkrx.com")>0 || window.USER_NAME.indexOf("@testmuai.com")> 0 || window.USER_NAME.indexOf("@aktosecurity.com")>0
+        || window.USER_NAME.indexOf("@razorpay.com")>0;
     },
 
     isTempAccount(){
@@ -2363,6 +2385,14 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
 
   isLimitedAccount(){
     return window?.ACTIVE_ACCOUNT === 1753372418
+  },
+
+  isModuleRestrictedOrg(){
+    const restrictedOrgIds = [
+      '11ea8bfd-0997-4bf9-9c4c-76f9640af7a2'
+    ];
+    const orgId = window?.STIGG_CUSTOMER_ID || '';
+    return restrictedOrgIds.includes(orgId);
   },
   /**
    * Validates if a string is a valid URL with http or https protocol
