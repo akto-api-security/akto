@@ -2418,6 +2418,8 @@ public class DbLayer {
 
         List<Bson> updateList = new ArrayList<>();
         updateList.add(Updates.set(McpAuditInfo.LAST_DETECTED, Context.now()));
+        updateList.add(Updates.setOnInsert(McpAuditInfo.TYPE, auditInfo.getType()));
+        updateList.add(Updates.setOnInsert(McpAuditInfo.RESOURCE_NAME, auditInfo.getResourceName()));
         ComponentRiskAnalysis componentRiskAnalysis = auditInfo.getComponentRiskAnalysis();
         if (componentRiskAnalysis != null) {
             updateList.add(Updates.set(McpAuditInfo.COMPONENT_RISK_ANALYSIS, componentRiskAnalysis));
@@ -2425,16 +2427,12 @@ public class DbLayer {
         if (auditInfo.getMcpHost() != null) {
             updateList.add(Updates.set(McpAuditInfo.MCP_HOST, auditInfo.getMcpHost()));
         }
-        // On insert (upsert), set all other fields from auditInfo
-        updateList.add(Updates.setOnInsert(McpAuditInfo.TYPE, auditInfo.getType()));
-        updateList.add(Updates.setOnInsert(McpAuditInfo.RESOURCE_NAME, auditInfo.getResourceName()));
-        updateList.add(Updates.setOnInsert(McpAuditInfo.REMARKS, auditInfo.getRemarks()));
-        updateList.add(Updates.setOnInsert(McpAuditInfo.API_ACCESS_TYPES, auditInfo.getApiAccessTypes()));
-        updateList.add(Updates.setOnInsert(McpAuditInfo.HOST_COLLECTION_ID, auditInfo.getHostCollectionId()));
-        updateList.add(Updates.setOnInsert(McpAuditInfo.MARKED_BY, auditInfo.getMarkedBy()));
-        updateList.add(Updates.setOnInsert(McpAuditInfo.UPDATED_TIMESTAMP, auditInfo.getUpdatedTimestamp()));
-        updateList.add(Updates.setOnInsert(McpAuditInfo.APPROVAL_CONDITIONS, auditInfo.getApprovalConditions()));
-        updateList.add(Updates.setOnInsert(McpAuditInfo.APPROVED_AT, auditInfo.getApprovedAt()));
+        if (auditInfo.getHostCollectionId() != 0) {
+            updateList.add(Updates.set(McpAuditInfo.HOST_COLLECTION_ID, auditInfo.getHostCollectionId()));
+        }
+        if (Context.contextSource.get() != null) {
+            updateList.add(Updates.set(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get()));
+        }
 
         Bson updates = Updates.combine(updateList.toArray(new Bson[0]));
         McpAuditInfoDao.instance.updateOne(filter, updates);
