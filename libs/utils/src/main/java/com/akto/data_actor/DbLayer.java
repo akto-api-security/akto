@@ -2514,11 +2514,7 @@ public class DbLayer {
         List<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.eq("type", componentType));
         filterList.add(Filters.eq("resourceName", componentName));
-        if (mcpHost != null) {
-            filterList.add(Filters.eq("mcpHost", mcpHost));
-        } else {
-            filterList.add(Filters.exists("mcpHost", false));
-        }
+        filterList.add(Filters.eq("mcpHost", mcpHost));
         Bson filter = Filters.and(filterList);
         Bson updates = Updates.combine(
                 Updates.set("componentRiskAnalysis", componentRiskAnalysis),
