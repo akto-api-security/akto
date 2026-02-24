@@ -17,6 +17,10 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.net.URL;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class McpRequestResponseUtilsTest {
 
@@ -376,9 +380,94 @@ public class McpRequestResponseUtilsTest {
         
         // Should return only 1 item (original tools/list request) when response is invalid
         Assertions.assertEquals(1, afterMcpList.size());
-        
+
         HttpResponseParams result = afterMcpList.get(0);
         URL finalUrl = new URL(result.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/list"));
+    }
+
+    // --- extractMcpHostFromResponseParams tests ---
+
+    private HttpResponseParams responseParamsWithUrlAndHeaders(String url, Map<String, List<String>> headers) {
+        HttpRequestParams reqParams = new HttpRequestParams();
+        reqParams.setUrl(url);
+        reqParams.setApiCollectionId(1);
+        if (headers != null) {
+            reqParams.setHeaders(headers);
+        }
+        HttpResponseParams responseParams = new HttpResponseParams();
+        responseParams.setRequestParams(reqParams);
+        return responseParams;
+    }
+
+    @Test
+    public void extractMcpHost_nullResponseParams_returnsNull() {
+        assertNull(McpRequestResponseUtils.extractMcpHostFromResponseParams(null));
+    }
+
+    @Test
+    public void extractMcpHost_nullRequestParams_returnsNull() {
+        HttpResponseParams responseParams = new HttpResponseParams();
+        responseParams.setRequestParams(null);
+        assertNull(McpRequestResponseUtils.extractMcpHostFromResponseParams(responseParams));
+    }
+
+    @Test
+    public void extractMcpHost_hostFromUrl_noTransport_returnsUrlHost() {
+        HttpResponseParams rp = responseParamsWithUrlAndHeaders("https://mcp.example.com/path", null);
+        assertEquals("mcp.example.com", McpRequestResponseUtils.extractMcpHostFromResponseParams(rp));
+    }
+
+    @Test
+    public void extractMcpHost_hostFromUrl_transportStdio_alwaysExtractsServiceName() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("x-transport", Collections.singletonList("STDIO"));
+        HttpResponseParams rp = responseParamsWithUrlAndHeaders("https://a.b.myservice.example.com/path", headers);
+        // STDIO: always extract service name (even when host came from URL)
+        assertEquals("myservice.example.com", McpRequestResponseUtils.extractMcpHostFromResponseParams(rp));
+    }
+
+    @Test
+    public void extractMcpHost_hostFromHostHeader_transportHttp_extractsServiceName() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Host", Collections.singletonList("a.b.myservice.example.com"));
+        headers.put("x-transport", Collections.singletonList("HTTP"));
+        // No host in URL so host comes from Host header (fromHost=true)
+        HttpResponseParams rp = responseParamsWithUrlAndHeaders("", headers);
+        assertEquals("myservice.example.com", McpRequestResponseUtils.extractMcpHostFromResponseParams(rp));
+    }
+
+    @Test
+    public void extractMcpHost_hostFromHostHeader_transportStdio_extractsServiceName() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Host", Collections.singletonList("x.y.servicename.domain"));
+        headers.put("x-transport", Collections.singletonList("STDIO"));
+        HttpResponseParams rp = responseParamsWithUrlAndHeaders("", headers);
+        assertEquals("servicename.domain", McpRequestResponseUtils.extractMcpHostFromResponseParams(rp));
+    }
+
+    @Test
+    public void extractMcpHost_hostFromHostHeader_fewerThanThreeParts_returnsHostAsIs() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Host", Collections.singletonList("a.b"));
+        headers.put("x-transport", Collections.singletonList("HTTP"));
+        HttpResponseParams rp = responseParamsWithUrlAndHeaders("", headers);
+        // extractServiceNameFromHost returns host when parts.length < 3
+        assertEquals("a.b", McpRequestResponseUtils.extractMcpHostFromResponseParams(rp));
+    }
+
+    @Test
+    public void extractMcpHost_hostFromHostHeader_transportOther_returnsHostAsIs() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Host", Collections.singletonList("a.b.myservice.com"));
+        headers.put("x-transport", Collections.singletonList("SSE"));
+        HttpResponseParams rp = responseParamsWithUrlAndHeaders("", headers);
+        assertEquals("a.b.myservice.com", McpRequestResponseUtils.extractMcpHostFromResponseParams(rp));
+    }
+
+    @Test
+    public void extractMcpHost_noHostInUrlNoHostHeader_returnsNull() {
+        HttpResponseParams rp = responseParamsWithUrlAndHeaders("", new HashMap<>());
+        assertNull(McpRequestResponseUtils.extractMcpHostFromResponseParams(rp));
     }
 }
