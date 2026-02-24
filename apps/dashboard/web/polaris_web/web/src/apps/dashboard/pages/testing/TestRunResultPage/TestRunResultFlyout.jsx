@@ -5,8 +5,8 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, ActionList } from '@shopify/polaris'
-import { EditMinor } from '@shopify/polaris-icons'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, Tooltip, VerticalStack, Link, ActionList } from '@shopify/polaris'
+import { EditMinor, FileMinor } from '@shopify/polaris-icons'
 import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
@@ -28,6 +28,7 @@ import ForbiddenRole from '../../../components/shared/ForbiddenRole'
 import LegendLabel from './LegendLabel.jsx'
 import TestRunResultChat from './TestRunResultChat.jsx'
 import AskAktoSection from './AskAktoSection.jsx'
+import PersistStore from '../../../../main/PersistStore'
 
 function TestRunResultFlyout(props) {
 
@@ -78,6 +79,8 @@ function TestRunResultFlyout(props) {
         noTimeToFix: false,
         acceptableFix: false
     })
+
+    const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
 
     const fetchRemediationInfo = useCallback(async (testId) => {
         if (testId && testId.length > 0) {
@@ -409,6 +412,18 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
+    const openUrlInTestEditor = () => {
+        const apiInfoKey = issueDetails?.id?.apiInfoKey
+        if (!apiInfoKey) return
+        setSelectedSampleApi({
+            apiCollectionId: apiInfoKey.apiCollectionId,
+            url: apiInfoKey.url,
+            method: { "_name": apiInfoKey.method }
+        })
+        const navUrl = window.location.origin + "/dashboard/test-editor/" + selectedTestRunResult.testCategoryId
+        window.open(navUrl, "_blank")
+    }
+
     const categoryKey = selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] || selectedTestRunResult?.testCategory;
     const owaspData = func.categoryMapping[categoryKey] || {};
     const owaspMapping = owaspData.label || "";
@@ -544,6 +559,11 @@ function TestRunResultFlyout(props) {
                     <ApiGroups collectionIds={apiInfo?.collectionIds} />
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
+                    {issueDetails?.id?.apiInfoKey && (
+                        <Tooltip content="Open URL in test editor" dismissOnMouseOut>
+                            <Button monochrome onClick={openUrlInTestEditor} icon={FileMinor} />
+                        </Tooltip>
+                    )}
                     <ActionsComp />
 
                     {selectedTestRunResult && selectedTestRunResult.vulnerable &&
