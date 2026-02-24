@@ -1,10 +1,13 @@
-package com.akto.utility;
+package com.akto.agent;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 
 import lombok.Getter;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -24,6 +27,8 @@ public class ApiExecutionJobStore {
         @Getter
         private final Status status;
         @Getter
+        private final OriginalHttpRequest request;
+        @Getter
         private final OriginalHttpResponse response;
         @Getter
         private final String errorMessage;
@@ -32,8 +37,9 @@ public class ApiExecutionJobStore {
         @Getter
         private final String conversationId;
 
-        public JobEntry(Status status, OriginalHttpResponse response, String errorMessage, long createdAtMs, String conversationId) {
+        public JobEntry(Status status, OriginalHttpRequest request, OriginalHttpResponse response, String errorMessage, long createdAtMs, String conversationId) {
             this.status = status;
+            this.request = request;
             this.response = response;
             this.errorMessage = errorMessage;
             this.createdAtMs = createdAtMs;
@@ -41,22 +47,23 @@ public class ApiExecutionJobStore {
         }
 
         public static JobEntry pending(String conversationId) {
-            return new JobEntry(Status.PENDING, null, null, Context.epochInMillis(), conversationId);
+            return new JobEntry(Status.PENDING, null, null, null, Context.epochInMillis(), conversationId);
         }
 
-        public static JobEntry completed(OriginalHttpResponse response, String conversationId) {
-            return new JobEntry(Status.COMPLETED, response, null, Context.epochInMillis(), conversationId);
+        public static JobEntry completed(OriginalHttpResponse response, String conversationId, OriginalHttpRequest request) {
+            return new JobEntry(Status.COMPLETED, request, response, null, Context.epochInMillis(), conversationId);
         }
 
-        public static JobEntry failed(String errorMessage, String conversationId) {
-            return new JobEntry(Status.FAILED, null, errorMessage, Context.epochInMillis(), conversationId);
+        public static JobEntry failed(String errorMessage, String conversationId, OriginalHttpRequest request) {
+            return new JobEntry(Status.FAILED, request, null, errorMessage, Context.epochInMillis(), conversationId);
         }
     }
 
     private static final int DEFAULT_MAX_SIZE = 10_000;
-    private static final long DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
+    private static final long DEFAULT_TTL_MS = 60 * 60 * 1000;
 
     private final Map<String, JobEntry> store = new ConcurrentHashMap<>();
+    private final Map<String, List<String>> conversationToJobIds = new ConcurrentHashMap<>();
     private final int maxSize;
     private final long ttlMs;
 
@@ -69,14 +76,15 @@ public class ApiExecutionJobStore {
         this.ttlMs = ttlMs > 0 ? ttlMs : DEFAULT_TTL_MS;
     }
 
-    /**
-     * Put a new pending job. If at capacity, evicts oldest entry.
-     */
     public void put(String jobId, JobEntry entry) {
         if (store.size() >= maxSize) {
             evictOldest();
         }
         store.put(jobId, entry);
+        String cid = entry.getConversationId();
+        if (cid != null && !cid.isEmpty()) {
+            conversationToJobIds.computeIfAbsent(cid, k -> new ArrayList<>()).add(jobId);
+        }
     }
 
     public JobEntry get(String jobId) {
@@ -99,6 +107,11 @@ public class ApiExecutionJobStore {
         store.remove(jobId);
     }
 
+    public List<String> getJobIdsByConversationId(String conversationId) {
+        List<String> list = conversationToJobIds.get(conversationId);
+        return list != null ? new ArrayList<>(list) : new ArrayList<>();
+    }
+
     private void evictOldest() {
         String oldestKey = null;
         long oldestMs = Long.MAX_VALUE;
@@ -114,4 +127,3 @@ public class ApiExecutionJobStore {
         }
     }
 }
-
