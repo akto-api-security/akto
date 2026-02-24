@@ -619,8 +619,8 @@ public class DbAction extends ActionSupport {
                 if (DataInsertionPreChecks.shouldSkipUrl(accountId, id.getUrl(), 0)) {
                     continue;
                 }
-                
-                if (UsageMetricCalculator.getDeactivated().contains(id.getApiCollectionId())) {
+
+                if (accountId != 1736798101 && UsageMetricCalculator.getDeactivated().contains(id.getApiCollectionId())) {
                     continue;
                 }
                 if (id.getApiCollectionId() == 0) {
@@ -909,7 +909,7 @@ public class DbAction extends ActionSupport {
                     String apiCollectionIdStr = mObj.get("apiCollectionId").toString();
                     int apiCollectionId = Integer.valueOf(apiCollectionIdStr);
 
-                    if(UsageMetricCalculator.getDeactivated().contains(apiCollectionId)){
+                    if(accId != 1736798101 && UsageMetricCalculator.getDeactivated().contains(apiCollectionId)){
                         continue;
                     }
 
@@ -1015,7 +1015,7 @@ public class DbAction extends ActionSupport {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
                             apiCollectionId = val;
-                            if(UsageMetricCalculator.getDeactivated().contains(apiCollectionId)){
+                            if(accId != 1736798101 && UsageMetricCalculator.getDeactivated().contains(apiCollectionId)){
                                 ignore = true;
                                 break;
                             }

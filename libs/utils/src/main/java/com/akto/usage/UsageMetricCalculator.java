@@ -52,7 +52,7 @@ public class UsageMetricCalculator {
      * to handle multiple accounts using static maps.
      */
     private static Map<Integer, Integer> lastDeactivatedFetchedMap = new HashMap<>();
-    private static final int REFRESH_INTERVAL = 60 * 2; // 2 minutes.
+    private static final int REFRESH_INTERVAL = 60 * 60 * 48; // 2 days.
     private static Map<Integer, Set<Integer>> deactivatedCollectionsMap = new HashMap<>();
 
     public static Set<Integer> getDeactivated() {
