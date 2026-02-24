@@ -824,6 +824,13 @@ const settingRequests = {
             data: {}
         })
     },
+    async resetCollectionAccessTypes() {
+        return await request({
+            url: '/api/resetCollectionAccessTypes',
+            method: 'post',
+            data: {}
+        })
+    },
     getAllowedFeaturesForRBAC() {
         return request({
             url: '/api/allowedFeaturesForRBAC',
