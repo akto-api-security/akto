@@ -69,6 +69,7 @@ public class ClientActor extends DataActor {
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     public static final String CYBORG_URL = "https://cyborg.akto.io";
+    public static final String ULTRON_URL = "https://ultron.akto.io";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
         
     /**
@@ -83,9 +84,20 @@ public class ClientActor extends DataActor {
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
 
     public static String buildDbAbstractorUrl() {
-        String dbAbsHost = CYBORG_URL;
-        if (checkAccount()) {
-            dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        String dbAbsHost = ULTRON_URL;
+        String dbAbsHostFromEnv = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        boolean isHighTrafficAccount = checkAccountHighTraffic();
+        String overrideDbAbsHost = System.getenv("OVERRIDE_DATABASE_ABSTRACTOR_SERVICE_URL");
+        boolean useOverrideDbAbsHost = overrideDbAbsHost != null && !overrideDbAbsHost.isEmpty() && overrideDbAbsHost.equalsIgnoreCase("true");
+        if (isHighTrafficAccount) {
+            dbAbsHost = CYBORG_URL;
+        } else if (checkAccount() || (useOverrideDbAbsHost && dbAbsHostFromEnv != null
+                && !dbAbsHostFromEnv.isEmpty()
+                && (CYBORG_URL.equals(dbAbsHostFromEnv) || ULTRON_URL.equals(dbAbsHostFromEnv)))) {
+            dbAbsHost = dbAbsHostFromEnv;
+        }
+        if (dbAbsHost == null || dbAbsHost.isEmpty()) {
+            dbAbsHost = ULTRON_URL;
         }
         loggerMaker.warn("dbHost value " + dbAbsHost);
         if (dbAbsHost.endsWith("/")) {
@@ -3540,6 +3552,10 @@ public class ClientActor extends DataActor {
     }
 
     public static boolean checkAccount() {
+        return checkAccount(Arrays.asList(1000000, 1752722331));
+    }
+
+    public static boolean checkAccount(List<Integer> allowedAccountIds) {
         try {
             String token = getAuthToken();
             DecodedJWT jwt = JWT.decode(token);
@@ -3550,11 +3566,15 @@ public class ClientActor extends DataActor {
             BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
             int accId = (int) basicDBObject.getInt("accountId");
             loggerMaker.warn("checkAccount accountId log " + accId);
-            return accId == 1000000 || accId == 1752722331;
+            return allowedAccountIds.contains(accId);
         } catch (Exception e) {
             loggerMaker.error("checkAccount error" + e.getStackTrace());
         }
         return false;
+    }
+
+    public static boolean checkAccountHighTraffic() {
+        return checkAccount(Arrays.asList(1718042191, 1736798101));
     }
 
     public List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {

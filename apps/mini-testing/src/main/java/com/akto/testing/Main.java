@@ -97,6 +97,15 @@ public class Main {
                         return;
                     }
 
+                    String miniTestingName = testingRunPlayground.getMiniTestingName();
+                    if (miniTestingName == null || miniTestingName.isEmpty()) {
+                        miniTestingName = customMiniTestingServiceName;
+                    }
+
+                    if (!miniTestingName.equals(customMiniTestingServiceName)) {
+                        return;
+                    }
+
                     switch (testingRunPlayground.getTestingRunPlaygroundType()) {
                         case TEST_EDITOR_PLAYGROUND:
                             handleTestEditorPlayground(testingRunPlayground);
@@ -164,7 +173,7 @@ public class Main {
 
         TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
         String message = messageStore.getSampleDataMap().get(infoKey).get(messageStore.getSampleDataMap().get(infoKey).size() - 1);
-        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs, message);
+        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunPlayground.getTestingRunConfig(), true, testLogs, message);
 
         GenericTestResult testRes = testingRunResult.getTestResults().get(0);
         if (testRes instanceof TestResult) {
