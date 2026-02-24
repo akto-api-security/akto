@@ -2,6 +2,8 @@ package com.akto.test_editor;
 
 import com.akto.dto.RawApi;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import org.junit.Test;
 import java.util.*;
 import static org.junit.Assert.*;
@@ -60,5 +62,34 @@ public class UtilsTest {
 
         String actual = Utils.buildResponseIHttpFormat(rawApi).trim();
         assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testModifyBodyParamWithSelfValue() {
+        OriginalHttpRequest req = new OriginalHttpRequest();
+        req.setMethod("POST");
+        req.setUrl("https://example.com/login");
+        req.setHeaders(new HashMap<>());
+        req.setBody("{\"email\":\"victim@gmail.com\",\"password\":\"victim123\"}");
+
+        OriginalHttpResponse resp = new OriginalHttpResponse();
+        resp.setBody("{}");
+        resp.setHeaders(new HashMap<>());
+        resp.setStatusCode(200);
+
+        RawApi rawApi = new RawApi(req, resp, "");
+        ExecutorSingleOperationResp opResp = Utils.modifySampleDataUtil(
+                "modify_body_param",
+                rawApi,
+                "email",
+                "${self}hello",
+                new HashMap<>(),
+                null,
+                false
+        );
+
+        assertTrue(opResp.getSuccess());
+        assertTrue(rawApi.getRequest().getBody().contains("\"email\": \"victim@gmail.comhello\""));
+        assertTrue(rawApi.getRequest().getBody().contains("\"password\": \"victim123\""));
     }
 }
