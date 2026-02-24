@@ -202,7 +202,6 @@ headers.push({
 })
 
 
-// Column index offset for sort options. With Component Risk Analysis column (Endpoint Security), column count matches API Security (Issues column), so no offset.
 const columnOffset = 0;
 
 const sortOptions = [
@@ -497,6 +496,7 @@ function ApiEndpoints(props) {
             if (!isEndpointSecurityCategory() || !resourceNameToRiskMap.size) return null;
             return <ComponentRiskAnalysisBadges componentRiskAnalysis={getRiskAnalysisForEndpoint(endpointUrl, resourceNameToRiskMap)} />;
         };
+
         const riskCompByEndpoint = new Map();
         const setRiskCompIfMissing = (item) => {
             if (item?.endpoint && !riskCompByEndpoint.has(item.endpoint)) {
