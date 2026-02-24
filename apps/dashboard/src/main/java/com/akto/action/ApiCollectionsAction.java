@@ -64,7 +64,6 @@ import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
-import com.akto.cache.IconCache;
 import com.akto.utils.scripts.AcesssTypeCollectionLevel;
 import com.akto.dao.ApiCollectionIconsDao;
 import com.akto.dto.ApiCollectionIcon;
