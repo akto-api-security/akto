@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Box, VerticalStack, HorizontalStack, Text, Badge, Modal } from '@shopify/polaris';
+import { Box, VerticalStack, HorizontalStack, Text, Badge, Modal, Button } from '@shopify/polaris';
 import { ExternalMinor } from '@shopify/polaris-icons';
 import MarkdownViewer from '../../../../components/shared/MarkdownViewer';
 import SampleData from '../../../../components/shared/SampleData';
@@ -83,9 +83,12 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                             <HorizontalStack gap="1" blockAlign="center">
                                 <Text variant="bodySm" color="subdued">{formattedTime}</Text>
                                 {prettyJson && (
-                                    <span onClick={() => setExpanded(true)} title="Expand" style={{ cursor: 'pointer', display: 'flex', color: '#6d7175' }}>
-                                        <ExternalMinor width={16} height={16} />
-                                    </span>
+                                    <Button
+                                        plain
+                                        icon={ExternalMinor}
+                                        onClick={() => setExpanded(true)}
+                                        accessibilityLabel="Expand JSON"
+                                    />
                                 )}
                             </HorizontalStack>
                         </HorizontalStack>
@@ -125,7 +128,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
             {prettyJson && expanded && (
                 <Modal open onClose={() => setExpanded(false)} title={label} large>
                     <Modal.Section>
-                        <SampleData key={content + '_modal'} data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="600px" />
+                        <SampleData key="modal" data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="600px" />
                     </Modal.Section>
                 </Modal>
             )}
