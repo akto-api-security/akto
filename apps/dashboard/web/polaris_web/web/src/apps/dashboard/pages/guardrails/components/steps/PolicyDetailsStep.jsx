@@ -1,4 +1,5 @@
-import { VerticalStack, Text, FormLayout, TextField, Checkbox } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, TextField, Checkbox, Select } from "@shopify/polaris";
+import { SEVERITY_OPTIONS } from "../../utils";
 
 // Step metadata
 export const PolicyDetailsConfig = {
@@ -29,7 +30,9 @@ const PolicyDetailsStep = ({
     blockedMessage,
     setBlockedMessage,
     applyToResponses,
-    setApplyToResponses
+    setApplyToResponses,
+    severity,
+    setSeverity
 }) => {
     return (
         <VerticalStack gap="4">
@@ -49,6 +52,13 @@ const PolicyDetailsStep = ({
                     multiline={3}
                     placeholder="This guardrail blocks toxic content, assistance related to - investment, insurance, medical and programming."
                     helpText="The description can have up to 200 characters."
+                />
+                <Select
+                    label="Severity"
+                    options={SEVERITY_OPTIONS}
+                    value={severity}
+                    onChange={setSeverity}
+                    helpText="Select the severity level for this guardrail policy."
                 />
                 <TextField
                     label="Messaging for blocked prompts"
