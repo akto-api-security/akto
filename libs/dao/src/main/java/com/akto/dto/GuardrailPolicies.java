@@ -79,6 +79,8 @@ public class GuardrailPolicies {
 
     private CONTEXT_SOURCE contextSource;
 
+    private SecretsDetection secretsDetection;
+
     public String getHexId() {
         if (this.id != null) {
             return this.id.toHexString();
@@ -269,6 +271,19 @@ public class GuardrailPolicies {
         public TokenLimit(boolean enabled, int threshold) {
             this.enabled = enabled;
             this.threshold = threshold;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class SecretsDetection {
+        private boolean enabled;
+        private double confidenceScore;
+
+        public SecretsDetection(boolean enabled, double confidenceScore) {
+            this.enabled = enabled;
+            this.confidenceScore = confidenceScore;
         }
     }
 }

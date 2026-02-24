@@ -1957,6 +1957,17 @@
             </result>
         </action>
 
+        <action name="api/updateMcpAuditInfo" class="com.akto.action.DbAction" method="updateMcpAuditInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/deleteTestRunResultSummary" class="com.akto.action.DbAction" method="deleteTestRunResultSummary">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

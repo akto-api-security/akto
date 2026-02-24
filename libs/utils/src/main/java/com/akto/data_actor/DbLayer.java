@@ -39,6 +39,7 @@ import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -2405,25 +2406,38 @@ public class DbLayer {
     }
 
     public static void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
+        List<Bson> filterList = new ArrayList<>();
+        filterList.add(Filters.eq(McpAuditInfo.TYPE, auditInfo.getType()));
+        filterList.add(Filters.eq(McpAuditInfo.RESOURCE_NAME, auditInfo.getResourceName()));
+        if (auditInfo.getMcpHost() != null) {
+            filterList.add(Filters.eq(McpAuditInfo.MCP_HOST, auditInfo.getMcpHost()));
+        } else {
+            filterList.add(Filters.exists(McpAuditInfo.MCP_HOST, false));
+        }
+        Bson filter = Filters.and(filterList);
 
-            // Check if record with same type, resourceName, and hostCollectionId already exists
-            BasicDBObject findQuery = new BasicDBObject();
-            findQuery.put("type", auditInfo.getType());
-            findQuery.put("resourceName", auditInfo.getResourceName());
-            //findQuery.put("hostCollectionId", auditInfo.getHostCollectionId());
+        List<Bson> updateList = new ArrayList<>();
+        updateList.add(Updates.set(McpAuditInfo.LAST_DETECTED, Context.now()));
+        ComponentRiskAnalysis componentRiskAnalysis = auditInfo.getComponentRiskAnalysis();
+        if (componentRiskAnalysis != null) {
+            updateList.add(Updates.set(McpAuditInfo.COMPONENT_RISK_ANALYSIS, componentRiskAnalysis));
+        }
+        if (auditInfo.getMcpHost() != null) {
+            updateList.add(Updates.set(McpAuditInfo.MCP_HOST, auditInfo.getMcpHost()));
+        }
+        // On insert (upsert), set all other fields from auditInfo
+        updateList.add(Updates.setOnInsert(McpAuditInfo.TYPE, auditInfo.getType()));
+        updateList.add(Updates.setOnInsert(McpAuditInfo.RESOURCE_NAME, auditInfo.getResourceName()));
+        updateList.add(Updates.setOnInsert(McpAuditInfo.REMARKS, auditInfo.getRemarks()));
+        updateList.add(Updates.setOnInsert(McpAuditInfo.API_ACCESS_TYPES, auditInfo.getApiAccessTypes()));
+        updateList.add(Updates.setOnInsert(McpAuditInfo.HOST_COLLECTION_ID, auditInfo.getHostCollectionId()));
+        updateList.add(Updates.setOnInsert(McpAuditInfo.MARKED_BY, auditInfo.getMarkedBy()));
+        updateList.add(Updates.setOnInsert(McpAuditInfo.UPDATED_TIMESTAMP, auditInfo.getUpdatedTimestamp()));
+        updateList.add(Updates.setOnInsert(McpAuditInfo.APPROVAL_CONDITIONS, auditInfo.getApprovalConditions()));
+        updateList.add(Updates.setOnInsert(McpAuditInfo.APPROVED_AT, auditInfo.getApprovedAt()));
 
-            McpAuditInfo existingRecord = McpAuditInfoDao.instance.findOne(findQuery);
-
-            if (existingRecord != null) {
-                // Update the existing record with new lastDetected timestamp
-                BasicDBObject update = new BasicDBObject();
-                update.put(MCollection.SET, new BasicDBObject("lastDetected", Context.now()));
-                McpAuditInfoDao.instance.updateOne(findQuery, update);
-            } else {
-                // Insert new record
-                McpAuditInfoDao.instance.insertOne(auditInfo);
-            }
-
+        Bson updates = Updates.combine(updateList.toArray(new Bson[0]));
+        McpAuditInfoDao.instance.updateOne(filter, updates);
     }
 
     public static List<SlackWebhook> fetchSlackWebhooks() {
@@ -2520,6 +2534,22 @@ public class DbLayer {
             loggerMaker.errorAndAddToDb(e, "Error in fetchMcpAuditInfo: " + e.getMessage());
             return new ArrayList<>();
         }
+    }
+
+    public static void updateMcpAuditInfo(String componentType, String componentName, String mcpHost, ComponentRiskAnalysis componentRiskAnalysis) {
+        if (componentType == null || componentName == null || componentRiskAnalysis == null || mcpHost == null) {
+            return;
+        }
+        Bson filter = Filters.and(
+                Filters.eq(McpAuditInfo.TYPE, componentType),
+                Filters.eq(McpAuditInfo.RESOURCE_NAME, componentName),
+                Filters.eq(McpAuditInfo.MCP_HOST, mcpHost)
+        );
+        List<Bson> updateList = new ArrayList<>();
+        updateList.add(Updates.set(McpAuditInfo.COMPONENT_RISK_ANALYSIS, componentRiskAnalysis));
+        updateList.add(Updates.set(McpAuditInfo.UPDATED_TIMESTAMP, Context.now()));
+        Bson updates = Updates.combine(updateList.toArray(new Bson[0]));
+        McpAuditInfoDao.instance.updateOneNoUpsert(filter, updates);
     }
 
     public static List<GuardrailPolicies> fetchGuardrailPolicies(Integer updatedAfter, CONTEXT_SOURCE contextSource) {
