@@ -49,11 +49,18 @@ const threatDetectionRequests = {
             }
         })
     },
-    fetchFiltersThreatTable() {
+    fetchFiltersThreatTable(startTimestamp, endTimestamp) {
+        const data = {};
+        if (startTimestamp !== undefined && startTimestamp !== null && startTimestamp > 0) {
+            data.startTimestamp = startTimestamp;
+        }
+        if (endTimestamp !== undefined && endTimestamp !== null && endTimestamp > 0) {
+            data.endTimestamp = endTimestamp;
+        }
         return request({
             url: '/api/fetchFiltersThreatTable',
             method: 'post',
-            data: {}
+            data: data
         })
     },
     fetchThreatActors(skip, sort, latestAttack, country, startTs, endTs, actorId, host, cursor) {

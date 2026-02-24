@@ -103,12 +103,20 @@ public class DashboardRouter implements ARouter {
         Router router = Router.router(vertx);
 
         router
-            .get("/fetch_filters")
+            .post("/fetch_filters")
             .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                FetchAlertFiltersRequest req = ProtoMessageUtils.<
+                    FetchAlertFiltersRequest
+                >toProtoMessage(
+                    FetchAlertFiltersRequest.class,
+                    reqBody.asString()
+                ).orElse(FetchAlertFiltersRequest.newBuilder().build());
+
                 ProtoMessageUtils.toString(
                     dsService.fetchAlertFilters(
                         ctx.get("accountId"),
-                        FetchAlertFiltersRequest.newBuilder().build()
+                        req
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
