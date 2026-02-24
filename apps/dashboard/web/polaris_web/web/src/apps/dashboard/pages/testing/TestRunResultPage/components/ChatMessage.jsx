@@ -7,6 +7,32 @@ import SampleData from '../../../../components/shared/SampleData';
 import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES, VULNERABILITY_BADGE } from './chatConstants';
 import func from "@/util/func";
 
+// This is done for Hybrid messages -> Markdown + JSON 
+function extractPrettyJson(content) {
+    try {
+        return {
+            prettyJson: JSON.stringify(JSON.parse(content), null, 2),
+            prefix: null,
+        };
+    } catch {}
+
+    const start = content.indexOf('{');
+    const end = content.lastIndexOf('}');
+    if (start === -1 || end <= start) {
+        return { prettyJson: null, prefix: null };
+    }
+
+    try {
+        const embeddedJson = content.slice(start, end + 1);
+        return {
+            prettyJson: JSON.stringify(JSON.parse(embeddedJson), null, 2),
+            prefix: content.slice(0, start).trim() || null,
+        };
+    } catch {
+        return { prettyJson: null, prefix: null };
+    }
+}
+
 function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode }) {
     const isRequest = type === MESSAGE_TYPES.REQUEST;
 
@@ -24,10 +50,12 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
     const shouldRenderAsCode = isCode !== undefined ? isCode : isRequest;
 
     const [expanded, setExpanded] = useState(false);
-    let prettyJson = null;
-    if (!shouldRenderAsCode) {
-        try { prettyJson = JSON.stringify(JSON.parse(content), null, 2); } catch {}
-    }
+    const { prettyJson, prefix } = useMemo(() => {
+        if (shouldRenderAsCode) {
+            return { prettyJson: null, prefix: null };
+        }
+        return extractPrettyJson(content);
+    }, [shouldRenderAsCode, content]);
 
     return (
         <Box padding="3">
@@ -76,7 +104,10 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                 </Box>
                             </Box>
                         ) : prettyJson ? (
-                            <SampleData key={content} data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="200px" />
+                            <VerticalStack gap="2">
+                                {prefix && <MarkdownViewer markdown={prefix} />}
+                                <SampleData key={content} data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="200px" />
+                            </VerticalStack>
                         ) : (
                             <MarkdownViewer markdown={content} />
                         )}
