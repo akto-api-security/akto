@@ -889,7 +889,7 @@ public class DbLayer {
         return tags;
     }
 
-    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
+    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
 
@@ -908,9 +908,17 @@ public class DbLayer {
             }
         }
 
+        boolean accessTypeChanged = false;
+        if (apiCollection != null && accessType != null) {
+            String existingAccessType = apiCollection.getAccessType();
+            if (!accessType.equals(existingAccessType)) {
+                accessTypeChanged = true;
+            }
+        }
+
         // Skip update for existing apiCollection if vpc and tags are same.
-        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty())) {
-            loggerMaker.info("No new tags or vpcId, Updates skipped for collectionId: " + vxlanId);
+        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty()) && !accessTypeChanged) {
+            loggerMaker.info("No new tags or vpcId or accessType, Updates skipped for collectionId: " + vxlanId);
             return;
         }
 
@@ -927,6 +935,10 @@ public class DbLayer {
         if (tags != null && !tags.isEmpty()) {
             // Update the entire tagsList
             update = Updates.combine(update, Updates.set(ApiCollection.TAGS_STRING, getFilteredTags(apiCollection, tags)));
+        }
+
+        if(accessType != null && !accessType.isEmpty()) {
+            update = Updates.combine(update, Updates.set(ApiCollection.ACCESS_TYPE, accessType));
         }
 
         ApiCollectionsDao.instance.getMCollection().updateOne(
@@ -950,7 +962,7 @@ public class DbLayer {
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
 
-    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags) {
+    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags, String accessType) {
 
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -967,9 +979,17 @@ public class DbLayer {
             }
         }
 
+        boolean accessTypeChanged = false;
+        if (apiCollection != null && accessType != null) {
+            String existingAccessType = apiCollection.getAccessType();
+            if (!accessType.equals(existingAccessType)) {
+                accessTypeChanged = true;
+            }
+        }
+
         // Skip update for existing apiCollection if vpc and tags are same.
-        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty())) {
-            loggerMaker.info("No new tags or vpcId, Updates skipped for collectionId: " + id);
+        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty()) && !accessTypeChanged) {
+            loggerMaker.info("No new tags or vpcId or accessType, Updates skipped for collectionId: " + id);
             return;
         }
 
@@ -986,6 +1006,10 @@ public class DbLayer {
 
         if(tags != null && !tags.isEmpty()) {
             updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, getFilteredTags(apiCollection, tags)));
+        }
+
+        if(accessType != null && !accessType.isEmpty()) {
+            updates = Updates.combine(updates, Updates.set(ApiCollection.ACCESS_TYPE, accessType));
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
@@ -1016,7 +1040,7 @@ public class DbLayer {
     }
 
     // Similar to createCollectionForHostAndVpc but for service-tag based collections
-    public static void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName) {
+    public static void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType) {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
 
@@ -1034,6 +1058,10 @@ public class DbLayer {
 
         if(tags != null && !tags.isEmpty()) {
             updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, tags));
+        }
+
+        if(accessType != null && !accessType.isEmpty()) {
+            updates = Updates.combine(updates, Updates.set(ApiCollection.ACCESS_TYPE, accessType));
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(

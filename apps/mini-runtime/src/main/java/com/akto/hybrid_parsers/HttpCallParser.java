@@ -123,7 +123,7 @@ public class HttpCallParser {
     }
 
     public int createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
-        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
+        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId, tags, null);
         return vxlanId;
     }
 
@@ -140,7 +140,7 @@ public class HttpCallParser {
         for (int i=0;i < 100; i++) {
             id += i;
             try {
-                dataActor.createCollectionForHostAndVpc(host, id, vpcId, tags);
+                dataActor.createCollectionForHostAndVpc(host, id, vpcId, tags, null);
                 flag = true;
                 break;
             } catch (Exception e) {
