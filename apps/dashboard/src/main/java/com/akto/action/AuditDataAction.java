@@ -11,6 +11,7 @@ import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -19,6 +20,8 @@ import com.mongodb.client.model.Updates;
 
 import lombok.Getter;
 import lombok.Setter;
+
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -59,6 +62,12 @@ public class AuditDataAction extends UserAction {
 
     public String fetchMcpAuditInfoByCollection() {
         mcpAuditInfoList = new ArrayList<>();
+
+        if (Context.contextSource.get() != null && Context.contextSource.get() != CONTEXT_SOURCE.ENDPOINT)  {
+            mcpAuditInfoList = Collections.emptyList();
+            return SUCCESS.toUpperCase();
+        }
+
         try {
             if (apiCollectionId == -1) {
                 addActionError("API Collection ID cannot be -1");
@@ -73,15 +82,12 @@ public class AuditDataAction extends UserAction {
                 return ERROR.toUpperCase();
             }
             String mcpName = McpRequestResponseUtils.extractServiceNameFromHost(apiCollection.getHostName());
-            if (mcpName == null || mcpName.isEmpty()) {
-                loggerMaker.errorAndAddToDb("MCP name is null or empty for collection: " + apiCollection.getHostName() + " id: " + apiCollectionId, LogDb.DASHBOARD);
+            if (StringUtils.isBlank(mcpName)) {
+                loggerMaker.errorAndAddToDb("MCP server name is null or empty for collection: " + apiCollection.getHostName() + " id: " + apiCollectionId, LogDb.DASHBOARD);
                 return SUCCESS.toUpperCase();
             }
-            Bson filter = Filters.eq("mcpHost", mcpName);
-            mcpAuditInfoList = McpAuditInfoDao.instance.findAll(filter, 0, 10_000, null);
-            if (mcpAuditInfoList == null) {
-                mcpAuditInfoList = Collections.emptyList();
-            }
+            Bson filter = Filters.eq(McpAuditInfo.MCP_HOST, mcpName);
+            mcpAuditInfoList = McpAuditInfoDao.instance.findAll(filter, 0, 1_000, null);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching McpAuditInfo by collection: " + e.getMessage(), LogDb.DASHBOARD);

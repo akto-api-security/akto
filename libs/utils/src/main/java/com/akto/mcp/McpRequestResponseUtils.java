@@ -464,7 +464,7 @@ public final class McpRequestResponseUtils {
     }
 
     public static String extractServiceNameFromHost(String host) {
-        if (host == null || host.isEmpty()) {
+        if (StringUtils.isBlank(host)) {
             return null;
         }
         String[] parts = host.split("\\.");

@@ -50,7 +50,7 @@ public class McpAuditInfoDao extends AccountsContextDao<McpAuditInfo> {
         fieldNames = new String[]{"updatedTimestamp"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
-        fieldNames = new String[]{"mcpHost"};
+        fieldNames = new String[]{McpAuditInfo.MCP_HOST};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
