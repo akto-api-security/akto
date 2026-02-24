@@ -11,6 +11,7 @@ import ServersLayout from './atlusPosture/ServersLayout'
 import AttackWorldMap from './atlusPosture/AttackWorldMap'
 import ComplianceAtRisksCard from './new_components/ComplianceAtRisksCard'
 import ThreatCategoryStackedChartWrapper from './atlusPosture/ThreatCategoryStackedChartWrapper'
+import { formatName } from './atlusPosture/ThreatCategoryChart'
 import CustomLineChart from './new_components/CustomLineChart'
 import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent'
 import dashboardApi from './api'
@@ -319,15 +320,6 @@ function EndpointPosture() {
                 // Define colors for top 3 categories
                 const categoryColors = ['#3b82f6', '#ef4444', '#10b981']
 
-                // Helper function to format category names
-                const formatCategoryName = (category) => {
-                    if (!category) return 'Unknown'
-                    return category
-                        .replace(/_/g, ' ')
-                        .toLowerCase()
-                        .replace(/\b\w/g, l => l.toUpperCase())
-                }
-
                 // Convert dynamic category keys to chart data (support both { data, filterId } and legacy array format)
                 const trendsChartData = Object.keys(dataProtectionTrends).map((category, index) => {
                     const raw = dataProtectionTrends[category]
@@ -335,7 +327,7 @@ function EndpointPosture() {
                     const data = isObj ? (raw.data || []) : (raw || [])
                     const filterId = isObj ? raw.filterId : null
                     return {
-                        name: formatCategoryName(category),
+                        name: formatName(category),
                         color: categoryColors[index] || '#9ca3af',
                         data,
                         filterId
@@ -349,7 +341,7 @@ function EndpointPosture() {
                 const guardrailPoliciesObject = {}
                 const guardrailColors = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'] // red, amber, blue, green
                 topGuardrailPolicies.forEach((policy, index) => {
-                    guardrailPoliciesObject[policy.name] = {
+                    guardrailPoliciesObject[formatName(policy.name)] = {
                         text: policy.count,
                         color: guardrailColors[index % guardrailColors.length],
                         filterValue: policy.filterId
@@ -482,7 +474,7 @@ function EndpointPosture() {
                                     <HorizontalGrid gap={1} columns={2}>
                                         <VerticalStack gap={4}>
                                             {item?.isComp ? item.data :
-                                                <div className='custom-color'>
+                                                <div className='custom-color summary-card-number'>
                                                     <Text variant={item.variant ? item.variant : 'bodyLg'} color={item.color ? item.color : ""}>
                                                         {item.data}
                                                     </Text>
@@ -503,12 +495,16 @@ function EndpointPosture() {
 
 
     const handleAgenticItemClick = (filterGroupName) => {
-        sessionStorage.setItem('akto_spaFilterNav', 'true')
         if (!filterGroupName) {
             navigate('/dashboard/observe/agentic-assets')
             return
         }
-        navigate(`/dashboard/observe/agentic-assets?filters=groupName__${encodeURIComponent(filterGroupName)}`)
+        const filterStr = `groupName__${filterGroupName}`
+        sessionStorage.setItem('akto_spaFilterNav', 'true')
+        sessionStorage.setItem('akto_spaNavFilter', filterStr)
+        sessionStorage.setItem('akto_spaNavPath', '/dashboard/observe/agentic-assets')
+        sessionStorage.setItem('akto_spaNavExpiry', String(Date.now() + 15000))
+        navigate(`/dashboard/observe/agentic-assets?filters=${encodeURIComponent(filterStr)}`)
     }
 
     const mcpServersComponent = (

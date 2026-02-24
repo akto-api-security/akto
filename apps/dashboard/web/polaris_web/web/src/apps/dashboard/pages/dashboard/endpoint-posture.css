@@ -76,6 +76,11 @@
     display: none;
 }
 
+/* Endpoint Summary: pointer cursor on the metric number to indicate it's clickable */
+.summary-card-number {
+    cursor: pointer;
+}
+
 /* Common MCP Servers / LLMs / AI Agents: clickable row hover */
 .servers-layout-item-link {
     cursor: pointer;

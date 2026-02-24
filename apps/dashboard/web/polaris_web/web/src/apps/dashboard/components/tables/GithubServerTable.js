@@ -112,16 +112,30 @@ function GithubServerTable(props) {
   }, [])
 
   useEffect(()=> {
-    let queryFilters
-    const isSpaFilterNav = sessionStorage.getItem('akto_spaFilterNav') === 'true'
-    if (isSpaFilterNav) {
+    const urlFilter = decodeURIComponent(searchParams.get("filters") || "")
+    const storedSpaNavFilter = sessionStorage.getItem('akto_spaNavFilter')
+    const storedSpaNavPath = sessionStorage.getItem('akto_spaNavPath')
+    const storedSpaNavExpiry = parseInt(sessionStorage.getItem('akto_spaNavExpiry') || '0')
+    const isFirstSpaMount = sessionStorage.getItem('akto_spaFilterNav') === 'true'
+    // Remount case: path matches the stored SPA nav destination and context hasn't expired
+    const isNavContextActive = storedSpaNavPath !== null &&
+      window.location.pathname === storedSpaNavPath &&
+      Date.now() < storedSpaNavExpiry
+    const isSpaFilterNav = isFirstSpaMount || isNavContextActive
+
+    if (isFirstSpaMount) {
       sessionStorage.removeItem('akto_spaFilterNav')
     }
-    if (!isSpaFilterNav && performance.getEntriesByType('navigation')[0].type === 'reload') {
-      queryFilters = []
-    }else{
-      queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey, isSpaFilterNav)
+    // Clear stored nav context when no longer on the SPA nav destination page or context expired
+    if (!isNavContextActive && storedSpaNavPath !== null) {
+      sessionStorage.removeItem('akto_spaNavFilter')
+      sessionStorage.removeItem('akto_spaNavPath')
+      sessionStorage.removeItem('akto_spaNavExpiry')
     }
+
+    // Use stored filter string (not URL) during SPA nav to avoid URL timing issues with GithubSimpleTable remounts
+    const filterToApply = (isNavContextActive && storedSpaNavFilter) ? storedSpaNavFilter : urlFilter
+    const queryFilters = tableFunc.getFiltersMapFromUrl(filterToApply, props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey, isSpaFilterNav)
     const currentFilters = isSpaFilterNav
       ? queryFilters
       : tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)

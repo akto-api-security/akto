@@ -106,7 +106,8 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
               innerSize: pieInnerSize ? pieInnerSize : '60%',
               dataLabels: {
                 enabled: false
-              }
+              },
+              cursor: onSliceClick || navUrlBuilder || navUrl ? 'pointer' : undefined
             },
             series: {
                 point: {

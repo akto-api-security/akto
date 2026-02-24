@@ -38,7 +38,7 @@ const BASE_COLORS = [
 
 const toNumber = (val, defaultVal = 0) => Number(val) || defaultVal;
 
-const formatName = (name) => {
+export const formatName = (name) => {
   if (!name) return "Unknown";
   return String(name)
     .replace(/([a-z])([A-Z])/g, '$1 $2')
