@@ -1,11 +1,5 @@
 import { VerticalStack, Text, FormLayout, TextField, Checkbox, Select } from "@shopify/polaris";
-
-const SEVERITY_OPTIONS = [
-    { label: "Critical", value: "CRITICAL" },
-    { label: "High", value: "HIGH" },
-    { label: "Medium", value: "MEDIUM" },
-    { label: "Low", value: "LOW" },
-];
+import { SEVERITY_OPTIONS } from "../../utils";
 
 // Step metadata
 export const PolicyDetailsConfig = {
