@@ -332,6 +332,11 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
      * Returns Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, matchingSummaryIds) or Filters.empty() if no matches
      */
     private Bson getDashboardContextFilterForIssues(CONTEXT_SOURCE contextSource) {
+        // If contextSource is null, return empty filter (no dashboard context filtering)
+        if (contextSource == null) {
+            return Filters.empty();
+        }
+        
         // Find all test runs with exact matching dashboardContext
         List<ObjectId> matchingTestRunIds = TestingRunDao.instance.getMCollection().find(
             Filters.eq(TestingRun.DASHBOARD_CONTEXT, contextSource)
@@ -373,25 +378,32 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
      */
     public Bson addCollectionsFilterForDashboard(Bson q) {
         CONTEXT_SOURCE contextSource = Context.contextSource.get();
-        boolean isAdmin = RBACDao.getCurrentRoleForUser(Context.userId.get(), Context.accountId.get()) == Role.ADMIN;
+        Integer userId = Context.userId.get();
+        Integer accountId = Context.accountId.get();
+        
+        // Handle test scenarios where userId/accountId might be null
+        if (userId == null || accountId == null) {
+            // In tests/background jobs: no filtering (show all)
+            return q;
+        }
+        
+        boolean isAdmin = RBACDao.getCurrentRoleForUser(userId, accountId) == Role.ADMIN;
         
         // Admin viewing user-based dashboard (no contextSource): show all
         if (isAdmin && contextSource == null) {
             return q;
         }
       
-        List<Integer> apiCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
-                Context.accountId.get()); 
+        List<Integer> apiCollectionIds = UsersCollectionsList.getCollectionsIdForUser(userId, accountId); 
 
-        // Filter by dashboardContext only (getCollectionsIdForUser already filtered by context)
-        Bson dashboardContextFilter = getDashboardContextFilterForIssues(contextSource);
-        
         // RBAC disabled or admin with empty list
         if (apiCollectionIds == null || (apiCollectionIds.isEmpty() && isAdmin)) {
             // No contextSource: show all
             if (contextSource == null) {
                 return q;
             }
+            // Filter by dashboardContext only (getCollectionsIdForUser already filtered by context)
+            Bson dashboardContextFilter = getDashboardContextFilterForIssues(contextSource);
             return Filters.and(q, dashboardContextFilter);
         }
         
@@ -407,6 +419,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         // Filter by dashboardContext if contextSource is set (for deleted collections)
         if (contextSource != null && isAdmin) {
             // Admin: accessible collections OR issues with matching dashboardContext
+            Bson dashboardContextFilter = getDashboardContextFilterForIssues(contextSource);
             if (dashboardContextFilter.equals(Filters.empty())) {
                 return Filters.and(q, accessibleCollectionsFilter);
             }
