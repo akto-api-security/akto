@@ -307,6 +307,25 @@ public class FilterValidationTests {
     }
 
     @Test
+    public void testRegexExtractConditions() {
+        Map<String, Object> config = initconfig();
+        String url = "https://api.stage.store.ignite.akto.com/v1/users/43017713-831f-458c-ae42-918215550c16/vehicles/663c72c829e603366a4bceb1/store/activity?since=1765000248&till=1765005649";
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, url, Method.PUT);
+        RawApi rawApi = initRawapi(apiInfoKey, url);
+
+        Object filterObj = config.get("regex_extract_filter");
+        com.akto.dao.test_editor.filter.ConfigParser parser = new com.akto.dao.test_editor.filter.ConfigParser();
+        ConfigParserResult configParserResult = parser.parse(filterObj);
+
+        Filter filter = new Filter();
+        Map<String, Object> varMap = new HashMap<>();
+        DataOperandsFilterResponse dataOperandsFilterResponse = filter.isEndpointValid(configParserResult.getNode(), rawApi, rawApi, apiInfoKey, null, null, false, "filter", varMap, "logId", false);
+        assertEquals(true, dataOperandsFilterResponse.getResult());
+        assertEquals(1, varMap.size());
+        assertEquals("43017713-831f-458c-ae42-918215550c16", varMap.get("extracted_data"));
+    }
+
+    @Test
     public void testRegexConditions() {
         Map<String, Object> config = initconfig();
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "https://epsilon.6sense.com:443/v3/company/details", Method.PUT);
@@ -414,13 +433,17 @@ public class FilterValidationTests {
         }
         return config;
     }
+    public RawApi initRawapi(ApiInfo.ApiInfoKey apiInfoKey, String url) {
+        return initRawapi(apiInfoKey, url, "");
+    }
 
     public RawApi initRawapi(ApiInfo.ApiInfoKey apiInfoKey) {
-        String payload1 = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"course\": \"MECH\"}";
-        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest("https://epsilon.6sense.com:443/v3/company/details", "limit=10&redirect=false", apiInfoKey.getMethod().name(), payload1, new HashMap<>(), "");
+        return initRawapi(apiInfoKey, "https://epsilon.6sense.com:443/v3/company/details", "limit=10&redirect=false");
+    }
 
-        //BasicDBObject basicDBObject =  BasicDBObject.parse(originalHttpRequest.getBody());
-        //basicDBObject.containsKey(apiInfoKey);
+    private RawApi initRawapi(ApiInfo.ApiInfoKey apiInfoKey, String url, String queryString) {
+        String payload1 = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"course\": \"MECH\"}";
+        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(url, queryString, apiInfoKey.getMethod().name(), payload1, new HashMap<>(), "");
 
         Map<String, java.util.List<String>> headers = new HashMap<>();
         headers.put("authorization", createList("eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJzdGF0dXMiOiJzdWNjZXNzIiwiZGF0YSI6eyJpZCI6MjIsInVzZXJuYW1lIjoiYXR0YWNrZXIiLCJlbWFpbCI6ImF0dGFja2VyQGdtYWlsLmNvbSIsInBhc3N3b3JkIjoiMTY2YzU1YjUxZmQ1ZmJkYTg3NWFiNmMzMTg0NDIyNTUiLCJyb2xlIjoiY3VzdG9tZXIiLCJkZWx1eGVUb2tlbiI6IiIsImxhc3RMb2dpbklwIjoiIiwicHJvZmlsZUltYWdlIjoiYXNzZXRzL3B1YmxpYy9pbWFnZXMvdXBsb2Fkcy9kZWZhdWx0LnN2ZyIsInRvdHBTZWNyZXQiOiIiLCJpc0FjdGl2ZSI6dHJ1ZSwiY3JlYXRlZEF0IjoiMjAyMy0wMy0xMCAwNTozOToxOC4yOTkgKzAwOjAwIiwidXBkYXRlZEF0IjoiMjAyMy0wMy0xMCAwNTozOToxOC4yOTkgKzAwOjAwIiwiZGVsZXRlZEF0IjpudWxsfSwiaWF0IjoxNjc4NDI3Mjg1LCJleHAiOjE5OTM3ODcyODV9.hBAPAJm1FZIpDb7fm4nT3GY_u3R0KeyjqK-Ns5pcz22RN5_qhWt-K98y8DdELjUsRKVodAFPOki0QBmAqdhp5umgJB1ZPk4uEKLg2AI6ztr5729UezMbQozbIOu8UFmVm2crJn5YZKCbPKCcDwRUpisICbjDtJ5PD41RhZfLut8"));
@@ -432,8 +455,6 @@ public class FilterValidationTests {
 
         originalHttpRequest.setHeaders(headers);
 
-        // TestConfigYamlParser parser = new TestConfigYamlParser();
-        // TestConfig testConfig = parser.parseTemplate("OpenRedirect");
         OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse();
         String message = "{\"method\":\"POST\",\"requestPayload\":\"[\\n  {\\n    \\\"id\\\": 0,\\n    \\\"username\\\": \\\"string\\\",\\n    \\\"firstName\\\": \\\"string\\\",\\n    \\\"lastName\\\": \\\"string\\\",\\n    \\\"email\\\": \\\"string\\\",\\n    \\\"password\\\": \\\"string\\\",\\n    \\\"phone\\\": \\\"string\\\",\\n    \\\"userStatus\\\": 0\\n  }\\n]\",\"responsePayload\":\"{\\\"code\\\":200,\\\"type\\\":\\\"unknown\\\",\\\"message\\\":{\\\"role\\\": \\\"admin\\\", \\\"param2\\\": \\\"ankush\\\"}}\",\"ip\":\"null\",\"source\":\"HAR\",\"type\":\"HTTP/2\",\"akto_vxlan_id\":\"1661807253\",\"path\":\"https://petstore.swagger.io/v2/user/createWithArray?user=1\",\"requestHeaders\":\"{\\\"Origin\\\":\\\"https://petstore.swagger.io\\\",\\\"Accept\\\":\\\"application/json\\\",\\\"User-Agent\\\":\\\"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:95.0) Gecko/20100101 Firefox/95.0\\\",\\\"Referer\\\":\\\"https://petstore.swagger.io/\\\",\\\"Connection\\\":\\\"keep-alive\\\",\\\"Sec-Fetch-Dest\\\":\\\"empty\\\",\\\"Sec-Fetch-Site\\\":\\\"same-origin\\\",\\\"Host\\\":\\\"petstore.swagger.io\\\",\\\"Accept-Encoding\\\":\\\"gzip, deflate, br\\\",\\\"Sec-Fetch-Mode\\\":\\\"cors\\\",\\\"TE\\\":\\\"trailers\\\",\\\"Accept-Language\\\":\\\"en-US,en;q=0.5\\\",\\\"Content-Length\\\":\\\"195\\\",\\\"Content-Type\\\":\\\"application/json\\\"}\",\"responseHeaders\":\"{\\\"date\\\":\\\"Tue, 04 Jan 2022 20:14:27 GMT\\\",\\\"access-control-allow-origin\\\":\\\"*\\\",\\\"server\\\":\\\"Jetty(9.2.9.v20150224)\\\",\\\"access-control-allow-headers\\\":\\\"Content-Type, api_key, Authorization\\\",\\\"location\\\":\\\"oldHeaderVal\\\",\\\"content-type\\\":\\\"application/json\\\",\\\"access-control-allow-methods\\\":\\\"GET, POST, DELETE, PUT\\\"}\",\"time\":\"1641327267\",\"contentType\":\"application/json\",\"akto_account_id\":\"1000000\",\"statusCode\":\"200\",\"status\":\"OK\"}";
         originalHttpResponse.buildFromSampleMessage(message);

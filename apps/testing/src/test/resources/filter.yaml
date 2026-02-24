@@ -287,3 +287,8 @@ regex_filter_extract_multiple:
       key:
         regex: .*
         extractMultiple: keyName
+
+regex_extract_filter:
+  url:
+    regex_extract: /users/([^/]+) 
+    extract: extracted_data
