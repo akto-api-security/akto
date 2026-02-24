@@ -56,7 +56,7 @@ public class Cron {
                 loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollectionId +
                         " accountId " + accountId);
                 try {
-                    MergingLogic.mergeUrlsAndSave(apiCollectionId, true, accountSettings.isAllowMergingOnVersions());
+                    MergingLogic.mergeUrlsAndSave(apiCollectionId, false, accountSettings.isAllowMergingOnVersions());
                     loggerMaker.infoAndAddToDb("Finished merging API collection " +
                             apiCollectionId + " accountId " + accountId + " in " + (Context.now() - start)
                             + " seconds");
