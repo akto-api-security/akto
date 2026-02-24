@@ -491,10 +491,26 @@ function ApiEndpoints(props) {
             }
         })
 
+        // Component Risk Analysis: single map (like sensitiveParamsMap) — build once, apply when building endpoint objects
         const getComponentRiskCompForEndpoint = (endpointUrl) => {
             if (!isEndpointSecurityCategory() || !resourceNameToRiskMap.size) return null;
             return <ComponentRiskAnalysisBadges componentRiskAnalysis={getRiskAnalysisForEndpoint(endpointUrl, resourceNameToRiskMap)} />;
         };
+        const riskCompByEndpoint = new Map();
+        allEndpoints.forEach((obj) => {
+            if (!riskCompByEndpoint.has(obj.endpoint)) {
+                riskCompByEndpoint.set(obj.endpoint, getComponentRiskCompForEndpoint(obj.endpoint));
+            }
+        });
+        shadowApis.forEach((s) => {
+            if (!riskCompByEndpoint.has(s.endpoint)) {
+                riskCompByEndpoint.set(s.endpoint, getComponentRiskCompForEndpoint(s.endpoint));
+            }
+        });
+        shadowApis = shadowApis.map((s) => ({
+            ...s,
+            componentRiskAnalysisComp: riskCompByEndpoint.get(s.endpoint) ?? null
+        }));
 
         // Step 1: Create lightweight objects for ALL endpoints (for filtering & counting only)
         const allEndpointsLight = allEndpoints.map((obj) => {
@@ -505,9 +521,8 @@ function ApiEndpoints(props) {
                 tagsString: t?.str || "",
                 isNew: transform.isNewEndpoint(obj.lastSeenTs),
                 open:  obj.auth_type === undefined || obj.auth_type.toLowerCase() === "unauthenticated" || obj.auth_type.toLowerCase() === "no auth type found",
+                componentRiskAnalysisComp: riskCompByEndpoint.get(obj.endpoint) ?? null
             };
-            const riskComp = getComponentRiskCompForEndpoint(obj.endpoint);
-            if (riskComp != null) base.componentRiskAnalysisComp = riskComp;
             return base;
         });
 
@@ -583,11 +598,9 @@ function ApiEndpoints(props) {
             zombie: zombieEndpoints.length
         };
 
-        // Step 3: Helper function to prettify a page of data with tags applied
+        // Step 3: Helper function to prettify a page of data with tags applied (componentRiskAnalysisComp preserved from ...url in prettifyEndpointsData)
         const prettifyPageWithTags = (pageData) => {
             const prettified = transform.prettifyEndpointsData(pageData);
-
-            // Re-apply tags and Component Risk Analysis (Endpoint Security) per endpoint after prettify
             prettified.forEach((obj) => {
                 const t = collectionTagsMap[obj.apiCollectionId];
                 if (t) {
@@ -596,10 +609,7 @@ function ApiEndpoints(props) {
                 } else {
                     obj.tagsString = "";
                 }
-                const riskComp = getComponentRiskCompForEndpoint(obj.endpoint);
-                if (riskComp != null) obj.componentRiskAnalysisComp = riskComp;
             });
-
             return prettified;
         };
 
@@ -609,17 +619,9 @@ function ApiEndpoints(props) {
             // For 'all' tab: mix raw allEndpointsLight + already prettified shadowApis
             data['all'] = [...allEndpointsLight, ...shadowApis];
             data['all']._prettifyPageData = (pageData) => {
-                // Determine which items are shadowApis (already prettified) vs raw data
-                return pageData.map((item) => {
-                    // Check if this item is a shadowApi by checking for codeAnalysisEndpoint flag
-                    if (item.codeAnalysisEndpoint === true) {
-                        const riskComp = getComponentRiskCompForEndpoint(item.endpoint);
-                        return riskComp != null ? { ...item, componentRiskAnalysisComp: riskComp } : item;
-                    } else {
-                        // Raw data, needs prettification
-                        return prettifyPageWithTags([item])[0];
-                    }
-                });
+                return pageData.map((item) =>
+                    item.codeAnalysisEndpoint === true ? item : prettifyPageWithTags([item])[0]
+                );
             };
 
             data['sensitive'] = sensitiveEndpoints;
@@ -645,9 +647,8 @@ function ApiEndpoints(props) {
             data['zombie'] = zombieEndpoints;
             data['zombie']._prettifyPageData = prettifyPageWithTags;
         } else {
-            // Small collection: render all normally
+            // Small collection: render all normally (componentRiskAnalysisComp preserved from allEndpointsLight via ...url in prettifyEndpointsData)
             const prettifyData = transform.prettifyEndpointsData(allEndpointsLight);
-
             prettifyData.forEach((obj) => {
                 const t = collectionTagsMap[obj.apiCollectionId];
                 if (t) {
@@ -656,8 +657,6 @@ function ApiEndpoints(props) {
                 } else {
                     obj.tagsString = "";
                 }
-                const riskComp = getComponentRiskCompForEndpoint(obj.endpoint);
-                if (riskComp != null) obj.componentRiskAnalysisComp = riskComp;
             });
 
             data['all'] = [...prettifyData, ...shadowApis];
