@@ -624,7 +624,7 @@ function TestRunResultFlyout(props) {
     const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
 
     // Component that handles vulnerability analysis only when mounted
-    const ValuesTabContent = React.memo(() => {
+    const ValuesTabContent = React.memo(({ isAgentic = false } = {}) => {
 
         useEffect(() => {
             // Check if vulnerability highlighting is enabled (use existing GPT feature flag)
@@ -644,7 +644,6 @@ function TestRunResultFlyout(props) {
                             try {
                                 messageObj = JSON.parse(messageObj);
                             } catch (e) {
-                                console.error('Failed to parse message string for idx', idx, e);
                                 return null;
                             }
                         }
@@ -707,7 +706,6 @@ function TestRunResultFlyout(props) {
                                 }
                                 return { idx, success: true };
                             } catch (error) {
-                                console.error('Failed to analyze vulnerability for result', idx, error);
                                 return { idx, success: false };
                             }
                         }
@@ -751,6 +749,12 @@ function TestRunResultFlyout(props) {
                                 // Add vulnerability highlights only for response
                                 let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
                                 if (result.originalMessage || result.message) {
+                                    if(isAgentic){
+                                        return {
+                                            originalMessage: result.message,
+                                            message: result.message
+                                        }
+                                    }
                                     return {
                                         originalMessage: result.originalMessage,
                                         message: result.message,
@@ -768,6 +772,8 @@ function TestRunResultFlyout(props) {
         );
     });
 
+    const hasConversations = conversations?.length > 0
+
     const conversationTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
 
@@ -778,7 +784,6 @@ function TestRunResultFlyout(props) {
         // TODO: Implement real message sending handler
         // Replace with actual API call when chat endpoint is available
         const handleSendMessage = (msg) => {
-            console.log("TODO: Send message to backend:", msg);
             // Future: Call testingApi.sendChatMessage(issueDetails.id, msg)
         };
 
@@ -794,6 +799,17 @@ function TestRunResultFlyout(props) {
         }
     }, [selectedTestRunResult, conversations])
 
+    const attemptTabForConversations = useMemo(() => {
+        if (!hasConversations) return null;
+        const hasTestResultsMessages = selectedTestRunResult?.testResults?.some(result => result.message);
+        if(!hasTestResultsMessages) return null;
+        return {
+            id: 'attempt',
+            content: "Attempt",
+            component: <ValuesTabContent isAgentic />
+        };
+    }, [hasConversations, selectedTestRunResult])
+
     const ValuesTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
         return {
@@ -803,7 +819,11 @@ function TestRunResultFlyout(props) {
         }
     }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag])
 
-    const finalResultTab = conversations?.length > 0 ? conversationTab : ValuesTab
+    const resultTabs = hasConversations
+        ? [conversationTab, attemptTabForConversations].filter(Boolean)
+        : [ValuesTab]
+
+    const finalResultTab = hasConversations ? conversationTab : ValuesTab
 
     function RowComp({ cardObj }) {
         const { title, value, tooltipContent } = cardObj
@@ -958,7 +978,7 @@ function TestRunResultFlyout(props) {
     const tabsComponent = (
         <LayoutWithTabs
             key={issueDetails?.id}
-            tabs={issueDetails?.id ? [overviewTab, timelineTab, finalResultTab, remediationTab].filter(Boolean) : [attemptTab]}
+            tabs={issueDetails?.id ? [overviewTab, timelineTab, ...resultTabs, remediationTab].filter(Boolean) : (hasConversations ? [conversationTab, attemptTabForConversations].filter(Boolean) : [attemptTab])}
             currTab={() => { }}
         />
     )
