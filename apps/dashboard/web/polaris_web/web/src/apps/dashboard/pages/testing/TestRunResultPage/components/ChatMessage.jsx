@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Box, VerticalStack, HorizontalStack, Text, Badge } from '@shopify/polaris';
+import { Box, VerticalStack, HorizontalStack, Text, Badge, Modal } from '@shopify/polaris';
+import { ExternalMinor } from '@shopify/polaris-icons';
 import MarkdownViewer from '../../../../components/shared/MarkdownViewer';
+import SampleData from '../../../../components/shared/SampleData';
 import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES, VULNERABILITY_BADGE } from './chatConstants';
 import func from "@/util/func";
 
@@ -20,6 +22,12 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
 
     // Determine if content should be rendered as code
     const shouldRenderAsCode = isCode !== undefined ? isCode : isRequest;
+
+    const [expanded, setExpanded] = useState(false);
+    let prettyJson = null;
+    if (!shouldRenderAsCode) {
+        try { prettyJson = JSON.stringify(JSON.parse(content), null, 2); } catch {}
+    }
 
     return (
         <Box padding="3">
@@ -44,7 +52,14 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                             <Text variant="bodyMd" fontWeight="semibold" color="subdued">
                                 {label}
                             </Text>
-                            <Text variant="bodySm" color="subdued">{formattedTime}</Text>
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text variant="bodySm" color="subdued">{formattedTime}</Text>
+                                {prettyJson && (
+                                    <span onClick={() => setExpanded(true)} title="Expand" style={{ cursor: 'pointer', display: 'flex', color: '#6d7175' }}>
+                                        <ExternalMinor width={16} height={16} />
+                                    </span>
+                                )}
+                            </HorizontalStack>
                         </HorizontalStack>
 
                         {/* Message Content */}
@@ -60,6 +75,8 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                     {content}
                                 </Box>
                             </Box>
+                        ) : prettyJson ? (
+                            <SampleData key={content} data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="200px" />
                         ) : (
                             <MarkdownViewer markdown={content} />
                         )}
@@ -73,6 +90,14 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                     </VerticalStack>
                 </Box>
             </Box>
+
+            {prettyJson && expanded && (
+                <Modal open onClose={() => setExpanded(false)} title={label} large>
+                    <Modal.Section>
+                        <SampleData key={content + '_modal'} data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="600px" />
+                    </Modal.Section>
+                </Modal>
+            )}
         </Box>
     );
 }
