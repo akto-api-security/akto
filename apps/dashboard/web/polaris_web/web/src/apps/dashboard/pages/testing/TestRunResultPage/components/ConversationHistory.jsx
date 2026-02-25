@@ -19,7 +19,7 @@ function ConversationHistory({ conversations, isInventory = false, testResults =
         if (!testResult || !testResult.message) return;
 
         setHttpModalData({
-            title: `HTTP Attempt ${testResultIndex + 1} of ${testResults.length}`,
+            title: "Attempt",
             sampleData: {
                 message: testResult.message,
                 originalMessage: testResult.message,

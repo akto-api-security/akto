@@ -164,28 +164,28 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
     const infoActions = [];
     if (hasModifiedPrompt) {
         infoActions.push({
-            tooltip: 'View original prompt',
+            tooltip: 'View akto agent prompt',
             onClick: () => {
                 setInfoModalData({
                     type: 'text',
-                    title: 'Original Prompt',
+                    title: 'Akto Agent Prompt',
                     content: originalPrompt,
                     sampleData: null,
                 });
                 setInfoModalOpen(true);
             },
-            accessibilityLabel: 'View original prompt',
+            accessibilityLabel: 'View akto agent prompt',
         });
     }
     if (hasHttpAttempt) {
         infoActions.push({
-            tooltip: 'View HTTP attempt',
+            tooltip: 'View attempt',
             onClick: () => {
                 if (onOpenAttempt) {
                     onOpenAttempt();
                 }
             },
-            accessibilityLabel: 'View HTTP attempt in Monaco editor',
+            accessibilityLabel: 'View attempt',
         });
     }
 
