@@ -1531,7 +1531,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
@@ -1552,7 +1552,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ACTIVE_ENDPOINTS</param>
+                <param name="featureLabel">API_COLLECTIONS</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
@@ -1582,7 +1582,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">ACTIVE_ENDPOINTS</param>
+                <param name="featureLabel">API_COLLECTIONS</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>

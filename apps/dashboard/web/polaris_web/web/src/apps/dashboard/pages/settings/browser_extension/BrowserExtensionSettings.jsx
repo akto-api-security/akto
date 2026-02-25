@@ -17,6 +17,7 @@ import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import func from "@/util/func";
 import api from "../../guardrails/api";
+import ShowListInBadge from "../../../components/shared/ShowListInBadge";
 
 const resourceName = {
     singular: "config",
@@ -64,14 +65,12 @@ function BrowserExtensionSettings() {
                     host: config.host,
                     paths: config.paths || [],
                     pathsComp: (
-                        <HorizontalStack gap="1" wrap>
-                            {(config.paths || []).slice(0, 3).map((p, i) => (
-                                <Badge key={i} size="small">{p}</Badge>
-                            ))}
-                            {(config.paths || []).length > 3 && (
-                                <Badge size="small" tone="info">+{config.paths.length - 3} more</Badge>
-                            )}
-                        </HorizontalStack>
+                        <ShowListInBadge
+                            itemsArr={config.paths || []}
+                            maxItems={3}
+                            status="info"
+                            useTooltip={true}
+                        />
                     ),
                     statusComp: (
                         <Badge tone={config.active ? "success" : undefined} size="small">
