@@ -51,7 +51,7 @@ const CenterViewType = {
 
 const API_COLLECTIONS_CACHE_DURATION_SECONDS = 5 * 60; // 5 minutes
 const COLLECTIONS_LAZY_RENDER_THRESHOLD = 100; // Collections count above which we use lazy rendering optimization
-const allowedAccounts = [1736798101, 1718042191, 1736983575];
+const allowedAccounts = [1736798101, 1718042191];
 
 
 const headers = [
