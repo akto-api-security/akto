@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { Box, VerticalStack, HorizontalStack, Text, Badge, Modal, Button } from '@shopify/polaris';
-import { ExternalMinor } from '@shopify/polaris-icons';
+import { Box, VerticalStack, HorizontalStack, Text, Badge } from '@shopify/polaris';
 import MarkdownViewer from '../../../../components/shared/MarkdownViewer';
-import SampleData from '../../../../components/shared/SampleData';
+import SampleDataComponent from '../../../../components/shared/SampleDataComponent';
 import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES, VULNERABILITY_BADGE } from './chatConstants';
 import func from "@/util/func";
 
@@ -16,6 +15,19 @@ function extractPrettyJson(content) {
 
         try {
             const parsed = JSON.parse(content);
+            // If parsed is empty object or array, treat as plain text
+            if (
+                (typeof parsed === 'object' && parsed !== null &&
+                    ((Array.isArray(parsed) && parsed.length === 0) ||
+                     (!Array.isArray(parsed) && Object.keys(parsed).length === 0)))
+            ) {
+                return {
+                    prettyJson: null,
+                    prefix: content,
+                    beforeText: null,
+                    afterText: null,
+                };
+            }
             return {
                 prettyJson: JSON.stringify(parsed, null, 2),
                 prefix: null,
@@ -68,7 +80,19 @@ function extractPrettyJson(content) {
                             const parsed = JSON.parse(embeddedJson);
                             const before = content.slice(0, start).trim();
                             const after = content.slice(i + 1).trim();
-
+                            // If parsed is empty object or array, treat as plain text
+                            if (
+                                (typeof parsed === 'object' && parsed !== null &&
+                                    ((Array.isArray(parsed) && parsed.length === 0) ||
+                                     (!Array.isArray(parsed) && Object.keys(parsed).length === 0)))
+                            ) {
+                                return {
+                                    prettyJson: null,
+                                    prefix: embeddedJson,
+                                    beforeText: before || null,
+                                    afterText: after || null,
+                                };
+                            }
                             return {
                                 prettyJson: JSON.stringify(parsed, null, 2),
                                 prefix: null,
@@ -108,7 +132,6 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
     // Determine if content should be rendered as code
     const shouldRenderAsCode = isCode !== undefined ? isCode : isRequest;
 
-    const [expanded, setExpanded] = useState(false);
     const { prettyJson, prefix, beforeText, afterText } = useMemo(() => {
         if (shouldRenderAsCode) {
             return { prettyJson: null, prefix: null, beforeText: null, afterText: null };
@@ -139,17 +162,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                             <Text variant="bodyMd" fontWeight="semibold" color="subdued">
                                 {label}
                             </Text>
-                            <HorizontalStack gap="1" blockAlign="center">
-                                <Text variant="bodySm" color="subdued">{formattedTime}</Text>
-                                {prettyJson && (
-                                    <Button
-                                        plain
-                                        icon={ExternalMinor}
-                                        onClick={() => setExpanded(true)}
-                                        accessibilityLabel="Expand JSON"
-                                    />
-                                )}
-                            </HorizontalStack>
+                            <Text variant="bodySm" color="subdued">{formattedTime}</Text>
                         </HorizontalStack>
 
                         {/* Message Content */}
@@ -168,7 +181,13 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                         ) : prettyJson ? (
                             <VerticalStack gap="2">
                                 {beforeText && <MarkdownViewer markdown={beforeText} />}
-                                <SampleData data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="200px" />
+                                <SampleDataComponent
+                                    type="response"
+                                    sampleData={{ message: prettyJson }}
+                                    minHeight="200px"
+                                    readOnly={true}
+                                    simpleJson={true}
+                                />
                                 {afterText && <MarkdownViewer markdown={afterText} />}
                             </VerticalStack>
                         ) : (
@@ -185,13 +204,6 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                 </Box>
             </Box>
 
-            {prettyJson && expanded && (
-                <Modal open onClose={() => setExpanded(false)} title={label} large>
-                    <Modal.Section>
-                        <SampleData data={{ message: prettyJson }} readOnly={true} editorLanguage="json" minHeight="600px" />
-                    </Modal.Section>
-                </Modal>
-            )}
         </Box>
     );
 }
