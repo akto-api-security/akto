@@ -51,7 +51,7 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 import com.slack.api.Slack;
-
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -232,9 +232,12 @@ public class StartTestAction extends UserAction {
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
 
+        // Get dashboard context from Context.contextSource (set by UserDetailsFilter from x-context-source header)
+        CONTEXT_SOURCE dashboardContext = Context.contextSource.get();
+        
         TestingRun testingRun = new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId);
+                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId, dashboardContext);
         testingRun.setDoNotMarkIssuesAsFixed(this.doNotMarkIssuesAsFixed);
         testingRun.setMaxAgentTokens(this.maxAgentTokens);
         return testingRun;
@@ -599,7 +602,7 @@ public class StartTestAction extends UserAction {
 
         int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
 
-        testingRuns = TestingRunDao.instance.findAll(
+        testingRuns = TestingRunDao.instance.findAllWithRbacAndContext(
                 Filters.and(testingRunFilters), skip, pageLimit,
                 prepareSort());
 
@@ -612,7 +615,7 @@ public class StartTestAction extends UserAction {
         latestTestingRunResultSummaries = TestingRunResultSummariesDao.instance
                 .fetchLatestTestingRunResultSummaries(testingRunHexIds);
 
-        testingRunsCount = TestingRunDao.instance.count(Filters.and(testingRunFilters));
+        testingRunsCount = TestingRunDao.instance.countWithRbacAndContext(Filters.and(testingRunFilters));
 
         return SUCCESS.toUpperCase();
     }
@@ -1098,7 +1101,8 @@ public class StartTestAction extends UserAction {
                 if (isTestRunByTestEditor) {
                     issuesId.setTestErrorSource(TestErrorSource.TEST_EDITOR);
                 }
-                runIssues = TestingRunIssuesDao.instance.findOne(Filters.eq(Constants.ID, issuesId));
+                // Use findOneNoRbacFilter to allow access to issues from deleted collections
+                runIssues = TestingRunIssuesDao.instance.findOneNoRbacFilter(Filters.eq(Constants.ID, issuesId), null);
             }
         } catch (Exception ignore) {
         }
@@ -1110,7 +1114,7 @@ public class StartTestAction extends UserAction {
         Bson filterQ = Filters.and(
                 Filters.eq("testingEndpoints.workflowTest._id", workflowTestId),
                 Filters.eq("state", TestingRun.State.SCHEDULED));
-        this.testingRuns = TestingRunDao.instance.findAll(filterQ);
+        this.testingRuns = TestingRunDao.instance.findAllWithRbacAndContext(filterQ, 0, 0, null);
         return SUCCESS.toUpperCase();
     }
 
@@ -1183,22 +1187,22 @@ public class StartTestAction extends UserAction {
         filters.addAll(prepareFilters(startTimestamp, endTimestamp));
         filters.addAll(getTableFilters());
 
-        long totalCount = TestingRunDao.instance.count(Filters.and(filters));
+        long totalCount = TestingRunDao.instance.countWithRbacAndContext(Filters.and(filters));
 
         ArrayList<Bson> filterForCicd = new ArrayList<>(filters); // Create a copy of filters
         filterForCicd.add(getTestingRunTypeFilter(TestingRunType.CI_CD));
-        long cicdCount = TestingRunDao.instance.count(Filters.and(filterForCicd));
+        long cicdCount = TestingRunDao.instance.countWithRbacAndContext(Filters.and(filterForCicd));
 
         filters.add(getTestingRunTypeFilter(TestingRunType.ONE_TIME));
 
-        long oneTimeCount = TestingRunDao.instance.count(Filters.and(filters));
+        long oneTimeCount = TestingRunDao.instance.countWithRbacAndContext(Filters.and(filters));
 
         ArrayList<Bson> continuousTestsFilter = new ArrayList<>(); // Create a copy of filters
         continuousTestsFilter.add(getTestingRunTypeFilter(TestingRunType.CONTINUOUS_TESTING));
         continuousTestsFilter.add(Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTimestamp));
         continuousTestsFilter.addAll(getTableFilters());
 
-        long continuousTestsCount = TestingRunDao.instance.count(Filters.and(continuousTestsFilter));
+        long continuousTestsCount = TestingRunDao.instance.countWithRbacAndContext(Filters.and(continuousTestsFilter));
 
         long scheduleCount = totalCount - oneTimeCount - cicdCount - continuousTestsCount;
 
@@ -1357,7 +1361,7 @@ public class StartTestAction extends UserAction {
                 totalRunningTests += currentTestsStoredForSummary;
                 currentTestsRunningList.add(new StatusForIndividualTest(summary.getTestingRunId().toHexString(), totalInitiatedTests, totalRunningTests));
             }
-            int totalTestsQueued = (int) TestingRunDao.instance.count(
+            int totalTestsQueued = (int) TestingRunDao.instance.countWithRbacAndContext(
                 Filters.eq(TestingRun.STATE, State.SCHEDULED)
             );
 

@@ -15,7 +15,7 @@ import {
 import PersistStore from '../../../../main/PersistStore';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
 import guardrailApi from '../api';
-import { transformPolicyForBackend } from '../utils';
+import { transformPolicyForBackend, SEVERITY } from '../utils';
 import {
     PolicyDetailsStep,
     PolicyDetailsConfig,
@@ -53,6 +53,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [blockedMessage, setBlockedMessage] = useState("");
+    const [severity, setSeverity] = useState(SEVERITY.MEDIUM.value);
     const [applyToResponses, setApplyToResponses] = useState(false);
 
     // Step 2: Content & Policy Guardrails
@@ -243,7 +244,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     const steps = getStepsWithSummary();
 
-    // Filter collections when component mounts or allCollections changes
+    useEffect(() => {
+        document.body.classList.add('guardrail-page-open');
+        return () => document.body.classList.remove('guardrail-page-open');
+    }, []);
+
     useEffect(() => {
         if (allCollections && allCollections.length > 0) {
             filterCollections();
@@ -312,6 +317,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setName("");
         setDescription("");
         setBlockedMessage("");
+        setSeverity(SEVERITY.MEDIUM.value);
         setApplyToResponses(false);
         setPlaygroundMessages([]);
         setEnablePromptAttacks(false);
@@ -369,6 +375,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setName(policy.name || "");
         setDescription(policy.description || "");
         setBlockedMessage(policy.blockedMessage || "");
+        setSeverity(policy.severity ? policy.severity.toUpperCase() : SEVERITY.MEDIUM.value);
         setApplyToResponses(policy.applyToResponses || false);
 
         // Content filters
@@ -526,6 +533,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 name,
                 description,
                 blockedMessage,
+                severity,
                 applyToResponses,
                 contentFilters: {
                     harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
@@ -617,6 +625,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setDescription={setDescription}
                         blockedMessage={blockedMessage}
                         setBlockedMessage={setBlockedMessage}
+                        severity={severity}
+                        setSeverity={setSeverity}
                         applyToResponses={applyToResponses}
                         setApplyToResponses={setApplyToResponses}
                     />
@@ -937,7 +947,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 <HorizontalStack gap="3" align="center">
                     <Icon source={SettingsMajor} />
                     <Text variant="headingLg" as="h1">
-                        Create Guardrail Policy
+                        {isEditMode ? "Edit Guardrail Policy" : "Create Guardrail Policy"}
                     </Text>
                 </HorizontalStack>
                 <button className="Polaris-Modal-CloseButton" onClick={handleClose}>
@@ -961,7 +971,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                 >
                                     <div className={`step-indicator ${
                                         step.number === currentStep ? 'current' :
-                                        step.number < currentStep ? (step.isValid ? 'completed' : 'error') : 'pending'
+                                        !step.isValid ? 'error' :
+                                        (step.summary && step.summary !== 'Coming soon') ? 'configured' : 'pending'
                                     }`} />
                                     <div style={{ flex: 1, paddingTop: '4px' }}>
                                         <Text
@@ -970,6 +981,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                         >
                                             {step.title}
                                         </Text>
+                                        {step.summary && (
+                                            <Text variant="bodySm" color="subdued" truncate>
+                                                <span className="guardrail-nav-summary" title={step.summary}>{step.summary}</span>
+                                            </Text>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -1005,7 +1021,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                     loading={loading}
                                     disabled={!allStepsValid}
                                 >
-                                    Create policy
+                                    {isEditMode ? "Update policy" : "Create policy"}
                                 </Button>
                             </HorizontalStack>
                         </HorizontalStack>
@@ -1047,7 +1063,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                         borderRadius='3'
                                                         borderRadiusStartEnd='1'
                                                     >
-                                                        <Text variant="bodyMd" color="subdued">
+                                                        <Text variant="bodyMd">
                                                             {message.userPrompt}
                                                         </Text>
                                                     </Box>
@@ -1056,7 +1072,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                 <Box paddingBlockStart="1">
                                                     <Text
                                                         variant="bodyMd"
-                                                        color={message.action === 'Blocked' ? 'success' : 'subdued'}
+                                                        color={message.action === 'Blocked' || message.action === 'Error' ? 'critical' : 'success'}
                                                     >
                                                         {message.action}
                                                         {message.reason && ` - ${message.reason}`}

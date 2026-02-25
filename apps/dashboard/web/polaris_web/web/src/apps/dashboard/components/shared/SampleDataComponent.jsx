@@ -190,6 +190,7 @@ function SampleDataComponent(props) {
                     items[0].content = "Copy attempt request as curl"
                     items[1].content = "Copy attempt request as burp"
                 }
+                if(data?.originalMessage != data?.message){
                 items.push({
                     content: 'Copy original request as curl',
                     onAction: () => { copyRequest(type, "CURL", data.originalMessage) },
@@ -198,6 +199,7 @@ function SampleDataComponent(props) {
                         content: 'Copy original request as burp',
                         onAction: () => { copyRequest(type, "BURP", data.originalMessage) },
                     })
+                }
             }
         } else {
             if (data.message) {
@@ -210,10 +212,12 @@ function SampleDataComponent(props) {
                 if(items.length==1){
                     items[0].content = "Copy attempt response"
                 }
+                if(data?.originalMessage != data?.message){
                 items.push({
                     content: 'Copy original response',
                     onAction: () => { copyRequest(type, "RESPONSE", data.originalMessage) },
                 })
+                }
             }
         }
 
@@ -259,7 +263,7 @@ function SampleDataComponent(props) {
                             (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`) 
                             : "" }
                         <HorizontalStack gap={2}>
-                        {isNewDiff ? <HorizontalStack gap="2">
+                        {isNewDiff && lineNumbers[type]?.length > 0 ? <HorizontalStack gap="2">
                                 <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="1">
                                     <Text variant="bodyMd" color="subdued">{ lineNumbers[type].length } changes</Text>
                                 </Box>

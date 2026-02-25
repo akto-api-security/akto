@@ -39,6 +39,7 @@ import McpToolsGraph from "./McpToolsGraph"
 import { findTypeTag, TYPE_TAG_KEYS } from "../agentic/mcpClientHelper"
 import AgentDiscoverGraphWithDummyData from "./AgentDiscoveryGraphWithDummyData"
 import AgentDiscoverGraph from "./AgentDiscoverGraph"
+import { dummyCollections } from "./AgentDiscoveryDummyData"
 
 const headings = [
     {
@@ -1692,6 +1693,7 @@ function ApiEndpoints(props) {
     />,
     ]
 
+    const dummyAgenticGraph = dummyCollections.has(apiCollectionId);
 
     const components = [
         loading ? [<SpinnerCentered key="loading" />] : (
@@ -1717,7 +1719,7 @@ function ApiEndpoints(props) {
             ] : showSchemaView ? [
                 <SchemaView key="schema-view" apiCollectionId={apiCollectionId} />
             ] : [
-                func.isDemoAccount() ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
+                dummyAgenticGraph ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
                 (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
                 // Hide "Test your Endpoints" banner for Endpoint Security
                 (!isEndpointSecurityCategory() && (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,
