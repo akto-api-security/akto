@@ -1444,9 +1444,7 @@ const transform = {
     let conversationsListCopy = []
     let extractedRemediationText = ''
 
-    const sortedResults = [...agentConversationResults].sort((a, b) => (a.lastUpdatedAt || 0) - (b.lastUpdatedAt || 0))
-
-    sortedResults.forEach(conversation => {
+    agentConversationResults.forEach(conversation => {
 
       let commonObj = {
         creationTimestamp: conversation.timestamp,
