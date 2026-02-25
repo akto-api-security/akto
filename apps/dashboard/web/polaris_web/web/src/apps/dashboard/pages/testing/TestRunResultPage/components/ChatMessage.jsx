@@ -119,8 +119,8 @@ function extractPrettyJson(content) {
 }
 
 function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt }) {
-    const isRequest = type === MESSAGE_TYPES.REQUEST;
 
+    const isRequest = type === MESSAGE_TYPES.REQUEST;
     // Icon
     const iconSrc = isRequest ? CHAT_ASSETS.AKTO_LOGO : CHAT_ASSETS.BOT_LOGO;
     const iconAlt = isRequest ? 'Akto Logo' : 'Agent Logo';
@@ -129,27 +129,40 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
     const label = customLabel || (isRequest ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE);
     const isAiAgentLabel = label === MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE;
     const isTestedInteraction = label === MESSAGE_LABELS.TESTED_INTERACTION;
-    const hasModifiedPrompt = isTestedInteraction && originalPrompt;
+    const hasModifiedPrompt = isTestedInteraction && originalPrompt && originalPrompt !== content;
     const hasHttpAttempt = isAiAgentLabel && onOpenAttempt;
 
     const [infoModalOpen, setInfoModalOpen] = useState(false);
     const [infoModalData, setInfoModalData] = useState({ type: 'text', title: '', content: null, sampleData: null });
 
-    const handleOpenPromptModal = () => {
-        setInfoModalData({
-            type: 'text',
-            title: 'Original Prompt',
-            content: originalPrompt,
-            sampleData: null,
+    // Prepare info actions array
+    const infoActions = [];
+    if (hasModifiedPrompt) {
+        infoActions.push({
+            tooltip: 'View original prompt',
+            onClick: () => {
+                setInfoModalData({
+                    type: 'text',
+                    title: 'Original Prompt',
+                    content: originalPrompt,
+                    sampleData: null,
+                });
+                setInfoModalOpen(true);
+            },
+            accessibilityLabel: 'View original prompt',
         });
-        setInfoModalOpen(true);
-    };
-
-    const handleOpenHttpModal = () => {
-        if (onOpenAttempt) {
-            onOpenAttempt();
-        }
-    };
+    }
+    if (hasHttpAttempt) {
+        infoActions.push({
+            tooltip: 'View HTTP attempt',
+            onClick: () => {
+                if (onOpenAttempt) {
+                    onOpenAttempt();
+                }
+            },
+            accessibilityLabel: 'View HTTP attempt in Monaco editor',
+        });
+    }
 
     // Format timestamp with memoization
     const formattedTime = useMemo(() => func.formatChatTimestamp(timestamp), [timestamp]);
@@ -188,28 +201,17 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                 <Text variant="bodyMd" fontWeight="semibold" color="subdued">
                                     {label}
                                 </Text>
-                                {hasModifiedPrompt && (
-                                    <Tooltip content="View original prompt" dismissOnMouseOut>
+                                {infoActions.map((action, idx) => (
+                                    <Tooltip key={idx} content={action.tooltip} dismissOnMouseOut>
                                         <Button
                                             plain
                                             monochrome
                                             icon={InfoMinor}
-                                            onClick={handleOpenPromptModal}
-                                            accessibilityLabel="View original prompt"
+                                            onClick={action.onClick}
+                                            accessibilityLabel={action.accessibilityLabel}
                                         />
                                     </Tooltip>
-                                )}
-                                {hasHttpAttempt && (
-                                    <Tooltip content="View HTTP attempt" dismissOnMouseOut>
-                                        <Button
-                                            plain
-                                            monochrome
-                                            icon={InfoMinor}
-                                            onClick={handleOpenHttpModal}
-                                            accessibilityLabel="View HTTP attempt in Monaco editor"
-                                        />
-                                    </Tooltip>
-                                )}
+                                ))}
                             </HorizontalStack>
                             <Text variant="bodySm" color="subdued">{formattedTime}</Text>
                         </HorizontalStack>
