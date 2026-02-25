@@ -10,10 +10,6 @@ function ChatInfoModal({ open, onClose, title, type, content, sampleData }) {
                 open={open}
                 onClose={onClose}
                 title={title}
-                primaryAction={{
-                    content: 'Close',
-                    onAction: onClose,
-                }}
             >
                 <Modal.Section>
                     <Box padding="4">
