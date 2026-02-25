@@ -956,7 +956,31 @@ const transform = {
             serviceName: parts.slice(2).join('.'),   // <3> (can contain dots)
             apiCollectionName: parts.slice(1).join('.') // <2>.<3> for backward compatibility
         };
-    }
+    },
+
+
+    extractMcpComponentNameFromPath(endpoint) {
+        const path = this.normalizeEndpointToPath(endpoint);
+        if (!path) return null;
+        const segments = path.split('/').filter(Boolean);
+        if (segments.length < 3) return null;
+        const mcpMethodSegments = [['tools', 'call'], ['resources', 'read'], ['prompts', 'get']];
+        for (const [first, second] of mcpMethodSegments) {
+            const i = segments.indexOf(first);
+            if (i === -1 || segments[i + 1] !== second) continue;
+            const component = segments[i + 2];
+            return component != null && component !== '' ? component : null;
+        }
+        return null;
+    },
+
+    normalizeEndpointToPath(endpoint) {
+        if (endpoint == null || typeof endpoint !== 'string') return '';
+        const s = endpoint.trim();
+        if (!s) return '';
+        const path = func.convertToRelativePath(s) || s;
+        return path.replace(/\?.*$/, '').replace(/\/+$/, '') || '/';
+    },
 }
 
 export default transform

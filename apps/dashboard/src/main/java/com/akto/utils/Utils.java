@@ -248,6 +248,16 @@ public class Utils {
             ArrayNode requestHeadersNode = (ArrayNode) request.get("header");
             Map<String, String> requestHeadersMap = getHeaders(requestHeadersNode, variables);
             requestHeadersMap.putAll(authMap);
+            // Extract host from the URL and add to headers if not already present
+            try {
+                URL parsedUrl = new URL(result.get("path"));
+                String host = parsedUrl.getHost();
+                if (host != null && !host.isEmpty()) {
+                    requestHeadersMap.putIfAbsent("host", host);
+                }
+            } catch (Exception e) {
+                loggerMaker.error("Not a valid hostname: " + e.getMessage());
+            }
             String requestHeadersString = mapper.writeValueAsString(requestHeadersMap);
             result.put("requestHeaders", requestHeadersString);
 

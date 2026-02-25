@@ -34,6 +34,15 @@ public class InitializerListener implements ServletContextListener {
         );
         KafkaUtils.setTopicPublisher(topicPublisher);
 
+        // Start Syslog UDP listener for Apigee async connector (Option B)
+        // This enables receiving traffic data from Apigee MessageLogging via UDP Syslog
+        // without requiring an external Fluentd service
+        Thread syslogThread = new Thread(new SyslogUdpListener());
+        syslogThread.setDaemon(true);
+        syslogThread.setName("syslog-udp-listener");
+        syslogThread.start();
+        logger.infoAndAddToDb("Syslog UDP listener thread started", LoggerMaker.LogDb.DATA_INGESTION);
+
         // Initialize DataActor
         DataActor dataActor = DataActorFactory.fetchInstance();
         ModuleInfoWorker.init(ModuleInfo.ModuleType.DATA_INGESTION, dataActor);

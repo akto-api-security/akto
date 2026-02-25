@@ -32,3 +32,6 @@ run-account-jobs.sh
 run-data-ingestion.sh
 CLAUDE.md
 run-account-job-executor.sh
+run-testing.sh
+THREAT_DETECTION_API_CHAIN_PATTERN.md
+**/THREAT_DETECTION_API_CHAIN_PATTERN.md
