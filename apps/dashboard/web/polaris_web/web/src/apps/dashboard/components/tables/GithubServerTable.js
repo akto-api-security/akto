@@ -102,7 +102,7 @@ function GithubServerTable(props) {
   const [activeColumnSort, setActiveColumnSort] = useState({columnIndex: -1, sortDirection: 'descending'})
   const [filterNegationState, setFilterNegationState] = useState({})
 
-  let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.filterKey || e.value] = 'OR'; return map }, {})
+  let filterOperators = props.headers.filter(e => !e.csvOnly).reduce((map, e) => { map[e.sortKey || e.filterKey || e.value] = 'OR'; return map }, {})
 
   useEffect(() => {
     if (!filtersWrapRef.current) return
@@ -185,8 +185,8 @@ function GithubServerTable(props) {
     const { signal } = abortControllerRef.current;
 
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
-    let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
-    
+    let filters = props.headers.filter(e => !e.csvOnly).reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
+
     // Optimize: process filters once, reuse logic
     const processFilter = (filter) => {
       const value = filter.value;
@@ -574,7 +574,7 @@ function GithubServerTable(props) {
   // Ensure all headings have unique id properties to avoid duplicate key warnings
   const processedHeadings = useMemo(() => {
     if (props?.headings) {
-      return props.headings.map((heading, index) => ({
+      return props.headings.filter(h => !h.csvOnly).map((heading, index) => ({
         ...heading,
         id: heading.id || heading.value || heading.text || `heading-${index}`
       }));
@@ -661,7 +661,7 @@ function GithubServerTable(props) {
 
     // Fetch all data (not just current page) for export
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
-    let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
+    let filters = props.headers.filter(e => !e.csvOnly).reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
     appliedFilters.forEach((filter) => {
       const value = filter.value;
       if (value && typeof value === 'object' && value.values !== undefined) {
@@ -676,8 +676,16 @@ function GithubServerTable(props) {
     func.setToast(true, false, "Exporting CSV, please wait...")
     const exportLimit = Math.max(total || 0, 10000);
     const allData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, 0, exportLimit, filters, filterOperators, queryValue);
-    func.exportTableAsCSV(props.headers, allData?.value || data, fileName)
-  }, [props.onExportCsv, props.headers, props.csvFileName, data, sortSelected, appliedFilters, total, queryValue, props.fetchData])
+    let exportData = allData?.value || data
+    if (props.csvExpandKey) {
+      exportData = exportData.flatMap(row => {
+        const items = row[props.csvExpandKey]
+        if (!Array.isArray(items) || items.length === 0) return [row]
+        return items.map(item => ({ ...row, [props.csvExpandKey]: item }))
+      })
+    }
+    func.exportTableAsCSV(props.headers, exportData, fileName)
+  }, [props.onExportCsv, props.headers, props.csvFileName, data, sortSelected, appliedFilters, total, queryValue, props.fetchData, props.csvExpandKey])
 
   return (
     <div className={tableClass} style={{display: "flex", flexDirection: "column", gap: "20px"}}>
