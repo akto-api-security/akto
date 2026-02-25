@@ -2,7 +2,6 @@ package com.akto.filter;
 
 import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
-import com.akto.util.enums.GlobalEnums;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -11,9 +10,6 @@ import io.jsonwebtoken.Jws;
 import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
-import org.apache.commons.lang3.StringUtils;
-
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -43,18 +39,10 @@ public class AuthFilter implements Filter {
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
         String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
         String requestURI = httpServletRequest.getRequestURI();
-        String contextSourceHeader = httpServletRequest.getHeader("x-context-source");
 
         try {
             Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
             Context.accountId.set((int) claims.getBody().get(ACCOUNT_ID));
-            if (StringUtils.isNotBlank(contextSourceHeader)) {
-                try {
-                    Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.valueOf(contextSourceHeader));
-                } catch (Exception ex) {
-                    // Ignore parsing errors
-                }
-            }
         } catch (Exception e) {
             if (shouldSkipAuth(e, requestURI)) {
                 chain.doFilter(servletRequest, servletResponse);

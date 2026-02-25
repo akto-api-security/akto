@@ -39,7 +39,6 @@ import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -2430,8 +2429,8 @@ public class DbLayer {
         if (auditInfo.getHostCollectionId() != 0) {
             updateList.add(Updates.set(McpAuditInfo.HOST_COLLECTION_ID, auditInfo.getHostCollectionId()));
         }
-        if (Context.contextSource.get() != null) {
-            updateList.add(Updates.set(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get()));
+        if (StringUtils.isNotBlank(auditInfo.getContextSource())) {
+            updateList.add(Updates.set(McpAuditInfo.CONTEXT_SOURCE, auditInfo.getContextSource()));
         }
 
         Bson updates = Updates.combine(updateList.toArray(new Bson[0]));

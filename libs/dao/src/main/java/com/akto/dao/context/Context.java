@@ -2,7 +2,6 @@ package com.akto.dao.context;
 
 import com.akto.dao.AccountsDao;
 import com.akto.dto.Account;
-import com.akto.util.enums.GlobalEnums;
 
 import java.math.BigDecimal;
 import java.time.*;
@@ -10,11 +9,9 @@ import java.time.format.DateTimeFormatter;
 
 public class Context {
 public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
-public static ThreadLocal<GlobalEnums.CONTEXT_SOURCE> contextSource = new ThreadLocal<GlobalEnums.CONTEXT_SOURCE>();
 
     public static void resetContextThreadLocals() {
         accountId.remove();
-        contextSource.remove();
     }
 
     public static int getId() {
