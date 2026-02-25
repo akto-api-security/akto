@@ -1531,7 +1531,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">SENSITIVE_DATA</param>
+                <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
@@ -1551,8 +1551,11 @@
         <action name="api/saveBrowserExtensionConfig" class="com.akto.action.BrowserExtensionConfigAction" method="saveBrowserExtensionConfig">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">ACTIVE_ENDPOINTS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">SENSITIVE_DATA</param>
+                <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User saved browser extension config</param>
             </interceptor-ref>
@@ -1568,13 +1571,21 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
         </action>
 
         <action name="api/deleteBrowserExtensionConfigs" class="com.akto.action.BrowserExtensionConfigAction" method="deleteBrowserExtensionConfigs">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">ACTIVE_ENDPOINTS</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">SENSITIVE_DATA</param>
+                <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted browser extension configs</param>
             </interceptor-ref>
@@ -1589,6 +1600,11 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 

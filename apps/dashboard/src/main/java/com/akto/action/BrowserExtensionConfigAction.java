@@ -42,6 +42,7 @@ public class BrowserExtensionConfigAction extends UserAction {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching browser extension configs: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Failed to fetch browser extension configs");
             return ERROR.toUpperCase();
         }
     }
@@ -70,17 +71,17 @@ public class BrowserExtensionConfigAction extends UserAction {
             if (hexId != null && !hexId.isEmpty()) {
                 filter = Filters.eq(Constants.ID, new ObjectId(hexId));
             } else {
-                filter = Filters.eq("host", browserExtensionConfig.getHost());
+                filter = Filters.eq(BrowserExtensionConfig.HOST, browserExtensionConfig.getHost());
             }
 
             List<Bson> updates = new ArrayList<>();
-            updates.add(Updates.set("host", browserExtensionConfig.getHost().trim()));
-            updates.add(Updates.set("paths", browserExtensionConfig.getPaths()));
-            updates.add(Updates.set("active", browserExtensionConfig.isActive()));
-            updates.add(Updates.set("updatedTimestamp", currentTime));
-            updates.add(Updates.set("updatedBy", user.getLogin()));
-            updates.add(Updates.setOnInsert("createdBy", user.getLogin()));
-            updates.add(Updates.setOnInsert("createdTimestamp", currentTime));
+            updates.add(Updates.set(BrowserExtensionConfig.HOST, browserExtensionConfig.getHost().trim()));
+            updates.add(Updates.set(BrowserExtensionConfig.PATHS, browserExtensionConfig.getPaths()));
+            updates.add(Updates.set(BrowserExtensionConfig.ACTIVE, browserExtensionConfig.isActive()));
+            updates.add(Updates.set(BrowserExtensionConfig.UPDATED_TIMESTAMP, currentTime));
+            updates.add(Updates.set(BrowserExtensionConfig.UPDATED_BY, user.getLogin()));
+            updates.add(Updates.setOnInsert(BrowserExtensionConfig.CREATED_BY, user.getLogin()));
+            updates.add(Updates.setOnInsert(BrowserExtensionConfig.CREATED_TIMESTAMP, currentTime));
 
             BrowserExtensionConfigDao.instance.getMCollection().updateOne(
                 filter,
@@ -94,6 +95,7 @@ public class BrowserExtensionConfigAction extends UserAction {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error saving browser extension config: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Failed to save browser extension config");
             return ERROR.toUpperCase();
         }
     }
@@ -119,6 +121,7 @@ public class BrowserExtensionConfigAction extends UserAction {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error deleting browser extension configs: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Failed to delete browser extension configs");
             return ERROR.toUpperCase();
         }
     }
