@@ -544,7 +544,6 @@ function GuardrailPolicies() {
             loading={loading}
             selectable={true}
             promotedBulkActions={promotedBulkActions}
-
         />
     ];
 
