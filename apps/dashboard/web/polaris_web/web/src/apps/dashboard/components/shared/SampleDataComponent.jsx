@@ -331,6 +331,7 @@ function SampleDataComponent(props) {
                         showDiff={showDiff}
                         editorLanguage={simpleJson ? "json" : "custom_http"}
                         minHeight="600px"
+                        getLineNumbers={getLineNumbers}
                     /> : null}
                 </Modal.Section>
             </Modal>
