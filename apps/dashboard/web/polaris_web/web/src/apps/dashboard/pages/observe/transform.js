@@ -978,15 +978,8 @@ const transform = {
         if (endpoint == null || typeof endpoint !== 'string') return '';
         const s = endpoint.trim();
         if (!s) return '';
-        try {
-            if (s.startsWith('http://') || s.startsWith('https://')) {
-                const pathname = new URL(s).pathname;
-                return pathname.replace(/\/+$/, '') || '/';
-            }
-        } catch (_) {
-            // not a valid URL, treat as path
-        }
-        return s.replace(/\?.*$/, '').replace(/\/+$/, '') || '/';
+        const path = func.convertToRelativePath(s) || s;
+        return path.replace(/\?.*$/, '').replace(/\/+$/, '') || '/';
     },
 }
 

@@ -11,10 +11,10 @@ function ComponentRiskAnalysisBadges({ componentRiskAnalysis }) {
     const evidence = componentRiskAnalysis.evidence;
     const tags = [];
     if (isComponentMalicious) {
-        tags.push(<div key="malicious" className="badge-wrapper-HIGH"><Badge size="small">Malicious</Badge></div>);
+        tags.push(<Box key="malicious" className="badge-wrapper-HIGH"><Badge size="small">Malicious</Badge></Box>);
     }
     if (hasPrivilegedAccess) {
-        tags.push(<div key="privileged" className="badge-wrapper-MEDIUM"><Badge size="small">Privileged Access</Badge></div>);
+        tags.push(<Box key="privileged" className="badge-wrapper-MEDIUM"><Badge size="small">Privileged Access</Badge></Box>);
     }
     const content = tags.length > 0 ? (
         <VerticalStack gap="2">
