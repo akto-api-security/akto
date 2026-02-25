@@ -71,10 +71,8 @@ public class AgentClient {
             int totalExternalApiTokens = 0;
             for (AgentConversationResult result : conversationResults) {
                 int tokens = result.getExternalApiTokens();
-                loggerMaker.infoAndAddToDb("🔢 Adding tokens from conversation: " + tokens);
                 totalExternalApiTokens += tokens;
             }
-            loggerMaker.infoAndAddToDb("TOTAL External API Tokens for test: " + totalExternalApiTokens);
 
             TestResult testResult = new TestResult();
             // TODO: Fill in message field
@@ -86,7 +84,7 @@ public class AgentClient {
             testResult.setErrors(errors);
             testResult.setPercentageMatch(isVulnerable ? 0.0 : 100.0);
             testResult.setExternalApiTokens(totalExternalApiTokens);
-            loggerMaker.infoAndAddToDb("TestResult.externalApiTokens set to: " + testResult.getExternalApiTokens());
+            loggerMaker.info("TestResult.externalApiTokens set to: " + testResult.getExternalApiTokens());
 
             // Store conversation results in MongoDB
             storeConversationResults(conversationResults);
