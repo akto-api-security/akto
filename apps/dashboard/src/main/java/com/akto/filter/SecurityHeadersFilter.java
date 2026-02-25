@@ -27,11 +27,11 @@ public class SecurityHeadersFilter implements Filter {
                 "*.akto.io " +                                   // Akto
                 "*.intercom.io wss://*.intercom.io " +           // Intercom (HTTPS + WebSocket)
                 "cdn.mxpnl.com *.mixpanel.com *.clarity.ms " +  // Analytics
-                "cdn.jsdelivr.net d1hvi6xs55woen.cloudfront.net " + // CDNs
+                "cdn.jsdelivr.net d1hvi6xs55woen.cloudfront.net *.highcharts.com " + // CDNs
                 "*.getbeamer.com *.stigg.io *.api.stigg.io; " + // Third-party
-            "frame-src js.stripe.com; " +                        // Stripe iframe
-            "img-src 'self' data: blob: www.google.com; " +
-            "font-src 'self' data: fonts.googleapis.com cdn.jsdelivr.net d1hvi6xs55woen.cloudfront.net; " +
+            "frame-src js.stripe.com *.getbeamer.com; " +        // Stripe + Beamer iframes
+            "img-src 'self' data: blob: www.google.com *.youtube.com *.getbeamer.com *.intercomcdn.com d1hvi6xs55woen.cloudfront.net; " +
+            "font-src 'self' data: fonts.googleapis.com fonts.gstatic.com cdn.jsdelivr.net d1hvi6xs55woen.cloudfront.net; " +
             "frame-ancestors 'self'; " +
             "base-uri 'self'";
 

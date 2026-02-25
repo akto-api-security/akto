@@ -109,6 +109,29 @@ public class McpAgentAction extends UserAction {
                         // Increase timeout for large data
                         tokensLimit = 60000; // 60 seconds
                     }
+                } else if(StringUtils.isNotEmpty(type) && type.equals("test_execution_result")) {
+                    Object data = metaData.get("data");
+                    if(data != null && data instanceof Map) {
+                        Map<String, Object> dataMap = (Map<String, Object>) data;
+                        StringBuilder sb = new StringBuilder("Test Execution Result Context:\n");
+                        sb.append("Test Name: ").append(dataMap.getOrDefault("testName", "")).append("\n");
+                        sb.append("Test Category: ").append(dataMap.getOrDefault("testCategory", "")).append("\n");
+                        sb.append("Vulnerable: ").append(dataMap.getOrDefault("vulnerable", false)).append("\n");
+                        sb.append("Severity: ").append(dataMap.getOrDefault("severity", "")).append("\n");
+                        sb.append("URL: ").append(dataMap.getOrDefault("url", "")).append("\n");
+                        Object sampleReq = dataMap.get("sampleRequest");
+                        if(sampleReq != null) {
+                            String reqStr = sampleReq.toString();
+                            sb.append("Sample Request: ").append(reqStr, 0, Math.min(reqStr.length(), 2000)).append("\n");
+                        }
+                        Object sampleResp = dataMap.get("sampleResponse");
+                        if(sampleResp != null) {
+                            String respStr = sampleResp.toString();
+                            sb.append("Sample Response: ").append(respStr, 0, Math.min(respStr.length(), 2000)).append("\n");
+                        }
+                        contextString = sb.toString();
+                        tokensLimit = 40000;
+                    }
                 }
             }
 

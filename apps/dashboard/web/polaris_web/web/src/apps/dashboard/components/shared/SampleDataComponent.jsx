@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
 import {
-    ClipboardMinor,ArrowDownMinor, ArrowUpMinor
+    ClipboardMinor,ArrowDownMinor, ArrowUpMinor, MaximizeMajor
 } from '@shopify/polaris-icons';
 import {
     HorizontalStack, Box, LegacyCard,
-    Button, Popover, ActionList, Icon, Text, Tooltip
+    Button, Popover, ActionList, Icon, Text, Tooltip, Modal
 } from '@shopify/polaris';
 import SampleData from './SampleData';
 import func from "@/util/func";
@@ -13,17 +13,28 @@ import transform from './customDiffEditor';
 
 function SampleDataComponent(props) {
 
-    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true } = props;
+    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true, simpleJson = false } = props;
     const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [popoverActive, setPopoverActive] = useState({});
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
     const [currentIndex, setCurrentIndex] = useState({request: 0, response: 0})
     const [responseTime, setResponseTime] = useState(undefined)
     const [ipObj, setIpObj] = useState({sourceIP: "", destIP: ""})
+    const [expanded, setExpanded] = useState(false)
 
     const ref = useRef(null)
 
     useEffect(()=>{
+        if (simpleJson) {
+            setSampleJsonData((prev) => ({
+                ...prev,
+                [type]: {
+                    message: sampleData?.message || "",
+                    originalMessage: sampleData?.originalMessage,
+                }
+            }))
+            return
+        }
 
         // Metadata parsing: JSON only
         let parsed;
@@ -117,7 +128,7 @@ function SampleDataComponent(props) {
                 response: showResponse ? { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, ...(segmentsFromMetadata ? {} : {vulnerabilitySegments}) } : {},
             })
         }
-      }, [sampleData, metadata])
+    }, [sampleData, metadata, isNewDiff, showResponse, simpleJson, type])
 
     const copyContent = async(type,completeData) => {
         let copyString = "";
@@ -190,6 +201,7 @@ function SampleDataComponent(props) {
                     items[0].content = "Copy attempt request as curl"
                     items[1].content = "Copy attempt request as burp"
                 }
+                if(data?.originalMessage !== data?.message){
                 items.push({
                     content: 'Copy original request as curl',
                     onAction: () => { copyRequest(type, "CURL", data.originalMessage) },
@@ -198,6 +210,7 @@ function SampleDataComponent(props) {
                         content: 'Copy original request as burp',
                         onAction: () => { copyRequest(type, "BURP", data.originalMessage) },
                     })
+                }
             }
         } else {
             if (data.message) {
@@ -210,10 +223,12 @@ function SampleDataComponent(props) {
                 if(items.length==1){
                     items[0].content = "Copy attempt response"
                 }
+                if(data?.originalMessage != data?.message){
                 items.push({
                     content: 'Copy original response',
                     onAction: () => { copyRequest(type, "RESPONSE", data.originalMessage) },
                 })
+                }
             }
         }
 
@@ -247,6 +262,7 @@ function SampleDataComponent(props) {
     }
 
     let currentLineActive = lineNumbers && lineNumbers[type].length > 0 ? lineNumbers[type][currentIndex[type]] : 1
+    const currentMessage = sampleJsonData?.[type]?.message
     return (
 
         <Box id='sample-data-editor-container'>
@@ -259,7 +275,7 @@ function SampleDataComponent(props) {
                             (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`) 
                             : "" }
                         <HorizontalStack gap={2}>
-                        {isNewDiff ? <HorizontalStack gap="2">
+                        {isNewDiff && lineNumbers[type]?.length > 0 ? <HorizontalStack gap="2">
                                 <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="1">
                                     <Text variant="bodyMd" color="subdued">{ lineNumbers[type].length } changes</Text>
                                 </Box>
@@ -277,6 +293,13 @@ function SampleDataComponent(props) {
                                 </HorizontalStack>
                             </HorizontalStack> 
                             : null}
+                            <Button
+                                plain
+                                icon={MaximizeMajor}
+                                onClick={() => setExpanded(true)}
+                                accessibilityLabel={`Expand ${type}`}
+                                disabled={!currentMessage}
+                            />
                             <Tooltip content={`Copy ${type}`}>
                             <Popover
                                 zIndexOverride={"600"}
@@ -297,8 +320,20 @@ function SampleDataComponent(props) {
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={getEditorData}/> : null}
+                {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage={simpleJson ? "json" : "custom_http"} currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={getEditorData}/> : null}
             </LegacyCard.Section>
+
+            <Modal open={expanded} onClose={() => setExpanded(false)} title={func.toSentenceCase(type)} large>
+                <Modal.Section>
+                    {sampleJsonData[type] ? <SampleData
+                        data={sampleJsonData[type]}
+                        readOnly={readOnly}
+                        showDiff={showDiff}
+                        editorLanguage={simpleJson ? "json" : "custom_http"}
+                        minHeight="600px"
+                    /> : null}
+                </Modal.Section>
+            </Modal>
         </Box>
     )
 

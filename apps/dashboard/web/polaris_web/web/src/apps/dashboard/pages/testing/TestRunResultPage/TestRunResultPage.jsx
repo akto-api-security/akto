@@ -13,6 +13,7 @@ import LocalStore from '../../../../main/LocalStorageStore';
 import observeFunc from "../../observe/transform"
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import issuesApi from "../../issues/api";
+import { sendQuery } from '../../agentic/services/agenticService';
 
 let headerDetails = [
   {
@@ -84,6 +85,14 @@ function TestRunResultPage(props) {
   const [validationFailed, setValidationFailed] = useState(false)
   const [showForbidden, setShowForbidden] = useState(false)
 
+  // AI Chat state
+  const [aiConversationId, setAiConversationId] = useState(null)
+  const [aiMessages, setAiMessages] = useState([])
+  const [aiSummary, setAiSummary] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false)
+  const [aiSummaryChecked, setAiSummaryChecked] = useState(false)
+
   const useFlyout = location.pathname.includes("test-editor") ? false : true
 
   const setToastConfig = Store(state => state.setToastConfig)
@@ -133,6 +142,72 @@ function TestRunResultPage(props) {
 
   async function attachFileToIssue(origReq, testReq, issueId) {
     let jiraInteg = await api.attachFileToIssue(origReq, testReq, issueId);
+  }
+
+  function buildTestResultMetadata() {
+    return {
+      type: "test_execution_result",
+      data: {
+        testName: selectedTestRunResult?.name,
+        testCategory: selectedTestRunResult?.testCategory,
+        testCategoryId: selectedTestRunResult?.testCategoryId,
+        vulnerable: selectedTestRunResult?.vulnerable,
+        severity: issueDetails?.severity,
+        url: selectedTestRunResult?.url || "",
+        sampleRequest: selectedTestRunResult?.testResults?.[0]?.originalMessage?.substring(0, 2000) || null,
+        sampleResponse: selectedTestRunResult?.testResults?.[0]?.message?.substring(0, 2000) || null,
+      }
+    };
+  }
+
+  async function handleGenerateAiOverview() {
+    if (aiSummary || aiSummaryLoading || aiSummaryChecked) return;
+    setAiSummaryLoading(true);
+    setAiSummaryChecked(true);
+    try {
+      const metaData = buildTestResultMetadata();
+      const response = await sendQuery(
+        "Analyze this test result and provide a plain text summary in 1-2 sentences. No markdown, no headers, no bullet points, no formatting. Just plain sentences.",
+        null,
+        "TEST_EXECUTION_RESULT",
+        metaData
+      );
+      if (response?.conversationId) {
+        setAiConversationId(response.conversationId);
+      }
+      if (response?.response) {
+        setAiSummary(response.response);
+      }
+    } catch (err) {
+    } finally {
+      setAiSummaryLoading(false);
+    }
+  }
+
+  async function handleSendFollowUp(query) {
+    if (!query.trim() || aiLoading) return;
+    const userMsg = { _id: "user_" + Date.now(), role: "user", message: query };
+    setAiMessages(prev => [...prev, userMsg]);
+    setAiLoading(true);
+    try {
+      const response = await sendQuery(query, aiConversationId, "TEST_EXECUTION_RESULT", null);
+      if (response?.conversationId && !aiConversationId) {
+        setAiConversationId(response.conversationId);
+      }
+      if (response?.response) {
+        const aiMsg = {
+          _id: "system_" + Date.now(),
+          role: "system",
+          message: response.response,
+          isComplete: true,
+          isFromHistory: false
+        };
+        setAiMessages(prev => [...prev, aiMsg]);
+      }
+    } catch (err) {
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   async function fetchData() {
@@ -292,6 +367,13 @@ function TestRunResultPage(props) {
   }
 
   useEffect(() => {
+    // Reset AI chat state when test result changes
+    setAiConversationId(null);
+    setAiMessages([]);
+    setAiSummary(null);
+    setAiLoading(false);
+    setAiSummaryLoading(false);
+    setAiSummaryChecked(false);
     fetchData();
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props, hexId2])
 
@@ -321,6 +403,12 @@ function TestRunResultPage(props) {
           conversationRemediationText={conversationRemediationText}
           validationFailed={validationFailed}
           showForbidden={showForbidden}
+          aiSummary={aiSummary}
+          aiSummaryLoading={aiSummaryLoading}
+          aiMessages={aiMessages}
+          aiLoading={aiLoading}
+          onGenerateAiOverview={handleGenerateAiOverview}
+          onSendFollowUp={handleSendFollowUp}
         />
       </>
       :

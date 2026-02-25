@@ -5,8 +5,8 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, ActionList } from '@shopify/polaris'
-import { EditMinor } from '@shopify/polaris-icons'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, Tooltip, VerticalStack, Link, ActionList } from '@shopify/polaris'
+import { EditMinor, FileMinor } from '@shopify/polaris-icons'
 import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
@@ -27,11 +27,13 @@ import ApiGroups from '../../../components/shared/ApiGroups'
 import ForbiddenRole from '../../../components/shared/ForbiddenRole'
 import LegendLabel from './LegendLabel.jsx'
 import TestRunResultChat from './TestRunResultChat.jsx'
+import AskAktoSection from './AskAktoSection.jsx'
+import PersistStore from '../../../../main/PersistStore'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -77,6 +79,8 @@ function TestRunResultFlyout(props) {
         noTimeToFix: false,
         acceptableFix: false
     })
+
+    const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
 
     const fetchRemediationInfo = useCallback(async (testId) => {
         if (testId && testId.length > 0) {
@@ -408,6 +412,18 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
+    const openUrlInTestEditor = () => {
+        const apiInfoKey = issueDetails?.id?.apiInfoKey
+        if (!apiInfoKey) return
+        setSelectedSampleApi({
+            apiCollectionId: apiInfoKey.apiCollectionId,
+            url: apiInfoKey.url,
+            method: { "_name": apiInfoKey.method }
+        })
+        const navUrl = window.location.origin + "/dashboard/test-editor/" + selectedTestRunResult.testCategoryId
+        window.open(navUrl, "_blank")
+    }
+
     const categoryKey = selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] || selectedTestRunResult?.testCategory;
     const owaspData = func.categoryMapping[categoryKey] || {};
     const owaspMapping = owaspData.label || "";
@@ -543,6 +559,11 @@ function TestRunResultFlyout(props) {
                     <ApiGroups collectionIds={apiInfo?.collectionIds} />
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
+                    {issueDetails?.id?.apiInfoKey && (
+                        <Tooltip content="Open URL in test editor" dismissOnMouseOut>
+                            <Button monochrome onClick={openUrlInTestEditor} icon={FileMinor} />
+                        </Tooltip>
+                    )}
                     <ActionsComp />
 
                     {selectedTestRunResult && selectedTestRunResult.vulnerable &&
@@ -623,7 +644,7 @@ function TestRunResultFlyout(props) {
     const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
 
     // Component that handles vulnerability analysis only when mounted
-    const ValuesTabContent = React.memo(() => {
+    const ValuesTabContent = React.memo(({ isAgentic = false } = {}) => {
 
         useEffect(() => {
             // Check if vulnerability highlighting is enabled (use existing GPT feature flag)
@@ -643,7 +664,6 @@ function TestRunResultFlyout(props) {
                             try {
                                 messageObj = JSON.parse(messageObj);
                             } catch (e) {
-                                console.error('Failed to parse message string for idx', idx, e);
                                 return null;
                             }
                         }
@@ -706,7 +726,6 @@ function TestRunResultFlyout(props) {
                                 }
                                 return { idx, success: true };
                             } catch (error) {
-                                console.error('Failed to analyze vulnerability for result', idx, error);
                                 return { idx, success: false };
                             }
                         }
@@ -750,6 +769,12 @@ function TestRunResultFlyout(props) {
                                 // Add vulnerability highlights only for response
                                 let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
                                 if (result.originalMessage || result.message) {
+                                    if(isAgentic){
+                                        return {
+                                            originalMessage: result.message,
+                                            message: result.message
+                                        }
+                                    }
                                     return {
                                         originalMessage: result.originalMessage,
                                         message: result.message,
@@ -767,6 +792,8 @@ function TestRunResultFlyout(props) {
         );
     });
 
+    const hasConversations = conversations?.length > 0
+
     const conversationTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
 
@@ -777,7 +804,6 @@ function TestRunResultFlyout(props) {
         // TODO: Implement real message sending handler
         // Replace with actual API call when chat endpoint is available
         const handleSendMessage = (msg) => {
-            console.log("TODO: Send message to backend:", msg);
             // Future: Call testingApi.sendChatMessage(issueDetails.id, msg)
         };
 
@@ -793,6 +819,17 @@ function TestRunResultFlyout(props) {
         }
     }, [selectedTestRunResult, conversations])
 
+    const attemptTabForConversations = useMemo(() => {
+        if (!hasConversations) return null;
+        const hasTestResultsMessages = selectedTestRunResult?.testResults?.some(result => result.message);
+        if(!hasTestResultsMessages) return null;
+        return {
+            id: 'attempt',
+            content: "Attempt",
+            component: <ValuesTabContent isAgentic />
+        };
+    }, [hasConversations, selectedTestRunResult])
+
     const ValuesTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
         return {
@@ -802,7 +839,11 @@ function TestRunResultFlyout(props) {
         }
     }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag])
 
-    const finalResultTab = conversations?.length > 0 ? conversationTab : ValuesTab
+    const resultTabs = hasConversations
+        ? [conversationTab, attemptTabForConversations].filter(Boolean)
+        : [ValuesTab]
+
+    const finalResultTab = hasConversations ? conversationTab : ValuesTab
 
     function RowComp({ cardObj }) {
         const { title, value, tooltipContent } = cardObj
@@ -957,14 +998,27 @@ function TestRunResultFlyout(props) {
     const tabsComponent = (
         <LayoutWithTabs
             key={issueDetails?.id}
-            tabs={issueDetails?.id ? [overviewTab, timelineTab, finalResultTab, remediationTab].filter(Boolean) : [attemptTab]}
+            tabs={issueDetails?.id ? [overviewTab, timelineTab, ...resultTabs, remediationTab].filter(Boolean) : (hasConversations ? [conversationTab, attemptTabForConversations].filter(Boolean) : [attemptTab])}
             currTab={() => { }}
         />
     )
 
+    const isAktoUser = window.USER_NAME && window.USER_NAME.endsWith('@akto.io')
+
+    const askAktoComp = isAktoUser ? (
+        <AskAktoSection
+            aiSummary={aiSummary}
+            aiSummaryLoading={aiSummaryLoading}
+            aiMessages={aiMessages}
+            aiLoading={aiLoading}
+            onGenerateAiOverview={onGenerateAiOverview}
+            onSendFollowUp={onSendFollowUp}
+        />
+    ) : null
+
     const currentComponents = showForbidden
         ? [<Box padding="4"><ForbiddenRole /></Box>]
-        : [<TitleComponent />, tabsComponent]
+        : [<TitleComponent />, askAktoComp, tabsComponent].filter(Boolean)
 
     const title = isIssuePage ? "Issue details" : mapLabel('Test result', getDashboardCategory())
 

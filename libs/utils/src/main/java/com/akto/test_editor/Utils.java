@@ -941,6 +941,24 @@ public class Utils {
         }
         return val;
     }
+
+    private static Object resolveSelfBodyParamValue(RawApi rawApi, Object key, Object value) {
+        if (!(value instanceof String) || key == null) {
+            return value;
+        }
+
+        String valueStr = value.toString();
+        if (!valueStr.contains("${self}")) {
+            return value;
+        }
+
+        List<String> existingValues = Utils.findAllValuesForKey(rawApi.getRequest().getBody(), key.toString(), false);
+        if (existingValues.isEmpty()) {
+            return value;
+        }
+
+        return valueStr.replace("${self}", existingValues.get(0));
+    }
     
     public static String escapeSpecialCharacters(String inputString){
         String specialChars = "\\.*+?^${}()|[]";
@@ -966,6 +984,7 @@ public class Utils {
                 }
                 return Operations.addBody(rawApi, key.toString(), value);
             case "modify_body_param":
+                value = resolveSelfBodyParamValue(rawApi, key, value);
                 epochVal = Utils.getEpochTime(value);
                 if (epochVal != null) {
                     value = epochVal;
