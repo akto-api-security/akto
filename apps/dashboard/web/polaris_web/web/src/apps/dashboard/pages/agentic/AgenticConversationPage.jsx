@@ -173,6 +173,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                 const aiMessage = {
                     _id: "system_" + Date.now(),
                     message: res.response,
+                    thinkingBlocks: res.thinkingBlocks || null,
                     role: "system",
                     isComplete: true,
                     isFromHistory: false
@@ -254,6 +255,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                                     <VerticalStack key={message.id || `response-${index}`} gap="2" align="start">
                                         <AgenticStreamingResponse
                                             content={message.message}
+                                            thinkingBlocks={message.thinkingBlocks}
                                             onStreamingComplete={() => handleStreamingComplete(message._id)}
                                             skipStreaming={message.isFromHistory || false}
                                         />

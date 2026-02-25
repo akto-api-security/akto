@@ -23,7 +23,7 @@ public class AgentConversationResult extends GenericAgentConversation {
     private List<Pair<String, String>> addedConversations;
 
     public AgentConversationResult(String conversationId, String originalPrompt, String response, List<String> conversation, int timestamp, boolean validation, String validationMessage, String finalSentPrompt, String remediationMessage){
-        super("", conversationId, originalPrompt, response,finalSentPrompt, timestamp, timestamp, 0, 0, ConversationType.TEST_EXECUTION_RESULT);
+        super("", conversationId, originalPrompt, response,finalSentPrompt, timestamp, timestamp, 0, 0, ConversationType.TEST_EXECUTION_RESULT, null);
         this.validation = validation;
         this.validationMessage = validationMessage;
         this.remediationMessage = remediationMessage;

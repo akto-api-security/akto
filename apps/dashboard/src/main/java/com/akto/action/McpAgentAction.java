@@ -148,6 +148,12 @@ public class McpAgentAction extends UserAction {
             this.response.put("finalSentPrompt", responseFromMcpServer.getFinalSentPrompt());
             this.response.put("tokensUsed", responseFromMcpServer.getTokensUsed());
             this.response.put("title", responseFromMcpServer.getTitle());
+            if (responseFromMcpServer.getThinkingBlocks() != null && !responseFromMcpServer.getThinkingBlocks().isEmpty()) {
+                this.response.put("thinkingBlocks", responseFromMcpServer.getThinkingBlocks());
+                logger.info("✓ ThinkingBlocks added to response: " + responseFromMcpServer.getThinkingBlocks().size() + " blocks");
+            } else {
+                logger.info("✗ ThinkingBlocks is null or empty. Value: " + (responseFromMcpServer.getThinkingBlocks() == null ? "null" : "empty list"));
+            }
         }catch(Exception e) {
             logger.error("Error chatting and storing conversation", e);
             return ERROR.toUpperCase();

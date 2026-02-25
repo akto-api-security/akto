@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import java.util.List;
 
 @Getter
 @Setter
@@ -30,4 +31,5 @@ public class GenericAgentConversation {
     private int tokensUsed;
     private int tokensLimit;
     private ConversationType conversationType;
+    private List<String> thinkingBlocks;
 }
