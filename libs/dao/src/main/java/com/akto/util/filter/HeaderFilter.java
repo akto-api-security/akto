@@ -10,21 +10,34 @@ import java.util.Set;
  */
 public class HeaderFilter {
 
-    // Headers to ignore - common infrastructure and browser headers
     private static final Set<String> IGNORED_HEADERS = new HashSet<>(Arrays.asList(
-        "user-agent",
-        "x-forwarded-proto",
-        "accept-encoding",
-        "date",
-        "accept",
-        "cache-control",
-        "connection",
-        "pragma",
-        "akamai-origin-hop",
-        "x-akamai-config-log-detail",
-        "cdn-loop",
-        "accept-language",
-        "etag",
+        // Proxy/Infrastructure headers (14)
+        "x-forwarded-for", "x-forwarded-host", "x-forwarded-port", "x-forwarded-proto",
+        "x-forwarded-scheme", "x-forwarded-client-cert", "x-original-forwarded-for",
+        "x-real-ip", "x-envoy-attempt-count", "x-envoy-external-address",
+        "x-request-id", "x-scheme", "via", "host",
+
+        // Browser/Client metadata headers (10)
+        "user-agent", "accept-encoding", "accept-language", "sec-ch-ua",
+        "sec-ch-ua-mobile", "sec-ch-ua-platform", "sec-fetch-dest",
+        "sec-fetch-mode", "sec-fetch-site", "dnt",
+
+        // CORS/Browser security headers (3)
+        "origin", "referer", "upgrade-insecure-requests",
+
+        // Auto-calculated headers (1)
+        "content-length",
+
+        // Misplaced response headers in request (1)
+        "access-control-allow-origin",
+
+        // Additional common headers (previously included) (7)
+        "date", "accept", "cache-control", "connection", "pragma", "etag", "priority", "vary",
+
+        // CDN/Infrastructure specific (3)
+        "akamai-origin-hop", "x-akamai-config-log-detail", "cdn-loop",
+
+        // Custom internal headers (1)
         "x-src-id"
     ));
 
