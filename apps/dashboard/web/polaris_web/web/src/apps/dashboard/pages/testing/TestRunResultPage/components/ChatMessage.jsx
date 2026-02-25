@@ -118,31 +118,6 @@ function extractPrettyJson(content) {
     }
 }
 
-// Utility: Detect multipart content
-function isMultipartContent(content) {
-    if (!content) return false;
-    // Simple regex for boundary marker and content-type header
-    const hasBoundary = /--[a-zA-Z0-9_-]+/m.test(content);
-    const hasContentType = /content-type\s*:/i.test(content);
-    return hasBoundary || hasContentType;
-}
-
-// Utility: Unescape JSON-encoded content
-function unescapeContent(content) {
-    if (!content) return content;
-    try {
-        // Convert escaped sequences from transport payloads into readable text
-        return content
-            .replace(/\\r\\n/g, '\r\n')
-            .replace(/\\n/g, '\n')
-            .replace(/\\t/g, '\t')
-            .replace(/\\"/g, '"')
-            .replace(/\\\\/g, '\\');
-    } catch {
-        return content;
-    }
-}
-
 function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt }) {
 
     const isRequest = type === MESSAGE_TYPES.REQUEST;
@@ -194,14 +169,30 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
 
     // Determine if content should be rendered as code
     const shouldRenderAsCode = isCode !== undefined ? isCode : isRequest;
-    const isMultipart = !shouldRenderAsCode && isMultipartContent(content);
 
-    const { prettyJson, prefix, beforeText, afterText } = useMemo(() => {
+    const { prettyJson, beforeText, afterText } = useMemo(() => {
         if (shouldRenderAsCode) {
             return { prettyJson: null, prefix: null, beforeText: null, afterText: null };
         }
         return extractPrettyJson(content);
     }, [shouldRenderAsCode, content]); 
+
+    const isHybridMessage = Boolean(prettyJson && (beforeText || afterText));
+
+    const decodedRawContent = useMemo(() => {
+        if (!content || shouldRenderAsCode || prettyJson) {
+            return null;
+        }
+
+        const decoded = content
+            .replace(/\\r\\n/g, '\r\n')
+            .replace(/\\n/g, '\n')
+            .replace(/\\t/g, '\t')
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\');
+
+        return decoded !== content ? decoded : null;
+    }, [content, shouldRenderAsCode, prettyJson]);
 
     return (
         <Box padding="3">
@@ -255,17 +246,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                     {content}
                                 </Box>
                             </Box>
-                        ) : isMultipart ? (
-                            <Box paddingBlockStart="1">
-                                <SampleDataComponent
-                                    type="response"
-                                    sampleData={{ message: unescapeContent(content) }}
-                                    minHeight="200px"
-                                    readOnly={true}
-                                    simpleJson={true}
-                                />
-                            </Box>
-                        ) : prettyJson ? (
+                        ) : isHybridMessage ? (
                             <VerticalStack gap="2">
                                 {beforeText && <MarkdownViewer markdown={beforeText} />}
                                 <SampleDataComponent
@@ -277,8 +258,24 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                 />
                                 {afterText && <MarkdownViewer markdown={afterText} />}
                             </VerticalStack>
+                        ) : prettyJson ? (
+                            <SampleDataComponent
+                                type="response"
+                                sampleData={{ message: prettyJson }}
+                                minHeight="200px"
+                                readOnly={true}
+                                simpleJson={true}
+                            />
+                        ) : decodedRawContent ? (
+                            <SampleDataComponent
+                                type="response"
+                                sampleData={{ message: decodedRawContent }}
+                                minHeight="200px"
+                                readOnly={true}
+                                simpleJson={true}
+                            />
                         ) : (
-                            <MarkdownViewer markdown={prefix || content} />
+                            <MarkdownViewer markdown={content} />
                         )}
 
                         {/* Vulnerability Badge */}
