@@ -134,7 +134,7 @@ function SampleDataComponent(props) {
         let copyString = "";
         let snackBarMessage = ""
         completeData = JSON.parse(completeData);
-        if (type === "RESPONSE") {
+        if (type=="RESPONSE") {
             let responsePayload = {}
             let responseHeaders = {}
             let statusCode = 0
@@ -185,7 +185,7 @@ function SampleDataComponent(props) {
     function getItems(type, data) {
         let items = []
 
-        if (type === "request") {
+        if (type == "request") {
             if (data.message) {
                 items.push({
                     content: 'Copy request as curl',
@@ -197,7 +197,7 @@ function SampleDataComponent(props) {
                     })
             }
             if (data.originalMessage) {
-                if(items.length === 2){
+                if(items.length==2){
                     items[0].content = "Copy attempt request as curl"
                     items[1].content = "Copy attempt request as burp"
                 }
@@ -220,10 +220,10 @@ function SampleDataComponent(props) {
                 })
             }
             if (data.originalMessage) {
-                if(items.length === 1){
+                if(items.length==1){
                     items[0].content = "Copy attempt response"
                 }
-                if(data?.originalMessage !== data?.message){
+                if(data?.originalMessage != data?.message){
                 items.push({
                     content: 'Copy original response',
                     onAction: () => { copyRequest(type, "RESPONSE", data.originalMessage) },
