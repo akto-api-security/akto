@@ -257,7 +257,7 @@ public class IssuesAction extends UserAction {
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
         );
         
-        // Apply dashboard filtering
+        // Apply dashboard filtering (handles API Security backward compatibility internally)
         Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilters);
 
         Bson totalIssuesMatchStage = Aggregates.match(dashboardFilter);
@@ -1218,17 +1218,9 @@ public class IssuesAction extends UserAction {
     }
 
     public String fetchSeverityInfoForIssues() {
-        Bson filter = createFilters(true);
-
-        if (issuesIds != null && !issuesIds.isEmpty()) {
-            filter = Filters.and(filter, Filters.in(Constants.ID, issuesIds));
-        }
-
-        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
-        filter = Filters.and(
-            filter,
-            Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, deactivatedCollections)
-        );
+        Bson filters = createFilters(true);      
+        // Apply dashboard filtering (RBAC + dashboardContext)
+        Bson filter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(filters);
 
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
                 .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
