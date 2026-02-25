@@ -177,8 +177,6 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
         return extractPrettyJson(content);
     }, [shouldRenderAsCode, content]); 
 
-    const isHybridMessage = Boolean(prettyJson && (beforeText || afterText));
-
     const decodedRawContent = useMemo(() => {
         if (!content || shouldRenderAsCode || prettyJson) {
             return null;
@@ -246,7 +244,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                     {content}
                                 </Box>
                             </Box>
-                        ) : isHybridMessage ? (
+                        ) : prettyJson ? (
                             <VerticalStack gap="2">
                                 {beforeText && <MarkdownViewer markdown={beforeText} />}
                                 <SampleDataComponent
@@ -258,14 +256,6 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                 />
                                 {afterText && <MarkdownViewer markdown={afterText} />}
                             </VerticalStack>
-                        ) : prettyJson ? (
-                            <SampleDataComponent
-                                type="response"
-                                sampleData={{ message: prettyJson }}
-                                minHeight="200px"
-                                readOnly={true}
-                                simpleJson={true}
-                            />
                         ) : decodedRawContent ? (
                             <SampleDataComponent
                                 type="response"
