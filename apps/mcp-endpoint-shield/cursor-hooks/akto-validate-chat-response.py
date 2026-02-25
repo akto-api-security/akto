@@ -140,10 +140,6 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.error(f"API CALL FAILED after {duration_ms}ms: {e}")
         raise
 
-def uuid_to_ipv6_simple(uuid_str):
-    hex_str = uuid_str.replace("-", "").lower()
-    return ":".join(hex_str[i:i+4] for i in range(0, 32, 4))
-
 def build_ingestion_payload(response_text: str) -> Dict[str, Any]:
     """Build the request body for data ingestion."""
     import time
@@ -188,8 +184,7 @@ def build_ingestion_payload(response_text: str) -> Dict[str, Any]:
         "method": "POST",
         "requestPayload": request_payload,
         "responsePayload": response_payload,
-        "ip": uuid_to_ipv6_simple(device_id),
-        "user": get_username(),
+        "ip": get_username(),
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": "200",

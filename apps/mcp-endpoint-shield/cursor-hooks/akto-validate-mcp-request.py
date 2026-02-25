@@ -191,10 +191,6 @@ def extract_mcp_server_name(input_data: Dict[str, Any]) -> str:
                 return parts[1]
     return "cursor-unknown"
 
-def uuid_to_ipv6_simple(uuid_str):
-    hex_str = uuid_str.replace("-", "").lower()
-    return ":".join(hex_str[i:i+4] for i in range(0, 32, 4))
-
 def build_validation_request(tool_input: str, mcp_server_name: str) -> dict:
     """Build the request body for guardrails validation."""
     import time
@@ -241,8 +237,7 @@ def build_validation_request(tool_input: str, mcp_server_name: str) -> dict:
         "method": "POST",
         "requestPayload": request_payload,
         "responsePayload": response_payload,
-        "ip": uuid_to_ipv6_simple(device_id),
-        "user": get_username(),
+        "ip": get_username(),
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": "200",
