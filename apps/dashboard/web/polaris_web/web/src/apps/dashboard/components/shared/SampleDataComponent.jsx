@@ -128,18 +128,11 @@ function SampleDataComponent(props) {
                 response: showResponse ? { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, ...(segmentsFromMetadata ? {} : {vulnerabilitySegments}) } : {},
             })
         }
-    }, [sampleData, metadata, simpleJson, type, isNewDiff, showResponse])
+    }, [sampleData, metadata, isNewDiff, showResponse, simpleJson, type])
 
     const copyContent = async(type,completeData) => {
         let copyString = "";
         let snackBarMessage = ""
-
-        if (simpleJson) {
-            copyString = completeData || ""
-            snackBarMessage = "JSON copied to clipboard"
-            return { copyString, snackBarMessage }
-        }
-
         completeData = JSON.parse(completeData);
         if (type === "RESPONSE") {
             let responsePayload = {}
@@ -191,16 +184,6 @@ function SampleDataComponent(props) {
 
     function getItems(type, data) {
         let items = []
-
-        if (simpleJson) {
-            if (data?.message) {
-                items.push({
-                    content: 'Copy JSON',
-                    onAction: () => { copyRequest(type, "JSON", data.message) },
-                })
-            }
-            return items
-        }
 
         if (type === "request") {
             if (data.message) {
@@ -287,12 +270,12 @@ function SampleDataComponent(props) {
                 <Box padding={"2"}>
                     <HorizontalStack padding="2" align='space-between'>
                         {func.toSentenceCase(type)} 
-                        { !simpleJson && type==="response" && responseTime ? (` (${responseTime} ms)`) : "" }
-                        { !simpleJson && type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ?
+                        { type==="response" && responseTime ? (` (${responseTime} ms)`) : "" }
+                        { type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ? 
                             (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`) 
                             : "" }
                         <HorizontalStack gap={2}>
-                        {!simpleJson && isNewDiff && lineNumbers[type]?.length > 0 ? <HorizontalStack gap="2">
+                        {isNewDiff && lineNumbers[type]?.length > 0 ? <HorizontalStack gap="2">
                                 <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="1">
                                     <Text variant="bodyMd" color="subdued">{ lineNumbers[type].length } changes</Text>
                                 </Box>
@@ -341,16 +324,16 @@ function SampleDataComponent(props) {
             </LegacyCard.Section>
 
             <Modal open={expanded} onClose={() => setExpanded(false)} title={func.toSentenceCase(type)} large>
-                    <Modal.Section>
-                        {sampleJsonData[type] ? <SampleData
-                            data={sampleJsonData[type]}
-                            readOnly={readOnly}
-                            showDiff={showDiff}
-                            editorLanguage={simpleJson ? "json" : "custom_http"}
-                            minHeight="600px"
-                        /> : null}
-                    </Modal.Section>
-                </Modal>
+                <Modal.Section>
+                    {sampleJsonData[type] ? <SampleData
+                        data={sampleJsonData[type]}
+                        readOnly={readOnly}
+                        showDiff={showDiff}
+                        editorLanguage={simpleJson ? "json" : "custom_http"}
+                        minHeight="600px"
+                    /> : null}
+                </Modal.Section>
+            </Modal>
         </Box>
     )
 
