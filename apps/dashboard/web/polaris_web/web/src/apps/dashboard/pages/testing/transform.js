@@ -1453,6 +1453,7 @@ const transform = {
         ...commonObj,
         _id: "user_" + conversation.prompt,
         message: conversation?.finalSentPrompt || conversation.prompt,
+        originalPrompt: conversation.prompt,
         validation:conversation?.validation,
         role: "user"
       })

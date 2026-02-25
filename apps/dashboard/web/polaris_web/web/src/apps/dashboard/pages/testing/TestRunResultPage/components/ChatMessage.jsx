@@ -1,9 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Box, VerticalStack, HorizontalStack, Text, Badge } from '@shopify/polaris';
+import { Box, VerticalStack, HorizontalStack, Text, Badge, Button, Tooltip } from '@shopify/polaris';
+import { InfoMinor } from '@shopify/polaris-icons';
 import MarkdownViewer from '../../../../components/shared/MarkdownViewer';
 import SampleDataComponent from '../../../../components/shared/SampleDataComponent';
 import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES, VULNERABILITY_BADGE } from './chatConstants';
+import ChatInfoModal from './ChatInfoModal';
 import func from "@/util/func";
 
 // This is done for Hybrid messages -> Markdown + JSON 
@@ -116,7 +118,7 @@ function extractPrettyJson(content) {
     }
 }
 
-function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode }) {
+function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt }) {
     const isRequest = type === MESSAGE_TYPES.REQUEST;
 
     // Icon
@@ -125,6 +127,29 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
 
     // Label
     const label = customLabel || (isRequest ? MESSAGE_LABELS.TESTED_INTERACTION : MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE);
+    const isAiAgentLabel = label === MESSAGE_LABELS.AKTO_AI_AGENT_RESPONSE;
+    const isTestedInteraction = label === MESSAGE_LABELS.TESTED_INTERACTION;
+    const hasModifiedPrompt = isTestedInteraction && originalPrompt;
+    const hasHttpAttempt = isAiAgentLabel && onOpenAttempt;
+
+    const [infoModalOpen, setInfoModalOpen] = useState(false);
+    const [infoModalData, setInfoModalData] = useState({ type: 'text', title: '', content: null, sampleData: null });
+
+    const handleOpenPromptModal = () => {
+        setInfoModalData({
+            type: 'text',
+            title: 'Original Prompt',
+            content: originalPrompt,
+            sampleData: null,
+        });
+        setInfoModalOpen(true);
+    };
+
+    const handleOpenHttpModal = () => {
+        if (onOpenAttempt) {
+            onOpenAttempt();
+        }
+    };
 
     // Format timestamp with memoization
     const formattedTime = useMemo(() => func.formatChatTimestamp(timestamp), [timestamp]);
@@ -137,7 +162,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
             return { prettyJson: null, prefix: null, beforeText: null, afterText: null };
         }
         return extractPrettyJson(content);
-    }, [shouldRenderAsCode, content]);
+    }, [shouldRenderAsCode, content]); 
 
     return (
         <Box padding="3">
@@ -159,9 +184,33 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                     <VerticalStack gap="1">
                         {/* Header */}
                         <HorizontalStack align="space-between" blockAlign="center">
-                            <Text variant="bodyMd" fontWeight="semibold" color="subdued">
-                                {label}
-                            </Text>
+                            <HorizontalStack gap="1" blockAlign="center">
+                                <Text variant="bodyMd" fontWeight="semibold" color="subdued">
+                                    {label}
+                                </Text>
+                                {hasModifiedPrompt && (
+                                    <Tooltip content="View original prompt" dismissOnMouseOut>
+                                        <Button
+                                            plain
+                                            monochrome
+                                            icon={InfoMinor}
+                                            onClick={handleOpenPromptModal}
+                                            accessibilityLabel="View original prompt"
+                                        />
+                                    </Tooltip>
+                                )}
+                                {hasHttpAttempt && (
+                                    <Tooltip content="View HTTP attempt" dismissOnMouseOut>
+                                        <Button
+                                            plain
+                                            monochrome
+                                            icon={InfoMinor}
+                                            onClick={handleOpenHttpModal}
+                                            accessibilityLabel="View HTTP attempt in Monaco editor"
+                                        />
+                                    </Tooltip>
+                                )}
+                            </HorizontalStack>
                             <Text variant="bodySm" color="subdued">{formattedTime}</Text>
                         </HorizontalStack>
 
@@ -204,6 +253,15 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                 </Box>
             </Box>
 
+            {/* Reusable Info Modal */}
+            <ChatInfoModal
+                open={infoModalOpen}
+                onClose={() => setInfoModalOpen(false)}
+                title={infoModalData.title}
+                type={infoModalData.type}
+                content={infoModalData.content}
+                sampleData={infoModalData.sampleData}
+            />
         </Box>
     );
 }
@@ -215,6 +273,8 @@ ChatMessage.propTypes = {
     isVulnerable: PropTypes.bool,
     customLabel: PropTypes.string,
     isCode: PropTypes.bool,
+    onOpenAttempt: PropTypes.func,
+    originalPrompt: PropTypes.string,
 };
 
 ChatMessage.defaultProps = {
@@ -222,6 +282,8 @@ ChatMessage.defaultProps = {
     isVulnerable: false,
     customLabel: null,
     isCode: undefined,
+    onOpenAttempt: null,
+    originalPrompt: null,
 };
 
 export default ChatMessage;
