@@ -39,7 +39,7 @@ public class HTTPClientHandler {
     }
 
     private HTTPClientHandler(boolean isSaas) {
-        if(isSaas) readTimeout = 60;
+        readTimeout = 60;
 
         clientWithoutFollowRedirect = builder(false, readTimeout).build();
         clientWithFollowRedirect = builder(true, readTimeout).build();
@@ -53,7 +53,7 @@ public class HTTPClientHandler {
     }
 
     public OkHttpClient getNewDebugClient(boolean isSaas, boolean followRedirects, List<TestingRunResult.TestLog> testLogs, String contentType, boolean isHttps) {
-        if(isSaas) readTimeout = 60;
+        readTimeout = 60;
         OkHttpClient.Builder builder = builder(followRedirects, readTimeout)
                 .addInterceptor(new NormalResponseInterceptor(testLogs))
                 .addNetworkInterceptor(new NetworkResponseInterceptor(testLogs));

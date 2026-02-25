@@ -103,8 +103,11 @@ public class AgentClient {
     
     private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
         Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest);
+
+        Call call = agentHttpClient.newCall(request);
+        call.timeout().timeout(60, TimeUnit.SECONDS);
         
-        try (Response response = agentHttpClient.newCall(request).execute()) {
+        try (Response response = call.execute()) {
             if (!response.isSuccessful()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
                 throw new Exception("Agent server returned status code: " + response.code() + ", body: " + responseBody);
