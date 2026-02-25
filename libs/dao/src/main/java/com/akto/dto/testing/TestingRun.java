@@ -25,6 +25,8 @@ public class TestingRun {
     private int testRunTime;
     public static final String MAX_CONCURRENT_REQUEST = "maxConcurrentRequests";
     private int maxConcurrentRequests;
+    public static final String MAX_AGENT_TOKENS = "maxAgentTokens";
+    private int maxAgentTokens = -1;
     private String triggeredBy;
     public static final String TRIGGERED_BY = "triggeredBy";
 
@@ -139,6 +141,14 @@ public class TestingRun {
 
     public void setMaxConcurrentRequests(int maxConcurrentRequests) {
         this.maxConcurrentRequests = maxConcurrentRequests;
+    }
+
+    public int getMaxAgentTokens() {
+        return maxAgentTokens;
+    }
+
+    public void setMaxAgentTokens(int maxAgentTokens) {
+        this.maxAgentTokens = maxAgentTokens;
     }
 
     // if u r adding anything here make sure to add to stopAllTests() method too

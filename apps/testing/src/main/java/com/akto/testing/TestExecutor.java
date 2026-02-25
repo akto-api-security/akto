@@ -330,7 +330,7 @@ public class TestExecutor {
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
 
-        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed());
+        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getMaxAgentTokens());
         TestingUtilsSingleton.init();
 
         // Pre-fetch auth token before inserting records in Kafka
@@ -518,12 +518,17 @@ public class TestExecutor {
             for (String testSubCategory: testingRunSubCategories) {
                 if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
                     loggerMaker.debugAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId) );
-                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
+                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)
+                            && !TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
                         insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit,
                                 apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun,
                                 isApiInfoTested, new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
                     }else{
-                        loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+                        if(TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
+                            loggerMaker.infoAndAddToDb("Agent token limit reached, stopping further tests for run: " + testingRun.getHexId(), LogDb.TESTING);
+                        } else {
+                            loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+                        }
                         break;
                     }
                 }
@@ -638,6 +643,14 @@ public class TestExecutor {
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap),
                         Updates.set(TestingRunResultSummary.STATE, updatedState)),
                 options);
+
+        if (TestingConfigurations.getInstance().isAgentTokenLimitExceeded()) {
+            TestingRunResultSummariesDao.instance.updateOne(
+                    Filters.eq(Constants.ID, summaryId),
+                    Updates.set(TestingRunResultSummary.METADATA_STRING + ".tokenRateLimited",
+                            TestResult.TestError.TOKEN_RATE_LIMITED.getMessage())
+            );
+        }
 
         if (TestingConfigurations.getInstance().getRerunTestingRunResultSummary() != null) {
             TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummary.ID,
@@ -907,12 +920,32 @@ public class TestExecutor {
                     VulnerableTestingRunResultDao.instance.insertMany(vulTestResults);
                 }
 
+                // Calculate total external API tokens from all test results
+                int totalExternalApiTokens = 0;
+                for (TestingRunResult runResult : testingRunResults) {
+                    if (runResult != null && runResult.getTestResults() != null) {
+                        for (GenericTestResult testResult : runResult.getTestResults()) {
+                            if (testResult instanceof TestResult) {
+                                int tokens = ((TestResult) testResult).getExternalApiTokens();
+                                loggerMaker.infoAndAddToDb("📊 TestExecutor reading tokens from TestResult: " + tokens, LogDb.TESTING);
+                                totalExternalApiTokens += tokens;
+                            }
+                        }
+                    }
+                }
+                loggerMaker.infoAndAddToDb("TestExecutor TOTAL tokens to add to summary: " + totalExternalApiTokens, LogDb.TESTING);
+                TestingConfigurations.getInstance().addAgentTokens(totalExternalApiTokens);
+
+                // Update summary with test count and cumulative external API tokens
                 TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                     Filters.eq(Constants.ID, testRunResultSummaryId),
-                    Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
+                    Updates.combine(
+                        Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize),
+                        Updates.inc(TestingRunResultSummary.TOTAL_EXTERNAL_API_TOKENS, totalExternalApiTokens)
+                    )
                 );
 
-                loggerMaker.debugAndAddToDb("Updated count in summary", LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Updated TestingRunResultSummary with " + totalExternalApiTokens + " tokens", LogDb.TESTING);
 
                 TestingIssuesHandler handler = new TestingIssuesHandler();
                 boolean triggeredByTestEditor = false;
