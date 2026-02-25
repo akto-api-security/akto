@@ -11,14 +11,11 @@ from typing import Any, Dict, Union
 from akto_machine_id import get_machine_id
 
 # Configuration
-LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/akto-main/akto/.github/akto/copilot/logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
-GITHUB_COPILOT_API_URL = os.getenv("GITHUB_COPILOT_API_URL", "https://api.github.com")
-AKTO_CONNECTOR = "github_copilot_cli"
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 MODE = os.getenv("MODE", "argus").lower()
 
@@ -26,60 +23,72 @@ MODE = os.getenv("MODE", "argus").lower()
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 
-if MODE == "atlas":
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    GITHUB_COPILOT_API_URL = f"https://{device_id}.ai-agent.copilot" if device_id else GITHUB_COPILOT_API_URL
 
-# Setup logging
-os.makedirs(LOG_DIR, exist_ok=True)
-logger = logging.getLogger(__name__)
-logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+def detect_connector(input_data: dict) -> str:
+    """Detect connector from hook payload. hookEventName is present in all VSCode payloads."""
+    if "hookEventName" in input_data:
+        return "vscode"
+    return os.getenv("AKTO_CONNECTOR", "github_copilot_cli")
 
-if not logger.handlers:
-    file_handler = logging.FileHandler(os.path.join(LOG_DIR, "validate-post-tool.log"))
-    file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-    logger.addHandler(file_handler)
 
-    console_handler = logging.StreamHandler(sys.stderr)
-    console_handler.setLevel(logging.ERROR)
-    logger.addHandler(console_handler)
+def get_connector_config(connector: str) -> dict:
+    """Return connector-specific config values."""
+    if connector == "vscode":
+        api_url = os.getenv("VSCODE_API_URL", "https://vscode.dev")
+        return {
+            "connector": connector,
+            "is_vscode": True,
+            "api_url": api_url,
+            "ai_agent_tag": "vscode",
+            "hook_header": "x-vscode-hook",
+            "atlas_domain": "ai-agent.vscode",
+            "log_dir_default": "~/akto/.github/akto/copilot/logs",
+        }
+    else:
+        api_url = os.getenv("GITHUB_COPILOT_API_URL", "https://api.github.com")
+        return {
+            "connector": connector,
+            "is_vscode": False,
+            "api_url": api_url,
+            "ai_agent_tag": "copilotcli",
+            "hook_header": "x-copilot-hook",
+            "atlas_domain": "ai-agent.copilot",
+            "log_dir_default": "~/akto/.github/akto/copilot/logs",
+        }
 
-if MODE == "atlas":
-    logger.info(f"MODE: {MODE}, Device ID: {device_id}, GITHUB_COPILOT_API_URL: {GITHUB_COPILOT_API_URL}")
-else:
-    logger.info(f"MODE: {MODE}, GITHUB_COPILOT_API_URL: {GITHUB_COPILOT_API_URL}")
+
+def setup_logging(log_dir: str):
+    os.makedirs(log_dir, exist_ok=True)
+    logger = logging.getLogger(__name__)
+    logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+    if not logger.handlers:
+        file_handler = logging.FileHandler(os.path.join(log_dir, "validate-post-tool.log"))
+        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        logger.addHandler(file_handler)
+        console_handler = logging.StreamHandler(sys.stderr)
+        console_handler.setLevel(logging.ERROR)
+        logger.addHandler(console_handler)
+    return logger
 
 
 def create_ssl_context():
-    """
-    Create SSL context with graceful fallback strategy.
-
-    Attempts in order:
-    1. Custom SSL_CERT_PATH if provided
-    2. System default SSL context
-    3. Python certifi bundle (if available)
-    4. Unverified context (last resort)
-
-    Returns:
-        ssl.SSLContext or None
-    """
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(ingest_data: bool = True) -> str:
+def build_http_proxy_url(cfg: dict, ingest_data: bool = True) -> str:
     """Build Akto HTTP proxy URL with query parameters."""
-    params = [f"akto_connector={AKTO_CONNECTOR}"]
+    params = [f"akto_connector={cfg['connector']}"]
     if ingest_data:
         params.append("ingest_data=true")
     return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
 
 
-def post_to_akto(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
+def post_to_akto(url: str, payload: Dict[str, Any], logger) -> Union[Dict[str, Any], str]:
     """Send JSON payload to Akto API."""
     logger.info(f"API CALL: POST {url}")
     if LOG_PAYLOADS:
         logger.debug(f"Payload: {json.dumps(payload, default=str)[:1000]}...")
-    
+
     headers = {"Content-Type": "application/json"}
     request = urllib.request.Request(
         url,
@@ -87,7 +96,7 @@ def post_to_akto(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str
         headers=headers,
         method="POST",
     )
-    
+
     start_time = time.time()
     try:
         ssl_context = create_ssl_context()
@@ -95,7 +104,6 @@ def post_to_akto(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str
             duration_ms = int((time.time() - start_time) * 1000)
             raw = response.read().decode("utf-8")
             logger.info(f"Response: {response.getcode()} in {duration_ms}ms")
-
             try:
                 return json.loads(raw)
             except json.JSONDecodeError:
@@ -114,40 +122,29 @@ def uuid_to_ipv6_simple(uuid_str):
 def build_akto_request(
     tool_name: str,
     tool_args: str,
-    tool_result: Dict[str, Any],
-    cwd: str,
-    timestamp: int
+    result_text: str,
+    status_code: str,
+    result_type: str,
+    cfg: dict
 ) -> Dict[str, Any]:
     """Build request payload for Akto data ingestion."""
-    result_type = tool_result.get("resultType", "unknown")
-    result_text = tool_result.get("textResultForLlm", "")
-
-    # Map result type to HTTP status
-    status_code = "200"
-    status = "200"
-    if result_type == "failure":
-        status_code = "500"
-        status = "500"
-    elif result_type == "denied":
-        status_code = "403"
-        status = "403"
-
     tags = {"gen-ai": "Gen AI", "tool-use": "Tool Execution"}
     if MODE == "atlas":
-        tags["ai-agent"] = "copilotcli"
+        tags["ai-agent"] = cfg["ai_agent_tag"]
         tags["source"] = CONTEXT_SOURCE
 
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    host = GITHUB_COPILOT_API_URL.replace("https://", "").replace("http://", "")
+    host = cfg["api_url"].replace("https://", "").replace("http://", "")
+    hook_header = cfg["hook_header"]
 
     request_headers = json.dumps({
         "host": host,
-        "x-copilot-hook": "PostToolUse",
+        hook_header: "PostToolUse",
         "content-type": "application/json"
     })
 
     response_headers = json.dumps({
-        "x-copilot-hook": "PostToolUse",
+        hook_header: "PostToolUse",
         "content-type": "application/json"
     })
 
@@ -155,9 +152,15 @@ def build_akto_request(
         "body": json.dumps({"toolName": tool_name, "toolArgs": tool_args})
     })
 
-    response_payload = json.dumps({
-        "body": json.dumps({"resultType": result_type, "result": result_text})
-    })
+    # VSCode response payload omits resultType; github-cli includes it
+    if cfg["is_vscode"]:
+        response_payload = json.dumps({
+            "body": json.dumps({"result": result_text})
+        })
+    else:
+        response_payload = json.dumps({
+            "body": json.dumps({"resultType": result_type, "result": result_text})
+        })
 
     return {
         "path": f"/copilot/tool/{tool_name}",
@@ -168,10 +171,10 @@ def build_akto_request(
         "responsePayload": response_payload,
         "ip": uuid_to_ipv6_simple(device_id),
         "destIp": "127.0.0.1",
-        "time": str(timestamp),
+        "time": str(int(time.time() * 1000)),
         "statusCode": status_code,
         "type": "HTTP/1.1",
-        "status": status,
+        "status": status_code,
         "akto_account_id": "1000000",
         "akto_vxlan_id": device_id,
         "is_pending": "false",
@@ -190,56 +193,81 @@ def build_akto_request(
 def ingest_tool_result(
     tool_name: str,
     tool_args: str,
-    tool_result: Dict[str, Any],
-    cwd: str,
-    timestamp: int
+    result_text: str,
+    status_code: str,
+    result_type: str,
+    cfg: dict,
+    logger
 ):
     """Ingest tool execution result to Akto for analytics."""
     if not AKTO_DATA_INGESTION_URL:
         logger.info("Skipping ingestion - no Akto URL configured")
         return
-    
-    result_type = tool_result.get("resultType", "unknown")
-    logger.info(f"Ingesting tool result: {tool_name} -> {result_type}")
-    
+
+    logger.info(f"Ingesting tool result: {tool_name}")
+
     try:
-        request_body = build_akto_request(tool_name, tool_args, tool_result, cwd, timestamp)
-        post_to_akto(build_http_proxy_url(ingest_data=True), request_body)
+        request_body = build_akto_request(tool_name, tool_args, result_text, status_code, result_type, cfg)
+        post_to_akto(build_http_proxy_url(cfg, ingest_data=True), request_body, logger)
         logger.info("Tool result ingested successfully")
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
 
 
 def main():
-    logger.info(f"=== Post-Tool Use Hook - Mode: {MODE} ===")
-    
     try:
         input_data = json.load(sys.stdin)
-        if LOG_PAYLOADS:
-            logger.debug(f"Input: {json.dumps(input_data)}")
     except json.JSONDecodeError as e:
-        logger.error(f"Invalid JSON input: {e}")
+        logging.basicConfig()
+        logging.error(f"Invalid JSON input: {e}")
         sys.exit(0)
-    
-    tool_name = input_data.get("toolName", "unknown")
-    tool_args = input_data.get("toolArgs", "")
-    tool_result = input_data.get("toolResult", {})
-    cwd = input_data.get("cwd", "")
-    timestamp = input_data.get("timestamp", int(time.time() * 1000))
-    
-    result_type = tool_result.get("resultType", "unknown")
-    result_text = tool_result.get("textResultForLlm", "")
-    
-    logger.info(f"Tool: {tool_name}, Result: {result_type}")
+
+    # Auto-detect connector from hookEventName (present in all VSCode payloads)
+    connector = detect_connector(input_data)
+    cfg = get_connector_config(connector)
+
+    # Update API URL for atlas mode now that we have the connector config
+    if MODE == "atlas":
+        device_id = os.getenv("DEVICE_ID") or get_machine_id()
+        if device_id:
+            cfg["api_url"] = f"https://{device_id}.{cfg['atlas_domain']}"
+
+    log_dir = os.path.expanduser(os.getenv("LOG_DIR", cfg["log_dir_default"]))
+    logger = setup_logging(log_dir)
+
+    logger.info(f"=== Post-Tool Use Hook - Connector: {connector}, Mode: {MODE} ===")
+
+    if LOG_PAYLOADS:
+        logger.debug(f"Input: {json.dumps(input_data)}")
+
+    logger.info(f"MODE: {MODE}, API_URL: {cfg['api_url']}")
+
+    # Parse input — key names and result format differ between connectors
+    if cfg["is_vscode"]:
+        tool_name = input_data.get("tool_name", "unknown")
+        tool_input = input_data.get("tool_input", {})
+        tool_args = json.dumps(tool_input) if isinstance(tool_input, dict) else str(tool_input)
+        tool_response = input_data.get("tool_response", "")
+        result_text = tool_response if isinstance(tool_response, str) else str(tool_response)
+        result_type = "unknown"
+        status_code = "200"
+    else:
+        tool_name = input_data.get("toolName", "unknown")
+        tool_args = input_data.get("toolArgs", "")
+        tool_result = input_data.get("toolResult", {})
+        result_text = tool_result.get("textResultForLlm", "")
+        result_type = tool_result.get("resultType", "unknown")
+        status_code = {"failure": "500", "denied": "403"}.get(result_type, "200")
+
+    logger.info(f"Tool: {tool_name}")
     if LOG_PAYLOADS:
         logger.debug(f"Tool args: {tool_args}")
-        logger.debug(f"Result: {result_text}")
+        logger.debug(f"Result: {result_text[:500]}")
     else:
         logger.info(f"Result preview: {result_text[:100]}...")
-    
-    # Ingest the tool execution result (async mode - fire and forget)
-    ingest_tool_result(tool_name, tool_args, tool_result, cwd, timestamp)
-    
+
+    ingest_tool_result(tool_name, tool_args, result_text, status_code, result_type, cfg, logger)
+
     logger.info("Hook completed")
     sys.exit(0)
 
