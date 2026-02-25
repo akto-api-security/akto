@@ -106,6 +106,7 @@ import DevRev from "../dashboard/pages/settings/integrations/DevRev";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
+import BrowserExtensionSettings from "../dashboard/pages/settings/browser_extension/BrowserExtensionSettings";
 import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhookCore";
 import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
@@ -559,6 +560,10 @@ const router = createBrowserRouter([
                     {
                         path: 'undo-demerge-apis',
                         element: <UndoDemergedApis/>
+                    },
+                    {
+                        path: 'browser-extension',
+                        element: <BrowserExtensionSettings/>
                     }
                 ]
             },

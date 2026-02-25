@@ -1,7 +1,7 @@
 import { Navigation } from "@shopify/polaris"
 import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ComposeMajor, ProfileMajor} from "@shopify/polaris-icons"
 import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
-import { VariantMajor, VocabularyMajor, AdjustMinor, UndoMajor, CodeMajor } from "@shopify/polaris-icons"
+import { VariantMajor, VocabularyMajor, AdjustMinor, UndoMajor, CodeMajor, GlobeMajor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 import func from "@/util/func"
 
@@ -113,7 +113,12 @@ const SettingsLeftNav = () => {
                         selected: page === "integrations",
                         onClick: () => navigate("/dashboard/settings/integrations")
                     },
-                    
+                    {
+                        label: 'Browser Extension',
+                        icon: GlobeMajor,
+                        selected: page === "browser-extension",
+                        onClick: () => navigate("/dashboard/settings/browser-extension")
+                    },
                     ...logsArr,
                     ...moduleInfoArr,
                     ...metricsArr,
