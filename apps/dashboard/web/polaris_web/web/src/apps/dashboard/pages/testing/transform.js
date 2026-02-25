@@ -1474,7 +1474,7 @@ const transform = {
           }
         }
 
-        if (currentRemediation) {
+        if (currentRemediation && currentRemediation.trim().toLowerCase() !== 'null') {
           extractedRemediationText = currentRemediation
         }
   
