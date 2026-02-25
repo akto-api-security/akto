@@ -777,7 +777,8 @@ const transform = {
         ...obj,
         prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues || { "CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0 }),
         startTime: date.toLocaleString('en-US', { timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE }) + " on " + date.toLocaleDateString('en-US', { timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE }),
-        id: obj.hexId
+        id: obj.hexId,
+        totalExternalApiTokens: obj.totalExternalApiTokens || 0
       }
     })
     return summaries;

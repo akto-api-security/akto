@@ -6,7 +6,7 @@ import func from "@/util/func"
 import DropdownSearch from '../../../components/shared/DropdownSearch';
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, generateLabelForJiraIntegration}) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, generateLabelForJiraIntegration}) => {
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
@@ -204,6 +204,20 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             }));
                         }} />
             </HorizontalGrid>
+            {isAgenticCategory && (
+                <HorizontalGrid gap={"4"} columns={"3"}>
+                    <Dropdown
+                        menuItems={maxAgentTokensOptions}
+                        label="Max Agent Tokens"
+                        initial={getLabel(maxAgentTokensOptions, (testRun.maxAgentTokens ?? -1).toString()).label}
+                        selected={(val) => {
+                            setTestRun(prev => ({
+                                ...prev,
+                                maxAgentTokens: parseInt(val)
+                            }));
+                        }} />
+                </HorizontalGrid>
+            )}
             {
                 miniTestingServiceNames?.length > 0 ?
                 <Dropdown
