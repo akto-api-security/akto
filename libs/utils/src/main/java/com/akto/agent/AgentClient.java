@@ -181,7 +181,7 @@ public class AgentClient {
     
     private AgentConversationResult parseResponse(String responseBody, String conversationId, String originalPrompt) throws Exception {
         try {
-            loggerMaker.infoAndAddToDb("🔍 RAW RESPONSE BODY: " + responseBody);
+            loggerMaker.info("RAW RESPONSE BODY: " + responseBody);
             JsonNode jsonNode = objectMapper.readTree(responseBody);
             
             String response = jsonNode.has("response") ? jsonNode.get("response").asText() : null;
