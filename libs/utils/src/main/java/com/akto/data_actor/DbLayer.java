@@ -1461,8 +1461,19 @@ public class DbLayer {
                 boolean eligible = allowedRunModulesTrrs.stream()
                     .anyMatch(name -> name.equals(miniTestingName));
                 if (!eligible) return null;
+                // Eligible via new list field — update miniTestingServiceName to this module and claim TRRS
+                TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                    Filters.eq(ID, trrs.getTestingRunId()),
+                    Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName)
+                );
+                return TestingRunResultSummariesDao.instance.getMCollection()
+                    .findOneAndUpdate(
+                        Filters.eq(ID, trrs.getId()),
+                        Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
+                    );
             }
 
+            // Backward compat: old runs with only single miniTestingServiceName field
             String validatedMiniTestingName = validateAndGetMiniTestingService(
                 testingRun.getMiniTestingServiceName(),
                 miniTestingName
