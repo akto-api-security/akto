@@ -16,7 +16,7 @@ public class HeaderFilter {
         "x-forwarded-for", "x-forwarded-host", "x-forwarded-port", "x-forwarded-proto",
         "x-forwarded-scheme", "x-forwarded-client-cert", "x-original-forwarded-for",
         "x-real-ip", "x-envoy-attempt-count", "x-envoy-external-address",
-        "x-request-id", "x-scheme", "via", "host",
+        "x-request-id", "x-scheme", "via",
 
         // Browser/Client metadata headers (10)
         "user-agent", "accept-encoding", "accept-language", "sec-ch-ua",
