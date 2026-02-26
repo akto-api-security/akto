@@ -520,6 +520,7 @@ public class Main {
             List<String> allowedModules = testingRun.getAllowedMiniTestingServiceNames();
             if (allowedModules != null && !allowedModules.isEmpty()) {
                 boolean eligible = allowedModules.stream()
+                        .filter(Objects::nonNull)
                         .anyMatch(name -> name.equalsIgnoreCase(customMiniTestingServiceName));
                 if (!eligible) {
                     Thread.sleep(1000);
