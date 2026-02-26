@@ -182,6 +182,6 @@ public class TestApiCollectionsAction extends MongoBasedTest {
         assertTrue(collection2.getEnvType() != null && collection2.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
         assertTrue(collection3.getEnvType() == null || collection3.getEnvType().stream().map(CollectionTags::getValue).noneMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
         assertTrue(collection4.getEnvType() != null && collection4.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
-        assertTrue(collection5.getEnvType() != null && collection5.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
+        assertTrue(collection5.getEnvType() != null && collection5.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.INTERNAL.name())));
     }
 }

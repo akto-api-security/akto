@@ -1382,16 +1382,16 @@ function ApiCollections(props) {
                 copyObj[id] = []
             } else {
                 if(tagObj?.keyName?.toLowerCase() === 'envtype') {
-                    const currentEnvIndex = copyObj[id].findIndex(tag => 
-                        tag.keyName.toLowerCase() === 'envtype' &&
-                        (tag.value.toLowerCase() === 'production' || tag.value.toLowerCase() === 'staging')
+                    // Replace any existing envType tag (staging, production, QA, DEV, INTEG, UAT, PREPROD, INTERNAL, etc.)
+                    const currentEnvIndex = copyObj[id].findIndex(tag =>
+                        tag.keyName?.toLowerCase() === 'envtype' || tag.keyName?.toLowerCase() === 'usersetenvtype'
                     )
 
                     if (currentEnvIndex === -1) {
                         copyObj[id].push(tagObj)
                     } else {
-                        const currentValue = copyObj[id][currentEnvIndex].value.toLowerCase()
-                        if (tagObj.value.toLowerCase() !== currentValue) {
+                        const currentValue = copyObj[id][currentEnvIndex].value?.toLowerCase()
+                        if (tagObj.value?.toLowerCase() !== currentValue) {
                             copyObj[id][currentEnvIndex] = tagObj
                         } else {
                             copyObj[id].splice(currentEnvIndex, 1)
