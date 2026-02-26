@@ -1314,7 +1314,7 @@ public class DbLayer {
             List<String> allowedModulesForRun = testingRun.getAllowedMiniTestingServiceNames();
             if (allowedModulesForRun != null && !allowedModulesForRun.isEmpty()) {
                 boolean eligible = allowedModulesForRun.stream()
-                    .anyMatch(name -> name.equalsIgnoreCase(miniTestingName));
+                    .anyMatch(name -> name.equals(miniTestingName));
                 if (!eligible) return null;
             }
 
@@ -1470,7 +1470,7 @@ public class DbLayer {
             List<String> allowedRunModulesTrrs = testingRun.getAllowedMiniTestingServiceNames();
             if (allowedRunModulesTrrs != null && !allowedRunModulesTrrs.isEmpty()) {
                 boolean eligible = allowedRunModulesTrrs.stream()
-                    .anyMatch(name -> name.equalsIgnoreCase(miniTestingName));
+                    .anyMatch(name -> name.equals(miniTestingName));
                 if (!eligible) return null;
             }
 
