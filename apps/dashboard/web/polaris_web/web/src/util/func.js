@@ -271,9 +271,9 @@ prettifyEpoch(epoch) {
     return String(val)
   },
   exportTableAsCSV(headers, data, fileName) {
-    const cols = headers.filter(x => (x.text || x.title)?.length > 0)
+    const cols = headers.filter(x => x.text?.length > 0)
     const csv = [
-      cols.map(x => x.text || x.title).join(","),
+      cols.map(x => x.text).join(","),
       ...data.map(row => cols.map(x => {
         const val = row[x.textValue || x.value]
         return `"${this.extractCsvText(val).replace(/"/g, '""')}"`
