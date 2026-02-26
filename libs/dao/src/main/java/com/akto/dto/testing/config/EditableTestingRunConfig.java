@@ -20,6 +20,11 @@ public class EditableTestingRunConfig extends TestingRunConfig {
     @Getter
     @Setter
     private String miniTestingServiceName;
+    
+    @Getter
+    @Setter
+    private List<String> allowedMiniTestingServiceNames;
+    
     public EditableTestingRunConfig() {
 
     }

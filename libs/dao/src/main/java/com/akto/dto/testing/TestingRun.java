@@ -47,8 +47,10 @@ public class TestingRun {
     private String name;
 
     public static final String MINI_TESTING_SERVICE_NAME = "miniTestingServiceName";
+    public static final String ALLOWED_MINI_TESTING_SERVICE_NAMES = "allowedMiniTestingServiceNames";
     public static final String SELECTED_SLACK_CHANNEL_ID = "selectedSlackChannelId";
     private String miniTestingServiceName;
+    private List<String> allowedMiniTestingServiceNames;
     private int selectedSlackChannelId;
 
     public enum TestingRunType{
@@ -274,6 +276,14 @@ public class TestingRun {
 
     public void setMiniTestingServiceName(String miniTestingServiceName) {
         this.miniTestingServiceName = miniTestingServiceName;
+    }
+
+    public List<String> getAllowedMiniTestingServiceNames() {
+        return allowedMiniTestingServiceNames;
+    }
+
+    public void setAllowedMiniTestingServiceNames(List<String> allowedMiniTestingServiceNames) {
+        this.allowedMiniTestingServiceNames = allowedMiniTestingServiceNames;
     }
 
     public int getSelectedSlackChannelId() {
