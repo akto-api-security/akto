@@ -1300,16 +1300,23 @@ public class DbLayer {
                 );
             }
 
-            // Priority 3: Find testing run with a dead mini-testing service - eligible modules can take over
+            // Priority 3: Backward compat — legacy runs (no allowedMiniTestingServiceNames) where assigned module is dead
             if (testingRun == null) {
-                Bson deadModuleFilter = Filters.and(
+                TestingRun anyRun = TestingRunDao.instance.findOne(
                     filter,
-                    Filters.in(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, miniTestingName)
-                );
-                testingRun = TestingRunDao.instance.findOne(
-                    deadModuleFilter,
                     Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, ID)
                 );
+                if (anyRun != null) {
+                    List<String> anyRunAllowed = anyRun.getAllowedMiniTestingServiceNames();
+                    // Only handle legacy runs with no allowedMiniTestingServiceNames
+                    if (anyRunAllowed == null || anyRunAllowed.isEmpty()) {
+                        String validated = validateAndGetMiniTestingService(
+                            anyRun.getMiniTestingServiceName(), miniTestingName);
+                        if (validated != null) {
+                            testingRun = anyRun;
+                        }
+                    }
+                }
             }
 
             if (testingRun == null) return null;
