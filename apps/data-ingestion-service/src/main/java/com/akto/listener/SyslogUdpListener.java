@@ -186,6 +186,9 @@ public class SyslogUdpListener implements Runnable {
         int idx = getInt(chunkEnvelope, "idx", -1);
         int total = getInt(chunkEnvelope, "total", -1);
         String payloadPart = getString(chunkEnvelope, "payload");
+        String reqId = getString(chunkEnvelope, "reqId");
+        int payloadBytes = getInt(chunkEnvelope, "bytes", -1);
+        String payloadSig = getString(chunkEnvelope, "sig");
 
         if (id.isEmpty()) {
             logger.warnAndAddToDb("Dropping chunk with empty id", LoggerMaker.LogDb.DATA_INGESTION);
@@ -208,16 +211,29 @@ public class SyslogUdpListener implements Runnable {
         }
 
         ChunkAccumulator acc = chunkBuffers.compute(id, (key, existing) -> {
-            if (existing == null || existing.totalChunks != total || existing.isExpired()) {
-                return new ChunkAccumulator(total);
+            if (existing == null || existing.isExpired()) {
+                return new ChunkAccumulator(total, reqId, payloadBytes, payloadSig);
             }
             return existing;
         });
 
-        ChunkAssemblyResult result = acc.addPart(idx, payloadPart);
+        if (acc.totalChunks != total) {
+            logger.warnAndAddToDb("Dropping chunk due to total mismatch for id=" + id + " expectedTotal=" + acc.totalChunks + " receivedTotal=" + total, LoggerMaker.LogDb.DATA_INGESTION);
+            return;
+        }
+
+        ChunkAssemblyResult result = acc.addPart(idx, payloadPart, reqId, payloadBytes, payloadSig);
         if (result.status == ChunkAssemblyStatus.REJECTED_SIZE) {
             chunkBuffers.remove(id, acc);
             logger.warnAndAddToDb("Dropping oversized reassembled payload for id=" + id, LoggerMaker.LogDb.DATA_INGESTION);
+            return;
+        }
+        if (result.status == ChunkAssemblyStatus.REJECTED_MISMATCH) {
+            logger.warnAndAddToDb(
+                "Dropping chunk due to envelope mismatch for id=" + id + " idx=" + idx +
+                " (prevents cross-request chunk mixing)",
+                LoggerMaker.LogDb.DATA_INGESTION
+            );
             return;
         }
         if (result.status == ChunkAssemblyStatus.INCOMPLETE) {
@@ -352,7 +368,8 @@ public class SyslogUdpListener implements Runnable {
     private enum ChunkAssemblyStatus {
         INCOMPLETE,
         COMPLETE,
-        REJECTED_SIZE
+        REJECTED_SIZE,
+        REJECTED_MISMATCH
     }
 
     private static class ChunkAssemblyResult {
@@ -368,23 +385,33 @@ public class SyslogUdpListener implements Runnable {
     private static class ChunkAccumulator {
         private final int totalChunks;
         private final String[] parts;
+        private final String expectedReqId;
+        private final int expectedPayloadBytes;
+        private final String expectedPayloadSig;
         private final boolean[] received;
         private int receivedCount = 0;
         private int assembledBytes = 0;
         private final long createdAt;
         private volatile long lastTouchedAt;
 
-        private ChunkAccumulator(int totalChunks) {
+        private ChunkAccumulator(int totalChunks, String expectedReqId, int expectedPayloadBytes, String expectedPayloadSig) {
             this.totalChunks = totalChunks;
             this.parts = new String[totalChunks];
+            this.expectedReqId = expectedReqId == null ? "" : expectedReqId;
+            this.expectedPayloadBytes = expectedPayloadBytes;
+            this.expectedPayloadSig = expectedPayloadSig == null ? "" : expectedPayloadSig;
             this.received = new boolean[totalChunks];
             long now = System.currentTimeMillis();
             this.createdAt = now;
             this.lastTouchedAt = now;
         }
 
-        private synchronized ChunkAssemblyResult addPart(int index, String payload) {
+        private synchronized ChunkAssemblyResult addPart(int index, String payload, String reqId, int payloadBytes, String payloadSig) {
             this.lastTouchedAt = System.currentTimeMillis();
+
+            if (!isCompatible(reqId, payloadBytes, payloadSig)) {
+                return new ChunkAssemblyResult(ChunkAssemblyStatus.REJECTED_MISMATCH, null);
+            }
 
             if (!received[index]) {
                 received[index] = true;
@@ -410,6 +437,14 @@ public class SyslogUdpListener implements Runnable {
             }
 
             return new ChunkAssemblyResult(ChunkAssemblyStatus.COMPLETE, sb.toString());
+        }
+
+        private boolean isCompatible(String reqId, int payloadBytes, String payloadSig) {
+            String normalizedReqId = reqId == null ? "" : reqId;
+            String normalizedPayloadSig = payloadSig == null ? "" : payloadSig;
+            return expectedReqId.equals(normalizedReqId)
+                && expectedPayloadBytes == payloadBytes
+                && expectedPayloadSig.equals(normalizedPayloadSig);
         }
 
         private boolean isExpired() {
