@@ -59,11 +59,6 @@ let headers = [
     type: CellType.TEXT
   },
   {
-    title: 'URL',
-    value: 'urlFilters',
-    csvOnly: true,
-  },
-  {
     value: "scanned_time_comp",
     title: 'Scanned',
     sortActive: true

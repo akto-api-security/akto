@@ -869,7 +869,6 @@ function SingleTestRunPage() {
           "selected": 1
         }}
         callFromOutside={updateTable}
-        csvExpandKey="urlFilters"
       />
       <Modal
         open={confirmationModal}
