@@ -36,10 +36,8 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
 
         fieldNames = new String[]{TestingRun.NAME};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
-
     }
     
-
     public List<Integer> getTestConfigIdsToDelete(List<ObjectId> testingRunIds){
         // this function is to get list of testConfigIds from testingRunIds for deleting from testing_run_config collection in DB.
         Bson filter = Filters.in("_id", testingRunIds);
