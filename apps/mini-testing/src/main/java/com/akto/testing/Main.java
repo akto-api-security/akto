@@ -486,7 +486,7 @@ public class Main {
             // Reset current execution fallback flag for new test cycle
             testExecutor.resetCurrentExecutionFallback();
             PrometheusMetricsHandler.markModuleIdle();
-            int start = Context.now();
+            int start = Context.now();  
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
             if (accountSettings.getTimeForScheduledSummaries() > 0) {
@@ -511,9 +511,22 @@ public class Main {
                 testingRun = dataActor.findTestingRun(trrs.getTestingRunId().toHexString());
             }
 
-            if (testingRun == null ||
-                    (testingRun.getMiniTestingServiceName() != null &&
-                            !testingRun.getMiniTestingServiceName().equalsIgnoreCase(customMiniTestingServiceName))) {
+            if (testingRun == null) {
+                Thread.sleep(1000);
+                continue;
+            }
+
+            // Check new list field (new runs) first, then fall back to legacy single-string field
+            List<String> allowedModules = testingRun.getAllowedMiniTestingServiceNames();
+            if (allowedModules != null && !allowedModules.isEmpty()) {
+                boolean eligible = allowedModules.stream()
+                        .anyMatch(name -> name.equalsIgnoreCase(customMiniTestingServiceName));
+                if (!eligible) {
+                    Thread.sleep(1000);
+                    continue;
+                }
+            } else if (testingRun.getMiniTestingServiceName() != null
+                    && !testingRun.getMiniTestingServiceName().equalsIgnoreCase(customMiniTestingServiceName)) {
                 Thread.sleep(1000);
                 continue;
             }
