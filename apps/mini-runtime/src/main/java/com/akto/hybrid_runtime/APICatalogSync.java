@@ -1790,9 +1790,9 @@ public class APICatalogSync {
             }
 
             // Skip standard infrastructure/browser headers to reduce noise and prevent unnecessary DB calls
-            if (deltaInfo != null && deltaInfo.getIsHeader() && HeaderFilter.shouldIgnoreHeader(deltaInfo.getParam())) {
-                continue;
-            }
+            // if (deltaInfo != null && deltaInfo.getIsHeader() && HeaderFilter.shouldIgnoreHeader(deltaInfo.getParam())) {
+            //     continue;
+            // }
 
             if (deltaInfo != null && deltaInfo.getParam().equalsIgnoreCase("host")) {
                 if (dbInfo == null) {
