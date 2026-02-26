@@ -254,6 +254,13 @@ const settingFunctions = {
       })
       return metricsData
     },
+    fetchMetricsDataByModule: async function(startTime, endTime, moduleType, instanceId) {
+      let metricsData = {}
+      await settingRequests.fetchMetricsByModule(startTime, endTime, moduleType, instanceId).then((resp) => {
+        metricsData = resp?.result?.metrics
+      })
+      return metricsData
+    },
     testJiraIntegration: async function(userEmail, apiToken, baseUrl, projId){
       let issueTypeMap = {}
       await settingRequests.testJiraIntegration(userEmail, apiToken, baseUrl, projId).then((resp)=>{

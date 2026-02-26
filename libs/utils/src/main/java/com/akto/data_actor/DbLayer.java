@@ -437,6 +437,10 @@ public class DbLayer {
         ProtectionLogsDao.instance.insertOne(log);
     }
 
+    public static void insertAgenticTestingLog(Log log) {
+        AgenticTestingLogsDao.instance.insertOne(log);
+    }
+
     public static Set<MergedUrls> fetchMergedUrls() {
         return MergedUrlsDao.instance.getMergedUrls();
     }

@@ -57,14 +57,9 @@ public final class JsonRpcUtils {
     }
 
     public static boolean isMcpPath(String url) {
-        if (url == null || url.isEmpty()) {
-            return false;
+        if (StringUtils.isNoneBlank(url)) {
+            return url.contains("mcp");
         }
-        try {
-            String path = new URL(url).getPath();
-            return path != null && (path.startsWith("/mcp") || path.startsWith("mcp"));
-        } catch (Exception e) {
-            return url.startsWith("/mcp") || url.startsWith("mcp");
-        }
+        return false;
     }
 }

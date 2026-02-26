@@ -21,11 +21,11 @@ const testEditorRequests = {
         })
     },
     
-    runTestForTemplate(content, apiInfoKey, sampleDataList, testRoleId) {
+    runTestForTemplate(content, apiInfoKey, sampleDataList, miniTestingName, testingRunConfig) {
         return request({
             url: '/api/runTestForGivenTemplate',
             method: 'post',
-            data:{content, apiInfoKey, sampleDataList, testRoleId}
+            data: { content, apiInfoKey, sampleDataList, miniTestingName, testingRunConfig }
         })
     },
 

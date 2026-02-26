@@ -1,6 +1,6 @@
 package com.akto.util;
 
-import com.akto.cache.IconCache;
+// IconCache removed - no longer needed
 import com.akto.dao.ApiCollectionIconsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
@@ -43,10 +43,9 @@ public class IconUtils {
             return;
         }
 
-        IconCache iconCache = IconCache.getInstance();
         Set<String> processedRootDomains = new HashSet<>();
 
-        // Process each hostname with cache-first approach
+        // Process each hostname for background icon fetching
         for (ApiCollection collection : apiCollections) {
             String hostname = collection.getHostName();
             if (hostname == null || hostname.trim().isEmpty()) continue;
@@ -56,12 +55,6 @@ public class IconUtils {
             String rootDomain = parts.length >= 2 ? parts[parts.length - 2] + "." + parts[parts.length - 1] : hostname;
 
             if (processedRootDomains.contains(rootDomain)) continue;
-
-            IconCache.IconData cachedIcon = iconCache.getIconData(hostname);
-            if (cachedIcon != null) {
-                processedRootDomains.add(rootDomain);
-                continue;
-            }
 
             processedRootDomains.add(rootDomain);
             executorService.submit(() -> {
@@ -107,8 +100,6 @@ public class IconUtils {
                 return; // Success - stop trying other levels
             }
         }
-
-        loggerMaker.infoAndAddToDb("Failed to fetch icon for hostname: " + fullHostname + " after trying all domain levels", LogDb.DASHBOARD);
     }
 
     /**
@@ -153,9 +144,8 @@ public class IconUtils {
                                     Updates.set(ApiCollectionIcon.UPDATED_AT, Context.now())
                                 )
                             );
-                            loggerMaker.infoAndAddToDb("Updated existing domain entry: " + domain + " with hostname: " + originalHostname, LogDb.DASHBOARD);
                         } else {
-                            loggerMaker.infoAndAddToDb("Domain: " + domain + " already contains hostname: " + originalHostname, LogDb.DASHBOARD);
+                           //Domain already contains hostname
                         }
                     } else {
                         // Create new entry
@@ -164,16 +154,11 @@ public class IconUtils {
                         
                         ApiCollectionIcon icon = new ApiCollectionIcon(domain, matchingHostnames, base64Data);
                         ApiCollectionIconsDao.instance.insertOne(icon);
-                        
-                        loggerMaker.infoAndAddToDb("Successfully fetched and cached new icon for domain: " + domain + " (from hostname: " + originalHostname + ")", LogDb.DASHBOARD);
                     }
                     
                     return true;
                 }
             }
-            
-            // Failed at this level - try next level
-            loggerMaker.infoAndAddToDb("No valid icon at domain level: " + domain + ", trying next level", LogDb.DASHBOARD);
             return false;
                 
         } catch (IOException e) {

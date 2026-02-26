@@ -13,6 +13,7 @@ const AgenticSearchInput = forwardRef(({
     containerStyle = {},
     sidebarWidth = '300px',
     inputWidth = '520px',
+    disabled = false,
 }, ref) => {
     const [internalValue, setInternalValue] = useState('');
     const inputRef = useRef(null);
@@ -35,7 +36,7 @@ const AgenticSearchInput = forwardRef(({
     const handleChange = useCallback((newValue) => setValue(newValue), [setValue]);
 
     const handleSubmit = useCallback(() => {
-        if (value.trim() && onSubmit) {
+        if (value.trim() && onSubmit && !disabled && !isStreaming) {
             onSubmit(value);
 
             // Scroll to the bottom of the page smoothly
@@ -55,7 +56,7 @@ const AgenticSearchInput = forwardRef(({
                 }
             }, 100);
         }
-    }, [value, onSubmit]);
+    }, [value, onSubmit, disabled, isStreaming]);
 
     const handleKeyDown = useCallback((e) => {
         if (e.key === 'Enter') {
@@ -115,7 +116,7 @@ const AgenticSearchInput = forwardRef(({
                                 placeholder={placeholder}
                                 autoComplete="off"
                                 borderless
-                                
+                                disabled={disabled || isStreaming}
                             />
                         </Box>
                     <Box
@@ -123,17 +124,17 @@ const AgenticSearchInput = forwardRef(({
                         style={{
                             padding: '8px',
                             borderRadius: '8px',
-                            background: (isStreaming || value.trim()) ? 'rgba(109, 59, 239, 1)' : 'rgba(109, 59, 239, 0.2)',
+                            background: (isStreaming || disabled || !value.trim()) ? 'rgba(109, 59, 239, 0.2)' : 'rgba(109, 59, 239, 1)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            cursor: isStreaming ? 'default' : 'pointer',
+                            cursor: (isStreaming || disabled || !value.trim()) ? 'default' : 'pointer',
                             flexShrink: 0,
                             marginLeft: '8px',
                             transition: 'background 0.2s ease',
                             width: '32px',
                             height: '32px',
-                            pointerEvents: isStreaming ? 'none' : 'auto'
+                            pointerEvents: (isStreaming || disabled) ? 'none' : 'auto'
                         }}
                     >
                         {isStreaming ? (

@@ -128,6 +128,9 @@ GET /health
 | `THREAT_BACKEND_TOKEN` | Token for threat reporting | **Required** |
 | `LOG_LEVEL` | Logging level (debug, info, warn, error) | `info` |
 | `GIN_MODE` | Gin framework mode (debug, release) | `release` |
+| `KAFKA_ENABLED` | Enable Kafka consumer mode (if false, runs as HTTP server) | `false` |
+
+**Note**: `skipThreat` is now an **API-level parameter** (per-request), not an environment variable. Include `"skipThreat": true` in your API request body to skip threat reporting for that specific request.
 
 ### Example Configuration
 
@@ -218,9 +221,15 @@ The validator checks for:
 - Prompt injection attacks
 - Banned substrings and topics
 
-### 4. Report Threats
-When threats are detected (blocked or modified payloads), they are automatically reported to the dashboard:
+### 4. Report Threats (Optional)
+When threats are detected (blocked or modified payloads), they are automatically reported to the dashboard **unless `skipThreat=true` is set in the API request**.
 
+**Per-Request Control**: The `skipThreat` parameter is now controlled at the API level, allowing you to decide per-request whether to skip threat reporting. This enables:
+- Same service instance for both production (with reporting) and testing (without reporting)
+- Playground/testing scenarios without TBS overhead
+- Flexible deployment without needing separate service instances
+
+If threat reporting is enabled (default, `skipThreat=false` or omitted):
 ```go
 threatReporter.ReportThreat(
     ctx,
@@ -237,6 +246,8 @@ threatReporter.ReportThreat(
 ```
 
 Threats are sent to: `https://tbs.akto.io/api/threat_detection/record_malicious_event`
+
+If `skipThreat=true` in the API request, threats are not forwarded to TBS and validation results are returned directly to the caller.
 
 ## Project Structure
 
@@ -331,6 +342,92 @@ guardrails-service/
 - **Purpose**: Receives and displays threat reports in dashboard
 - **Authentication**: Bearer token via `THREAT_BACKEND_TOKEN`
 - **Endpoint**: `https://tbs.akto.io/api/threat_detection/record_malicious_event`
+- **Behavior**: Only used when `skipThreat=false` (default) in API requests. When `skipThreat=true` is set in the request, threats are not forwarded and validation results are returned directly.
+
+## Calling Guardrail Service Directly
+
+Instead of using Kafka, you can call the guardrail service directly via HTTP:
+
+### HTTP Endpoints
+
+1. **Validate Single Request**:
+```bash
+POST http://localhost:8080/api/validate/request
+Content-Type: application/json
+
+{
+  "payload": "your request payload here",
+  "contextSource": "AGENTIC",  // optional
+  "skipThreat": true            // optional: skip threat reporting to TBS (default: false)
+}
+```
+
+2. **Validate Single Response**:
+```bash
+POST http://localhost:8080/api/validate/response
+Content-Type: application/json
+
+{
+  "payload": "your response payload here",
+  "contextSource": "AGENTIC",  // optional
+  "skipThreat": true            // optional: skip threat reporting to TBS (default: false)
+}
+```
+
+3. **Batch Validation** (similar to mini-runtime-service):
+```bash
+POST http://localhost:8080/api/ingestData
+Content-Type: application/json
+
+{
+  "batchData": [
+    {
+      "path": "/api/users",
+      "method": "POST",
+      "requestPayload": "...",
+      "responsePayload": "...",
+      ...
+    }
+  ],
+  "contextSource": "AGENTIC",  // optional
+  "skipThreat": true            // optional: skip threat reporting to TBS (default: false)
+}
+```
+
+### Example: Direct HTTP Call
+
+**With threat reporting (default)**:
+```bash
+curl -X POST http://localhost:8080/api/validate/request \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payload": "test input",
+    "contextSource": "AGENTIC"
+  }'
+```
+
+**Without threat reporting (skip TBS)**:
+```bash
+curl -X POST http://localhost:8080/api/validate/request \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payload": "test input",
+    "contextSource": "AGENTIC",
+    "skipThreat": true
+  }'
+```
+
+Response:
+```json
+{
+  "allowed": true,
+  "modified": false,
+  "modifiedPayload": "",
+  "reason": ""
+}
+```
+
+**Note**: The `skipThreat` parameter allows per-request control over threat reporting. When `skipThreat=true`, the service returns validation results immediately without forwarding to TBS, making it suitable for real-time validation scenarios like playground testing. When `skipThreat=false` (default), threats are reported to TBS as usual.
 
 ## Development
 

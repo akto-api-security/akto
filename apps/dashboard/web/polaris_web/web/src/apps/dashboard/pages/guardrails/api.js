@@ -27,4 +27,42 @@ export default {
         return resp
     },
 
+    async guardrailPlayground(testInput, policyData) {
+        const resp = await request({
+            url: '/api/guardrailPlayground',
+            method: 'post',
+            data: {
+                testInput,
+                policy: policyData
+            }
+        })
+        return resp
+    },
+
+    async fetchBrowserExtensionConfigs() {
+        const resp = await request({
+            url: '/api/fetchBrowserExtensionConfigs',
+            method: 'post'
+        })
+        return resp
+    },
+
+    async saveBrowserExtensionConfig(browserExtensionConfig, hexId) {
+        const resp = await request({
+            url: '/api/saveBrowserExtensionConfig',
+            method: 'post',
+            data: { browserExtensionConfig, hexId }
+        })
+        return resp
+    },
+
+    async deleteBrowserExtensionConfigs(configIds) {
+        const resp = await request({
+            url: '/api/deleteBrowserExtensionConfigs',
+            method: 'post',
+            data: { configIds }
+        })
+        return resp
+    },
+
 }

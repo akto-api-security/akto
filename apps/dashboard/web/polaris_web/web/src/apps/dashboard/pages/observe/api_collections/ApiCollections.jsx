@@ -51,6 +51,8 @@ const CenterViewType = {
 
 const API_COLLECTIONS_CACHE_DURATION_SECONDS = 5 * 60; // 5 minutes
 const COLLECTIONS_LAZY_RENDER_THRESHOLD = 100; // Collections count above which we use lazy rendering optimization
+const allowedAccounts = [1736798101, 1718042191];
+
 
 const headers = [
     ...((isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory() || isApiSecurityCategory() || isDastCategory()) ? [{
@@ -177,6 +179,16 @@ const headers = [
         textValue: 'envType',
         tooltipContent: (<Text variant="bodySm">Tags for an API collection to describe collection attributes such as environment type (staging, production) and other custom attributes</Text>),
     },
+    ...(allowedAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? [{
+        title: "Access Type",
+        text: "Access Type",
+        value: "accessType",
+        textValue: "accessType",
+        filterKey: "accessType",
+        showFilter: true,
+        isText: CellType.TEXT,
+        boxWidth: '120px'
+    }] : []),
     {   
         title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time an endpoint within collection was either discovered for the first time or seen again</Text>} title="Last traffic seen" />, 
         text: 'Last traffic seen', 
@@ -298,6 +310,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             registryStatus: c.registryStatus,
             description: c.description,
             isOutOfTestingScope: c.isOutOfTestingScope,
+            accessType: (c.accessType && c.accessType !== "Unknown") ? c.accessType : "No Access Type",
             rowStatus: c.rowStatus,
             disableClick: c.disableClick,
             icon: CircleTickMajor,
@@ -406,6 +419,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         registryStatus: rawCollection.registryStatus,
         description: rawCollection.description,
         isOutOfTestingScope: rawCollection.isOutOfTestingScope,
+        accessType: rawCollection.accessType ? rawCollection.accessType : "No Access Type",
         envType,
         envTypeOriginal: rawCollection?.envType,
         testedEndpoints,
@@ -1753,7 +1767,37 @@ function ApiCollections(props) {
             });
         }
         
-        return modifiedSortOptions;
+        const allSortOptions = selectedTab === 'groups' ? [...tempSortOptions, ...modifiedSortOptions] : modifiedSortOptions;
+        
+        // This ensures column indices match the actual table structure
+        const updatedSortOptions = allSortOptions.map(opt => {
+            // Find the actual column index in dynamicHeaders based on sortKey or matching criteria
+            let actualColumnIndex = -1;
+            
+            // Map sortKey to the header value field
+            const sortKeyToValueMap = {
+                'urlsCount': 'urlsCount',
+                'riskScore': 'riskScoreComp',
+                'startTs': 'discovered',
+                'detectedTimestamp': 'lastTraffic',
+                'customGroupsSort': 'displayNameComp'
+            };
+            
+            const headerValue = sortKeyToValueMap[opt.sortKey];
+            if (headerValue) {
+                actualColumnIndex = dynamicHeaders.findIndex(h => h.value === headerValue);
+            }
+            
+            // If found, use the actual index + 1 (1-based indexing for Polaris)
+            if (actualColumnIndex !== -1) {
+                return { ...opt, columnIndex: actualColumnIndex + 1 };
+            }
+            
+            // Otherwise keep the original columnIndex (fallback)
+            return opt;
+        });
+        
+        return updatedSortOptions;
     };
     const dynamicSortOptions = getModifiedSortOptions();
 
@@ -1820,7 +1864,7 @@ function ApiCollections(props) {
                 filterStateUrl={"/dashboard/observe/inventory/"}
                 pageLimit={100}
                 data={data[selectedTab]}
-                sortOptions={selectedTab === 'groups' ? [...tempSortOptions, ...dynamicSortOptions] : dynamicSortOptions}
+                sortOptions={dynamicSortOptions}
                 resourceName={resourceName}
                 filters={[]}
                 disambiguateLabel={disambiguateLabel}
@@ -1837,6 +1881,7 @@ function ApiCollections(props) {
                 csvFileName={"Inventory"}
                 prettifyPageData={(pageData) => selectedTab === 'untracked' ? transform.prettifyUntrackedCollectionsData(pageData) : transform.prettifyCollectionsData(pageData, false, selectedTab, activeFilterType)}
                 transformRawData={transformRawCollectionData}
+                onExportCsv={() => exportCsv()}
             />
         );
     };

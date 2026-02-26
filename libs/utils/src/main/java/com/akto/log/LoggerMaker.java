@@ -1,5 +1,6 @@
 package com.akto.log;
 
+import com.akto.dao.AgenticTestingLogsDao;
 import com.akto.dao.AnalyserLogsDao;
 import com.akto.dao.BillingLogsDao;
 import com.akto.dao.ConfigsDao;
@@ -93,7 +94,7 @@ public class LoggerMaker  {
     }
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD, AGENTIC_TESTING
     }
 
     private static AccountSettings accountSettings = null;
@@ -283,6 +284,9 @@ public class LoggerMaker  {
                 case THREAT_DETECTION:
                     dataActor.insertProtectionLog(log);
                     break;
+                case AGENTIC_TESTING:
+                    dataActor.insertAgenticTestingLog(log);
+                    break;
                 default:
                     break;
             }
@@ -330,6 +334,9 @@ public class LoggerMaker  {
             case ENDPOINT_SHIELD:
                 List<EndpointShieldLog> endpointShieldLogs = EndpointShieldLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP, EndpointShieldLog.AGENT_ID, EndpointShieldLog.DEVICE_ID, EndpointShieldLog.LEVEL));
                 logs = new ArrayList<>(endpointShieldLogs);
+                break;
+            case AGENTIC_TESTING:
+                logs = AgenticTestingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
             default:
                 break;

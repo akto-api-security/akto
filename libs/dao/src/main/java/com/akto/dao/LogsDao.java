@@ -1,17 +1,10 @@
 package com.akto.dao;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.akto.dao.context.Context;
 import com.akto.dto.Log;
 import com.akto.util.DbMode;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.CreateCollectionOptions;
-import com.mongodb.client.model.Indexes;
-
-import org.bson.Document;
 
 public class LogsDao extends AccountsContextDao<Log> {
 

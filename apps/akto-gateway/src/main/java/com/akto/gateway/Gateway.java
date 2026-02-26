@@ -13,21 +13,12 @@ public class Gateway {
     private static final Logger logger = LogManager.getLogger(Gateway.class);
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
-    private final AktoIngestAdapter aktoIngestAdapter;
-    private final AdapterFactory adapterFactory;
     private DataPublisher dataPublisher;
 
     private Gateway() {
         this.guardrailsClient = new GuardrailsClient();
-        this.aktoIngestAdapter = new AktoIngestAdapter();
-        this.adapterFactory = new AdapterFactory(guardrailsClient);
-        logger.info("Gateway instance initialized with adapter factory (Strategy pattern)");
     }
 
-    /**
-     * Get singleton instance of Gateway
-     * @return Gateway instance
-     */
     public static synchronized Gateway getInstance() {
         if (instance == null) {
             instance = new Gateway();
@@ -35,245 +26,150 @@ public class Gateway {
         return instance;
     }
 
-    @SuppressWarnings("unchecked")
-    public Map<String, Object> processHttpProxy(Map<String, Object> proxyData) {
-        logger.info("Processing HTTP proxy request");
+    public Map<String, Object> processHttpProxy(Map<String, Object> requestData) {
+        logger.info("Processing HTTP proxy request - path: {}, method: {}, guardrails: {}, ingest_data: {}",
+            requestData.get("path"), requestData.get("method"),
+            requestData.get("guardrails"), requestData.get("ingest_data"));
 
+        long start = System.currentTimeMillis();
         try {
-            String url = (String) proxyData.get("url");
-            String path = (String) proxyData.get("path");
-            Map<String, Object> request = (Map<String, Object>) proxyData.get("request");
-            Map<String, Object> response = (Map<String, Object>) proxyData.get("response");
-
-            // Extract URL query parameters (from the actual HTTP request URL)
-            Map<String, Object> urlQueryParams = (Map<String, Object>) proxyData.get("urlQueryParams");
-
-            logger.debug("Request map contents: {}", request);
-            logger.debug("URL Query Params: {}", urlQueryParams);
-
-            String method = String.valueOf(request.getOrDefault("method", ""));
-
-            logger.info("Request - Method: {}, URL: {}, Path: {}", method, url, path);
-
-            // Apply guardrails validation if enabled
-            GuardrailsValidationResult guardrailsResult = applyGuardrailsValidation(
-                url, path, request, response, urlQueryParams);
-
-            // If guardrails blocked the request (Allowed = false), add x-blocked-by to response payload
-            if (guardrailsResult.guardrailsResponse != null) {
-                Object allowed = guardrailsResult.guardrailsResponse.get("Allowed");
-                if (allowed != null && !Boolean.TRUE.equals(allowed) && !"true".equalsIgnoreCase(String.valueOf(allowed))) {
-                    addBlockedByHeader(proxyData, response);
-                }
+            String requestPayload = getStringField(requestData, "requestPayload");
+            if (requestPayload == null || requestPayload.isEmpty()) {
+                logger.warn("Missing required field: requestPayload");
+                Map<String, Object> error = new HashMap<>();
+                error.put("success", false);
+                error.put("message", "Missing required field: requestPayload");
+                error.put("error", "requestPayload is required");
+                return error;
             }
 
-            // Ingest data if requested (regardless of guardrails result)
-            DataIngestionResult ingestionResult = processDataIngestion(proxyData, urlQueryParams);
+            Map<String, Object> result = new HashMap<>();
 
-            // Build and return final response
-            return buildFinalResponse(url, path, method, guardrailsResult, ingestionResult);
+            String guardrails = getStringField(requestData, "guardrails");
+            if ("true".equalsIgnoreCase(guardrails)) {
+                long guardrailsStart = System.currentTimeMillis();
+                Map<String, Object> guardrailsResponse = callGuardrails(requestData);
+                logger.info("Guardrails call completed - path: {}, latencyMs: {}",
+                    requestData.get("path"), System.currentTimeMillis() - guardrailsStart);
+                result.put("guardrailsResult", guardrailsResponse);
+            }
+
+            String ingestData = getStringField(requestData, "ingest_data");
+            if ("true".equalsIgnoreCase(ingestData)) {
+                long kafkaStart = System.currentTimeMillis();
+                ingestData(requestData);
+                logger.info("Kafka ingestion completed - path: {}, latencyMs: {}",
+                    requestData.get("path"), System.currentTimeMillis() - kafkaStart);
+            }
+
+            logger.info("processHttpProxy completed - path: {}, method: {}, totalLatencyMs: {}",
+                requestData.get("path"), requestData.get("method"), System.currentTimeMillis() - start);
+            result.put("success", true);
+            result.put("message", "Request processed successfully");
+            return result;
 
         } catch (Exception e) {
-            logger.error("Error processing HTTP proxy request: {}", e.getMessage(), e);
-            return buildErrorResponse("Error processing request: " + e.getMessage());
+            logger.error("Error processing HTTP proxy request: {}, latencyMs: {}", e.getMessage(),
+                System.currentTimeMillis() - start, e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", "Unexpected error: " + e.getMessage());
+            error.put("error", e.getMessage());
+            return error;
         }
     }
 
-    /**
-     * Applies guardrails validation if enabled
-     */
-    private GuardrailsValidationResult applyGuardrailsValidation(String url, String path,
-                                                                   Map<String, Object> request,
-                                                                   Map<String, Object> response,
-                                                                   Map<String, Object> urlQueryParams) {
-        GuardrailsValidationResult result = new GuardrailsValidationResult();
+    private Map<String, Object> callGuardrails(Map<String, Object> requestData) {
+        Map<String, Object> validateRequest = new HashMap<>();
+        validateRequest.put("requestPayload", requestData.get("requestPayload"));
+        validateRequest.put("contextSource", requestData.get("contextSource"));
 
-        boolean shouldApplyGuardrails = adapterFactory.shouldApplyGuardrails(urlQueryParams);
-        result.applied = shouldApplyGuardrails;
+        putIfNotNull(validateRequest, requestData, "path");
+        putIfNotNull(validateRequest, requestData, "requestHeaders");
+        putIfNotNull(validateRequest, requestData, "responseHeaders");
+        putIfNotNull(validateRequest, requestData, "method");
+        putIfNotNull(validateRequest, requestData, "responsePayload");
+        putIfNotNull(validateRequest, requestData, "ip");
+        putIfNotNull(validateRequest, requestData, "destIp");
+        putIfNotNull(validateRequest, requestData, "time");
+        putIfNotNull(validateRequest, requestData, "statusCode");
+        putIfNotNull(validateRequest, requestData, "type");
+        putIfNotNull(validateRequest, requestData, "status");
+        putIfNotNull(validateRequest, requestData, "akto_account_id");
+        putIfNotNull(validateRequest, requestData, "akto_vxlan_id");
+        putIfNotNull(validateRequest, requestData, "is_pending");
+        putIfNotNull(validateRequest, requestData, "source");
+        putIfNotNull(validateRequest, requestData, "direction");
+        putIfNotNull(validateRequest, requestData, "tag");
+        putIfNotNull(validateRequest, requestData, "metadata");
 
-        if (!shouldApplyGuardrails) {
-            result.adapterUsed = "none";
-            return result;
-        }
+        String contextSource = getStringField(requestData, "contextSource");
+        logger.info("Calling guardrails /validate/request, contextSource: {}", contextSource);
 
-        // Select appropriate adapter
-        GuardrailsAdapter adapter = adapterFactory.selectAdapter(urlQueryParams);
-        result.adapterUsed = adapter.getAdapterName();
-        logger.info("Guardrails enabled - using {} adapter", result.adapterUsed);
+        Map<String, Object> guardrailsResponse = guardrailsClient.callValidateRequest(validateRequest);
 
-        // Format the request using the selected adapter
-        Map<String, Object> formattedApiRequest = adapter.formatRequest(url, path, request, response);
-        logger.debug("Adapter formatted API request: {}", formattedApiRequest);
+        logger.info("Guardrails response - allowed: {}",
+            guardrailsResponse != null ? guardrailsResponse.get("Allowed") : "null");
 
-        // Call guardrails service
-        result.guardrailsResponse = guardrailsClient.callValidateRequest(formattedApiRequest);
-
-        return result;
+        return guardrailsResponse;
     }
 
-    /**
-     * Processes data ingestion if requested
-     */
-    private DataIngestionResult processDataIngestion(Map<String, Object> proxyData,
-                                                       Map<String, Object> urlQueryParams) {
-        DataIngestionResult result = new DataIngestionResult();
+    private void ingestData(Map<String, Object> requestData) {
+        IngestDataBatch batch = new IngestDataBatch();
+        batch.setPath(getStringField(requestData, "path"));
+        batch.setRequestHeaders(getStringField(requestData, "requestHeaders"));
+        batch.setResponseHeaders(getStringField(requestData, "responseHeaders"));
+        batch.setMethod(getStringField(requestData, "method"));
+        batch.setRequestPayload(getStringField(requestData, "requestPayload"));
+        batch.setResponsePayload(getStringField(requestData, "responsePayload"));
+        batch.setIp(getStringField(requestData, "ip"));
+        batch.setDestIp(getStringField(requestData, "destIp"));
+        batch.setTime(getStringField(requestData, "time"));
+        batch.setStatusCode(getStringField(requestData, "statusCode"));
+        batch.setType(getStringField(requestData, "type"));
+        batch.setStatus(getStringField(requestData, "status"));
+        batch.setAkto_account_id(getStringField(requestData, "akto_account_id"));
+        batch.setAkto_vxlan_id(getStringField(requestData, "akto_vxlan_id"));
+        batch.setIs_pending(getStringField(requestData, "is_pending"));
+        batch.setSource(getStringField(requestData, "source"));
+        batch.setDirection(getStringField(requestData, "direction"));
+        batch.setProcess_id(getStringField(requestData, "process_id"));
+        batch.setSocket_id(getStringField(requestData, "socket_id"));
+        batch.setDaemonset_id(getStringField(requestData, "daemonset_id"));
+        batch.setEnabled_graph(getStringField(requestData, "enabled_graph"));
+        batch.setTag(getStringField(requestData, "tag"));
 
-        boolean shouldIngestData = checkShouldIngestData(urlQueryParams);
-        result.shouldIngest = shouldIngestData;
-
-        if (!shouldIngestData) {
-            return result;
-        }
-
-        logger.info("ingest_data=true, converting to IngestDataBatch");
-
-        try {
-            IngestDataBatch ingestBatch = aktoIngestAdapter.convertToIngestDataBatch(proxyData);
-            logger.info("Successfully converted to IngestDataBatch");
-
-            // Publish to data pipeline if publisher is configured
-            if (dataPublisher != null) {
-                logger.info("Publishing to data pipeline via DataPublisher");
-                dataPublisher.publish(ingestBatch);
-                result.ingested = true;
-                logger.info("Data successfully published to Kafka");
-            } else {
-                logger.warn("DataPublisher not configured - data will not be published to Kafka");
-                result.error = "DataPublisher not configured";
+        if (dataPublisher != null) {
+            try {
+                dataPublisher.publish(batch);
+                logger.info("Data ingested to Kafka - path: {}, method: {}",
+                    requestData.get("path"), requestData.get("method"));
+            } catch (Exception e) {
+                logger.error("Error publishing data to Kafka: {}", e.getMessage(), e);
+                throw new RuntimeException("Failed to publish data: " + e.getMessage(), e);
             }
-        } catch (Exception e) {
-            logger.error("Error ingesting data: {}", e.getMessage(), e);
-            result.error = e.getMessage();
-        }
-
-        return result;
-    }
-
-    /**
-     * Builds the final response with all processing results
-     */
-    private Map<String, Object> buildFinalResponse(String url, String path, String method,
-                                                     GuardrailsValidationResult guardrailsResult,
-                                                     DataIngestionResult ingestionResult) {
-        Map<String, Object> result = new HashMap<>();
-
-        result.put("success", true);
-
-        if (guardrailsResult.guardrailsResponse != null) {
-            result.put("guardrailsResult", guardrailsResult.guardrailsResponse);
-        }
-
-        if (ingestionResult.shouldIngest) {
-            result.put("ingestionResult", ingestionResult.ingested);
-            if (ingestionResult.error != null) {
-                result.put("ingestError", ingestionResult.error);
-            }
-        }
-
-        result.put("timestamp", System.currentTimeMillis());
-
-        logger.info("HTTP proxy processed - Adapter: {}, Blocked: {}, IngestData: {}, Ingested: {}",
-            guardrailsResult.adapterUsed, guardrailsResult.blocked,
-            ingestionResult.shouldIngest, ingestionResult.ingested);
-
-        return result;
-    }
-
-    /**
-     * Add x-blocked-by to response payload and set blocked status (only if response is null)
-     */
-    private void addBlockedByHeader(Map<String, Object> proxyData, Map<String, Object> response) {
-        // Only modify if response is null (no backend response)
-        if (response == null) {
-            // Create a new response with blocked status
-            response = new HashMap<>();
-
-            // Create body with x-blocked-by field
-            Map<String, Object> newBody = new HashMap<>();
-            newBody.put("x-blocked-by", "Akto Proxy");
-            response.put("body", newBody);
-
-            // Set statusCode to 403 and status to "forbidden" for blocked requests
-            response.put("statusCode", 403);
-            response.put("status", "forbidden");
-
-            // Add response to proxyData
-            proxyData.put("response", response);
-
-            logger.info("Added x-blocked-by to response payload and set status to 403 forbidden due to guardrails blocking");
+        } else {
+            logger.warn("DataPublisher not configured - data will not be published to Kafka");
         }
     }
 
-    /**
-     * Check if data should be ingested based on URL query parameters
-     */
-    private boolean checkShouldIngestData(Map<String, Object> urlQueryParams) {
-        if (urlQueryParams == null || urlQueryParams.isEmpty()) {
-            return false;
+    private String getStringField(Map<String, Object> data, String key) {
+        Object val = data.get(key);
+        return val != null ? val.toString() : null;
+    }
+
+    private void putIfNotNull(Map<String, Object> target, Map<String, Object> source, String key) {
+        Object val = source.get(key);
+        if (val != null) {
+            target.put(key, val);
         }
-
-        Object ingestData = urlQueryParams.get("ingest_data");
-        if (ingestData == null) {
-            return false;
-        }
-
-        String ingestDataValue = ingestData.toString();
-        return "true".equalsIgnoreCase(ingestDataValue);
-    }
-
-    /**
-     * Build error response
-     */
-    private Map<String, Object> buildErrorResponse(String errorMessage) {
-        Map<String, Object> error = new HashMap<>();
-        error.put("success", false);
-        error.put("error", errorMessage);
-        error.put("timestamp", System.currentTimeMillis());
-        return error;
-    }
-
-    // Getters and setters
-    public GuardrailsClient getGuardrailsClient() {
-        return guardrailsClient;
-    }
-
-    public AktoIngestAdapter getAktoIngestAdapter() {
-        return aktoIngestAdapter;
-    }
-
-    public AdapterFactory getAdapterFactory() {
-        return adapterFactory;
     }
 
     public DataPublisher getDataPublisher() {
         return dataPublisher;
     }
 
-    /**
-     * Set the data publisher for publishing IngestDataBatch to Kafka
-     * @param dataPublisher The publisher implementation
-     */
     public void setDataPublisher(DataPublisher dataPublisher) {
         this.dataPublisher = dataPublisher;
-        logger.info("DataPublisher configured for Gateway");
-    }
-
-    /**
-     * Helper class to hold guardrails validation results
-     */
-    private static class GuardrailsValidationResult {
-        boolean applied = false;
-        boolean blocked = false;
-        String adapterUsed = "none";
-        Map<String, Object> guardrailsResponse;
-    }
-
-    /**
-     * Helper class to hold data ingestion results
-     */
-    private static class DataIngestionResult {
-        boolean shouldIngest = false;
-        boolean ingested = false;
-        String error = null;
     }
 }

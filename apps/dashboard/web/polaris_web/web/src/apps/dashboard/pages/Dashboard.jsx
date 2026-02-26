@@ -2,11 +2,10 @@ import { Outlet, useLocation, useNavigate} from "react-router-dom"
 import { history } from "@/util/history";
 import Store from "../store";
 import homeFunctions from "./home/module";
-import { useEffect, useState, useRef} from "react";
+import { useEffect, useState } from "react";
 import { Frame, Toast, VerticalStack, Banner, Button, Text } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
-import values from "@/util/values";
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
 import LocalStore, { localStorePersistSync } from "../../main/LocalStorageStore";
@@ -32,8 +31,6 @@ function Dashboard() {
     const threatFiltersMap = SessionStore(state => state.threatFiltersMap);
 
     const { selectItems } = useTable()
-
-    const navigate = useNavigate();
 
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
@@ -62,9 +59,6 @@ function Dashboard() {
     const trafficAlerts = PersistStore(state => state.trafficAlerts)
     const setTrafficAlerts = PersistStore(state => state.setTrafficAlerts)
     const [displayItems, setDisplayItems] = useState([])
-
-    const timeoutRef = useRef(null);
-    const inactivityTime = 10 * 60 * 1000;
 
     const fetchMetadata = async () => {
         await transform.setTestMetadata();
@@ -177,48 +171,6 @@ function Dashboard() {
         alert.lastDismissed = func.timeNow();
         await homeRequests.markAlertAsDismissed(alert);
     }
-
-    const refreshFunc = () => {
-        if (values.DISABLED_AUTO_ACCOUNT_REFRESH.includes(window.ACTIVE_ACCOUNT)){
-            return;
-        }
-        if(document.visibilityState === 'hidden'){
-            const currentCategory = PersistStore.getState().dashboardCategory;
-            PersistStore.getState().resetAll();
-            LocalStore.getState().resetStore();
-            PersistStore.getState().setDashboardCategory(currentCategory);
-            const targetPath = currentCategory === "Endpoint Security"
-                ? "/dashboard/observe/agentic-assets"
-                : "/dashboard/observe/inventory";
-            navigate(targetPath);
-            window.location.reload();
-        }
-    }
-
-    const initializeTimer = () => {
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current); // Clear existing timeout to prevent duplicates
-          }
-          timeoutRef.current = setTimeout(refreshFunc, inactivityTime);
-    }
-
-    const handleVisibilityChange = () => {
-        if (document.visibilityState === 'hidden') {
-          initializeTimer(); 
-        } else {
-          clearTimeout(timeoutRef.current);
-        }
-    };
-
-    useEffect(() => {
-        initializeTimer();
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            clearTimeout(timeoutRef.current);
-        };
-
-    },[])
 
     const shouldShowWelcomeBackModal = window.IS_SAAS === "true" && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
 

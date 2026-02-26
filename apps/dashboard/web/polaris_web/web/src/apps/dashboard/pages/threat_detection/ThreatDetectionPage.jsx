@@ -240,6 +240,7 @@ function ThreatDetectionPage() {
     const [eventState, setEventState] = useState(initialEventState);
     const [triggerTableRefresh, setTriggerTableRefresh] = useState(0)
     const initialVal = useMemo(() => {
+        // Support navigation from dashboard with period passed via location state
         const period = location.state?.period;
         if (period?.since != null && period?.until != null) {
             return {
@@ -251,6 +252,13 @@ function ThreatDetectionPage() {
                 }
             };
         }
+        // Support range alias preset (e.g. ?range=last7days)
+        const rangeAlias = searchParams.get('range');
+        if (rangeAlias) {
+            const preset = values.ranges.find((r) => r.alias === rangeAlias);
+            if (preset) return preset;
+        }
+        // Support startTimestamp/endTimestamp params
         const startTs = searchParams.get('startTimestamp');
         const endTs = searchParams.get('endTimestamp');
         if (startTs && endTs) {
@@ -258,6 +266,19 @@ function ThreatDetectionPage() {
             const until = new Date(parseInt(endTs, 10) * 1000);
             if (!Number.isNaN(since.getTime()) && !Number.isNaN(until.getTime())) {
                 return { alias: 'custom', title: 'Custom', period: { since, until } };
+            }
+        }
+        // Support since/until params with formatted title
+        const sinceParam = searchParams.get('since');
+        const untilParam = searchParams.get('until');
+        if (sinceParam != null && untilParam != null) {
+            const sinceTs = parseInt(sinceParam, 10);
+            const untilTs = parseInt(untilParam, 10);
+            if (!Number.isNaN(sinceTs) && !Number.isNaN(untilTs)) {
+                const sinceDate = new Date(sinceTs * 1000);
+                const untilDate = new Date(untilTs * 1000);
+                const title = sinceDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) + " - " + untilDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                return { alias: 'custom', title, period: { since: sinceDate, until: untilDate } };
             }
         }
         return values.ranges[2];
@@ -275,7 +296,6 @@ function ThreatDetectionPage() {
             }
         }
     }, [searchParams]);
-
     const [showDetails, setShowDetails] = useState(false);
     const [sampleData, setSampleData] = useState([])
     const [showNewTab, setShowNewTab] = useState(false)

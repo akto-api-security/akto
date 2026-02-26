@@ -56,6 +56,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Utils module for SlackUtils -->
+        <dependency>
+            <groupId>com.akto.libs.utils</groupId>
+            <artifactId>utils</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- JUnit for testing -->
         <dependency>
             <groupId>junit</groupId>

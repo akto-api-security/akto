@@ -26,6 +26,7 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.CollectionTags.TagSource;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -63,7 +64,10 @@ import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
-import com.akto.cache.IconCache;
+import com.akto.utils.scripts.AcesssTypeCollectionLevel;
+import com.akto.dao.ApiCollectionIconsDao;
+import com.akto.dto.ApiCollectionIcon;
+import com.mongodb.client.model.Projections;
 
 public class ApiCollectionsAction extends UserAction {
 
@@ -179,7 +183,7 @@ public class ApiCollectionsAction extends UserAction {
     private Map<Integer, Integer> uningestedApiCountMap;
     private List<UningestedApiOverage> uningestedApiList;
 
-    public String getCountForHostnameDeactivatedCollections(){
+    public String fetchCountForHostnameDeactivatedCollections(){
         this.deactivatedHostnameCountMap = new HashMap<>();
         if(deactivatedCollections == null || deactivatedCollections.isEmpty()){
             return SUCCESS.toUpperCase();
@@ -203,7 +207,7 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String getCountForUningestedApis(){
+    public String fetchCountForUningestedApis(){
         this.uningestedApiCountMap = new HashMap<>();
         try {
             this.uningestedApiCountMap = UningestedApiOverageDao.instance.getCountByCollection();
@@ -637,7 +641,7 @@ public class ApiCollectionsAction extends UserAction {
         }
     }
 
-    public String getEndpointsFromConditions(){
+    public String fetchEndpointsFromConditions(){
         try {
             List<TestingEndpoints> conditions = generateConditions(this.conditions);
 
@@ -1099,7 +1103,7 @@ public class ApiCollectionsAction extends UserAction {
 
 
     HashMap<Integer, List<Integer>> usersCollectionList;
-    public String getAllUsersCollections() {
+    public String fetchAllUsersCollections() {
         int accountId = Context.accountId.get();
         this.usersCollectionList = RBACDao.instance.getAllUsersCollections(accountId);
 
@@ -1727,33 +1731,178 @@ public class ApiCollectionsAction extends UserAction {
         this.resetEnvTypes = resetEnvTypes;
     }
 
+    // Input parameter for on-demand icon fetching
+    private List<String> hostnames;
 
-    public String fetchAllIconsCache() {
+    public void setHostnames(List<String> hostnames) {
+        this.hostnames = hostnames;
+    }
+
+    public List<String> getHostnames() {
+        return hostnames;
+    }
+
+    /**
+     * On-demand endpoint that fetches icons only for specified hostnames
+     * Direct database queries without server-side caching for optimal performance if not found in local storage
+     */
+    public String fetchIconsForHostnames() {
         try {
-            loggerMaker.infoAndAddToDb("DEBUG: fetchAllIconsCache called", LogDb.DASHBOARD);
+            if (hostnames == null || hostnames.isEmpty()) {
+                if(this.response == null) {
+                    this.response = new BasicDBObject();
+                }
+                this.response.put("icons", new HashMap<>());
+                return Action.SUCCESS.toUpperCase();
+            }
+
+            // Direct database query for icons
+            Map<String, Map<String, Object>> result = new HashMap<>();
             
-            // Get both caches from IconCache
-            IconCache iconCache = IconCache.getInstance();
-            
-            // Force refresh the cache to get latest data from database
-            loggerMaker.infoAndAddToDb("DEBUG: Force refreshing icon cache", LogDb.DASHBOARD);
-            
-            Map<String, String> hostnameToObjectIdCache = iconCache.getHostnameToObjectIdCache();
-            Map<String, IconCache.IconData> objectIdToIconDataCache = iconCache.getObjectIdToIconDataCache();
+            try {
+                // Clean and deduplicate hostnames
+                List<String> cleanHostnames = hostnames.stream()
+                    .filter(h -> h != null && !h.trim().isEmpty())
+                    .map(String::trim)
+                    .distinct()
+                    .collect(java.util.stream.Collectors.toList());
+
+                if (!cleanHostnames.isEmpty()) {
+                    // First: Try exact hostname matches
+                    List<ApiCollectionIcon> exactMatches = ApiCollectionIconsDao.instance.findAll(
+                        Filters.in(ApiCollectionIcon.MATCHING_HOSTNAMES, cleanHostnames),
+                        Projections.include(ApiCollectionIcon.DOMAIN_NAME, ApiCollectionIcon.MATCHING_HOSTNAMES,
+                                          ApiCollectionIcon.IMAGE_DATA)
+                    );
+
+                    if (exactMatches != null) {
+                        for (ApiCollectionIcon icon : exactMatches) {
+                            if (icon.isAvailable() && icon.getMatchingHostnames() != null) {
+                                Map<String, Object> iconData = new HashMap<>();
+                                iconData.put("imageData", icon.getImageData());
+                                iconData.put("domainName", icon.getDomainName());
+
+                                // Map all matching hostnames that were requested
+                                for (String matchingHostname : icon.getMatchingHostnames()) {
+                                    if (cleanHostnames.contains(matchingHostname)) {
+                                        result.put(matchingHostname, iconData);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Second: Handle missing hostnames with domain stripping
+                    List<String> missingHostnames = cleanHostnames.stream()
+                        .filter(h -> !result.containsKey(h))
+                        .collect(java.util.stream.Collectors.toList());
+
+                    if (!missingHostnames.isEmpty()) {
+                        // Collect all possible domain variations
+                        Set<String> allDomains = new HashSet<>();
+                        Map<String, List<String>> domainToHostnames = new HashMap<>();
+                        
+                        for (String hostname : missingHostnames) {
+                            String[] hostParts = hostname.split("\\.");
+                            if (hostParts.length >= 2) {
+                                // Try progressively shorter domains (abc.example.com -> example.com -> com)
+                                for (int i = 1; i <= hostParts.length - 2; i++) {
+                                    StringBuilder domainBuilder = new StringBuilder();
+                                    for (int j = i; j < hostParts.length; j++) {
+                                        if (j > i) domainBuilder.append(".");
+                                        domainBuilder.append(hostParts[j]);
+                                    }
+                                    String domain = domainBuilder.toString();
+                                    allDomains.add(domain);
+                                    domainToHostnames.computeIfAbsent(domain, k -> new ArrayList<>()).add(hostname);
+                                }
+                            }
+                        }
+
+                        if (!allDomains.isEmpty()) {
+                            // Query for all domains at once
+                            List<ApiCollectionIcon> domainIcons = ApiCollectionIconsDao.instance.findAll(
+                                Filters.in(ApiCollectionIcon.DOMAIN_NAME, allDomains),
+                                Projections.include(ApiCollectionIcon.DOMAIN_NAME, ApiCollectionIcon.IMAGE_DATA, 
+                                                  ApiCollectionIcon.MATCHING_HOSTNAMES)
+                            );
+
+                            if (domainIcons != null) {
+                                for (ApiCollectionIcon icon : domainIcons) {
+                                    if (icon.isAvailable()) {
+                                        Map<String, Object> iconData = new HashMap<>();
+                                        iconData.put("imageData", icon.getImageData());
+                                        iconData.put("domainName", icon.getDomainName());
+
+                                        // Map back to original hostnames that need this domain
+                                        List<String> hostnamesForDomain = domainToHostnames.get(icon.getDomainName());
+                                        if (hostnamesForDomain != null) {
+                                            for (String hostname : hostnamesForDomain) {
+                                                if (!result.containsKey(hostname)) { // Only if not already found
+                                                    result.put(hostname, iconData);
+                                                    
+                                                    // Update database to include this hostname in matchingHostnames
+                                                    try {
+                                                        ApiCollectionIconsDao.instance.updateOne(
+                                                            Filters.eq("_id", icon.getId()),
+                                                            Updates.addToSet(ApiCollectionIcon.MATCHING_HOSTNAMES, hostname)
+                                                        );
+                                                    } catch (Exception e) {
+                                                        loggerMaker.errorAndAddToDb(e, "Failed to update matchingHostnames for " + hostname, LogDb.DASHBOARD);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error querying icons from database", LogDb.DASHBOARD);
+            }
             
             if(this.response == null) {
                 this.response = new BasicDBObject();
             }
-            this.response.put("hostnameToObjectIdCache", hostnameToObjectIdCache);
-            this.response.put("objectIdToIconDataCache", objectIdToIconDataCache);
-            
-            loggerMaker.infoAndAddToDb("DEBUG: fetchAllIconsCache returning " + hostnameToObjectIdCache.size() + " hostname mappings and " + objectIdToIconDataCache.size() + " icon data entries", LogDb.DASHBOARD);
+            this.response.put("icons", result);
             return Action.SUCCESS.toUpperCase();
             
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error fetching all icons cache", LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, "Error fetching icons for hostnames", LogDb.DASHBOARD);
             return Action.ERROR.toUpperCase();
         }
     }
+
+    
+    public String resetCollectionAccessTypes() {
+        try {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb("Starting resetCollectionAccessTypes for account: " + accountId + " (background)", LogDb.DASHBOARD);
+
+            Runnable r = () -> {
+                Context.accountId.set(accountId);
+                try {
+                    AcesssTypeCollectionLevel.doResetCollectionAccessTypes();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error in resetCollectionAccessTypes (background)", LogDb.DASHBOARD);
+                }
+            };
+            new Thread(r).start();
+
+            if (this.response == null) {
+                this.response = new BasicDBObject();
+            }
+            this.response.put("started", true);
+            this.response.put("message", "Reset started in the background. This may take a few minutes. Refresh the inventory page to see updated access types.");
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error starting resetCollectionAccessTypes", LogDb.DASHBOARD);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
 
 }

@@ -55,7 +55,6 @@ const ServerSettingsStep = ({
 }) => {
     return (
         <VerticalStack gap="4">
-            <Text variant="headingMd">Server and application settings</Text>
             <Text variant="bodyMd" tone="subdued">
                 Configure which servers the guardrail should be applied to and specify whether it applies to requests, responses, or both.
             </Text>
@@ -68,6 +67,7 @@ const ServerSettingsStep = ({
                     setSelected={setSelectedMcpServers}
                     preSelected={selectedMcpServers}
                     allowMultiple={true}
+                    showSelectAllMinOptions={1}
                     disabled={collectionsLoading}
                 />
 
@@ -78,6 +78,7 @@ const ServerSettingsStep = ({
                     setSelected={setSelectedAgentServers}
                     preSelected={selectedAgentServers}
                     allowMultiple={true}
+                    showSelectAllMinOptions={1}
                     disabled={collectionsLoading}
                 />
 

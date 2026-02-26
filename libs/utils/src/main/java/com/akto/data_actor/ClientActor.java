@@ -75,15 +75,20 @@ public class ClientActor extends DataActor {
         return dbAbsHost + "/api";
     }
 
-    public static int getAccountId() throws Exception {
-        String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
-        DecodedJWT jwt = JWT.decode(token);
-        String payload = jwt.getPayload();
-        byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
-        String decodedPayload = new String(decodedBytes);
-        BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
-        int accId = (int) basicDBObject.getInt("accountId");
-        return accId;
+    public static int getAccountId() {
+        try {
+            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+            DecodedJWT jwt = JWT.decode(token);
+            String payload = jwt.getPayload();
+            byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
+            String decodedPayload = new String(decodedBytes);
+            BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
+            int accId = (int) basicDBObject.getInt("accountId");
+            return accId;
+        } catch (Exception e) {
+            return 1000000;
+        }
+        
     }
 
     public static boolean checkAccount() {
@@ -1137,6 +1142,28 @@ public class ClientActor extends DataActor {
             );
         } catch (Exception e) {
             System.out.println("error in insertProtectionLog" + e);
+            return;
+        }
+    }
+
+    public void insertAgenticTestingLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertAgenticTestingLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                System.out.println("non 2xx response in insertAgenticTestingLog");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("error in insertAgenticTestingLog " + e);
             return;
         }
     }

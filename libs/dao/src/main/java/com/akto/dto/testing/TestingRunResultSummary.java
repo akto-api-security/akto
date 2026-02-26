@@ -17,6 +17,7 @@ public class TestingRunResultSummary {
     public static final String TEST_RESULTS_COUNT = "testResultsCount";
     public static final String METADATA_STRING = "metadata";
     public static final String TESTS_INITIATED_COUNT = "testInitiatedCount";
+    public static final String TOTAL_EXTERNAL_API_TOKENS = "totalExternalApiTokens";
 
     private ObjectId id;
     private int startTimestamp;
@@ -24,6 +25,7 @@ public class TestingRunResultSummary {
     private Map<String, Integer> countIssues;
     private int totalApis;
     private ObjectId testingRunId;
+    private int totalExternalApiTokens;
     @BsonIgnore
     private String testingRunHexId;
 
@@ -164,6 +166,14 @@ public class TestingRunResultSummary {
 
     public void setTestInitiatedCount(int testInitiatedCount) {
         this.testInitiatedCount = testInitiatedCount;
+    }
+
+    public int getTotalExternalApiTokens() {
+        return totalExternalApiTokens;
+    }
+
+    public void setTotalExternalApiTokens(int totalExternalApiTokens) {
+        this.totalExternalApiTokens = totalExternalApiTokens;
     }
 
     @Override

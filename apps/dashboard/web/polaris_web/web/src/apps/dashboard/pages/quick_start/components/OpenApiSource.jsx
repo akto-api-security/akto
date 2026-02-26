@@ -1,4 +1,4 @@
-import { Text, Modal, DescriptionList, RadioButton, Icon, Tooltip } from "@shopify/polaris";
+import { Text, Modal, DescriptionList, RadioButton, Icon, Tooltip, Checkbox, Box } from "@shopify/polaris";
 import { useState } from "react";
 import FileUploadCard from "../../../components/shared/FileUploadCard";
 import api from "../api";
@@ -15,6 +15,7 @@ function OpenApiSource() {
     const [importType, setImportType] = useState('ONLY_SUCCESSFUL_APIS');
     const [uploadId, setUploadId] = useState('');
     const [intervalId, setIntervalId] = useState(null);
+    const [skipLiveReplay, setSkipLiveReplay] = useState(false);
 
     const setFilesCheck = (file) => {
         var reader = new FileReader()
@@ -28,6 +29,7 @@ function OpenApiSource() {
         setLoading(true)
         const formData = new FormData();
         formData.append("openAPIString", files.content)
+        formData.append("skipLiveReplay", skipLiveReplay);
         await api.importDataFromOpenApiSpec(formData).then((res) => {
             let uploadId = res.uploadId;
             setLoading(false)
@@ -154,6 +156,14 @@ function OpenApiSource() {
                 onSecondaryAction={goToDocs}
                 secondaryActionLabel="Go to docs"
             />
+            <Box paddingBlockStart="3">
+                <Checkbox
+                    label="Skip live replay (use spec examples only)"
+                    helpText="Enable this if your server is not reachable from Akto. The spec's example responses will be used instead of making real HTTP requests."
+                    checked={skipLiveReplay}
+                    onChange={(val) => setSkipLiveReplay(val)}
+                />
+            </Box>
             <Modal
                 open={showImportDetailsModal}
                 onClose={() => {closeModal()}}

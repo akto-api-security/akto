@@ -60,7 +60,7 @@ public class ApiExecutorUtil {
             SimpleScriptContext sctx = ((SimpleScriptContext) engine.get("context"));
             sctx.setAttribute("method", originalHttpRequest.getMethod(), ScriptContext.ENGINE_SCOPE);
             sctx.setAttribute("headers", originalHttpRequest.getHeaders(), ScriptContext.ENGINE_SCOPE);
-            sctx.setAttribute("url", originalHttpRequest.getPath(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("url", originalHttpRequest.getUrl(), ScriptContext.ENGINE_SCOPE);
             sctx.setAttribute("payload", originalHttpRequest.getBody(), ScriptContext.ENGINE_SCOPE);
             sctx.setAttribute("queryParams", originalHttpRequest.getQueryParams(), ScriptContext.ENGINE_SCOPE);
             engine.eval(script);

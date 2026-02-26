@@ -7,7 +7,7 @@ import PersistStore from '../../../main/PersistStore';
 import observeFunc from "../../pages/observe/transform"
 
 
-function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, subtitle, navUrlBuilder, invertTextSizes, onSliceClick}) {
+function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, subtitle, navUrlBuilder, invertTextSizes, onSegmentClick}) {
     const chartComponentRef = useRef(null)
     const navigate = useNavigate()
     const filtersMap = PersistStore(state => state.filtersMap)
@@ -107,7 +107,7 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
               dataLabels: {
                 enabled: false
               },
-              cursor: onSliceClick || navUrlBuilder || navUrl ? 'pointer' : undefined
+              cursor: onSegmentClick || navUrlBuilder || navUrl ? 'pointer' : undefined
             },
             series: {
                 point: {
@@ -115,9 +115,11 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
 
                         click: (event) => {
                             const { point } = event;
-                            if (onSliceClick) {
-                                onSliceClick(point.filterValue)
-                            } else if (navUrlBuilder) {
+                            if (onSegmentClick) {
+                                onSegmentClick(point.filterValue || point.name);
+                                return;
+                            }
+                            if (navUrlBuilder) {
                                 const builtUrl = navUrlBuilder(navUrl, point.filterValue)
                                 if (builtUrl) {
                                     window.open(builtUrl, '_blank', 'noopener,noreferrer')

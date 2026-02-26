@@ -161,6 +161,19 @@ const settingRequests = {
             data
         })
     },
+    fetchMetricsByModule(startTimestamp, endTimestamp, moduleType, instanceId) {
+        const data = {
+            startTime: startTimestamp,
+            endTime: endTimestamp,
+            moduleType: moduleType
+        }
+        if (instanceId) data.instanceId = instanceId
+        return request({
+            url: '/api/metrics',
+            method: 'post',
+            data
+        })
+    },
 
     addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, webhookType, sendInstantly) {
         return request({
@@ -776,11 +789,11 @@ const settingRequests = {
             data: {}
         })
     },
-    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType,severityLevels) {
+    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels) {
         return await request({
             url: '/api/addCloudflareWafIntegration',
             method: 'post',
-            data: {accountOrZoneId, apiKey, email, integrationType,severityLevels}
+            data: {accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels}
         })
     },
     async getDeMergedApis() {
@@ -807,6 +820,13 @@ const settingRequests = {
     async deleteAllMaliciousEvents() {
         return await request({
             url: '/api/deleteAllMaliciousEvents',
+            method: 'post',
+            data: {}
+        })
+    },
+    async resetCollectionAccessTypes() {
+        return await request({
+            url: '/api/resetCollectionAccessTypes',
             method: 'post',
             data: {}
         })

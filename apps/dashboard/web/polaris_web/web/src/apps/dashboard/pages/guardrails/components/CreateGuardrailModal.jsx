@@ -34,6 +34,7 @@ import {
     ServerSettingsStep,
     ServerSettingsConfig
 } from './steps';
+import { SEVERITY } from '../utils';
 
 const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, isEditMode = false }) => {
     // Step management
@@ -44,6 +45,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [blockedMessage, setBlockedMessage] = useState("");
+    const [severity, setSeverity] = useState(SEVERITY.MEDIUM.value);
     const [applyToResponses, setApplyToResponses] = useState(false);
 
     // Step 2: Content & Policy Guardrails
@@ -301,6 +303,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setName("");
         setDescription("");
         setBlockedMessage("");
+        setSeverity(SEVERITY.MEDIUM.value);
         setApplyToResponses(false);
         setEnablePromptAttacks(false);
         setPromptAttackLevel("high");
@@ -357,6 +360,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setName(policy.name || "");
         setDescription(policy.description || "");
         setBlockedMessage(policy.blockedMessage || "");
+        setSeverity(policy.severity ? policy.severity.toUpperCase() : SEVERITY.MEDIUM.value);
         setApplyToResponses(policy.applyToResponses || false);
         
         // Content filters
@@ -539,6 +543,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 name,
                 description,
                 blockedMessage,
+                severity,
                 applyToResponses,
                 contentFilters: {
                     harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
@@ -733,6 +738,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setDescription={setDescription}
                         blockedMessage={blockedMessage}
                         setBlockedMessage={setBlockedMessage}
+                        severity={severity}
+                        setSeverity={setSeverity}
                         applyToResponses={applyToResponses}
                         setApplyToResponses={setApplyToResponses}
                     />

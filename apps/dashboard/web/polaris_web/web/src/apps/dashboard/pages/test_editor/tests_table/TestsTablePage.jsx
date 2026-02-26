@@ -36,7 +36,7 @@ const headings = [
         title: "Test",
         text: "Tests",
         value: "tests",
-        textValue: "tests",
+        textValue: "name",
         sortActive: true,
         boxWidth: "465px",
     },

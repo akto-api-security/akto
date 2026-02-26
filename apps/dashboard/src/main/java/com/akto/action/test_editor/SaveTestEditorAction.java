@@ -55,7 +55,6 @@ import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
-import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
 import com.akto.utils.TrafficFilterUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -105,7 +104,9 @@ public class SaveTestEditorAction extends UserAction {
     private String testingRunPlaygroundHexId;
     private State testingRunPlaygroundStatus;
     @Getter @Setter
-    private String testRoleId;
+    private String miniTestingName;
+    @Getter @Setter
+    private Map<String, Object> testingRunConfig;
 
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
@@ -341,6 +342,13 @@ public class SaveTestEditorAction extends UserAction {
                     testingRunPlayground.setSamples(sampleDataList.get(0).getSamples());
                     testingRunPlayground.setApiInfoKey(infoKey);
                     testingRunPlayground.setCreatedAt(Context.now());
+                    if (StringUtils.isNotBlank(miniTestingName)) {
+                        testingRunPlayground.setMiniTestingName(miniTestingName);
+                    }
+                    TestingRunConfig testingRunConfig = buildTestingRunConfigFromRequest(this.testingRunConfig);
+                    if (testingRunConfig != null) {
+                        testingRunPlayground.setTestingRunConfig(testingRunConfig);
+                    }
 
                     InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(testingRunPlayground);
                     if (insertOne.wasAcknowledged()) {
@@ -392,8 +400,10 @@ public class SaveTestEditorAction extends UserAction {
         List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
         int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         
-        TestingRunConfig testingRunConfig = new TestingRunConfig();
-        testingRunConfig.setTestRoleId(testRoleId);
+        TestingRunConfig testingRunConfig = buildTestingRunConfigFromRequest(this.testingRunConfig);
+        if (testingRunConfig == null) {
+            testingRunConfig = new TestingRunConfig();
+        }
         List<String> samples = testingUtil.getSampleMessages().get(infoKey);
         TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(null, infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
         if(testingRunResult == null){
@@ -474,6 +484,20 @@ public class SaveTestEditorAction extends UserAction {
             }
         }
         return SUCCESS.toUpperCase();
+    }
+
+    private TestingRunConfig buildTestingRunConfigFromRequest(Map<String, Object> config) {
+        if (config == null || config.isEmpty()) return null;
+        TestingRunConfig runConfig = new TestingRunConfig();
+        Object overridden = config.get(TestingRunConfig.OVERRIDDEN_TEST_APP_URL);
+        if (overridden != null && StringUtils.isNotBlank(overridden.toString())) {
+            runConfig.setOverriddenTestAppUrl(overridden.toString());
+        }
+        Object roleId = config.get(TestingRunConfig.TEST_ROLE_ID);
+        if (roleId != null && StringUtils.isNotBlank(roleId.toString())) {
+            runConfig.setTestRoleId(roleId.toString());
+        }
+        return runConfig;
     }
 
     public void generateTestingRunResultAndIssue(TestConfig testConfig, ApiInfo.ApiInfoKey infoKey, TestingRunResult testingRunResult) {

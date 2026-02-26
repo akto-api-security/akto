@@ -435,8 +435,13 @@ function EndpointPosture() {
         if (index === 0) {
             navigate('/dashboard/observe/agentic-assets')
         } else if (index === 1) {
+            const filterStr = 'successfulExploit__true'
+            const targetPath = '/dashboard/protection/threat-activity'
             sessionStorage.setItem('akto_spaFilterNav', 'true')
-            navigate('/dashboard/protection/threat-activity?filters=successfulExploit__true#active', {
+            sessionStorage.setItem('akto_spaNavFilter', filterStr)
+            sessionStorage.setItem('akto_spaNavPath', targetPath)
+            sessionStorage.setItem('akto_spaNavExpiry', String(Date.now() + 15000))
+            navigate(`${targetPath}?filters=${encodeURIComponent(filterStr)}#active`, {
                 state: { period: { since: currDateRange.period.since, until: currDateRange.period.until } }
             })
         } else {
@@ -552,9 +557,14 @@ function EndpointPosture() {
 
     const navigateToThreatActivityWithFilter = (filterId) => {
         if (!filterId) return
+        const filterStr = `latestAttack__${filterId}`
+        const targetPath = '/dashboard/protection/threat-activity'
         sessionStorage.setItem('akto_spaFilterNav', 'true')
+        sessionStorage.setItem('akto_spaNavFilter', filterStr)
+        sessionStorage.setItem('akto_spaNavPath', targetPath)
+        sessionStorage.setItem('akto_spaNavExpiry', String(Date.now() + 15000))
         navigate(
-            `/dashboard/protection/threat-activity?filters=latestAttack__${encodeURIComponent(filterId)}#active`,
+            `${targetPath}?filters=${encodeURIComponent(filterStr)}#active`,
             { state: { period: { since: currDateRange.period.since, until: currDateRange.period.until } } }
         )
     }
@@ -680,7 +690,7 @@ function EndpointPosture() {
                     chartOnLeft={true}
                     dataTableWidth="250px"
                     pieInnerSize="50%"
-                    onSliceClick={handleGuardrailPolicyClick}
+                    onSegmentClick={handleGuardrailPolicyClick}
                 />
             </Box>
         </CardWithHeader>

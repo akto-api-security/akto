@@ -59,6 +59,7 @@ function GithubSimpleTable(props) {
         emptyStateMarkup={props?.emptyStateMarkup}
         calendarFilterKeys={props?.calendarFilterKeys}
         supportsNegationFilter={true}
+        onExportCsv={props?.onExportCsv}
     />
 
 }

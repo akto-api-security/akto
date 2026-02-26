@@ -768,13 +768,14 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 }
             }
             
-            // Sort by count descending and take top 5
+            // Sort by count descending; take more candidates so we can filter to collections with hostnames only
             List<Map.Entry<Integer, Long>> sortedCollections = collectionCounts.entrySet().stream()
                 .sorted(Map.Entry.<Integer, Long>comparingByValue().reversed())
-                .limit(5)
+                .limit(20)
                 .collect(Collectors.toList());
             
             for (Map.Entry<Integer, Long> entry : sortedCollections) {
+                if (result.size() >= 5) break;
                 int collectionId = entry.getKey();
                 long count = entry.getValue();
                 
@@ -782,11 +783,14 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                     Filters.eq(Constants.ID, collectionId),
                     Projections.include(ApiCollection.HOST_NAME, ApiCollection.NAME)
                 );
+                // Only include collections that have a hostname (exclude collection name / Unknown)
+                String hostname = collection != null && collection.getHostName() != null && !collection.getHostName().trim().isEmpty()
+                    ? collection.getHostName()
+                    : null;
+                if (hostname == null) continue;
                 
                 BasicDBObject hostnameResult = new BasicDBObject();
-                hostnameResult.put("hostname", collection != null ? 
-                    (collection.getHostName() != null ? collection.getHostName() : collection.getName()) : 
-                    "Unknown");
+                hostnameResult.put("hostname", hostname);
                 hostnameResult.put("count", count);
                 result.add(hostnameResult);
             }
@@ -1284,7 +1288,9 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections)
             );
 
-            result = TestingRunIssuesDao.instance.findAll(baseFilter);
+            // Apply dashboard filtering (RBAC + dashboardContext)
+            Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilter);
+            result = TestingRunIssuesDao.instance.getMCollection().find(dashboardFilter).into(new ArrayList<>());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching TestingRunIssues records: " + e.getMessage());
         }
