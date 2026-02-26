@@ -735,4 +735,9 @@ public class DbActor extends DataActor {
     public void storeSpans(List<Span> spans) {
         DbLayer.storeSpans(spans);
     }
+
+    @Override
+    public void storeSsrfTestTracking(SsrfTestTracking ssrfTestTracking) {
+        DbLayer.storeSsrfTestTracking(ssrfTestTracking);
+    }
 }

@@ -2612,6 +2612,10 @@ public class DbLayer {
         SpanDao.instance.insertMany(spans);
     }
 
+    public static void storeSsrfTestTracking(SsrfTestTracking ssrfTestTracking) {
+        SsrfTestTrackingDao.instance.insertOne(ssrfTestTracking);
+    }
+
     public static void bulkUpsertAgenticSessionContext(List<SessionDocument> sessionDocuments) {
         if (sessionDocuments == null || sessionDocuments.isEmpty()) {
             return;

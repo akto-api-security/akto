@@ -31,6 +31,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.Trace;
+import com.akto.dto.SsrfTestTracking;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -397,4 +398,6 @@ public abstract class DataActor {
     public abstract void storeTrace(Trace trace);
 
     public abstract void storeSpans(List<Span> spans);
+
+    public abstract void storeSsrfTestTracking(SsrfTestTracking ssrfTestTracking);
 }

@@ -3556,6 +3556,26 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private SsrfTestTracking ssrfTestTracking;
+
+    public SsrfTestTracking getSsrfTestTracking() {
+        return ssrfTestTracking;
+    }
+
+    public void setSsrfTestTracking(SsrfTestTracking ssrfTestTracking) {
+        this.ssrfTestTracking = ssrfTestTracking;
+    }
+
+    public String storeSsrfTestTracking() {
+        try {
+            DbLayer.storeSsrfTestTracking(ssrfTestTracking);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in storeSsrfTestTracking " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String updateServiceGraphEdges() {
         try {
             if (apiCollectionId == -1) {

@@ -4412,4 +4412,23 @@ public class ClientActor extends DataActor {
             return;
         }
     }
+
+    @Override
+    public void storeSsrfTestTracking(SsrfTestTracking ssrfTestTracking) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("ssrfTestTracking", ssrfTestTracking);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeSsrfTestTracking", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in storeSsrfTestTracking", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in storeSsrfTestTracking" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
 }
