@@ -1267,12 +1267,26 @@ public class DbLayer {
                 }
             }
 
-            // Priority 1: Find testing run with matching miniTestingName (new list field or legacy single string)
+            // Priority 1: Find testing run with matching miniTestingName (hierarchical).
+            // If allowedMiniTestingServiceNames is set (non-null/non-empty) check only that field;
+            // otherwise fall back to legacy miniTestingServiceName to prevent conflicting assignments.
             Bson matchingFilter = Filters.and(
                 filter,
                 Filters.or(
-                    Filters.in(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, miniTestingName),
-                    Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName)
+                    // New list field is populated and contains this service
+                    Filters.and(
+                        Filters.exists(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES),
+                        Filters.not(Filters.size(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, 0)),
+                        Filters.in(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, miniTestingName)
+                    ),
+                    // Legacy: list field is absent/empty and old single-value field matches
+                    Filters.and(
+                        Filters.or(
+                            Filters.eq(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, null),
+                            Filters.size(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, 0)
+                        ),
+                        Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName)
+                    )
                 )
             );
 
@@ -1300,21 +1314,31 @@ public class DbLayer {
                 );
             }
 
-            // Priority 3: Find testing run with a dead mini-testing service
+            // Priority 3: Find testing run with a dead legacy mini-testing service.
+            // Explicitly exclude runs with allowedMiniTestingServiceNames set — those are owned
+            // by specific modules via the new field and should not be stolen by this path.
             if (testingRun == null) {
-                testingRun = TestingRunDao.instance.findOne(
+                Bson deadServiceFilter = Filters.and(
                     filter,
+                    Filters.or(
+                        Filters.eq(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, null),
+                        Filters.size(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, 0)
+                    )
+                );
+                testingRun = TestingRunDao.instance.findOne(
+                    deadServiceFilter,
                     Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, ID)
                 );
             }
 
             if (testingRun == null) return null;
 
-            // For runs assigned to specific modules via the new list field, verify eligibility before claiming
+            // For runs assigned to specific modules via the new list field, verify eligibility before claiming.
+            // Use case-sensitive equals() to stay consistent with the case-sensitive Filters.in/eq DB queries above.
             List<String> allowedModulesForRun = testingRun.getAllowedMiniTestingServiceNames();
             if (allowedModulesForRun != null && !allowedModulesForRun.isEmpty()) {
                 boolean eligible = allowedModulesForRun.stream()
-                    .anyMatch(name -> name.equalsIgnoreCase(miniTestingName));
+                    .anyMatch(name -> name.equals(miniTestingName));
                 if (!eligible) return null;
             }
 
@@ -1366,10 +1390,24 @@ public class DbLayer {
 
         Bson testingRunsProjections = Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, ID);
         Bson trrsProjections = Projections.include(TestingRunResultSummary.TESTING_RUN_ID, ID, TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID);
+        // Priority 1 (hierarchical): if allowedMiniTestingServiceNames is set use only that field;
+        // otherwise fall back to legacy miniTestingServiceName to prevent conflicting assignments.
         List<TestingRun> testingRuns = TestingRunDao.instance.findAll(
                 Filters.or(
-                    Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName),
-                    Filters.in(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, miniTestingName)
+                    // New list field is populated and contains this service
+                    Filters.and(
+                        Filters.exists(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES),
+                        Filters.not(Filters.size(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, 0)),
+                        Filters.in(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, miniTestingName)
+                    ),
+                    // Legacy: list field is absent/empty and old single-value field matches
+                    Filters.and(
+                        Filters.or(
+                            Filters.eq(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, null),
+                            Filters.size(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, 0)
+                        ),
+                        Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName)
+                    )
                 ), testingRunsProjections);
 
         TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.findOne(
@@ -1466,11 +1504,12 @@ public class DbLayer {
                 }
             }
 
-            // For runs assigned to specific modules via the new list field, verify eligibility
+            // For runs assigned to specific modules via the new list field, verify eligibility.
+            // Use case-sensitive equals() to stay consistent with the case-sensitive Filters.in/eq DB queries above.
             List<String> allowedRunModulesTrrs = testingRun.getAllowedMiniTestingServiceNames();
             if (allowedRunModulesTrrs != null && !allowedRunModulesTrrs.isEmpty()) {
                 boolean eligible = allowedRunModulesTrrs.stream()
-                    .anyMatch(name -> name.equalsIgnoreCase(miniTestingName));
+                    .anyMatch(name -> name.equals(miniTestingName));
                 if (!eligible) return null;
             }
 

@@ -37,8 +37,6 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
         fieldNames = new String[]{TestingRun.NAME};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
 
-        fieldNames = new String[]{TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
     
 
