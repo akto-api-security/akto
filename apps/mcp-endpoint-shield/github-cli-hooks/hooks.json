@@ -4,7 +4,7 @@
     "userPromptSubmitted": [
       {
         "type": "command",
-        "bash": "bash ./.github/hooks/akto-validate-prompt-wrapper.sh",
+        "bash": "bash ~/.github/hooks/akto-validate-prompt-wrapper.sh",
         "powershell": "python .github/hooks/akto-validate-prompt.py",
         "comment": "Validate prompts against Akto Guardrails (monitoring only - cannot block per GitHub limitation)",
         "timeoutSec": 30
@@ -13,7 +13,7 @@
     "preToolUse": [
       {
         "type": "command",
-        "bash": "bash ./.github/hooks/akto-validate-pre-tool-wrapper.sh",
+        "bash": "bash ~/.github/hooks/akto-validate-pre-tool-wrapper.sh",
         "powershell": "python .github/hooks/akto-validate-pre-tool.py",
         "comment": "Validate and block tool execution based on Akto Guardrails policies",
         "timeoutSec": 30
@@ -22,7 +22,7 @@
     "postToolUse": [
       {
         "type": "command",
-        "bash": "bash ./.github/hooks/akto-validate-post-tool-wrapper.sh",
+        "bash": "bash ~/.github/hooks/akto-validate-post-tool-wrapper.sh",
         "powershell": "python .github/hooks/akto-validate-post-tool.py",
         "comment": "Ingest tool execution results to Akto for monitoring and analytics",
         "timeoutSec": 30
