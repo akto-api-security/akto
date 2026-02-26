@@ -51,6 +51,8 @@ const CenterViewType = {
 
 const API_COLLECTIONS_CACHE_DURATION_SECONDS = 5 * 60; // 5 minutes
 const COLLECTIONS_LAZY_RENDER_THRESHOLD = 100; // Collections count above which we use lazy rendering optimization
+const allowedAccounts = [1736798101, 1718042191];
+
 
 const headers = [
     ...((isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory() || isApiSecurityCategory() || isDastCategory()) ? [{
@@ -177,7 +179,7 @@ const headers = [
         textValue: 'envType',
         tooltipContent: (<Text variant="bodySm">Tags for an API collection to describe collection attributes such as environment type (staging, production) and other custom attributes</Text>),
     },
-    {   
+    ...(allowedAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? [{
         title: "Access Type",
         text: "Access Type",
         value: "accessType",
@@ -186,7 +188,7 @@ const headers = [
         showFilter: true,
         isText: CellType.TEXT,
         boxWidth: '120px'
-    },
+    }] : []),
     {   
         title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time an endpoint within collection was either discovered for the first time or seen again</Text>} title="Last traffic seen" />, 
         text: 'Last traffic seen', 

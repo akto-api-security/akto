@@ -815,6 +815,7 @@ function TestRunResultFlyout(props) {
                 conversations={conversations}
                 onSendMessage={handleSendMessage}
                 isStreaming={false}
+                testResults={selectedTestRunResult?.testResults || []}
             />
         }
     }, [selectedTestRunResult, conversations])
