@@ -45,6 +45,7 @@ import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.types.CappedSet;
 import com.akto.util.Pair;
 import com.akto.util.filter.DictionaryFilter;
+import com.akto.util.filter.HeaderFilter;
 import com.akto.utils.RedactSampleData;
 import com.google.api.client.util.Charsets;
 import com.google.common.hash.BloomFilter;
@@ -1788,7 +1789,12 @@ public class APICatalogSync {
                 loggerMaker.infoAndAddToDb("Found debug url in getDBUpdatesForParamsHybrid in dbInfo " + dbInfo.getUrl());
             }
 
-            if (deltaInfo.getParam().equalsIgnoreCase("host")) {
+            // Skip standard infrastructure/browser headers to reduce noise and prevent unnecessary DB calls
+            if (deltaInfo != null && deltaInfo.getIsHeader() && HeaderFilter.shouldIgnoreHeader(deltaInfo.getParam())) {
+                continue;
+            }
+
+            if (deltaInfo != null && deltaInfo.getParam().equalsIgnoreCase("host")) {
                 if (dbInfo == null) {
                     AllMetrics.instance.setCyborgNewApiCount(1);
                 }
