@@ -42,6 +42,9 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
             case CICD:
                 apiToken = new ApiToken(Context.now(),Context.accountId.get(), tokenUtility.toString().toLowerCase(), apiKey, Context.now(), username, ApiToken.Utility.CICD);
                 break;
+            case BROWSER_EXTENSION:
+                apiToken = new ApiToken(Context.now(),Context.accountId.get(),tokenUtility.toString().toLowerCase(), apiKey, Context.now(), username, ApiToken.Utility.BROWSER_EXTENSION);
+                break;
             default:
             apiToken = new ApiToken(Context.now(),Context.accountId.get(),tokenUtility.toString().toLowerCase(), apiKey, Context.now(), username, ApiToken.Utility.EXTERNAL_API);
         }
