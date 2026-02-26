@@ -32,10 +32,7 @@ import PersistStore from '../../../../main/PersistStore'
 
 const SKIPPED_TEST_DOCS_URL = "https://docs.akto.io/api-security-testing/concepts/skipped-test-cases";
 
-const SKIP_ERROR_KEYWORDS = [
-  "api_selection_filters block, skipping execution",
-  "authentication check, skipping execution"
-];
+const SKIP_ERROR_KEYWORDS = ["skipping execution"];
 
 function isSkippedTestError(errorText) {
   return SKIP_ERROR_KEYWORDS.some(keyword => errorText?.includes(keyword));
