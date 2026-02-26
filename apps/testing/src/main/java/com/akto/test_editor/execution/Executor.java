@@ -2,7 +2,9 @@ package com.akto.test_editor.execution;
 
 import com.akto.agent.AgentClient;
 import com.akto.billing.UsageMetricUtils;
+
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.TestingRunWebhookDao;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -17,6 +19,7 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
+import com.akto.dto.TestingRunWebhook;
 import com.akto.dto.testing.*;
 import com.akto.testing.*;
 import com.akto.testing.kafka_utils.TestingConfigurations;
@@ -745,6 +748,31 @@ public class Executor {
                 String generatedUUID =  UUID.randomUUID().toString();
                 uuidList.add(generatedUUID);
                 varMap.put("random_uuid", uuidList);
+
+                // Store UUID mapping in common database for SSRF hit tracking
+                try {
+                    String testRunIdStr = (String) varMap.get("testRunId");
+                    String testRunResultSummaryIdStr = (String) varMap.get("testRunResultSummaryId");
+                    Integer accountId = (Integer) varMap.get("accountId");
+                    String apiInfoKeyStr = (String) varMap.get("apiInfoKey");
+                    String testSubType = (String) varMap.get("testSubType");
+                    
+                    if (testRunIdStr != null && testRunResultSummaryIdStr != null && accountId != null && 
+                        apiInfoKeyStr != null && testSubType != null) {
+                        TestingRunWebhook mapping = new TestingRunWebhook(
+                            generatedUUID,
+                            accountId,
+                            new ObjectId(testRunIdStr),
+                            new ObjectId(testRunResultSummaryIdStr),
+                            apiInfoKeyStr,
+                            testSubType,
+                            Context.now()
+                        );
+                        TestingRunWebhookDao.instance.insertOne(mapping);
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error storing SSRF UUID mapping: " + e.getMessage(), LogDb.TESTING);
+                }
 
                 BasicDBObject response = OrganizationsDao.getBillingTokenForAuth();
                 if(response.getString("token") != null){

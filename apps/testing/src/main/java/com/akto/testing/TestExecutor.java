@@ -1163,6 +1163,13 @@ public class TestExecutor {
         Map<String, Object> varMap = new HashMap<>();
         String severity = testConfig.getInfo().getSeverity();
 
+        // Add test context to varMap for SSRF UUID mapping
+        varMap.put("testRunId", testRunId.toHexString());
+        varMap.put("testRunResultSummaryId", testRunResultSummaryId.toHexString());
+        varMap.put("accountId", Context.accountId.get());
+        varMap.put("apiInfoKey", apiInfoKey.toString());
+        varMap.put("testSubType", testSubType);
+
         for (String key: wordListsMap.keySet()) {
             varMap.put("wordList_" + key, wordListsMap.get(key));
         }
