@@ -1300,35 +1300,24 @@ public class DbLayer {
                 );
             }
 
-            // Priority 3: Find testing run with a dead mini-testing service
+            // Priority 3: Find testing run with a dead mini-testing service - eligible modules can take over
             if (testingRun == null) {
-                testingRun = TestingRunDao.instance.findOne(
+                Bson deadModuleFilter = Filters.and(
                     filter,
+                    Filters.in(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, miniTestingName)
+                );
+                testingRun = TestingRunDao.instance.findOne(
+                    deadModuleFilter,
                     Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, ID)
                 );
             }
 
             if (testingRun == null) return null;
 
-            // For runs assigned to specific modules via the new list field, verify eligibility before claiming
-            List<String> allowedModulesForRun = testingRun.getAllowedMiniTestingServiceNames();
-            if (allowedModulesForRun != null && !allowedModulesForRun.isEmpty()) {
-                boolean eligible = allowedModulesForRun.stream()
-                    .anyMatch(name -> name.equals(miniTestingName));
-                if (!eligible) return null;
-            }
-
-            String validatedMiniTestingName = validateAndGetMiniTestingService(
-                testingRun.getMiniTestingServiceName(),
-                miniTestingName
-            );
-
-            if (validatedMiniTestingName == null) return null;
-
             Bson update = Updates.combine(
                 Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
                 Updates.set(TestingRun.STATE, TestingRun.State.RUNNING),
-                Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, validatedMiniTestingName)
+                Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName)
             );
 
             return TestingRunDao.instance.getMCollection().findOneAndUpdate(
