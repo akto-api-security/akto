@@ -1,19 +1,19 @@
 package com.akto.action;
 
-import com.akto.dao.SsrfTestTrackingDao;
+import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.SsrfTestTracking;
+import com.akto.dto.TestingRunWebhook;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.SlackSender;
-import com.akto.notifications.slack.SsrfVulnerabilityAlert;
+import com.akto.notifications.slack.TestingRunWebhookAlert;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -40,7 +40,7 @@ public class ToolsAction extends ActionSupport {
             }
 
             // Find UUID mapping in common database
-            SsrfTestTracking tracking = SsrfTestTrackingDao.instance.findByUuid(uuid);
+            TestingRunWebhook tracking = TestingRunWebhookDao.instance.findByUuid(uuid);
             if (tracking == null) {
                 loggerMaker.errorAndAddToDb("SSRF UUID mapping not found: " + uuid, LogDb.DASHBOARD);
                 addActionError("UUID mapping not found: " + uuid);
@@ -48,7 +48,7 @@ public class ToolsAction extends ActionSupport {
             }
 
             // Mark URL as hit
-            SsrfTestTrackingDao.instance.markUrlHit(uuid);
+            TestingRunWebhookDao.instance.markUrlHit(uuid);
             loggerMaker.infoAndAddToDb("Marked SSRF URL as hit for UUID: " + uuid, LogDb.DASHBOARD);
 
             // Set account context for database operations
@@ -105,7 +105,7 @@ public class ToolsAction extends ActionSupport {
                     String summaryId = testResult.getTestRunResultSummaryId() != null 
                         ? testResult.getTestRunResultSummaryId().toHexString() 
                         : null;
-                    SsrfVulnerabilityAlert alert = new SsrfVulnerabilityAlert(
+                    TestingRunWebhookAlert alert = new TestingRunWebhookAlert(
                         testSubType,
                         apiInfoKey,
                         testRunId.toHexString(),

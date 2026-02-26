@@ -415,7 +415,7 @@ public class DaoInit {
         McpReconResultDao.instance.createIndicesIfAbsent();
         LogsEndpointShieldDao.instance.createIndicesIfAbsent();
         AgentTrafficLogDao.instance.createIndicesIfAbsent();
-        SsrfTestTrackingDao.instance.createIndicesIfAbsent();
+        TestingRunWebhookDao.instance.createIndicesIfAbsent();
     }
 
 }

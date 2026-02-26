@@ -7,14 +7,15 @@ import org.bson.types.ObjectId;
 import java.util.Date;
 
 /**
- * DTO for tracking SSRF test execution and URL hits.
- * Stores UUID mappings to link SSRF URL hits with test execution context.
+ * DTO for tracking test execution webhook callbacks.
+ * Stores UUID mappings to link webhook URL hits with test execution context.
  * Documents are automatically deleted after 7 days via TTL index on expiresAt field.
+ * 
  */
 @Getter
 @Setter
 @NoArgsConstructor
-public class SsrfTestTracking {
+public class TestingRunWebhook {
     
     public static final String ID = "_id";
     private ObjectId id;
@@ -50,7 +51,7 @@ public class SsrfTestTracking {
     private Date expiresAt;
 
     /**
-     * Constructor for creating a new SSRF test tracking entry.
+     * Constructor for creating a new test run webhook tracking entry.
      * Automatically sets expiresAt to 7 days from createdAt for TTL index.
      * 
      * @param uuid The generated UUID for tracking
@@ -58,10 +59,10 @@ public class SsrfTestTracking {
      * @param testRunId The test run ID
      * @param testRunResultSummaryId The test run result summary ID
      * @param apiInfoKey The API endpoint being tested (format: "METHOD /path")
-     * @param testSubType The subtype of the SSRF test
+     * @param testSubType The subtype of the test (e.g., "BLIND_SSRF", "BLIND_XSS")
      * @param createdAt Timestamp when the entry was created (Unix timestamp in seconds)
      */
-    public SsrfTestTracking(String uuid, int accountId, ObjectId testRunId, ObjectId testRunResultSummaryId, 
+    public TestingRunWebhook(String uuid, int accountId, ObjectId testRunId, ObjectId testRunResultSummaryId, 
                           String apiInfoKey, String testSubType, int createdAt) {
         this.uuid = uuid;
         this.accountId = accountId;

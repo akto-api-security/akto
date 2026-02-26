@@ -3556,21 +3556,21 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private SsrfTestTracking ssrfTestTracking;
+    private TestingRunWebhook testingRunWebhook;
 
-    public SsrfTestTracking getSsrfTestTracking() {
-        return ssrfTestTracking;
+    public TestingRunWebhook getTestingRunWebhook() {
+        return testingRunWebhook;
     }
 
-    public void setSsrfTestTracking(SsrfTestTracking ssrfTestTracking) {
-        this.ssrfTestTracking = ssrfTestTracking;
+    public void setTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
+        this.testingRunWebhook = testingRunWebhook;
     }
 
-    public String storeSsrfTestTracking() {
+    public String storeTestingRunWebhook() {
         try {
-            DbLayer.storeSsrfTestTracking(ssrfTestTracking);
+            DbLayer.storeTestingRunWebhook(testingRunWebhook);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in storeSsrfTestTracking " + e.toString());
+            loggerMaker.errorAndAddToDb(e, "Error in storeTestingRunWebhook " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();

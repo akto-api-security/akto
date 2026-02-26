@@ -1,36 +1,36 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.SsrfTestTracking;
+import com.akto.dto.TestingRunWebhook;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
 import org.bson.conversions.Bson;
 
 /**
- * DAO for managing SSRF test tracking entries in the common database.
+ * DAO for managing test run webhook tracking entries in the common database.
  * 
  * This DAO handles:
- * - Storing UUID mappings for SSRF test execution
- * - Tracking when SSRF URLs are hit
+ * - Storing UUID mappings for test execution webhook callbacks
+ * - Tracking when webhook URLs are hit
  * - Automatic cleanup via TTL index (7 days)
  * 
- * Collection: ssrf_test_tracking (in common database)
+ * Collection: testing_run_webhook (in common database)
  */
-public class SsrfTestTrackingDao extends CommonContextDao<SsrfTestTracking> {
+public class TestingRunWebhookDao extends CommonContextDao<TestingRunWebhook> {
     
-    public static final SsrfTestTrackingDao instance = new SsrfTestTrackingDao();
+    public static final TestingRunWebhookDao instance = new TestingRunWebhookDao();
     
-    private SsrfTestTrackingDao() {}
+    private TestingRunWebhookDao() {}
     
     @Override
     public String getCollName() {
-        return "ssrf_test_tracking";
+        return "testing_run_webhook";
     }
     
     @Override
-    public Class<SsrfTestTracking> getClassT() {
-        return SsrfTestTracking.class;
+    public Class<TestingRunWebhook> getClassT() {
+        return TestingRunWebhook.class;
     }
     
     /**
@@ -44,14 +44,14 @@ public class SsrfTestTrackingDao extends CommonContextDao<SsrfTestTracking> {
     public void createIndicesIfAbsent() {
         // TTL Index on expiresAt - auto-deletes documents when expiresAt date is reached
         // Setting expireAfter to 0 means MongoDB will delete documents when the expiresAt date field value is reached
-        Bson ttlIndex = Indexes.ascending(SsrfTestTracking.EXPIRES_AT);
+        Bson ttlIndex = Indexes.ascending(TestingRunWebhook.EXPIRES_AT);
         IndexOptions ttlOptions = new IndexOptions()
                 .name("expiresAt_ttl")
                 .expireAfter(0L, java.util.concurrent.TimeUnit.SECONDS);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), ttlIndex, ttlOptions);
         
         // Unique index on uuid for fast lookups and ensuring UUID uniqueness
-        Bson uuidIndex = Indexes.ascending(SsrfTestTracking.UUID);
+        Bson uuidIndex = Indexes.ascending(TestingRunWebhook.UUID);
         IndexOptions uuidIndexOptions = new IndexOptions()
                 .name("uuid_1")
                 .unique(true);
@@ -59,23 +59,23 @@ public class SsrfTestTrackingDao extends CommonContextDao<SsrfTestTracking> {
     }
     
     /**
-     * Finds an SSRF test tracking entry by UUID.
+     * Finds a test run webhook tracking entry by UUID.
      * 
      * @param uuid The UUID to search for
-     * @return SsrfTestTracking entry if found, null otherwise
+     * @return TestingRunWebhook entry if found, null otherwise
      */
-    public SsrfTestTracking findByUuid(String uuid) {
+    public TestingRunWebhook findByUuid(String uuid) {
         if (uuid == null || uuid.isEmpty()) {
             return null;
         }
-        return instance.findOne(Filters.eq(SsrfTestTracking.UUID, uuid));
+        return instance.findOne(Filters.eq(TestingRunWebhook.UUID, uuid));
     }
     
     /**
      * Marks a URL as hit for the given UUID.
      * Updates the urlHit flag and updatedAt timestamp.
      * 
-     * @param uuid The UUID of the SSRF test tracking entry to update
+     * @param uuid The UUID of the test run webhook tracking entry to update
      * @return true if the entry was found and updated, false otherwise
      */
     public boolean markUrlHit(String uuid) {
@@ -83,11 +83,11 @@ public class SsrfTestTrackingDao extends CommonContextDao<SsrfTestTracking> {
             return false;
         }
         
-        SsrfTestTracking mapping = findByUuid(uuid);
+        TestingRunWebhook mapping = findByUuid(uuid);
         if (mapping != null) {
             mapping.setUrlHit(true);
             mapping.setUpdatedAt(Context.now());
-            instance.replaceOne(Filters.eq(SsrfTestTracking.UUID, uuid), mapping);
+            instance.replaceOne(Filters.eq(TestingRunWebhook.UUID, uuid), mapping);
             return true;
         }
         return false;

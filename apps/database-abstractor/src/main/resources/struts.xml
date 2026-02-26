@@ -2262,7 +2262,7 @@
             </result>
         </action>
 
-        <action name="api/storeSsrfTestTracking" class="com.akto.action.DbAction" method="storeSsrfTestTracking">
+        <action name="api/storeTestingRunWebhook" class="com.akto.action.DbAction" method="storeTestingRunWebhook">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

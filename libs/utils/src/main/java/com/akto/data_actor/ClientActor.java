@@ -48,6 +48,7 @@ import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.dto.TestingRunWebhook;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.config.TestScript;
@@ -4414,20 +4415,20 @@ public class ClientActor extends DataActor {
     }
 
     @Override
-    public void storeSsrfTestTracking(SsrfTestTracking ssrfTestTracking) {
+    public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("ssrfTestTracking", ssrfTestTracking);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeSsrfTestTracking", "", "POST", obj.toString(), headers, "");
+        obj.put("testingRunWebhook", testingRunWebhook);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeTestingRunWebhook", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in storeSsrfTestTracking", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("non 2xx response in storeTestingRunWebhook", LoggerMaker.LogDb.RUNTIME);
                 return;
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in storeSsrfTestTracking" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error in storeTestingRunWebhook" + e, LoggerMaker.LogDb.RUNTIME);
             return;
         }
     }

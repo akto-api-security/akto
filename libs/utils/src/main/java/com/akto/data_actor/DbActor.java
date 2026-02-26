@@ -737,7 +737,7 @@ public class DbActor extends DataActor {
     }
 
     @Override
-    public void storeSsrfTestTracking(SsrfTestTracking ssrfTestTracking) {
-        DbLayer.storeSsrfTestTracking(ssrfTestTracking);
+    public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
+        DbLayer.storeTestingRunWebhook(testingRunWebhook);
     }
 }

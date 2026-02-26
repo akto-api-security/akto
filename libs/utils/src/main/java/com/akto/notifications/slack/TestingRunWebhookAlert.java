@@ -13,12 +13,12 @@ import java.util.List;
 
 import static com.akto.notifications.slack.SlackAlertType.API_TEST_STATUS_ALERT;
 
-public class SsrfVulnerabilityAlert extends SlackAlerts {
+public class TestingRunWebhookAlert extends SlackAlerts {
     private final String color;
     private List<FieldsModel> fieldsModelList;
     private String dashboardUrl;
 
-    public SsrfVulnerabilityAlert(String testSubType, ApiInfo.ApiInfoKey apiInfoKey, String testRunId, String summaryId, int accountId) {
+    public TestingRunWebhookAlert(String testSubType, ApiInfo.ApiInfoKey apiInfoKey, String testRunId, String summaryId, int accountId) {
         super(API_TEST_STATUS_ALERT);
         this.color = "#D72C0D";
         
