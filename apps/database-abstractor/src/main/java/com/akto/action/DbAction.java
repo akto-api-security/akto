@@ -4758,8 +4758,6 @@ public class DbAction extends ActionSupport {
 
     private int createCollectionForOpenApi(String hostName) throws Exception {
         int id = hostName.hashCode();
-        id = id < 0 ? id * -1 : id;
-        if (id == 0) id = 1;
 
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
