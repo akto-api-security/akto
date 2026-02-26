@@ -18,7 +18,7 @@ import dashboardApi from './api'
 import api from '../observe/api'
 import func from '@/util/func'
 import values from '@/util/values'
-import { getTypeFromTags, CLIENT_TYPES, getDomainForFavicon, formatDisplayName, getMcpServerDisplayName, getFriendlyLlmName } from '../observe/agentic/mcpClientHelper'
+import { getTypeFromTags, CLIENT_TYPES, formatDisplayName, getMcpServerDisplayName, getFriendlyLlmName } from '../observe/agentic/mcpClientHelper'
 import { extractEndpointId } from '../observe/agentic/constants'
 import { GridLayout, verticalCompactor } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
@@ -138,8 +138,6 @@ const processAgenticCollections = (collections, topN = 10) => {
     const processGroup = (group, groupType) =>
         Object.values(group)
             .map(g => {
-                const domainForIcon = getDomainForFavicon(g.name) || (g.domain && g.domain.includes('.') ? g.domain : null)
-                const icon = domainForIcon ? `https://www.google.com/s2/favicons?domain=${domainForIcon}&sz=32` : undefined
                 const matches = (hostName) => {
                     if (!hostName || typeof hostName !== 'string') return false
                     if (groupType === CLIENT_TYPES.MCP_SERVER || groupType === CLIENT_TYPES.LLM) {
@@ -153,7 +151,7 @@ const processAgenticCollections = (collections, topN = 10) => {
                 const hostNamesList = [...g.hostNames].filter(matches)
                 const url = null
                 const filterGroupName = groupType === 'aiAgent' ? g.name : g.domain
-                return { name: g.name, value: g.endpoints.size || g.count, icon, url, hostNames: hostNamesList, filterGroupName }
+                return { name: g.name, value: g.endpoints.size || g.count, hostName: [...g.hostNames][0], url, hostNames: hostNamesList, filterGroupName }
             })
             .sort((a, b) => b.value - a.value)
             .slice(0, topN)

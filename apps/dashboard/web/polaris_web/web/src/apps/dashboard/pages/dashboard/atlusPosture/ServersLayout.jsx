@@ -1,6 +1,7 @@
-import { Avatar, Box, Card, DataTable, HorizontalStack, ProgressBar, Scrollable, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Card, DataTable, HorizontalStack, ProgressBar, Scrollable, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import ComponentHeader from '../new_components/ComponentHeader'
+import { CollectionIcon } from '../../../components/shared/CollectionIcon'
 
 function ServersLayout({ title, itemId, tooltipContent, items, hasItems, emptyMessage, onRemove, boxHeight = "200px", onItemClick }) {
     if (!hasItems) {
@@ -33,13 +34,13 @@ function ServersLayout({ title, itemId, tooltipContent, items, hasItems, emptyMe
         const nameContent = item.url ? (
             <a href={item.url} className="servers-layout-item-link" style={{ color: 'inherit', textDecoration: 'none' }}>
                 <HorizontalStack gap="2" wrap={false}>
-                    <Avatar size="extraSmall" source={item.icon} />
+                    <Box><CollectionIcon hostName={item.hostName} displayName={item.name} /></Box>
                     <Text variant="bodyMd" fontWeight="medium" as="span">{item.name}</Text>
                 </HorizontalStack>
             </a>
         ) : (
             <HorizontalStack gap="2" wrap={false}>
-                <Avatar size="extraSmall" source={item.icon} />
+                <Box><CollectionIcon hostName={item.hostName} displayName={item.name} /></Box>
                 <Text variant="bodyMd" fontWeight="medium">{item.name}</Text>
             </HorizontalStack>
         )
