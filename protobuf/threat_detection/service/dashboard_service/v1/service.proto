@@ -71,7 +71,9 @@ message ListMaliciousRequestsRequest {
     Filter filter = 4;
 }
 
-message FetchAlertFiltersRequest {}
+message FetchAlertFiltersRequest {
+  optional TimeRangeFilter detected_at_time_range = 1;
+}
 
 message FetchAlertFiltersResponse {
   repeated string actors = 1;

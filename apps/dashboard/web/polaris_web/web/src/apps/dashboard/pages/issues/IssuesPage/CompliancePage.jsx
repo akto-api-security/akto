@@ -207,7 +207,29 @@ function CompliancePage() {
     })
 
 
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
+    const [searchParams, setSearchParams] = useSearchParams();
+    const getInitialDateRange = () => {
+        const rangeAlias = searchParams.get('range');
+        if (rangeAlias) {
+            const preset = values.ranges.find((r) => r.alias === rangeAlias);
+            if (preset) return preset;
+        }
+        const sinceParam = searchParams.get('since');
+        const untilParam = searchParams.get('until');
+        if (sinceParam != null && untilParam != null) {
+            const sinceTs = parseInt(sinceParam, 10);
+            const untilTs = parseInt(untilParam, 10);
+            if (!Number.isNaN(sinceTs) && !Number.isNaN(untilTs)) {
+                const sinceDate = new Date(sinceTs * 1000);
+                const untilDate = new Date(untilTs * 1000);
+                const title = sinceDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) + " - " + untilDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                return { alias: "custom", title, period: { since: sinceDate, until: untilDate } };
+            }
+        }
+        return values.ranges[5];
+    };
+    const initialDateRange = getInitialDateRange();
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialDateRange)
 
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
@@ -331,7 +353,6 @@ function CompliancePage() {
         })
     }
 
-    const [searchParams, setSearchParams] = useSearchParams();
     const resultId = searchParams.get("result")
 
     const filterParams = searchParams.get('filters')
@@ -350,6 +371,17 @@ function CompliancePage() {
             onRemove: () => {}
         }
     ]
+
+    useEffect(() => {
+        const complianceParam = searchParams.get('compliance');
+        if (complianceParam) {
+            const decoded = decodeURIComponent(complianceParam);
+            const match = allCompliances.find((c) => c.toLowerCase() === decoded.toLowerCase());
+            if (match) {
+                setComplianceView(match);
+            }
+        }
+    }, [])
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
 

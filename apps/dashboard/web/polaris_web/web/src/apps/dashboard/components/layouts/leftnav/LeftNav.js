@@ -11,7 +11,7 @@ import {
     MagicMinor
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
-
+import DropdownSearch from "../../shared/DropdownSearch";
 import "./LeftNav.css";
 import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -110,12 +110,23 @@ export default function LeftNav() {
             {
                 label: (!func.checkLocal()) ? (
                     <Box paddingBlockEnd={"2"}>
-                        <Dropdown
-                            id={`select-account`}
-                            menuItems={accountOptions}
-                            initial={() => accounts[activeAccount]}
-                            selected={(type) => handleAccountChange(type)}
-                        />
+                        {accountOptions.length > 5 ? (
+                            <DropdownSearch
+                                id={`select-account`}
+                                optionsList={accountOptions}
+                                value={accounts[activeAccount]}
+                                preSelected={[`${activeAccount}`]}
+                                setSelected={(type) => handleAccountChange(type)}
+                                searchDisable={false}
+                            />
+                        ) : (
+                            <Dropdown
+                                id={`select-account`}
+                                menuItems={accountOptions}
+                                initial={() => accounts[activeAccount]}
+                                selected={(type) => handleAccountChange(type)}
+                            />
+                        )}
                     </Box>
 
                 ) : null

@@ -26,6 +26,7 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.CollectionTags.TagSource;
+import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -63,6 +64,7 @@ import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
+import com.akto.utils.scripts.AcesssTypeCollectionLevel;
 import com.akto.dao.ApiCollectionIconsDao;
 import com.akto.dto.ApiCollectionIcon;
 import com.mongodb.client.model.Projections;
@@ -1872,5 +1874,35 @@ public class ApiCollectionsAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
     }
+
+    
+    public String resetCollectionAccessTypes() {
+        try {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb("Starting resetCollectionAccessTypes for account: " + accountId + " (background)", LogDb.DASHBOARD);
+
+            Runnable r = () -> {
+                Context.accountId.set(accountId);
+                try {
+                    AcesssTypeCollectionLevel.doResetCollectionAccessTypes();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error in resetCollectionAccessTypes (background)", LogDb.DASHBOARD);
+                }
+            };
+            new Thread(r).start();
+
+            if (this.response == null) {
+                this.response = new BasicDBObject();
+            }
+            this.response.put("started", true);
+            this.response.put("message", "Reset started in the background. This may take a few minutes. Refresh the inventory page to see updated access types.");
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error starting resetCollectionAccessTypes", LogDb.DASHBOARD);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
 
 }

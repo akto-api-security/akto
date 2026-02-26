@@ -38,15 +38,40 @@ function ApiChanges() {
     const showDetails = ObserveStore(state => state.inventoryFlyout)
     const setShowDetails = ObserveStore(state => state.setInventoryFlyout)
     
-    const initialVal = (location.state) ?  { alias: "recencyPeriod", title : (new Date((location.state.timestamp - 5* 60 )*1000)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' }).replace(/,/g, '') ,  period : {since: new Date((location.state.timestamp - 5* 60 )*1000), until: new Date((location.state.timestamp + 5* 60 )*1000)} } : values.ranges[3]
+    const getInitialDateRange = () => {
+        if (location.state?.timestamp != null) {
+            const ts = location.state.timestamp;
+            return { alias: "recencyPeriod", title: (new Date((ts - 5 * 60) * 1000)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: '2-digit', year: 'numeric' }).replace(/,/g, ''), period: { since: new Date((ts - 5 * 60) * 1000), until: new Date((ts + 5 * 60) * 1000) } };
+        }
+        const params = new URLSearchParams(location.search);
+        const rangeAlias = params.get('range');
+        if (rangeAlias) {
+            const preset = values.ranges.find((r) => r.alias === rangeAlias);
+            if (preset) return preset;
+        }
+        const sinceParam = params.get('since');
+        const untilParam = params.get('until');
+        if (sinceParam != null && untilParam != null) {
+            const sinceTs = parseInt(sinceParam, 10);
+            const untilTs = parseInt(untilParam, 10);
+            if (!Number.isNaN(sinceTs) && !Number.isNaN(untilTs)) {
+                const sinceDate = new Date(sinceTs * 1000);
+                const untilDate = new Date(untilTs * 1000);
+                const title = sinceDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) + " - " + untilDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                return { alias: "custom", title, period: { since: sinceDate, until: untilDate } };
+            }
+        }
+        return values.ranges[3];
+    };
 
+    const initialVal = getInitialDateRange();
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
     }
 
-    const startTimestamp = (location.state)? (location.state.timestamp - 25*60) : getTimeEpoch("since")
-    const endTimestamp = (location.state)? (location.state.timestamp + 25*60) : getTimeEpoch("until")
+    const startTimestamp = (location.state?.timestamp != null) ? (location.state.timestamp - 25 * 60) : getTimeEpoch("since")
+    const endTimestamp = (location.state?.timestamp != null) ? (location.state.timestamp + 25 * 60) : getTimeEpoch("until")
     
     function handleRowClick(data,headers) {
         const sameRow = func.deepComparison(apiDetail, data);

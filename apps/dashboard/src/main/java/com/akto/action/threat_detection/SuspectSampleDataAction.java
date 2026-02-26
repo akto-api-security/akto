@@ -5,6 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsRequest;
@@ -236,29 +237,52 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchFilters() {
-    HttpGet get = new HttpGet(String.format("%s/api/dashboard/fetch_filters", this.getBackendUrl()));
-    get.addHeader("Authorization", "Bearer " + this.getApiToken());
-    get.addHeader("Content-Type", "application/json");
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/fetch_filters", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
 
     int accountId = Context.accountId.get();
     CONTEXT_SOURCE source = Context.contextSource.get();
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    try {
+      // Build request with time range if provided
+      FetchAlertFiltersRequest.Builder requestBuilder = FetchAlertFiltersRequest.newBuilder();
 
-      ProtoMessageUtils.<FetchAlertFiltersResponse>toProtoMessage(
-          FetchAlertFiltersResponse.class, responseBody)
-          .ifPresent(
-              msg -> {
-                this.ips = msg.getActorsList();
-                this.urls = msg.getUrlsList();
-                this.hosts = msg.getHostsList();
-                Set<String> allowedTemplates = FilterYamlTemplateDao.getContextTemplatesForAccount(accountId, source);
-                this.subCategory =
-                    msg.getSubCategoryList().stream()
-                        .filter(allowedTemplates::contains)
-                        .collect(Collectors.toList());
-              });
+      if (this.startTimestamp > 0 || this.endTimestamp > 0) {
+        TimeRangeFilter.Builder timeRangeBuilder = TimeRangeFilter.newBuilder();
+
+        if (this.startTimestamp > 0) {
+          timeRangeBuilder.setStart(this.startTimestamp);
+        }
+
+        if (this.endTimestamp > 0) {
+          timeRangeBuilder.setEnd(this.endTimestamp);
+        }
+
+        requestBuilder.setDetectedAtTimeRange(timeRangeBuilder.build());
+      }
+
+      String requestBody = ProtoMessageUtils.toString(requestBuilder.build()).orElse("{}");
+      StringEntity requestEntity = new StringEntity(requestBody, ContentType.APPLICATION_JSON);
+      post.setEntity(requestEntity);
+
+      try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+        String responseBody = EntityUtils.toString(resp.getEntity());
+
+        ProtoMessageUtils.<FetchAlertFiltersResponse>toProtoMessage(
+            FetchAlertFiltersResponse.class, responseBody)
+            .ifPresent(
+                msg -> {
+                  this.ips = msg.getActorsList();
+                  this.urls = msg.getUrlsList();
+                  this.hosts = msg.getHostsList();
+                  Set<String> allowedTemplates = FilterYamlTemplateDao.getContextTemplatesForAccount(accountId, source);
+                  this.subCategory =
+                      msg.getSubCategoryList().stream()
+                          .filter(allowedTemplates::contains)
+                          .collect(Collectors.toList());
+                });
+      }
     } catch (Exception e) {
       e.printStackTrace();
       return ERROR.toUpperCase();

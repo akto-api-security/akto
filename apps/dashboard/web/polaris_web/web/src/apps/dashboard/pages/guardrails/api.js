@@ -39,4 +39,30 @@ export default {
         return resp
     },
 
+    async fetchBrowserExtensionConfigs() {
+        const resp = await request({
+            url: '/api/fetchBrowserExtensionConfigs',
+            method: 'post'
+        })
+        return resp
+    },
+
+    async saveBrowserExtensionConfig(browserExtensionConfig, hexId) {
+        const resp = await request({
+            url: '/api/saveBrowserExtensionConfig',
+            method: 'post',
+            data: { browserExtensionConfig, hexId }
+        })
+        return resp
+    },
+
+    async deleteBrowserExtensionConfigs(configIds) {
+        const resp = await request({
+            url: '/api/deleteBrowserExtensionConfigs',
+            method: 'post',
+            data: { configIds }
+        })
+        return resp
+    },
+
 }

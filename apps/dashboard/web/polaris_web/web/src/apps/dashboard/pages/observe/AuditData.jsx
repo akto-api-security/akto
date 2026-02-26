@@ -16,12 +16,18 @@ import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
 import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
 import RegistryBadge from "../../components/shared/RegistryBadge";
+import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges";
 
 const headings = [
     {
         title: 'Type',
         value: 'typeComp',
         text: 'Type',
+    },
+    {
+        title: 'Risk Analysis',
+        value: 'riskAnalysisComp',
+        text: 'Risk Analysis',
     },
     {
         text: "Agentic Component name",
@@ -157,7 +163,9 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     temp['typeComp'] = (
         <MethodBox method={""} url={auditRecord?.type.toLowerCase() || "TOOL"}/>
     )
-    
+
+    temp['riskAnalysisComp'] = <ComponentRiskAnalysisBadges componentRiskAnalysis={auditRecord?.componentRiskAnalysis} />;
+
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
     temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, allCollections, temp?.hostCollectionId);
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)

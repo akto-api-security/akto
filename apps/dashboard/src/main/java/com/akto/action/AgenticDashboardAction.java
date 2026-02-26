@@ -1288,7 +1288,9 @@ public class AgenticDashboardAction extends AbstractThreatDetectionAction {
                 Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections)
             );
 
-            result = TestingRunIssuesDao.instance.findAll(baseFilter);
+            // Apply dashboard filtering (RBAC + dashboardContext)
+            Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilter);
+            result = TestingRunIssuesDao.instance.getMCollection().find(dashboardFilter).into(new ArrayList<>());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching TestingRunIssues records: " + e.getMessage());
         }

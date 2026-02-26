@@ -724,6 +724,14 @@ function SingleTestRunPage() {
       </div> : null
   )
 
+  const tokenRateLimitBannerComp = selectedTestRun?.metadata?.tokenRateLimited ? (
+    <div className="banner-wrapper">
+      <Banner status="warning">
+        <Text>{selectedTestRun.metadata.tokenRateLimited}</Text>
+      </Banner>
+    </div>
+  ) : null
+
   const definedTableTabs = ['Vulnerable', 'Need configurations', 'Skipped', 'No vulnerability found', 'Domain unreachable', 'Ignored Issues']
 
   const { tabsInfo } = useTable()
@@ -902,7 +910,7 @@ function SingleTestRunPage() {
 
   // Filter out keys with empty string values and the 'error' key
   const filteredMetadata = Object.keys(selectedTestRun.metadata)
-    .filter(key => key !== 'error' && selectedTestRun.metadata[key] !== '');
+    .filter(key => key !== 'error' && key !== 'tokenRateLimited' && selectedTestRun.metadata[key] !== '');
 
   if (filteredMetadata.length === 0) {
     return undefined;
@@ -940,7 +948,7 @@ function SingleTestRunPage() {
 
   const components = [
     runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} refreshTrigger={chartRefreshCounter} />,
-    metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
+    tokenRateLimitBannerComp, metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
   const openVulnerabilityReport = async (summaryMode = false) => {
     const currentPageKey = "/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab

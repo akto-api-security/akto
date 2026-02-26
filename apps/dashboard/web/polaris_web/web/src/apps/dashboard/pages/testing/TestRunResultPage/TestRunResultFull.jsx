@@ -136,6 +136,26 @@ function TestRunResultFull(props) {
           isVulnerable={selectedTestRunResult.vulnerable}
         />
 
+    const attemptCardForConversations = hasConversations && (func.showTestSampleData(selectedTestRunResult) && selectedTestRunResult.testResults) &&
+        <SampleDataList
+          key={"sampleDataAgentic"}
+          sampleData={selectedTestRunResult?.testResults.map((result) => {
+            if (result.errors && result.errors.length > 0) {
+              let errorList = result.errors.join(", ");
+              return { errorList: errorList }
+            }
+            if (result.message) {
+              return { originalMessage: result.message, message: result.message, highlightPaths: [] }
+            }
+            return { errorList: "No data found" }
+          })}
+          isNewDiff={true}
+          vertical={false}
+          vulnerable={false}
+          heading={"Attempt"}
+          isVulnerable={false}
+        />
+
     const remediationCard = remediationText && selectedTestRunResult?.vulnerable && (
         <LegacyCard title="Remediation" sectioned key="remediation">
             <MarkdownViewer markdown={remediationText} />
@@ -153,6 +173,7 @@ function TestRunResultFull(props) {
         !hasConversations && (!func.showTestSampleData(selectedTestRunResult)) && testErrorComponent,
         attemptCard,
         evidenceCard,
+        attemptCardForConversations,
         remediationCard,
         issueDetails.id &&
           <MoreInformationComponent

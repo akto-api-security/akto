@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Button, Icon, Avatar } from '@shopify/polaris';
+import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Icon, Avatar } from '@shopify/polaris';
 import ReactFlow, { Background, Handle, Position, getBezierPath } from 'react-flow-renderer';
 import TooltipText from '../../../components/shared/TooltipText';
 import { CustomersMinor, AutomationMajor, MagicMajor } from "@shopify/polaris-icons";

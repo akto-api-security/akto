@@ -33,6 +33,7 @@ import ThreatConfiguration from "../dashboard/pages/settings/threat_configuratio
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TrafficCollectorsMetrics from "../dashboard/pages/settings/metrics/TrafficCollectorsMetrics";
 import ThreatDetectionMetrics from "../dashboard/pages/settings/metrics/ThreatDetectionMetrics";
+import MiniRuntimeMetrics from "../dashboard/pages/settings/metrics/MiniRuntimeMetrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import PromptHardening from "../dashboard/pages/prompt_hardening/PromptHardening";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
@@ -106,6 +107,7 @@ import DevRev from "../dashboard/pages/settings/integrations/DevRev";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
+import BrowserExtensionSettings from "../dashboard/pages/settings/browser_extension/BrowserExtensionSettings";
 import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhookCore";
 import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
@@ -393,6 +395,10 @@ const router = createBrowserRouter([
                         element: <ThreatDetectionMetrics/>,
                     },
                     {
+                        path: "mini-runtime-metrics",
+                        element: <MiniRuntimeMetrics/>,
+                    },
+                    {
                         path: "integrations/burp",
                         element: <BurpSuite/>,
                     },
@@ -559,6 +565,10 @@ const router = createBrowserRouter([
                     {
                         path: 'undo-demerge-apis',
                         element: <UndoDemergedApis/>
+                    },
+                    {
+                        path: 'browser-extension',
+                        element: <BrowserExtensionSettings/>
                     }
                 ]
             },
