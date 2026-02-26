@@ -30,6 +30,21 @@ import TestRunResultChat from './TestRunResultChat.jsx'
 import AskAktoSection from './AskAktoSection.jsx'
 import PersistStore from '../../../../main/PersistStore'
 
+const SKIPPED_TEST_DOCS_URL = "https://docs.akto.io/api-security-testing/concepts/skipped-test-cases";
+
+const SKIP_ERROR_KEYWORDS = [
+  "skipping execution",
+  "deactivated endpoint",
+  "No sample data found",
+  "Invalid test execution block",
+  "Test took too long",
+  "Token rate limit reached"
+];
+
+function isSkippedTestError(errorText) {
+  return SKIP_ERROR_KEYWORDS.some(keyword => errorText?.includes(keyword));
+}
+
 function TestRunResultFlyout(props) {
 
 
@@ -748,6 +763,9 @@ function TestRunResultFlyout(props) {
             return null;
         }
 
+        const firstError = selectedTestRunResult?.testResults?.find(result =>
+          result.errors && result.errors.length > 0
+        )?.errors?.join(", ");
 
         return (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
@@ -787,6 +805,9 @@ function TestRunResultFlyout(props) {
                         vulnerable={selectedTestRunResult?.vulnerable}
                         vulnerabilityAnalysisError={vulnerabilityAnalysisError}
                     />
+                    {firstError && isSkippedTestError(firstError) && (
+                        <Link url={SKIPPED_TEST_DOCS_URL} external>Learn more about skipped tests</Link>
+                    )}
                 </VerticalStack>
             </Box>
         );

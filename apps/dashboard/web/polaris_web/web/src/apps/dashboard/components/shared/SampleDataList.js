@@ -5,26 +5,11 @@ import {
   Text,
   VerticalStack,
   HorizontalStack, Box, LegacyCard, HorizontalGrid,
-  Pagination, Key, Badge, Link} from '@shopify/polaris';
+  Pagination, Key, Badge} from '@shopify/polaris';
 import SampleDataComponent from './SampleDataComponent';
 import SampleData from './SampleData';
 import func from '../../../../util/func';
 import { getDashboardCategory, mapLabel } from '../../../main/labelHelper';
-
-const SKIPPED_TEST_DOCS_URL = "https://docs.akto.io/api-security-testing/concepts/skipped-test-cases";
-
-const SKIP_ERROR_KEYWORDS = [
-  "skipping execution",
-  "deactivated endpoint",
-  "No sample data found",
-  "Invalid test execution block",
-  "Test took too long",
-  "Token rate limit reached"
-];
-
-function isSkippedTestError(errorList) {
-  return SKIP_ERROR_KEYWORDS.some(keyword => errorList?.includes(keyword));
-}
 
 function SchemaValidationError({ sampleData}) {
     if (!sampleData || !sampleData?.metadata) {
@@ -100,9 +85,6 @@ function SampleDataList(props) {
                       <Box paddingInlineEnd={"2"} paddingInlineStart={"2"} paddingBlockEnd={"3"} paddingBlockStart={"3"}>
                         <HorizontalStack padding="2" align='space-between'>
                           {func.toSentenceCase("Errors")}
-                          {isSkippedTestError(sampleData[Math.min(page, sampleData.length - 1)]?.errorList) &&
-                            <Link url={SKIPPED_TEST_DOCS_URL} external>Learn more</Link>
-                          }
                         </HorizontalStack>
                       </Box>
                     </LegacyCard.Section>
