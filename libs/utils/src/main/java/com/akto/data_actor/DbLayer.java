@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -1466,6 +1467,7 @@ public class DbLayer {
             List<String> allowedRunModulesTrrs = testingRun.getAllowedMiniTestingServiceNames();
             if (allowedRunModulesTrrs != null && !allowedRunModulesTrrs.isEmpty()) {
                 boolean eligible = allowedRunModulesTrrs.stream()
+                    .filter(Objects::nonNull)
                     .anyMatch(name -> name.equals(miniTestingName));
                 if (!eligible) return null;
                 // Eligible via new list field — update miniTestingServiceName to this module and claim TRRS
