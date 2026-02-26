@@ -84,44 +84,67 @@ public class SyslogUdpListener implements Runnable {
         try {
             // Convert bytes to string, trim whitespace
             String raw = new String(data, 0, length, StandardCharsets.UTF_8).trim();
+            logger.debugAndAddToDb("Received syslog packet of length: " + length, LoggerMaker.LogDb.DATA_INGESTION);
 
             // Find the start of the JSON payload (first '{')
             int jsonStart = raw.indexOf('{');
             if (jsonStart == -1) {
-                logger.errorAndAddToDb("No JSON found in syslog packet: " + raw, LoggerMaker.LogDb.DATA_INGESTION);
+                logger.warnAndAddToDb("No JSON found in syslog packet: " + raw.substring(0, Math.min(200, raw.length())), LoggerMaker.LogDb.DATA_INGESTION);
                 return;
             }
 
             // Extract JSON from '{' to end of string
             String json = raw.substring(jsonStart);
+            logger.debugAndAddToDb("Extracted JSON payload: " + json.substring(0, Math.min(300, json.length())), LoggerMaker.LogDb.DATA_INGESTION);
 
             // Parse the outer object to get batchData array
-            BasicDBObject outer = BasicDBObject.parse(json);
-            BasicDBList batchArray = (BasicDBList) outer.get("batchData");
-
-            if (batchArray == null || batchArray.isEmpty()) {
-                logger.errorAndAddToDb("No batchData found in payload: " + json, LoggerMaker.LogDb.DATA_INGESTION);
+            BasicDBObject outer;
+            try {
+                outer = BasicDBObject.parse(json);
+            } catch (Exception parseErr) {
+                logger.warnAndAddToDb("Invalid JSON format in syslog packet. Error: " + parseErr.getMessage() + ". JSON snippet: " + json.substring(0, Math.min(300, json.length())), LoggerMaker.LogDb.DATA_INGESTION);
                 return;
             }
 
+            BasicDBList batchArray = (BasicDBList) outer.get("batchData");
+
+            if (batchArray == null) {
+                logger.warnAndAddToDb("No batchData field found in payload. Available keys: " + outer.keySet(), LoggerMaker.LogDb.DATA_INGESTION);
+                return;
+            }
+
+            if (batchArray.isEmpty()) {
+                logger.warnAndAddToDb("batchData array is empty", LoggerMaker.LogDb.DATA_INGESTION);
+                return;
+            }
+
+            logger.debugAndAddToDb("Processing " + batchArray.size() + " items from batchData array", LoggerMaker.LogDb.DATA_INGESTION);
+
             // Process each item in the batch
+            int successCount = 0;
             for (Object item : batchArray) {
                 try {
                     if (!(item instanceof BasicDBObject)) {
+                        logger.warnAndAddToDb("Skipping non-object item in batchData: " + item.getClass().getName(), LoggerMaker.LogDb.DATA_INGESTION);
                         continue;
                     }
 
                     BasicDBObject dbObject = (BasicDBObject) item;
+                    logger.debugAndAddToDb("Processing batch item with path: " + dbObject.get("path"), LoggerMaker.LogDb.DATA_INGESTION);
+
                     IngestDataBatch batch = parseIngestDataBatch(dbObject);
 
                     // Insert into Kafka using the existing KafkaUtils
                     KafkaUtils.insertData(batch);
+                    successCount++;
 
                 } catch (Exception e) {
-                    logger.errorAndAddToDb("Error processing batch item: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
+                    logger.errorAndAddToDb("Error processing batch item: " + e.getMessage() + ". Item: " + item, LoggerMaker.LogDb.DATA_INGESTION);
                     // Continue processing other items
                 }
             }
+
+            logger.infoAndAddToDb("Successfully processed " + successCount + "/" + batchArray.size() + " items from batch", LoggerMaker.LogDb.DATA_INGESTION);
 
         } catch (Exception e) {
             logger.errorAndAddToDb("Error processing syslog packet: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
