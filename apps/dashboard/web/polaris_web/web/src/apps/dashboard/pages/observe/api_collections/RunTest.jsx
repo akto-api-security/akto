@@ -93,6 +93,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     const [slackChannels, setSlackChannels] = useState([])
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
 
+    // Set all modules as default selection when modules are loaded (for new tests only)
+    useEffect(() => {
+        if (miniTestingServiceNames && miniTestingServiceNames.length > 0 && !testIdConfig) {
+            setTestRun(prev => ({
+                ...prev,
+                miniTestingServiceNames: miniTestingServiceNames.map(m => m.value)
+            }));
+        }
+    }, [miniTestingServiceNames, testIdConfig]);
+
     const localCategoryMap = LocalStore.getState().categoryMap
     const dashboardCategory = getDashboardCategory();
     const localSubCategoryMap = LocalStore.getState().subCategoryMap

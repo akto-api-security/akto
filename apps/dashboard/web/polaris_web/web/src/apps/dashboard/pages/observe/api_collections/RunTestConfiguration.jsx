@@ -231,12 +231,13 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                         }))
                     }}
                     allowMultiple={true}
+                    showSelectAllMinOptions={1}
                     value={testRun?.miniTestingServiceNames?.length > 0 
                         ? `${testRun.miniTestingServiceNames.length} module(s) selected` 
                         : "Any module"}
                     preSelected={testRun?.miniTestingServiceNames || []}
                 /> : <></>
-            }
+            } 
 
             <HorizontalStack gap={4}>
             <Checkbox
