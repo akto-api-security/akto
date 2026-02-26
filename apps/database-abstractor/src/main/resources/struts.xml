@@ -147,6 +147,16 @@
             </result>
         </action>
 
+        <action name="api/fetchBrowserExtensionConfigs" class="com.akto.action.BrowserExtensionConfigAction" method="fetchBrowserExtensionConfigs">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchApiInfos" class="com.akto.action.DbAction" method="fetchApiInfos">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
