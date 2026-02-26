@@ -31,7 +31,6 @@ import AskAktoSection from './AskAktoSection.jsx'
 import PersistStore from '../../../../main/PersistStore'
 
 const SKIPPED_TEST_DOCS_URL = "https://docs.akto.io/api-security-testing/concepts/skipped-test-cases";
-
 const SKIP_ERROR_KEYWORDS = ["skipping execution"];
 
 function isSkippedTestError(errorText) {
@@ -39,8 +38,6 @@ function isSkippedTestError(errorText) {
 }
 
 function TestRunResultFlyout(props) {
-
-
     const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
