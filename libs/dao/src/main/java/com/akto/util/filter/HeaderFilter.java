@@ -11,8 +11,9 @@ import java.util.Set;
 public class HeaderFilter {
 
     // Headers to ignore - categorized for clarity and maintainability
+    // Note: Headers actively used in mini-runtime (host, content-type, cookie, origin, referer, location) are NOT included
     private static final Set<String> IGNORED_HEADERS = new HashSet<>(Arrays.asList(
-        // Proxy/Infrastructure headers (14)
+        // Proxy/Infrastructure headers (13)
         "x-forwarded-for", "x-forwarded-host", "x-forwarded-port", "x-forwarded-proto",
         "x-forwarded-scheme", "x-forwarded-client-cert", "x-original-forwarded-for",
         "x-real-ip", "x-envoy-attempt-count", "x-envoy-external-address",
@@ -23,16 +24,14 @@ public class HeaderFilter {
         "sec-ch-ua-mobile", "sec-ch-ua-platform", "sec-fetch-dest",
         "sec-fetch-mode", "sec-fetch-site", "dnt",
 
-        // CORS/Browser security headers (3)
-        "origin", "referer", "upgrade-insecure-requests",
-
-        // Auto-calculated headers (1)
-        "content-length",
+        // CORS/Browser security headers (1)
+        // Removed: origin, referer (used in RedactSampleData for content-type detection)
+        "upgrade-insecure-requests",
 
         // Misplaced response headers in request (1)
         "access-control-allow-origin",
 
-        // Additional common headers (previously included) (7)
+        // Additional common headers (7)
         "date", "accept", "cache-control", "connection", "pragma", "etag",
 
         // CDN/Infrastructure specific (3)
