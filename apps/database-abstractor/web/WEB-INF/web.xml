@@ -16,6 +16,16 @@
     </filter-mapping>
 
     <filter>
+        <filter-name>ToolsAuthFilter</filter-name>
+        <filter-class>com.akto.filter.ToolsAuthFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>ToolsAuthFilter</filter-name>
+        <url-pattern>/tools/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
         <filter-name>struts2</filter-name>
         <filter-class>org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter</filter-class>
     </filter>

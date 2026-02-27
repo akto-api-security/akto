@@ -735,4 +735,9 @@ public class DbActor extends DataActor {
     public void storeSpans(List<Span> spans) {
         DbLayer.storeSpans(spans);
     }
+
+    @Override
+    public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
+        DbLayer.storeTestingRunWebhook(testingRunWebhook);
+    }
 }

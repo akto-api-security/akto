@@ -3556,6 +3556,26 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private TestingRunWebhook testingRunWebhook;
+
+    public TestingRunWebhook getTestingRunWebhook() {
+        return testingRunWebhook;
+    }
+
+    public void setTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
+        this.testingRunWebhook = testingRunWebhook;
+    }
+
+    public String storeTestingRunWebhook() {
+        try {
+            DbLayer.storeTestingRunWebhook(testingRunWebhook);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in storeTestingRunWebhook " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String updateServiceGraphEdges() {
         try {
             if (apiCollectionId == -1) {

@@ -26,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, SLACK_ALERT_CYBORG;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, SLACK_ALERT_CYBORG, CYBORG_TOOLS_AUTH;
     }
 
     ConfigType configType;
@@ -671,6 +671,32 @@ public abstract class Config {
 
         public void setPublicKey(String publicKey) {
             this.publicKey = publicKey;
+        }
+    }
+
+    @BsonDiscriminator
+    public static class CyborgToolsAuthConfig extends Config {
+        private String staticToken;
+
+        public static final String CONFIG_ID = ConfigType.CYBORG_TOOLS_AUTH.name() + CONFIG_SALT;
+
+        public CyborgToolsAuthConfig() {
+            this.configType = ConfigType.CYBORG_TOOLS_AUTH;
+            this.id = CONFIG_ID;
+        }
+
+        public CyborgToolsAuthConfig(String staticToken) {
+            this.configType = ConfigType.CYBORG_TOOLS_AUTH;
+            this.id = CONFIG_ID;
+            this.staticToken = staticToken;
+        }
+
+        public String getStaticToken() {
+            return staticToken;
+        }
+
+        public void setStaticToken(String staticToken) {
+            this.staticToken = staticToken;
         }
     }
 
