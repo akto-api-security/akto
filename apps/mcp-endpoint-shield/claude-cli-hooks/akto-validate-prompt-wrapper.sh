@@ -8,6 +8,17 @@ export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="claude_code_cli"
 export CONTEXT_SOURCE="ENDPOINT"
+export DEVICE_ID="{{DEVICE_ID (optional)}}"
+
+# Logging Configuration
+export LOG_LEVEL="INFO"
+export LOG_PAYLOADS="false"
+
+# SSL Configuration
+# Optional: Path to custom CA certificate bundle for SSL verification
+# export SSL_CERT_PATH="/path/to/ca-bundle.crt"
+# Optional: Disable SSL verification (INSECURE - use only for testing)
+# export SSL_VERIFY="false"
 
 # Execute Python hook script
 exec python3 "$HOME/.claude/hooks/akto-validate-prompt.py" "$@"

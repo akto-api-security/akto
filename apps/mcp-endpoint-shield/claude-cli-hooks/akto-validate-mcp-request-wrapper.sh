@@ -21,4 +21,4 @@ export LOG_PAYLOADS="false"
 # export SSL_VERIFY="false"
 
 # Execute Python hook script
-exec python3 "$HOME/.claude/hooks/akto-validate-response.py" "$@"
+exec python3 "$HOME/.claude/hooks/akto-validate-mcp-request.py" "$@"
