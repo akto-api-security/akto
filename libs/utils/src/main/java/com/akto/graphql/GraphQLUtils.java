@@ -356,13 +356,13 @@ public class GraphQLUtils {//Singleton class
                         HttpResponseParams httpResponseParamsCopy = responseParams.copy();
                         httpResponseParamsCopy.requestParams.setUrl(graphqlPath);
                         try {
-                            Map<String, Object> map = fieldTraversal(field);
-                            HashMap hashMap = new HashMap(mapOfRequestPayload);
-                            for (String key : map.keySet()) {
-                                hashMap.put(GraphQLUtils.QUERY + key, map.get(key));
-                            }
-                            hashMap.remove(GraphQLUtils.QUERY);
-                            httpResponseParamsCopy.requestParams.setPayload(JSON.toJSONString(hashMap));
+                            // Map<String, Object> map = fieldTraversal(field);
+                            // //HashMap hashMap = new HashMap(mapOfRequestPayload);
+                            // for (String key : map.keySet()) {
+                            //     hashMap.put(GraphQLUtils.QUERY + key, map.get(key));
+                            // }
+                            // hashMap.remove(GraphQLUtils.QUERY);
+                            httpResponseParamsCopy.requestParams.setPayload("");
                             responseParamsList.add(httpResponseParamsCopy);
                         } catch (Exception e) {
                             //eat exception, No changes to request payload, parse Exception
