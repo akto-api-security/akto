@@ -121,13 +121,11 @@ public class McpAgentAction extends UserAction {
                         sb.append("URL: ").append(dataMap.getOrDefault("url", "")).append("\n");
                         Object originalMsg = dataMap.get("originalMessage");
                         if(originalMsg != null) {
-                            String reqStr = originalMsg.toString();
-                            sb.append("Original API Request+Response: ").append(reqStr, 0, Math.min(reqStr.length(), 2000)).append("\n");
+                            sb.append("Original API Request+Response: ").append(originalMsg).append("\n");
                         }
                         Object attemptMsg = dataMap.get("attemptMessage");
                         if(attemptMsg != null) {
-                            String respStr = attemptMsg.toString();
-                            sb.append("Test Attempt Request+Response: ").append(respStr, 0, Math.min(respStr.length(), 2000)).append("\n");
+                            sb.append("Test Attempt Request+Response: ").append(attemptMsg).append("\n");
                         }
                         contextString = sb.toString();
                         tokensLimit = 40000;
