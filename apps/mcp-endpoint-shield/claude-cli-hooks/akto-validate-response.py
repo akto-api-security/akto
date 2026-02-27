@@ -142,13 +142,13 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
     # Build request headers as JSON string
     request_headers = json.dumps({
         "host": host,
-        "x-claude-hook": "PostToolUse",
+        "x-claude-hook": "Stop",
         "content-type": "application/json"
     })
 
     # Build response headers as JSON string
     response_headers = json.dumps({
-        "x-claude-hook": "PostToolUse",
+        "x-claude-hook": "Stop",
         "content-type": "application/json"
     })
 

@@ -300,15 +300,23 @@ def ingest_blocked_request(tool_name: str, tool_input: str, mcp_server_name: str
         return
 
     try:
-        blocked_response_payload = {
-            "body": {"x-blocked-by": "Akto Proxy", "reason": reason or "Policy violation"},
-            "headers": {"content-type": "application/json"},
-            "statusCode": 403,
-            "status": "forbidden",
-        }
-
         request_body = build_validation_request(tool_name, tool_input, mcp_server_name)
-        request_body["response"] = blocked_response_payload
+        request_body["responseHeaders"] = json.dumps(
+            {
+                "x-claude-hook": "PreToolUse",
+                "x-blocked-by": "Akto Proxy",
+                "content-type": "application/json",
+            }
+        )
+        request_body["responsePayload"] = json.dumps(
+            {
+                "body": json.dumps(
+                    {"x-blocked-by": "Akto Proxy", "reason": reason or "Policy violation"}
+                )
+            }
+        )
+        request_body["statusCode"] = "403"
+        request_body["status"] = "403"
         post_payload_json(
             build_http_proxy_url(guardrails=False, ingest_data=True),
             request_body,

@@ -142,13 +142,13 @@ def build_validation_request(query: str) -> dict:
     # Build request headers as JSON string
     request_headers = json.dumps({
         "host": host,
-        "x-claude-hook": "PreToolUse",
+        "x-claude-hook": "UserPromptSubmit",
         "content-type": "application/json"
     })
 
     # Build response headers as JSON string
     response_headers = json.dumps({
-        "x-claude-hook": "PreToolUse"
+        "x-claude-hook": "UserPromptSubmit"
     })
 
     # Build request payload as JSON string
@@ -221,21 +221,26 @@ def call_guardrails(query: str) -> Tuple[bool, str]:
         return True, ""
 
 
-def ingest_blocked_request(user_prompt: str):
+def ingest_blocked_request(user_prompt: str, reason: str):
     if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
         return
 
     logger.info("Ingesting blocked request data")
     try:
-        blocked_response_payload = {
-            "body": {"x-blocked-by": "Akto Proxy"},
-            "headers": {"content-type": "application/json"},
-            "statusCode": 403,
-            "status": "forbidden"
-        }
-
         request_body = build_validation_request(user_prompt)
-        request_body["response"] = blocked_response_payload
+        request_body["responseHeaders"] = json.dumps({
+            "x-claude-hook": "UserPromptSubmit",
+            "x-blocked-by": "Akto Proxy",
+            "content-type": "application/json"
+        })
+        request_body["responsePayload"] = json.dumps({
+            "body": json.dumps({
+                "x-blocked-by": "Akto Proxy",
+                "reason": reason or "Policy violation"
+            })
+        })
+        request_body["statusCode"] = "403"
+        request_body["status"] = "403"
         post_payload_json(
             build_http_proxy_url(guardrails=False, ingest_data=True),
             request_body,
@@ -271,7 +276,7 @@ def main():
             }
             logger.warning(f"BLOCKING prompt - Reason: {reason}")
             print(json.dumps(output))
-            ingest_blocked_request(prompt)
+            ingest_blocked_request(prompt, reason)
             sys.exit(1)
 
     logger.info("Prompt allowed")
