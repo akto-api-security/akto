@@ -34,14 +34,27 @@ public class InitializerListener implements ServletContextListener {
         );
         KafkaUtils.setTopicPublisher(topicPublisher);
 
-        // Start Syslog UDP listener for Apigee async connector (Option B)
-        // This enables receiving traffic data from Apigee MessageLogging via UDP Syslog
-        // without requiring an external Fluentd service
-        Thread syslogThread = new Thread(new SyslogUdpListener());
-        syslogThread.setDaemon(true);
-        syslogThread.setName("syslog-udp-listener");
-        syslogThread.start();
-        logger.infoAndAddToDb("Syslog UDP listener thread started", LoggerMaker.LogDb.DATA_INGESTION);
+        boolean udpEnabled = isEnabled("SYSLOG_UDP_ENABLED", true);
+        if (udpEnabled) {
+            Thread syslogUdpThread = new Thread(new SyslogUdpListener());
+            syslogUdpThread.setDaemon(true);
+            syslogUdpThread.setName("syslog-udp-listener");
+            syslogUdpThread.start();
+            logger.infoAndAddToDb("Syslog UDP listener thread started", LoggerMaker.LogDb.DATA_INGESTION);
+        } else {
+            logger.infoAndAddToDb("Syslog UDP listener disabled via SYSLOG_UDP_ENABLED", LoggerMaker.LogDb.DATA_INGESTION);
+        }
+
+        boolean tcpEnabled = isEnabled("SYSLOG_TCP_ENABLED", true);
+        if (tcpEnabled) {
+            Thread syslogTcpThread = new Thread(new SyslogTcpListener());
+            syslogTcpThread.setDaemon(true);
+            syslogTcpThread.setName("syslog-tcp-listener");
+            syslogTcpThread.start();
+            logger.infoAndAddToDb("Syslog TCP listener thread started", LoggerMaker.LogDb.DATA_INGESTION);
+        } else {
+            logger.infoAndAddToDb("Syslog TCP listener disabled via SYSLOG_TCP_ENABLED", LoggerMaker.LogDb.DATA_INGESTION);
+        }
 
         // Initialize DataActor
         DataActor dataActor = DataActorFactory.fetchInstance();
@@ -51,6 +64,21 @@ public class InitializerListener implements ServletContextListener {
     @Override
     public void contextDestroyed(javax.servlet.ServletContextEvent sce) {
         // override
+    }
+
+    private boolean isEnabled(String envVar, boolean defaultValue) {
+        String value = System.getenv(envVar);
+        if (value == null) {
+            return defaultValue;
+        }
+        value = value.trim().toLowerCase();
+        if ("true".equals(value) || "1".equals(value) || "yes".equals(value) || "y".equals(value) || "on".equals(value)) {
+            return true;
+        }
+        if ("false".equals(value) || "0".equals(value) || "no".equals(value) || "n".equals(value) || "off".equals(value)) {
+            return false;
+        }
+        return defaultValue;
     }
 
 }
