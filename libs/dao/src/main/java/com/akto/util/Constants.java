@@ -50,6 +50,10 @@ public class Constants {
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
     public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
     public static final String AKTO_MCP_PROMPTS_TAG = "mcp-prompt";
+    public static final String HOST_HEADER = "Host";
+    public static final String X_TRANSPORT_HEADER = "x-transport";
+    public static final String STDIO_TRANSPORT = "STDIO";
+    public static final String HTTP_TRANSPORT = "HTTP";
 
     // RAG and Vector Database Tags
     public static final String AKTO_RAG_DATABASE_TAG = "rag-database";
@@ -64,6 +68,7 @@ public class Constants {
     public static final String AI_AGENT_SOURCE_COPILOT_STUDIO = "COPILOT_STUDIO";
     public static final String AI_AGENT_SOURCE_DATABRICS = "DATABRICKS";
     public static final String AI_AGENT_SOURCE_VERTEX = "VERTEX_AI";
+    public static final String AI_AGENT_SOURCE_SNOWFLAKE = "SNOWFLAKE";
     public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
     public static final String AI_AGENT_TAG_SOURCE = "source";
 

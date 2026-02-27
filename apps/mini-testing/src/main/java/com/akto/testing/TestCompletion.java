@@ -23,7 +23,7 @@ import com.akto.usage.OrgUtils;
 
 public class TestCompletion {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(TestCompletion.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestCompletion.class, LogDb.TESTING);
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -36,7 +36,7 @@ public class TestCompletion {
             scheduleTs = testingRun.getScheduleTimestamp() + 5 * 60;
         }
 
-        if(GetRunningTestsStatus.getRunningTests().isTestRunning(testingRun.getId())){
+        if (testingRun != null && testingRun.getId() != null) {
             dataActor.updateTestingRunAndMarkCompleted(testingRun.getId().toHexString(), scheduleTs);
         }
 

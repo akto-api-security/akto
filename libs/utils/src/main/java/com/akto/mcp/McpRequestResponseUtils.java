@@ -1,5 +1,12 @@
 package com.akto.mcp;
 
+import static com.akto.util.Constants.AKTO_MCP_RESOURCES_TAG;
+import static com.akto.util.Constants.AKTO_MCP_TOOLS_TAG;
+import static com.akto.util.Constants.HOST_HEADER;
+import static com.akto.util.Constants.HTTP_TRANSPORT;
+import static com.akto.util.Constants.STDIO_TRANSPORT;
+import static com.akto.util.Constants.X_TRANSPORT_HEADER;
+
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -14,6 +21,7 @@ import com.akto.mcp.McpSchema.JSONRPCResponse;
 import com.akto.mcp.McpSchema.JsonSchema;
 import com.akto.mcp.McpSchema.ListToolsResult;
 import com.akto.mcp.McpSchema.Tool;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -24,6 +32,7 @@ import io.swagger.oas.inflector.examples.models.Example;
 import io.swagger.oas.inflector.processors.JsonNodeExampleSerializer;
 import io.swagger.util.Json;
 import io.swagger.v3.oas.models.media.Schema;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -33,9 +42,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-
-import static com.akto.util.Constants.AKTO_MCP_RESOURCES_TAG;
-import static com.akto.util.Constants.AKTO_MCP_TOOLS_TAG;
 
 
 public final class McpRequestResponseUtils {
@@ -122,6 +128,7 @@ public final class McpRequestResponseUtils {
         }
 
         String url = responseParams.getRequestParams().getURL();
+        String mcpHost = extractMcpHostFromResponseParams(responseParams);
 
         McpAuditInfo auditInfo = null;
 
@@ -133,8 +140,8 @@ public final class McpRequestResponseUtils {
                         String name = params.getName() != null ? params.getName() : "";
                         auditInfo = new McpAuditInfo(
                             Context.now(), "", AKTO_MCP_TOOLS_TAG, 0,
-                            name, "", null, responseParams.getRequestParams().getApiCollectionId()
-
+                            name, "", null, responseParams.getRequestParams().getApiCollectionId(),
+                            mcpHost
                         );
                     }
                     break;
@@ -145,7 +152,8 @@ public final class McpRequestResponseUtils {
                         String uri = params.getUri() != null ? params.getUri() : "";
                         auditInfo = new McpAuditInfo(
                             Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
-                            uri, "", null, responseParams.getRequestParams().getApiCollectionId()
+                            uri, "", null, responseParams.getRequestParams().getApiCollectionId(),
+                            mcpHost
                         );
                     }
                     break;
@@ -290,5 +298,59 @@ public final class McpRequestResponseUtils {
             logger.error("Failed to generate example arguments using OpenAPI ExampleBuilder", e);
             return Collections.emptyMap();
         }
+    }
+
+    public static String extractMcpHostFromResponseParams(HttpResponseParams responseParams) {
+        if (responseParams == null || responseParams.getRequestParams() == null) {
+            return null;
+        }
+        Map<String, List<String>> reqHeaders = responseParams.getRequestParams().getHeaders();
+
+        String hostRaw = null;
+        String url = responseParams.getRequestParams().getURL();
+        if (StringUtils.isNotBlank(url)) {
+            try {
+                URI uri = new URI(url.trim());
+                if (uri.getHost() != null) {
+                    hostRaw = uri.getHost();
+                }
+            } catch (Exception e) {
+                logger.debug("Failed to parse request URL for host: " + e.getMessage());
+            }
+        }
+
+        boolean fromHost = false;
+        if (StringUtils.isBlank(hostRaw) && reqHeaders != null) {
+            hostRaw = HttpRequestResponseUtils.getHeaderValue(reqHeaders, HOST_HEADER);
+            fromHost = true;
+        }
+
+        if (hostRaw == null || StringUtils.isBlank(hostRaw)) {
+            return null;
+        }
+        final String host = hostRaw.trim();
+
+        String headerValue = reqHeaders != null ? HttpRequestResponseUtils.getHeaderValue(reqHeaders, X_TRANSPORT_HEADER) : null;
+
+        // STDIO: always extract service name. HTTP: extract only when host was taken from Host header
+        if (STDIO_TRANSPORT.equals(headerValue) || (fromHost && HTTP_TRANSPORT.equals(headerValue))) {
+            return extractServiceNameFromHost(host);
+        }
+        return host;
+    }
+
+    private static String extractServiceNameFromHost(String host) {
+        if (host == null || host.isEmpty()) {
+            return null;
+        }
+        String[] parts = host.split("\\.");
+        if (parts.length < 3) {
+            return host;
+        }
+        StringBuilder sb = new StringBuilder(parts[2]);
+        for (int i = 3; i < parts.length; i++) {
+            sb.append(".").append(parts[i]);
+        }
+        return sb.toString();
     }
 }

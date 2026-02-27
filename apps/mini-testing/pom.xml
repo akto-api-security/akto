@@ -29,6 +29,10 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.akto.apps</groupId>
+            <artifactId>akto-utility-server</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.akto.apps.api-runtime</groupId>
             <artifactId>api-runtime</artifactId>
             <version>${project.version}</version>

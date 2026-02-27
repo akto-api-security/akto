@@ -140,6 +140,13 @@ public class ConsumerUtil {
 
         ParallelStreamProcessor<String, String> parallelConsumer = null;
 
+        /*
+         * Edge case:
+         * In case the module restarts and starts processing the incomplete testing run,
+         * then the consumer will process some of the records again.
+         * This happens because the commits to kafka are periodic (5 seconds, default) and not per message.
+         */
+        
         if(isConsumerRunning){
             String topicName = Constants.TEST_RESULTS_TOPIC_NAME;
             consumer = new KafkaConsumer<>(properties); 
@@ -158,10 +165,13 @@ public class ConsumerUtil {
         }
 
         try {
+            if(parallelConsumer != null){
             parallelConsumer.poll(record -> {
                 String threadName = Thread.currentThread().getName();
                 String message = record.value();
-                loggerMaker.infoAndAddToDb("Thread [" + threadName + "] picked up record: " + message);
+                // Stable id per Kafka record: same record redelivered (e.g. after rebalance/restart) will log the same id again.
+                String recordId = record.getSingleConsumerRecord().topic() + "-p" + record.getSingleConsumerRecord().partition() + "-o" + record.offset();
+                loggerMaker.infoAndAddToDb("Thread [" + threadName + "] picked up record recordId=" + recordId + " " + message);
                 try {
                     if(!executor.isShutdown()){
                         Future<?> future = executor.submit(() -> runTestFromMessage(message));
@@ -181,9 +191,10 @@ public class ConsumerUtil {
                     }
                     
                 } finally {
-                    loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record: " + message);
+                    loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record recordId=" + recordId);
                 }
             });
+        }
 
             while (parallelConsumer != null) {
                 if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
@@ -212,7 +223,9 @@ public class ConsumerUtil {
 
             flushLastTestedUpdates();
 
-            parallelConsumer.closeDrainFirst();
+            if(parallelConsumer != null){
+                parallelConsumer.closeDrainFirst();
+            }
             parallelConsumer = null;
             consumer.close();
             writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, null);

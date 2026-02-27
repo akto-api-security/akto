@@ -10,6 +10,7 @@ public class MetricData {
     private String orgId;
     private String instanceId;
     private int timestamp;
+    private String moduleType;
 
     public MetricType getMetricType() {
         return metricType;
@@ -104,6 +105,16 @@ public class MetricData {
         this.metricType = metricType;
     }
 
+    public MetricData(String metricId, float value, String orgId, String instanceId, MetricType metricType, String moduleType) {
+        this.metricId = metricId;
+        this.value = value;
+        this.orgId = orgId;
+        this.instanceId = instanceId;
+        this.timestamp = Context.now();
+        this.metricType = metricType;
+        this.moduleType = moduleType;
+    }
+
     public ObjectId getId() {
         return id;
     }
@@ -150,5 +161,13 @@ public class MetricData {
 
     public void setTimestamp(int timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public String getModuleType() {
+        return moduleType;
+    }
+
+    public void setModuleType(String moduleType) {
+        this.moduleType = moduleType;
     }
 } 

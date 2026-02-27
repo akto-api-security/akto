@@ -198,6 +198,8 @@ public abstract class DataActor {
 
     public abstract void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount);
 
+    public abstract TestingRunResultSummary updateMetadataInSummary(String summaryId, Map<String, String> metadata);
+
     public abstract void insertActivity(int count);
 
     public abstract TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues);
@@ -226,7 +228,7 @@ public abstract class DataActor {
 
     public abstract void insertApiCollection(int apiCollectionId, String apiCollectionName);
 
-    public abstract void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName);
+    public abstract void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType);
 
     public abstract void addHostNameToServiceTagCollection(int collectionId, String hostName);
 
@@ -266,6 +268,8 @@ public abstract class DataActor {
 
     public abstract void insertTestingLog(Log log);
 
+    public abstract void insertAgenticTestingLog(Log log);
+
     public abstract EndpointLogicalGroup fetchEndpointLogicalGroupById(String endpointLogicalGroupId);
 
     public abstract DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand);
@@ -279,9 +283,9 @@ public abstract class DataActor {
 
     public abstract Set<MergedUrls> fetchMergedUrls();
 
-    public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags);
+    public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType);
 
-    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags);
+    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType);
 
     public abstract List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue);
 
@@ -307,7 +311,7 @@ public abstract class DataActor {
 
     public abstract List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId);
 
-    public abstract TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter);
+    public abstract TestingRunResultSummary findLatestTestingRunResultSummary(String testingRunId);
     public abstract ModuleInfo updateModuleInfo(ModuleInfo moduleInfo);
     public abstract void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList);
 

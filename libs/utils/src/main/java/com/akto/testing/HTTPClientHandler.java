@@ -39,7 +39,7 @@ public class HTTPClientHandler {
     }
 
     private HTTPClientHandler(boolean isSaas) {
-        if(isSaas) readTimeout = 60;
+        readTimeout = 60;
 
         clientWithoutFollowRedirect = builder(false, readTimeout).build();
         clientWithFollowRedirect = builder(true, readTimeout).build();
@@ -52,13 +52,17 @@ public class HTTPClientHandler {
         http2httpsClientWithFollowRedirect = builder(true, readTimeout).protocols(Arrays.asList(Protocol.HTTP_2, Protocol.HTTP_1_1)).build();
     }
 
-    public OkHttpClient getNewDebugClient(boolean isSaas, boolean followRedirects, List<TestingRunResult.TestLog> testLogs, String contentType) {
-        if(isSaas) readTimeout = 60;
+    public OkHttpClient getNewDebugClient(boolean isSaas, boolean followRedirects, List<TestingRunResult.TestLog> testLogs, String contentType, boolean isHttps) {
+        readTimeout = 60;
         OkHttpClient.Builder builder = builder(followRedirects, readTimeout)
                 .addInterceptor(new NormalResponseInterceptor(testLogs))
                 .addNetworkInterceptor(new NetworkResponseInterceptor(testLogs));
         if (contentType != null && contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
-            builder.protocols(Collections.singletonList(Protocol.H2_PRIOR_KNOWLEDGE));
+            if (isHttps) {
+                builder.protocols(Arrays.asList(Protocol.HTTP_2, Protocol.HTTP_1_1));
+            } else {
+                builder.protocols(Collections.singletonList(Protocol.H2_PRIOR_KNOWLEDGE));
+            }
         }
         return builder.build();
     }

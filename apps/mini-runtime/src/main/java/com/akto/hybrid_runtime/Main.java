@@ -423,7 +423,7 @@ public class Main {
 
         final boolean checkPg = aSettings != null && aSettings.isRedactPayload();
 
-        AllMetrics.instance.init(LogDb.RUNTIME, checkPg, dataActor, Context.getActualAccountId(), customMiniRuntimeServiceName);
+        AllMetrics.instance.init(LogDb.RUNTIME, checkPg, dataActor, Context.getActualAccountId(), customMiniRuntimeServiceName, ModuleInfo.ModuleType.MINI_RUNTIME.name());
         loggerMaker.infoAndAddToDb("All metrics initialized");
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());

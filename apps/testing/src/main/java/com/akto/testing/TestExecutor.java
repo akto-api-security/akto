@@ -162,11 +162,10 @@ public class TestExecutor {
         try {
             StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig());
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb(e, "Error while running status code analyser " + e.getMessage());
         }
 
-        loggerMaker.infoAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result, LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("StatusCodeAnalyser defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result + " defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap);
 
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
