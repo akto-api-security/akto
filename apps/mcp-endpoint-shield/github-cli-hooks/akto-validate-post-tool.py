@@ -8,7 +8,7 @@ import sys
 import time
 import urllib.request
 from typing import Any, Dict, Union
-from akto_machine_id import get_machine_id
+from akto_machine_id import get_machine_id, get_username
 
 # Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -114,11 +114,6 @@ def post_to_akto(url: str, payload: Dict[str, Any], logger) -> Union[Dict[str, A
         raise
 
 
-def uuid_to_ipv6_simple(uuid_str):
-    hex_str = uuid_str.replace("-", "").lower()
-    return ":".join(hex_str[i:i+4] for i in range(0, 32, 4))
-
-
 def build_akto_request(
     tool_name: str,
     tool_args: str,
@@ -169,7 +164,7 @@ def build_akto_request(
         "method": "POST",
         "requestPayload": request_payload,
         "responsePayload": response_payload,
-        "ip": uuid_to_ipv6_simple(device_id),
+        "ip": get_username(),
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": status_code,
