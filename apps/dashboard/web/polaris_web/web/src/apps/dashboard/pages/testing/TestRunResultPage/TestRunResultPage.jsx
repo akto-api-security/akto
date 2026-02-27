@@ -154,8 +154,8 @@ function TestRunResultPage(props) {
         vulnerable: selectedTestRunResult?.vulnerable,
         severity: issueDetails?.severity,
         url: selectedTestRunResult?.url || "",
-        sampleRequest: selectedTestRunResult?.testResults?.[0]?.originalMessage?.substring(0, 2000) || null,
-        sampleResponse: selectedTestRunResult?.testResults?.[0]?.message?.substring(0, 2000) || null,
+        originalMessage: selectedTestRunResult?.testResults?.[0]?.originalMessage || null,
+        attemptMessage: selectedTestRunResult?.testResults?.[0]?.message || null,
       }
     };
   }
@@ -375,6 +375,7 @@ function TestRunResultPage(props) {
     setAiLoading(false);
     setAiSummaryLoading(false);
     setAiSummaryChecked(false);
+    setSelectedTestRunResult({});
     fetchData();
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props?.testingRunResult, props?.runIssues, hexId2])
 
