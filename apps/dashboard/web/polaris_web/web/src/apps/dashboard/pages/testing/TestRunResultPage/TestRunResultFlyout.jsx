@@ -30,9 +30,14 @@ import TestRunResultChat from './TestRunResultChat.jsx'
 import AskAktoSection from './AskAktoSection.jsx'
 import PersistStore from '../../../../main/PersistStore'
 
+const SKIPPED_TEST_DOCS_URL = "https://docs.akto.io/api-security-testing/concepts/skipped-test-cases";
+const SKIP_ERROR_KEYWORDS = ["skipping execution"];
+
+function isSkippedTestError(errorText) {
+  return SKIP_ERROR_KEYWORDS.some(keyword => errorText?.includes(keyword));
+}
+
 function TestRunResultFlyout(props) {
-
-
     const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
@@ -748,6 +753,9 @@ function TestRunResultFlyout(props) {
             return null;
         }
 
+        const firstError = selectedTestRunResult?.testResults?.find(result =>
+          result.errors && result.errors.length > 0
+        )?.errors?.join(", ");
 
         return (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
@@ -755,38 +763,45 @@ function TestRunResultFlyout(props) {
                     <Box padding="3" background="bg-surface-secondary" borderRadius="2">
                         <LegendLabel />
                     </Box>
-                    <SampleDataList
-                        key="Sample values"
-                        heading={"Attempt"}
-                        minHeight={"30vh"}
-                        vertical={true}
-                        sampleData={
-                            selectedTestRunResult?.testResults.map((result, idx) => {
-                                if (result.errors && result.errors.length > 0) {
-                                    let errorList = result.errors.join(", ");
-                                    return { errorList: errorList }
-                                }
-                                // Add vulnerability highlights only for response
-                                let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
-                                if (result.originalMessage || result.message) {
-                                    if(isAgentic){
+                    <VerticalStack gap="0">
+                        <SampleDataList
+                            key="Sample values"
+                            heading={"Attempt"}
+                            minHeight={"30vh"}
+                            vertical={true}
+                            sampleData={
+                                selectedTestRunResult?.testResults.map((result, idx) => {
+                                    if (result.errors && result.errors.length > 0) {
+                                        let errorList = result.errors.join(", ");
+                                        return { errorList: errorList }
+                                    }
+                                    // Add vulnerability highlights only for response
+                                    let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
+                                    if (result.originalMessage || result.message) {
+                                        if(isAgentic){
+                                            return {
+                                                originalMessage: result.message,
+                                                message: result.message
+                                            }
+                                        }
                                         return {
-                                            originalMessage: result.message,
-                                            message: result.message
+                                            originalMessage: result.originalMessage,
+                                            message: result.message,
+                                            vulnerabilitySegments
                                         }
                                     }
-                                    return {
-                                        originalMessage: result.originalMessage,
-                                        message: result.message,
-                                        vulnerabilitySegments
-                                    }
-                                }
-                                return { errorList: "No data found" }
-                            })}
-                        isNewDiff={true}
-                        vulnerable={selectedTestRunResult?.vulnerable}
-                        vulnerabilityAnalysisError={vulnerabilityAnalysisError}
-                    />
+                                    return { errorList: "No data found" }
+                                })}
+                            isNewDiff={true}
+                            vulnerable={selectedTestRunResult?.vulnerable}
+                            vulnerabilityAnalysisError={vulnerabilityAnalysisError}
+                        />
+                        {firstError && isSkippedTestError(firstError) && (
+                            <Box paddingBlockStart="2" paddingInlineStart="2">
+                                <Link url={SKIPPED_TEST_DOCS_URL} external>Learn more about skipped tests</Link>
+                            </Box>
+                        )}
+                    </VerticalStack>
                 </VerticalStack>
             </Box>
         );
