@@ -34,17 +34,6 @@ public class InitializerListener implements ServletContextListener {
         );
         KafkaUtils.setTopicPublisher(topicPublisher);
 
-        boolean udpEnabled = isEnabled("SYSLOG_UDP_ENABLED", true);
-        if (udpEnabled) {
-            Thread syslogUdpThread = new Thread(new SyslogUdpListener());
-            syslogUdpThread.setDaemon(true);
-            syslogUdpThread.setName("syslog-udp-listener");
-            syslogUdpThread.start();
-            logger.infoAndAddToDb("Syslog UDP listener thread started", LoggerMaker.LogDb.DATA_INGESTION);
-        } else {
-            logger.infoAndAddToDb("Syslog UDP listener disabled via SYSLOG_UDP_ENABLED", LoggerMaker.LogDb.DATA_INGESTION);
-        }
-
         boolean tcpEnabled = isEnabled("SYSLOG_TCP_ENABLED", true);
         if (tcpEnabled) {
             Thread syslogTcpThread = new Thread(new SyslogTcpListener());
