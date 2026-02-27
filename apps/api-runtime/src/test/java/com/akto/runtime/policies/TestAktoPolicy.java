@@ -24,7 +24,7 @@ public class TestAktoPolicy extends MongoBasedTest {
     }
 
     public HttpResponseParams generateHttpResponseParams(String url, URLMethods.Method method, int aci,
-                                                         List<ApiInfo.AuthType> authTypes, boolean isPublic) {
+                                                         List<String> authTypes, boolean isPublic) {
         HttpResponseParams hrp = new HttpResponseParams();
         hrp.requestParams = new HttpRequestParams();
         hrp.requestParams.setApiCollectionId(aci);
@@ -37,22 +37,22 @@ public class TestAktoPolicy extends MongoBasedTest {
         hrp.accountId = "0";
 
         // authType
-        for (ApiInfo.AuthType authType: authTypes) {
+        for (String authType: authTypes) {
             switch (authType) {
-                case UNAUTHENTICATED:
+                case "UNAUTHENTICATED":
                     break;
-                case BASIC:
+                case "BASIC":
                     hrp.requestParams.getHeaders().put("authorization", Collections.singletonList("Basic somerandom"));
                     break;
-                case AUTHORIZATION_HEADER:
+                case "AUTHORIZATION_HEADER":
                     hrp.requestParams.getHeaders().put("authorization", Collections.singletonList("somerandom"));
                     break;
-                case JWT:
+                case "JWT":
                     hrp.requestParams.getHeaders().put("akto-token123", Collections.singletonList("eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoicmVmcmVzaFRva2VuIiwic2lnbmVkVXAiOiJ0cnVlIiwidXNlcm5hbWUiOiJhbmtpdGFAZ21haWwuY29tIiwiaWF0IjoxNjM0OTcxMTMxLCJleHAiOjE2MzUwNTc1MzF9.Ph4Jv-fdggwvnbdVViD9BWUReYL0dVfVGuMRz4d2oZNnYzWV0JCmjpB68p6k0yyPPua_yagIWVZf_oYH9PUgS7EuaPYR-Vg6uxKR1HuXRA6wb8Xf4RPoFjJYkhWoYmv38V9Cz2My9U85wgGHGZXEufu8ubrFmIfOP6-A39M4meNGw48f5oOz8V337SX45uPc6jE0EfmM4l9EbqFFCF0lRXbMMzn-ijsyXxLkI5npWnqtW3PAHC2Rs3FV40tkRqHYF-WM6SzyHLBh6bVeyeOsFRBoEjv-zFh8yrYnT6OvCa6jII2A6uj4MQ2k11-5bDBhfVPVc4hEQz37H_DWwtf23g"));
                     break;
-                case API_TOKEN:
+                case "API_TOKEN":
                     break;
-                case BEARER:
+                case "BEARER":
                     hrp.requestParams.getHeaders().put("authorization", Collections.singletonList("Bearer somerandom"));
                     break;
             }

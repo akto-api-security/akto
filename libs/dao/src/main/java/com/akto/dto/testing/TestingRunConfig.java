@@ -3,6 +3,9 @@ package com.akto.dto.testing;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
@@ -32,6 +35,11 @@ public class TestingRunConfig {
     public static final String AUTO_TICKETING_DETAILS = "autoTicketingDetails";
 
     private AutoTicketingDetails autoTicketingDetails;
+
+    @BsonIgnore
+    @Getter
+    @Setter
+    private String conversationId;
 
     public TestingRunConfig() {}
 

@@ -374,7 +374,7 @@ public class FastDiscoveryConsumer {
             try {
                 // Use same method as mini-runtime for consistency
                 // With vpcId=null and empty tags, creates only 4 fields
-                dataActor.createCollectionForHostAndVpc(hostname, collectionId, vpcId, emptyTags);
+                dataActor.createCollectionForHostAndVpc(hostname, collectionId, vpcId, emptyTags, null);
                 successfulInserts.add(collectionId);
             } catch (Exception e) {
                 // Creation failed - either collection exists or collision

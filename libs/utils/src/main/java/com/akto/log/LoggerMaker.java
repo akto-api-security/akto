@@ -94,7 +94,7 @@ public class LoggerMaker {
     private LogDb db;
 
     public enum LogDb {
-        TESTING, RUNTIME, DASHBOARD, BILLING, ANALYSER
+        TESTING, RUNTIME, DASHBOARD, BILLING, ANALYSER, AGENTIC_TESTING
     }
 
     private static AccountSettings accountSettings = null;
@@ -318,6 +318,9 @@ public class LoggerMaker {
                 case BILLING:
                     BillingLogsDao.instance.insertOne(log);
                     break;
+                case AGENTIC_TESTING:
+                    dataActor.insertAgenticTestingLog(log);
+                    break;
                 default:
                     break;
             }
@@ -352,6 +355,9 @@ public class LoggerMaker {
                 break;
             case BILLING:
                 logs = BillingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            case AGENTIC_TESTING:
+                logs = AgenticTestingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
             default:
                 break;

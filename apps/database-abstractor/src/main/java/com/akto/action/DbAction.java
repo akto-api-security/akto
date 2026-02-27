@@ -191,6 +191,7 @@ public class DbAction extends ActionSupport {
     int testResultsCount;
     Bson completedUpdate;
     int totalApiCount;
+    Map<String, String> metadata;
     boolean hybridTestingEnabled;
     TestingRun testingRun;
     TestingRunConfig testingRunConfig;
@@ -222,6 +223,10 @@ public class DbAction extends ActionSupport {
     @lombok.Getter
     @lombok.Setter
     List<CollectionTags> tagsList;
+
+    @lombok.Getter
+    @lombok.Setter
+    String accessType;
 
     String metricType;
 
@@ -1678,6 +1683,19 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String updateMetadataInSummary() {
+        try {
+            trrs = DbLayer.updateMetadataInSummary(summaryId, metadata);
+            if (trrs != null && trrs.getTestingRunId() != null) {
+                trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateMetadataInSummary...");
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String modifyHybridTestingSetting() {
         try {
             DbLayer.modifyHybridTestingSetting(hybridTestingEnabled);
@@ -1692,6 +1710,17 @@ public class DbAction extends ActionSupport {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             DbLayer.insertTestingLog(dbLog);
         } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String insertAgenticTestingLog() {
+        try {
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            DbLayer.insertAgenticTestingLog(dbLog);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertAgenticTestingLog " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -1756,7 +1785,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionSimpleForVpc() {
         try {
             System.out.println("called1 vpcId" + vpcId);
-            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tagsList);
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tagsList, accessType);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -1766,7 +1795,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionForHostAndVpc() {
         try {
             System.out.println("called2 vpcId" + vpcId);
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tagsList);
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tagsList, accessType);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -1836,8 +1865,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String findLatestTestingRunResultSummary(){
-        trrs = DbLayer.findLatestTestingRunResultSummary(filter);
+    public String findLatestTestingRunResultSummary() {
+        try {
+            trrs = DbLayer.findLatestTestingRunResultSummary(testingRunId);
+            if (trrs != null) {
+                trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in findLatestTestingRunResultSummary " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -2516,6 +2553,14 @@ public class DbAction extends ActionSupport {
 
     public void setTotalApiCount(int totalApiCount) {
         this.totalApiCount = totalApiCount;
+    }
+
+    public Map<String, String> getMetadata() {
+        return metadata;
+    }
+
+    public void setMetadata(Map<String, String> metadata) {
+        this.metadata = metadata;
     }
 
     public boolean isHybridTestingEnabled() {

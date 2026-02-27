@@ -70,4 +70,26 @@ public class MetricDataDao extends AccountsContextDao<MetricData> {
         cursor.close();
         return metrics;
     }
+
+    public List<MetricData> getMetricsForModule(long startTime, long endTime, String moduleType) {
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.gte("timestamp", startTime));
+        filters.add(Filters.lte("timestamp", endTime));
+        filters.add(Filters.eq("moduleType", moduleType));
+
+        return instance.findAll(Filters.and(filters), 0, 100_000, Sorts.ascending("timestamp"));
+    }
+
+    public List<MetricData> getMetricsForModule(long startTime, long endTime, String moduleType, String instanceId) {
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.gte("timestamp", startTime));
+        filters.add(Filters.lte("timestamp", endTime));
+        filters.add(Filters.eq("moduleType", moduleType));
+
+        if (instanceId != null && !instanceId.isEmpty()) {
+            filters.add(Filters.eq("instanceId", instanceId));
+        }
+
+        return instance.findAll(Filters.and(filters), 0, 100_000, Sorts.ascending("timestamp"));
+    }
 }

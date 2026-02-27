@@ -17,12 +17,12 @@ public class TestApiInfo {
         ApiInfo apiInfo = new ApiInfo();
         apiInfo.setAllAuthTypesFound(new HashSet<>());
 
-        Set<ApiInfo.AuthType> a = new HashSet<>();
+        Set<String> a = new HashSet<>();
         a.add(ApiInfo.AuthType.JWT);
         apiInfo.getAllAuthTypesFound().add(a);
 
 
-        Set<ApiInfo.AuthType> b = new HashSet<>();
+        Set<String> b = new HashSet<>();
         b.add(ApiInfo.AuthType.BEARER);
         b.add(ApiInfo.AuthType.UNAUTHENTICATED);
         apiInfo.getAllAuthTypesFound().add(b);
@@ -37,13 +37,13 @@ public class TestApiInfo {
         ApiInfo apiInfo = new ApiInfo();
         apiInfo.setAllAuthTypesFound(new HashSet<>());
 
-        Set<ApiInfo.AuthType> a = new HashSet<>();
+        Set<String> a = new HashSet<>();
         a.add(ApiInfo.AuthType.JWT);
         a.add(ApiInfo.AuthType.BEARER);
         apiInfo.getAllAuthTypesFound().add(a);
 
 
-        Set<ApiInfo.AuthType> b = new HashSet<>();
+        Set<String> b = new HashSet<>();
         b.add(ApiInfo.AuthType.BEARER);
         apiInfo.getAllAuthTypesFound().add(b);
 
@@ -59,16 +59,16 @@ public class TestApiInfo {
         ApiInfo apiInfo = new ApiInfo();
         apiInfo.setAllAuthTypesFound(new HashSet<>());
 
-        Set<ApiInfo.AuthType> a = new HashSet<>();
+        Set<String> a = new HashSet<>();
         a.add(ApiInfo.AuthType.JWT);
         a.add(ApiInfo.AuthType.BEARER);
         apiInfo.getAllAuthTypesFound().add(a);
 
-        Set<ApiInfo.AuthType> b = new HashSet<>();
+        Set<String> b = new HashSet<>();
         b.add(ApiInfo.AuthType.JWT);
         apiInfo.getAllAuthTypesFound().add(b);
 
-        Set<ApiInfo.AuthType> c = new HashSet<>();
+        Set<String> c = new HashSet<>();
         c.add(ApiInfo.AuthType.BASIC);
         apiInfo.getAllAuthTypesFound().add(c);
 

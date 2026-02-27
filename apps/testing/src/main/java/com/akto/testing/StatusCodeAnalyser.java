@@ -51,14 +51,14 @@ public class StatusCodeAnalyser {
         defaultPayloadsMap = new HashMap<>();
         result = new ArrayList<>();
         if (sampleDataMap == null) {
-            loggerMaker.errorAndAddToDb("No sample data", LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("No sample data");
             return;
         }
-        loggerMaker.infoAndAddToDb("started calc default payloads", LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("started calc default payloads");
 
         calculateDefaultPayloads(sampleMessageStore, sampleDataMap, testingRunConfig);
 
-        loggerMaker.infoAndAddToDb("started fill result", LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("started fill result");
         fillResult(sampleMessageStore, sampleDataMap, authMechanism, testingRunConfig);
     }
 
@@ -69,7 +69,7 @@ public class StatusCodeAnalyser {
             try {
                  host = findHost(apiInfoKey, sampleDataMap, sampleMessageStore);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while finding host in status code analyser: " + e, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Error while finding host in status code analyser: " + e.getMessage());
                 continue;
             }
 

@@ -17,6 +17,16 @@
         <module>testing-db-layer</module>
     </modules>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.akto.apps</groupId>
+                <artifactId>akto-utility-server</artifactId>
+                <version>${revision}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <profiles>
         <profile>
             <id>dashboard</id>
@@ -103,7 +113,19 @@
                 </file>
             </activation>
             <modules>
+                <module>akto-utility-server</module>
                 <module>mini-testing</module>
+            </modules>
+        </profile>
+        <profile>
+            <id>akto-utility-server</id>
+            <activation>
+                <file>
+                    <exists>akto-utility-server/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>akto-utility-server</module>
             </modules>
         </profile>
         <profile>

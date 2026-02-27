@@ -11,7 +11,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.json.JSONObject;
 
-import com.akto.agent.AgentClient;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -62,9 +61,6 @@ public class YamlNodeExecutor extends NodeExecutor {
     
     private static final Gson gson = new Gson();
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
-    private final AgentClient agentClient = new AgentClient(
-        Constants.AGENT_BASE_URL
-    );
 
     public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         List<String> testErrors = new ArrayList<>();
@@ -394,41 +390,37 @@ public class YamlNodeExecutor extends NodeExecutor {
             int statusCode = 0;
             String eventStreamResponse = null;
 
-            if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
-                res = agentClient.executeAgenticTest(testReq, yamlNodeDetails.getApiCollectionId());
+            int tsBeforeReq = Context.nowInMillis();
+            OriginalHttpResponse testResponse = ApiExecutor.sendRequest(
+                    testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK
+            );
+
+            if (apiInfoKey != null && memory != null) {
+                memory.fillResponse(testReq.getRequest(), testResponse,
+                        apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+            }
+
+            int tsAfterReq = Context.nowInMillis();
+            responseTime = tsAfterReq - tsBeforeReq;
+
+            ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(),
+                    testReq.getRequest(), testResponse);
+            res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
+
+            try {
+                messageStr = convertOriginalReqRespToString(testReq.getRequest(), testResponse, responseTime);
+            } catch (Exception ignored) {
+            }
+
+            savedResponses = testResponse.getBody();
+            statusCode = testResponse.getStatusCode();
+            eventStreamResponse = com.akto.test_editor.Utils.buildEventStreamResponseIHttpFormat(testResponse);
+
+            if (testResponse.getBody() == null) {
+                responseLength = 0;
             } else {
-                int tsBeforeReq = Context.nowInMillis();
-                OriginalHttpResponse testResponse = ApiExecutor.sendRequest(
-                        testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK
-                );
-
-                if (apiInfoKey != null && memory != null) {
-                    memory.fillResponse(testReq.getRequest(), testResponse,
-                            apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
-                    memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
-                }
-
-                int tsAfterReq = Context.nowInMillis();
-                responseTime = tsAfterReq - tsBeforeReq;
-
-                ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(),
-                        testReq.getRequest(), testResponse);
-                res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
-
-                try {
-                    messageStr = convertOriginalReqRespToString(testReq.getRequest(), testResponse, responseTime);
-                } catch (Exception ignored) {
-                }
-
-                savedResponses = testResponse.getBody();
-                statusCode = testResponse.getStatusCode();
-                eventStreamResponse = com.akto.test_editor.Utils.buildEventStreamResponseIHttpFormat(testResponse);
-
-                if (testResponse.getBody() == null) {
-                    responseLength = 0;
-                } else {
-                    responseLength = testResponse.getBody().length();
-                }
+                responseLength = testResponse.getBody().length();
             }
 
             return new ApiCallResult(res, messageStr, responseTime, responseLength,

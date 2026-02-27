@@ -452,8 +452,8 @@ public class DbActor extends DataActor {
         DbLayer.insertApiCollection(apiCollectionId, apiCollectionName);
     }
 
-    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName) {
-        DbLayer.createCollectionForServiceTag(id, serviceTagValue, hostNames, tags, hostName);
+    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType) {
+        DbLayer.createCollectionForServiceTag(id, serviceTagValue, hostNames, tags, hostName, accessType);
     }
 
     public void addHostNameToServiceTagCollection(int collectionId, String hostName) {
@@ -564,12 +564,20 @@ public class DbActor extends DataActor {
         DbLayer.updateTotalApiCountInTestSummary(summaryId, totalApiCount);
     }
 
+    public TestingRunResultSummary updateMetadataInSummary(String summaryId, Map<String, String> metadata) {
+        return DbLayer.updateMetadataInSummary(summaryId, metadata);
+    }
+
     public void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         DbLayer.modifyHybridTestingSetting(hybridTestingEnabled);
     }
 
     public void insertTestingLog(Log log) {
         DbLayer.insertTestingLog(log);
+    }
+
+    public void insertAgenticTestingLog(Log log) {
+        DbLayer.insertAgenticTestingLog(log);
     }
 
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
@@ -592,12 +600,12 @@ public class DbActor extends DataActor {
         return DbLayer.fetchMergedUrls();
     }
 
-    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
-        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
+        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags, accessType);
     }
 
-    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags) {
-        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags);
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType) {
+        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags, accessType);
     }
 
     public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
@@ -648,8 +656,8 @@ public class DbActor extends DataActor {
         return DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId);
     }
 
-    public TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
-        return DbLayer.findLatestTestingRunResultSummary(filter);
+    public TestingRunResultSummary findLatestTestingRunResultSummary(String testingRunId){
+        return DbLayer.findLatestTestingRunResultSummary(testingRunId);
     }
 
     public TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){

@@ -193,10 +193,16 @@ public class Executor {
             try {
                 // follow redirects = true for now
                 TestResult res = null;
+                List<TestResult> agenticResults = null;
                 if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
                     // execute agentic test here
                     requestAttempted = true;
-                    res = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
+                    agenticResults = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
+                    if (agenticResults != null && !agenticResults.isEmpty()) {
+                        result.addAll(agenticResults);
+                        // needed to check for vulnerable 
+                        res = agenticResults.get(agenticResults.size() - 1);
+                    }
                 }else{
                     List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
                     String contentTypeString = "";
@@ -219,10 +225,12 @@ public class Executor {
                     ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                     res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
                 }
-                if (res != null) {
+                if (res != null && agenticResults == null) {
                     result.add(res);
                 }
-                vulnerable = res.getVulnerable();
+                if (res != null) {
+                    vulnerable = res.getVulnerable();
+                }
             } catch(Exception e) {
                 testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
                 error_messages.add("Error executing test request: " + e.getMessage());
@@ -717,6 +725,24 @@ public class Executor {
         }
     }
 
+    private static Object resolveSelfBodyParamValue(RawApi rawApi, Object key, Object value) {
+        if (!(value instanceof String) || key == null) {
+            return value;
+        }
+
+        String valueStr = value.toString();
+        if (!valueStr.contains("${self}")) {
+            return value;
+        }
+
+        List<String> existingValues = Utils.findAllValuesForKey(rawApi.getRequest().getBody(), key.toString(), false);
+        if (existingValues.isEmpty()) {
+            return value;
+        }
+
+        return valueStr.replace("${self}", existingValues.get(0));
+    }
+
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
         switch (operationType.toLowerCase()) {
             case "send_ssrf_req":
@@ -782,6 +808,7 @@ public class Executor {
             case "add_body_param":
                 return Operations.addBody(rawApi, key.toString(), value);
             case "modify_body_param":
+                value = resolveSelfBodyParamValue(rawApi, key, value);
                 return Operations.modifyBodyParam(rawApi, key.toString(), value);
             case "delete_graphql_field":
                 return Operations.deleteGraphqlField(rawApi, key == null ? "": key.toString());
