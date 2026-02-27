@@ -3,7 +3,7 @@ module github.com/akto-api-security/guardrails-service
 go 1.24.2
 
 require (
-	github.com/akto-api-security/mcp-endpoint-shield v0.0.0-20260217025739-aa06fd4417e3
+	github.com/akto-api-security/mcp-endpoint-shield v0.0.0-20260227184836-25b12048f790
 	github.com/gin-gonic/gin v1.11.0
 	github.com/segmentio/kafka-go v0.4.49
 	go.uber.org/zap v1.27.1
@@ -72,4 +72,4 @@ require (
 )
 
 // Replace directive to point to the actual location in akto-gateway repository (feature/session_based_guardrails branch)
-replace github.com/akto-api-security/mcp-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260227144223-93f794206819
+replace github.com/akto-api-security/mcp-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260227184836-25b12048f790
