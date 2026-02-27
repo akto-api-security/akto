@@ -2,6 +2,7 @@ package com.akto.dto.testing;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
+import java.util.List;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -40,7 +41,9 @@ public class TestingRun {
     private String name;
 
     public static final String MINI_TESTING_SERVICE_NAME = "miniTestingServiceName";
+    public static final String ALLOWED_MINI_TESTING_SERVICE_NAMES = "allowedMiniTestingServiceNames";
     private String miniTestingServiceName;
+    private List<String> allowedMiniTestingServiceNames;
 
     public static final String SELECTED_SLACK_CHANNEL_ID = "selectedSlackChannelId";
     @Getter
@@ -229,6 +232,14 @@ public class TestingRun {
 
     public void setMiniTestingServiceName(String miniTestingServiceName) {
         this.miniTestingServiceName = miniTestingServiceName;
+    }
+
+    public List<String> getAllowedMiniTestingServiceNames() {
+        return allowedMiniTestingServiceNames;
+    }
+
+    public void setAllowedMiniTestingServiceNames(List<String> allowedMiniTestingServiceNames) {
+        this.allowedMiniTestingServiceNames = allowedMiniTestingServiceNames;
     }
 
     public boolean getDoNotMarkIssuesAsFixed() {

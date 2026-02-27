@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -1245,14 +1246,15 @@ public class DbLayer {
 
             TestingRun testingRun = TestingRunDao.instance.findOne(
                 filter,
-                Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, ID)
+                Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, ID)
             );
 
             if (testingRun == null) return null;
 
             // Handle legacy case
             if (StringUtils.isEmpty(miniTestingName)) {
-                if (StringUtils.isEmpty(testingRun.getMiniTestingServiceName())) {
+                List<String> allowedList = testingRun.getAllowedMiniTestingServiceNames();
+                if (StringUtils.isEmpty(testingRun.getMiniTestingServiceName()) && (allowedList == null || allowedList.isEmpty())) {
                     Bson update = Updates.combine(
                             Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
                             Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
@@ -1266,53 +1268,64 @@ public class DbLayer {
                 }
             }
 
-            // Priority 1: Find testing run with matching miniTestingName
+            // Priority 1: Find testing run with matching miniTestingName (new list field or legacy single string)
             Bson matchingFilter = Filters.and(
                 filter,
-                Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName)
+                Filters.or(
+                    Filters.in(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, miniTestingName),
+                    Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName)
+                )
             );
 
             testingRun = TestingRunDao.instance.findOne(
                 matchingFilter,
-                Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, ID)
+                Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, ID)
             );
 
-            // Priority 2: Find testing run without miniTestingName set
+            // Priority 2: Find testing run without any module assignment (both old and new fields unset)
             if (testingRun == null) {
                 Bson unassignedFilter = Filters.and(
                     filter,
                     Filters.or(
                         Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, null),
                         Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, "")
+                    ),
+                    Filters.or(
+                        Filters.eq(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, null),
+                        Filters.size(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, 0)
                     )
                 );
                 testingRun = TestingRunDao.instance.findOne(
                     unassignedFilter,
-                    Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, ID)
+                    Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, ID)
                 );
             }
 
-            // Priority 3: Find testing run with a dead mini-testing service
+            // Priority 3: Backward compat — legacy runs (no allowedMiniTestingServiceNames) where assigned module is dead
             if (testingRun == null) {
-                testingRun = TestingRunDao.instance.findOne(
+                TestingRun anyRun = TestingRunDao.instance.findOne(
                     filter,
-                    Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, ID)
+                    Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, ID)
                 );
+                if (anyRun != null) {
+                    List<String> anyRunAllowed = anyRun.getAllowedMiniTestingServiceNames();
+                    // Only handle legacy runs with no allowedMiniTestingServiceNames
+                    if (anyRunAllowed == null || anyRunAllowed.isEmpty()) {
+                        String validated = validateAndGetMiniTestingService(
+                            anyRun.getMiniTestingServiceName(), miniTestingName);
+                        if (validated != null) {
+                            testingRun = anyRun;
+                        }
+                    }
+                }
             }
 
             if (testingRun == null) return null;
 
-            String validatedMiniTestingName = validateAndGetMiniTestingService(
-                testingRun.getMiniTestingServiceName(),
-                miniTestingName
-            );
-
-            if (validatedMiniTestingName == null) return null;
-
             Bson update = Updates.combine(
                 Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
                 Updates.set(TestingRun.STATE, TestingRun.State.RUNNING),
-                Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, validatedMiniTestingName)
+                Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName)
             );
 
             return TestingRunDao.instance.getMCollection().findOneAndUpdate(
@@ -1348,10 +1361,13 @@ public class DbLayer {
 
     private static TestingRunResultSummary findPendingTestingRunResultSummaryBasedOnPriority(Bson filter, String miniTestingName) {
 
-        Bson testingRunsProjections = Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, ID);
+        Bson testingRunsProjections = Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, ID);
         Bson trrsProjections = Projections.include(TestingRunResultSummary.TESTING_RUN_ID, ID, TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID);
         List<TestingRun> testingRuns = TestingRunDao.instance.findAll(
-                Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName), testingRunsProjections);
+                Filters.or(
+                    Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName),
+                    Filters.in(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, miniTestingName)
+                ), testingRunsProjections);
 
         TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.findOne(
                 Filters.and(filter,
@@ -1362,9 +1378,16 @@ public class DbLayer {
             return trrs;
 
         testingRuns = TestingRunDao.instance.findAll(
-                Filters.or(
+                Filters.and(
+                    Filters.or(
                         Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, null),
-                        Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, "")),
+                        Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, "")
+                    ),
+                    Filters.or(
+                        Filters.eq(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, null),
+                        Filters.size(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, 0)
+                    )
+                ),
                 testingRunsProjections);
 
         trrs = TestingRunResultSummariesDao.instance.findOne(
@@ -1421,14 +1444,15 @@ public class DbLayer {
 
             testingRun = TestingRunDao.instance.findOne(
                 Filters.eq(ID, trrs.getTestingRunId()),
-                Projections.include(ID,TestingRun.MINI_TESTING_SERVICE_NAME)
+                Projections.include(ID, TestingRun.MINI_TESTING_SERVICE_NAME, TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES)
             );
 
             if (testingRun == null) return null;
 
             // Handle legacy case
             if (StringUtils.isEmpty(miniTestingName)) {
-                if (StringUtils.isEmpty(testingRun.getMiniTestingServiceName())) {
+                List<String> allowedListLegacy = testingRun.getAllowedMiniTestingServiceNames();
+                if (StringUtils.isEmpty(testingRun.getMiniTestingServiceName()) && (allowedListLegacy == null || allowedListLegacy.isEmpty())) {
                     return TestingRunResultSummariesDao.instance.getMCollection()
                             .findOneAndUpdate(
                                     Filters.eq(ID, trrs.getId()),
@@ -1439,6 +1463,26 @@ public class DbLayer {
                 }
             }
 
+            // For runs assigned to specific modules via the new list field, verify eligibility
+            List<String> allowedRunModulesTrrs = testingRun.getAllowedMiniTestingServiceNames();
+            if (allowedRunModulesTrrs != null && !allowedRunModulesTrrs.isEmpty()) {
+                boolean eligible = allowedRunModulesTrrs.stream()
+                    .filter(Objects::nonNull)
+                    .anyMatch(name -> name.equals(miniTestingName));
+                if (!eligible) return null;
+                // Eligible via new list field — update miniTestingServiceName to this module and claim TRRS
+                TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                    Filters.eq(ID, trrs.getTestingRunId()),
+                    Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName)
+                );
+                return TestingRunResultSummariesDao.instance.getMCollection()
+                    .findOneAndUpdate(
+                        Filters.eq(ID, trrs.getId()),
+                        Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
+                    );
+            }
+
+            // Backward compat: old runs with only single miniTestingServiceName field
             String validatedMiniTestingName = validateAndGetMiniTestingService(
                 testingRun.getMiniTestingServiceName(),
                 miniTestingName
