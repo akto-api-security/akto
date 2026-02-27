@@ -67,6 +67,42 @@ def create_ssl_context():
     Returns:
         ssl.SSLContext or None
     """
+    if not SSL_VERIFY:
+        logger.warning("SSL verification disabled via SSL_VERIFY=false - INSECURE!")
+        return ssl._create_unverified_context()
+
+    # Try 1: Custom certificate path
+    if SSL_CERT_PATH:
+        try:
+            context = ssl.create_default_context(cafile=SSL_CERT_PATH)
+            logger.info(f"Using custom SSL certificate: {SSL_CERT_PATH}")
+            return context
+        except Exception as e:
+            logger.warning(f"Failed to load custom SSL certificate from {SSL_CERT_PATH}: {e}")
+
+    # Try 2: System default context
+    try:
+        context = ssl.create_default_context()
+        logger.debug("Using system default SSL context")
+        return context
+    except Exception as e:
+        logger.warning(f"Failed to create default SSL context: {e}")
+
+    # Try 3: Python certifi bundle
+    try:
+        import certifi
+        context = ssl.create_default_context(cafile=certifi.where())
+        logger.info("Using Python certifi SSL bundle")
+        return context
+    except ImportError:
+        logger.debug("certifi package not available")
+    except Exception as e:
+        logger.warning(f"Failed to create SSL context with certifi: {e}")
+
+    # Try 4: Unverified context (last resort)
+    logger.error("WARNING: All SSL verification methods failed! Falling back to UNVERIFIED context - INSECURE!")
+    logger.error("This connection is vulnerable to Man-in-the-Middle attacks!")
+    logger.error("Fix: Install proper certificates or set SSL_CERT_PATH environment variable")
     return ssl._create_unverified_context()
 
 
@@ -190,6 +226,9 @@ def build_validation_request(query: str) -> dict:
 def call_guardrails(query: str) -> Tuple[bool, str]:
     if not query.strip():
         return True, ""
+    if not AKTO_DATA_INGESTION_URL:
+        logger.warning("AKTO_DATA_INGESTION_URL not set, allowing prompt (fail-open)")
+        return True, ""
 
     logger.info("Validating prompt against guardrails")
     if LOG_PAYLOADS:
@@ -257,7 +296,7 @@ def main():
         input_data = json.load(sys.stdin)
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON input: {e}")
-        sys.exit(1)
+        sys.exit(0)
 
     prompt = input_data.get("prompt", "")
 
@@ -277,7 +316,7 @@ def main():
             logger.warning(f"BLOCKING prompt - Reason: {reason}")
             print(json.dumps(output))
             ingest_blocked_request(prompt, reason)
-            sys.exit(1)
+            sys.exit(0)
 
     logger.info("Prompt allowed")
     sys.exit(0)
