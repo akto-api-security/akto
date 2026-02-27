@@ -10,4 +10,4 @@ export AKTO_CONNECTOR="github_copilot_cli"
 export CONTEXT_SOURCE="ENDPOINT"
 
 # Execute Python hook script
-exec python3 "$HOME/.github/hooks/akto-validate-prompt.py" "$@"
+exec python3 "./.github/hooks/akto-validate-prompt.py" "$@"
