@@ -72,4 +72,4 @@ require (
 )
 
 // Replace directive to point to the actual location in akto-gateway repository (feature/session_based_guardrails branch)
-replace github.com/akto-api-security/mcp-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260227144223-93f794206819
+replace github.com/akto-api-security/mcp-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260227182847-37e5c6241141
