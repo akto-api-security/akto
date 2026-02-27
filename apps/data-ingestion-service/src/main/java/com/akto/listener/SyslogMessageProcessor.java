@@ -1,124 +1,62 @@
 package com.akto.listener;
 
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import com.akto.dto.IngestDataBatch;
 import com.akto.log.LoggerMaker;
 import com.akto.utils.KafkaUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
-/**
- * UDP Syslog listener for Apigee MessageLogging policy
- *
- * Receives Syslog messages from Apigee's PostClientFlow MessageLogging policy.
- * Extracts the JSON payload (traffic data), parses it, and inserts into Kafka.
- *
- * Usage: Apigee MessageLogging → UDP Syslog → this listener → KafkaUtils → Kafka
- */
-public class SyslogUdpListener implements Runnable {
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
-    private static final LoggerMaker logger = new LoggerMaker(SyslogUdpListener.class, LoggerMaker.LogDb.DATA_INGESTION);
-    private static final int BUFFER_SIZE = 65535;  // Max UDP payload size
-    private static final int DEFAULT_PORT = 5140;
-    private static final int THREAD_POOL_SIZE = 4;
+/**
+ * Shared syslog message processor used by both UDP and TCP listeners.
+ * It parses JSON payloads, reassembles chunked envelopes, and publishes to Kafka.
+ */
+public class SyslogMessageProcessor {
+
+    private static final LoggerMaker logger = new LoggerMaker(SyslogMessageProcessor.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final long CHUNK_TTL_MILLIS = 30_000L;
     private static final int MAX_ACTIVE_CHUNK_MESSAGES = 5000;
     private static final int MAX_REASSEMBLED_BYTES = 1_000_000;
     private static final int MAX_TOTAL_CHUNKS = 500;
+    private static final int CLEANUP_INTERVAL_MESSAGES = 200;
 
-    private int port;
-    private ExecutorService executorService;
     private final ConcurrentHashMap<String, ChunkAccumulator> chunkBuffers = new ConcurrentHashMap<>();
-    private final AtomicInteger packetCounter = new AtomicInteger(0);
+    private final AtomicInteger messageCounter = new AtomicInteger(0);
 
-    public SyslogUdpListener() {
-        // Read port from environment, default to 5140
-        String portEnv = System.getenv("SYSLOG_UDP_PORT");
-        this.port = (portEnv != null) ? Integer.parseInt(portEnv) : DEFAULT_PORT;
-        this.executorService = Executors.newFixedThreadPool(THREAD_POOL_SIZE, r -> {
-            Thread t = new Thread(r, "syslog-processor-" + System.nanoTime());
-            t.setDaemon(true);
-            return t;
-        });
+    public void processPacket(byte[] data, int length) {
+        String raw = new String(data, 0, length, StandardCharsets.UTF_8);
+        processRaw(raw);
     }
 
-    @Override
-    public void run() {
-        DatagramSocket socket = null;
+    public void processRaw(String rawMessage) {
         try {
-            socket = new DatagramSocket(port);
-            logger.infoAndAddToDb("Syslog UDP listener started on port " + port, LoggerMaker.LogDb.DATA_INGESTION);
-
-            byte[] buffer = new byte[BUFFER_SIZE];
-
-            while (true) {
-                try {
-                    DatagramPacket packet = new DatagramPacket(buffer, BUFFER_SIZE);
-                    socket.receive(packet);
-
-                    if (packetCounter.incrementAndGet() % 200 == 0) {
-                        cleanupExpiredChunks(false);
-                    }
-
-                    // Copy packet bytes before async handoff; DatagramPacket reuses the same backing buffer.
-                    int packetLength = packet.getLength();
-                    byte[] packetCopy = new byte[packetLength];
-                    System.arraycopy(packet.getData(), packet.getOffset(), packetCopy, 0, packetLength);
-
-                    // Submit packet processing to thread pool to avoid blocking the receive loop.
-                    executorService.submit(() -> processPacket(packetCopy, packetLength));
-
-                } catch (Exception e) {
-                    logger.errorAndAddToDb("Error receiving syslog packet: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
-                    // Continue receiving despite errors
-                }
+            if (messageCounter.incrementAndGet() % CLEANUP_INTERVAL_MESSAGES == 0) {
+                cleanupExpiredChunks(false);
             }
-        } catch (Exception e) {
-            logger.errorAndAddToDb("Syslog UDP listener error: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
-        } finally {
-            if (socket != null && !socket.isClosed()) {
-                socket.close();
-            }
-        }
-    }
 
-    /**
-     * Process a single Syslog UDP packet
-     *
-     * Expected format (from Apigee MessageLogging):
-     *   <134>2024-01-15T10:30:00.000Z apigee akto: {"batchData":[{...}]}
-     *
-     * We extract the JSON payload (from first '{' to end) and parse it.
-     */
-    private void processPacket(byte[] data, int length) {
-        try {
-            // Convert bytes to string, trim whitespace
-            String raw = new String(data, 0, length, StandardCharsets.UTF_8).trim();
-            logger.debugAndAddToDb("Received syslog packet of length: " + length, LoggerMaker.LogDb.DATA_INGESTION);
-
-            // Find the start of the JSON payload (first '{')
-            int jsonStart = raw.indexOf('{');
-            if (jsonStart == -1) {
-                logger.warnAndAddToDb("No JSON found in syslog packet: " + raw.substring(0, Math.min(200, raw.length())), LoggerMaker.LogDb.DATA_INGESTION);
+            String raw = rawMessage == null ? "" : rawMessage.trim();
+            if (raw.isEmpty()) {
                 return;
             }
 
-            // Extract JSON from '{' to end of string
+            logger.debugAndAddToDb("Received syslog message of length: " + raw.length(), LoggerMaker.LogDb.DATA_INGESTION);
+
+            int jsonStart = raw.indexOf('{');
+            if (jsonStart == -1) {
+                logger.warnAndAddToDb("No JSON found in syslog message: " + raw.substring(0, Math.min(200, raw.length())), LoggerMaker.LogDb.DATA_INGESTION);
+                return;
+            }
+
             String json = raw.substring(jsonStart);
             logger.debugAndAddToDb("Extracted JSON payload: " + json.substring(0, Math.min(300, json.length())), LoggerMaker.LogDb.DATA_INGESTION);
 
-            // Parse the outer object to get batchData array
             BasicDBObject outer;
             try {
                 outer = BasicDBObject.parse(json);
@@ -154,7 +92,6 @@ public class SyslogUdpListener implements Runnable {
 
         logger.debugAndAddToDb("Processing " + batchArray.size() + " items from batchData array", LoggerMaker.LogDb.DATA_INGESTION);
 
-        // Process each item in the batch
         int successCount = 0;
         for (Object item : batchArray) {
             try {
@@ -167,14 +104,11 @@ public class SyslogUdpListener implements Runnable {
                 logger.debugAndAddToDb("Processing batch item with path: " + dbObject.get("path"), LoggerMaker.LogDb.DATA_INGESTION);
 
                 IngestDataBatch batch = parseIngestDataBatch(dbObject);
-
-                // Insert into Kafka using the existing KafkaUtils
                 KafkaUtils.insertData(batch);
                 successCount++;
 
             } catch (Exception e) {
                 logger.errorAndAddToDb("Error processing batch item: " + e.getMessage() + ". Item: " + item, LoggerMaker.LogDb.DATA_INGESTION);
-                // Continue processing other items
             }
         }
 
@@ -186,6 +120,9 @@ public class SyslogUdpListener implements Runnable {
         int idx = getInt(chunkEnvelope, "idx", -1);
         int total = getInt(chunkEnvelope, "total", -1);
         String payloadPart = getString(chunkEnvelope, "payload");
+        String reqId = getString(chunkEnvelope, "reqId");
+        int payloadBytes = getInt(chunkEnvelope, "bytes", -1);
+        String payloadSig = getString(chunkEnvelope, "sig");
 
         if (id.isEmpty()) {
             logger.warnAndAddToDb("Dropping chunk with empty id", LoggerMaker.LogDb.DATA_INGESTION);
@@ -208,16 +145,29 @@ public class SyslogUdpListener implements Runnable {
         }
 
         ChunkAccumulator acc = chunkBuffers.compute(id, (key, existing) -> {
-            if (existing == null || existing.totalChunks != total || existing.isExpired()) {
-                return new ChunkAccumulator(total);
+            if (existing == null || existing.isExpired()) {
+                return new ChunkAccumulator(total, reqId, payloadBytes, payloadSig);
             }
             return existing;
         });
 
-        ChunkAssemblyResult result = acc.addPart(idx, payloadPart);
+        if (acc.totalChunks != total) {
+            logger.warnAndAddToDb("Dropping chunk due to total mismatch for id=" + id + " expectedTotal=" + acc.totalChunks + " receivedTotal=" + total, LoggerMaker.LogDb.DATA_INGESTION);
+            return;
+        }
+
+        ChunkAssemblyResult result = acc.addPart(idx, payloadPart, reqId, payloadBytes, payloadSig);
         if (result.status == ChunkAssemblyStatus.REJECTED_SIZE) {
             chunkBuffers.remove(id, acc);
             logger.warnAndAddToDb("Dropping oversized reassembled payload for id=" + id, LoggerMaker.LogDb.DATA_INGESTION);
+            return;
+        }
+        if (result.status == ChunkAssemblyStatus.REJECTED_MISMATCH) {
+            logger.warnAndAddToDb(
+                    "Dropping chunk due to envelope mismatch for id=" + id + " idx=" + idx +
+                            " (prevents cross-request chunk mixing)",
+                    LoggerMaker.LogDb.DATA_INGESTION
+            );
             return;
         }
         if (result.status == ChunkAssemblyStatus.INCOMPLETE) {
@@ -245,10 +195,6 @@ public class SyslogUdpListener implements Runnable {
         }
     }
 
-    /**
-     * Convert BasicDBObject to IngestDataBatch
-     * Maps MongoDB BSON document fields to IngestDataBatch fields
-     */
     private IngestDataBatch parseIngestDataBatch(BasicDBObject dbObject) {
         IngestDataBatch batch = new IngestDataBatch();
 
@@ -278,9 +224,6 @@ public class SyslogUdpListener implements Runnable {
         return batch;
     }
 
-    /**
-     * Safely get a string value from BasicDBObject, return empty string if not found
-     */
     private String getString(BasicDBObject obj, String key) {
         Object value = obj.get(key);
         if (value == null) {
@@ -311,7 +254,6 @@ public class SyslogUdpListener implements Runnable {
         if (obj instanceof BasicDBObject) {
             return (BasicDBObject) obj;
         }
-        // Fallback for unexpected container types that still serialize as JSON.
         try {
             return BasicDBObject.parse(obj.toString());
         } catch (Exception ignored) {
@@ -352,7 +294,8 @@ public class SyslogUdpListener implements Runnable {
     private enum ChunkAssemblyStatus {
         INCOMPLETE,
         COMPLETE,
-        REJECTED_SIZE
+        REJECTED_SIZE,
+        REJECTED_MISMATCH
     }
 
     private static class ChunkAssemblyResult {
@@ -368,23 +311,33 @@ public class SyslogUdpListener implements Runnable {
     private static class ChunkAccumulator {
         private final int totalChunks;
         private final String[] parts;
+        private final String expectedReqId;
+        private final int expectedPayloadBytes;
+        private final String expectedPayloadSig;
         private final boolean[] received;
         private int receivedCount = 0;
         private int assembledBytes = 0;
         private final long createdAt;
         private volatile long lastTouchedAt;
 
-        private ChunkAccumulator(int totalChunks) {
+        private ChunkAccumulator(int totalChunks, String expectedReqId, int expectedPayloadBytes, String expectedPayloadSig) {
             this.totalChunks = totalChunks;
             this.parts = new String[totalChunks];
+            this.expectedReqId = expectedReqId == null ? "" : expectedReqId;
+            this.expectedPayloadBytes = expectedPayloadBytes;
+            this.expectedPayloadSig = expectedPayloadSig == null ? "" : expectedPayloadSig;
             this.received = new boolean[totalChunks];
             long now = System.currentTimeMillis();
             this.createdAt = now;
             this.lastTouchedAt = now;
         }
 
-        private synchronized ChunkAssemblyResult addPart(int index, String payload) {
+        private synchronized ChunkAssemblyResult addPart(int index, String payload, String reqId, int payloadBytes, String payloadSig) {
             this.lastTouchedAt = System.currentTimeMillis();
+
+            if (!isCompatible(reqId, payloadBytes, payloadSig)) {
+                return new ChunkAssemblyResult(ChunkAssemblyStatus.REJECTED_MISMATCH, null);
+            }
 
             if (!received[index]) {
                 received[index] = true;
@@ -412,6 +365,14 @@ public class SyslogUdpListener implements Runnable {
             return new ChunkAssemblyResult(ChunkAssemblyStatus.COMPLETE, sb.toString());
         }
 
+        private boolean isCompatible(String reqId, int payloadBytes, String payloadSig) {
+            String normalizedReqId = reqId == null ? "" : reqId;
+            String normalizedPayloadSig = payloadSig == null ? "" : payloadSig;
+            return expectedReqId.equals(normalizedReqId)
+                    && expectedPayloadBytes == payloadBytes
+                    && expectedPayloadSig.equals(normalizedPayloadSig);
+        }
+
         private boolean isExpired() {
             return isExpiredAt(System.currentTimeMillis());
         }
@@ -420,5 +381,4 @@ public class SyslogUdpListener implements Runnable {
             return now - lastTouchedAt > CHUNK_TTL_MILLIS || now - createdAt > CHUNK_TTL_MILLIS;
         }
     }
-
 }
