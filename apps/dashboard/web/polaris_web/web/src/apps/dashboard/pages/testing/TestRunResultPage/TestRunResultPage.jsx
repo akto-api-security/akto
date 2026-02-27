@@ -375,6 +375,7 @@ function TestRunResultPage(props) {
     setAiLoading(false);
     setAiSummaryLoading(false);
     setAiSummaryChecked(false);
+    setSelectedTestRunResult({});
     fetchData();
   }, [subCategoryMap, subCategoryFromSourceConfigMap, props?.testingRunResult, props?.runIssues, hexId2])
 
