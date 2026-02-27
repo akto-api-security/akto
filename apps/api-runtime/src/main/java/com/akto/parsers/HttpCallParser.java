@@ -680,18 +680,13 @@ public class HttpCallParser {
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
             if (responseParamsList.isEmpty()) {
-                // Check for persisted GraphQL payload structure (only for account 1767847021 or 1726615470 or 1667235738)
-                if (Context.accountId.get() == 1767847021 || Context.accountId.get() == 1726615470 || Context.accountId.get() == 1667235738) {
-                    List<HttpResponseParams> persistedGraphQLResponseParams =
-                            PersistedGraphQLUtils.getUtils().parsePersistedGraphQLResponseParam(httpResponseParam);
-                    if (!persistedGraphQLResponseParams.isEmpty()) {
-                        filteredResponseParams.addAll(persistedGraphQLResponseParams);
-                        loggerMaker.infoAndAddToDb("Adding " + persistedGraphQLResponseParams.size() +
-                                " new persisted GraphQL endpoints in inventory", LogDb.RUNTIME);
-                    } else {
-                        // Fallback: add original httpResponseParam unchanged
-                        filteredResponseParams.add(httpResponseParam);
-                    }
+                // Check for persisted GraphQL payload structure
+                List<HttpResponseParams> persistedGraphQLResponseParams =
+                        PersistedGraphQLUtils.getUtils().parsePersistedGraphQLResponseParam(httpResponseParam);
+                if (!persistedGraphQLResponseParams.isEmpty()) {
+                    filteredResponseParams.addAll(persistedGraphQLResponseParams);
+                    loggerMaker.infoAndAddToDb("Adding " + persistedGraphQLResponseParams.size() +
+                            " new persisted GraphQL endpoints in inventory");
                 } else if (Context.accountId.get() == 1758525547 || Context.accountId.get() == 1667235738) {
                     List<HttpResponseParams> restMethodResponseParams = RestMethodUtils.getUtils().parseRestMethodResponseParam(httpResponseParam);
                     if (!restMethodResponseParams.isEmpty()) {

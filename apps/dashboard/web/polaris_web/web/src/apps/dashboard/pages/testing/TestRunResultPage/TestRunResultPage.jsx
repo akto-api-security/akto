@@ -179,6 +179,7 @@ function TestRunResultPage(props) {
         setAiSummary(response.response);
       }
     } catch (err) {
+      setAiSummary("Unable to generate AI overview. Please try again later.");
     } finally {
       setAiSummaryLoading(false);
     }
@@ -375,7 +376,7 @@ function TestRunResultPage(props) {
     setAiSummaryLoading(false);
     setAiSummaryChecked(false);
     fetchData();
-  }, [subCategoryMap, subCategoryFromSourceConfigMap, props, hexId2])
+  }, [subCategoryMap, subCategoryFromSourceConfigMap, props?.testingRunResult, props?.runIssues, hexId2])
 
   return (
     useFlyout ?
