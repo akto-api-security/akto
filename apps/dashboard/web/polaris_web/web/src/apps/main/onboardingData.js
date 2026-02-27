@@ -467,7 +467,7 @@ const learnMoreObject = {
                     value:"https://docs.akto.io/testing/run-test"
                 },
                 {
-                    content:"Learn Result Types",
+                    content:"Learn about Result Types",
                     value:"https://docs.akto.io/api-security-testing/concepts/result-types"
                 },
                 {
@@ -477,6 +477,10 @@ const learnMoreObject = {
                 {
                     content:"How to run tests in CI/CD",
                     value:"https://docs.akto.io/testing/run-tests-in-cicd"
+                },
+                {
+                    content:"Learn about Skipped Test Cases",
+                    value:"https://docs.akto.io/api-security-testing/concepts/skipped-test-cases"
                 }
             ],
             videoLink: [
