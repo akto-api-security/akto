@@ -162,7 +162,7 @@ export default function LeftNav() {
                 selected: leftNavSelected === "dashboard_endpoint_security_dashboard" || currPathString === "dashboard_endpoint_dashboard",
                 key: "1",
             }] : []),
-            ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
+            ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY && window.USER_NAME.indexOf("@akto.io") !== -1 ? [{
                 label: "Endpoint Security Posture",
                 icon: ReportFilledMinor,
                 onClick: () => {
