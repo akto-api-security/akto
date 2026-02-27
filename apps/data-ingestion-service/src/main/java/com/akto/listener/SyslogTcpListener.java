@@ -71,10 +71,12 @@ public class SyslogTcpListener implements Runnable {
                 try {
                     read = in.read(readBuffer);
                 } catch (SocketTimeoutException timeout) {
+                    logger.error("Socket timeout error while reading buffer: " + timeout.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
                     break;
                 }
 
                 if (read == -1) {
+                    logger.debug("Buffer is completed", LoggerMaker.LogDb.DATA_INGESTION);
                     break;
                 }
 
@@ -111,13 +113,13 @@ public class SyslogTcpListener implements Runnable {
             int newline = indexOfByte(data, pos, end, (byte) '\n');
             if (newline == -1) {
                 if (eof) {
-                    processFrame(data, pos, end);
+                    trimLeadingAndTrailingWhitespaces(data, pos, end);
                     pos = end;
                 }
                 break;
             }
 
-            processFrame(data, pos, newline);
+            trimLeadingAndTrailingWhitespaces(data, pos, newline);
             pos = newline + 1;
         }
 
@@ -170,7 +172,7 @@ public class SyslogTcpListener implements Runnable {
             return eof ? -1 : start;
         }
 
-        processFrame(data, frameStart, frameEnd);
+        trimLeadingAndTrailingWhitespaces(data, frameStart, frameEnd);
         return frameEnd;
     }
 
@@ -183,7 +185,7 @@ public class SyslogTcpListener implements Runnable {
         return -1;
     }
 
-    private void processFrame(byte[] data, int start, int end) {
+    private void trimLeadingAndTrailingWhitespaces(byte[] data, int start, int end) {
         int s = start;
         int e = end;
 

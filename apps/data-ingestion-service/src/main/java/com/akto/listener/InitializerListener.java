@@ -34,7 +34,8 @@ public class InitializerListener implements ServletContextListener {
         );
         KafkaUtils.setTopicPublisher(topicPublisher);
 
-        boolean tcpEnabled = isEnabled("SYSLOG_TCP_ENABLED", true);
+        String tcpEnv = System.getenv("SYSLOG_TCP_ENABLED");
+        boolean tcpEnabled = tcpEnv == null || Boolean.parseBoolean(tcpEnv.trim());
         if (tcpEnabled) {
             Thread syslogTcpThread = new Thread(new SyslogTcpListener());
             syslogTcpThread.setDaemon(true);
@@ -53,21 +54,6 @@ public class InitializerListener implements ServletContextListener {
     @Override
     public void contextDestroyed(javax.servlet.ServletContextEvent sce) {
         // override
-    }
-
-    private boolean isEnabled(String envVar, boolean defaultValue) {
-        String value = System.getenv(envVar);
-        if (value == null) {
-            return defaultValue;
-        }
-        value = value.trim().toLowerCase();
-        if ("true".equals(value) || "1".equals(value) || "yes".equals(value) || "y".equals(value) || "on".equals(value)) {
-            return true;
-        }
-        if ("false".equals(value) || "0".equals(value) || "no".equals(value) || "n".equals(value) || "off".equals(value)) {
-            return false;
-        }
-        return defaultValue;
     }
 
 }
