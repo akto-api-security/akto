@@ -68,7 +68,7 @@ public class IngestionAction extends ActionSupport {
                     payload.setPath("/");
                 }
 
-                KafkaUtils.insertData(payload);
+                KafkaUtils.insertData(payload, true);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while inserting data to Kafka: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);

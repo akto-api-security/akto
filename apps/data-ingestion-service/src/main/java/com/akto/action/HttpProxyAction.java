@@ -2,8 +2,8 @@ package com.akto.action;
 
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
+import com.akto.publisher.KafkaDataPublisher;
 import com.akto.utils.SlackUtils;
-import com.akto.utils.KafkaUtils;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
@@ -16,6 +16,11 @@ import java.util.Map;
 public class HttpProxyAction extends ActionSupport {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpProxyAction.class, LoggerMaker.LogDb.DATA_INGESTION);
+    private static final Gateway gateway = Gateway.getInstance();
+
+    static {
+        gateway.setDataPublisher(new KafkaDataPublisher());
+    }
 
     private String guardrails;
     private String akto_connector;
@@ -54,9 +59,6 @@ public class HttpProxyAction extends ActionSupport {
         long start = System.currentTimeMillis();
         try {
             loggerMaker.info("HTTP Proxy API called - path: " + path + ", method: " + method + ", account: " + akto_account_id);
-
-            Gateway gateway = Gateway.getInstance();
-            ensureDataPublisher(gateway);
 
             Map<String, Object> requestData = buildRequestData();
             Map<String, Object> result = gateway.processHttpProxy(requestData);
@@ -132,9 +134,4 @@ public class HttpProxyAction extends ActionSupport {
         return requestData;
     }
 
-    private void ensureDataPublisher(Gateway gateway) {
-        if (gateway.getDataPublisher() == null) {
-            gateway.setDataPublisher(batch -> KafkaUtils.insertData(batch));
-        }
-    }
 }

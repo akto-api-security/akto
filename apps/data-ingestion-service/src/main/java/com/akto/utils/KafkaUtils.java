@@ -22,10 +22,10 @@ public class KafkaUtils {
         logger.infoAndAddToDb("Kafka Producer Init " + Context.now(), LoggerMaker.LogDb.DATA_INGESTION);
     }
 
-    public static void insertData(IngestDataBatch payload) {
+    public static void insertData(IngestDataBatch payload, boolean publishToGuardrails) {
         String topicName = "akto.api.logs";
         BasicDBObject obj = buildMessageObject(payload);
-        topicPublisher.publish(obj.toString(), topicName);
+        topicPublisher.publish(obj.toString(), topicName, publishToGuardrails);
     }
 
     /**
