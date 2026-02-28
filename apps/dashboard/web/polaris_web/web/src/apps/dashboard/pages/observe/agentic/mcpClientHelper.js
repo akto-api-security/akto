@@ -30,7 +30,12 @@ const KNOWN_CLIENTS = {
     stripe: { displayName: 'Stripe', domain: 'stripe.com', agentType: CLIENT_TYPES.MCP_SERVER },
     aws: { displayName: 'AWS', domain: 'aws.amazon.com', agentType: CLIENT_TYPES.MCP_SERVER },
     azure: { displayName: 'Azure', domain: 'azure.microsoft.com', agentType: CLIENT_TYPES.MCP_SERVER },
+    playwright: { displayName: 'Playwright', domain: 'playwright.dev', agentType: CLIENT_TYPES.MCP_SERVER },
+    postgres: { displayName: 'Postgres', domain: 'postgresql.org', agentType: CLIENT_TYPES.MCP_SERVER },
+    atlassian: { displayName: 'Atlassian', domain: 'atlassian.net', agentType: CLIENT_TYPES.MCP_SERVER },
+    docker: { displayName: 'Docker', domain: 'docker.com', agentType: CLIENT_TYPES.MCP_SERVER },
     google: { displayName: 'Google', domain: 'google.com', agentType: CLIENT_TYPES.AI_AGENT },
+    vs: { displayName: 'VS Code', domain: 'code.visualstudio.com', agentType: CLIENT_TYPES.AI_AGENT }, // for VS Code
     antigravity: { displayName: 'Antigravity', domain: 'antigravity.google', agentType: CLIENT_TYPES.AI_AGENT },
     litellm: { displayName: 'LiteLLM', domain: 'litellm.ai', agentType: CLIENT_TYPES.AI_AGENT },
     filesystem: { displayName: 'Filesystem', domain: 'filesystem', agentType: CLIENT_TYPES.MCP_SERVER },
@@ -67,6 +72,25 @@ const formatDisplayName = (tagValue) => {
 
 const getDomainForFavicon = (tagValue) => findClientInfo(tagValue)?.domain || null;
 
+/** Display name for Common MCP Servers list: "Playwright MCP Server", "Slack MCP Server", etc. */
+const getMcpServerDisplayName = (domain) => {
+    if (!domain) return 'Unknown MCP Server';
+    const info = findClientInfo(domain);
+    if (info) return `${info.displayName} MCP Server`;
+    const parts = domain.split('.');
+    const brand = (parts[0] === 'api' && parts.length > 1) ? parts[1] : (parts[0] || domain);
+    return `${formatDisplayName(brand)} MCP Server`;
+};
+
+/** Friendly name for Common LLMs list: "ChatGPT", "Gemini", "Grok", etc. */
+const getFriendlyLlmName = (domain) => {
+    if (!domain) return 'Unknown';
+    const info = findClientInfo(domain);
+    if (info) return info.displayName;
+    const first = domain.split('.')[0];
+    return formatDisplayName(first || domain);
+};
+
 const getTypeFromTags = (envType) => {
     if (!Array.isArray(envType)) return CLIENT_TYPES.MCP_SERVER;
     for (const tag of envType) {
@@ -99,16 +123,18 @@ const getAgentTypeFromValue = (tagValue) => {
     return info?.agentType || CLIENT_TYPES.AI_AGENT;
 };
 
-export { 
-    formatDisplayName, 
-    getDomainForFavicon, 
-    getTypeFromTags, 
-    findAssetTag, 
+export {
+    formatDisplayName,
+    getDomainForFavicon,
+    getMcpServerDisplayName,
+    getFriendlyLlmName,
+    getTypeFromTags,
+    findAssetTag,
     findTypeTag,
     getAgentTypeFromValue,
-    CLIENT_TYPES, 
-    TYPE_TAG_KEYS, 
+    CLIENT_TYPES,
+    TYPE_TAG_KEYS,
     ASSET_TAG_KEYS,
-    ROW_TYPES 
+    ROW_TYPES
 };
 export default formatDisplayName;

@@ -106,7 +106,8 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
               innerSize: pieInnerSize ? pieInnerSize : '60%',
               dataLabels: {
                 enabled: false
-              }
+              },
+              cursor: onSegmentClick || navUrlBuilder || navUrl ? 'pointer' : undefined
             },
             series: {
                 point: {
@@ -115,7 +116,7 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
                         click: (event) => {
                             const { point } = event;
                             if (onSegmentClick) {
-                                onSegmentClick(point.name);
+                                onSegmentClick(point.filterValue || point.name);
                                 return;
                             }
                             if (navUrlBuilder) {

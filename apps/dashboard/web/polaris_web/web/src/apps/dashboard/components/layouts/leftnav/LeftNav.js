@@ -162,17 +162,17 @@ export default function LeftNav() {
                 selected: leftNavSelected === "dashboard_endpoint_security_dashboard" || currPathString === "dashboard_endpoint_dashboard",
                 key: "1",
             }] : []),
-            // ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
-            //     label: "Endpoint Security Posture",
-            //     icon: ReportFilledMinor,
-            //     onClick: () => {
-            //         handleSelect("dashboard_endpoint_posture");
-            //         navigate("/dashboard/endpoint-dashboard");
-            //         setActive("normal");
-            //     },
-            //     selected: leftNavSelected === "dashboard_endpoint_posture",
-            //     key: "2a",
-            // }] : []),
+            ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY && window.USER_NAME.indexOf("@akto.io") !== -1 ? [{
+                label: "Endpoint Security Posture",
+                icon: ReportFilledMinor,
+                onClick: () => {
+                    handleSelect("dashboard_endpoint_posture");
+                    navigate("/dashboard/endpoint-dashboard");
+                    setActive("normal");
+                },
+                selected: leftNavSelected === "dashboard_endpoint_posture",
+                key: "2a",
+            }] : []),
             ...(dashboardCategory !== "Endpoint Security" ? [{
                 label: mapLabel("API Security Posture", dashboardCategory),
                 icon: ReportFilledMinor,
