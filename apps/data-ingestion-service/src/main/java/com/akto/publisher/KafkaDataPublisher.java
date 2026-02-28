@@ -22,7 +22,7 @@ public class KafkaDataPublisher implements DataPublisher {
 
         try {
             logger.info("Publishing IngestDataBatch to Kafka - path: " + batch.getPath() + ", method: " + batch.getMethod());
-            KafkaUtils.insertData(batch);
+            KafkaUtils.insertData(batch, false);
             logger.info("Successfully published to Kafka");
         } catch (Exception e) {
             logger.errorAndAddToDb("Error publishing to Kafka: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
