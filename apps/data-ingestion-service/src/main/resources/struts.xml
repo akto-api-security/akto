@@ -91,6 +91,17 @@
             </result>
         </action>
 
+        <!-- LiteLLM Generic Guardrail API -->
+        <action name="beta/litellm_basic_guardrail_api" class="com.akto.action.LiteLLMGuardrailAction" method="guardrail">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^action,^blocked_reason</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="includeProperties">^action,^blocked_reason</param>
+            </result>
+        </action>
+
 
     </package>
 
