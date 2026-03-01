@@ -4559,4 +4559,23 @@ public class ClientActor extends DataActor {
             return false;
         }
     }
+
+    @Override
+    public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunWebhook", testingRunWebhook);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeTestingRunWebhook", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in storeTestingRunWebhook", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in storeTestingRunWebhook" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
 }
