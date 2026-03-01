@@ -1204,11 +1204,10 @@ public class Main {
         }
         
         if (isKafkaAuthenticationEnabled) {
-            if(StringUtils.isEmpty(kafkaPassword) || StringUtils.isEmpty(kafkaUsername)){
+            if (!KafkaConfig.addValidatedAuthenticationProperties(properties, kafkaUsername, kafkaPassword)) {
                 loggerMaker.errorAndAddToDb("Kafka authentication credentials not provided");
                 return null;
             }
-            KafkaConfig.addAuthenticationProperties(properties, kafkaUsername, kafkaPassword);
         }
 
         return properties;
