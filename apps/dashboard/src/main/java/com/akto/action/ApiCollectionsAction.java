@@ -231,6 +231,9 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty());
+        for (ApiCollection c : this.apiCollections) {
+            ApiCollectionsDao.instance.ensureEnvTypeFromHostname(c);
+        }
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.empty());
         return Action.SUCCESS.toUpperCase();
     }
@@ -253,6 +256,9 @@ public class ApiCollectionsAction extends UserAction {
     public String fetchAllCollectionsBasic() {
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude("urls"));
+        for (ApiCollection c : this.apiCollections) {
+            ApiCollectionsDao.instance.ensureEnvTypeFromHostname(c);
+        }
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
 
         // Start background icon processing for all collections asynchronously
@@ -264,7 +270,11 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchCollection() {
         this.apiCollections = new ArrayList<>();
-        this.apiCollections.add(ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId)));
+        ApiCollection c = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
+        if (c != null) {
+            ApiCollectionsDao.instance.ensureEnvTypeFromHostname(c);
+            this.apiCollections.add(c);
+        }
         return Action.SUCCESS.toUpperCase();
     }
 

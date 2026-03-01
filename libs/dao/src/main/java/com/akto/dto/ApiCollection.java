@@ -283,35 +283,39 @@ public class ApiCollection {
         this.urls = urls;
     }
 
+    /**
+     * Returns env type from DB only (tagsList). No on-the-fly derivation from hostname.
+     */
     public List<CollectionTags> getEnvType(){
-        if(this.tagsList == null || this.tagsList.isEmpty()){
-            CollectionTags envTypeTag = new CollectionTags();
-            envTypeTag.setKeyName("envType");
-            if (this.hostName != null) {
-                String hostLower = this.hostName.toLowerCase();
-                for (Map.Entry<String, String> e : ENV_KEYWORD_TO_TAG_WITH_DOT.entrySet()) {
-                    if (hostLower.contains("." + e.getKey())) {
-                        envTypeTag.setValue(e.getValue());
-                        break;
-                    }
-                }
-                if (envTypeTag.getValue() == null) {
-                    for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
-                        if (hostLower.contains(keyword)) {
-                            envTypeTag.setValue(ENV_TYPE.INTERNAL.name());
-                            break;
-                        }
-                    }
-                }
-
-                if(envTypeTag.getValue() != null) {
-                    return Arrays.asList(envTypeTag);
-                }
-            }
+        if (this.tagsList == null || this.tagsList.isEmpty()) {
             return null;
-        }else{
-            return this.tagsList;
         }
+        return this.tagsList;
+    }
+
+    /**
+     * Computes env type tag from hostname using same rules as before. Used to persist to DB
+     * when a collection has no tags so that env type always comes from DB.
+     * @return envType tag to persist, or null if hostname does not match any rule
+     */
+    public CollectionTags computeEnvTypeFromHostname() {
+        if (this.hostName == null) {
+            return null;
+        }
+        String hostLower = this.hostName.toLowerCase();
+        for (Map.Entry<String, String> e : ENV_KEYWORD_TO_TAG_WITH_DOT.entrySet()) {
+            if (hostLower.contains("." + e.getKey())) {
+                CollectionTags tag = new CollectionTags(Context.now(), "envType", e.getValue(), CollectionTags.TagSource.USER);
+                return tag;
+            }
+        }
+        for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
+            if (hostLower.contains(keyword)) {
+                CollectionTags tag = new CollectionTags(Context.now(), "envType", ENV_TYPE.INTERNAL.name(), CollectionTags.TagSource.USER);
+                return tag;
+            }
+        }
+        return null;
     }
 
     @Override
