@@ -1425,6 +1425,7 @@ const transform = {
       recurringWeekly: testRun.recurringWeekly,
       recurringMonthly: testRun.recurringMonthly,
       miniTestingServiceName: testRun.miniTestingServiceName,
+      allowedMiniTestingServiceNames: testRun.miniTestingServiceNames,
       testSuiteIds: testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
       selectedSlackChannelId: testRun?.slackChannel || 0,
