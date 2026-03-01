@@ -9,4 +9,4 @@ export AKTO_TIMEOUT="5"
 export CONTEXT_SOURCE="ENDPOINT"
 
 # Execute Python hook script
-exec python3 "$HOME/.github/hooks/akto-validate-pre-tool.py" "$@"
+exec python3 "./.github/hooks/akto-validate-pre-tool.py" "$@"

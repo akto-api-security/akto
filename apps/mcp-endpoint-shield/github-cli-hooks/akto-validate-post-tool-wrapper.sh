@@ -8,4 +8,4 @@ export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export CONTEXT_SOURCE="ENDPOINT"
 # Execute Python hook script
-exec python3 "$HOME/.github/hooks/akto-validate-post-tool.py" "$@"
+exec python3 "./.github/hooks/akto-validate-post-tool.py" "$@"
