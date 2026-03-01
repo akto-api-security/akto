@@ -8,7 +8,10 @@ public class KafkaConfig {
   public static final String SASL_MECHANISM = "sasl.mechanism";
   public static final String SASL_JAAS_CONFIG = "sasl.jaas.config";
   public static final String SECURITY_PROTOCOL_SASL_PLAINTEXT = "SASL_PLAINTEXT";
+  public static final String SECURITY_PROTOCOL_SASL_SSL = "SASL_SSL";
   public static final String SASL_MECHANISM_PLAIN = "PLAIN";
+  public static final String SASL_MECHANISM_SCRAM_SHA_256 = "SCRAM-SHA-256";
+  public static final String SASL_MECHANISM_SCRAM_SHA_512 = "SCRAM-SHA-512";
 
   private final String bootstrapServers;
   private final String groupId;
@@ -109,12 +112,54 @@ public class KafkaConfig {
    * @param password   Kafka password
    */
   public static void addAuthenticationProperties(Properties properties, String username, String password) {
-    properties.put(SECURITY_PROTOCOL, SECURITY_PROTOCOL_SASL_PLAINTEXT);
-    properties.put(SASL_MECHANISM, SASL_MECHANISM_PLAIN);
+    // Default to PLAIN for backward compatibility
+    addAuthenticationProperties(properties, username, password, SASL_MECHANISM_PLAIN, SECURITY_PROTOCOL_SASL_PLAINTEXT);
+  }
+
+  /**
+   * Adds Kafka SASL authentication properties to the given Properties object with specified mechanism.
+   *
+   * @param properties   The Properties object to add authentication to
+   * @param username     Kafka username
+   * @param password     Kafka password
+   * @param saslMechanism SASL mechanism (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512)
+   */
+  public static void addAuthenticationProperties(Properties properties, String username, String password, String saslMechanism) {
+    addAuthenticationProperties(properties, username, password, saslMechanism, SECURITY_PROTOCOL_SASL_PLAINTEXT);
+  }
+
+  /**
+   * Adds Kafka SASL authentication properties to the given Properties object with specified mechanism and security protocol.
+   *
+   * @param properties       The Properties object to add authentication to
+   * @param username         Kafka username
+   * @param password         Kafka password
+   * @param saslMechanism    SASL mechanism (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512)
+   * @param securityProtocol Security protocol (SASL_PLAINTEXT, SASL_SSL)
+   */
+  public static void addAuthenticationProperties(Properties properties, String username, String password, String saslMechanism, String securityProtocol) {
+    properties.put(SECURITY_PROTOCOL, securityProtocol);
+    properties.put(SASL_MECHANISM, saslMechanism);
+
+    // Select login module based on mechanism
+    String loginModule;
+    if (SASL_MECHANISM_PLAIN.equals(saslMechanism)) {
+      loginModule = "org.apache.kafka.common.security.plain.PlainLoginModule";
+    } else if (SASL_MECHANISM_SCRAM_SHA_256.equals(saslMechanism) ||
+               SASL_MECHANISM_SCRAM_SHA_512.equals(saslMechanism)) {
+      loginModule = "org.apache.kafka.common.security.scram.ScramLoginModule";
+    } else {
+      throw new IllegalArgumentException("Unsupported SASL mechanism: " + saslMechanism);
+    }
 
     String jaasConfig = String.format(
-        "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
-        username, password);
+        "%s required username=\"%s\" password=\"%s\";",
+        loginModule, username, password);
     properties.put(SASL_JAAS_CONFIG, jaasConfig);
+
+    // If using SSL, disable hostname verification for NLB with SSL termination
+    if (SECURITY_PROTOCOL_SASL_SSL.equals(securityProtocol)) {
+      properties.put("ssl.endpoint.identification.algorithm", "");
+    }
   }
 }
