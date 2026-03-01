@@ -34,8 +34,9 @@ public class SingleTypeInfo {
     public static final Map<Integer, List<CustomAuthType>> activeCustomAuthTypes = new HashMap<>();
 
     public static Map<String, CustomDataType> getCustomDataTypeMap(int accountId) {
-        if (accountToDataTypesInfo.containsKey(accountId)) {
-            return accountToDataTypesInfo.get(accountId).getCustomDataTypeMap();
+        AccountDataTypesInfo info = accountToDataTypesInfo.get(accountId);
+        if (info != null) {
+            return info.getCustomDataTypeMap();
         } else {
             return new HashMap<>();
         }
@@ -50,16 +51,18 @@ public class SingleTypeInfo {
     }
 
     public static Map<String, AktoDataType> getAktoDataTypeMap(int accountId) {
-        if (accountToDataTypesInfo.containsKey(accountId)) {
-            return accountToDataTypesInfo.get(accountId).getAktoDataTypeMap();
+        AccountDataTypesInfo info = accountToDataTypesInfo.get(accountId);
+        if (info != null) {
+            return info.getAktoDataTypeMap();
         } else {
             return new HashMap<>();
         }
     }
 
     public static List<CustomDataType> getCustomDataTypesSortedBySensitivity(int accountId) {
-        if (accountToDataTypesInfo.containsKey(accountId)) {
-            return accountToDataTypesInfo.get(accountId).getCustomDataTypesSortedBySensitivity();
+        AccountDataTypesInfo info = accountToDataTypesInfo.get(accountId);
+        if (info != null) {
+            return info.getCustomDataTypesSortedBySensitivity();
         } else {
             return new ArrayList<>();
         }

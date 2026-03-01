@@ -422,6 +422,9 @@ public class HttpCallParser {
 
 
     public static Pair<HttpResponseParams,FILTER_TYPE> applyAdvancedFilters(HttpResponseParams responseParams, Map<String, List<ExecutorNode>> executorNodesMap,  Map<String,FilterConfig> filterMap){
+        if (true) {
+            return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, FILTER_TYPE.ERROR);
+        }
         if (filterMap != null && !filterMap.isEmpty()) {
             FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED; 
 
@@ -1216,7 +1219,7 @@ public class HttpCallParser {
 
             Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
             HttpResponseParams param = temp.getFirst();
-            if(param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)){
+            if(false){
                 if(param == null && httpResponseParam != null && httpResponseParam.getRequestParams() != null){
                     loggerMaker.infoAndAddToDb("blocked api " + httpResponseParam.getRequestParams().getURL() + " " + httpResponseParam.getRequestParams().getApiCollectionId() + " " + httpResponseParam.getRequestParams().getMethod());
                     if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {

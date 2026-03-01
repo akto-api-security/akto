@@ -156,6 +156,10 @@ public class KeyTypes {
     }
 
     private static SubType getSubtype(Object o,String key, boolean checkForSubtypes, boolean isHeader){
+        if (true) {
+            return SingleTypeInfo.OTHER;
+        }
+
         if (o == null) {
             return SingleTypeInfo.NULL;
         }
@@ -255,15 +259,20 @@ public class KeyTypes {
     }
 
     public static SubType findSubType(Object o,String key, ParamId paramId) {
-        
+
         int accountId = Context.getActualAccountId();
         boolean checkForSubtypes = true ;
-        for (String keyType : SingleTypeInfo.getCustomDataTypeMap(accountId).keySet()) {
-            IgnoreData ignoreData = SingleTypeInfo.getCustomDataTypeMap(accountId).get(keyType).getIgnoreData();
+
+        // Cache map lookups to avoid repeated Integer.valueOf() calls
+        Map<String, CustomDataType> customDataTypeMap = SingleTypeInfo.getCustomDataTypeMap(accountId);
+        for (String keyType : customDataTypeMap.keySet()) {
+            IgnoreData ignoreData = customDataTypeMap.get(keyType).getIgnoreData();
             checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
         }
-        for (String keyType : SingleTypeInfo.getAktoDataTypeMap(accountId).keySet()) {
-            IgnoreData ignoreData = SingleTypeInfo.getAktoDataTypeMap(accountId).get(keyType).getIgnoreData();
+
+        Map<String, AktoDataType> aktoDataTypeMap = SingleTypeInfo.getAktoDataTypeMap(accountId);
+        for (String keyType : aktoDataTypeMap.keySet()) {
+            IgnoreData ignoreData = aktoDataTypeMap.get(keyType).getIgnoreData();
             checkForSubtypes = checkForSubtypesTest(paramId, ignoreData);
         }
 

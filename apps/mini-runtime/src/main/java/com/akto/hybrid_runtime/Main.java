@@ -421,6 +421,34 @@ public class Main {
             }
         }, 5, 5, TimeUnit.MINUTES);
 
+        // Memory monitoring - log every 5 seconds
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                try {
+                    Runtime runtime = Runtime.getRuntime();
+                    long maxMemory = runtime.maxMemory();
+                    long totalMemory = runtime.totalMemory();
+                    long freeMemory = runtime.freeMemory();
+                    long usedMemory = totalMemory - freeMemory;
+
+                    // Convert to MB
+                    long usedMemoryMB = usedMemory / (1024 * 1024);
+                    long totalMemoryMB = totalMemory / (1024 * 1024);
+                    long maxMemoryMB = maxMemory / (1024 * 1024);
+
+                    // Calculate percentage
+                    double usagePercent = (usedMemory * 100.0) / maxMemory;
+
+                    loggerMaker.warn(String.format(
+                        "[MEMORY] Used: %d MB | Total: %d MB | Max: %d MB | Usage: %.1f%%",
+                        usedMemoryMB, totalMemoryMB, maxMemoryMB, usagePercent
+                    ));
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error logging memory usage: " + e.getMessage());
+                }
+            }
+        }, 0, 5, TimeUnit.SECONDS);
+
         final boolean checkPg = aSettings != null && aSettings.isRedactPayload();
 
         AllMetrics.instance.init(LogDb.RUNTIME, checkPg, dataActor, Context.getActualAccountId(), customMiniRuntimeServiceName, ModuleInfo.ModuleType.MINI_RUNTIME.name());
@@ -621,7 +649,7 @@ public class Main {
         ConfigUpdatePoller configUpdatePoller = new ConfigUpdatePoller(customMiniRuntimeServiceName, localKafkaProducer, configUpdateTopicName);
         configUpdatePoller.start();
 
-        String runMcpJobs = System.getenv("AKTO_RUN_MCP_JOBS");
+        String runMcpJobs = "false";//System.getenv("AKTO_RUN_MCP_JOBS");
         boolean shouldRunMcpJobs = true;
         if (runMcpJobs != null && runMcpJobs.equalsIgnoreCase("false")) {
             shouldRunMcpJobs = false;
