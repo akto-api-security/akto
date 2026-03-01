@@ -159,6 +159,29 @@ public class ApiCollection {
         "kubernetes", "internal"
     );
 
+    /**
+     * Derives environment type string (one of {@link ENV_TYPE}) from hostname.
+     * Used by mini-runtime when creating collections to set envType tag in DB.
+     * Returns PRODUCTION when hostname is null/empty or when no keyword matches.
+     */
+    public static String deriveEnvTypeFromHostname(String hostName) {
+        if (hostName == null || hostName.trim().isEmpty()) {
+            return ENV_TYPE.PRODUCTION.name();
+        }
+        String hostLower = hostName.toLowerCase().trim();
+        for (Map.Entry<String, String> e : ENV_KEYWORD_TO_TAG_WITH_DOT.entrySet()) {
+            if (hostLower.contains("." + e.getKey())) {
+                return e.getValue();
+            }
+        }
+        for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
+            if (hostLower.contains(keyword)) {
+                return ENV_TYPE.INTERNAL.name();
+            }
+        }
+        return ENV_TYPE.PRODUCTION.name();
+    }
+
     Map<String, ServiceGraphEdgeInfo> serviceGraphEdges;
     public static final String SERVICE_GRAPH_EDGES = "serviceGraphEdges";
 
