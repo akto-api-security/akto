@@ -17,7 +17,7 @@ function AgenticSuggestions({ onSuggestionClick, hide }) {
         <HorizontalStack align="start">
         <Box opacity={hide ? 0 : 1} visibility={hide ? 'hidden' : 'visible'} transition="opacity 0.3s ease, visibility 0.3s ease" pointerEvents={hide ? 'none' : 'auto'} paddingInlineEnd={"3"} paddingInlineStart={"3"}>
             <Box>
-                <VerticalStack gap="1">
+                <VerticalStack gap="3">
                 {suggestions.map((suggestion, index) => (
                     <Box
                         key={index}
@@ -42,6 +42,11 @@ function AgenticSuggestions({ onSuggestionClick, hide }) {
                                 </Text>
                             </Box>
                         </HorizontalStack>
+                        <style jsx>{`
+                            .suggestion-item:hover :global(.Polaris-Text) {
+                                color: var(--p-color-text, #202223) !important;
+                            }
+                        `}</style>
                     </Box>
                 ))}
                 </VerticalStack>
