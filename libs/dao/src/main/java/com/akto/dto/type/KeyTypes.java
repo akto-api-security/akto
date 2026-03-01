@@ -52,11 +52,11 @@ public class KeyTypes {
                         String userId, int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap,
                         boolean isUrlParam, int timestamp) {
 
-        String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
-        String[] keyArr = key.split("\\.");
-        String lastField = keyArr[keyArr.length - 1].split("_queryParam")[0];
+        //String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
+        //String[] keyArr = key.split("\\.");
+        //String lastField = keyArr[keyArr.length - 1].split("_queryParam")[0];
         ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, SingleTypeInfo.GENERIC, apiCollectionId, isUrlParam);
-        SubType subType = findSubType(object,lastField,paramId);
+        SubType subType = findSubType(object,"", paramId);
 
         SingleTypeInfo singleTypeInfo = occurrences.get(subType);
         if (singleTypeInfo == null) {
@@ -251,6 +251,9 @@ public class KeyTypes {
     }
 
     public static SubType findSubType(Object o,String key, ParamId paramId, boolean executeCheckForSubtypes){
+        if (true) {
+            return SingleTypeInfo.OTHER;
+        }
         if(executeCheckForSubtypes){
             return getSubtype(o, key, true, paramId == null ? false: paramId.isHeader());
         }else{
@@ -259,6 +262,10 @@ public class KeyTypes {
     }
 
     public static SubType findSubType(Object o,String key, ParamId paramId) {
+
+        if (true) {
+            return SingleTypeInfo.OTHER;
+        }
 
         int accountId = Context.getActualAccountId();
         boolean checkForSubtypes = true ;
