@@ -112,9 +112,17 @@ public class TestingIssuesHandler {
             }
             // When flag is true we intentionally avoid touching the status for non-vulnerable results
 
-            String severity = TestExecutor.getSeverityFromTestingRunResult(runResult).toString();
-            updatePayload = new UpdatePayload(TestingRunIssues.KEY_SEVERITY, severity, SET_OPERATION);
-            updates.add(updatePayload.toString());
+            // Check if severity was manually updated by a user
+            boolean wasManuallySeverityUpdated = testingRunIssues.getLastUpdatedBy() != null && !testingRunIssues.getLastUpdatedBy().isEmpty();
+
+            if (wasManuallySeverityUpdated) {
+                loggerMaker.infoAndAddToDb(String.format("Preserving manual severity update for issue %s", issuesId), LogDb.TESTING);
+                // Skip automatic severity update to preserve user preference
+            } else {
+                String severity = TestExecutor.getSeverityFromTestingRunResult(runResult).toString();
+                updatePayload = new UpdatePayload(TestingRunIssues.KEY_SEVERITY, severity, SET_OPERATION);
+                updates.add(updatePayload.toString());
+            }
             updatePayload = new UpdatePayload(TestingRunIssues.LAST_SEEN, lastSeen, SET_OPERATION);
             updates.add(updatePayload.toString());
             updatePayload = new UpdatePayload(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString(), SET_OPERATION);
