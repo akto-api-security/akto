@@ -4,6 +4,7 @@ import com.akto.util.Constants;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -90,12 +91,40 @@ public class ApiCollection {
         }
     }
 
+    // Keyword (with dot prefix in hostname) -> env tag value. Order: specific envs first, then STAGING fallback.
+    private static final LinkedHashMap<String, String> ENV_KEYWORD_TO_TAG_WITH_DOT = new LinkedHashMap<>();
+    static {
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("staging", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("qa", ENV_TYPE.QA.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("dev", ENV_TYPE.DEV.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("integ", ENV_TYPE.INTEG.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("uat", ENV_TYPE.UAT.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("preprod", ENV_TYPE.PREPROD.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("demo", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("test", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("svc", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("localhost", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("local", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("intranet", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("lan", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("example", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("invalid", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("home", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("corp", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("priv", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("localdomain", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("localnet", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("network", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("int", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("private", ENV_TYPE.STAGING.name());
+    }
+
     public enum Type {
         API_GROUP
     }
 
     public enum ENV_TYPE {
-        STAGING,PRODUCTION
+        STAGING, PRODUCTION, QA, DEV, INTEG, UAT, PREPROD, INTERNAL
     }
 
     Type type;
@@ -125,10 +154,33 @@ public class ApiCollection {
             "localhost", "local", "intranet", "lan", "example", "invalid",
             "home", "corp", "priv", "localdomain", "localnet", "network",
             "int", "private");
-    
+
     private static final List<String> ENV_KEYWORDS_WITHOUT_DOT = Arrays.asList(
         "kubernetes", "internal"
     );
+
+    /**
+     * Derives environment type string (one of {@link ENV_TYPE}) from hostname.
+     * Used by mini-runtime when creating collections to set envType tag in DB.
+     * Returns PRODUCTION when hostname is null/empty or when no keyword matches.
+     */
+    public static String deriveEnvTypeFromHostname(String hostName) {
+        if (hostName == null || hostName.trim().isEmpty()) {
+            return ENV_TYPE.PRODUCTION.name();
+        }
+        String hostLower = hostName.toLowerCase().trim();
+        for (Map.Entry<String, String> e : ENV_KEYWORD_TO_TAG_WITH_DOT.entrySet()) {
+            if (hostLower.contains("." + e.getKey())) {
+                return e.getValue();
+            }
+        }
+        for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
+            if (hostLower.contains(keyword)) {
+                return ENV_TYPE.INTERNAL.name();
+            }
+        }
+        return ENV_TYPE.PRODUCTION.name();
+    }
 
     Map<String, ServiceGraphEdgeInfo> serviceGraphEdges;
     public static final String SERVICE_GRAPH_EDGES = "serviceGraphEdges";
@@ -244,19 +296,24 @@ public class ApiCollection {
 
     public List<CollectionTags> getEnvType(){
         if(this.type != null && this.type == Type.API_GROUP) return null;
-        
+
         if(this.tagsList == null || this.tagsList.isEmpty()){
             CollectionTags envTypeTag = new CollectionTags();
             envTypeTag.setKeyName("envType");
             if (this.hostName != null) {
-                for (String keyword : ENV_KEYWORDS_WITH_DOT) {
-                    if (this.hostName.contains("." + keyword)) {
-                        envTypeTag.setValue("STAGING");
+                String hostLower = this.hostName.toLowerCase();
+                for (Map.Entry<String, String> e : ENV_KEYWORD_TO_TAG_WITH_DOT.entrySet()) {
+                    if (hostLower.contains("." + e.getKey())) {
+                        envTypeTag.setValue(e.getValue());
+                        break;
                     }
                 }
-                for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
-                    if (this.hostName.contains(keyword)) {
-                        envTypeTag.setValue("STAGING");
+                if (envTypeTag.getValue() == null) {
+                    for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
+                        if (hostLower.contains(keyword)) {
+                            envTypeTag.setValue(ENV_TYPE.INTERNAL.name());
+                            break;
+                        }
                     }
                 }
 
@@ -457,7 +514,7 @@ public class ApiCollection {
 
     public String getSseCallbackUrl() {
         return sseCallbackUrl;
-    }   
+    }
 
     public void setSseCallbackUrl(String sseCallbackUrl) {
         this.sseCallbackUrl = sseCallbackUrl;
@@ -507,7 +564,7 @@ public class ApiCollection {
     public void setHostNames(List<String> hostNames) {
         this.hostNames = hostNames;
     }
-    
+
     public Map<String, ServiceGraphEdgeInfo> getServiceGraphEdges() {
         return serviceGraphEdges;
     }

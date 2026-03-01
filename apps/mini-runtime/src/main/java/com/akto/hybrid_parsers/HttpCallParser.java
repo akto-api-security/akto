@@ -802,6 +802,14 @@ public class HttpCallParser {
             }
         }
 
+        // Ensure envType tag is set/refreshed (STAGING, PRODUCTION, QA, DEV, etc.) when syncing tags
+        String hostForEnv = getHostnameForCollection(httpResponseParams);
+        String vpcForEnv = (hostNameMapKey != null && hostNameMapKey.contains(NON_HOSTNAME_KEY)) ? System.getenv("VPC_ID") : null;
+        if (tagsList == null) {
+            tagsList = new ArrayList<>();
+        }
+        addOrReplaceEnvTypeTag(tagsList, hostForEnv, vpcForEnv);
+
         if (!accessTypeChanged && (tagsList == null || tagsList.isEmpty())) {
             return;
         }
@@ -876,6 +884,7 @@ public class HttpCallParser {
         String vpcId = System.getenv("VPC_ID");
         List<CollectionTags> tagList = CollectionTags.convertTagsFormat(httpResponseParam.getTags());
         tagList = filterTagsForAccount(tagList);
+        addOrReplaceEnvTypeTag(tagList, hostName, vpcId);
 
         if (useHostCondition(hostName, httpResponseParam.getSource())) {
             hostName = hostName.toLowerCase();
@@ -990,6 +999,7 @@ public class HttpCallParser {
             }
             List<CollectionTags> tagsList = CollectionTags.convertTagsFormat(tagsJson);
             tagsList = filterTagsForAccount(tagsList);
+            addOrReplaceEnvTypeTag(tagsList, hostName, null);
 
             String accessType = getOrComputeAccessType(direction, null);
 
@@ -1357,6 +1367,26 @@ public class HttpCallParser {
             return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_RAG_DATABASE_TAG, "RAG Database", TagSource.KUBERNETES));
         }
         return Optional.empty();
+    }
+
+    private static final String ENV_TYPE_TAG_KEY = "envType";
+
+    /**
+     * Adds or replaces the envType tag in the list so that every collection created by mini-runtime
+     * has an ENV_TYPE tag (STAGING, PRODUCTION, QA, DEV, etc.) in the DB, aligned with dashboard.
+     * Derives from hostname first, then from vpcIdFallback (e.g. VPC_ID), else PRODUCTION.
+     */
+    private void addOrReplaceEnvTypeTag(List<CollectionTags> tags, String hostName, String vpcIdFallback) {
+        String derived = (hostName != null && !hostName.trim().isEmpty())
+                ? ApiCollection.deriveEnvTypeFromHostname(hostName)
+                : ((vpcIdFallback != null && !vpcIdFallback.trim().isEmpty())
+                        ? ApiCollection.deriveEnvTypeFromHostname(vpcIdFallback)
+                        : ApiCollection.ENV_TYPE.PRODUCTION.name());
+        if (tags == null) {
+            return;
+        }
+        tags.removeIf(t -> t != null && ENV_TYPE_TAG_KEY.equals(t.getKeyName()));
+        tags.add(new CollectionTags(Context.now(), ENV_TYPE_TAG_KEY, derived, TagSource.KUBERNETES));
     }
 
     private SyncLimit fetchSyncLimit(Organization organization, MetricTypes metricType) {
