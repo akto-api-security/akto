@@ -1,5 +1,6 @@
 import { VerticalStack, Text, FormLayout, Box, Checkbox } from "@shopify/polaris";
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
+import DomainInput from "../DomainInput";
 
 export const ServerSettingsConfig = {
     number: 9,
@@ -9,7 +10,7 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ selectedMcpServers, selectedAgentServers, mcpServers, agentServers, applyOnRequest, applyOnResponse }) => {
+    getSummary: ({ selectedMcpServers, selectedAgentServers, targetDomains, mcpServers, agentServers, applyOnRequest, applyOnResponse }) => {
         if (selectedMcpServers?.length > 0 || selectedAgentServers?.length > 0) {
             const serverSummary = [];
             if (selectedMcpServers.length > 0) {
@@ -34,8 +35,24 @@ export const ServerSettingsConfig = {
             }
             const appSettings = (applyOnRequest || applyOnResponse) ?
                 ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
+
+            // Add domain summary if present
+            if (targetDomains?.length > 0) {
+                const domainPreview = targetDomains.slice(0, 2).join(", ");
+                const domainMore = targetDomains.length > 2 ? ` +${targetDomains.length - 2}` : '';
+                return `${serverSummary.join(", ")}, Domains: ${domainPreview}${domainMore}${appSettings}`;
+            }
+
             return `${serverSummary.join(", ")}${appSettings}`;
         }
+
+        // If only domains are specified
+        if (targetDomains?.length > 0) {
+            const domainPreview = targetDomains.slice(0, 2).join(", ");
+            const domainMore = targetDomains.length > 2 ? ` +${targetDomains.length - 2}` : '';
+            return `Domains: ${domainPreview}${domainMore}`;
+        }
+
         return null;
     }
 };
@@ -45,6 +62,8 @@ const ServerSettingsStep = ({
     setSelectedMcpServers,
     selectedAgentServers,
     setSelectedAgentServers,
+    targetDomains,
+    setTargetDomains,
     applyOnResponse,
     setApplyOnResponse,
     applyOnRequest,
@@ -80,6 +99,11 @@ const ServerSettingsStep = ({
                     allowMultiple={true}
                     showSelectAllMinOptions={1}
                     disabled={collectionsLoading}
+                />
+
+                <DomainInput
+                    domains={targetDomains}
+                    setDomains={setTargetDomains}
                 />
 
                 <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
