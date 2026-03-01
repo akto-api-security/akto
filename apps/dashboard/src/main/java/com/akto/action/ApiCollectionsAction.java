@@ -1018,34 +1018,14 @@ public class ApiCollectionsAction extends UserAction {
                         }
                     }
 
-                    boolean isAddingStaging = toAdd.stream().anyMatch(tag ->
-                            "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                    "staging".equalsIgnoreCase(tag.getValue())
+                    // When adding any envType tag, remove all existing envType tags (single env type per collection)
+                    boolean isAddingEnvType = toAdd.stream().anyMatch(tag ->
+                            "envType".equalsIgnoreCase(tag.getKeyName())
                     );
-
-                    boolean isAddingProduction = toAdd.stream().anyMatch(tag ->
-                            "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                    "production".equalsIgnoreCase(tag.getValue())
-                    );
-
-                    if (isAddingStaging) {
+                    if (isAddingEnvType) {
                         tagsList.stream()
-                                .filter(tag ->
-                                        "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                                "production".equalsIgnoreCase(tag.getValue())
-                                )
-                                .findFirst()
-                                .ifPresent(toPull::add);
-                    }
-
-                    if (isAddingProduction) {
-                        tagsList.stream()
-                                .filter(tag ->
-                                        "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                                "staging".equalsIgnoreCase(tag.getValue())
-                                )
-                                .findFirst()
-                                .ifPresent(toPull::add);
+                                .filter(tag -> "envType".equalsIgnoreCase(tag.getKeyName()))
+                                .forEach(toPull::add);
                     }
                 }
 
