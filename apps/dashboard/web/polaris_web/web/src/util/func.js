@@ -2232,7 +2232,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
 
   shouldShowIpReputation() {
-    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409
+    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1745303931
   },
 
   
