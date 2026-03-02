@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -122,6 +123,7 @@ import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
+import com.akto.util.UsageUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
@@ -1889,7 +1891,24 @@ public class DbLayer {
                 Filters.eq(Tokens.ORG_ID, organizationId),
                 Filters.eq(Tokens.ACCOUNT_ID, accountId)
         );
-        return TokensDao.instance.findOne(filters);
+        Tokens tokens = TokensDao.instance.findOne(filters);
+        if (tokens == null || tokens.isOldToken()) {
+            Bson updates;
+            if (tokens == null) {
+                updates = Updates.combine(
+                        Updates.set(Tokens.UPDATED_AT, Context.now()),
+                        Updates.setOnInsert(Tokens.CREATED_AT, Context.now()),
+                        Updates.setOnInsert(Tokens.ORG_ID, organizationId),
+                        Updates.setOnInsert(Tokens.ACCOUNT_ID, accountId)
+                );
+            } else {
+                updates = Updates.set(Tokens.UPDATED_AT, Context.now());
+            }
+            String newToken = organizationId + "_" + accountId + "_" + UUID.randomUUID().toString().replace("-", "");
+            UsageUtils.saveToken(organizationId, accountId, updates, filters, newToken);
+            tokens = TokensDao.instance.findOne(filters);
+        }
+        return tokens;
     }
 
     public static List<ApiCollection> findApiCollections(List<String> apiCollectionNames) {
