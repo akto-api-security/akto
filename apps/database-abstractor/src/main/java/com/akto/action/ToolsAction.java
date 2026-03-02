@@ -22,7 +22,7 @@ import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.ReplaceOptions;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -30,6 +30,8 @@ import lombok.Getter;
 import lombok.Setter;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+
+import java.util.Arrays;
 
 @Getter
 @Setter
@@ -65,12 +67,15 @@ public class ToolsAction extends ActionSupport {
 
             // Parse API info from string
             ApiInfo.ApiInfoKey apiInfoKey = ApiInfo.ApiInfoKey.fromString(tracking.getApiInfoKey());
-            ObjectId testRunId = tracking.getTestRunId();
+            ObjectId testRunResultSummaryId = tracking.getTestRunResultSummaryId();
             String testSubType = tracking.getTestSubType();
 
-            // Find test result 
+            // Find test result using summaryId (indexes are on summaryId, not testRunId)
             Bson filter = Filters.and(
-                TestingRunResultDao.generateFilter(testRunId, apiInfoKey),
+                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testRunResultSummaryId),
+                Filters.eq(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, apiInfoKey.getApiCollectionId()),
+                Filters.eq(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.URL, apiInfoKey.getUrl()),
+                Filters.eq(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.METHOD, apiInfoKey.getMethod().name()),
                 Filters.eq(TestingRunResult.TEST_SUB_TYPE, testSubType)
             );
             TestingRunResult testResult = TestingRunResultDao.instance.findOne(filter);
@@ -81,7 +86,7 @@ public class ToolsAction extends ActionSupport {
             }
 
             if (testResult == null) {
-                loggerMaker.errorAndAddToDb("Test result not found for UUID: " + uuid + ", testRunId: " + testRunId + ", apiInfoKey: " + apiInfoKey + ", testSubType: " + testSubType, LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("Test result not found for UUID: " + uuid + ", summaryId: " + testRunResultSummaryId + ", apiInfoKey: " + apiInfoKey + ", testSubType: " + testSubType, LogDb.DASHBOARD);
                 // Still return success since URL was hit and marked in webhook tracking
                 result = "SUCCESS";
                 return Action.SUCCESS.toUpperCase();
@@ -90,30 +95,20 @@ public class ToolsAction extends ActionSupport {
             // Check if this is a NEW vulnerability (wasn't vulnerable before)
             boolean wasAlreadyVulnerable = testResult.isVulnerable();
 
-            // Mark test result as vulnerable
-            testResult.setVulnerable(true);
+            // Update in both collections
+            Bson updateFilter = Filters.eq("_id", testResult.getId());
+            Bson updates = Updates.set(TestingRunResult.VULNERABLE, true);
 
-            // Mark all nested test results as vulnerable
-            // Since we already filtered by testSubType above, all results in this TestingRunResult belong to the correct test
-            if (testResult.getTestResults() != null) {
-                for (GenericTestResult testResultItem : testResult.getTestResults()) {
-                    if (testResultItem != null) {
-                        testResultItem.setVulnerable(true);
-                    }
-                }
+            // Update in testing_run_results collection (no upsert needed - document already exists)
+            TestingRunResultDao.instance.getMCollection().updateOne(updateFilter, updates);
+
+            // Insert into vulnerable_testing_run_results collection if it's a new vulnerability
+            if (!wasAlreadyVulnerable) {
+                testResult.setVulnerable(true); // Set the field in the object before inserting
+                VulnerableTestingRunResultDao.instance.insertOne(testResult);
             }
 
-            // Update in both collections (using upsert to ensure document exists in both)
-            Bson updateFilter = Filters.eq("_id", testResult.getId());
-            ReplaceOptions replaceOptions = new ReplaceOptions().upsert(true);
-
-            // Update in testing_run_results collection
-            TestingRunResultDao.instance.getMCollection().replaceOne(updateFilter, testResult, replaceOptions);
-
-            // Also update in vulnerable_testing_run_results collection (upsert ensures it's created if not exists)
-            VulnerableTestingRunResultDao.instance.getMCollection().replaceOne(updateFilter, testResult, replaceOptions);
-
-            loggerMaker.infoAndAddToDb("Marked test as vulnerable for UUID: " + uuid + ", testRunId: " + testRunId + ", testSubType: " + testSubType, LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Marked test as vulnerable for UUID: " + uuid + ", summaryId: " + testRunResultSummaryId + ", testSubType: " + testSubType, LogDb.DASHBOARD);
 
             // Create or update issue ONLY if this is a NEW vulnerability
             if (!wasAlreadyVulnerable) {
@@ -128,6 +123,7 @@ public class ToolsAction extends ActionSupport {
 
             // Send Slack alert for SSRF
             try {
+                ObjectId testRunId = tracking.getTestRunId();
                 TestingRun testingRun = DbLayer.findTestingRun(testRunId.toHexString());
                 if (testingRun != null && testingRun.getSendSlackAlert()) {
                     String summaryId = testResult.getTestRunResultSummaryId() != null 
@@ -172,54 +168,53 @@ public class ToolsAction extends ActionSupport {
             testResult.getTestSubType()
         );
         
-        // Check if issue already exists
-        TestingRunIssues existingIssue = TestingRunIssuesDao.instance.findOne(Filters.eq("_id", issueId));
+        // Build filter for composite ID
+        Bson issueFilter = Filters.and(
+            Filters.eq("_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, testResult.getApiInfoKey().getApiCollectionId()),
+            Filters.eq("_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.URL, testResult.getApiInfoKey().getUrl()),
+            Filters.eq("_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.METHOD, testResult.getApiInfoKey().getMethod().name()),
+            Filters.eq("_id." + TestingIssuesId.TEST_ERROR_SOURCE, TestErrorSource.AUTOMATED_TESTING.name()),
+            Filters.eq("_id." + TestingIssuesId.TEST_SUB_CATEGORY, testResult.getTestSubType())
+        );
         
-        if (existingIssue != null) {
-            // Update existing issue - reopen if it was fixed/ignored
-            TestRunIssueStatus newStatus = existingIssue.getTestRunIssueStatus() == TestRunIssueStatus.IGNORED
-                ? TestRunIssueStatus.IGNORED  // Keep ignored status
-                : TestRunIssueStatus.OPEN;     // Reopen if fixed
-            
-            TestingRunIssuesDao.instance.updateOne(
-                Filters.eq("_id", issueId),
-                Updates.combine(
-                    Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, newStatus),
-                    Updates.set(TestingRunIssues.LAST_SEEN, now),
-                    Updates.set(TestingRunIssues.LAST_UPDATED, now),
-                    Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testResult.getTestRunResultSummaryId()),
-                    Updates.set(TestingRunIssues.UNREAD, false)
-                )
-            );
-            loggerMaker.infoAndAddToDb("Updated existing issue: " + issueId.toString(), LogDb.DASHBOARD);
-        } else {
-            // Create new issue - get severity from first test result's confidence (same as testing module)
-            Severity severity = Severity.HIGH; // default
-            try {
-                if (testResult.getTestResults() != null && !testResult.getTestResults().isEmpty()) {
-                    GenericTestResult firstResult = testResult.getTestResults().get(0);
-                    if (firstResult != null && firstResult.getConfidence() != null) {
-                        severity = Severity.valueOf(firstResult.getConfidence().toString());
-                    }
+        // Get severity from first test result's confidence (same as testing module)
+        Severity severity = Severity.HIGH; // default
+        try {
+            if (testResult.getTestResults() != null && !testResult.getTestResults().isEmpty()) {
+                GenericTestResult firstResult = testResult.getTestResults().get(0);
+                if (firstResult != null && firstResult.getConfidence() != null) {
+                    severity = Severity.valueOf(firstResult.getConfidence().toString());
                 }
-            } catch (Exception e) {
-                // Keep default HIGH severity if conversion fails
             }
-            
-            TestingRunIssues newIssue = new TestingRunIssues(
-                issueId,
-                severity,
-                TestRunIssueStatus.OPEN,
-                now,  // creationTime
-                now,  // lastSeen
-                testResult.getTestRunResultSummaryId(),
-                null, // jiraIssueUrl
-                now,  // lastUpdated
-                false // unread
-            );
-            
-            TestingRunIssuesDao.instance.insertOne(newIssue);
-            loggerMaker.infoAndAddToDb("Created new issue: " + issueId.toString(), LogDb.DASHBOARD);
+        } catch (Exception e) {
+            // Keep default HIGH severity if conversion fails
         }
+        
+        // Check if issue exists to determine status (keep IGNORED if it was ignored, otherwise OPEN)
+        TestingRunIssues existingIssue = TestingRunIssuesDao.instance.findOne(issueFilter);
+        TestRunIssueStatus status = (existingIssue != null && existingIssue.getTestRunIssueStatus() == TestRunIssueStatus.IGNORED)
+            ? TestRunIssueStatus.IGNORED
+            : TestRunIssueStatus.OPEN;
+        
+        // Single updateOne with upsert handles both create and update cases
+        TestingRunIssuesDao.instance.getMCollection().updateOne(
+            issueFilter,
+            Updates.combine(
+                // Always update these fields
+                Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, status),
+                Updates.set(TestingRunIssues.LAST_SEEN, now),
+                Updates.set(TestingRunIssues.LAST_UPDATED, now),
+                Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testResult.getTestRunResultSummaryId()),
+                Updates.set(TestingRunIssues.UNREAD, false),
+                // Only set these on insert (when document doesn't exist)
+                Updates.setOnInsert("_id", issueId),
+                Updates.setOnInsert(TestingRunIssues.KEY_SEVERITY, severity),
+                Updates.setOnInsert(TestingRunIssues.CREATION_TIME, now),
+                Updates.setOnInsert(TestingRunIssues.COLLECTION_IDS, Arrays.asList(testResult.getApiInfoKey().getApiCollectionId()))
+            ),
+            new UpdateOptions().upsert(true)
+        );
+        
+        loggerMaker.infoAndAddToDb("Created/updated issue for vulnerability: " + issueId.toString(), LogDb.DASHBOARD);
     }
 }
