@@ -6,10 +6,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.ahocorasick.trie.Trie;
 import org.json.JSONObject;
 
+import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.HttpResponseParams;
@@ -46,6 +48,8 @@ public class ThreatDetector {
     public static final String OS_COMMAND_INJECTION_FILTER_ID = "OSCommandInjection";
     public static final String SSRF_FILTER_ID = "SSRF";
     public static final String PARAM_ENUMERATION_FILTER_ID = "ParamEnumeration";
+    public static final String INTERNAL_IP_REGEX = "^(10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}(:\\d+)?|127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}(:\\d+)?|169\\.254\\.\\d{1,3}\\.\\d{1,3}(:\\d+)?|172\\.(1[6-9]|2[0-9]|3[0-1])\\.\\d{1,3}\\.\\d{1,3}(:\\d+)?|192\\.168\\.\\d{1,3}\\.\\d{1,3}(:\\d+)?|100\\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\\.\\d{1,3}\\.\\d{1,3}(:\\d+)?|0\\.0\\.0\\.0(:\\d+)?)$";
+    public static final Pattern INTERNAL_IP_PATTERN = Pattern.compile(INTERNAL_IP_REGEX);
     private static Map<String, Object> varMap = new HashMap<>();
     private Trie lfiTrie;
     private Trie osCommandInjectionTrie;
@@ -456,12 +460,22 @@ public class ThreatDetector {
         return false;
     }
 
+    public boolean isInternalIp(String ip) {
+        return INTERNAL_IP_PATTERN.matcher(ip).matches();
+    }
 
-    public boolean shouldIgnoreApi(FilterConfig apiFilter, RawApi rawApi, ApiInfoKey apiInfoKey) {
+    public boolean shouldIgnoreApi(FilterConfig apiFilter, RawApi rawApi, ApiInfoKey apiInfoKey, String actor) {
         if (apiFilter.getIgnore() == null) {
             return false; // No ignore section, don't ignore
         }
         
+
+        if (Context.accountId.get() == 1745303931) {
+            if (isInternalIp(actor)){
+                return true;
+            }
+        }
+
         try {
             // Create a temporary FilterConfig with just the ignore condition as the filter
             FilterConfig tempFilter = new FilterConfig();

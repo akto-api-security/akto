@@ -591,7 +591,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       // If filter matches, check ignore condition
       // If both filter AND ignore match, don't treat it as a threat (ignore wins)
       if (hasPassedFilter) {
-        boolean shouldIgnore = threatDetector.shouldIgnoreApi(apiFilter, rawApi, apiInfoKey);
+        boolean shouldIgnore = threatDetector.shouldIgnoreApi(apiFilter, rawApi, apiInfoKey, actor);
         if (shouldIgnore) {
           logger.debugAndAddToDb("Filter matched but ignore condition also matched for url " + apiInfoKey.getUrl() + 
               " filterId " + apiFilter.getId() + " - skipping threat detection");
