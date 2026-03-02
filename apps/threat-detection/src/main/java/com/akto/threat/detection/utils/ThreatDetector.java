@@ -470,13 +470,13 @@ public class ThreatDetector {
         }
         
 
-        if (Context.accountId.get() == 1745303931) {
-            if (isInternalIp(actor)){
-                return true;
-            }
-        }
-
         try {
+            if (Context.accountId.get() == 1745303931) {
+                if (isInternalIp(actor)){
+                    return true;
+                }
+            }
+
             // Create a temporary FilterConfig with just the ignore condition as the filter
             FilterConfig tempFilter = new FilterConfig();
             tempFilter.setId(apiFilter.getId() + "_ignore");
