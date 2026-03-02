@@ -18,7 +18,12 @@ public class KafkaUtils {
         int kafkaLingerMS = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_PRODUCER_LINGER_MS", "10"));
         String kafkaUsername = System.getenv("AKTO_KAFKA_USERNAME");
         String kafkaPassword = System.getenv("AKTO_KAFKA_PASSWORD");
-        kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize, kafkaUsername, kafkaPassword, LoggerMaker.LogDb.DATA_INGESTION);
+        String kafkaSaslMechanism = System.getenv().getOrDefault("AKTO_KAFKA_SASL_MECHANISM", "PLAIN");
+        kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize, kafkaUsername, kafkaPassword, kafkaSaslMechanism, LoggerMaker.LogDb.DATA_INGESTION);
+
+        if (kafkaUsername != null && !kafkaUsername.isEmpty()) {
+            logger.infoAndAddToDb("Kafka authentication enabled with mechanism: " + kafkaSaslMechanism, LoggerMaker.LogDb.DATA_INGESTION);
+        }
         logger.infoAndAddToDb("Kafka Producer Init " + Context.now(), LoggerMaker.LogDb.DATA_INGESTION);
     }
 
