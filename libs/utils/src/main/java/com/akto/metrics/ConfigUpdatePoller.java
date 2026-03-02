@@ -10,7 +10,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.google.gson.Gson;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,32 +74,28 @@ public class ConfigUpdatePoller {
 
             loggerMaker.infoAndAddToDb("Found " + moduleInfoList.size() + " module(s) with config updates for mini-runtime: " + miniRuntimeName);
 
-            // Collect all daemon names
-            List<String> daemonNames = new ArrayList<>();
+            Map<String, Map<String, String>> daemonEnvMap = new HashMap<>();
             for (ModuleInfo moduleInfo : moduleInfoList) {
-                daemonNames.add(moduleInfo.getName());
-            }
-
-            // Extract envVars from additionalData.env of the first module
-            Map<String, String> envVars = new HashMap<>();
-            if (!moduleInfoList.isEmpty() && moduleInfoList.get(0).getAdditionalData() != null) {
-                Map<String, Object> additionalData = moduleInfoList.get(0).getAdditionalData();
-                Object envObj = additionalData.get("env");
-                if (envObj instanceof Map) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, String> env = (Map<String, String>) envObj;
-                    envVars = env;
+                Map<String, String> envVars = new HashMap<>();
+                if (moduleInfo.getAdditionalData() != null) {
+                    Object envObj = moduleInfo.getAdditionalData().get("env");
+                    if (envObj instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, String> env = (Map<String, String>) envObj;
+                        envVars = env;
+                    }
                 }
+                daemonEnvMap.put(moduleInfo.getName(), envVars);
             }
 
-            publishConfigUpdate(daemonNames, envVars);
+            publishConfigUpdate(daemonEnvMap);
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error polling and publishing config updates");
         }
     }
 
-    private void publishConfigUpdate(List<String> daemonNames, Map<String, String> envVars) {
+    private void publishConfigUpdate(Map<String, Map<String, String>> daemonEnvMap) {
         try {
             if (kafkaProducer == null || !kafkaProducer.producerReady) {
                 loggerMaker.infoAndAddToDb("Kafka producer not ready, will retry in next poll cycle");
@@ -109,14 +104,13 @@ public class ConfigUpdatePoller {
 
             Map<String, Object> configUpdate = new HashMap<>();
             configUpdate.put("messageType", "ENV_RELOAD");
-            configUpdate.put("daemonNames", daemonNames);
-            configUpdate.put("env", envVars);
+            configUpdate.put("daemonEnvMap", daemonEnvMap);
             configUpdate.put("timestamp", System.currentTimeMillis());
 
             String message = gson.toJson(configUpdate);
             kafkaProducer.send(message, configUpdateTopicName);
 
-            loggerMaker.infoAndAddToDb("Published config update for " + daemonNames.size() + " daemon(s) to topic: " + configUpdateTopicName);
+            loggerMaker.infoAndAddToDb("Published config update for " + daemonEnvMap.size() + " daemon(s) to topic: " + configUpdateTopicName);
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error publishing config update");
