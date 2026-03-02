@@ -256,9 +256,6 @@ public class ApiCollectionsAction extends UserAction {
     public String fetchAllCollectionsBasic() {
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude("urls"));
-        for (ApiCollection c : this.apiCollections) {
-            ApiCollectionsDao.instance.ensureEnvTypeFromHostname(c);
-        }
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
 
         // Start background icon processing for all collections asynchronously
