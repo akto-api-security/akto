@@ -3,6 +3,7 @@ import { DeleteMajor } from "@shopify/polaris-icons"
 import React, { useEffect, useState } from 'react'
 import func from "@/util/func"
 import TooltipText from '../../../../components/shared/TooltipText'
+import { ENV_TYPE_OPTIONS } from '@/apps/dashboard/components/shared/envTypeConstants'
 
 const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds, updateTags }) => {
     const [allEnvTypes, setAllEnvTypes] = useState([])
@@ -48,25 +49,17 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
 
         const envType = tag?.value?.toLowerCase?.()
         const isEnvType = tag?.keyName?.toLowerCase?.() === "envtype"
+        const isPredefinedEnv = ENV_TYPE_OPTIONS.some(opt => opt.value === envType)
         let newEnvTypes = [...allEnvTypes]
 
-        if (isEnvType && (envType === "staging" || envType === "production")) {
-            newEnvTypes = newEnvTypes.filter(
-                obj => obj.keyName?.toLowerCase() !== "envtype" ||
-                    obj.value?.toLowerCase() === envType
-            )
-
-            newEnvTypes = newEnvTypes.filter(
-                obj => obj.value?.toLowerCase() !== (envType === "staging" ? "production" : "staging")
-            )
-
+        if (isEnvType && isPredefinedEnv) {
+            newEnvTypes = newEnvTypes.filter(obj => obj.keyName?.toLowerCase() !== "envtype")
             const alreadyExists = newEnvTypes.some(obj =>
                 obj.keyName?.toLowerCase() === "envtype" && obj.value?.toLowerCase() === envType
             )
             if (!alreadyExists) {
                 newEnvTypes.push({ keyName: "envType", value: envType, lastUpdatedTs: 0 })
             }
-
             setSelectedEnvType(envType)
         } else if (typeof tag === "object" && tag !== null) {
             const exists = newEnvTypes.some(obj =>
@@ -86,12 +79,11 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                 : [...newEnvTypes, { ...tag, lastUpdatedTs: 0 }]
         }
 
-        if (selectedEnvType === 'staging' || selectedEnvType === 'production') {
+        if (selectedEnvType && ENV_TYPE_OPTIONS.some(opt => opt.value === selectedEnvType)) {
             const hasSelectedEnvTag = newEnvTypes.some(obj =>
                 obj.keyName?.toLowerCase() === "envtype" &&
                 obj.value?.toLowerCase() === selectedEnvType
             )
-
             if (!hasSelectedEnvTag) {
                 newEnvTypes.push({
                     keyName: "envType",
@@ -107,47 +99,28 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
 
     const handleEnvChange = (value) => {
         if (apiCollectionIds.length !== 1) return
+        if (!ENV_TYPE_OPTIONS.some(opt => opt.value === value)) return
 
-        let updatedTags = [...allEnvTypes]
-
-        if (value === 'staging') {
-            updatedTags = updatedTags.filter(tag => tag?.value?.toLowerCase() !== 'production')
-
-            const hasStagingTag = updatedTags.some(tag =>
-                tag?.keyName?.toLowerCase() === 'envtype' &&
-                tag?.value?.toLowerCase() === 'staging'
-            )
-            if (!hasStagingTag) {
-                updatedTags.push({ keyName: "envType", value: "staging", lastUpdatedTs: 0 })
-            }
-
-            setSelectedEnvType('staging')
-        } else if (value === 'production') {
-            updatedTags = updatedTags.filter(tag => tag?.value?.toLowerCase() !== 'staging')
-
-            const hasProductionTag = updatedTags.some(tag =>
-                tag?.keyName?.toLowerCase() === 'envtype' &&
-                tag?.value?.toLowerCase() === 'production'
-            )
-            if (!hasProductionTag) {
-                updatedTags.push({ keyName: "envType", value: "production", lastUpdatedTs: 0 })
-            }
-
-            setSelectedEnvType('production')
+        let updatedTags = allEnvTypes.filter(tag => tag?.keyName?.toLowerCase() !== 'envtype')
+        const hasTag = updatedTags.some(tag =>
+            tag?.keyName?.toLowerCase() === 'envtype' && tag?.value?.toLowerCase() === value
+        )
+        if (!hasTag) {
+            updatedTags.push({ keyName: "envType", value, lastUpdatedTs: 0 })
         }
-
+        setSelectedEnvType(value)
         setAllEnvTypes(updatedTags)
-        updateTags(apiCollectionIds, updatedTags.at(updatedTags.length-1))
+        updateTags(apiCollectionIds, updatedTags.at(updatedTags.length - 1))
     }
 
     useEffect(() => {
         apiCollectionIds.map((apiCollectionId) => {
             const envTypes = tags?.[apiCollectionId]
-
             envTypes?.map((envType) => {
-                if(envType?.keyName === "envType" || envType?.keyName === "userSetEnvType") {
-                    if(  (envType?.keyName === "envType" && (envType?.value?.toLowerCase() === "staging" || envType?.value?.toLowerCase() === "production"))) {
-                        setSelectedEnvType(envType?.value?.toLowerCase())
+                if (envType?.keyName === "envType" || envType?.keyName === "userSetEnvType") {
+                    const val = envType?.value?.toLowerCase?.()
+                    if (envType?.keyName === "envType" && ENV_TYPE_OPTIONS.some(opt => opt.value === val)) {
+                        setSelectedEnvType(val)
                     } else if (envType?.keyName === "userSetEnvType") {
                         setAllEnvTypes((prev) => [...prev, { ...envType, keyName: "env" }])
                     }
@@ -165,20 +138,16 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                     <Popover.Section>
                         <VerticalStack gap={2}>
                             <Text variant='headingXs'>Environment</Text>
-                            <RadioButton
-                                label="Staging"
-                                checked={selectedEnvType === 'staging'}
-                                id="staging"
-                                name="envType"
-                                onChange={() => handleEnvChange('staging')}
-                            />
-                            <RadioButton
-                                label="Production"
-                                checked={selectedEnvType === 'production'}
-                                id="production"
-                                name="envType"
-                                onChange={() => handleEnvChange('production')}
-                            />
+                            {ENV_TYPE_OPTIONS.map((opt) => (
+                                <RadioButton
+                                    key={opt.value}
+                                    label={opt.label}
+                                    checked={selectedEnvType === opt.value}
+                                    id={opt.value}
+                                    name="envType"
+                                    onChange={() => handleEnvChange(opt.value)}
+                                />
+                            ))}
                         </VerticalStack>
                     </Popover.Section>
 
@@ -189,7 +158,7 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                                 <VerticalStack gap={3}>
                                     {
                                         allEnvTypes.map((env) => {
-                                            if (["staging", "production"].includes(env?.value?.toLowerCase())) return null
+                                            if (ENV_TYPE_OPTIONS.some(opt => opt.value === env?.value?.toLowerCase())) return null
 
                                             return (
                                                 <HorizontalStack align='space-between' gap={4}>

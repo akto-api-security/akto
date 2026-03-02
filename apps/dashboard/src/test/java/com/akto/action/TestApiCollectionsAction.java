@@ -178,10 +178,19 @@ public class TestApiCollectionsAction extends MongoBasedTest {
         collection5.setId(5);
         collection5.setHostName("kubernetes-121212-akto.io");
 
-        assertTrue(collection1.getEnvType() != null && collection1.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
-        assertTrue(collection2.getEnvType() != null && collection2.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
-        assertTrue(collection3.getEnvType() == null || collection3.getEnvType().stream().map(CollectionTags::getValue).noneMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
-        assertTrue(collection4.getEnvType() != null && collection4.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
-        assertTrue(collection5.getEnvType() != null && collection5.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
+        // getEnvType() returns DB only; no tags yet so null for all
+        assertTrue(collection1.getEnvType() == null);
+        assertTrue(collection3.getEnvType() == null);
+
+        // computeEnvTypeFromHostname() returns derived tag from hostname
+        CollectionTags t1 = collection1.computeEnvTypeFromHostname();
+        assertTrue(t1 != null && ApiCollection.ENV_TYPE.STAGING.name().equals(t1.getValue()));
+        CollectionTags t2 = collection2.computeEnvTypeFromHostname();
+        assertTrue(t2 != null && ApiCollection.ENV_TYPE.STAGING.name().equals(t2.getValue()));
+        assertTrue(collection3.computeEnvTypeFromHostname() == null);
+        CollectionTags t4 = collection4.computeEnvTypeFromHostname();
+        assertTrue(t4 != null && ApiCollection.ENV_TYPE.STAGING.name().equals(t4.getValue()));
+        CollectionTags t5 = collection5.computeEnvTypeFromHostname();
+        assertTrue(t5 != null && ApiCollection.ENV_TYPE.INTERNAL.name().equals(t5.getValue()));
     }
 }
