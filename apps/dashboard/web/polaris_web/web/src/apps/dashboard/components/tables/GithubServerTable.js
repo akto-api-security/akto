@@ -576,6 +576,7 @@ function GithubServerTable(props) {
     if (props?.headings) {
       return props.headings.map((heading, index) => ({
         ...heading,
+        title: heading.titleNode ?? heading.title,
         id: heading.id || heading.value || heading.text || `heading-${index}`
       }));
     }

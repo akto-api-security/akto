@@ -25,7 +25,8 @@ import LocalStore from "../../../main/LocalStorageStore";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import JiraTicketDisplay from "../../components/shared/JiraTicketDisplay";
 import { getMethod } from "../observe/GetPrettifyEndpoint";
-import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, CATEGORY_API_SECURITY, CATEGORY_DAST } from "../../../main/labelHelper";
+import TooltipWithLink from "../../components/shared/TooltipWithLink";
 
 let headers = [
   {
@@ -65,6 +66,7 @@ let headers = [
   },
 ]
 
+const SKIPPED_TESTS_DOCS_URL = "https://docs.akto.io/api-security-testing/concepts/skipped-test-cases";
 const MAX_SEVERITY_THRESHOLD = 100000;
 
 function getStatus(state) {
@@ -1343,14 +1345,36 @@ const transform = {
       case "no_vulnerability_found":
         return headers.filter((header) => header.title !== "Severity")
 
-      case "skipped":
+      case "skipped": {
+        const category = getDashboardCategory();
+        // Add agentic security docsUrl here when available
+        const docsUrl = [CATEGORY_API_SECURITY, CATEGORY_DAST].includes(category)
+          ? SKIPPED_TESTS_DOCS_URL
+          : null;
         return headers.filter((header) => header.title !== "CWE tags").map((header) => {
           if (header.title === "Severity") {
-            // Modify the object as needed
-            return { type: CellType.TEXT, title: "Error message", value: 'errorMessage' };
+            return {
+              type: CellType.TEXT,
+              title: "Error message",
+              titleNode: docsUrl
+                ? <HorizontalStack gap="1" blockAlign="center">
+                    <span>Error message</span>
+                    <TooltipWithLink
+                      content={<Link url={docsUrl} target="_blank">Common reasons for skipped tests</Link>}
+                      preferredPosition="top"
+                    >
+                      <div className='reduce-size'>
+                        <Avatar shape="round" size="extraSmall" source='/public/info_filled_icon.svg'/>
+                      </div>
+                    </TooltipWithLink>
+                  </HorizontalStack>
+                : undefined,
+              value: 'errorMessage'
+            };
           }
           return header;
-        })
+        });
+      }
 
       case "need_configurations":
         return headers.filter((header) => header.title !== "CWE tags").map((header) => {
