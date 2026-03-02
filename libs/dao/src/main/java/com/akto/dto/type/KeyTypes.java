@@ -145,7 +145,7 @@ public class KeyTypes {
         return SingleTypeInfo.OTHER;
     }
 
-    private static String extractLastField(String param) {
+    static String extractLastField(String param) {
         if (param == null || param.isEmpty()) return param;
 
         int end = param.length();
