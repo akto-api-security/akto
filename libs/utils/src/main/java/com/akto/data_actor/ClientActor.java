@@ -69,6 +69,7 @@ public class ClientActor extends DataActor {
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     public static final String CYBORG_URL = "https://cyborg.akto.io";
+    public static final String ULTRON_URL = "https://ultron.akto.io";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
         
     /**
@@ -83,9 +84,20 @@ public class ClientActor extends DataActor {
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
 
     public static String buildDbAbstractorUrl() {
-        String dbAbsHost = CYBORG_URL;
-        if (checkAccount()) {
-            dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        String dbAbsHost = ULTRON_URL;
+        String dbAbsHostFromEnv = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        boolean isHighTrafficAccount = checkAccountHighTraffic();
+        String overrideDbAbsHost = System.getenv("OVERRIDE_DATABASE_ABSTRACTOR_SERVICE_URL");
+        boolean useOverrideDbAbsHost = overrideDbAbsHost != null && !overrideDbAbsHost.isEmpty() && overrideDbAbsHost.equalsIgnoreCase("true");
+        if (isHighTrafficAccount) {
+            dbAbsHost = CYBORG_URL;
+        } else if (checkAccount() || (useOverrideDbAbsHost && dbAbsHostFromEnv != null
+                && !dbAbsHostFromEnv.isEmpty()
+                && (CYBORG_URL.equals(dbAbsHostFromEnv) || ULTRON_URL.equals(dbAbsHostFromEnv)))) {
+            dbAbsHost = dbAbsHostFromEnv;
+        }
+        if (dbAbsHost == null || dbAbsHost.isEmpty()) {
+            dbAbsHost = ULTRON_URL;
         }
         loggerMaker.warn("dbHost value " + dbAbsHost);
         if (dbAbsHost.endsWith("/")) {
@@ -1373,13 +1385,14 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags) {
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("colId", colId);
         obj.put("host", host);
         obj.put("vpcId", vpcId);
         obj.put("tagsList", tags);
+        obj.put("accessType", accessType);
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForHostAndVpc", "", "POST", objString, headers, "");
         try {
@@ -1394,12 +1407,13 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("vxlanId", vxlanId);
         obj.put("vpcId", vpcId);
         obj.put("tagsList", tags);
+        obj.put("accessType", accessType);
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionSimpleForVpc", "", "POST", objString, headers, "");
         try {
@@ -2829,7 +2843,7 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName) {
+    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("colId", id);
@@ -2837,6 +2851,7 @@ public class ClientActor extends DataActor {
         obj.put("hostNames", hostNames);
         obj.put("tagsList", tags);
         obj.put("hostName", hostName);
+        obj.put("accessType", accessType);
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForServiceTag", "", "POST", objString, headers, "");
         try {
@@ -3487,6 +3502,28 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void insertAgenticTestingLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertAgenticTestingLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.info("non 2xx response in insertAgenticTestingLog");
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.error("error in insertAgenticTestingLog " + e);
+            return;
+        }
+    }
+
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("dependencyNodeList", dependencyNodeList);
@@ -3518,6 +3555,10 @@ public class ClientActor extends DataActor {
     }
 
     public static boolean checkAccount() {
+        return checkAccount(Arrays.asList(1000000, 1752722331));
+    }
+
+    public static boolean checkAccount(List<Integer> allowedAccountIds) {
         try {
             String token = getAuthToken();
             DecodedJWT jwt = JWT.decode(token);
@@ -3528,11 +3569,15 @@ public class ClientActor extends DataActor {
             BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
             int accId = (int) basicDBObject.getInt("accountId");
             loggerMaker.warn("checkAccount accountId log " + accId);
-            return accId == 1000000 || accId == 1752722331;
+            return allowedAccountIds.contains(accId);
         } catch (Exception e) {
             loggerMaker.error("checkAccount error" + e.getStackTrace());
         }
         return false;
+    }
+
+    public static boolean checkAccountHighTraffic() {
+        return checkAccount(Arrays.asList(1718042191, 1736798101));
     }
 
     public List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {
@@ -4246,15 +4291,16 @@ public class ClientActor extends DataActor {
 
     public void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
         Map<String, List<String>> headers = buildHeaders();
-            Document d = new Document()
-                    .append("lastDetected", auditInfo.getLastDetected())
-                    .append("markedBy", auditInfo.getMarkedBy())
-                    .append("type", auditInfo.getType())
-                    .append("updatedTimestamp", auditInfo.getUpdatedTimestamp())
-                    .append("resourceName", auditInfo.getResourceName())
-                    .append("remarks",auditInfo.getRemarks())
-                    .append("apiAccessTypes", auditInfo.getApiAccessTypes())
-                    .append("hostCollectionId", auditInfo.getHostCollectionId());
+        Document d = new Document()
+            .append(McpAuditInfo.LAST_DETECTED, auditInfo.getLastDetected())
+            .append(McpAuditInfo.MARKED_BY, auditInfo.getMarkedBy())
+            .append(McpAuditInfo.TYPE, auditInfo.getType())
+            .append(McpAuditInfo.UPDATED_TIMESTAMP, auditInfo.getUpdatedTimestamp())
+            .append(McpAuditInfo.RESOURCE_NAME, auditInfo.getResourceName())
+            .append(McpAuditInfo.REMARKS, auditInfo.getRemarks())
+            .append(McpAuditInfo.API_ACCESS_TYPES, auditInfo.getApiAccessTypes())
+            .append(McpAuditInfo.HOST_COLLECTION_ID, auditInfo.getHostCollectionId())
+            .append(McpAuditInfo.MCP_HOST, auditInfo.getMcpHost());
 
         Document wrapper = new Document("auditInfo", d);
         String jsonBody = wrapper.toJson();
@@ -4383,23 +4429,9 @@ public class ClientActor extends DataActor {
     @Override
     public void storeConversationResults(List<AgentConversationResult> conversationResults) {
         Map<String, List<String>> headers = buildHeaders();
-        
-        List<Document> docs = new ArrayList<>();
-        for (AgentConversationResult r : conversationResults) {
-            Document d = new Document()
-                    .append("conversationId", r.getConversationId())
-                    .append("prompt", r.getPrompt())
-                    .append("response", r.getResponse())
-                    .append("conversation", r.getConversation())
-                    .append("timestamp", r.getTimestamp())
-                    .append("validation", r.isValidation());
-
-            docs.add(d);
-        }
-
-        Document wrapper = new Document("conversationResults", docs);
-        String jsonBody = wrapper.toJson();
-        
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("conversationResults", conversationResults);
+        String jsonBody = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeConversationResults", "", "POST", jsonBody, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -4525,6 +4557,25 @@ public class ClientActor extends DataActor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in updateServiceGraphEdges: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
             return false;
+        }
+    }
+
+    @Override
+    public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunWebhook", testingRunWebhook);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeTestingRunWebhook", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in storeTestingRunWebhook", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in storeTestingRunWebhook" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
         }
     }
 }

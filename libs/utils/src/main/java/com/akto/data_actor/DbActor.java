@@ -452,8 +452,8 @@ public class DbActor extends DataActor {
         DbLayer.insertApiCollection(apiCollectionId, apiCollectionName);
     }
 
-    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName) {
-        DbLayer.createCollectionForServiceTag(id, serviceTagValue, hostNames, tags, hostName);
+    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType) {
+        DbLayer.createCollectionForServiceTag(id, serviceTagValue, hostNames, tags, hostName, accessType);
     }
 
     public void addHostNameToServiceTagCollection(int collectionId, String hostName) {
@@ -576,6 +576,10 @@ public class DbActor extends DataActor {
         DbLayer.insertTestingLog(log);
     }
 
+    public void insertAgenticTestingLog(Log log) {
+        DbLayer.insertAgenticTestingLog(log);
+    }
+
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         DbLayer.bulkWriteDependencyNodes(dependencyNodeList);
     }
@@ -596,12 +600,12 @@ public class DbActor extends DataActor {
         return DbLayer.fetchMergedUrls();
     }
 
-    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
-        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
+        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags, accessType);
     }
 
-    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags) {
-        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags);
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType) {
+        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags, accessType);
     }
 
     public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
@@ -745,5 +749,10 @@ public class DbActor extends DataActor {
 
     public boolean updateServiceGraphEdges(int apiCollectionId, Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges) {
         return DbLayer.updateServiceGraphEdges(apiCollectionId, serviceGraphEdges);
+    }
+
+    @Override
+    public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
+        DbLayer.storeTestingRunWebhook(testingRunWebhook);
     }
 }

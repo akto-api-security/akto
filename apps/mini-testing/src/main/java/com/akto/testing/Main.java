@@ -31,6 +31,7 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
 import com.akto.testing.kafka_utils.Producer;
 import com.akto.testing.kafka_utils.TestingConfigurations;
+import com.akto.utility.UtilityServer;
 import com.akto.usage.OrgUtils;
 import com.akto.util.Constants;
 import com.akto.store.SampleMessageStore;
@@ -93,6 +94,15 @@ public class Main {
                     TestingRunPlayground testingRunPlayground =  dataActor.getCurrentTestingRunDetailsFromEditor(timestamp); // fetch from Db
                     
                     if (testingRunPlayground == null) {
+                        return;
+                    }
+
+                    String miniTestingName = testingRunPlayground.getMiniTestingName();
+                    if (miniTestingName == null || miniTestingName.isEmpty()) {
+                        miniTestingName = customMiniTestingServiceName;
+                    }
+
+                    if (!miniTestingName.equals(customMiniTestingServiceName)) {
                         return;
                     }
 
@@ -163,7 +173,7 @@ public class Main {
 
         TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
         String message = messageStore.getSampleDataMap().get(infoKey).get(messageStore.getSampleDataMap().get(infoKey).size() - 1);
-        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs, message);
+        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunPlayground.getTestingRunConfig(), true, testLogs, message);
 
         GenericTestResult testRes = testingRunResult.getTestResults().get(0);
         if (testRes instanceof TestResult) {
@@ -356,6 +366,11 @@ public class Main {
 
     private static void shutdown() {
         try {
+            UtilityServer.stop();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Exception while stopping utility server");
+        }
+        try {
             PrometheusMetricsHandler.shutdownServer();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Exception while performing shutdown tasks");
@@ -367,6 +382,7 @@ public class Main {
 
     private static void runModule() throws InterruptedException, IOException {
         PrometheusMetricsHandler.init();
+        UtilityServer.start();
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
         setupRateLimitWatcher(accountSettings);
