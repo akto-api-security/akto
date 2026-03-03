@@ -1,7 +1,10 @@
 package com.akto.utils;
 
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,6 +31,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.Remediation;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.wiz_integration.WizFinding;
 import com.akto.dto.wiz_integration.WizIntegration;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -35,11 +39,14 @@ import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.http_util.CoreHTTPClient;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
 
 import okhttp3.FormBody;
 import okhttp3.OkHttpClient;
@@ -266,9 +273,21 @@ public class WizIntegrationUtils {
         loggerMaker.infoAndAddToDb("Successfully uploaded enrichment JSON to S3");
     }
 
-    public static void updateWizFindingUrl(TestingIssuesId testingIssuesId) throws Exception {
-        Bson update = Updates.set(TestingRunIssues.WIZ_FINDING_URL, "unavailable");
-        TestingRunIssuesDao.instance.updateOne(Filters.eq(Constants.ID, testingIssuesId), update);
+    public static String fetchWizAssetId(ApiInfoKey apiInfoKey) throws Exception{
+        String json = new ObjectMapper().writeValueAsString(apiInfoKey);
+        return Base64.getUrlEncoder().withoutPadding()
+             .encodeToString(json.getBytes(StandardCharsets.UTF_8));
+    }
+
+    public static String fetchWizFindingId(TestingIssuesId testingIssuesId) throws Exception {
+        String json = new ObjectMapper().writeValueAsString(testingIssuesId);
+        return Base64.getUrlEncoder().withoutPadding()
+             .encodeToString(json.getBytes(StandardCharsets.UTF_8));
+    }   
+
+    public static TestingIssuesId fetchTestingIssuesId(String wizFindingId) throws Exception {
+        String json = new String(Base64.getDecoder().decode(wizFindingId), StandardCharsets.UTF_8);
+        return new ObjectMapper().readValue(json, TestingIssuesId.class);
     }
 
     public static BasicDBObject buildAssetDetails(ApiInfoKey apiInfoKey) throws Exception {
@@ -285,7 +304,7 @@ public class WizIntegrationUtils {
                 String path = richUrl.getPath();
                 int port = (richUrl.getPort() == -1) ? richUrl.getDefaultPort() : richUrl.getPort(); 
             
-                endpoint.put("assetId", String.format("%s#%s#%d", method.toString(), url, apiCollectionId));
+                endpoint.put("assetId", WizIntegrationUtils.fetchWizAssetId(apiInfoKey));
                 endpoint.put("assetName", String.format("%s %s", method.toString(), path));
                 endpoint.put("host", host);
                 endpoint.put("port", port);
@@ -299,17 +318,21 @@ public class WizIntegrationUtils {
         return assetDetails;
     }
 
-    public static BasicDBObject buildAssetAttackSurfaceFinding(TestingIssuesId testingIssuesId, TestingRunResult testingRunResult, YamlTemplate yamlTemplate, Remediation remediation) throws Exception{
+    public static BasicDBObject buildAssetAttackSurfaceFinding(TestingIssuesId testingIssuesId, TestingRunIssues testingRunIssues, TestingRunResult testingRunResult, YamlTemplate yamlTemplate, Remediation remediation) throws Exception{
         BasicDBObject assetAttackSurfaceFinding = new BasicDBObject();
-        if (testingIssuesId != null && yamlTemplate != null) {
+        if (testingIssuesId != null && testingRunIssues != null && yamlTemplate != null) {
             try {
                 Info testInfo = yamlTemplate.getInfo();
                 
-                assetAttackSurfaceFinding.put("id", yamlTemplate.getId());
+                assetAttackSurfaceFinding.put("id", WizIntegrationUtils.fetchWizFindingId(testingIssuesId));
 
                 assetAttackSurfaceFinding.put("name", testInfo.getName());
                 assetAttackSurfaceFinding.put("description", testInfo.getDescription());
-                assetAttackSurfaceFinding.put("severity", testInfo.getSeverity()); 
+
+                String severity = testingRunIssues.getSeverity() != null ? testingRunIssues.getSeverity().toString() : "None";
+                severity = severity.substring(0, 1).toUpperCase() + severity.substring(1).toLowerCase();
+
+                assetAttackSurfaceFinding.put("severity", testingRunIssues.getSeverity().toString()); 
                 assetAttackSurfaceFinding.put("vulnerabilities", testInfo.getCve());
                 assetAttackSurfaceFinding.put("weaknesses", testInfo.getCwe());
 
@@ -335,28 +358,6 @@ public class WizIntegrationUtils {
         }
 
         return assetAttackSurfaceFinding;
-    }
-
-    public static TestingRunResult fetchTestingRunResult(String testSubCategory, ApiInfoKey apiInfoKey) {
-        TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
-            Filters.in(TestingRunResult.TEST_SUB_TYPE, testSubCategory),
-            Filters.in(TestingRunResult.API_INFO_KEY, apiInfoKey)
-        ));
-
-        return testingRunResult;
-    }
-
-    public static YamlTemplate fetchYamlTemplate(String testSubCategory) {
-        Bson filter = Filters.in(Constants.ID, testSubCategory);
-        YamlTemplate yamlTemplate = YamlTemplateDao.instance.findOne(filter, Projections.include(YamlTemplate.INFO));
-        return yamlTemplate;
-    }
-
-    public static Remediation fetchRemediation(String testSubCategory) {
-        Remediation remediation = RemediationsDao.instance.findOne(
-            Filters.eq(Constants.ID, String.format("tests-library-master/remediation/%s.md", testSubCategory)));
-
-        return remediation;
     }
 
     public static Map<TestingIssuesId,TestingRunResult> fetchTestingRunResultMap(List<TestingIssuesId> testingIssuesIdList) {
@@ -417,58 +418,16 @@ public class WizIntegrationUtils {
         return remediationMap;
     }
 
-    public static String prepareSingleIssueEnrichmentJSON(TestingIssuesId testingIssuesId) throws Exception {
+    public static String prepareMultipleIssueEnrichmentJSON(List<TestingRunIssues> testingRunIssuesList) throws Exception {
 
-        String testSubCategory = testingIssuesId.getTestSubCategory();
-        ApiInfoKey apiInfoKey = testingIssuesId.getApiInfoKey();
+        Map<TestingIssuesId, TestingRunIssues> testingRunIssuesMap = new HashMap<>();
 
-        TestingRunResult testingRunResult = fetchTestingRunResult(testSubCategory, apiInfoKey);
-        YamlTemplate yamlTemplate = fetchYamlTemplate(testSubCategory);
-        Remediation remediation = fetchRemediation(testSubCategory);
-
-        if (testingRunResult == null || yamlTemplate == null) {
-            String errMsg = String.format("Missing data for enrichment JSON. testingRunResult: %s, yamlTemplate: %s, remediation: %s", 
-                testingRunResult == null ? "null" : testingRunResult.getHexId(),
-                yamlTemplate == null ? "null" : yamlTemplate.getId(),
-                remediation == null ? "null" : remediation.getid()
-            );
-            throw new Exception(errMsg);
+        for (TestingRunIssues testingRunIssues: testingRunIssuesList) {
+            if (testingRunIssues == null || testingRunIssues.getId() == null) continue;
+            testingRunIssuesMap.put(testingRunIssues.getId(), testingRunIssues);
         }
 
-        // Prepare asset
-        BasicDBObject asset = new BasicDBObject();
-        BasicDBObject assetDetails = WizIntegrationUtils.buildAssetDetails(apiInfoKey);
-
-        BasicDBObject assetAttackSurfaceFinding = WizIntegrationUtils.buildAssetAttackSurfaceFinding(testingIssuesId, testingRunResult, yamlTemplate, remediation);
-        BasicDBList attackSurfaceFindingsList = new BasicDBList();
-        attackSurfaceFindingsList.add(assetAttackSurfaceFinding);
-
-        asset.put("details", assetDetails);
-        asset.put("attackSurfaceFindings", attackSurfaceFindingsList);
-
-        BasicDBList assetsList = new BasicDBList();
-        assetsList.add(asset);
-
-        // Prepare datasources
-        BasicDBObject dataSource = new BasicDBObject();
-
-        dataSource.put("id", String.format("akto-testing-run-result-%s", testingRunResult.getHexId()));
-        dataSource.put("assets", assetsList);
-
-        BasicDBList dataSourcesList = new BasicDBList();
-        dataSourcesList.add(dataSource);
-
-        // Prepare enrichment JSON
-        BasicDBObject enrichmentJSONObj = new BasicDBObject();
-        enrichmentJSONObj.put("integrationId", "placeholder-integration-id");
-        enrichmentJSONObj.put("dataSources", dataSourcesList);
-
-        String enrichmentJSON = enrichmentJSONObj.toJson();
-
-        return enrichmentJSON;
-    }
-
-    public static String prepareMultipleIssueEnrichmentJSON(List<TestingIssuesId> testingIssuesIdList) throws Exception {
+        List<TestingIssuesId> testingIssuesIdList = new ArrayList<>(testingRunIssuesMap.keySet());
 
         Set<String> testSubCategorySet = new HashSet<>();
         Map<ApiInfoKey, Set<TestingIssuesId>> apiTestingIssuesIdMap = new HashMap<>();
@@ -505,13 +464,14 @@ public class WizIntegrationUtils {
 
             for (TestingIssuesId testingIssuesId: apiTestingIssuesIdSet) {
                 try {
+                    TestingRunIssues testingRunIssues = testingRunIssuesMap.get(testingIssuesId);
                     TestingRunResult testingRunResult = testingRunResultMap.get(testingIssuesId);
                     YamlTemplate yamlTemplate = yamlTemplateMap.get(testingIssuesId.getTestSubCategory());
                     Remediation remediation = remediationMap.get(testingIssuesId.getTestSubCategory());
-                    BasicDBObject finding = WizIntegrationUtils.buildAssetAttackSurfaceFinding(testingIssuesId, testingRunResult, yamlTemplate, remediation);
+                    BasicDBObject finding = WizIntegrationUtils.buildAssetAttackSurfaceFinding(testingIssuesId, testingRunIssues, testingRunResult, yamlTemplate, remediation);
                     findingList.add(finding);
                 } catch (Exception e) {
-                    // do nothing
+                    loggerMaker.error("Error building attack surface finding for testing issue ID: " + testingIssuesId.toString() + " - " + e.getMessage());
                 }
             }
 
@@ -534,7 +494,7 @@ public class WizIntegrationUtils {
 
                 assetList.add(asset);
             } catch (Exception e) {
-                // do nothing
+                loggerMaker.error("Error building asset details for API info key: " + apiInfoKey.toString() + " - " + e.getMessage());
             }
         }
 
@@ -550,6 +510,308 @@ public class WizIntegrationUtils {
         String enrichmentJSON = enrichmentJSONObj.toJson();
 
         return enrichmentJSON;
+    }
+
+    public static void pullFindingsFromWiz(List<TestingRunIssues> testingRunIssuesList, WizIntegration wizIntegration) {
+        if (testingRunIssuesList == null || testingRunIssuesList.isEmpty()) {
+            loggerMaker.infoAndAddToDb("No testing run issues to pull Wiz findings for");
+            return;
+        }
+
+        if (wizIntegration == null) {
+            loggerMaker.errorAndAddToDb("WizIntegration configuration is missing. Cannot pull Wiz findings.");
+            return;
+        }
+
+        // Prepare list of Wiz finding IDs to pull
+        List<String> wizFindingIdList = new ArrayList<>();
+        for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
+            TestingIssuesId testingIssuesId = testingRunIssues.getId();
+            if (testingIssuesId == null) continue;
+
+            try {
+                String wizFindingId = fetchWizFindingId(testingIssuesId);
+                wizFindingIdList.add(wizFindingId);
+            } catch (Exception e) {
+                loggerMaker.error("Error fetching Wiz finding ID for testing issue ID: " + testingIssuesId.toString() + " - " + e.getMessage());
+            }
+        }
+
+        // Get valid access token
+        String accessToken = null;
+        try {
+            accessToken = getValidAccessToken();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Failed to get valid access token for pulling Wiz findings: " + e.getMessage());
+            return;
+        }
+
+        // Build GraphQL API endpoint
+        String apiUrl = String.format(
+            WizIntegration.API_BASE_URL_PATTERN,
+            wizIntegration.getTenantDataCenter(),
+            WizIntegration.ENVIRONMENT
+        );
+        
+        //todo: remove test endpoint
+        //apiUrl = "http://localhost:8080/graphql";
+
+        Map<TestingIssuesId, String> testingIssuesIdToPortalUrlMap = new HashMap<>();
+
+        boolean hasNextPage = true;
+        String after = null;
+
+        long lastSyncTs = wizIntegration.getLastSyncTs();
+        if (lastSyncTs == 0) {
+            // If last sync timestamp is not set, default to pulling findings updated in the last 7 days
+            lastSyncTs = Instant.now().minusSeconds(7 * 24 * 60 * 60).getEpochSecond();
+        }
+        // convert above to ISO 8601 format with UTC timezone.
+        String formattedLastSyncTs = Instant.ofEpochSecond(lastSyncTs).toString();
+
+        long newLastSyncTs = System.currentTimeMillis()/1000L;
+
+        while (hasNextPage) {
+            try {
+                // Construct GraphQL query
+                String query = new StringBuilder()
+                    .append("query VulnerabilityFindingsPage($filterBy: VulnerabilityFindingFilters $first: Int $after: String $orderBy: VulnerabilityFindingOrder) { ")
+                    .append("vulnerabilityFindings(filterBy: $filterBy first: $first after: $after orderBy: $orderBy) { ")
+                    .append("nodes { id portalUrl } ")
+                    .append("pageInfo { hasNextPage endCursor } } }")
+                    .toString();
+
+                BasicDBObject filterBy = new BasicDBObject();
+                filterBy.put("vulnerabilityId", wizFindingIdList);
+
+                filterBy.put("lastUpdatedAt", formattedLastSyncTs);
+
+                BasicDBObject variables = new BasicDBObject();
+                variables.put("filterBy", filterBy);
+                variables.put("first", 1000);
+                variables.put("after", after);
+
+                BasicDBObject graphqlQuery = new BasicDBObject();
+                graphqlQuery.put("query", query);
+                graphqlQuery.put("variables", variables);
+
+                String unescapedGraphqlQueryStr = graphqlQuery.toJson();
+
+                ObjectMapper mapper = new ObjectMapper();
+                String graphqlQueryStr = mapper.writeValueAsString(mapper.readTree(unescapedGraphqlQueryStr));
+
+                // Set headers
+                Map<String, List<String>> headers = new HashMap<>();
+                headers.put("Content-Type", Collections.singletonList("application/json"));
+                headers.put("Authorization", Collections.singletonList("Bearer " + accessToken));
+
+                // Make request
+
+                // todo: remove skipSSRF set to true
+                OriginalHttpRequest request = new OriginalHttpRequest(apiUrl, "", "POST", graphqlQueryStr, headers, "");
+                //OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, true, new ArrayList<>(), true);
+
+                if (response == null) {
+                    throw new Exception("Failed to pull Wiz findings - null response");
+                }
+
+                int statusCode = response.getStatusCode();
+                String responsePayload = response.getBody();
+
+                if (statusCode != 200 || responsePayload == null) {
+                    throw new Exception("Failed to pull Wiz findings. Status code: " + statusCode);
+                }
+
+                // Parse response - retrieve node list and page info
+                BasicDBList nodes = new BasicDBList();
+                BasicDBObject pageInfo = new BasicDBObject();
+                try {
+                    BasicDBObject responseObj = BasicDBObject.parse(responsePayload);
+                    BasicDBObject data = (BasicDBObject) responseObj.get("data");
+                    BasicDBObject vulnerabilityFindings = (BasicDBObject) data.get("vulnerabilityFindings");
+                    nodes = (BasicDBList) vulnerabilityFindings.get("nodes");
+                    pageInfo = (BasicDBObject) vulnerabilityFindings.get("pageInfo");
+                } catch (Exception e) {
+                    throw new Exception("Error parsing response while pulling Wiz findings: " + e.getMessage());
+                }
+
+                // Build a map consisting of wiz portal urls
+                for (Object nodeObj : nodes) {
+                    try {
+                        BasicDBObject node = (BasicDBObject) nodeObj;
+                        String id = node.getString("id");
+                        String portalUrl = node.getString("portalUrl");
+                        TestingIssuesId testingIssuesId = fetchTestingIssuesId(id);
+                        testingIssuesIdToPortalUrlMap.put(testingIssuesId, portalUrl);
+                    } catch (Exception e) {
+                        loggerMaker.error("Error processing node while pulling Wiz findings: " + e.getMessage());
+                    }
+                }
+
+                hasNextPage = pageInfo.getBoolean("hasNextPage", false);
+                after = pageInfo.getString("endCursor", null);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error while pulling Wiz findings: " + e.getMessage());
+                return;
+            }
+        }
+
+        List<WriteModel<TestingRunIssues>> bulkUpdates = new ArrayList<>();
+        for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
+            TestingIssuesId testingIssuesId = testingRunIssues.getId();
+            if (testingIssuesId == null) continue;
+
+            String wizPortalaUrl = testingIssuesIdToPortalUrlMap.get(testingIssuesId);
+            WizFinding wizFinding = testingRunIssues.getWizFinding();
+
+            if (wizFinding == null) continue;
+
+            if (wizPortalaUrl != null) {
+                // If the finding url is not already set and we have a portal url from the pull, update the finding url. 
+                // The finding can be marked as having been successfully created in Wiz at this point since we have the portal url available
+                wizFinding.setUrl(wizPortalaUrl);
+                wizFinding.setStatus(WizFinding.Status.CREATION_SUCCESSFUL);
+                bulkUpdates.add(
+                    new UpdateOneModel<> (
+                        Filters.eq(Constants.ID, testingIssuesId),
+                        Updates.set(TestingRunIssues.WIZ_FINDING, wizFinding)
+                    )
+                );
+            }
+        }
+
+        if (!bulkUpdates.isEmpty()) {
+            try {
+                TestingRunIssuesDao.instance.getMCollection().bulkWrite(bulkUpdates);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error updating TestingRunIssues with Wiz finding URLs: " + e.getMessage());
+                return;
+            }
+        }
+
+        // If we reach here, it means sync was successful. Update the wiz last sync timestamp
+        try {
+            WizIntegrationDao.instance.updateOne(
+                new BasicDBObject(),
+                Updates.set(WizIntegration.LAST_SYNC_TS, newLastSyncTs)
+            );
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error updating Wiz integration last sync timestamp: " + e.getMessage());
+        }
+    }
+
+    public static void uploadWizDataSource(WizIntegration wizIntegration) {
+        if (wizIntegration == null) {
+            loggerMaker.infoAndAddToDb("Wiz integration not configured for this account. Skipping sync.");
+            return;
+        }
+
+        // Find all testing run issues in this account that need to be synced with Wiz
+        List<TestingRunIssues> testingRunIssuesList = new ArrayList<>();
+        try {
+            testingRunIssuesList = TestingRunIssuesDao.instance.findAll(
+                Filters.ne(TestingRunIssues.WIZ_FINDING, null),
+                Projections.include(Constants.ID, TestingRunIssues.KEY_SEVERITY, TestingRunIssues.WIZ_FINDING)
+            );
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching testing run issues for Wiz sync: " + e.getMessage());
+            return;
+        }
+
+        if (testingRunIssuesList == null || testingRunIssuesList.isEmpty()) {
+            loggerMaker.infoAndAddToDb("No testing run issues to sync with Wiz. Skipping sync.");
+            return;
+        }   
+
+        Map<TestingIssuesId, WizFinding> testingRunIssuesMap = new HashMap<>();
+
+        for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
+            if (testingRunIssues == null) continue;
+            TestingIssuesId testingIssuesId = testingRunIssues.getId();
+            WizFinding wizFinding = testingRunIssues.getWizFinding();
+            testingRunIssuesMap.put(testingIssuesId, wizFinding);
+        }
+        
+        String enrichmentJSON = null;
+        try {
+            enrichmentJSON = prepareMultipleIssueEnrichmentJSON(testingRunIssuesList);
+        } catch (Exception e) {
+            String errMsg = "Error preparing enrichment JSON for Wiz sync: " + e.getMessage();
+            loggerMaker.errorAndAddToDb(e, errMsg);
+            return;
+        }
+
+        String systemActivityId = null;
+
+        try {
+            Map<String, String> securityScanUploadResult = WizIntegrationUtils.requestSecurityScanUpload("akto-testing-issue.json");
+            String signedS3Url = securityScanUploadResult.get("url");
+            systemActivityId = securityScanUploadResult.get("systemActivityId");
+            WizIntegrationUtils.uploadEnrichmentJSONToS3(enrichmentJSON, signedS3Url);
+
+            List<WriteModel<TestingRunIssues>> bulkUpdatesForNewFindings = new ArrayList<>();
+            for (Map.Entry<TestingIssuesId, WizFinding> entry : testingRunIssuesMap.entrySet()) {
+                TestingIssuesId testingIssuesId = entry.getKey();
+                WizFinding wizFinding = entry.getValue();
+
+                if (wizFinding.getStatus() == WizFinding.Status.CREATION_REQUESTED) {
+                    wizFinding.setStatus(WizFinding.Status.CREATION_INITIATED);
+                    bulkUpdatesForNewFindings.add(
+                        new UpdateOneModel<> (
+                            Filters.eq(Constants.ID, testingIssuesId),
+                            Updates.set(TestingRunIssues.WIZ_FINDING, wizFinding)
+                        )
+                    );
+                }
+            }
+
+            if (!bulkUpdatesForNewFindings.isEmpty()) {
+                TestingRunIssuesDao.instance.getMCollection().bulkWrite(bulkUpdatesForNewFindings);
+            }
+        } catch (Exception e) {
+            String errMsg = "Error uploading enrichment JSON to Wiz: " + e.getMessage();
+            loggerMaker.errorAndAddToDb(e, errMsg);
+            return;
+        }
+
+        // If we reach here, it means the upload was successful. Update the wiz last upload timestamp
+        try {
+            WizIntegrationDao.instance.updateOne(
+                new BasicDBObject(),
+                Updates.combine(
+                    Updates.set(WizIntegration.SYSTEM_ACTIVITY_ID, systemActivityId),
+                    Updates.set(WizIntegration.LAST_UPLOADED_SCAN_TS, System.currentTimeMillis()/1000L)
+                )
+            );
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error updating Wiz integration last sync timestamp: " + e.getMessage());
+        }
+    }
+
+    public static void markIssuesAsWizFinding(List<TestingIssuesId> testingIssuesIdList) throws Exception {
+        try {
+            List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(
+                Filters.and(
+                    Filters.in(Constants.ID, testingIssuesIdList),
+                    Filters.eq(TestingRunIssues.WIZ_FINDING, null)
+                ),
+                Projections.include(Constants.ID)  
+            );
+
+            List<TestingIssuesId> issueIdsWithoutWizFindings = new ArrayList<>();
+            for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
+                issueIdsWithoutWizFindings.add(testingRunIssues.getId());     
+            }
+
+            WizFinding wizFinding = new WizFinding(WizFinding.Status.CREATION_REQUESTED, null);
+            TestingRunIssuesDao.instance.updateMany(
+                Filters.in(Constants.ID, issueIdsWithoutWizFindings),
+                Updates.set(TestingRunIssues.WIZ_FINDING, wizFinding)
+            );
+        } catch (Exception e) {
+            throw new Exception("Error marking issues as Wiz findings: " + e.getMessage());
+        }
     }
 }
 

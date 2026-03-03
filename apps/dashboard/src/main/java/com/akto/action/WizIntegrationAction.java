@@ -15,7 +15,6 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 import java.util.List;
-import java.util.Map;
 
 import com.opensymphony.xwork2.Action;
 
@@ -101,49 +100,6 @@ public class WizIntegrationAction extends UserAction {
 
     @Getter
     @Setter
-    private TestingIssuesId testingIssuesId;
-
-    public String createWizFinding() {
-        WizIntegration wizIntegration = WizIntegrationDao.instance.findOne(new BasicDBObject());
-        if(wizIntegration == null) {
-            logger.errorAndAddToDb("Wiz not not integrated for this account: " + Context.accountId.get());
-            addActionError("Wiz is not integrated.");
-            return Action.ERROR.toUpperCase();
-        }
-
-        if (this.testingIssuesId == null) {
-            logger.errorAndAddToDb("Testing Issues Id is null");
-            addActionError("Testing Issues Id cannot be null.");
-            return Action.ERROR.toUpperCase();
-        }
-
-        String enrichmentJSON;
-        try {
-            enrichmentJSON = WizIntegrationUtils.prepareSingleIssueEnrichmentJSON(testingIssuesId);
-        } catch (Exception e) {
-            String errString = "Error preparing enrichment JSON for Wiz: " + e.getMessage();
-            logger.errorAndAddToDb(e, errString);
-            addActionError("Error creating wiz finding.");
-            return Action.ERROR.toUpperCase();
-        }
-
-        try {
-            Map<String, String> securityScanUploadResult = WizIntegrationUtils.requestSecurityScanUpload("akto-testing-issue.json");
-            String signedS3Url = securityScanUploadResult.get("url");
-            WizIntegrationUtils.uploadEnrichmentJSONToS3(enrichmentJSON, signedS3Url);
-            WizIntegrationUtils.updateWizFindingUrl(testingIssuesId);
-        } catch (Exception e) {
-            String errString = "Error uploading enrichment JSON to Wiz: " + e.getMessage();
-            logger.errorAndAddToDb(errString);
-            addActionError(errString);
-            return Action.ERROR.toUpperCase();
-        }
-
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    @Getter
-    @Setter
     private List<TestingIssuesId> testingIssuesIdList;
 
     public String createWizFindings() {
@@ -161,27 +117,11 @@ public class WizIntegrationAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        String enrichmentJSON;
         try {
-            enrichmentJSON = WizIntegrationUtils.prepareMultipleIssueEnrichmentJSON(testingIssuesIdList);
+            WizIntegrationUtils.markIssuesAsWizFinding(testingIssuesIdList);
+            WizIntegrationUtils.uploadWizDataSource(wizIntegration);
         } catch (Exception e) {
-            String errString = "Error preparing enrichment JSON for Wiz: " + e.getMessage();
-            logger.errorAndAddToDb(e, errString);
-            addActionError("Error creating wiz findings.");
-            return Action.ERROR.toUpperCase();
-        }
-
-        try {
-            Map<String, String> securityScanUploadResult = WizIntegrationUtils.requestSecurityScanUpload("akto-testing-issue.json");
-            String signedS3Url = securityScanUploadResult.get("url");
-            WizIntegrationUtils.uploadEnrichmentJSONToS3(enrichmentJSON, signedS3Url);
-
-            // todo: update finding url for each issue
-            // for (TestingIssuesId testingIssuesId : testingIssuesIdList) {
-            //     WizIntegrationUtils.updateWizFindingUrl(testingIssuesId);
-            // }
-        } catch (Exception e) {
-            String errString = "Error uploading enrichment JSON to Wiz: " + e.getMessage();
+            String errString = "Error initiating wiz finding(s) creation: " + e.getMessage();
             logger.errorAndAddToDb(errString);
             addActionError(errString);
             return Action.ERROR.toUpperCase();
