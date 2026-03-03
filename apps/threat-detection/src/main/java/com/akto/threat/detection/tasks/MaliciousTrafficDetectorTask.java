@@ -147,7 +147,17 @@ public class MaliciousTrafficDetectorTask implements Task {
     properties.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, 100 * 1024 * 1024);
     properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
     properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-    this.kafkaConsumer = new KafkaConsumer<>(properties);
+
+    logger.warnAndAddToDb(instanceId + ": Creating Kafka consumer with bootstrap servers: " + trafficConfig.getBootstrapServers() +
+                          ", groupId: " + trafficConfig.getGroupId() +
+                          ", maxPollRecords: " + trafficConfig.getConsumerConfig().getMaxPollRecords());
+    try {
+      this.kafkaConsumer = new KafkaConsumer<>(properties);
+      logger.warnAndAddToDb(instanceId + ": Kafka consumer created successfully");
+    } catch (Exception e) {
+      logger.errorAndAddToDb(e, instanceId + ": FAILED to create Kafka consumer: " + e.getMessage());
+      throw e;
+    }
 
     this.httpCallParser = new HttpCallParser(120, 1000);
     
@@ -181,7 +191,16 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static boolean kafkaPollingEnabled = System.getenv().getOrDefault("KAFKA_POLL_ENABLED", "true").equals("true");
 
   public void run() {
-    this.kafkaConsumer.subscribe(Collections.singletonList("akto.api.logs2"));
+    String topicName = "akto.api.logs2";
+    logger.warnAndAddToDb(this.instanceId + ": Subscribing to Kafka topic: " + topicName);
+    try {
+      this.kafkaConsumer.subscribe(Collections.singletonList(topicName));
+      logger.warnAndAddToDb(this.instanceId + ": Successfully subscribed to topic: " + topicName);
+    } catch (Exception e) {
+      logger.errorAndAddToDb(e, this.instanceId + ": FAILED to subscribe to topic " + topicName + ": " + e.getMessage());
+      throw e;
+    }
+
     ExecutorService pollingExecutor = Executors.newSingleThreadExecutor();
     pollingExecutor.execute(
         () -> {
@@ -211,6 +230,11 @@ public class MaliciousTrafficDetectorTask implements Task {
               if (timeDiff >= 60000) { // 60 seconds = 1 minute
                 logger.warnAndAddToDb(this.instanceId + ": Kafka records read in last minute: " + recordsReadCount +
                                       " (avg " + String.format("%.2f", recordsReadCount / (timeDiff / 1000.0)) + " records/sec)");
+                logger.warnAndAddToDb(this.instanceId + ": Assigned partitions: " + kafkaConsumer.assignment());
+                logger.warnAndAddToDb(this.instanceId + ": Subscription: " + kafkaConsumer.subscription());
+                if (kafkaConsumer.assignment().isEmpty()) {
+                  logger.warnAndAddToDb(this.instanceId + ": WARNING - No partitions assigned! Consumer may not receive records.");
+                }
                 recordsReadCount = 0;
                 lastRecordCountLogTime = currentTime;
               }
