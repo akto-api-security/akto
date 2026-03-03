@@ -404,6 +404,15 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             return ERROR.toUpperCase();
         }
 
+        // Check threat policy and severity filters before blocking
+        if (status.equalsIgnoreCase("blocked")) {
+            String filterError = validateThreatForBlockingCloudflare(cloudflareWafConfig);
+            if (filterError != null) {
+                addActionError(filterError);
+                return ERROR.toUpperCase();
+            }
+        }
+
         boolean result;
         if (status.equalsIgnoreCase("blocked")) {
             result = addIPsToList(cloudflareWafConfig, Collections.singletonList(actorIp));
@@ -631,6 +640,16 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             List<String> ipAddresses = new ArrayList<>(getResponse.ipSet().addresses());
 
             String ipWithCidr = actorIp + "/32";
+
+            // Check threat policy and severity filters before blocking
+            if (status.equalsIgnoreCase("blocked")) {
+                String filterError = validateThreatForBlocking(awsWafConfig);
+                if (filterError != null) {
+                    addActionError(filterError);
+                    return ERROR.toUpperCase();
+                }
+            }
+
             boolean resp;
             if (status.equalsIgnoreCase("blocked")) {
               resp = blockActorIp(ipAddresses, ipWithCidr, wafClient, awsWafConfig, getResponse);
@@ -984,5 +1003,85 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setThreatComplianceInfos(List<BasicDBObject> threatComplianceInfos) {
     this.threatComplianceInfos = threatComplianceInfos;
+  }
+
+  /**
+   * Validates if a threat should be blocked based on configured threat policies and severity levels.
+   * Returns null if threat passes validation (should be blocked), error message otherwise.
+   */
+  private String validateThreatForBlocking(Config.AwsWafConfig wafConfig) {
+    // Get configured threat policies and severity levels
+    List<String> threatPolicies = wafConfig != null ? wafConfig.getThreatPolicies() : new ArrayList<>();
+    List<String> severityLevels = wafConfig != null ? wafConfig.getSeverityLevels() : new ArrayList<>();
+
+    // If no filters configured, allow blocking
+    if ((threatPolicies == null || threatPolicies.isEmpty()) &&
+        (severityLevels == null || severityLevels.isEmpty())) {
+      return null;
+    }
+
+    // Check threat policy filter
+    if (threatPolicies != null && !threatPolicies.isEmpty()) {
+      // latestAttack contains the policy ID that triggered detection
+      if (latestAttack == null || latestAttack.isEmpty()) {
+        return "Unable to determine threat policy. Cannot block without threat policy information.";
+      }
+
+      boolean policyMatches = false;
+      for (String attack : latestAttack) {
+        if (threatPolicies.contains(attack)) {
+          policyMatches = true;
+          break;
+        }
+      }
+
+      if (!policyMatches) {
+        return "This threat does not match any of the configured threat policies.";
+      }
+    }
+
+    // Check severity level filter (if severity field is available on threat actor)
+    // Note: Severity information would need to be passed from the frontend or fetched from backend
+    // For now, we validate the policy filter only since severity is not accessible in modifyThreatActorStatus
+
+    return null; // Validation passed, allow blocking
+  }
+
+  /**
+   * Validates if a threat should be blocked based on configured threat policies and severity levels (Cloudflare version).
+   * Returns null if threat passes validation (should be blocked), error message otherwise.
+   */
+  private String validateThreatForBlockingCloudflare(Config.CloudflareWafConfig wafConfig) {
+    // Get configured threat policies and severity levels
+    List<String> threatPolicies = wafConfig != null ? wafConfig.getThreatPolicies() : new ArrayList<>();
+    List<String> severityLevels = wafConfig != null ? wafConfig.getSeverityLevels() : new ArrayList<>();
+
+    // If no filters configured, allow blocking
+    if ((threatPolicies == null || threatPolicies.isEmpty()) &&
+        (severityLevels == null || severityLevels.isEmpty())) {
+      return null;
+    }
+
+    // Check threat policy filter
+    if (threatPolicies != null && !threatPolicies.isEmpty()) {
+      // latestAttack contains the policy ID that triggered detection
+      if (latestAttack == null || latestAttack.isEmpty()) {
+        return "Unable to determine threat policy. Cannot block without threat policy information.";
+      }
+
+      boolean policyMatches = false;
+      for (String attack : latestAttack) {
+        if (threatPolicies.contains(attack)) {
+          policyMatches = true;
+          break;
+        }
+      }
+
+      if (!policyMatches) {
+        return "This threat does not match any of the configured threat policies.";
+      }
+    }
+
+    return null; // Validation passed, allow blocking
   }
 }

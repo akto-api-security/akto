@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -770,6 +771,8 @@ public abstract class Config {
         private int accountId;
         private List<String> severityLevels;
         public static final String SEVERITY_LEVELS = "severityLevels";
+        private List<String> threatPolicies;
+        public static final String THREAT_POLICIES = "threatPolicies";
 
         public static final String LIST_IDS = "listIds";
         private List<String> listIds;
@@ -794,6 +797,18 @@ public abstract class Config {
             this.accountId = accountId;
             this.id = accountId + "_" + CONFIG_ID;
             this.severityLevels = severityLevels;
+            this.threatPolicies = new ArrayList<>();
+        }
+
+        public CloudflareWafConfig(String apiKey, String email, String integrationType, String accountOrZoneId, int accountId, List<String> severityLevels, List<String> threatPolicies) {
+            this.apiKey = apiKey;
+            this.email = email;
+            this.integrationType = integrationType;
+            this.accountOrZoneId = accountOrZoneId;
+            this.accountId = accountId;
+            this.id = accountId + "_" + CONFIG_ID;
+            this.severityLevels = severityLevels;
+            this.threatPolicies = threatPolicies != null ? threatPolicies : new ArrayList<>();
         }
 
         public String getApiKey() {
@@ -871,6 +886,14 @@ public abstract class Config {
         public void setZoneId(String zoneId) {
             this.zoneId = zoneId;
         }
+
+        public List<String> getThreatPolicies() {
+            return threatPolicies;
+        }
+
+        public void setThreatPolicies(List<String> threatPolicies) {
+            this.threatPolicies = threatPolicies;
+        }
     }
 
     @BsonDiscriminator
@@ -882,8 +905,10 @@ public abstract class Config {
         private String ruleSetName;
         private int accountId;
         private List<String> severityLevels;
+        private List<String> threatPolicies;
 
         public static final String CONFIG_ID = ConfigType.AWS_WAF.name();
+        public static final String THREAT_POLICIES = "threatPolicies";
 
         public AwsWafConfig() {
             this.configType = ConfigType.AWS_WAF;
@@ -899,6 +924,21 @@ public abstract class Config {
             this.ruleSetName = ruleSetName;
             this.accountId = accountId;
             this.id = accountId + "_" + CONFIG_ID;
+            this.severityLevels = severityLevels;
+            this.threatPolicies = new ArrayList<>();
+        }
+
+        public AwsWafConfig(String awsAccessKey, String awsSecretKey, String region, String ruleSetId,
+                String ruleSetName, int accountId, List<String> severityLevels, List<String> threatPolicies) {
+            this.awsAccessKey = awsAccessKey;
+            this.awsSecretKey = awsSecretKey;
+            this.region = region;
+            this.ruleSetId = ruleSetId;
+            this.ruleSetName = ruleSetName;
+            this.accountId = accountId;
+            this.id = accountId + "_" + CONFIG_ID;
+            this.severityLevels = severityLevels;
+            this.threatPolicies = threatPolicies != null ? threatPolicies : new ArrayList<>();
         }
 
         public String getAwsAccessKey() {
@@ -960,7 +1000,15 @@ public abstract class Config {
         public void setSeverityLevels(List<String> severityLevels) {
             this.severityLevels = severityLevels;
         }
-       
+
+        public List<String> getThreatPolicies() {
+            return threatPolicies;
+        }
+
+        public void setThreatPolicies(List<String> threatPolicies) {
+            this.threatPolicies = threatPolicies;
+        }
+
     }
 
     @BsonDiscriminator

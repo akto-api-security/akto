@@ -33,6 +33,7 @@ public class CloudflareWafAction extends UserAction {
     private String accountOrZoneId;   // Cloudflare account ID (always required for lists)
     private String zoneId;            // Cloudflare zone ID (required when integrationType = "zones")
     private List<String> severityLevels;
+    private List<String> threatPolicies;
 
     private Config.CloudflareWafConfig cloudflareWafConfig;
 
@@ -63,7 +64,7 @@ public class CloudflareWafAction extends UserAction {
             setApiKey(existingConfig.getApiKey());
         }
 
-        Config.CloudflareWafConfig config = new Config.CloudflareWafConfig(apiKey, email, integrationType, accountOrZoneId, accId, severityLevels);
+        Config.CloudflareWafConfig config = new Config.CloudflareWafConfig(apiKey, email, integrationType, accountOrZoneId, accId, severityLevels, threatPolicies);
         if (isZoneLevel) {
             config.setZoneId(zoneId);
         }
@@ -109,6 +110,7 @@ public class CloudflareWafAction extends UserAction {
                     Updates.set(Config.CloudflareWafConfig.INTEGRATION_TYPE, integrationType),
                     Updates.set(Config.CloudflareWafConfig.EMAIL, email),
                     Updates.set(Config.CloudflareWafConfig.SEVERITY_LEVELS, severityLevels),
+                    Updates.set(Config.CloudflareWafConfig.THREAT_POLICIES, threatPolicies),
                     Updates.set(Config.CloudflareWafConfig.LIST_IDS, listIds),
                     Updates.set(Config.CloudflareWafConfig.RULE_ID, ruleId),
                     Updates.set(Config.CloudflareWafConfig.ZONE_ID, zoneId)
@@ -584,6 +586,8 @@ public class CloudflareWafAction extends UserAction {
     public void setIntegrationType(String integrationType) { this.integrationType = integrationType; }
     public List<String> getSeverityLevels() { return severityLevels; }
     public void setSeverityLevels(List<String> severityLevels) { this.severityLevels = severityLevels; }
+    public List<String> getThreatPolicies() { return threatPolicies; }
+    public void setThreatPolicies(List<String> threatPolicies) { this.threatPolicies = threatPolicies; }
     public String getZoneId() { return zoneId; }
     public void setZoneId(String zoneId) { this.zoneId = zoneId; }
 }
