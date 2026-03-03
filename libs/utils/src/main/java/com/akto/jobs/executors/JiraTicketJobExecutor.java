@@ -130,13 +130,18 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
 
             JiraMetaData meta;
             try {
-                URI url = new URI(id.getApiInfoKey().getUrl());
-                String hostname = url.getHost();
-                String endpoint = url.getPath();
+                String url = issue.getId().getApiInfoKey().getUrl();
+                String host = "";
+                try {
+                    URI uri = new URI(url);
+                    host = uri.getHost();
+                } catch (Exception e) {
+                    // TODO: handle exception
+                }
                 meta = new JiraMetaData(
                     info.getName(),
-                    "Host - " + hostname,
-                    endpoint,
+                    "Host - " + host,
+                    url,
                     dashboardUrl + "/dashboard/issues?result=" + testingRunResult.getId().toHexString(),
                     info.getDescription(),
                     id,
@@ -363,7 +368,8 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         }
     }
 
-    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData meta, Severity severity, String issueType, String projId, JiraIntegration jira) {
+    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData meta, Severity severity, String issueType, String projId,
+                                                    JiraIntegration jira) {
         String method = meta.getTestingIssueId().getApiInfoKey().getMethod().name();
         String endpoint = meta.getEndPointStr().replace("Endpoint - ", "");
         String truncated = endpoint.length() > 30 ? endpoint.substring(0, 15) + "..." + endpoint.substring(endpoint.length() - 15) : endpoint;
