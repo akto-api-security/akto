@@ -47,7 +47,7 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.io.File;
-import java.net.URL;
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -130,17 +130,19 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
 
             JiraMetaData meta;
             try {
-                URL url = new URL(id.getApiInfoKey().getUrl());
+                URI url = new URI(id.getApiInfoKey().getUrl());
+                String hostname = url.getHost();
+                String endpoint = url.getPath();
                 meta = new JiraMetaData(
                     info.getName(),
-                    "Host - " + url.getHost(),
-                    url.getPath(),
+                    "Host - " + hostname,
+                    endpoint,
                     dashboardUrl + "/dashboard/issues?result=" + testingRunResult.getId().toHexString(),
                     info.getDescription(),
                     id,
                     summaryId,
                     null,
-                    ""
+                    null
                 );
             } catch (Exception e) {
                 logger.error("Error parsing URL for issue {}: {}", id, e.getMessage(), e);
