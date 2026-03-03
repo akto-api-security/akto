@@ -1,6 +1,7 @@
 package com.akto.dto.test_run_findings;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.wiz_integration.WizFinding;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 
@@ -50,8 +51,9 @@ public class TestingRunIssues {
     private String servicenowIssueUrl;
     public static final String DEVREV_WORK_URL = "devrevWorkUrl";
     private String devrevWorkUrl;
-    public static final String WIZ_FINDING_URL = "wizFindingUrl";
-    private String wizFindingUrl;
+
+    public static final String WIZ_FINDING = "wizFinding";
+    private WizFinding wizFinding;
 
     public static final String ID_API_COLLECTION_ID = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.API_COLLECTION_ID;
     public static final String ID_URL = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL;
@@ -261,11 +263,11 @@ public class TestingRunIssues {
         this.devrevWorkUrl = devrevWorkUrl;
     }
 
-    public String getWizFindingUrl() {
-        return wizFindingUrl;
+    public WizFinding getWizFinding() {
+        return wizFinding;
     }
 
-    public void setWizFindingUrl(String wizFindingUrl) {
-        this.wizFindingUrl = wizFindingUrl;
+    public void setWizFinding(WizFinding wizFinding) {
+        this.wizFinding = wizFinding;
     }
 }
