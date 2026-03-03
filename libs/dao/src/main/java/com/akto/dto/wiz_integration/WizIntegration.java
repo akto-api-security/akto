@@ -22,6 +22,9 @@ public class WizIntegration {
     public static final String TOKEN_EXPIRY_TS = "tokenExpiryTs";
     public static final String CREATED_TS = "createdTs";
     public static final String UPDATED_TS = "updatedTs";
+    public static final String LAST_SYNC_TS = "lastSyncTs";
+    public static final String SYSTEM_ACTIVITY_ID = "systemActivityId";
+    public static final String LAST_UPLOADED_SCAN_TS = "lastUploadedScanTs";
 
     // OAuth 2.0 Client Credentials
     private String clientId;
@@ -39,6 +42,12 @@ public class WizIntegration {
     private int createdTs;
     private int updatedTs;
 
+    // Timestamp of the last successful sync with Wiz
+    private long lastSyncTs;
+
+    // System action status (for tracking status of uploaded security scans)
+    private String systemActivityId;
+    private long lastUploadedScanTs;
 
     public boolean isTokenValid() {
         return accessToken != null &&
