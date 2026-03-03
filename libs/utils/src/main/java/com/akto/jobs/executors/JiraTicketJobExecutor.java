@@ -47,7 +47,7 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.io.File;
-import java.net.URL;
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -130,17 +130,24 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
 
             JiraMetaData meta;
             try {
-                URL url = new URL(id.getApiInfoKey().getUrl());
+                String url = issue.getId().getApiInfoKey().getUrl();
+                String host = "";
+                try {
+                    URI uri = new URI(url);
+                    host = uri.getHost();
+                } catch (Exception e) {
+                    // TODO: handle exception
+                }
                 meta = new JiraMetaData(
                     info.getName(),
-                    "Host - " + url.getHost(),
-                    url.getPath(),
+                    "Host - " + host,
+                    url,
                     dashboardUrl + "/dashboard/issues?result=" + testingRunResult.getId().toHexString(),
                     info.getDescription(),
                     id,
                     summaryId,
                     null,
-                    ""
+                    null
                 );
             } catch (Exception e) {
                 logger.error("Error parsing URL for issue {}: {}", id, e.getMessage(), e);
@@ -361,7 +368,8 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         }
     }
 
-    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData meta, Severity severity, String issueType, String projId, JiraIntegration jira) {
+    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData meta, Severity severity, String issueType, String projId,
+                                                    JiraIntegration jira) {
         String method = meta.getTestingIssueId().getApiInfoKey().getMethod().name();
         String endpoint = meta.getEndPointStr().replace("Endpoint - ", "");
         String truncated = endpoint.length() > 30 ? endpoint.substring(0, 15) + "..." + endpoint.substring(endpoint.length() - 15) : endpoint;
