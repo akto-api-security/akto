@@ -25,7 +25,7 @@ import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
 import useThreatReportDownload from "../../hooks/useThreatReportDownload";
 import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
-
+import { updateThreatFiltersStore } from "./utils/threatFilters";
 const convertToGraphData = (severityMap) => {
     let dataArr = []
     Object.keys(severityMap).forEach((x) => {
@@ -239,12 +239,36 @@ function ThreatDetectionPage() {
     
     const [eventState, setEventState] = useState(initialEventState);
     const [triggerTableRefresh, setTriggerTableRefresh] = useState(0)
-    const getInitialDateRange = () => {
+    const initialVal = useMemo(() => {
+        // Support navigation from dashboard with period passed via location state
+        const period = location.state?.period;
+        if (period?.since != null && period?.until != null) {
+            return {
+                alias: 'custom',
+                title: 'Custom',
+                period: {
+                    since: period.since instanceof Date ? period.since : new Date(period.since),
+                    until: period.until instanceof Date ? period.until : new Date(period.until)
+                }
+            };
+        }
+        // Support range alias preset (e.g. ?range=last7days)
         const rangeAlias = searchParams.get('range');
         if (rangeAlias) {
             const preset = values.ranges.find((r) => r.alias === rangeAlias);
             if (preset) return preset;
         }
+        // Support startTimestamp/endTimestamp params
+        const startTs = searchParams.get('startTimestamp');
+        const endTs = searchParams.get('endTimestamp');
+        if (startTs && endTs) {
+            const since = new Date(parseInt(startTs, 10) * 1000);
+            const until = new Date(parseInt(endTs, 10) * 1000);
+            if (!Number.isNaN(since.getTime()) && !Number.isNaN(until.getTime())) {
+                return { alias: 'custom', title: 'Custom', period: { since, until } };
+            }
+        }
+        // Support since/until params with formatted title
         const sinceParam = searchParams.get('since');
         const untilParam = searchParams.get('until');
         if (sinceParam != null && untilParam != null) {
@@ -254,13 +278,24 @@ function ThreatDetectionPage() {
                 const sinceDate = new Date(sinceTs * 1000);
                 const untilDate = new Date(untilTs * 1000);
                 const title = sinceDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) + " - " + untilDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
-                return { alias: "custom", title, period: { since: sinceDate, until: untilDate } };
+                return { alias: 'custom', title, period: { since: sinceDate, until: untilDate } };
             }
         }
         return values.ranges[2];
-    };
-    const initialDateRange = getInitialDateRange();
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialDateRange);
+    }, [location.state, searchParams]);
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
+
+    useEffect(() => {
+        const startTs = searchParams.get('startTimestamp');
+        const endTs = searchParams.get('endTimestamp');
+        if (startTs && endTs) {
+            const since = new Date(parseInt(startTs, 10) * 1000);
+            const until = new Date(parseInt(endTs, 10) * 1000);
+            if (!Number.isNaN(since.getTime()) && !Number.isNaN(until.getTime())) {
+                dispatchCurrDateRange({ type: 'update', period: { since, until }, title: 'Custom', alias: 'custom' });
+            }
+        }
+    }, [searchParams]);
     const [showDetails, setShowDetails] = useState(false);
     const [sampleData, setSampleData] = useState([])
     const [showNewTab, setShowNewTab] = useState(false)
@@ -275,6 +310,22 @@ function ThreatDetectionPage() {
     const [pendingRowContext, setPendingRowContext] = useState(null);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const resp = await api.fetchFilterYamlTemplate();
+                const templates = Array.isArray(resp?.templates) ? resp.templates : [];
+                if (!cancelled && templates.length > 0) {
+                    updateThreatFiltersStore(templates);
+                }
+            } catch (e) {
+                if (!cancelled) console.error(`Failed to load threat filter templates: ${e?.message}`);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
 
     const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000)
     const endTimestamp = parseInt(currDateRange.period.until.getTime()/1000)

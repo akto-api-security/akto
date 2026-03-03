@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useReducer } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { HorizontalStack, Box, Text, Spinner, Button, Card, VerticalStack, HorizontalGrid } from '@shopify/polaris'
 import { produce } from 'immer'
 import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCards'
@@ -10,15 +11,16 @@ import ServersLayout from './atlusPosture/ServersLayout'
 import AttackWorldMap from './atlusPosture/AttackWorldMap'
 import ComplianceAtRisksCard from './new_components/ComplianceAtRisksCard'
 import ThreatCategoryStackedChartWrapper from './atlusPosture/ThreatCategoryStackedChartWrapper'
+import { formatName } from './atlusPosture/ThreatCategoryChart'
 import CustomLineChart from './new_components/CustomLineChart'
 import ChartypeComponent from '../testing/TestRunsPage/ChartypeComponent'
 import dashboardApi from './api'
 import api from '../observe/api'
 import func from '@/util/func'
 import values from '@/util/values'
-import { getTypeFromTags, CLIENT_TYPES, getDomainForFavicon } from '../observe/agentic/mcpClientHelper'
+import { getTypeFromTags, CLIENT_TYPES, formatDisplayName, getMcpServerDisplayName, getFriendlyLlmName } from '../observe/agentic/mcpClientHelper'
 import { extractEndpointId } from '../observe/agentic/constants'
-import { GridLayout } from 'react-grid-layout'
+import { GridLayout, verticalCompactor } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 import './endpoint-posture.css'
@@ -50,14 +52,46 @@ const cleanHostname = (hostname) => {
     return hostname
 }
 
-const processAgenticCollections = (collections, topN = 4) => {
+const BROWSER_PREFIXES = ['safari','chrome','firefox','edge','brave','opera', 'vivaldi','arc','crios','fxios','edgios']
+
+const getMcpServerName = (displayName) => {
+    if (!displayName || !displayName.includes('.')) return displayName
+    const parts = displayName.split('.')
+    return parts.length >= 2 ? parts.slice(1).join('.') : displayName
+}
+
+const getLlmName = (displayName) => {
+    if (!displayName || !displayName.includes('.')) return displayName
+    const parts = displayName.split('.')
+    const first = (parts[0] || '').toLowerCase()
+    if (BROWSER_PREFIXES.includes(first)) {
+        return parts.slice(1).join('.')
+    }
+    return displayName
+}
+
+const getAgentNameFromMcpDisplayName = (displayName) => {
+    if (!displayName || !displayName.includes('.')) return null
+    const parts = displayName.split('.')
+    return parts.length >= 2 ? parts[0] : null
+}
+
+const processAgenticCollections = (collections, topN = 10) => {
     const typeGroups = {
         [CLIENT_TYPES.MCP_SERVER]: {},
         [CLIENT_TYPES.LLM]: {},
-        [CLIENT_TYPES.AI_AGENT]: {}
+        [CLIENT_TYPES.AI_AGENT]: {},
+        agentNames: {}
     }
 
     const uniqueEndpointIds = new Set()
+
+    const ensureGroup = (group, key, displayLabel) => {
+        if (!group[key]) {
+            group[key] = { name: displayLabel ?? key, count: 0, endpoints: new Set(), hostNames: new Set(), domain: key }
+        }
+        return group[key]
+    }
 
     collections.forEach(c => {
         if (c.deactivated) return
@@ -68,59 +102,84 @@ const processAgenticCollections = (collections, topN = 4) => {
         const displayName = cleanHostname(rawDisplayName)
         const endpointId = extractEndpointId(hostName)
 
-        // Track unique endpoints
         if (endpointId) {
             uniqueEndpointIds.add(endpointId)
         }
 
-        // Group by collection name and type
-        if (!typeGroups[clientType][displayName]) {
-            typeGroups[clientType][displayName] = {
-                name: displayName,
-                count: 0,
-                endpoints: new Set()
-            }
-        }
+        if (clientType === CLIENT_TYPES.MCP_SERVER) {
+            const mcpServerName = getMcpServerName(displayName)
+            const g = ensureGroup(typeGroups[CLIENT_TYPES.MCP_SERVER], mcpServerName, getMcpServerDisplayName(mcpServerName))
+            g.count++
+            if (endpointId) g.endpoints.add(endpointId)
+            g.hostNames.add(hostName)
 
-        typeGroups[clientType][displayName].count++
-        if (endpointId) {
-            typeGroups[clientType][displayName].endpoints.add(endpointId)
+            const agentName = getAgentNameFromMcpDisplayName(displayName)
+            if (agentName) {
+                const label = formatDisplayName(agentName)
+                const gAgent = ensureGroup(typeGroups.agentNames, agentName, label)
+                gAgent.count++
+                if (endpointId) gAgent.endpoints.add(endpointId)
+                gAgent.hostNames.add(hostName)
+            }
+        } else if (clientType === CLIENT_TYPES.LLM) {
+            const llmName = getLlmName(displayName)
+            const g = ensureGroup(typeGroups[CLIENT_TYPES.LLM], llmName, getFriendlyLlmName(llmName))
+            g.count++
+            if (endpointId) g.endpoints.add(endpointId)
+            g.hostNames.add(hostName)
+        } else if (clientType === CLIENT_TYPES.AI_AGENT) {
+            const g = ensureGroup(typeGroups[CLIENT_TYPES.AI_AGENT], displayName, displayName)
+            g.count++
+            if (endpointId) g.endpoints.add(endpointId)
+            g.hostNames.add(hostName)
         }
     })
 
-    // Convert to arrays and sort by count, take top N
-    const processGroup = (type) =>
-        Object.values(typeGroups[type])
+    const processGroup = (group, groupType) =>
+        Object.values(group)
             .map(g => {
-                const domain = getDomainForFavicon(g.name)
-                const icon = domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : undefined
-                return { name: g.name, value: g.endpoints.size || g.count, icon }
+                const matches = (hostName) => {
+                    if (!hostName || typeof hostName !== 'string') return false
+                    if (groupType === CLIENT_TYPES.MCP_SERVER || groupType === CLIENT_TYPES.LLM) {
+                        return hostName === g.domain || hostName.endsWith('.' + g.domain)
+                    }
+                    if (groupType === 'aiAgent') {
+                        return hostName.includes('.' + g.domain + '.')
+                    }
+                    return true
+                }
+                const hostNamesList = [...g.hostNames].filter(matches)
+                const url = null
+                const filterGroupName = groupType === 'aiAgent' ? g.name : g.domain
+                return { name: g.name, value: g.endpoints.size || g.count, hostName: [...g.hostNames][0], url, hostNames: hostNamesList, filterGroupName }
             })
             .sort((a, b) => b.value - a.value)
             .slice(0, topN)
 
     return {
-        mcpServers: processGroup(CLIENT_TYPES.MCP_SERVER),
-        llms: processGroup(CLIENT_TYPES.LLM),
-        aiAgents: processGroup(CLIENT_TYPES.AI_AGENT),
+        mcpServers: processGroup(typeGroups[CLIENT_TYPES.MCP_SERVER], CLIENT_TYPES.MCP_SERVER),
+        llms: processGroup(typeGroups[CLIENT_TYPES.LLM], CLIENT_TYPES.LLM),
+        aiAgents: processGroup(typeGroups.agentNames).length > 0 ? processGroup(typeGroups.agentNames, 'aiAgent') : processGroup(typeGroups[CLIENT_TYPES.AI_AGENT], 'aiAgent'),
         totalEndpoints: uniqueEndpointIds.size
     }
 }
 
 // Default layout configuration - each component is independently draggable/resizable
+// Attack Flow Map hidden for now (no data) - entry commented out below; uncomment to re-enable
 const defaultLayout = [
     { i: 'summary', x: 0, y: 0, w: 12, h: 3, minW: 6, minH: 2, maxH: 6 },
     { i: 'mcpServers', x: 0, y: 3, w: 4, h: 4, minW: 3, minH: 3, maxH: 10 },
     { i: 'llms', x: 4, y: 3, w: 4, h: 4, minW: 3, minH: 3, maxH: 10 },
     { i: 'aiAgents', x: 8, y: 3, w: 4, h: 4, minW: 3, minH: 3, maxH: 10 },
-    { i: 'attackFlowMap', x: 0, y: 8, w: 6, h: 6, minW: 4, minH: 4, maxH: 18 },
-    { i: 'complianceAtRisks', x: 6, y: 8, w: 6, h: 6, minW: 4, minH: 4, maxH: 18 },
-    { i: 'threatCategory', x: 0, y: 14, w: 12, h: 9.5, minW: 6, minH: 4, maxH: 18 },
-    { i: 'dataProtectionTrends', x: 0, y: 23.5, w: 6, h: 7, minW: 4, minH: 4, maxH: 18 },
-    { i: 'guardrailPolicies', x: 6, y: 23.5, w: 6, h: 7, minW: 4, minH: 4, maxH: 18 }
+    // { i: 'attackFlowMap', x: 0, y: 8, w: 6, h: 6, minW: 4, minH: 4, maxH: 18 },
+    { i: 'complianceAtRisks', x: 0, y: 8, w: 12, h: 4, minW: 4, minH: 4, maxH: 18 },
+    { i: 'threatCategory', x: 0, y: 14, w: 12, h: 8.5, minW: 6, minH: 4, maxH: 18 },
+    { i: 'dataProtectionTrends', x: 0, y: 23.5, w: 6, h: 5, minW: 4, minH: 4, maxH: 18 },
+    { i: 'guardrailPolicies', x: 6, y: 23.5, w: 6, h: 5, minW: 4, minH: 4, maxH: 18 }
 ]
 
 function EndpointPosture() {
+    const navigate = useNavigate()
     const [summaryInfoData, setSummaryInfoData] = useState([])
     const [commonMcpServers, setCommonMcpServers] = useState([])
     const [commonLlmsInBrowsers, setCommonLlmsInBrowsers] = useState([])
@@ -137,10 +196,11 @@ function EndpointPosture() {
     const containerRef = useRef(null)
     const [gridWidth, setGridWidth] = useState(1200)
 
-    // Load layout from localStorage or use default
+    // Load layout from localStorage or use default (strip attackFlowMap if present in saved layout)
     const [layout, setLayout] = useState(() => {
         const savedLayout = localStorage.getItem('endpointDashboardLayout')
-        return savedLayout ? JSON.parse(savedLayout) : defaultLayout
+        const parsed = savedLayout ? JSON.parse(savedLayout) : defaultLayout
+        return Array.isArray(parsed) ? parsed.filter(item => item.i !== 'attackFlowMap') : defaultLayout
     })
 
     // State to track which widgets are visible
@@ -171,11 +231,20 @@ function EndpointPosture() {
         }
 
         window.addEventListener('resize', updateWidth)
+        // Recompute layout when zoom changes (visualViewport resize fires on zoom)
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', updateWidth)
+            window.visualViewport.addEventListener('scroll', updateWidth)
+        }
 
         return () => {
             if (rafId) cancelAnimationFrame(rafId)
             if (resizeObserver) resizeObserver.disconnect()
             window.removeEventListener('resize', updateWidth)
+            if (window.visualViewport) {
+                window.visualViewport.removeEventListener('resize', updateWidth)
+                window.visualViewport.removeEventListener('scroll', updateWidth)
+            }
         }
     }, [])
 
@@ -201,7 +270,7 @@ function EndpointPosture() {
 
                 // Process collections to get component data (like Endpoints.jsx does)
                 const collections = collectionsResponse?.apiCollections || []
-                const { mcpServers, llms, aiAgents, totalEndpoints } = processAgenticCollections(collections, 4)
+                const { mcpServers, llms, aiAgents, totalEndpoints } = processAgenticCollections(collections, 10)
 
                 // Extract values from guardrail response
                 const sensitiveCount = guardrailResponse?.sensitiveCount || 0
@@ -211,7 +280,7 @@ function EndpointPosture() {
                 const summaryData = [
                     {
 
-                        title: "Total Endpoint Components",
+                        title: "Total Agentic Assests",
                         data: totalEndpoints.toString(),
                         variant: 'heading2xl',
                     },
@@ -239,9 +308,9 @@ function EndpointPosture() {
                 setCommonLlmsInBrowsers(llms)
                 setCommonAiAgents(aiAgents)
 
-                // Get attack flows from guardrail response (consolidated into single API call)
-                const attackFlows = guardrailResponse?.attackFlows || []
-                setAttackRequests(attackFlows)
+                // Attack Flow Map hidden for now - uncomment to re-enable
+                // const attackFlows = guardrailResponse?.attackFlows || []
+                // setAttackRequests(attackFlows)
 
                 // Process Data Protection Trends - dynamic categories
                 const dataProtectionTrends = guardrailResponse?.dataProtectionTrends || {}
@@ -249,21 +318,19 @@ function EndpointPosture() {
                 // Define colors for top 3 categories
                 const categoryColors = ['#3b82f6', '#ef4444', '#10b981']
 
-                // Helper function to format category names
-                const formatCategoryName = (category) => {
-                    if (!category) return 'Unknown'
-                    return category
-                        .replace(/_/g, ' ')
-                        .toLowerCase()
-                        .replace(/\b\w/g, l => l.toUpperCase())
-                }
-
-                // Convert dynamic category keys to chart data
-                const trendsChartData = Object.keys(dataProtectionTrends).map((category, index) => ({
-                    name: formatCategoryName(category),
-                    color: categoryColors[index] || '#9ca3af', // Use gray as fallback
-                    data: dataProtectionTrends[category] || []
-                }))
+                // Convert dynamic category keys to chart data (support both { data, filterId } and legacy array format)
+                const trendsChartData = Object.keys(dataProtectionTrends).map((category, index) => {
+                    const raw = dataProtectionTrends[category]
+                    const isObj = raw && typeof raw === 'object' && !Array.isArray(raw)
+                    const data = isObj ? (raw.data || []) : (raw || [])
+                    const filterId = isObj ? raw.filterId : null
+                    return {
+                        name: formatName(category),
+                        color: categoryColors[index] || '#9ca3af',
+                        data,
+                        filterId
+                    }
+                })
 
                 setDataProtectionTrendsData(trendsChartData)
 
@@ -272,9 +339,10 @@ function EndpointPosture() {
                 const guardrailPoliciesObject = {}
                 const guardrailColors = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'] // red, amber, blue, green
                 topGuardrailPolicies.forEach((policy, index) => {
-                    guardrailPoliciesObject[policy.name] = {
+                    guardrailPoliciesObject[formatName(policy.name)] = {
                         text: policy.count,
-                        color: guardrailColors[index % guardrailColors.length]
+                        color: guardrailColors[index % guardrailColors.length],
+                        filterValue: policy.filterId
                     }
                 })
                 setGuardrailPoliciesData(guardrailPoliciesObject)
@@ -289,7 +357,7 @@ function EndpointPosture() {
                     return {
                         name: compliance.name,
                         percentage: Math.round(compliance.percentage || 0),
-                        color: complianceColors[index] || '#6b7280', // Use gray as fallback
+                        color: '#dc2626', // Use red for all
                         icon: func.getComplianceIcon(compliance.name)
                     }
                 })
@@ -317,10 +385,11 @@ function EndpointPosture() {
         )
     }
 
-    // Handler for layout changes (drag/resize)
+    // Handler for layout changes (drag/resize) - keep attackFlowMap out of saved layout
     const onLayoutChange = (newLayout) => {
-        setLayout(newLayout)
-        localStorage.setItem('endpointDashboardLayout', JSON.stringify(newLayout))
+        const filtered = newLayout.filter(item => item.i !== 'attackFlowMap')
+        setLayout(filtered)
+        localStorage.setItem('endpointDashboardLayout', JSON.stringify(filtered))
     }
 
     // Hide widget
@@ -330,14 +399,12 @@ function EndpointPosture() {
         localStorage.setItem('endpointDashboardHidden', JSON.stringify(newHidden))
     }
 
-    // Reset layout to default and show all widgets
+    // Reset layout to default and show all widgets (strip attackFlowMap if present)
     const resetLayout = () => {
-        // Create a deep copy to force re-render
-        const resetLayoutCopy = JSON.parse(JSON.stringify(defaultLayout))
+        const resetLayoutCopy = JSON.parse(JSON.stringify(defaultLayout)).filter(item => item.i !== 'attackFlowMap')
         setLayout(resetLayoutCopy)
         localStorage.removeItem('endpointDashboardLayout')
 
-        // Show all widgets
         setHiddenWidgets([])
         localStorage.removeItem('endpointDashboardHidden')
     }
@@ -362,13 +429,40 @@ function EndpointPosture() {
     const hasLlms = commonLlmsInBrowsers && commonLlmsInBrowsers.length > 0
     const hasAiAgents = commonAiAgents && commonAiAgents.length > 0
 
+    const handleSummaryCardClick = (index) => {
+        if (index === 0) {
+            navigate('/dashboard/observe/agentic-assets')
+        } else if (index === 1) {
+            const filterStr = 'successfulExploit__true'
+            const targetPath = '/dashboard/protection/threat-activity'
+            sessionStorage.setItem('akto_spaFilterNav', 'true')
+            sessionStorage.setItem('akto_spaNavFilter', filterStr)
+            sessionStorage.setItem('akto_spaNavPath', targetPath)
+            sessionStorage.setItem('akto_spaNavExpiry', String(Date.now() + 15000))
+            navigate(`${targetPath}?filters=${encodeURIComponent(filterStr)}#active`, {
+                state: { period: { since: currDateRange.period.since, until: currDateRange.period.until } }
+            })
+        } else {
+            sessionStorage.setItem('akto_spaFilterNav', 'true')
+            navigate('/dashboard/protection/threat-activity?filters=#active', {
+                state: { period: { since: currDateRange.period.since, until: currDateRange.period.until } }
+            })
+        }
+    }
+
     const summaryHeader = (
         <Card>
             <VerticalStack gap={4}>
                 <ComponentHeader title='Endpoint Summary' itemId='summary' onRemove={hideWidget} tooltipContent="Overview of key endpoint security metrics" />
                 <HorizontalGrid columns={summaryInfoData.length} gap={4}>
                     {summaryInfoData.map((item, index) => (
-                        <Box borderInlineEndWidth={index < (summaryInfoData.length - 1) ? "1" : ""} key={index} borderColor="transparent">
+                        <Box
+                            borderInlineEndWidth={index < (summaryInfoData.length - 1) ? "1" : ""}
+                            key={index}
+                            borderColor="transparent"
+                            cursor="pointer"
+                            onClick={() => handleSummaryCardClick(index)}
+                        >
                             <HorizontalStack>
                                 <VerticalStack gap="4">
                                     <TitleWithInfo
@@ -383,7 +477,7 @@ function EndpointPosture() {
                                     <HorizontalGrid gap={1} columns={2}>
                                         <VerticalStack gap={4}>
                                             {item?.isComp ? item.data :
-                                                <div className='custom-color'>
+                                                <div className='custom-color summary-card-number'>
                                                     <Text variant={item.variant ? item.variant : 'bodyLg'} color={item.color ? item.color : ""}>
                                                         {item.data}
                                                     </Text>
@@ -402,6 +496,20 @@ function EndpointPosture() {
         </Card>
     )
 
+
+    const handleAgenticItemClick = (filterGroupName) => {
+        if (!filterGroupName) {
+            navigate('/dashboard/observe/agentic-assets')
+            return
+        }
+        const filterStr = `groupName__${filterGroupName}`
+        sessionStorage.setItem('akto_spaFilterNav', 'true')
+        sessionStorage.setItem('akto_spaNavFilter', filterStr)
+        sessionStorage.setItem('akto_spaNavPath', '/dashboard/observe/agentic-assets')
+        sessionStorage.setItem('akto_spaNavExpiry', String(Date.now() + 15000))
+        navigate(`/dashboard/observe/agentic-assets?filters=${encodeURIComponent(filterStr)}`)
+    }
+
     const mcpServersComponent = (
         <ServersLayout
             title='Common MCP Servers'
@@ -411,6 +519,7 @@ function EndpointPosture() {
             hasItems={hasMcpServers}
             emptyMessage="No MCP servers detected"
             onRemove={hideWidget}
+            onItemClick={handleAgenticItemClick}
         />
     )
 
@@ -423,6 +532,7 @@ function EndpointPosture() {
             hasItems={hasLlms}
             emptyMessage="No LLMs detected"
             onRemove={hideWidget}
+            onItemClick={handleAgenticItemClick}
         />
     )
 
@@ -435,11 +545,47 @@ function EndpointPosture() {
             hasItems={hasAiAgents}
             emptyMessage="No AI agents detected"
             onRemove={hideWidget}
+            onItemClick={handleAgenticItemClick}
         />
     )
 
-    const hasAttackFlowData = attackRequests && attackRequests.length > 0
+    const handleGuardrailPolicyClick = (filterValue) => {
+        navigateToThreatActivityWithFilter(filterValue)
+    }
+
+    const navigateToThreatActivityWithFilter = (filterId) => {
+        if (!filterId) return
+        const filterStr = `latestAttack__${filterId}`
+        const targetPath = '/dashboard/protection/threat-activity'
+        sessionStorage.setItem('akto_spaFilterNav', 'true')
+        sessionStorage.setItem('akto_spaNavFilter', filterStr)
+        sessionStorage.setItem('akto_spaNavPath', targetPath)
+        sessionStorage.setItem('akto_spaNavExpiry', String(Date.now() + 15000))
+        navigate(
+            `${targetPath}?filters=${encodeURIComponent(filterStr)}#active`,
+            { state: { period: { since: currDateRange.period.since, until: currDateRange.period.until } } }
+        )
+    }
+
+    const handleDataProtectionTrendPointClick = function() {
+        const seriesName = this.series?.name
+        const matchingTrend = dataProtectionTrendsData.find(item => item.name === seriesName)
+        navigateToThreatActivityWithFilter(matchingTrend?.filterId)
+    }
+
+    // Attack Flow Map hidden for now - uncomment to re-enable
+    // const hasAttackFlowData = attackRequests && attackRequests.length > 0
     const hasComplianceData = complianceData && complianceData.length > 0
+
+    const handleThreatCategoryClick = (rawName) => {
+        if (!rawName || rawName === 'Other') {
+            navigate('/dashboard/protection/threat-activity', {
+                state: { period: { since: currDateRange.period.since, until: currDateRange.period.until } }
+            })
+            return
+        }
+        navigateToThreatActivityWithFilter(rawName)
+    }
 
     const threatCategoryStackedChartComponent = (
         <ThreatCategoryStackedChartWrapper
@@ -447,31 +593,28 @@ function EndpointPosture() {
             endTimestamp={getTimeEpoch("until")}
             itemId='threatCategory'
             onRemoveComponent={hideWidget}
+            onCategoryClick={handleThreatCategoryClick}
         />
     )
 
-    const attackFlowMapComponent = hasAttackFlowData ? (
-        <AttackWorldMap
-            attackRequests={attackRequests}
-            style={{
-                width: "100%",
-                height: "100%",
-                marginRight: "auto",
-            }}
-            itemId='attackFlowMap'
-            onRemoveComponent={hideWidget}
-        />
-    ) : (
-        <CardWithHeader
-            title='Attack Flow Map'
-            itemId='attackFlowMap'
-            onRemove={hideWidget}
-            tooltipContent="Geographic visualization of attack sources"
-            hasData={false}
-            emptyMessage="No attack flow data in the selected period"
-            minHeight="300px"
-        />
-    )
+    // const attackFlowMapComponent = hasAttackFlowData ? (
+    //     <AttackWorldMap
+    //         attackRequests={attackRequests}
+    //         style={{ width: "100%", height: "100%", marginRight: "auto" }}
+    //         itemId='attackFlowMap'
+    //         onRemoveComponent={hideWidget}
+    //     />
+    // ) : (
+    //     <CardWithHeader
+    //         title='Attack Flow Map'
+    //         itemId='attackFlowMap'
+    //         onRemove={hideWidget}
+    //         tooltipContent="Geographic visualization of attack sources"
+    //         hasData={false}
+    //         emptyMessage="No attack flow data in the selected period"
+    //         minHeight="300px"
+    //     />
+    // )
 
     const complianceAtRisksComponent = hasComplianceData ? (
         <ComplianceAtRisksCard
@@ -496,7 +639,8 @@ function EndpointPosture() {
 
     const dataProtectionTrendsLabels = dataProtectionTrendsData.map(item => ({
         label: item.name,
-        color: item.color
+        color: item.color,
+        filterId: item.filterId
     }))
 
     const hasDataProtectionTrends = dataProtectionTrendsData && dataProtectionTrendsData.length > 0 &&
@@ -511,6 +655,8 @@ function EndpointPosture() {
             itemId='dataProtectionTrends'
             onRemoveComponent={hideWidget}
             tooltipContent="Trends showing how data protection mechanisms are being triggered over time"
+            graphPointClick={handleDataProtectionTrendPointClick}
+            onLabelClick={navigateToThreatActivityWithFilter}
         />
     ) : (
         <CardWithHeader
@@ -542,6 +688,7 @@ function EndpointPosture() {
                     chartOnLeft={true}
                     dataTableWidth="250px"
                     pieInnerSize="50%"
+                    onSegmentClick={handleGuardrailPolicyClick}
                 />
             </Box>
         </CardWithHeader>
@@ -560,7 +707,7 @@ function EndpointPosture() {
             primaryAction={resetButton}
             secondaryActions={[dateRangeFilter]}
             components={[
-                <div key="grid-container" ref={containerRef} style={{ width: '100%' }}>
+                <div key="grid-container" ref={containerRef} style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
                     <GridLayout
                         width={gridWidth}
                         layout={layout.filter(item => isWidgetVisible(item.i))}
@@ -577,7 +724,7 @@ function EndpointPosture() {
                         resizeConfig={{
                             enabled: true
                         }}
-                        compactor={null}
+                        compactor={verticalCompactor}
                         onLayoutChange={onLayoutChange}
                     >
                         {isWidgetVisible('summary') && (
@@ -604,11 +751,10 @@ function EndpointPosture() {
                             </div>
                         )}
 
-                        {isWidgetVisible('attackFlowMap') && (
-                            <div key="attackFlowMap">
-                                {attackFlowMapComponent}
-                            </div>
-                        )}
+                        {/* Attack Flow Map hidden for now - uncomment layout entry, component, and this block to re-enable */}
+                        {/* {isWidgetVisible('attackFlowMap') && (
+                            <div key="attackFlowMap">{attackFlowMapComponent}</div>
+                        )} */}
 
                         {isWidgetVisible('complianceAtRisks') && (
                             <div key="complianceAtRisks">
