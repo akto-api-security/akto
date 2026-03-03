@@ -4988,6 +4988,9 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
 
+        loggerMaker.infoAndAddToDb("Starting import of OpenAPI spec for accountId=" + accountId);
+        loggerMaker.infoAndAddToDb("OpenAPI spec: " + openApiSchema);
+
         // Submit task to a separate executor with timeout
         new Thread(new Runnable() {
             public void run() {
