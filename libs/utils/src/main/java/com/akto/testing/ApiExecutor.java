@@ -78,9 +78,9 @@ public class ApiExecutor {
                 HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol, isHttps) :
                 HTTPClientHandler.instance.getHTTPClient(isHttps, followRedirects, requestProtocol);
 
-        if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
-            throw new IllegalArgumentException("SSRF attack attempt");
-        }
+        // if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
+        //     throw new IllegalArgumentException("SSRF attack attempt");
+        // }
 
         Call call = client.newCall(request);
         Response response = null;

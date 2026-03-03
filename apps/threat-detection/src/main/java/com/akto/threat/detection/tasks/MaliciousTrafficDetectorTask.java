@@ -68,6 +68,8 @@ import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.threat.detection.utils.ThreatDetector;
 import com.akto.threat.detection.utils.Utils;
+// import com.akto.threat.detection.hyperscan.HyperscanThreatMatcher;
+// import com.akto.threat.detection.benchmark.ThreatDetectionBenchmark;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.utils.GzipUtils;
@@ -108,7 +110,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static final FilterConfig ipApiRateLimitFilter = Utils.getipApiRateLimitFilter();
   private static Supplier<String> lazyToString;
   private DistributionCalculator distributionCalculator;
-  private ThreatDetector threatDetector = new ThreatDetector();
+  private com.akto.threat.detection.utils.ThreatDetectorWithStrategy threatDetector;
   private boolean apiDistributionEnabled;
   private ApiCountCacheLayer apiCacheCountLayer;
   private static List<FilterConfig> successfulExploitFilters = new ArrayList<>();
@@ -124,6 +126,17 @@ public class MaliciousTrafficDetectorTask implements Task {
   // Valid hostname tracking (non-IP, not localhost, no port)
   private int validHostnameCount = 0;
   private long lastValidHostnameLogTime = System.currentTimeMillis();
+
+  // Hyperscan configuration (LEGACY - replaced by THREAT_DETECTION_MODE)
+  // USE_HYPERSCAN is deprecated, use THREAT_DETECTION_MODE=HYPERSCAN_ONLY or HYBRID instead
+  private static final boolean USE_HYPERSCAN = Boolean.parseBoolean(
+      System.getenv().getOrDefault("USE_HYPERSCAN", "false")
+  );
+  private static final boolean RUN_BENCHMARK = Boolean.parseBoolean(
+      System.getenv().getOrDefault("RUN_THREAT_BENCHMARK", "false")
+  );
+  // private HyperscanThreatMatcher hyperscanMatcher;
+  // private boolean hyperscanInitialized = false;
 
     public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled, String instanceId) throws Exception {
@@ -175,7 +188,51 @@ public class MaliciousTrafficDetectorTask implements Task {
     this.rawApiFactory = new RawApiMetadataFactory(new IPLookupClient());
     this.distributionCalculator = distributionCalculator;
     this.apiDistributionEnabled = apiDistributionEnabled;
+
+    // Initialize threat detector with strategy pattern
+    this.threatDetector = new com.akto.threat.detection.utils.ThreatDetectorWithStrategy();
+    logger.infoAndAddToDb("Threat detector initialized with strategy: " + this.threatDetector.getStrategyName());
+
+    // Initialize Hyperscan if enabled (legacy - can be removed when fully migrated)
+    // if (USE_HYPERSCAN) {
+    //   initializeHyperscan();
+    // }
   }
+
+  // /**
+  //  * Initialize Hyperscan threat matcher
+  //  */
+  // private void initializeHyperscan() {
+  //   try {
+  //     logger.infoAndAddToDb("Initializing Hyperscan threat matcher...");
+
+  //     String patternFile = System.getenv().getOrDefault(
+  //         "HYPERSCAN_PATTERN_FILE",
+  //         "apps/threat-detection/src/main/resources/patterns/threat-patterns.txt"
+  //     );
+
+  //     hyperscanMatcher = HyperscanThreatMatcher.getInstance();
+  //     hyperscanInitialized = hyperscanMatcher.initialize(patternFile);
+
+  //     if (hyperscanInitialized) {
+  //       logger.infoAndAddToDb(String.format(
+  //           "✓ Hyperscan initialized successfully with %d patterns in %d categories",
+  //           hyperscanMatcher.getPatternCount(),
+  //           hyperscanMatcher.getCategoryCount()
+  //       ));
+
+  //       // Run benchmark if requested
+  //       if (RUN_BENCHMARK) {
+  //         logger.infoAndAddToDb("RUN_THREAT_BENCHMARK=true - Will run benchmark after collecting test data");
+  //       }
+  //     } else {
+  //       logger.errorAndAddToDb("Failed to initialize Hyperscan - falling back to standard regex");
+  //     }
+  //   } catch (Exception e) {
+  //     logger.errorAndAddToDb(e, "Error initializing Hyperscan: " + e.getMessage());
+  //     hyperscanInitialized = false;
+  //   }
+  // }
 
   private int MAX_KAFKA_DEBUG_MSGS = 100;
   private static boolean kafkaPollingEnabled = System.getenv().getOrDefault("KAFKA_POLL_ENABLED", "true").equals("true");
@@ -453,6 +510,61 @@ public class MaliciousTrafficDetectorTask implements Task {
   }
 
 
+  // /**
+  //  * Process record using Hyperscan (NEW APPROACH)
+  //  * Scans URL, headers, and body in a single pass with all patterns
+  //  */
+  // private Map<String, Integer> processRecordWithHyperscan(HttpResponseParams responseParam) {
+  //   Map<String, Integer> categoryMatches = new HashMap<>();
+
+  //   try {
+  //     String url = responseParam.getRequestParams().getURL();
+  //     String headers = responseParam.getRequestParams().getHeaders() != null
+  //         ? responseParam.getRequestParams().getHeaders().toString()
+  //         : "";
+  //     String body = responseParam.getRequestParams().getPayload() != null
+  //         ? responseParam.getRequestParams().getPayload()
+  //         : "";
+
+  //     // Single Hyperscan scan for all patterns
+  //     Map<String, List<HyperscanThreatMatcher.MatchResult>> matches =
+  //         hyperscanMatcher.scanAll(url, headers, body);
+
+  //     // Count matches by category
+  //     for (Map.Entry<String, List<HyperscanThreatMatcher.MatchResult>> entry : matches.entrySet()) {
+  //       String location = entry.getKey();
+  //       List<HyperscanThreatMatcher.MatchResult> locationMatches = entry.getValue();
+
+  //       for (HyperscanThreatMatcher.MatchResult match : locationMatches) {
+  //         String category = match.category;
+  //         categoryMatches.put(category, categoryMatches.getOrDefault(category, 0) + 1);
+
+  //         // Log match details for debugging
+  //         if (isDebugRequest(responseParam)) {
+  //           logger.debugAndAddToDb(String.format(
+  //               "Hyperscan match: %s in %s (category: %s)",
+  //               match.prefix, location, category
+  //           ));
+  //         }
+  //       }
+  //     }
+
+  //     // Log summary if threats detected
+  //     if (!categoryMatches.isEmpty()) {
+  //       logger.debugAndAddToDb(String.format(
+  //           "Hyperscan detected threats in URL %s: %s",
+  //           responseParam.getRequestParams().getURL(),
+  //           categoryMatches
+  //       ));
+  //     }
+
+  //   } catch (Exception e) {
+  //     logger.errorAndAddToDb(e, "Error in Hyperscan processing: " + e.getMessage());
+  //   }
+
+  //   return categoryMatches;
+  // }
+
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
     String actor = this.threatConfigEvaluator.getActorId(responseParam);
@@ -465,6 +577,18 @@ public class MaliciousTrafficDetectorTask implements Task {
       logger.warnAndAddToDb("No filters found for account " + responseParam.getAccountId());
       return;
     }
+
+    // Run Hyperscan scan if enabled (for comparison/logging)
+    // if (USE_HYPERSCAN && hyperscanInitialized) {
+    //   Map<String, Integer> hyperscanMatches = processRecordWithHyperscan(responseParam);
+    //   if (!hyperscanMatches.isEmpty()) {
+    //     logger.infoAndAddToDb(String.format(
+    //         "Hyperscan detected %d threat categories for URL: %s",
+    //         hyperscanMatches.size(),
+    //         responseParam.getRequestParams().getURL()
+    //     ));
+    //   }
+    // }
 
     RawApi rawApi = RawApi.buildFromMessageNew(responseParam);
     RawApiMetadata metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());

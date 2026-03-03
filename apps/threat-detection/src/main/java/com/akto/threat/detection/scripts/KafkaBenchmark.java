@@ -28,12 +28,12 @@ public class KafkaBenchmark {
     public static String FILE_PATH = "sample-payloads/";
     public static String payloadFormat = "json";
     public static String payloadSize = payloadSizes.get(0);
-    public static long numRecords = 41L;
+    public static long numRecords = 10000L;
     
     
     
     public static final String THREAT_TOPIC = "akto.api.logs2";
-    public static final String KAFKA_URL = "localhost:9092";
+    public static final String KAFKA_URL = "localhost:29092";
     private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
     private static KafkaConfig internalKafkaConfig =
         KafkaConfig.newBuilder()
@@ -55,7 +55,8 @@ public class KafkaBenchmark {
         System.out.printf("\n\n*******Running KafkaBenchmark******\n\n");
         System.out.println(String.format("Payload size: %s, Number of records: %,d", payloadSize, numRecords));
         dumpRecords(payloadSize, numRecords);
-        Thread.sleep(numRecords * 1000);
+        System.out.println("Messages sent to Kafka. Check threat-detection consumer for processing metrics.");
+        Thread.sleep(30000); // Wait 30 seconds for processing
 
         // timeFunction(() -> {
         // buildRecords(1024, 100000L);
@@ -94,12 +95,13 @@ public class KafkaBenchmark {
             e.printStackTrace();
         }
 
-        // Add request headers
+        // Add request headers with malicious patterns
         Map<String, StringList> requestHeaders = new HashMap<>();
         requestHeaders.put("content-type", StringList.newBuilder().addValues("application/json").build());
-        requestHeaders.put("authorization", StringList.newBuilder().addValues("Bearer token").build());
-        requestHeaders.put("user-agent", StringList.newBuilder().addValues("KafkaBenchmark/1.0/alert('XSS')").build());
+        requestHeaders.put("authorization", StringList.newBuilder().addValues("Bearer token' OR '1'='1").build());
+        requestHeaders.put("user-agent", StringList.newBuilder().addValues("<script>alert('XSS')</script>").build());
         requestHeaders.put("x-forwarded-for", StringList.newBuilder().addValues("14.143.179.162").build());
+        requestHeaders.put("referer", StringList.newBuilder().addValues("http://evil.com/../../etc/passwd").build());
             
         // Add response headers
         Map<String, StringList> responseHeaders = new HashMap<>();
@@ -108,7 +110,7 @@ public class KafkaBenchmark {
         responseHeaders.put("server", StringList.newBuilder().addValues("nginx").build());
 
         builder.setMethod("POST")
-            .setPath("v1/api/test/orders")
+            .setPath("v1/api/test/orders?id=' UNION SELECT * FROM users--")
             .setType("HTTP/1.1")
             .putAllRequestHeaders(requestHeaders)
             .putAllResponseHeaders(responseHeaders)
