@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.UningestedApiOverageDao;
 import com.akto.dto.*;
 import com.akto.service.ApiCollectionUrlService;
@@ -21,6 +22,7 @@ import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.CollectionTags;
@@ -65,8 +67,6 @@ import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
 import com.akto.utils.scripts.AcesssTypeCollectionLevel;
-import com.akto.dao.ApiCollectionIconsDao;
-import com.akto.dto.ApiCollectionIcon;
 import com.mongodb.client.model.Projections;
 
 public class ApiCollectionsAction extends UserAction {
@@ -1866,6 +1866,16 @@ public class ApiCollectionsAction extends UserAction {
     public String resetCollectionAccessTypes() {
         try {
             int accountId = Context.accountId.get();
+
+            Organization orgInfo = OrganizationsDao.instance.updateOneNoUpsert(
+                    Filters.in(Organization.ACCOUNTS, accountId),
+                    Updates.set(Organization.COLLECTIN_ACCESS_TYPE_ENABLED, true)); 
+            
+            if (orgInfo == null) {
+                loggerMaker.errorAndAddToDb(e, "Error in resetCollectionAccessTypes, no org exists for accountId", LogDb.DASHBOARD);
+                return Action.ERROR.toUpperCase();
+            }    
+
             loggerMaker.infoAndAddToDb("Starting resetCollectionAccessTypes for account: " + accountId + " (background)", LogDb.DASHBOARD);
 
             Runnable r = () -> {
