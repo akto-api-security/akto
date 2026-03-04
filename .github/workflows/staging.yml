@@ -8,9 +8,11 @@ on:
     types: [ submitted ]
   workflow_dispatch:
 
+env:
+  THREAT_VERSION: vthreat-1.12.8
+
 jobs:
   build-threat:
-    # The type of runner that the job will run on
     runs-on: ubuntu-22.04
 
     # Steps represent a sequence of tasks that will be executed as part of the job
@@ -46,11 +48,7 @@ jobs:
           wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
 
       - name: Run mvn package
-        if: ${{github.event.inputs.skipTests == 'False' }}
-        run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version_threat}} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version_threat}}
-      - name: Run mvn package dangerously
-        if: ${{github.event.inputs.skipTests== 'True' }}
-        run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version_threat }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version_threat}} -DskipTests
+        run: mvn package -Dakto-image-tag=${{ env.THREAT_VERSION }} -Dakto-build-time=$(date +%s) -Dakto-release-version=${{ env.THREAT_VERSION }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -76,22 +74,10 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           REGISTRY_ALIAS: p7q3h0z2
-          IMAGE_TAG_THREAT: latest
-          IMAGE_TAG_THREAT_2: ${{github.event.inputs.release_version_threat}}
         run: |
-
           docker buildx create --use
-          # Build a docker container and push it to DockerHub
-          cd apps/dashboard
-          if [[ "${{ github.event.inputs.threat_detection}}" == "true" ]]; then
-            cd ../threat-detection
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection:$IMAGE_TAG_THREAT_2 . --push
-          fi
-
-          if [[ "${{ github.event.inputs.threat_detection_backend}}" == "true" ]]; then
-            cd ../threat-detection-backend
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection-backend:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection-backend:$IMAGE_TAG_THREAT_2 . --push
-          fi
+          cd apps/threat-detection
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection:latest -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection:${{ env.THREAT_VERSION }} . --push
           docker buildx create --use
           
       - name: Set up JDK 11
