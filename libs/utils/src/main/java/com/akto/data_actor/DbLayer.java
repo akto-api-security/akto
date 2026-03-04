@@ -1157,6 +1157,10 @@ public class DbLayer {
         CyborgLogsDao.instance.insertOne(log);
     }
 
+    public static void insertAwsApiGatewayLog(Log log) {
+        AwsApiGatewayLogsDao.instance.insertOne(log);
+    }
+
     public static void insertEndpointShieldLog(LogsEndpointShield log) {
         LogsEndpointShieldDao.instance.insertOne(log);
     }
