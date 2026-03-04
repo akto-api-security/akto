@@ -64,33 +64,30 @@ public class OrganizationsDao extends BillingContextDao<Organization>{
         
         Tokens tokens = TokensDao.instance.findOne(filters);
         
-        // If token is missing or old, regenerate a fresh token
         if (tokens == null || tokens.isOldToken()) {
             Bson updates;
+            String newToken = null;
             
             if (tokens == null) {
                 // Create new token entry
+                newToken = organization.getId() + "_" + accountId + "_" + UUID.randomUUID().toString().replace("-", "");
                 updates = Updates.combine(
                         Updates.set(Tokens.UPDATED_AT, Context.now()),
                         Updates.setOnInsert(Tokens.CREATED_AT, Context.now()),
                         Updates.setOnInsert(Tokens.ORG_ID, organization.getId()),
-                        Updates.setOnInsert(Tokens.ACCOUNT_ID, accountId)
+                        Updates.setOnInsert(Tokens.ACCOUNT_ID, accountId),
+                        Updates.setOnInsert(Tokens.TOKEN, newToken)
                 );
             } else {
                 // Update existing token
                 updates = Updates.set(Tokens.UPDATED_AT, Context.now());
+                newToken = tokens.getToken();
             }
-            
-            // Generate new token: orgId_accountId_UUID
-            String newToken = organization.getId() + "_" + accountId + "_" + UUID.randomUUID().toString().replace("-", "");
-            
-            // Save the new token
             UsageUtils.saveToken(organization.getId(), accountId, updates, filters, newToken);
             
             return new BasicDBObject("token", newToken);
         }
         
-        // Return existing valid token
         return new BasicDBObject("token", tokens.getToken());
     }
 
