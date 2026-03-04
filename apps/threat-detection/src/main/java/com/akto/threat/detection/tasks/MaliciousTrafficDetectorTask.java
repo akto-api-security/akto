@@ -148,6 +148,8 @@ public class MaliciousTrafficDetectorTask implements Task {
     properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
     properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
 
+    KafkaConfig.addAuthenticationFromEnv(properties);
+
     logger.warnAndAddToDb(instanceId + ": Creating Kafka consumer with bootstrap servers: " + trafficConfig.getBootstrapServers() +
                           ", groupId: " + trafficConfig.getGroupId() +
                           ", maxPollRecords: " + trafficConfig.getConsumerConfig().getMaxPollRecords());

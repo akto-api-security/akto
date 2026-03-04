@@ -105,31 +105,27 @@ public class KafkaConfig {
   }
 
   /**
+   * If AKTO_KAFKA_USERNAME and AKTO_KAFKA_PASSWORD are set, adds SASL/SSL properties to the given Properties.
+   * Defaults: SCRAM-SHA-512, SASL_SSL. Same env vars as Helm chart and data-ingestion.
+   */
+  public static void addAuthenticationFromEnv(Properties properties) {
+    String username = System.getenv("AKTO_KAFKA_USERNAME");
+    String password = System.getenv("AKTO_KAFKA_PASSWORD");
+    if (username == null || username.isEmpty() || password == null || password.isEmpty()) {
+      return;
+    }
+    String saslMechanism = System.getenv().getOrDefault(
+        "AKTO_KAFKA_SASL_MECHANISM",
+        SASL_MECHANISM_SCRAM_SHA_512);
+    String securityProtocol = System.getenv().getOrDefault(
+        "AKTO_KAFKA_SECURITY_PROTOCOL",
+        SECURITY_PROTOCOL_SASL_SSL);
+    addAuthenticationProperties(properties, username, password, saslMechanism, securityProtocol);
+  }
+
+  /**
    * Adds Kafka SASL authentication properties to the given Properties object.
-   *
-   * @param properties The Properties object to add authentication to
-   * @param username   Kafka username
-   * @param password   Kafka password
-   */
-  public static void addAuthenticationProperties(Properties properties, String username, String password) {
-    // Default to PLAIN for backward compatibility
-    addAuthenticationProperties(properties, username, password, SASL_MECHANISM_PLAIN, SECURITY_PROTOCOL_SASL_PLAINTEXT);
-  }
-
-  /**
-   * Adds Kafka SASL authentication properties to the given Properties object with specified mechanism.
-   *
-   * @param properties   The Properties object to add authentication to
-   * @param username     Kafka username
-   * @param password     Kafka password
-   * @param saslMechanism SASL mechanism (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512)
-   */
-  public static void addAuthenticationProperties(Properties properties, String username, String password, String saslMechanism) {
-    addAuthenticationProperties(properties, username, password, saslMechanism, SECURITY_PROTOCOL_SASL_PLAINTEXT);
-  }
-
-  /**
-   * Adds Kafka SASL authentication properties to the given Properties object with specified mechanism and security protocol.
+   * Use addAuthenticationFromEnv(properties) when credentials come from AKTO_KAFKA_* env vars.
    *
    * @param properties       The Properties object to add authentication to
    * @param username         Kafka username
