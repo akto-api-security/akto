@@ -11,6 +11,7 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.CounterCache;
 import com.akto.threat.detection.constants.RedisKeyInfo;
@@ -24,7 +25,7 @@ public class ApiCountInfoRelayCron {
     List<String> apiCountKeys;
     Map<String, Long> keyValData;
     private static CounterCache cache;
-    private static final LoggerMaker logger = new LoggerMaker(ApiCountInfoRelayCron.class);
+    private static final LoggerMaker logger = new LoggerMaker(ApiCountInfoRelayCron.class, LogDb.THREAT_DETECTION);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
 
@@ -36,24 +37,22 @@ public class ApiCountInfoRelayCron {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run(){
                 try {
-                    logger.infoAndAddToDb("relayApiCountInfo cron started at " + Context.now(), LoggerMaker.LogDb.THREAT_DETECTION);
+                    logger.debugAndAddToDb("relayApiCountInfo cron started at " + Context.now(), LoggerMaker.LogDb.THREAT_DETECTION);
                     long endBinId = (Context.now()/60) - 5; // pick keys which are older than at least 5 mins
 
                     // Always process last 8 hours to handle Kafka lag
                     // DB upsert handles duplicate entries, so reprocessing is safe
                     long startBinId = endBinId - (8 * 60);
-                    logger.infoAndAddToDb("relayApiCountInfo cron processing window: startBin " + startBinId + " endBin " + endBinId +
+                    logger.debugAndAddToDb("relayApiCountInfo cron processing window: startBin " + startBinId + " endBin " + endBinId +
                         " (8 hours)", LoggerMaker.LogDb.THREAT_DETECTION);
 
                     // fetch keys for which count needs to be fetched
                     apiCountKeys = cache.fetchMembersFromSortedSet(RedisKeyInfo.API_COUNTER_SORTED_SET, startBinId, endBinId);
                     if (apiCountKeys.size() == 0) {
-                        logger.infoAndAddToDb("No keys found in sorted set for range " + startBinId + " to " + endBinId,
-                            LoggerMaker.LogDb.THREAT_DETECTION);
+                        logger.debugAndAddToDb("No keys found in sorted set for range " + startBinId + " to " + endBinId);
                         return;
                     }
-                    logger.infoAndAddToDb("Fetched " + apiCountKeys.size() + " keys from sorted set for range " + startBinId + " to " + endBinId,
-                        LoggerMaker.LogDb.THREAT_DETECTION);
+                    logger.debugAndAddToDb("Fetched " + apiCountKeys.size() + " keys from sorted set for range " + startBinId + " to " + endBinId);
 
                     // Warn if processing very large batch
                     if (apiCountKeys.size() > 10000) {
@@ -70,17 +69,17 @@ public class ApiCountInfoRelayCron {
                             LoggerMaker.LogDb.THREAT_DETECTION);
                         return;
                     }
-                    logger.infoAndAddToDb("Built " + hitCountInfos.size() + " api hit count records to relay to DB",
+                    logger.debugAndAddToDb("Built " + hitCountInfos.size() + " api hit count records to relay to DB",
                         LoggerMaker.LogDb.THREAT_DETECTION);
 
                     try {
                         dataActor.bulkInsertApiHitCount(hitCountInfos);
-                        logger.infoAndAddToDb("Successfully relayed " + hitCountInfos.size() + " api hit count records to DB",
+                        logger.debugAndAddToDb("Successfully relayed " + hitCountInfos.size() + " api hit count records to DB",
                             LoggerMaker.LogDb.THREAT_DETECTION);
 
                         // Clean up processed keys from sorted set
                         cache.removeMembersFromSortedSet(RedisKeyInfo.API_COUNTER_SORTED_SET, startBinId, endBinId);
-                        logger.infoAndAddToDb("Cleaned up sorted set: removed keys in range " + startBinId + " to " + endBinId,
+                        logger.debugAndAddToDb("Cleaned up sorted set: removed keys in range " + startBinId + " to " + endBinId,
                             LoggerMaker.LogDb.THREAT_DETECTION);
                     } catch (Exception e) {
                         logger.errorAndAddToDb("Error relaying api count info: " + e.getMessage(), LoggerMaker.LogDb.THREAT_DETECTION);

@@ -29,9 +29,12 @@ import {
     CustomGuardrailsConfig,
     UsageGuardrailsStep,
     UsageGuardrailsConfig,
+    AnomalyDetectionStep,
+    AnomalyDetectionConfig,
     ServerSettingsStep,
     ServerSettingsConfig
 } from './steps';
+import { SEVERITY } from '../utils';
 
 const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, isEditMode = false }) => {
     // Step management
@@ -42,6 +45,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [blockedMessage, setBlockedMessage] = useState("");
+    const [severity, setSeverity] = useState(SEVERITY.MEDIUM.value);
     const [applyToResponses, setApplyToResponses] = useState(false);
 
     // Step 2: Content & Policy Guardrails
@@ -101,7 +105,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [enableTokenLimit, setEnableTokenLimit] = useState(false);
     const [tokenLimitConfidenceScore, setTokenLimitConfidenceScore] = useState(0.7);
 
-    // Step 8: Server settings
+    // Step 8: Anomaly Detection (coming soon)
+
+    // Step 9: Server settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
@@ -160,7 +166,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // Step 7
         enableTokenLimit,
         tokenLimitConfidenceScore,
-        // Step 8
+        // Step 9
         selectedMcpServers,
         selectedAgentServers,
         mcpServers,
@@ -214,6 +220,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 title: UsageGuardrailsConfig.title,
                 summary: UsageGuardrailsConfig.getSummary(storedStateData),
                 ...UsageGuardrailsConfig.validate(storedStateData)
+            },
+            {
+                number: AnomalyDetectionConfig.number,
+                title: AnomalyDetectionConfig.title,
+                summary: AnomalyDetectionConfig.getSummary(storedStateData),
+                ...AnomalyDetectionConfig.validate(storedStateData)
             },
             {
                 number: ServerSettingsConfig.number,
@@ -291,6 +303,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setName("");
         setDescription("");
         setBlockedMessage("");
+        setSeverity(SEVERITY.MEDIUM.value);
         setApplyToResponses(false);
         setEnablePromptAttacks(false);
         setPromptAttackLevel("high");
@@ -347,6 +360,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setName(policy.name || "");
         setDescription(policy.description || "");
         setBlockedMessage(policy.blockedMessage || "");
+        setSeverity(policy.severity ? policy.severity.toUpperCase() : SEVERITY.MEDIUM.value);
         setApplyToResponses(policy.applyToResponses || false);
         
         // Content filters
@@ -529,6 +543,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 name,
                 description,
                 blockedMessage,
+                severity,
                 applyToResponses,
                 contentFilters: {
                     harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
@@ -723,6 +738,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setDescription={setDescription}
                         blockedMessage={blockedMessage}
                         setBlockedMessage={setBlockedMessage}
+                        severity={severity}
+                        setSeverity={setSeverity}
                         applyToResponses={applyToResponses}
                         setApplyToResponses={setApplyToResponses}
                     />
@@ -828,6 +845,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     />
                 );
             case 8:
+                return (
+                    <AnomalyDetectionStep />
+                );
+            case 9:
                 return (
                     <ServerSettingsStep
                         selectedMcpServers={selectedMcpServers}

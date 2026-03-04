@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </Console>
+    </Appenders>
+    <Loggers>
+        <!-- Akto Gateway specific logging - controlled by AKTO_GATEWAY_LOG_LEVEL env var -->
+        <Logger name="com.akto.gateway" level="${env:AKTO_GATEWAY_LOG_LEVEL:-INFO}" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+
+        <!-- Root logger - controlled by AKTO_LOG_LEVEL env var -->
+        <Root level="${env:AKTO_LOG_LEVEL:-INFO}">
+            <AppenderRef ref="Console"/>
+        </Root>
+    </Loggers>
+</Configuration>

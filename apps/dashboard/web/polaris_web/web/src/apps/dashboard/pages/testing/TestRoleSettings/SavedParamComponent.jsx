@@ -13,7 +13,7 @@ const SavedParamComponent = ({
   initialItems,
   setAuthMechanism,
   setOpenAuth,
-  setAdvancedHeaderSettingsOpen
+  setAdvancedHeaderSettingsOpen,
 }) => {
 
   const [deletedIndex, setDeletedIndex] = useState(-1);
@@ -23,8 +23,9 @@ const SavedParamComponent = ({
   const handleOpenEdit = (authObj, index) => {
     setAuthMechanism(authObj.authMechanism);
     const headerKVPairs = authObj.headerKVPairs || {};
+    const hasUrlConditions = authObj.urlRegex && String(authObj.urlRegex).trim() !== "";
 
-    if (Object.keys(headerKVPairs).length > 0) {
+    if (Object.keys(headerKVPairs).length > 0 || hasUrlConditions) {
       setAdvancedHeaderSettingsOpen(true);
     }
     setShowAuthComponent(true);

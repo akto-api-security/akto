@@ -117,3 +117,12 @@
   border-top: 1px solid #e1e4e8 !important;
   margin: 24px 0 !important;
 }
+
+@keyframes pulseFade {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}

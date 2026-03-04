@@ -137,6 +137,11 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                 return;
             }
 
+            // Ignore if any modifier keys are being held (keyboard shortcuts)
+            if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) {
+                return;
+            }
+
             // Ignore special keys
             const ignoredKeys = ['Escape', 'Tab', 'Enter', 'Shift', 'Control', 'Alt', 'Meta', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
             if (ignoredKeys.includes(e.key)) {

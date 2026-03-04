@@ -7,22 +7,41 @@ import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.Util;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.util.http_util.CoreHTTPClient;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 import lombok.Getter;
 import lombok.Setter;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 
 public class GuardrailPoliciesAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GuardrailPoliciesAction.class, LogDb.DASHBOARD);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
+            .build();
 
 
     @Getter
@@ -40,6 +59,12 @@ public class GuardrailPoliciesAction extends UserAction {
 
     @Setter
     private List<String> policyIds;
+
+    // For playground testing
+    @Setter
+    private String testInput;
+    @Getter
+    private BasicDBObject playgroundResult;
 
 
     public String fetchGuardrailPolicies() {
@@ -178,6 +203,155 @@ public class GuardrailPoliciesAction extends UserAction {
             loggerMaker.errorAndAddToDb("Error deleting guardrail policies: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
+    }
+
+    public String guardrailPlayground() {
+        try {
+            if (testInput == null || testInput.trim().isEmpty()) {
+                loggerMaker.errorAndAddToDb("Test input is required for playground testing", LogDb.DASHBOARD);
+                return ERROR.toUpperCase();
+            }
+
+            User user = getSUser();
+            int currentTime = Context.now();
+
+            // Get guardrail service URL from environment variable or use default
+            String guardrailServiceUrl = Util.getEnvironmentVariable("GUARDRAIL_SERVICE_URL");
+            String validateUrl = guardrailServiceUrl + "/api/validate/requestWithPolicy";
+
+            // Prepare request payload - wrap testInput in JSON with "prompt" key
+            BasicDBObject promptObject = new BasicDBObject();
+            promptObject.put("prompt", testInput);
+            String payloadJson = promptObject.toJson();
+            
+            BasicDBObject requestPayload = new BasicDBObject();
+            requestPayload.put("payload", payloadJson);
+            
+            // Get context source for the request
+            CONTEXT_SOURCE contextSource = Context.contextSource.get();
+            if (contextSource == null) {
+                contextSource = CONTEXT_SOURCE.AGENTIC;
+            }
+            requestPayload.put("contextSource", contextSource.name());
+            
+            // For playground testing, skip threat reporting to TBS
+            // This allows testing without creating threat events in the dashboard
+            requestPayload.put("skipThreat", true);
+
+            // Policy must be provided directly in the request
+            if (policy == null) {
+                loggerMaker.errorAndAddToDb("No policy provided for playground testing", LogDb.DASHBOARD);
+                return ERROR.toUpperCase();
+            }
+            
+            GuardrailPolicies policyToSend = policy;
+            loggerMaker.info("Using provided policy for playground testing: " + policy.getName());
+
+            // Ensure policy is active for playground testing
+            policyToSend.setActive(true);
+            
+            // Set context source if not already set
+            if (policyToSend.getContextSource() == null) {
+                policyToSend.setContextSource(contextSource);
+            }
+            
+            // Ensure applyOnRequest is set (required for request validation)
+            if (!policyToSend.isApplyOnRequest() && !policyToSend.isApplyOnResponse()) {
+                policyToSend.setApplyOnRequest(true);
+            }
+
+            // Serialize policy to JSON and add to request
+            try {
+                BasicDBObject policyObject = serializePolicyToJson(policyToSend, user, currentTime);
+                requestPayload.put("policy", policyObject);
+                loggerMaker.info("Playground test with policy: " + policyObject.getString("name"));
+                
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Failed to serialize policy for playground request: " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                return ERROR.toUpperCase();
+            }
+
+            // Call guardrail service using shared HTTP client
+            MediaType mediaType = MediaType.parse("application/json");
+            RequestBody body = RequestBody.create(requestPayload.toJson(), mediaType);
+            Request request = new Request.Builder()
+                    .url(validateUrl)
+                    .method("POST", body)
+                    .addHeader("Content-Type", "application/json")
+                    .build();
+
+            // Call guardrail service using shared HTTP client
+            try (Response response = httpClient.newCall(request).execute()) {
+                ResponseBody responseBodyObj = response.body();
+                String responseBody = (responseBodyObj != null) ? responseBodyObj.string() : "";
+
+                if (response.isSuccessful()) {
+                    if (responseBody != null && !responseBody.isEmpty()) {
+                        try {
+                            // Parse the response
+                            this.playgroundResult = BasicDBObject.parse(responseBody);
+                            loggerMaker.info("Guardrail playground test completed successfully for policy: " + policy.getName());
+                            return SUCCESS.toUpperCase();
+                        } catch (Exception parseException) {
+                            loggerMaker.errorAndAddToDb("Failed to parse guardrail service response: " + parseException.getMessage() + ". Response body: " + responseBody, LogDb.DASHBOARD);
+                            return ERROR.toUpperCase();
+                        }
+                    } else {
+                        loggerMaker.errorAndAddToDb("Guardrail service returned empty response body. Status code: " + response.code(), LogDb.DASHBOARD);
+                        return ERROR.toUpperCase();
+                    }
+                } else {
+                    String errorMessage = String.format("Guardrail service returned error. Status: %d, Response: %s", response.code(), responseBody);
+                    loggerMaker.errorAndAddToDb(errorMessage, LogDb.DASHBOARD);
+                    return ERROR.toUpperCase();
+                }
+            } catch (IOException e) {
+                loggerMaker.errorAndAddToDb("IO error calling guardrail service at " + validateUrl + ": " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e.toString(), LogDb.DASHBOARD);
+                return ERROR.toUpperCase();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in guardrail playground test: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Serializes a GuardrailPolicies object to BasicDBObject for JSON transmission
+     * This method handles all policy fields including nested objects
+     */
+    private BasicDBObject serializePolicyToJson(GuardrailPolicies policy, User user, int currentTime) {
+        // Use Jackson to serialize the DTO to a Map (handles all nested objects automatically)
+        @SuppressWarnings("unchecked")
+        Map<String, Object> policyMap = objectMapper.convertValue(policy, Map.class);
+        
+        // Remove internal/MongoDB-specific fields that shouldn't be sent to guardrail service
+        policyMap.remove("id");
+        policyMap.remove("hexId");
+        policyMap.remove("createdTimestamp");
+        policyMap.remove("updatedTimestamp");
+        policyMap.remove("createdBy");
+        policyMap.remove("updatedBy");
+        
+        // Ensure required fields are set
+        String policyName = policy.getName();
+        if (policyName == null || policyName.isEmpty()) {
+            policyName = "PLAYGROUND_TEST_" + user.getLogin() + "_" + currentTime;
+        }
+        policyMap.put("name", policyName);
+        policyMap.put("active", true); // Always active for playground testing
+        
+        // Serialize CONTEXT_SOURCE enum to string (Jackson handles this automatically, but ensure it's a string)
+        if (policy.getContextSource() != null) {
+            policyMap.put("contextSource", policy.getContextSource().name());
+        }
+        
+        // Add policy version for future compatibility
+        policyMap.put("policyVersion", "1.0");
+        
+        // Convert Map to BasicDBObject for compatibility with existing code
+        return new BasicDBObject(policyMap);
     }
 
 }

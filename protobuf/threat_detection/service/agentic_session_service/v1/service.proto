@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package threat_detection.service.agentic_session_service.v1;
+
+import "threat_detection/message/agentic_session/v1/message.proto";
+
+option java_outer_classname = "AgenticSessionServiceProto";
+option java_package = "com.akto.proto.generated.threat_detection.service.agentic_session_service.v1";
+
+message BulkUpdateAgenticSessionContextRequest {
+  repeated threat_detection.message.agentic_session.v1.SessionDocumentMessage session_documents = 1;
+}
+
+message BulkUpdateAgenticSessionContextResponse {
+  bool success = 1;
+  string error_message = 2;
+  int32 updated_count = 3;
+}

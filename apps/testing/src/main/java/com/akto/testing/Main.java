@@ -32,6 +32,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.CollectionWiseTestingEndpoints;
 import com.akto.dto.testing.CustomTestingEndpoints;
+import com.akto.dto.testing.MultiCollectionTestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints.Operator;
 import com.akto.dto.testing.TestingRun;
@@ -887,6 +888,14 @@ public class Main {
         if (tr.getTestingEndpoints() instanceof CollectionWiseTestingEndpoints) {
             CollectionWiseTestingEndpoints eps = (CollectionWiseTestingEndpoints) tr.getTestingEndpoints();
             apiCollectionId = eps.getApiCollectionId();
+        } else if (tr.getTestingEndpoints() instanceof MultiCollectionTestingEndpoints) {
+            MultiCollectionTestingEndpoints eps = (MultiCollectionTestingEndpoints) tr.getTestingEndpoints();
+            List<Integer> collectionIds = eps.getApiCollectionIds();
+            if (collectionIds == null || collectionIds.isEmpty()) {
+                return;
+            }
+            // Added to handle the case where multiple collection ids are present,but we will take any api changes from first collection only
+            apiCollectionId = collectionIds.get(0);
         } else if (tr.getTestingEndpoints() instanceof CustomTestingEndpoints) {
             CustomTestingEndpoints eps = (CustomTestingEndpoints) tr.getTestingEndpoints();
             apiCollectionId = eps.getApisList().get(0).getApiCollectionId();
@@ -1027,6 +1036,21 @@ public class Main {
             int apiCollectionId = collectionWiseTestingEndpoints.getApiCollectionId();
             ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
             collection = apiCollection.getName();
+        } else if(testingEndpoints.getType().equals(TestingEndpoints.Type.MULTI_COLLECTION)) {
+            MultiCollectionTestingEndpoints multiCollectionTestingEndpoints = (MultiCollectionTestingEndpoints) testingEndpoints;
+            List<Integer> collectionIds = multiCollectionTestingEndpoints.getApiCollectionIds();
+            List<String> collectionNames = new ArrayList<>();
+            if (collectionIds != null) {
+                for (Integer colId : collectionIds) {
+                    ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(colId);
+                    if (apiCollection != null) {
+                        collectionNames.add(apiCollection.getName());
+                    }
+                }
+            }
+            if (!collectionNames.isEmpty()) {
+                collection = String.join(", ", collectionNames);   // CSV format of collection names in test alerts
+            }
         }
 
         long currentTime = Context.now();

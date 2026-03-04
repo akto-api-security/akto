@@ -104,7 +104,8 @@ public class ModuleInfo {
         DATA_INGESTION,
         TRAFFIC_COLLECTOR,
         AKTO_AGENT_GATEWAY,
-        DAST
+        DAST,
+        AGENTIC_TESTING
     }
 
 }

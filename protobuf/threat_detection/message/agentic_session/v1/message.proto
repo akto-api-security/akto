@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package threat_detection.message.agentic_session.v1;
+
+option java_outer_classname = "AgenticSessionProto";
+option java_package = "com.akto.proto.generated.threat_detection.message.agentic_session.v1";
+
+message ConversationEntry {
+  string request_id = 1;
+  string request_payload = 2;
+  string response_payload = 3;
+  int64 timestamp = 4;
+}
+
+message SessionDocumentMessage {
+  string session_identifier = 1;
+  string session_summary = 2;
+  repeated ConversationEntry conversation_info = 3;
+  bool is_malicious = 4;
+  string blocked_reason = 5;
+  int64 created_at = 6;
+  int64 updated_at = 7;
+}

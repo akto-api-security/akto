@@ -172,6 +172,7 @@ function TestCollectionConfiguration() {
                 hideQueryField={true}
                 headings={headers}
                 hidePagination={true}
+                showFooter={false}
             />
         </div>
 

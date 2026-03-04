@@ -15,6 +15,7 @@ import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCat
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
 import IpReputationScore from "./IpReputationScore";
+import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../observe/api_collections/endpointShieldHelper";
 
 const resourceName = {
   singular: "actor",
@@ -24,20 +25,20 @@ const resourceName = {
 const getBaseHeaders = () => {
   const baseHeaders = [
     {
-      text: "Actor Id",
+      text: isEndpointSecurityCategory() ? "Username" : "Actor Id",
       value: "actor",
-      title: "Actor Id",
+      title: isEndpointSecurityCategory() ? "Username" : "Actor Id",
     },
     {
       text: "Country",
       title: "Country",
       value: "country",
     },
-    {
+    ...(!isEndpointSecurityCategory() ? [{
       text: "Actor Ip",
       title: "Actor Ip",
       value: "latestIp",
-    },
+    }] : []),
   ];
 
   if (func.shouldShowIpReputation()) {
@@ -120,6 +121,19 @@ const sortOptions = [
 
 function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   const [loading, setLoading] = useState(false);
+  const [lastCursor, setLastCursor] = useState(null);  // Track last ObjectId for cursor pagination
+  const [usernameMap, setUsernameMap] = useState({});
+  const [usernameMapLoaded, setUsernameMapLoaded] = useState(!isEndpointSecurityCategory());
+
+  useEffect(() => {
+    if (isEndpointSecurityCategory()) {
+      fetchEndpointShieldUsernameMap().then(map => {
+        setUsernameMap(map);
+        setUsernameMapLoaded(true);
+      });
+    }
+  }, []);
+
   const [filters, setFilters] = useState([
     {
       key: 'actorId',
@@ -181,7 +195,10 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     let total = 0;
     let ret = [];
     try {
-      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || [], startTimestamp, endTimestamp, filters.actorId || [], filters.host || []);
+      // Use cursor-based pagination: send lastCursor if skip > 0, otherwise null for first page
+      const cursor = skip > 0 ? lastCursor : null;
+      const res = await api.fetchThreatActors(skip, sort, filters.latestAttack || [], filters.country || [], startTimestamp, endTimestamp, filters.actorId || [], filters.host || [], cursor);
+      // Always show total for now (will optimize to hide on cursor pagination later)
       total = res.total;
       if (res?.actors?.length === 0) {
         return { value: [], total: 0 };
@@ -224,7 +241,9 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
 
         const baseData = {
           ...x,
-          actor: formatActorId(x.id),
+          actor: isEndpointSecurityCategory()
+            ? getUsernameForCollection({ displayName: x.latestApiHost || x.id }, usernameMap)
+            : formatActorId(x.id),
           latestIp: formatActorId(x.latestApiIp),
           latestHost: x.latestApiHost || "-",
           discoveredAt: x.discoveredAt ? dayjs(x.discoveredAt*1000).format('YYYY-MM-DD, HH:mm:ss A') : "-",
@@ -284,6 +303,13 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
 
         return baseData;
       }));
+
+      // Store last actor's MongoDB ObjectId as cursor for next page
+      if (ret.length > 0) {
+        const lastActor = ret[ret.length - 1];
+        // Use objectId (MongoDB _id) for cursor-based pagination, not id (actorId/IP)
+        setLastCursor(lastActor.objectId);
+      }
     } catch (e) {
       setToast(true, true, "Error fetching threat actors");
     } finally {
@@ -292,7 +318,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     return { value: ret, total: total };
   }
 
-  const key = startTimestamp + endTimestamp;
+  const key = startTimestamp + endTimestamp + (usernameMapLoaded ? '_u' : '');
 
   async function fillFilters() {
     const res = await api.fetchThreatActorFilters();
@@ -354,6 +380,11 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     fillFilters();
   }, []);
 
+  // Reset cursor when date range changes
+  useEffect(() => {
+    setLastCursor(null);
+  }, [startTimestamp, endTimestamp]);
+
   const getHeaders = () => {
     const baseHeaders = [...getBaseHeaders()];
 
@@ -368,6 +399,22 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     return baseHeaders;
   };
 
+  const promotedBulkActions = (selectedIps) => {
+    return [
+      {
+        content: `Block ${selectedIps.length} IP${selectedIps.length > 1 ? 's' : ''}`,
+        onAction: async () => {
+          try {
+            await api.bulkModifyThreatActorStatusCloudflare(selectedIps, "blocked");
+            func.setToast(true, false, `Successfully blocked ${selectedIps.length} IP(s)`);
+          } catch (e) {
+            func.setToast(true, true, "Failed to block IPs");
+          }
+        },
+      },
+    ];
+  };
+
   return (
     <GithubServerTable
       onRowClick={(data) => onRowClick(data)}
@@ -380,7 +427,8 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
       loading={loading}
       fetchData={fetchData}
       filters={filters}
-      selectable={false}
+      selectable={true}
+      promotedBulkActions={promotedBulkActions}
       hasRowActions={true}
       getActions={() => { }}
       hideQueryField={true}

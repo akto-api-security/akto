@@ -154,7 +154,6 @@ const SensitiveInfoStep = ({
 
     return (
         <VerticalStack gap="4">
-            <Text variant="headingMd">Sensitive Information Guardrails</Text>
             <Text variant="bodyMd" tone="subdued">
                 Use these filters to handle any data related to privacy.
             </Text>

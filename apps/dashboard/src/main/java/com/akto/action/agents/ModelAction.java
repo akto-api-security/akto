@@ -18,6 +18,7 @@ public class ModelAction extends UserAction {
     String model;
     String apiKey;
     String azureOpenAIEndpoint;
+    String ollamaAIEndpoint;
     ModelType type;
 
     public String saveAgentModel() {
@@ -50,7 +51,7 @@ public class ModelAction extends UserAction {
          * Anthropic model should be like claude-3 etc.
          */
 
-        if (apiKey == null || apiKey.isEmpty()) {
+        if ((apiKey == null || apiKey.isEmpty()) && type != ModelType.OLLAMA) {
             addActionError("Please add a apiKey");
             return Action.ERROR.toUpperCase();
         }
@@ -61,11 +62,19 @@ public class ModelAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
+        if (type == ModelType.OLLAMA && (ollamaAIEndpoint == null || ollamaAIEndpoint.isEmpty())) {
+            addActionError("Please add ollamaAIEndpoint");
+            return Action.ERROR.toUpperCase();
+        }
+
         Map<String, String> params = new HashMap<>();
         params.put(Model.PARAM_MODEL, this.model);
         params.put(Model.PARAM_API_KEY, this.apiKey);
         if (type == ModelType.AZURE_OPENAI) {
             params.put(Model.PARAM_AZURE_OPENAI_ENDPOINT, this.azureOpenAIEndpoint);
+        }
+        if (type == ModelType.OLLAMA) {
+            params.put(Model.PARAM_OLLAMA_ENDPOINT, this.ollamaAIEndpoint);
         }
 
         Model model = new Model(name, type, params);
@@ -124,6 +133,14 @@ public class ModelAction extends UserAction {
 
     public void setAzureOpenAIEndpoint(String azureOpenAIEndpoint) {
         this.azureOpenAIEndpoint = azureOpenAIEndpoint;
+    }
+
+    public String getOllamaAIEndpoint() {
+        return ollamaAIEndpoint;
+    }
+
+    public void setOllamaAIEndpoint(String ollamaAIEndpoint) {
+        this.ollamaAIEndpoint = ollamaAIEndpoint;
     }
 
     public ModelType getType() {

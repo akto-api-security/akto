@@ -4,6 +4,7 @@ package com.akto.testing.kafka_utils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -27,6 +28,8 @@ public class TestingConfigurations {
     Map<String, TestConfig> testConfigMap;
     private  Map<ApiInfoKey, RawApi> rawApiMap = new HashMap<>();
     private boolean doNotMarkIssuesAsFixed;
+    private int maxAgentTokens = -1;
+    private final AtomicLong runningAgentTokenCount = new AtomicLong(0);
 
     private TestingConfigurations() {
     }
@@ -35,13 +38,23 @@ public class TestingConfigurations {
         return instance;
     }
 
-    public synchronized void init(TestingUtil testingUtil, TestingRunConfig testingRunConfig, boolean debug, Map<String, TestConfig> testConfigMap, int maxConcurrentRequests, boolean doNotMarkIssuesAsFixed) {
+    public synchronized void init(TestingUtil testingUtil, TestingRunConfig testingRunConfig, boolean debug, Map<String, TestConfig> testConfigMap, int maxConcurrentRequests, boolean doNotMarkIssuesAsFixed, int maxAgentTokens) {
         this.testingUtil = testingUtil;
         this.testingRunConfig = testingRunConfig;
         this.debug = debug;
         this.testConfigMap = testConfigMap;
         this.maxConcurrentRequest = maxConcurrentRequests == -1 ? 10 : maxConcurrentRequests;
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+        this.maxAgentTokens = maxAgentTokens;
+        this.runningAgentTokenCount.set(0);
+    }
+
+    public void addAgentTokens(int tokens) {
+        runningAgentTokenCount.addAndGet(tokens);
+    }
+
+    public boolean isAgentTokenLimitExceeded() {
+        return maxAgentTokens != -1 && runningAgentTokenCount.get() >= maxAgentTokens;
     }
 
     public boolean isDebug() {

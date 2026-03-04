@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { Box, Text, VerticalStack, HorizontalStack, Button } from '@shopify/polaris';
 import { ChevronDownMinor, ChevronUpMinor } from '@shopify/polaris-icons';
@@ -17,10 +17,23 @@ const styles = {
     },
 };
 
-function AiAnalysisCard({ summary }) {
+function AiAnalysisCard({ summary, isLoading, onGetOverview, children, footer, scrollRef }) {
     const [isExpanded, setIsExpanded] = useState(false);
 
+    useEffect(() => {
+        if (!summary && !isLoading) {
+            setIsExpanded(false);
+        }
+    }, [summary, isLoading]);
+
     const toggleExpanded = () => setIsExpanded(prev => !prev);
+
+    const handleGetOverview = () => {
+        if (onGetOverview) {
+            onGetOverview();
+            setIsExpanded(true);
+        }
+    };
 
     return (
         <Box
@@ -47,21 +60,43 @@ function AiAnalysisCard({ summary }) {
                         </Text>
                     </HorizontalStack>
 
-                    <Button
-                        plain
-                        icon={isExpanded ? ChevronUpMinor : ChevronDownMinor}
-                        onClick={toggleExpanded}
-                        accessibilityLabel={isExpanded ? "Collapse AI analysis" : "Expand AI analysis"}
-                    />
+                    {!summary && !isLoading && onGetOverview ? (
+                        <Button
+                            onClick={handleGetOverview}
+                            accessibilityLabel="Get AI Analysis"
+                        >
+                            Get AI Overview
+                        </Button>
+                    ) : (
+                        <Button
+                            plain
+                            icon={isExpanded ? ChevronUpMinor : ChevronDownMinor}
+                            onClick={toggleExpanded}
+                            accessibilityLabel={isExpanded ? "Collapse AI analysis" : "Expand AI analysis"}
+                        />
+                    )}
                 </HorizontalStack>
 
-                {isExpanded && (
-                    <Box paddingBlockStart="2">
-                        <Text variant="bodyMd" as="p" color="subdued">
-                            {summary || ANALYSIS_TEXT.LOADING}
-                        </Text>
-                    </Box>
-                )}
+                <Box style={{ display: isExpanded ? 'flex' : 'none', flexDirection: 'column', maxHeight: '40vh' }}>
+                    <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+                        <VerticalStack gap="4">
+                            <Box paddingBlockStart="2">
+                                {(isLoading || !summary) ? (
+                                    <VerticalStack gap="2">
+                                        <Box style={{ height: '12px', width: '90%', borderRadius: '4px', background: '#E4E5E7', animation: 'pulseFade 1.5s ease-in-out infinite' }} />
+                                        <Box style={{ height: '12px', width: '70%', borderRadius: '4px', background: '#E4E5E7', animation: 'pulseFade 1.5s ease-in-out infinite' }} />
+                                    </VerticalStack>
+                                ) : (
+                                    <Text variant="bodyMd" as="p" color="subdued">
+                                        {summary}
+                                    </Text>
+                                )}
+                            </Box>
+                            {children}
+                        </VerticalStack>
+                    </div>
+                    {footer && <Box paddingBlockStart="4">{footer}</Box>}
+                </Box>
             </VerticalStack>
         </Box>
     );
@@ -69,10 +104,12 @@ function AiAnalysisCard({ summary }) {
 
 AiAnalysisCard.propTypes = {
     summary: PropTypes.string,
+    isLoading: PropTypes.bool,
 };
 
 AiAnalysisCard.defaultProps = {
     summary: null,
+    isLoading: false,
 };
 
 export default AiAnalysisCard;

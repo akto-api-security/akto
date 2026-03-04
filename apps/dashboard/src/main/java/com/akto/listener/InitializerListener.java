@@ -4272,6 +4272,15 @@ public class InitializerListener implements ServletContextListener {
                             } catch (Exception e) {
                             }
 
+                            try {
+                                Object estimatedTokensObj = TestConfigYamlParser.getFieldIfExists(templateContent, YamlTemplate.ESTIMATED_TOKENS);
+                                if (estimatedTokensObj != null && estimatedTokensObj instanceof Integer) {
+                                    updates.add(Updates.set(YamlTemplate.ESTIMATED_TOKENS, (int) estimatedTokensObj));
+                                }
+                            } catch (Exception e) {
+                                logger.errorAndAddToDb("Error parsing estimatedTokens for template " + id + ": " + e.getMessage(), LogDb.DASHBOARD);
+                            }
+
                             if (Constants._AKTO.equals(author)) {
                                 YamlTemplateDao.instance.updateOne(
                                         Filters.eq(Constants.ID, id),

@@ -12,6 +12,7 @@ import com.akto.proto.generated.threat_detection.service.malicious_alert_service
 import com.akto.testing.ApiExecutor;
 import com.akto.threat.detection.utils.Utils;
 import com.google.protobuf.InvalidProtocolBufferException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -59,7 +60,7 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
                         logger.debugAndAddToDb("sending malicious event to threat backend for url " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
                         OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
                         String responsePayload = response.getBody();
-                        if (response.getStatusCode() != 200 || responsePayload == null) {
+                        if (!Arrays.asList(200, 202).contains(response.getStatusCode()) || responsePayload == null) {
                           logger.errorAndAddToDb("statusCode: " +  response.getStatusCode() + " in record_malicious_event API");
                         }
                       } catch (Exception e) {

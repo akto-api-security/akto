@@ -94,6 +94,9 @@ public class ConsumerUtil {
 
         List<String> messagesList = instance.getTestingUtil().getSampleMessages().get(apiInfoKey);
         if(messagesList == null || messagesList.isEmpty()){}
+        else if(TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
+            logger.info("Agent token limit reached, skipping test for: " + apiInfoKey + " with subcategory: " + subCategory);
+        }
         else{
             logger.info("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
             String sample = messagesList.get(messagesList.size() - 1);

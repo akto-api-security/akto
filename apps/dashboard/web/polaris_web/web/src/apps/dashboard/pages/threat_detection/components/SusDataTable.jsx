@@ -14,6 +14,7 @@ import { formatActorId, extractRuleViolated } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../observe/api_collections/endpointShieldHelper";
 import IpReputationScore from "./IpReputationScore";
 
 const resourceName = {
@@ -39,9 +40,9 @@ const getHeaders = () => {
       title: "Host",
     },
     {
-      text: "Threat Actor",
+      text: isEndpointSecurityCategory() ? "Username" : "Threat Actor",
       value: "actorComp",
-      title: "Actor",
+      title: isEndpointSecurityCategory() ? "Username" : "Actor",
       filterKey: 'actor'
     },
   ];
@@ -140,6 +141,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const [selected, setSelected] = useState(0)
   const [currentFilters, setCurrentFilters] = useState({})
   const [totalFilteredCount, setTotalFilteredCount] = useState(0)
+  const [usernameMap, setUsernameMap] = useState({});
+  const [usernameMapLoaded, setUsernameMapLoaded] = useState(!isEndpointSecurityCategory());
+
+  useEffect(() => {
+    if (isEndpointSecurityCategory()) {
+      fetchEndpointShieldUsernameMap().then(map => {
+        setUsernameMap(map);
+        setUsernameMapLoaded(true);
+      });
+    }
+  }, []);
 
   const baseTabs = [
     {
@@ -537,19 +549,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       const complianceMap = filterTemplate?.compliance?.mapComplianceToListClauses || {};
       const complianceList = Object.keys(complianceMap);
 
-      // Extract detection type from sessionContext field (new field for session data)
-      let detectionType = 'SINGLE_PROMPT';
-      try {
-        if (x?.sessionContext) {
-          const sessionData = typeof x.sessionContext === 'string'
-            ? JSON.parse(x.sessionContext)
-            : x.sessionContext;
-          detectionType = sessionData?.detectionType || 'SINGLE_PROMPT';
-        }
-      } catch (e) {
-        console.error('[SusDataTable] Error parsing sessionContext:', e);
-      }
-      const isSessionBased = detectionType === 'SESSION_CONTEXT';
+      // Determine if this is session-based by checking if sessionId is present and not empty
+      const isSessionBased = x?.sessionId && x.sessionId !== '';
 
       let nextUrl = null;
       if (x.refId && x.eventType && x.actor && x.filterId) {
@@ -567,7 +568,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       const rowData = {
         ...x,
         id: x.id,
-        actorComp: formatActorId(x.actor),
+        actorComp: isEndpointSecurityCategory()
+          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap)
+          : formatActorId(x.actor),
         host: x.host || "-",
         endpointComp: (
           <GetPrettifyEndpoint
@@ -632,7 +635,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   }
 
   async function fillFilters() {
-    const res = await api.fetchFiltersThreatTable();
+    const res = await api.fetchFiltersThreatTable(startTimestamp, endTimestamp);
     let urlChoices = res?.urls
       .map((x) => {
         const url = x || "/"
@@ -650,14 +653,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         .map(x => ({ label: x, value: x }));
     }
 
-    const attackTypeChoices = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
-      ? (res?.subCategory || []).map(x => ({ label: x, value: x }))
-      : Object.keys(threatFiltersMap).length === 0 ? [] : Object.entries(threatFiltersMap).map(([key, value]) => {
-          return {
-            label: value?._id || key,
-            value: value?._id || key
-          }
-        })
+    // Policy triggered (latestAttack): merge subCategory from API (actual data) with threatFiltersMap (configured templates)
+    const subCategoryFromApi = (res?.subCategory || []).map(x => ({ label: x, value: x }));
+    const fromThreatFiltersMap = Object.entries(threatFiltersMap || {}).map(([key, value]) => ({
+      label: value?._id || key,
+      value: value?._id || key
+    }));
+    const uniqueByValue = new Map();
+    [...subCategoryFromApi, ...fromThreatFiltersMap].forEach(({ label, value }) => {
+      if (value && !uniqueByValue.has(value)) {
+        uniqueByValue.set(value, { label: label || value, value });
+      }
+    });
+    const attackTypeChoices = Array.from(uniqueByValue.values());
 
     filters = [
       {
@@ -709,18 +717,26 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   useEffect(() => {
     fillFilters();
-  }, [threatFiltersMap]);
+  }, [threatFiltersMap, startTimestamp, endTimestamp]);
 
   function disambiguateLabel(key, value) {
     switch (key) {
       case "apiCollectionId":
         return func.convertToDisambiguateLabelObj(value, collectionsMap, 2);
+      case "latestAttack":
+        const latestAttackLabelMap = Object.fromEntries(
+          Object.entries(threatFiltersMap || {}).map(([k, v]) => [
+            v?._id || k,
+            v?.category?.name || v?._id || k
+          ])
+        );
+        return func.convertToDisambiguateLabelObj(value, latestAttackLabelMap, 2);
       default:
         return func.convertToDisambiguateLabelObj(value, null, 2);
     }
   }
 
-  const key = startTimestamp + endTimestamp;
+  const key = startTimestamp + endTimestamp + (usernameMapLoaded ? '_u' : '');
   const headers = getHeaders();
 
   return (

@@ -9,6 +9,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.BulkModifyThreatActorStatusRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.SplunkIntegrationRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
@@ -102,12 +103,20 @@ public class DashboardRouter implements ARouter {
         Router router = Router.router(vertx);
 
         router
-            .get("/fetch_filters")
+            .post("/fetch_filters")
             .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                FetchAlertFiltersRequest req = ProtoMessageUtils.<
+                    FetchAlertFiltersRequest
+                >toProtoMessage(
+                    FetchAlertFiltersRequest.class,
+                    reqBody.asString()
+                ).orElse(FetchAlertFiltersRequest.newBuilder().build());
+
                 ProtoMessageUtils.toString(
                     dsService.fetchAlertFilters(
                         ctx.get("accountId"),
-                        FetchAlertFiltersRequest.newBuilder().build()
+                        req
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -415,6 +424,30 @@ public class DashboardRouter implements ARouter {
             });
 
         router
+            .post("/bulkModifyThreatActorStatus")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                BulkModifyThreatActorStatusRequest req = ProtoMessageUtils.<
+                BulkModifyThreatActorStatusRequest
+                >toProtoMessage(
+                    BulkModifyThreatActorStatusRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    threatActorService.bulkModifyThreatActorStatus(
+                        ctx.get("accountId"),
+                        req
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
             .post("/get_daily_actor_count")
             .blockingHandler(ctx -> {
                 String contextSource = getContextSourceHeader(ctx);
@@ -635,6 +668,38 @@ public class DashboardRouter implements ARouter {
                         contextSource
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .get("/fetch_session_context")
+            .blockingHandler(ctx -> {
+                String sessionId = ctx.request().getParam("sessionId");
+
+                if (sessionId == null || sessionId.isEmpty()) {
+                    ctx.response().setStatusCode(400).end("{\"errorMessage\": \"Session ID is required\"}");
+                    return;
+                }
+
+                try {
+                    com.akto.dto.agentic_sessions.SessionDocument sessionData =
+                        dsService.fetchSessionContext(ctx.get("accountId"), sessionId);
+
+                    if (sessionData == null) {
+                        ctx.response().setStatusCode(404).end("{\"errorMessage\": \"Session not found\"}");
+                        return;
+                    }
+
+                    // Convert to JSON and return
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    String responseJson = mapper.writeValueAsString(
+                        new java.util.HashMap<String, Object>() {{
+                            put("sessionData", sessionData);
+                        }}
+                    );
+                    ctx.response().setStatusCode(200).end(responseJson);
+                } catch (Exception e) {
+                    ctx.response().setStatusCode(500).end("{\"errorMessage\": \"Failed to fetch session context\"}");
+                }
             });
 
         return router;

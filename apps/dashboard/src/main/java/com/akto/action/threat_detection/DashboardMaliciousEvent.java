@@ -12,6 +12,7 @@ public class DashboardMaliciousEvent {
   private int apiCollectionId;
   private String ip;
   private String country;
+  private String destCountry;
   private long timestamp;
   private String type;
   private String refId;
@@ -26,7 +27,7 @@ public class DashboardMaliciousEvent {
   private String host;
   private String jiraTicketUrl;
   private String severity;
-  private String sessionContext;
+  private String sessionId;
   public DashboardMaliciousEvent() {}
 
   public DashboardMaliciousEvent(
@@ -38,6 +39,7 @@ public class DashboardMaliciousEvent {
       int apiCollectionId,
       String ip,
       String country,
+      String destCountry,
       long timestamp,
       String type,
       String refId,
@@ -52,7 +54,7 @@ public class DashboardMaliciousEvent {
       String host,
       String jiraTicketUrl,
       String severity,
-      String sessionContext) {
+      String sessionId) {
     this.id = id;
     this.actor = actor;
     this.filter_id = filter;
@@ -61,6 +63,7 @@ public class DashboardMaliciousEvent {
     this.apiCollectionId = apiCollectionId;
     this.ip = ip;
     this.country = country;
+    this.destCountry = destCountry;
     this.timestamp = timestamp;
     this.type = type;
     this.refId = refId;
@@ -75,7 +78,7 @@ public class DashboardMaliciousEvent {
     this.host = host;
     this.jiraTicketUrl = jiraTicketUrl;
     this.severity = severity;
-    this.sessionContext = sessionContext;
+    this.sessionId = sessionId;
   }
 
   public String getId() {
@@ -132,6 +135,14 @@ public class DashboardMaliciousEvent {
 
   public void setCountry(String country) {
     this.country = country;
+  }
+
+  public String getDestCountry() {
+    return destCountry;
+  }
+
+  public void setDestCountry(String destCountry) {
+    this.destCountry = destCountry;
   }
 
   public long getTimestamp() {
@@ -254,12 +265,12 @@ public class DashboardMaliciousEvent {
     this.severity = severity;
   }
 
-  public String getSessionContext() {
-    return sessionContext;
+  public String getSessionId() {
+    return sessionId;
   }
 
-  public void setSessionContext(String sessionContext) {
-    this.sessionContext = sessionContext;
+  public void setSessionId(String sessionId) {
+    this.sessionId = sessionId;
   }
 
 }

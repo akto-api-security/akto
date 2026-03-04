@@ -139,6 +139,22 @@
     --p-color-bg-app-hover: #F6F6F7 !important;
 }
 
+button:has(#bulk-run-test-button) {
+    background: var(--akto-primary) !important;
+    color: white !important;
+    height: 28px !important;
+    overflow: hidden !important;
+}
+
+button:has(#bulk-run-test-button):hover {
+    background: var(--p-color-bg-primary-hover) !important;
+}
+
+#bulk-run-test-button {
+    color: white !important;
+    font-weight: 600 !important;
+}
+
 .Polaris-Page{
     padding: 0 32px !important;
 }

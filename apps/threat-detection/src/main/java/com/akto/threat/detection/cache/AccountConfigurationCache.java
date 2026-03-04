@@ -1,5 +1,6 @@
 package com.akto.threat.detection.cache;
 
+import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
@@ -54,6 +55,10 @@ public class AccountConfigurationCache {
      */
     public AccountConfig getConfig(DataActor dataActor) {
         long currentTime = System.currentTimeMillis();
+        if(Context.accountId.get() == 1758787662){
+            logger.infoAndAddToDb("Returning default account config");
+            return getDefaultConfig();
+        }
 
         // Check if cache is expired
         if (cachedConfig == null || (currentTime - lastRefreshTime) >= REFRESH_INTERVAL_MS) {

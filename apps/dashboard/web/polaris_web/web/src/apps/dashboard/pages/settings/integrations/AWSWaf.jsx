@@ -5,6 +5,7 @@ import IntegrationsLayout from './IntegrationsLayout';
 import settingRequests from '../api';
 import func from '@/util/func'
 import SeverityLevelDropdown from '../../../components/shared/SeverityLevelDropdown';
+import ThreatPoliciesDropdown from '../../../components/shared/ThreatPoliciesDropdown';
 
 function AWSWaf() {
     const [accessKey, setAccessKey] = useState('');
@@ -14,6 +15,7 @@ function AWSWaf() {
     const [ruleSetName, setRuleSetName] = useState('');
     const [isPresent, setIsPresent] = useState(false);
     const [severityLevels, setSeverityLevels] = useState(['CRITICAL']);
+    const [threatPolicies, setThreatPolicies] = useState([]);
     const wafCard = (
         <LegacyCard
             primaryFooterAction={{content: 'Save', onAction: () => addAwsWafIntegration()}}
@@ -36,13 +38,17 @@ function AWSWaf() {
                   severityLevels={severityLevels}
                   setSeverityLevels={setSeverityLevels}
                 />
+                <ThreatPoliciesDropdown
+                  threatPolicies={threatPolicies}
+                  setThreatPolicies={setThreatPolicies}
+                />
             </VerticalStack>
-          </LegacyCard.Section> 
+          </LegacyCard.Section>
         </LegacyCard>
     )
 
     async function addAwsWafIntegration(){
-      await settingRequests.addAwsWafIntegration(accessKey, secretKey, region, ruleSetId, ruleSetName,severityLevels)
+      await settingRequests.addAwsWafIntegration(accessKey, secretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies)
       func.setToast(true, false, "Successfully added Aws Waf Integration")
     }
 
@@ -55,6 +61,7 @@ function AWSWaf() {
       setRuleSetId(resp?.wafConfig?.ruleSetId)
       setRuleSetName(resp?.wafConfig?.ruleSetName)
       setSeverityLevels(resp?.wafConfig?.severityLevels || ['CRITICAL'])
+      setThreatPolicies(resp?.wafConfig?.threatPolicies || [])
     }
 
     useEffect(() => {

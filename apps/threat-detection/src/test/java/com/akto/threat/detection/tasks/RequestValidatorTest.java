@@ -10,8 +10,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 class RequestValidatorTest {
 
@@ -219,6 +222,8 @@ class RequestValidatorTest {
         responseParam.setRequestParams(new HttpRequestParams());
         responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus");
         responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
 
         List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
 
@@ -231,6 +236,8 @@ class RequestValidatorTest {
         responseParam.setRequestParams(new HttpRequestParams());
         responseParam.getRequestParams().setUrl("/api/v3/pet/{petId}");
         responseParam.getRequestParams().setMethod("DELETE");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
 
         List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
 
@@ -273,5 +280,428 @@ class RequestValidatorTest {
 
         // Assertions
         assertTrue(errors.isEmpty(), "Expected no schema conformance errors for valid XML payload");
+    }
+
+    // ==================== Header Validation Tests ====================
+
+    @Test
+    void testValidate_ExtraHeaderNotInSchema() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available");
+        responseParam.getRequestParams().setMethod("GET");
+
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("content-type", Collections.singletonList("application/json"));
+        headers.put("x-custom-header", Collections.singletonList("custom-value"));
+        responseParam.getRequestParams().setHeaders(headers);
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        assertFalse(errors.isEmpty());
+        boolean hasHeaderError = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("header") && e.getMessage().contains("x-custom-header"));
+        assertTrue(hasHeaderError, "Expected error for extra header not defined in schema");
+    }
+
+    @Test
+    void testValidate_StandardHeadersSkipped() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus");
+        responseParam.getRequestParams().setMethod("GET");
+
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("user-agent", Collections.singletonList("Mozilla/5.0"));
+        headers.put("accept-encoding", Collections.singletonList("gzip, deflate"));
+        headers.put("x-forwarded-for", Collections.singletonList("192.168.1.1"));
+        headers.put("content-length", Collections.singletonList("100"));
+        headers.put("content-type", Collections.singletonList("application/json"));
+        responseParam.getRequestParams().setHeaders(headers);
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasHeaderError = errors.stream().anyMatch(e -> e.getAttribute().equals("header"));
+        assertFalse(hasHeaderError, "Standard headers should be skipped and not cause errors");
+    }
+
+    @Test
+    void testValidate_AktoK8sHeadersSkipped() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus");
+        responseParam.getRequestParams().setMethod("GET");
+
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("x-akto-k8s-namespace", Collections.singletonList("default"));
+        headers.put("content-type", Collections.singletonList("application/json"));
+        headers.put("x-akto-k8s-pod", Collections.singletonList("pod-123"));
+        responseParam.getRequestParams().setHeaders(headers);
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasHeaderError = errors.stream().anyMatch(e -> e.getAttribute().equals("header"));
+        assertFalse(hasHeaderError, "x-akto-k8s prefixed headers should be skipped");
+    }
+
+    @Test
+    void testValidate_DefinedHeaderAllowed() throws Exception {
+        // DELETE /pet/{petId} has api_key header defined in schema
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/123");
+        responseParam.getRequestParams().setMethod("DELETE");
+
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("content-type", Collections.singletonList("application/json"));
+        headers.put("api_key", Collections.singletonList("my-api-key"));
+        responseParam.getRequestParams().setHeaders(headers);
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasHeaderError = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("header") && e.getMessage().contains("api_key"));
+        assertFalse(hasHeaderError, "Headers defined in schema should not cause errors");
+    }
+
+    // ==================== Query Parameter Validation Tests ====================
+
+    @Test
+    void testValidate_ExtraQueryParamNotInSchema() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available&extraParam=value");
+        responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        assertFalse(errors.isEmpty());
+        boolean hasQueryError = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("query") && e.getMessage().contains("extraparam"));
+        assertTrue(hasQueryError, "Expected error for extra query parameter not defined in schema");
+    }
+
+    @Test
+    void testValidate_DefinedQueryParamAllowed() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available");
+        responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasQueryError = errors.stream().anyMatch(e -> e.getAttribute().equals("query"));
+        assertFalse(hasQueryError, "Query parameters defined in schema should not cause errors");
+    }
+
+    @Test
+    void testValidate_MultipleQueryParams() throws Exception {
+        // /user/login has username and password query params
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/user/login?username=user1&password=pass123");
+        responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasQueryError = errors.stream().anyMatch(e -> e.getAttribute().equals("query"));
+        assertFalse(hasQueryError, "Multiple query parameters defined in schema should not cause errors");
+    }
+
+    @Test
+    void testValidate_QueryParamWithEmptyValue() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=&undefinedParam=");
+        responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasUndefinedParamError = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("query") && e.getMessage().contains("undefinedparam"));
+        assertTrue(hasUndefinedParamError, "Extra query parameter with empty value should still be flagged");
+    }
+
+    @Test
+    void testValidate_MissingRequiredQueryParam() throws Exception {
+        // /user/login has required 'username' query parameter
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/user/login");
+        responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasMissingRequiredError = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("query")
+                        && e.getMessage().contains("Required query parameter")
+                        && e.getMessage().contains("username"));
+        assertTrue(hasMissingRequiredError, "Expected error for missing required query parameter 'username'");
+    }
+
+    @Test
+    void testValidate_RequiredQueryParamPresent_NoError() throws Exception {
+        // /user/login has required 'username' query parameter - providing it should not error
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/user/login?username=testuser");
+        responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasMissingRequiredError = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("query") && e.getMessage().contains("Required"));
+        assertFalse(hasMissingRequiredError, "Required query parameter is present, should not have missing required error");
+    }
+
+    @Test
+    void testValidate_MissingRequiredHeader() throws Exception {
+        // /pet/findByStatus has required 'Content-Type' header
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available");
+        responseParam.getRequestParams().setMethod("GET");
+        // Not setting any headers
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasMissingRequiredHeader = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("header")
+                        && e.getMessage().contains("Required header")
+                        && e.getMessage().contains("content-type"));
+        assertTrue(hasMissingRequiredHeader, "Expected error for missing required header 'Content-Type'");
+    }
+
+    @Test
+    void testValidate_RequiredHeaderPresent_NoError() throws Exception {
+        // /pet/findByStatus has required 'Content-Type' header - providing it should not error
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available");
+        responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("Content-Type", Collections.singletonList("application/json")));
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasMissingRequiredHeader = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("header") && e.getMessage().contains("Required"));
+        assertFalse(hasMissingRequiredHeader, "Required header is present, should not have missing required error");
+    }
+
+    // ==================== Extra Body Attributes Validation Tests ====================
+
+    @Test
+    void testValidate_ExtraPropertyInRequestBody() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet");
+        responseParam.getRequestParams().setMethod("PUT");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        String requestPayload = "{\"id\":10,\"name\":\"doggie\",\"photoUrls\":[\"string\"],\"extraField\":\"extraValue\"}";
+        responseParam.getRequestParams().setPayload(requestPayload);
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        assertFalse(errors.isEmpty());
+        boolean hasExtraPropertyError = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("requestBody") && e.getMessage().contains("extraField"));
+        assertTrue(hasExtraPropertyError, "Expected error for extra property in request body");
+    }
+
+    @Test
+    void testValidate_ExtraNestedPropertyInRequestBody() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet");
+        responseParam.getRequestParams().setMethod("PUT");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        // category has nested extra property
+        String requestPayload = "{\"id\":10,\"name\":\"doggie\",\"photoUrls\":[\"string\"],\"category\":{\"id\":1,\"name\":\"Dogs\",\"nestedExtra\":\"value\"}}";
+        responseParam.getRequestParams().setPayload(requestPayload);
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        assertFalse(errors.isEmpty());
+        boolean hasNestedExtraError = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("requestBody") && e.getMessage().contains("nestedExtra"));
+        assertTrue(hasNestedExtraError, "Expected error for extra nested property in request body");
+    }
+
+    @Test
+    void testValidate_MultipleExtraPropertiesInRequestBody() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet");
+        responseParam.getRequestParams().setMethod("PUT");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        String requestPayload = "{\"id\":10,\"name\":\"doggie\",\"photoUrls\":[\"string\"],\"extra1\":\"val1\",\"extra2\":\"val2\"}";
+        responseParam.getRequestParams().setPayload(requestPayload);
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        long extraPropertyErrors = errors.stream()
+                .filter(e -> e.getAttribute().equals("requestBody") && e.getMessage().contains("Extra property"))
+                .count();
+        assertEquals(2, extraPropertyErrors, "Expected two errors for two extra properties");
+    }
+
+    // ==================== getRequestBodySchemaNode Tests ====================
+
+    @Test
+    void testGetRequestBodySchemaNode_GetMethodReturnsNull() throws Exception {
+        JsonNode rootSchemaNode = objectMapper.readTree(apiSchema);
+        JsonNode pathNode = rootSchemaNode.path("paths").path("/pet/findByStatus");
+        JsonNode methodNode = pathNode.path("get");
+
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setMethod("GET");
+
+        JsonNode result = RequestValidator.getRequestBodySchemaNode(methodNode, responseParam, "/pet/findByStatus");
+
+        assertNull(result, "GET method should return null for request body schema node");
+    }
+
+    @Test
+    void testGetRequestBodySchemaNode_DeleteMethodReturnsNull() throws Exception {
+        JsonNode rootSchemaNode = objectMapper.readTree(apiSchema);
+        JsonNode pathNode = rootSchemaNode.path("paths").path("/pet/{petId}");
+        JsonNode methodNode = pathNode.path("delete");
+
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setMethod("DELETE");
+
+        JsonNode result = RequestValidator.getRequestBodySchemaNode(methodNode, responseParam, "/pet/{petId}");
+
+        assertNull(result, "DELETE method should return null for request body schema node");
+    }
+
+    @Test
+    void testGetRequestBodySchemaNode_NonJsonContentTypeReturnsNull() throws Exception {
+        JsonNode rootSchemaNode = objectMapper.readTree(apiSchema);
+        JsonNode pathNode = rootSchemaNode.path("paths").path("/pet");
+        JsonNode methodNode = pathNode.path("put");
+
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setMethod("PUT");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/xml")));
+
+        JsonNode result = RequestValidator.getRequestBodySchemaNode(methodNode, responseParam, "/pet");
+
+        assertNull(result, "Non-JSON content type should return null for request body schema node");
+    }
+
+    @Test
+    void testGetRequestBodySchemaNode_ValidJsonContentTypeReturnsSchema() throws Exception {
+        JsonNode rootSchemaNode = objectMapper.readTree(apiSchema);
+        JsonNode pathNode = rootSchemaNode.path("paths").path("/pet");
+        JsonNode methodNode = pathNode.path("put");
+
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setMethod("PUT");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        JsonNode result = RequestValidator.getRequestBodySchemaNode(methodNode, responseParam, "/pet");
+
+        assertNotNull(result, "JSON content type should return schema node");
+        assertTrue(result.has("properties"), "Schema node should have properties");
+    }
+
+    // ==================== Error Location Verification Tests ====================
+
+    @Test
+    void testValidate_ErrorLocation_UrlPathNotFound() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/unknown/path");
+        responseParam.getRequestParams().setMethod("GET");
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        assertFalse(errors.isEmpty());
+        assertEquals(SchemaConformanceError.Location.LOCATION_BODY, errors.get(0).getLocation(),
+                "URL path not found error should have LOCATION_BODY");
+    }
+
+    @Test
+    void testValidate_ErrorLocation_ExtraHeader() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available");
+        responseParam.getRequestParams().setMethod("GET");
+
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("content-type", Collections.singletonList("application/json"));
+        headers.put("x-custom-header", Collections.singletonList("value"));
+        responseParam.getRequestParams().setHeaders(headers);
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasHeaderErrorWithCorrectLocation = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("header")
+                        && e.getLocation() == SchemaConformanceError.Location.LOCATION_HEADER);
+        assertTrue(hasHeaderErrorWithCorrectLocation, "Extra header error should have LOCATION_HEADER");
+    }
+
+    @Test
+    void testValidate_ErrorLocation_ExtraQueryParam() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available&extraParam=value");
+        responseParam.getRequestParams().setMethod("GET");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasQueryErrorWithCorrectLocation = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("query")
+                        && e.getLocation() == SchemaConformanceError.Location.LOCATION_URL);
+        assertTrue(hasQueryErrorWithCorrectLocation, "Extra query param error should have LOCATION_URL");
+    }
+
+    @Test
+    void testValidate_ErrorLocation_ExtraBodyProperty() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet");
+        responseParam.getRequestParams().setMethod("PUT");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+
+        String requestPayload = "{\"id\":10,\"name\":\"doggie\",\"photoUrls\":[\"string\"],\"extraField\":\"value\"}";
+        responseParam.getRequestParams().setPayload(requestPayload);
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        boolean hasBodyErrorWithCorrectLocation = errors.stream()
+                .anyMatch(e -> e.getAttribute().equals("requestBody")
+                        && e.getMessage().contains("extraField")
+                        && e.getLocation() == SchemaConformanceError.Location.LOCATION_BODY);
+        assertTrue(hasBodyErrorWithCorrectLocation, "Extra body property error should have LOCATION_BODY");
     }
 }

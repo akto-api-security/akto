@@ -160,6 +160,9 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     @Setter
     private boolean triggeredWithAIAgent;
 
+    @Setter
+    private boolean skipLiveReplay;
+
     @Audit(description = "User imported an OpenAPI specification", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"getApiCollectionId"})
     public String importDataFromOpenApiSpec(){
 
@@ -272,7 +275,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                                 .collect(Collectors.toList());
                     }
 
-                    ParserResult parsedSwagger = Parser.convertOpenApiToAkto(openAPI, fileUploadId, useHost, urlsList);
+                    ParserResult parsedSwagger = Parser.convertOpenApiToAkto(openAPI, fileUploadId, useHost, urlsList, skipLiveReplay);
                     List<FileUploadError> fileErrors = parsedSwagger.getFileErrors();
 
                     List<SwaggerUploadLog> messages = parsedSwagger.getUploadLogs();

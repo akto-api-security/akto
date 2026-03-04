@@ -161,6 +161,19 @@ const settingRequests = {
             data
         })
     },
+    fetchMetricsByModule(startTimestamp, endTimestamp, moduleType, instanceId) {
+        const data = {
+            startTime: startTimestamp,
+            endTime: endTimestamp,
+            moduleType: moduleType
+        }
+        if (instanceId) data.instanceId = instanceId
+        return request({
+            url: '/api/metrics',
+            method: 'post',
+            data
+        })
+    },
 
     addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections, batchSize, webhookType, sendInstantly) {
         return request({
@@ -599,11 +612,11 @@ const settingRequests = {
             data: {roleName}
         })
     },
-    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName,severityLevels) {
+    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies) {
         return request({
             url: '/api/addAwsWafIntegration',
             method: 'post',
-            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName,severityLevels}
+            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies}
         })
     },
     fetchAwsWafIntegration() {
@@ -776,11 +789,11 @@ const settingRequests = {
             data: {}
         })
     },
-    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType,severityLevels) {
+    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels, threatPolicies) {
         return await request({
             url: '/api/addCloudflareWafIntegration',
             method: 'post',
-            data: {accountOrZoneId, apiKey, email, integrationType,severityLevels}
+            data: {accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels, threatPolicies}
         })
     },
     async getDeMergedApis() {
@@ -807,6 +820,13 @@ const settingRequests = {
     async deleteAllMaliciousEvents() {
         return await request({
             url: '/api/deleteAllMaliciousEvents',
+            method: 'post',
+            data: {}
+        })
+    },
+    async resetCollectionAccessTypes() {
+        return await request({
+            url: '/api/resetCollectionAccessTypes',
             method: 'post',
             data: {}
         })
@@ -888,6 +908,13 @@ const settingRequests = {
             url: '/api/updateModuleEnvAndReboot',
             method: 'post',
             data: {moduleId, moduleName, envData}
+        })
+    },
+    fetchFilterYamlTemplate() {
+        return request({
+            url: '/api/fetchFilterYamlTemplate',
+            method: 'post',
+            data: {}
         })
     }
 }

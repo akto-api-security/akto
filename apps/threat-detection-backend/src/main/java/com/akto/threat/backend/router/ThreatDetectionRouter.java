@@ -4,6 +4,7 @@ import com.akto.ProtoMessageUtils;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ApiDistributionDataRequestPayload;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchApiDistributionDataRequest;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
+import com.akto.proto.generated.threat_detection.service.agentic_session_service.v1.BulkUpdateAgenticSessionContextRequest;
 import com.akto.threat.backend.service.ApiDistributionDataService;
 import com.akto.threat.backend.service.MaliciousEventService;
 import io.vertx.core.Vertx;
@@ -42,6 +43,26 @@ public class ThreatDetectionRouter implements ARouter {
               maliciousEventService.recordMaliciousEvent(ctx.get("accountId"), req);
               ctx.response().setStatusCode(202).end();
             });
+
+    router
+        .post("/bulk_update_agentic_session_context")
+        .blockingHandler(
+            ctx -> {
+              RequestBody reqBody = ctx.body();
+              BulkUpdateAgenticSessionContextRequest req =
+                  ProtoMessageUtils.<BulkUpdateAgenticSessionContextRequest>toProtoMessage(
+                          BulkUpdateAgenticSessionContextRequest.class, reqBody.asString())
+                      .orElse(null);
+
+              if (req == null) {
+                ctx.response().setStatusCode(400).end("Invalid request");
+                return;
+              }
+
+              maliciousEventService.bulkUpdateAgenticSessionContext(ctx.get("accountId"), req);
+              ctx.response().setStatusCode(200).end();
+            });
+
     router
         .post("/save_api_distribution_data")
         .blockingHandler(ctx -> {

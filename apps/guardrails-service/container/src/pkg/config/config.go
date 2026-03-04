@@ -44,6 +44,10 @@ type Config struct {
 	// Also supports regex patterns by prefixing with "regex:", e.g., "regex:.*\\.example\\.com"
 	FilterHost string // Filter traffic by host header (comma-separated or regex)
 	FilterPath string // Filter traffic by path prefix (comma-separated or regex)
+
+	// Session management configuration
+	SessionSyncIntervalMin int  // Minutes between cyborg API syncs (default: 5)
+	SessionEnabled         bool // Enable session-based guardrailing (default: true)
 }
 
 // LoadConfig loads configuration from environment variables
@@ -70,6 +74,8 @@ func LoadConfig() *Config {
 		PolicyRefreshIntervalMin: getEnvAsInt("POLICY_REFRESH_INTERVAL_MIN", 15),
 		FilterHost:               getEnv("FILTER_HOST", ""),
 		FilterPath:               getEnv("FILTER_PATH", ""),
+		SessionSyncIntervalMin:   getEnvAsInt("SESSION_SYNC_INTERVAL_MIN", 5),
+		SessionEnabled:           getEnvAsBool("SESSION_ENABLED", true),
 	}
 }
 

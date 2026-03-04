@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList, Avatar } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList, Avatar, Spinner } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -229,25 +229,78 @@ function SampleDetails(props) {
 
     // Session Context Tab - shows prompts involved in session-based detection
     const SessionContextComponent = () => {
-        // Extract session data from moreInfoData.sessionContext
+        // Determine if this is session-based by checking if sessionId is present and not empty
+        const sessionId = moreInfoData?.sessionId;
+        const isSessionBased = sessionId && sessionId !== '';
+
+        const [sessionData, setSessionData] = useState(null);
+        const [sessionLoading, setSessionLoading] = useState(false);
+        const [sessionError, setSessionError] = useState(null);
+
+        // Fetch session data from agentic_session_context table API using sessionId
+        useEffect(() => {
+            if (isSessionBased) {
+                setSessionLoading(true);
+                setSessionError(null);
+
+                threatDetectionApi.fetchSessionContext(sessionId)
+                    .then((resp) => {
+                        if (resp && resp.sessionData) {
+                            setSessionData(resp.sessionData);
+                        } else {
+                            setSessionError(resp?.errorMessage || "Session data not found");
+                        }
+                    })
+                    .catch((err) => {
+                        setSessionError("Failed to fetch session data");
+                    })
+                    .finally(() => {
+                        setSessionLoading(false);
+                    });
+            }
+        }, [sessionId, isSessionBased]);
+
+        // Parse conversation info from session data
         let sessionPrompts = [];
-        let sessionId = null;
-        let detectionType = 'SINGLE_PROMPT';
         let sessionSummary = null;
+        let blockedReason = null;
 
-        const sessionContext = moreInfoData?.sessionContext;
+        if (sessionData) {
+            sessionSummary = sessionData.sessionSummary;
+            blockedReason = sessionData.blockedReason;
 
-        if (sessionContext) {
-            try {
-                const sessionData = typeof sessionContext === 'string'
-                    ? JSON.parse(sessionContext)
-                    : sessionContext;
-                sessionPrompts = sessionData?.sessionPrompts || [];
-                sessionId = sessionData?.sessionId || null;
-                detectionType = sessionData?.detectionType || 'SINGLE_PROMPT';
-                sessionSummary = sessionData?.sessionSummary || null;
-            } catch (e) {
-                console.error('[SampleDetails] Error parsing sessionContext:', e);
+            // Map conversationInfo to the format expected by the display logic
+            if (sessionData.conversationInfo && Array.isArray(sessionData.conversationInfo)) {
+                sessionPrompts = sessionData.conversationInfo.map((conv) => {
+                    // Parse request and response payloads if they're JSON strings
+                    let requestContent = conv.requestPayload;
+                    let responseContent = conv.responsePayload;
+
+                    try {
+                        if (typeof requestContent === 'string') {
+                            const parsed = JSON.parse(requestContent);
+                            requestContent = parsed.prompt || parsed.content || requestContent;
+                        }
+                    } catch (e) {
+                        // Keep as is if not valid JSON
+                    }
+
+                    try {
+                        if (typeof responseContent === 'string') {
+                            const parsed = JSON.parse(responseContent);
+                            responseContent = parsed.response || parsed.content || responseContent;
+                        }
+                    } catch (e) {
+                        // Keep as is if not valid JSON
+                    }
+
+                    return {
+                        content: requestContent,
+                        response: responseContent,
+                        timestamp: conv.timestamp,
+                        requestId: conv.requestId
+                    };
+                });
             }
         }
 
@@ -271,8 +324,8 @@ function SampleDetails(props) {
                     <VerticalStack gap={"2"}>
                         <Text variant="headingMd">Detection Type</Text>
                         <HorizontalStack gap={"2"}>
-                            <Badge status={detectionType === 'SESSION_CONTEXT' ? 'info' : 'default'}>
-                                {detectionType === 'SESSION_CONTEXT' ? 'Session-based' : 'Single Prompt'}
+                            <Badge status={isSessionBased ? 'info' : 'default'}>
+                                {isSessionBased ? 'Session-based' : 'Single Prompt'}
                             </Badge>
                             {sessionId && (
                                 <Text variant="bodySm" color="subdued">Session ID: {sessionId}</Text>
@@ -280,9 +333,32 @@ function SampleDetails(props) {
                         </HorizontalStack>
                     </VerticalStack>
 
-                    {detectionType === 'SESSION_CONTEXT' && (
+                    {isSessionBased && (
                         <>
-                            {sessionSummary && (
+                            {sessionLoading && (
+                                <>
+                                    <Divider />
+                                    <Box padding={"4"}>
+                                        <HorizontalStack gap={"2"} align="center">
+                                            <Spinner size="small" />
+                                            <Text variant="bodyMd" color="subdued">Loading session data...</Text>
+                                        </HorizontalStack>
+                                    </Box>
+                                </>
+                            )}
+
+                            {sessionError && !sessionLoading && (
+                                <>
+                                    <Divider />
+                                    <Box padding={"3"} background="bg-surface-critical" borderRadius="200">
+                                        <Text variant="bodyMd" color="critical">
+                                            {sessionError}
+                                        </Text>
+                                    </Box>
+                                </>
+                            )}
+
+                            {!sessionLoading && !sessionError && sessionSummary && (
                                 <>
                                     <Divider />
                                     <VerticalStack gap={"2"}>
@@ -296,8 +372,22 @@ function SampleDetails(props) {
                                 </>
                             )}
 
+                            {!sessionLoading && !sessionError && blockedReason && (
+                                <>
+                                    <Divider />
+                                    <VerticalStack gap={"2"}>
+                                        <Text variant="headingMd">Reason</Text>
+                                        <Box padding={"3"} background="bg-surface-critical" borderRadius="200">
+                                            <Text variant="bodyMd" color="critical">
+                                                {blockedReason}
+                                            </Text>
+                                        </Box>
+                                    </VerticalStack>
+                                </>
+                            )}
+
                             {/* Detection Reason - show all reasons from blocked prompts */}
-                            {sessionPrompts.some(p => p.detectionReason) && (
+                            {!sessionLoading && !sessionError && sessionPrompts.some(p => p.detectionReason) && (
                                 <>
                                     <Divider />
                                     <VerticalStack gap={"2"}>
@@ -321,7 +411,7 @@ function SampleDetails(props) {
                                 </>
                             )}
 
-                            {sessionPrompts.length > 0 && (
+                            {!sessionLoading && !sessionError && sessionPrompts.length > 0 && (
                                 <>
                                     <Divider />
                                     <VerticalStack gap={"4"}>
@@ -402,7 +492,7 @@ function SampleDetails(props) {
                         </>
                     )}
 
-                    {detectionType === 'SINGLE_PROMPT' && (
+                    {!isSessionBased && (
                         <>
                             <Divider />
                             <Box padding={"3"} background="bg-surface-secondary" borderRadius="200">

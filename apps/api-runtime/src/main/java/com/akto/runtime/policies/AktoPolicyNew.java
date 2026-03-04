@@ -7,7 +7,6 @@ import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
-import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -18,7 +17,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.APICatalogSync;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
-import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -120,7 +118,7 @@ public class AktoPolicyNew {
         PolicyCatalog policyCatalog = new PolicyCatalog(apiInfo, filterSampleDataMap);
 
         if (APICatalog.isTemplateUrl(apiInfoKey.url)) {
-            URLTemplate urlTemplate = createUrlTemplate(apiInfoKey.url, apiInfoKey.method);
+            URLTemplate urlTemplate = createUrlTemplate(apiInfoKey.url, apiInfoKey.method, this.mergeUrlsOnVersions);
             Map<URLTemplate, PolicyCatalog> templateURLToMethods = apiInfoCatalog.getTemplateURLToMethods();
             templateURLToMethods.putIfAbsent(urlTemplate, policyCatalog);
         } else {
@@ -301,76 +299,8 @@ public class AktoPolicyNew {
 
         List<WriteModel<ApiInfo>> updatesForApiInfo = getUpdatesForApiInfo(apiInfoList, source);
         List<WriteModel<FilterSampleData>> updatesForSampleData = getUpdatesForSampleData(filterSampleDataList);
-        Map<ApiInfoKey, List<Integer>> updatesForApiGroups = getUpdatesForApiGroups(apiInfoList);
-
-        System.out.println(StringUtils.join(updatesForApiGroups));
 
         return new UpdateReturn(updatesForApiInfo, updatesForSampleData);
-    }
-
-    private static Map<ApiInfoKey, List<Integer>> getUpdatesForApiGroups(List<ApiInfo> apiInfoList) {
-        List<ApiCollection> apiGroups = ApiCollectionsDao.instance.fetchApiGroups();
-        Map<ApiInfoKey, List<Integer>> ret = new HashMap<>();
-        Map<Integer, List<TestingEndpoints>> idToAndList = new HashMap<>();
-        Map<Integer, List<TestingEndpoints>> idToOrList = new HashMap<>();
-
-        for(ApiCollection apiGroup: apiGroups) {
-            int id = apiGroup.getId();
-            if (!idToAndList.containsKey(id)) {
-                idToAndList.put(id, new ArrayList<>());
-            }
-            if (!idToOrList.containsKey(id)) {
-                idToOrList.put(id, new ArrayList<>());
-            }
-            List<TestingEndpoints> andList = idToAndList.get(id);
-            List<TestingEndpoints> orList = idToOrList.get(id);
-            for(TestingEndpoints testingEndpoints: apiGroup.getConditions()) {
-                switch (testingEndpoints.getOperator()) {
-                    case AND:
-                        andList.add(testingEndpoints);
-                        break;
-                    case OR:
-                        orList.add(testingEndpoints);
-                        break;
-                }
-            }
-        }
-
-        for(ApiInfo apiInfo: apiInfoList) {
-            ApiInfoKey apiInfoKey = apiInfo.getId();
-            for(ApiCollection apiGroup: apiGroups) {
-                int id = apiGroup.getId();
-                List<TestingEndpoints> andList = idToAndList.get(id);
-                List<TestingEndpoints> orList = idToOrList.get(id);
-
-                boolean andResult = true;
-                for(TestingEndpoints te: andList) {
-                    if (!te.containsApi(apiInfoKey)) {
-                        andResult = false;
-                        break;
-                    }
-                }
-
-                if (andResult) {
-                    boolean orResult = orList.size() == 0;
-                    for(TestingEndpoints te: orList) {
-                        if (te.containsApi(apiInfoKey)) {
-                            orResult = true;
-                            break;
-                        }
-                    }
-
-                    andResult = orResult;
-                }
-
-                if(andResult) {
-                    List<Integer> apiGroupsToAdd = ret.computeIfAbsent(apiInfoKey, k -> new ArrayList<>());
-                    apiGroupsToAdd.add(id);
-                }
-            }
-        }
-
-        return ret;
     }
 
     public static class UpdateReturn {
@@ -391,7 +321,7 @@ public class AktoPolicyNew {
             List<Bson> subUpdates = new ArrayList<>();
 
             // allAuthTypesFound
-            Set<Set<ApiInfo.AuthType>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
+            Set<Set<String>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
             if (allAuthTypesFound.isEmpty()) {
                 // to make sure no field is null (so setting empty objects)
                 subUpdates.add(Updates.setOnInsert(ApiInfo.ALL_AUTH_TYPES_FOUND, new HashSet<>()));

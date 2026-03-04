@@ -249,6 +249,10 @@ function SampleData(props) {
     }, [])
 
     useEffect(() => {
+      setDynamicHeight(minHeight || '300px')
+    }, [minHeight])
+
+    useEffect(() => {
       if (instance && props?.useDynamicHeight) {
           const disposeOnContentSizeChange = instance.onDidContentSizeChange((e) => {
             const contentHeight = e.contentHeight > 900 ? 900 : e.contentHeight // 3600 means 200 lines (18 == 1 line)

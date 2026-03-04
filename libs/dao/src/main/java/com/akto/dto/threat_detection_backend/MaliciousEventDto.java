@@ -30,7 +30,7 @@ public class MaliciousEventDto {
   private String host;
   private String jiraTicketUrl;
   private String contextSource;
-  private String sessionContext;
+  private String sessionId;
 
   public enum EventType {
     SINGLE,
@@ -76,7 +76,7 @@ public class MaliciousEventDto {
     this.metadata = builder.metadata;
     this.jiraTicketUrl = builder.jiraTicketUrl;
     this.contextSource = builder.contextSource;
-    this.sessionContext = builder.sessionContext;
+    this.sessionId = builder.sessionId;
   }
 
   public static class Builder {
@@ -103,7 +103,7 @@ public class MaliciousEventDto {
     private String host;
     private String jiraTicketUrl;
     private String contextSource;
-    private String sessionContext;
+    private String sessionId;
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
       return this;
@@ -219,8 +219,8 @@ public class MaliciousEventDto {
       return this;
     }
 
-    public Builder setSessionContext(String sessionContext) {
-      this.sessionContext = sessionContext;
+    public Builder setSessionId(String sessionId) {
+      this.sessionId = sessionId;
       return this;
     }
 
@@ -425,12 +425,12 @@ public class MaliciousEventDto {
     this.contextSource = contextSource;
   }
 
-  public String getSessionContext() {
-    return sessionContext;
+  public String getSessionId() {
+    return sessionId;
   }
 
-  public void setSessionContext(String sessionContext) {
-    this.sessionContext = sessionContext;
+  public void setSessionId(String sessionId) {
+    this.sessionId = sessionId;
   }
 
 }
