@@ -1872,7 +1872,7 @@ public class ApiCollectionsAction extends UserAction {
                     Updates.set(Organization.COLLECTIN_ACCESS_TYPE_ENABLED, true)); 
             
             if (orgInfo == null) {
-                loggerMaker.errorAndAddToDb(e, "Error in resetCollectionAccessTypes, no org exists for accountId", LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb("Error in resetCollectionAccessTypes, no org exists for accountId", LogDb.DASHBOARD);
                 return Action.ERROR.toUpperCase();
             }    
 

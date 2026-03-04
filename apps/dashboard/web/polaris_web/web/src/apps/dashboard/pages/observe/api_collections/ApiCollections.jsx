@@ -179,7 +179,7 @@ const getBaseHeaders = (collectionAccessTypeEnabled) => [
         textValue: 'envType',
         tooltipContent: (<Text variant="bodySm">Tags for an API collection to describe collection attributes such as environment type (staging, production) and other custom attributes</Text>),
     },
-    ...(allowedAccounts.includes(Number(window.ACTIVE_ACCOUNT)) && collectionAccessTypeEnabled ? [{
+    ...(allowedAccounts.includes(Number(window.ACTIVE_ACCOUNT)) || collectionAccessTypeEnabled ? [{
         title: "Access Type",
         text: "Access Type",
         value: "accessType",
@@ -1104,9 +1104,8 @@ function ApiCollections(props) {
     }, [])
 
     useEffect(() => {
-        if (!allowedAccounts.includes(Number(window.ACTIVE_ACCOUNT))) return
         settingRequests.fetchAdminSettings().then(response => {
-            setCollectionAccessTypeEnabled(response?.currentAccount?.collectionAccessTypeEnabled === true)
+            setCollectionAccessTypeEnabled(response?.organization?.collectionAccessTypeEnabled === true)
         }).catch(() => {})
     }, [])
 
