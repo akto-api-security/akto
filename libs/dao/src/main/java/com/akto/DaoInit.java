@@ -178,6 +178,12 @@ public class DaoInit {
                 .builder(WorkflowTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<HostRegexTestingEndpoints> hostRegexTestingEndpointsClassModel = ClassModel
                 .builder(HostRegexTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<TagsTestingEndpoints> tagsTestingEndpointsClassModel = ClassModel
+                .builder(TagsTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<AuthTypeTestingEndpoints> authTypeTestingEndpointsClassModel = ClassModel
+                .builder(AuthTypeTestingEndpoints.class).enableDiscriminator(true).build();
+        ClassModel<AccessTypeTestingEndpoints> accessTypeTestingEndpointsClassModel = ClassModel
+                .builder(AccessTypeTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<WorkflowTestResult> workflowTestResultClassModel = ClassModel.builder(WorkflowTestResult.class)
                 .enableDiscriminator(true).build();
         ClassModel<WorkflowTest> workflowTestClassModel = ClassModel.builder(WorkflowTest.class)
@@ -303,7 +309,7 @@ public class DaoInit {
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
-                RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel,fileClassModel, tlsAuthClassModel, apiHitCountInfoClassModel, collectionTagsModel, hostRegexTestingEndpointsClassModel, logsEndpointShieldClassModel).automatic(true).build());
+                RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel,fileClassModel, tlsAuthClassModel, apiHitCountInfoClassModel, collectionTagsModel, hostRegexTestingEndpointsClassModel, tagsTestingEndpointsClassModel, authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
