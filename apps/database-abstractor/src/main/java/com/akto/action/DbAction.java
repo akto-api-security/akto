@@ -5091,8 +5091,7 @@ public class DbAction extends ActionSupport {
                                 loggerMaker.sendCyborgSlackAsync("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec completed accountId=" + accountId + " colId=" + colId + " apiCount=" + msgs.size());
 
                             } catch (Exception e) {
-                                loggerMaker.errorAndAddToDb(e, "Error in importOpenApiSpec: " + e.toString());
-                                loggerMaker.sendCyborgSlackAsync("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec error accountId=" + accountId + " " + e.getMessage());
+                                loggerMaker.errorAndAddToDb(e, "ip=" + LoggerMaker.getHostIp() + " Error in importOpenApiSpec. accountId=" + accountId + ", error=" + e.toString());
                             }
                         }
                     });
@@ -5100,8 +5099,7 @@ public class DbAction extends ActionSupport {
                     // Wait with timeout
                     boolean completed = openApiExecutor.awaitTermination(OPENAPI_IMPORT_TIMEOUT_MINUTES, TimeUnit.MINUTES);
                     if (!completed) {
-                        loggerMaker.errorAndAddToDb("importOpenApiSpec timeout accountId=" + accountId + " timeoutMinutes=" + OPENAPI_IMPORT_TIMEOUT_MINUTES + " task_cancelled");
-                        loggerMaker.sendCyborgSlackAsync("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec timeout accountId=" + accountId + " timeoutMinutes=" + OPENAPI_IMPORT_TIMEOUT_MINUTES + " task_cancelled");
+                        loggerMaker.errorAndAddToDb("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec timeout accountId=" + accountId + " timeoutMinutes=" + OPENAPI_IMPORT_TIMEOUT_MINUTES + " task_cancelled");
                         openApiExecutor.shutdownNow();
                     }
                 } catch (InterruptedException e) {
