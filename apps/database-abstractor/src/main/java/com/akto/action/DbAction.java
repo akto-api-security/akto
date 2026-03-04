@@ -3440,6 +3440,17 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String insertAwsApiGatewayLog() {
+        try {
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            AwsApiGatewayLogsDao.instance.insertOne(dbLog);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertAwsApiGatewayLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
 
     private List<CrawlerRun> crawlerRuns;
     private List<CrawlerRunDTO> crawlerRunsData;

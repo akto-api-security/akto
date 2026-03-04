@@ -557,6 +557,10 @@ public class DbActor extends DataActor {
         DbLayer.insertCyborgLog(log);
     }
 
+    public void insertAwsApiGatewayLog(Log log) {
+        DbLayer.insertAwsApiGatewayLog(log);
+    }
+
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         DbLayer.bulkWriteDependencyNodes(dependencyNodeList);
     }
