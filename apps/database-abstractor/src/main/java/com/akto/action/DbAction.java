@@ -5001,12 +5001,16 @@ public class DbAction extends ActionSupport {
                         public void run() {
                             Context.accountId.set(accountId);
                             try {
-                                // Parse OpenAPI spec
+                                loggerMaker.infoAndAddToDb("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec started accountId=" + accountId);
+                                loggerMaker.sendCyborgSlackAsync("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec started accountId=" + accountId);
+
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " step=before_OpenAPI_parse");
                                 ParseOptions options = new ParseOptions();
                                 options.setResolve(true);
                                 options.setResolveFully(true);
                                 SwaggerParseResult result = new OpenAPIParser().readContents(openApiSchema, null, options);
                                 OpenAPI openAPI = result.getOpenAPI();
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " step=after_OpenAPI_parse");
                                 if (openAPI == null) {
                                     loggerMaker.errorAndAddToDb("Failed to parse OpenAPI spec in importOpenApiSpec");
                                     return;
@@ -5020,8 +5024,9 @@ public class DbAction extends ActionSupport {
                                     title += Context.now();
                                 }
 
-                                // Parse into Akto format with useHost=true
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " step=before_convertOpenApiToAkto");
                                 ParserResult parsedResult = Parser.convertOpenApiToAkto(openAPI, null, true, new ArrayList<>());
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " step=after_convertOpenApiToAkto");
                                 List<SwaggerUploadLog> uploadLogs = parsedResult.getUploadLogs();
 
                                 // Filter based on importType
@@ -5048,8 +5053,9 @@ public class DbAction extends ActionSupport {
                                     extractedHost = title;
                                 }
 
-                                // Create collection using hostName.hashCode() pattern
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " step=before_createCollectionForOpenApi host=" + extractedHost);
                                 int colId = createCollectionForOpenApi(extractedHost);
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " step=after_createCollectionForOpenApi colId=" + colId);
 
                                 // Process through HttpCallParser (same as dashboard's skipKafka=true path)
                                 List<HttpResponseParams> responses = new ArrayList<>();
@@ -5063,19 +5069,30 @@ public class DbAction extends ActionSupport {
                                 HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
                                 AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
                                     AccountSettingsDao.generateFilter());
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " colId=" + colId + " step=before_filterBasedOnHeaders apiCount=" + responses.size());
                                 responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, accountSettings);
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " colId=" + colId + " step=after_filterBasedOnHeaders apiCount=" + responses.size());
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " colId=" + colId + " step=before_syncFunction apiCount=" + responses.size());
                                 callParser.syncFunction(responses, true, false, accountSettings);
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " colId=" + colId + " step=after_syncFunction");
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " colId=" + colId + " step=before_mergeUrlsAndSave");
                                 APICatalogSync.mergeUrlsAndSave(colId, true, false,
                                     callParser.apiCatalogSync.existingAPIsInDb);
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " colId=" + colId + " step=after_mergeUrlsAndSave");
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " colId=" + colId + " step=before_buildFromDB");
                                 callParser.apiCatalogSync.buildFromDB(false, false);
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " colId=" + colId + " step=after_buildFromDB");
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " colId=" + colId + " step=before_updateApiCollectionCount");
                                 APICatalogSync.updateApiCollectionCount(
                                     callParser.apiCatalogSync.getDbState(colId), colId);
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " colId=" + colId + " step=after_updateApiCollectionCount");
 
-                                loggerMaker.infoAndAddToDb("Successfully imported " + msgs.size() +
-                                    " APIs from OpenAPI spec into collection " + colId);
+                                loggerMaker.infoAndAddToDb("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec completed accountId=" + accountId + " colId=" + colId + " apiCount=" + msgs.size());
+                                loggerMaker.sendCyborgSlackAsync("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec completed accountId=" + accountId + " colId=" + colId + " apiCount=" + msgs.size());
 
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e, "Error in importOpenApiSpec: " + e.toString());
+                                loggerMaker.sendCyborgSlackAsync("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec error accountId=" + accountId + " " + e.getMessage());
                             }
                         }
                     });
@@ -5083,8 +5100,8 @@ public class DbAction extends ActionSupport {
                     // Wait with timeout
                     boolean completed = openApiExecutor.awaitTermination(OPENAPI_IMPORT_TIMEOUT_MINUTES, TimeUnit.MINUTES);
                     if (!completed) {
-                        loggerMaker.errorAndAddToDb("importOpenApiSpec timeout - took longer than " + OPENAPI_IMPORT_TIMEOUT_MINUTES +
-                            " minutes, task cancelled");
+                        loggerMaker.errorAndAddToDb("importOpenApiSpec timeout accountId=" + accountId + " timeoutMinutes=" + OPENAPI_IMPORT_TIMEOUT_MINUTES + " task_cancelled");
+                        loggerMaker.sendCyborgSlackAsync("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec timeout accountId=" + accountId + " timeoutMinutes=" + OPENAPI_IMPORT_TIMEOUT_MINUTES + " task_cancelled");
                         openApiExecutor.shutdownNow();
                     }
                 } catch (InterruptedException e) {

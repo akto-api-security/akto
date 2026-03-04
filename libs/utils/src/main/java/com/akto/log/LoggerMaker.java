@@ -14,7 +14,10 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,6 +44,25 @@ public class LoggerMaker  {
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
+
+    private static final String HOST_IP = initHostIp();
+
+    /** Primary non-loopback IPv4 (e.g. private IP on Linux). */
+    private static String initHostIp() {
+        try {
+            for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                if (ni.isLoopback() || !ni.isUp()) continue;
+                for (InetAddress addr : Collections.list(ni.getInetAddresses())) {
+                    if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()) continue;
+                    String ip = addr.getHostAddress();
+                    if (ip != null && ip.indexOf(':') < 0) return ip; // IPv4
+                }
+            }
+        } catch (Exception e) { /* ignore */ }
+        return "unknown";
+    }
+
+    public static String getHostIp() { return HOST_IP; }
 
     static {
         scheduler.scheduleAtFixedRate(new Runnable() {
