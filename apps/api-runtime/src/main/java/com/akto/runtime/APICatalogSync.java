@@ -83,6 +83,9 @@ public class APICatalogSync {
         mergedUrls = new HashSet<>();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
+        } else {
+            // Light init for single-collection flows (e.g. OpenAPI import): load mergedUrls only so mergeUrlsAndSave works
+            mergedUrls = MergedUrlsDao.instance.getMergedUrls();
         }
     }
 

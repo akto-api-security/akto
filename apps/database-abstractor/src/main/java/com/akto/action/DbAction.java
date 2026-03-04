@@ -5057,7 +5057,8 @@ public class DbAction extends ActionSupport {
                                 }
 
                                 SingleTypeInfo.fetchCustomDataTypes(accountId);
-                                HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                                // Skip full-account buildFromDB to avoid timeout; only this collection is synced
+                                HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false, false);
                                 AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
                                     AccountSettingsDao.generateFilter());
                                 responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, accountSettings);

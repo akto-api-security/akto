@@ -80,11 +80,20 @@ public class HttpCallParser {
         },0,5,TimeUnit.MINUTES);
     }
     public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time, boolean fetchAllSTI) {
+        this(userIdentifier, thresh, sync_threshold_count, sync_threshold_time, fetchAllSTI, true);
+    }
+
+    /**
+     * @param buildFromDbOnInit if false, skips loading all account STIs (for single-collection flows e.g. OpenAPI import to avoid timeout)
+     */
+    public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time, boolean fetchAllSTI, boolean buildFromDbOnInit) {
         last_synced = 0;
         this.sync_threshold_count = sync_threshold_count;
         this.sync_threshold_time = sync_threshold_time;
-        apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
-        apiCatalogSync.buildFromDB(false, fetchAllSTI);
+        apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI, buildFromDbOnInit);
+        if (buildFromDbOnInit) {
+            apiCatalogSync.buildFromDB(false, fetchAllSTI);
+        }
         apiCollectionsMap = ApiCollectionsDao.instance.getApiCollectionsMetaMap();
         this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
     }
