@@ -5001,8 +5001,8 @@ public class DbAction extends ActionSupport {
                         public void run() {
                             Context.accountId.set(accountId);
                             try {
-                                loggerMaker.infoAndAddToDb("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec started accountId=" + accountId);
-                                loggerMaker.sendCyborgSlackAsync("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec started accountId=" + accountId);
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec started accountId=" + accountId);
+                                loggerMaker.sendCyborgSlackAsync("importOpenApiSpec started accountId=" + accountId);
 
                                 loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " step=before_OpenAPI_parse");
                                 ParseOptions options = new ParseOptions();
@@ -5087,11 +5087,11 @@ public class DbAction extends ActionSupport {
                                     callParser.apiCatalogSync.getDbState(colId), colId);
                                 loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " colId=" + colId + " step=after_updateApiCollectionCount");
 
-                                loggerMaker.infoAndAddToDb("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec completed accountId=" + accountId + " colId=" + colId + " apiCount=" + msgs.size());
-                                loggerMaker.sendCyborgSlackAsync("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec completed accountId=" + accountId + " colId=" + colId + " apiCount=" + msgs.size());
+                                loggerMaker.infoAndAddToDb("importOpenApiSpec completed accountId=" + accountId + " colId=" + colId + " apiCount=" + msgs.size());
+                                loggerMaker.sendCyborgSlackAsync("importOpenApiSpec completed accountId=" + accountId + " colId=" + colId + " apiCount=" + msgs.size());
 
                             } catch (Exception e) {
-                                loggerMaker.errorAndAddToDb(e, "ip=" + LoggerMaker.getHostIp() + " Error in importOpenApiSpec. accountId=" + accountId + ", error=" + e.toString());
+                                loggerMaker.errorAndAddToDb(e, "Error in importOpenApiSpec. accountId=" + accountId + ", error=" + e.toString());
                             }
                         }
                     });
@@ -5099,7 +5099,7 @@ public class DbAction extends ActionSupport {
                     // Wait with timeout
                     boolean completed = openApiExecutor.awaitTermination(OPENAPI_IMPORT_TIMEOUT_MINUTES, TimeUnit.MINUTES);
                     if (!completed) {
-                        loggerMaker.errorAndAddToDb("ip=" + LoggerMaker.getHostIp() + " importOpenApiSpec timeout accountId=" + accountId + " timeoutMinutes=" + OPENAPI_IMPORT_TIMEOUT_MINUTES + " task_cancelled");
+                        loggerMaker.errorAndAddToDb("importOpenApiSpec timeout accountId=" + accountId + " timeoutMinutes=" + OPENAPI_IMPORT_TIMEOUT_MINUTES + " task_cancelled");
                         openApiExecutor.shutdownNow();
                     }
                 } catch (InterruptedException e) {
