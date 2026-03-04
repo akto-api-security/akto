@@ -148,25 +148,53 @@ jobs:
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG3 . --push
           fi
 
-      - name: Send Github release notification to Slack
-        id: slack
+      - name: Send Github release notification to Slack - Mini-Runtime
+        id: slack-mini-runtime
+        if: ${{ github.event.inputs.mini-runtime == 'true' }}
         uses: slackapi/slack-github-action@v1.23.0
         with:
           payload: |
             {
-              "text": "Hybrid Runtime and testing version v${{ github.event.inputs.release_version }} released!",
-              "attachments": [
-                {
-                  "color": "#36a64f",
-                  "fields": [
-                    {
-                      "title": "Services Deployed",
-                      "value": "${{ github.event.inputs.mini-runtime == 'true' && 'Mini-Runtime ✅\\n' || '' }}${{ github.event.inputs.mini-testing == 'true' && 'Mini-Testing ✅\\n' || '' }}${{ github.event.inputs.testing-db-layer == 'true' && 'Testing-Db-Layer ✅' || '' }}",
-                      "short": false
-                    }
-                  ]
-                }
-              ]
+              "text": "⚙️ Mini-Runtime version v${{ github.event.inputs.release_version }} released!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Send Github release notification to Slack - Mini-Testing
+        id: slack-mini-testing
+        if: ${{ github.event.inputs.mini-testing == 'true' }}
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "🧪 Mini-Testing version v${{ github.event.inputs.release_version }} released!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Send Github release notification to Slack - Testing-Db-Layer
+        id: slack-testing-db-layer
+        if: ${{ github.event.inputs.testing-db-layer == 'true' }}
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "🗄️ Testing-Db-Layer version v${{ github.event.inputs.release_version }} released!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Send Github release notification to Slack - Mini-Runtime-Service
+        id: slack-mini-runtime-service
+        if: ${{ github.event.inputs.mini-runtime-service == 'true' }}
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "📡 Mini-Runtime-Service version v${{ github.event.inputs.release_version }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -4,6 +4,7 @@ import com.akto.dto.sql.SampleDataAlt;
 import com.akto.dto.sql.SampleDataAltCopy;
 import com.akto.dto.type.URLMethods;
 import com.akto.sql.SampleDataAltDb;
+import com.akto.util.SampleDeduplicationFilter;
 import com.mongodb.BasicDBList;
 import com.opensymphony.xwork2.ActionSupport;
 
@@ -86,20 +87,54 @@ public class DbLayerAction extends ActionSupport {
         if (System.getenv().getOrDefault("SKIP_BULK_INSERT", "false").equals("true")) {
             return SUCCESS.toUpperCase();
         }
+
         try {
             List<SampleDataAlt> sampleDataList = new ArrayList<>();
+            int batchDuplicates = 0;
+
             for (SampleDataAltCopy sampleDataAltCopy: samplesCopy) {
-                sampleDataList.add(new SampleDataAlt(UUID.fromString(sampleDataAltCopy.getId()), 
-                sampleDataAltCopy.getSample(), sampleDataAltCopy.getApiCollectionId(), 
-                sampleDataAltCopy.getMethod(), sampleDataAltCopy.getUrl(), 
-                sampleDataAltCopy.getResponseCode(), sampleDataAltCopy.getTimestamp(), 
-                sampleDataAltCopy.getAccountId()));
+                // Check if sample should be inserted using deduplication filter
+                boolean shouldInsert = SampleDeduplicationFilter.shouldInsertSample(
+                    sampleDataAltCopy.getApiCollectionId(),
+                    sampleDataAltCopy.getMethod(),
+                    sampleDataAltCopy.getUrl()
+                );
+
+                if (!shouldInsert) {
+                    batchDuplicates++;
+                    continue;
+                }
+
+                // Add to insertion list for database
+                sampleDataList.add(new SampleDataAlt(
+                    UUID.fromString(sampleDataAltCopy.getId()),
+                    sampleDataAltCopy.getSample(),
+                    sampleDataAltCopy.getApiCollectionId(),
+                    sampleDataAltCopy.getMethod(),
+                    sampleDataAltCopy.getUrl(),
+                    sampleDataAltCopy.getResponseCode(),
+                    sampleDataAltCopy.getTimestamp(),
+                    sampleDataAltCopy.getAccountId()
+                ));
             }
-            SampleDataAltDb.bulkInsert(sampleDataList);
+
+            // Log batch results
+            logger.info("bulkInsertSamples: batch processed={}, unique to insert={}, duplicates skipped={}",
+                       samplesCopy.size(), sampleDataList.size(), batchDuplicates);
+
+            // Insert unique samples into database
+            if (!sampleDataList.isEmpty()) {
+                SampleDataAltDb.bulkInsert(sampleDataList);
+                logger.info("bulkInsertSamples: successfully inserted {} unique samples into database",
+                           sampleDataList.size());
+            } else {
+                logger.info("bulkInsertSamples: no unique samples to insert (all duplicates)");
+            }
+
         } catch (Exception e) {
-            e.printStackTrace();
-            logger.error("error in deleteOldRecords " + e.getMessage());
+            logger.error("error in bulkInsertSamples: {}", e.getMessage(), e);
         }
+
         return SUCCESS.toUpperCase();
     }
 

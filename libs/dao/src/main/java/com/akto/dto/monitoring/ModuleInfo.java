@@ -96,6 +96,7 @@ public class ModuleInfo {
     public enum ModuleType {
         MINI_RUNTIME,
         MINI_TESTING,
+        AGENTIC_TESTING,
         K8S,
         EBPF,
         THREAT_DETECTION,

@@ -422,7 +422,7 @@ public class DbLayer {
         );
     }
 
-    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
+    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
 
@@ -434,6 +434,9 @@ public class DbLayer {
         );
         if(tags != null && !tags.isEmpty()) {
             updates = Updates.combine(updates, Updates.set("tagsList", tags));
+        }
+        if(accessType != null && !accessType.isEmpty()) {
+            updates = Updates.combine(updates, Updates.set(ApiCollection.ACCESS_TYPE, accessType));
         }
 
         ApiCollectionsDao.instance.getMCollection().updateOne(
@@ -457,7 +460,7 @@ public class DbLayer {
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
 
-    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags) {
+    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags, String accessType) {
 
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -473,12 +476,15 @@ public class DbLayer {
         if(tags != null && !tags.isEmpty()) {
             updates = Updates.combine(updates, Updates.set("tagsList", tags));
         }
+        if(accessType != null && !accessType.isEmpty()) {
+            updates = Updates.combine(updates, Updates.set(ApiCollection.ACCESS_TYPE, accessType));
+        }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
 
     // Similar to createCollectionForHostAndVpc but for service-tag based collections
-    public static void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName) {
+    public static void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType) {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
 
@@ -498,6 +504,10 @@ public class DbLayer {
             updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, tags));
         }
 
+        if(accessType != null) {
+            updates = Updates.combine(updates, Updates.set(ApiCollection.ACCESS_TYPE, accessType));
+        }
+
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(
             Filters.eq(Constants.ID, id),
             updates,
@@ -515,6 +525,10 @@ public class DbLayer {
 
     public static void insertTestingLog(Log log) {
         LogsDao.instance.insertOne(log);
+    }
+
+    public static void insertAgenticTestingLog(Log log) {
+        AgenticTestingLogsDao.instance.insertOne(log);
     }
 
     public static void modifyHybridSaasSetting(boolean isHybridSaas) {
@@ -811,6 +825,16 @@ public class DbLayer {
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryObjectId),
             Updates.set(TestingRunResultSummary.TOTAL_APIS, totalApiCount));
+    }
+
+    public static TestingRunResultSummary updateMetadataInSummary(String summaryId, Map<String, String> metadata) {
+        ObjectId summaryObjectId = new ObjectId(summaryId);
+        return TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                Filters.eq(Constants.ID, summaryObjectId),
+                Updates.combine(
+                        Updates.set(TestingRunResultSummary.METADATA_STRING, metadata)
+                )
+        );
     }
 
     public static void insertActivity(int count) {
@@ -1236,7 +1260,9 @@ public class DbLayer {
         return new ArrayList<>(subcategorySet);
     }
 
-    public static TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
+    public static TestingRunResultSummary findLatestTestingRunResultSummary(String testingRunId){
+        if (testingRunId == null || testingRunId.isEmpty()) return null;
+        Bson filter = Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, new ObjectId(testingRunId));
         return TestingRunResultSummariesDao.instance.findLatestOne(filter);
     }
 

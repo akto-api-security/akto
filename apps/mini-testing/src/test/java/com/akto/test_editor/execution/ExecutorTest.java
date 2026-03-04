@@ -1,12 +1,15 @@
 package com.akto.test_editor.execution;
 
-import com.akto.dto.test_editor.ExecutorNode;
+import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.TestResult.TestError;
+import com.akto.dto.type.URLMethods;
 import com.mongodb.BasicDBObject;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -182,6 +185,37 @@ public class ExecutorTest {
 
         result = Executor.categorizeError("SSL ERROR OCCURRED");
         assertEquals(TestError.API_SSL_HANDSHAKE_FAILED, result);
+    }
+
+    @Test
+    public void testModifyBodyParamWithSelfValue() {
+        com.akto.dto.OriginalHttpRequest req = new com.akto.dto.OriginalHttpRequest();
+        req.setMethod("POST");
+        req.setUrl("https://example.com/login");
+        req.setHeaders(new HashMap<>());
+        req.setBody("{\"email\":\"victim@gmail.com\",\"password\":\"victim123\"}");
+
+        com.akto.dto.OriginalHttpResponse resp = new com.akto.dto.OriginalHttpResponse();
+        resp.setBody("{}");
+        resp.setHeaders(new HashMap<>());
+        resp.setStatusCode(200);
+
+        com.akto.dto.RawApi rawApi = new com.akto.dto.RawApi(req, resp, "");
+        ExecutorSingleOperationResp opResp = new Executor().runOperation(
+                "modify_body_param",
+                rawApi,
+                "email",
+                "${self}hello",
+                new HashMap<>(),
+                null,
+                new ArrayList<>(),
+                new com.akto.dto.ApiInfo.ApiInfoKey(0, "/login", URLMethods.Method.POST)
+        );
+
+        assertTrue(opResp.getSuccess());
+        BasicDBObject payload = BasicDBObject.parse(rawApi.getRequest().getBody());
+        assertEquals("victim@gmail.comhello", payload.getString("email"));
+        assertEquals("victim123", payload.getString("password"));
     }
 
     // Integration tests with real HTTP requests showing actual error categorization
