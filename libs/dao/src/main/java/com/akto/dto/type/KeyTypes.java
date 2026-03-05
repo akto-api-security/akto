@@ -85,7 +85,10 @@ public class KeyTypes {
         SingleTypeInfo.Domain domain = singleTypeInfo.getDomain();
         if (domain == null || domain == SingleTypeInfo.Domain.ENUM) {
             String value  = object == null ? "null" : object.toString();
-            singleTypeInfo.getValues().add(value);
+            // Only store values if they're reasonably sized (< 8 KB)
+            if (value.length() < 8192) {
+                singleTypeInfo.getValues().add(value);
+            }
         }
 
         SensitiveParamInfo sensitiveParamInfo = new SensitiveParamInfo(
