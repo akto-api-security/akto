@@ -67,7 +67,7 @@ public class KeyTypes {
         if (singleTypeInfo == null) {
             Set<Object> examples = new HashSet<>();
             SingleTypeInfo.Position position = SingleTypeInfo.findPosition(responseCode, isHeader);
-            if (subType.isSensitive(position)) {
+            if (subType.isSensitive(position) && rawMessage != null && rawMessage.length() < 8192) {
                 examples.add(rawMessage);
             }
 
@@ -98,7 +98,9 @@ public class KeyTypes {
             if (singleTypeInfo.getExamples() == null) {
                 singleTypeInfo.setExamples(new HashSet<>());
             }
-            singleTypeInfo.getExamples().add(rawMessage);
+            if (rawMessage != null && rawMessage.length() < 8192) {
+                singleTypeInfo.getExamples().add(rawMessage);
+            }
             sensitiveParamInfoBooleanMap.put(sensitiveParamInfo,true);
         }
 
