@@ -1983,7 +1983,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   checkLocal() {
     if (window.DASHBOARD_MODE !== 'ON_PREM' && window.IS_SAAS !== "true") {
-      return true;
+      return false;
     }
     return false;
   },

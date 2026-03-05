@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { EmptySearchResult, VerticalStack, Button, Badge, Text } from '@shopify/polaris';
+import { EmptySearchResult, VerticalStack, HorizontalStack, Button, Badge, Text, Banner, Card, Link, Modal, Box } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailModal from "./components/CreateGuardrailModal";
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
@@ -120,11 +120,28 @@ function GuardrailPolicies() {
     const [loading, setLoading] = useState(false);
     const [editingPolicy, setEditingPolicy] = useState(null);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [recommendations, setRecommendations] = useState([]);
+    const [unseenCount, setUnseenCount] = useState(0);
+    const [recommendationBannerDismissed, setRecommendationBannerDismissed] = useState(false);
+    const [selectedRecommendation, setSelectedRecommendation] = useState(null);
+    const [adoptingRecommendation, setAdoptingRecommendation] = useState(false);
 
-    // Load guardrail policies on component mount
     useEffect(() => {
         fetchGuardrailPolicies();
+        fetchRecommendations();
     }, []);
+
+    const fetchRecommendations = async () => {
+        try {
+            const response = await api.fetchGuardrailPolicyRecommendations();
+            if (response && response.guardrailPolicyRecommendations) {
+                setRecommendations(response.guardrailPolicyRecommendations);
+                setUnseenCount(response.unseenCount != null ? response.unseenCount : 0);
+            }
+        } catch (e) {
+            console.error("Error fetching recommendations:", e);
+        }
+    };
 
     const fetchGuardrailPolicies = async () => {
         setLoading(true);
@@ -362,6 +379,36 @@ function GuardrailPolicies() {
         setShowCreateModal(true);
     };
 
+    const handleDismissRecommendationBanner = async () => {
+        setRecommendationBannerDismissed(true);
+        try {
+            await api.markGuardrailRecommendationsSeen();
+            setUnseenCount(0);
+        } catch (e) {
+            console.error("Error marking recommendations seen:", e);
+        }
+    };
+
+    const handleAcceptRecommendation = async () => {
+        if (!selectedRecommendation?.hexId) return;
+        setAdoptingRecommendation(true);
+        try {
+            await api.adoptGuardrailRecommendation(selectedRecommendation.hexId);
+            func.setToast(true, false, "Guardrail created from recommendation");
+            setSelectedRecommendation(null);
+            await fetchGuardrailPolicies();
+            await fetchRecommendations();
+        } catch (e) {
+            console.error("Error adopting recommendation:", e);
+            func.setToast(true, true, "Failed to create guardrail from recommendation");
+        } finally {
+            setAdoptingRecommendation(false);
+        }
+    };
+
+    const showRecommendationBanner = unseenCount > 0 && !recommendationBannerDismissed;
+    const recommendationDetailModalOpen = selectedRecommendation != null;
+
     const emptyStateMarkup = (
         <EmptySearchResult
           title={'No guardrail policy found'}
@@ -523,7 +570,103 @@ function GuardrailPolicies() {
         );
     }
 
+    const truncateSummary = (str, maxLen = 120) => {
+        if (!str || str.length <= maxLen) return str || "";
+        return str.slice(0, maxLen).trim() + "\u2026";
+    };
+
+    const recommendationsCard = recommendations.length > 0 ? (
+        <Card key="guardrail-recommendations-card">
+            <VerticalStack gap="500">
+                {showRecommendationBanner && (
+                    <Banner
+                        title="New policy recommendation(s) available"
+                        onDismiss={handleDismissRecommendationBanner}
+                        tone="info"
+                    >
+                        <p>Based on agentic AI and MCP security news. Review and accept to add a guardrail.</p>
+                    </Banner>
+                )}
+                <VerticalStack gap="200">
+                    <Text variant="headingMd" as="h2">Policy recommendations from security news</Text>
+                    <Text variant="bodySm" tone="subdued">
+                        Recommendations from agentic AI and MCP vulnerability news. Review each to see the news, how Akto addresses it, and what the policy does.
+                    </Text>
+                </VerticalStack>
+                <VerticalStack gap="600">
+                    {recommendations.slice(0, 10).map((rec) => (
+                        <Box key={rec.hexId} padding="500" background="bg-surface-secondary" borderRadius="200">
+                            <VerticalStack gap="400">
+                                <HorizontalStack align="space-between" blockAlign="center" gap="500" wrap={false}>
+                                    <Box minWidth={0} width="100%">
+                                        <VerticalStack gap="200">
+                                            <Text variant="bodyMd" as="h3">
+                                                {rec.vulnerabilityHeadline ? (
+                                                    <Link url={rec.vulnerabilityNewsUrl || "#"} external>
+                                                        {rec.vulnerabilityHeadline}
+                                                    </Link>
+                                                ) : (
+                                                    "Security recommendation"
+                                                )}
+                                            </Text>
+                                            {rec.vulnerabilitySummary && (
+                                                <Text variant="bodySm" tone="subdued" as="p">
+                                                    {truncateSummary(rec.vulnerabilitySummary)}
+                                                </Text>
+                                            )}
+                                        </VerticalStack>
+                                    </Box>
+                                    <Button size="medium" onClick={() => setSelectedRecommendation(rec)}>
+                                        Review and accept
+                                    </Button>
+                                </HorizontalStack>
+                            </VerticalStack>
+                        </Box>
+                    ))}
+                </VerticalStack>
+            </VerticalStack>
+        </Card>
+    ) : null;
+
+    const recommendationDetailModal = recommendationDetailModalOpen && selectedRecommendation ? (
+        <Modal
+            open={recommendationDetailModalOpen}
+            onClose={() => setSelectedRecommendation(null)}
+            title="Review recommendation"
+            primaryAction={{
+                content: "Accept recommendation",
+                onAction: handleAcceptRecommendation,
+                loading: adoptingRecommendation
+            }}
+        >
+            <Modal.Section>
+                <VerticalStack gap="600">
+                    <VerticalStack gap="200">
+                        <Text variant="headingSm" as="h3">What&apos;s the news</Text>
+                        <Text variant="bodyMd" as="p">{selectedRecommendation.vulnerabilityHeadline || "Security update"}</Text>
+                        {selectedRecommendation.vulnerabilityNewsUrl && (
+                            <Link url={selectedRecommendation.vulnerabilityNewsUrl} external>Read full article</Link>
+                        )}
+                        {selectedRecommendation.vulnerabilitySummary && (
+                            <Text variant="bodySm" tone="subdued">{selectedRecommendation.vulnerabilitySummary}</Text>
+                        )}
+                    </VerticalStack>
+                    <VerticalStack gap="200">
+                        <Text variant="headingSm" as="h3">How we solve it</Text>
+                        <Text variant="bodySm" as="p">{selectedRecommendation.aktoTacklingDescription || "Akto guardrails help mitigate this class of risk."}</Text>
+                    </VerticalStack>
+                    <VerticalStack gap="200">
+                        <Text variant="headingSm" as="h3">What this policy does</Text>
+                        <Text variant="bodySm" as="p">{selectedRecommendation.policySummary || "Creates a guardrail policy that addresses this vulnerability."}</Text>
+                        <Text variant="bodySm" tone="subdued" as="p">Accepting creates an active policy with these guardrails enabled; you can edit it to add specific topics, thresholds, or rules.</Text>
+                    </VerticalStack>
+                </VerticalStack>
+            </Modal.Section>
+        </Modal>
+    ) : null;
+
     const components = [
+        ...(recommendationsCard ? [recommendationsCard] : []),
         <GithubSimpleTable
             key={`policies-table-${policyData.length}`}
             resourceName={resourceName}
@@ -547,8 +690,10 @@ function GuardrailPolicies() {
         />
     ];
 
-
-    return <PageWithMultipleCards
+    return (
+        <>
+            {recommendationDetailModal}
+            <PageWithMultipleCards
             title={
                 <TitleWithInfo
                     titleText={mapLabel("Guardrail Policies", getDashboardCategory())}
@@ -559,6 +704,8 @@ function GuardrailPolicies() {
             primaryAction={<Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>}
             components={components}
         />
+        </>
+    );
 }
 
 export default GuardrailPolicies;

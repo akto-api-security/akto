@@ -1,7 +1,10 @@
 package com.akto.action;
 
+import com.akto.dao.GuardrailPolicyRecommendationDao;
 import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dao.GuardrailRecommendationSeenDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.GuardrailPolicyRecommendation;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
@@ -29,6 +32,7 @@ import org.bson.types.ObjectId;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -65,6 +69,14 @@ public class GuardrailPoliciesAction extends UserAction {
     private String testInput;
     @Getter
     private BasicDBObject playgroundResult;
+
+    // Guardrail policy recommendations (news watcher)
+    @Getter
+    private List<GuardrailPolicyRecommendation> guardrailPolicyRecommendations;
+    @Getter
+    private long unseenCount;
+    @Setter
+    private String recommendationHexId;
 
 
     public String fetchGuardrailPolicies() {
@@ -315,6 +327,137 @@ public class GuardrailPoliciesAction extends UserAction {
             loggerMaker.errorAndAddToDb("Error in guardrail playground test: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
+    }
+
+    public String fetchGuardrailPolicyRecommendations() {
+        try {
+            this.guardrailPolicyRecommendations = GuardrailPolicyRecommendationDao.instance.findAllByCreatedTimestamp(0, 50);
+            int lastSeen = GuardrailRecommendationSeenDao.instance.getLastSeenTimestamp();
+            this.unseenCount = GuardrailPolicyRecommendationDao.instance.countUnseenForAccount(lastSeen);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching guardrail policy recommendations: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String adoptGuardrailRecommendation() {
+        try {
+            if (recommendationHexId == null || recommendationHexId.isEmpty()) {
+                loggerMaker.errorAndAddToDb("No recommendation ID provided for adopt", LogDb.DASHBOARD);
+                return ERROR.toUpperCase();
+            }
+            GuardrailPolicyRecommendation rec = GuardrailPolicyRecommendationDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(recommendationHexId)));
+            if (rec == null) {
+                loggerMaker.errorAndAddToDb("Guardrail recommendation not found: " + recommendationHexId, LogDb.DASHBOARD);
+                return ERROR.toUpperCase();
+            }
+            GuardrailPolicies newPolicy = buildPolicyFromRecommendation(rec);
+            this.policy = newPolicy;
+            this.hexId = null;
+            return createGuardrailPolicy();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error adopting guardrail recommendation: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String markGuardrailRecommendationsSeen() {
+        try {
+            GuardrailRecommendationSeenDao.instance.setLastSeenTimestamp(Context.now());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error marking guardrail recommendations seen: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    private static final String SECTION_CONTENT_FILTERS = "Content Filters";
+    private static final String SECTION_TOOL_ACCESS = "Tool Access Controls";
+    private static final String SECTION_PROMPT_INJECTION = "Content & Prompt Injection Filtering";
+    private static final String SECTION_PII = "Sensitive Information Scrubbing";
+    private static final String SECTION_DENIED_TOPICS = "Denied Topics";
+
+    private GuardrailPolicies buildPolicyFromRecommendation(GuardrailPolicyRecommendation rec) {
+        GuardrailPolicies p = new GuardrailPolicies();
+        String name = rec.getVulnerabilityHeadline();
+        if (name != null && name.length() > 100) {
+            name = name.substring(0, 97) + "...";
+        }
+        if (name == null || name.isEmpty()) {
+            name = "Guardrail from recommendation";
+        }
+        p.setName(name);
+        StringBuilder desc = new StringBuilder();
+        if (rec.getAktoTacklingDescription() != null) {
+            desc.append(rec.getAktoTacklingDescription());
+        }
+        if (rec.getVulnerabilityNewsUrl() != null && !rec.getVulnerabilityNewsUrl().isEmpty()) {
+            desc.append("\n\nSource: ").append(rec.getVulnerabilityNewsUrl());
+        }
+        p.setDescription(desc.toString());
+        p.setBlockedMessage("Request blocked by guardrail policy.");
+        p.setSeverity(com.akto.util.enums.GlobalEnums.Severity.MEDIUM.name());
+        p.setActive(true);
+        p.setApplyOnRequest(true);
+        p.setApplyOnResponse(false);
+        p.setContextSource(CONTEXT_SOURCE.AGENTIC);
+
+        String section = rec.getGuardrailSectionRef();
+        if (SECTION_PROMPT_INJECTION.equals(section)) {
+            Map<String, Object> contentFiltering = new HashMap<>();
+            Map<String, String> promptAttacks = new HashMap<>();
+            promptAttacks.put("level", "HIGH");
+            contentFiltering.put("promptAttacks", promptAttacks);
+            p.setContentFiltering(contentFiltering);
+            p.setBanCodeDetection(new GuardrailPolicies.BanCodeDetection(true, 0.8));
+            p.setSecretsDetection(new GuardrailPolicies.SecretsDetection(true, 0.8));
+        } else if (SECTION_CONTENT_FILTERS.equals(section)) {
+            Map<String, Object> contentFiltering = new HashMap<>();
+            Map<String, String> promptAttacks = new HashMap<>();
+            promptAttacks.put("level", "HIGH");
+            contentFiltering.put("promptAttacks", promptAttacks);
+            Map<String, Object> harmfulCategories = new HashMap<>();
+            harmfulCategories.put("hate", "HIGH");
+            harmfulCategories.put("insults", "HIGH");
+            harmfulCategories.put("sexual", "HIGH");
+            harmfulCategories.put("violence", "HIGH");
+            harmfulCategories.put("misconduct", "HIGH");
+            harmfulCategories.put("useForResponses", false);
+            contentFiltering.put("harmfulCategories", harmfulCategories);
+            p.setContentFiltering(contentFiltering);
+        } else if (SECTION_DENIED_TOPICS.equals(section)) {
+            p.setDeniedTopics(new ArrayList<>());
+            Map<String, Object> contentFiltering = new HashMap<>();
+            Map<String, String> promptAttacks = new HashMap<>();
+            promptAttacks.put("level", "HIGH");
+            contentFiltering.put("promptAttacks", promptAttacks);
+            p.setContentFiltering(contentFiltering);
+        } else if (SECTION_PII.equals(section)) {
+            List<GuardrailPolicies.PiiType> piiTypes = new ArrayList<>();
+            piiTypes.add(new GuardrailPolicies.PiiType("EMAIL", "Block"));
+            piiTypes.add(new GuardrailPolicies.PiiType("API_KEY", "Block"));
+            piiTypes.add(new GuardrailPolicies.PiiType("CREDIT_CARD", "Block"));
+            p.setPiiTypes(piiTypes);
+            p.setSecretsDetection(new GuardrailPolicies.SecretsDetection(true, 0.8));
+        } else if (SECTION_TOOL_ACCESS.equals(section)) {
+            p.setSelectedMcpServersV2(new ArrayList<>());
+            p.setSelectedAgentServersV2(new ArrayList<>());
+        }
+
+        // Fallback: ensure every policy has at least one concrete safeguard (block or enable)
+        boolean hasSafeguard = p.getContentFiltering() != null && !p.getContentFiltering().isEmpty()
+                || (p.getPiiTypes() != null && !p.getPiiTypes().isEmpty())
+                || (p.getDeniedTopics() != null)
+                || (p.getSelectedMcpServersV2() != null);
+        if (!hasSafeguard) {
+            Map<String, Object> contentFiltering = new HashMap<>();
+            Map<String, String> promptAttacks = new HashMap<>();
+            promptAttacks.put("level", "HIGH");
+            contentFiltering.put("promptAttacks", promptAttacks);
+            p.setContentFiltering(contentFiltering);
+        }
+        return p;
     }
 
     /**

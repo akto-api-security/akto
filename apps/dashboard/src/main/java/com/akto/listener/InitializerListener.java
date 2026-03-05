@@ -2578,6 +2578,7 @@ public class InitializerListener implements ServletContextListener {
                         setUpDependencyFlowScheduler();
                         tokenGeneratorCron.tokenGeneratorScheduler();
                         crons.deleteTestRunsScheduler();
+                        crons.securityNewsScheduler();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
 

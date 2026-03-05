@@ -26,9 +26,13 @@ import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficAlerts;
 import com.akto.dto.traffic_metrics.TrafficAlerts.ALERT_TYPE;
+import com.akto.dao.GuardrailPolicyRecommendationDao;
+import com.akto.dto.GuardrailPolicyRecommendation;
 import com.akto.util.AccountTask;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.utils.DeleteTestRunUtils;
+import com.akto.utils.security_news.SecurityNewsFetcher;
+import com.akto.utils.security_news.VulnToGuardrailMapper;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -207,5 +211,31 @@ public class Crons {
         return Duration.between(now, nextRun).toMillis();
     }
 
+    public void securityNewsScheduler() {
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                java.util.List<SecurityNewsFetcher.RawNewsItem> items = SecurityNewsFetcher.fetch();
+                if (items.isEmpty()) {
+                    return;
+                }
+                AccountTask.instance.executeTask(account -> {
+                    try {
+                        int now = Context.now();
+                        for (SecurityNewsFetcher.RawNewsItem item : items) {
+                            if (GuardrailPolicyRecommendationDao.instance.findOne(Filters.eq("vulnerabilityNewsUrl", item.getLink())) != null) {
+                                continue;
+                            }
+                            GuardrailPolicyRecommendation rec = VulnToGuardrailMapper.map(item, now);
+                            GuardrailPolicyRecommendationDao.instance.insertOne(rec);
+                        }
+                    } catch (Exception e) {
+                        logger.errorAndAddToDb(e, "Error in securityNewsScheduler for account " + Context.accountId.get() + ": " + e.getMessage());
+                    }
+                }, "security-news-watcher");
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "Error in securityNewsScheduler: " + e.getMessage());
+            }
+        }, 0, 1, TimeUnit.DAYS);
+    }
 
 }

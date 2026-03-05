@@ -65,4 +65,29 @@ export default {
         return resp
     },
 
+    async fetchGuardrailPolicyRecommendations() {
+        const resp = await request({
+            url: '/api/fetchGuardrailPolicyRecommendations',
+            method: 'post'
+        })
+        return resp
+    },
+
+    async adoptGuardrailRecommendation(recommendationHexId) {
+        const resp = await request({
+            url: '/api/adoptGuardrailRecommendation',
+            method: 'post',
+            data: { recommendationHexId }
+        })
+        return resp
+    },
+
+    async markGuardrailRecommendationsSeen() {
+        const resp = await request({
+            url: '/api/markGuardrailRecommendationsSeen',
+            method: 'post'
+        })
+        return resp
+    },
+
 }

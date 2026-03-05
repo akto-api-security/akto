@@ -530,10 +530,10 @@ export default function LeftNav() {
             //     url: "#",
             //     key: "8",
             // }] : []),
-            ...(dashboardCategory === "MCP Security" ? [{
+            ...((dashboardCategory === "MCP Security" || dashboardCategory === CATEGORY_AGENTIC_SECURITY || (typeof window !== "undefined" && (window.location?.hostname === "localhost" || window.location?.hostname === "127.0.0.1"))) ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
-                        MCP Guardrails
+                        {dashboardCategory === "MCP Security" ? "MCP Guardrails" : "Guardrails"}
                     </Text>
                 ),
                 icon: LockMajor,
