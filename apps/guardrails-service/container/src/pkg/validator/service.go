@@ -463,6 +463,24 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		// Extract host header for McpServerName
 		mcpServerName := extractHostHeader(reqHeaders)
 
+		// Extract session and request IDs from headers for session tracking
+		sessionID := session.ExtractSessionID(reqHeaders)
+		requestID := session.ExtractRequestID(reqHeaders)
+
+		// Check if session is already malicious
+		if validationResult, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, data.RequestPayload); isMalicious {
+			result.RequestAllowed = validationResult.Allowed
+			result.RequestReason = validationResult.Reason
+			results = append(results, result)
+			continue
+		}
+
+		// Track request and generate summary asynchronously
+		session.TrackRequestAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, data.RequestPayload)
+
+		// Inject session summary into payload if available
+		requestPayloadToValidate := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, data.RequestPayload, sessionID)
+
 		// Create validation context with actual data
 		valCtx := &mcp.ValidationContext{
 			IP:              data.IP,
@@ -471,10 +489,11 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			RequestHeaders:  reqHeaders,
 			ResponseHeaders: respHeaders,
 			StatusCode:      statusCode,
-			RequestPayload:  data.RequestPayload,
+			RequestPayload:  requestPayloadToValidate,
 			ResponsePayload: data.ResponsePayload,
 			ContextSource:   types.ContextSource(contextSource),
 			McpServerName:   mcpServerName,
+			SessionID:       sessionID,
 		}
 
 		var reqResult, respResult *mcp.ValidationResult
@@ -485,9 +504,10 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.Int("index", i),
 				zap.String("method", data.Method),
 				zap.String("path", data.Path),
+				zap.String("sessionID", sessionID),
 				zap.String("payload", data.RequestPayload))
 
-			processResult, err := s.processor.ProcessRequest(ctx, data.RequestPayload, valCtx, policies, auditPolicies, hasAuditRules)
+			processResult, err := s.processor.ProcessRequest(ctx, requestPayloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
 			if err != nil {
 				s.logger.Error("Failed to validate request",
 					zap.Int("index", i),
@@ -498,6 +518,9 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					zap.Int("index", i),
 					zap.Bool("isBlocked", processResult.IsBlocked),
 					zap.String("modifiedPayload", processResult.ModifiedPayload))
+
+				// Track blocked response if request was blocked
+				session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, requestID, processResult)
 
 				reqResult = &mcp.ValidationResult{
 					Allowed:         !processResult.IsBlocked,
@@ -531,6 +554,10 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				result.ResponseModified = respResult.Modified
 				result.ResponseModifiedPayload = respResult.ModifiedPayload
 				result.ResponseReason = respResult.Reason
+
+				// Track response and generate summary
+				isMalicious := processResult.IsBlocked
+				session.TrackResponseAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, data.ResponsePayload, isMalicious)
 			}
 		}
 
