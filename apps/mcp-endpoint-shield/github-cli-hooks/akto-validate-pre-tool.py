@@ -265,8 +265,8 @@ def main():
         tool_input = input_data.get("tool_input", {})
         tool_args = json.dumps(tool_input) if isinstance(tool_input, dict) else str(tool_input)
     else:
-        tool_name = input_data.get("toolName", "unknown")
-        tool_args = input_data.get("toolArgs", "")
+        tool_name = input_data.get("toolName") or input_data.get("tool_name", "unknown")
+        tool_args = input_data.get("toolArgs") or json.dumps(input_data.get("tool_input", {}))
 
     cwd = input_data.get("cwd", "")
     timestamp = input_data.get("timestamp", int(time.time() * 1000))
@@ -281,9 +281,14 @@ def main():
 
     if not allowed:
         logger.warning(f"Blocking tool use: {reason}")
+        denial_reason = f"Blocked by Akto Guardrails: {reason or 'Policy violation'}"
         output = {
             "permissionDecision": "deny",
-            "permissionDecisionReason": f"Blocked by Akto Guardrails: {reason or 'Policy violation'}"
+            "permissionDecisionReason": denial_reason,
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": denial_reason
+            }
         }
         sys.stdout.write(json.dumps(output))
         sys.stdout.flush()

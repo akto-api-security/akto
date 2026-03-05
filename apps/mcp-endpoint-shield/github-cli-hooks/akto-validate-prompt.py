@@ -278,8 +278,11 @@ def main():
         if not allowed:
             logger.warning(f"Prompt blocked: {reason}")
             ingest_request(prompt, cwd, timestamp, reason, blocked=True, cfg=cfg, logger=logger)
-            sys.stderr.write(f"⚠️  Akto Guardrails flagged prompt: {reason}\n")
+            sys.stderr.write(f"⚠️  Akto Guardrails flagged prompt: {reason or 'Policy violation'}\n")
             sys.stderr.flush()
+            output = {"continue": False, "stopReason": f"Blocked by Akto Guardrails: {reason or 'Policy violation'}"}
+            sys.stdout.write(json.dumps(output))
+            sys.stdout.flush()
             sys.exit(cfg["blocked_exit_code"])
         else:
             ingest_request(prompt, cwd, timestamp, reason, blocked=False, cfg=cfg, logger=logger)
