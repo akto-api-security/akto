@@ -5,9 +5,13 @@ Uses only Python standard library modules.
 """
 import os
 import platform
-import pwd
 import subprocess
 import uuid
+
+try:
+    import pwd
+except ImportError:
+    pwd = None
 
 
 _machine_id = None
@@ -119,9 +123,10 @@ def get_username() -> str:
     current_user = None
     is_root = False
     try:
-        current_uid = os.getuid()
-        current_user = pwd.getpwuid(current_uid).pw_name
-        is_root = current_user == "root" or current_uid == 0
+        if pwd is not None and hasattr(os, "getuid"):
+            current_uid = os.getuid()
+            current_user = pwd.getpwuid(current_uid).pw_name
+            is_root = current_user == "root" or current_uid == 0
     except Exception:
         pass
 
