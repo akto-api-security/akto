@@ -697,6 +697,7 @@ public class Executor {
     }
 
     private static ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
+    private static final int ROLE_FETCH_THROTTLE_SECS = 1 * 60; // 1 minute
 
     public static TestRoles fetchOrFindAttackerRole() {
         return fetchOrFindTestRole("ATTACKER_TOKEN_ALL", false);
@@ -706,19 +707,24 @@ public class Executor {
         if (roleCache == null) {
             roleCache = new ConcurrentHashMap<>();
         }
-        if (roleCache.containsKey(name)) {
+        TestRoles cached = roleCache.get(name);
+        if (cached != null) {
+            int now = Context.now();
+            if (cached.getLastFetched() > 0 && (now - cached.getLastFetched()) < ROLE_FETCH_THROTTLE_SECS) {
+                return roleCache.get(name);
+            }
+        }
+        TestRoles fresh = isId ? dataActor.fetchTestRolesforId(name) : dataActor.fetchTestRole(name);
+        if (fresh == null) {
             return roleCache.get(name);
         }
-
-        if(!isId){
-            TestRoles testRole = dataActor.fetchTestRole(name);
-            roleCache.put(name, testRole);
-            return roleCache.get(name);
-        }else{
-            TestRoles testRole = dataActor.fetchTestRolesforId(name);
-            roleCache.put(name, testRole);
+        if (cached != null && fresh.getLastUpdatedTs() <= cached.getLastUpdatedTs()) {
+            cached.setLastFetched(Context.now());
             return roleCache.get(name);
         }
+        fresh.setLastFetched(Context.now());
+        roleCache.put(name, fresh);
+        return roleCache.get(name);
     }
 
     public static void clearRoleCache() {

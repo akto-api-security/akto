@@ -1127,11 +1127,19 @@ public class TestExecutor {
         VariableResolver.resolveWordList(varMap, sampleMessageStore.getSampleDataMap(), apiInfoKey);
 
         // Add SSRF tracking values to varMap
-        varMap.put("testRunId", testRunId.toHexString());
-        varMap.put("testRunResultSummaryId", testRunResultSummaryId.toHexString());
+        if(testRunId != null) {
+            varMap.put("testRunId", testRunId.toHexString());
+        }
+        if(testRunResultSummaryId != null) {
+            varMap.put("testRunResultSummaryId", testRunResultSummaryId.toHexString());
+        }
         varMap.put("accountId", Context.accountId.get());
-        varMap.put("apiInfoKey", apiInfoKey.toString());
-        varMap.put("testSubType", testSubType);
+        if(apiInfoKey != null) {
+            varMap.put("apiInfoKey", apiInfoKey.toString());
+        }
+        if(testSubType != null) {
+            varMap.put("testSubType", testSubType);
+        }
 
         String testExecutionLogId = UUID.randomUUID().toString();
         
