@@ -51,6 +51,9 @@ public class AccountSettings {
 
     public static final String URL_REGEX_MATCHING_ENABLED = "urlRegexMatchingEnabled";
 
+    private boolean bodyMatchEnabled = true;;
+    public static final String BODY_MATCH_ENABLED = "bodyMatchEnabled";
+
     private String initStackType;
 
     private boolean enableDebugLogs;
@@ -326,6 +329,14 @@ public class AccountSettings {
 
     public void setShowOnboarding(boolean showOnboarding) {
         this.showOnboarding = showOnboarding;
+    }
+
+    public void setBodyMatchEnabled(boolean bodyMatchEnabled) {
+        this.bodyMatchEnabled = bodyMatchEnabled;
+    }
+
+    public boolean getBodyMatchEnabled() {
+        return bodyMatchEnabled;
     }
 
     public boolean getUrlRegexMatchingEnabled() {
