@@ -238,7 +238,7 @@ def ingest_request(prompt: str, cwd: str, timestamp: int, reason: str, blocked: 
 
 def main():
     try:
-        input_data = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+        input_data = json.load(sys.stdin)
     except json.JSONDecodeError as e:
         logging.basicConfig()
         logging.error(f"Invalid JSON input: {e}")

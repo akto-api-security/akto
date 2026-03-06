@@ -234,7 +234,7 @@ def ingest_blocked_tool_use(tool_name: str, tool_args: str, cwd: str, timestamp:
 
 def main():
     try:
-        input_data = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+        input_data = json.load(sys.stdin)
     except json.JSONDecodeError as e:
         logging.basicConfig()
         logging.error(f"Invalid JSON input: {e}")
