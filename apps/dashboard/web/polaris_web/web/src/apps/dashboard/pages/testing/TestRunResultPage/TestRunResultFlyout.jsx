@@ -38,7 +38,7 @@ function isSkippedTestError(errorText) {
 }
 
 function TestRunResultFlyout(props) {
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, wizFindingUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, wizFinding, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -137,7 +137,7 @@ function TestRunResultFlyout(props) {
                 })
             })
 
-            setRowItems(transform.getRowInfo(issueDetails.severity, apiInfoData, issueDetails.jiraIssueUrl, sensitiveParam, issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl))
+            setRowItems(transform.getRowInfo(issueDetails.severity, apiInfoData, issueDetails.jiraIssueUrl, sensitiveParam, issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl, issueDetails.wizFinding))
         }
     }, [issueDetails])
 
@@ -406,10 +406,11 @@ function TestRunResultFlyout(props) {
     }
 
     const handleWizFindingCreation = async () => {
-        await issuesApi.createWizFinding(issueDetails.id).then((res) => {
+        const items = [issueDetails?.id]
+        await issuesApi.createWizFindings(items).then((res) => {
             func.setToast(true, false, "Wiz finding created")
         }).catch((err) => {
-            func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating wiz finding")
+            func.setToast(true, true, "Error creating wiz finding")
         })
     }
 
@@ -673,7 +674,7 @@ function TestRunResultFlyout(props) {
                             />
                            
                             { window.WIZ_INTEGRATED === 'true' ? 
-                                <Button id={"create-wiz-finding-button"} primary onClick={handleWizFindingCreation} disabled={ wizFindingUrl !== "" || window.WIZ_INTEGRATED !== "true"}>
+                                <Button id={"create-wiz-finding-button"} primary onClick={handleWizFindingCreation} disabled={ wizFinding !== null || window.WIZ_INTEGRATED !== "true"}>
                                     Create Wiz Finding
                                 </Button> 
                                 : <></>

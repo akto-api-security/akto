@@ -1124,7 +1124,7 @@ const transform = {
     return finalMethod + " " + truncatedUrl
 
   },
-  getRowInfo(severity, apiInfo, jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId, devrevWorkUrl) {
+  getRowInfo(severity, apiInfo, jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId, devrevWorkUrl, wizFinding) {
     if (apiInfo == null || apiInfo === undefined) {
       apiInfo = {
         allAuthTypesFound: [],
@@ -1217,6 +1217,21 @@ const transform = {
       </Box>
     ) : null
 
+    const wizComp = wizFinding?.url ? (
+      <Box>
+        <Tag>
+          <HorizontalStack gap={1}>
+            <Avatar size="extraSmall" shape='round' source="/public/wiz_logo.svg" />
+            <Link target="_blank" url={wizFinding?.url}>
+              <Text>
+                View finding
+              </Text>
+            </Link>
+          </HorizontalStack>
+        </Tag>
+      </Box>
+    ) : null
+
     const rowItems = [
       {
         title: 'Severity',
@@ -1286,6 +1301,14 @@ const transform = {
         title: "DevRev ticket",
         value: devrevComp,
         tooltipContent: "DevRev ticket attached to the testing run issue"
+      })
+    }
+
+    if (wizComp != null) {
+      rowItems.push({
+        title: "Wiz finding",
+        value: wizComp,
+        tooltipContent: "Wiz finding attached to the testing run issue"
       })
     }
 

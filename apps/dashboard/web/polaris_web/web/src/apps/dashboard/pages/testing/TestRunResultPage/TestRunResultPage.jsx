@@ -69,7 +69,7 @@ function TestRunResultPage(props) {
   const [azureBoardsWorkItemUrl, setAzureBoardsWorkItemUrl] = useState({});
   const [serviceNowTicketUrl, setServiceNowTicketUrl] = useState({});
   const [devrevWorkUrl, setDevRevWorkUrl] = useState({});
-  const [wizFindingUrl, setWizFindingUrl] = useState({});
+  const [wizFinding, setWizFinding] = useState({});
   const subCategoryMap = LocalStore(state => state.subCategoryMap);
   const params = useParams();
   const hexId = params.hexId;
@@ -478,13 +478,13 @@ function TestRunResultPage(props) {
       let azureBoardsWorkItemUrlCopy = runIssues.azureBoardsWorkItemUrl || "";
       let serviceNowTicketUrlCopy = runIssues.servicenowIssueUrl || "";
       let devrevWorkUrlCopy = runIssues.devrevWorkUrl || "";
-      let wizFindingUrlCopy = runIssues.wizFindingUrl || "";
+      let wizFindingCopy = runIssues.wizFinding || null;
       const moreInfoSections = transform.getInfoSectionsHeaders()
       setJiraIssueUrl(jiraIssueCopy)
       setAzureBoardsWorkItemUrl(azureBoardsWorkItemUrlCopy)
       setServiceNowTicketUrl(serviceNowTicketUrlCopy)
       setDevRevWorkUrl(devrevWorkUrlCopy)
-      setWizFindingUrl(wizFindingUrlCopy)
+      setWizFinding(wizFindingCopy)
       setInfoState(transform.fillMoreInformation(tmp[runIssues?.id?.testSubCategory], moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
       setRemediation(tmp[runIssues?.id?.testSubCategory]?.remediation)
       // setJiraIssueUrl(jiraIssueUrl)
@@ -528,7 +528,7 @@ function TestRunResultPage(props) {
           azureBoardsWorkItemUrl={azureBoardsWorkItemUrl}
           serviceNowTicketUrl={serviceNowTicketUrl}
           devrevWorkUrl={devrevWorkUrl}
-          wizFindingUrl={wizFindingUrl}
+          wizFinding={wizFinding}
           conversations={conversations}
           conversationRemediationText={conversationRemediationText}
           showForbidden={showForbidden}
