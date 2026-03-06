@@ -256,7 +256,7 @@ def main():
 
     log_dir = os.path.expanduser(os.getenv("LOG_DIR", cfg["log_dir_default"]))
     logger = setup_logging(log_dir)
-    send_heartbeat(log_dir, connector, logger)
+    send_heartbeat(log_dir, logger)
 
     logger.info(f"=== User Prompt Submitted Hook - Connector: {connector}, Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
 

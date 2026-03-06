@@ -11,7 +11,6 @@ timestamp cache is used to rate-limit sends to once every 30 seconds.
 """
 import json
 import os
-import platform
 import ssl
 import time
 import urllib.request
@@ -68,15 +67,14 @@ def _post_heartbeat(payload: dict) -> None:
         resp.read()
 
 
-def send_heartbeat(log_dir: str, connector: str, logger=None) -> None:
+def send_heartbeat(log_dir: str, logger=None) -> None:
     """
     Send a heartbeat to Akto cyborg if the rate-limit window has passed.
     Errors are swallowed — heartbeat failure must never affect hook behaviour.
 
     Args:
-        log_dir:   Resolved (expanded) log directory path used by the hook.
-        connector: Connector string, e.g. 'github_copilot_cli' or 'vscode'.
-        logger:    Optional logger for debug output.
+        log_dir: Resolved (expanded) log directory path used by the hook.
+        logger:  Optional logger for debug output.
     """
     try:
         os.makedirs(log_dir, exist_ok=True)
@@ -101,8 +99,7 @@ def send_heartbeat(log_dir: str, connector: str, logger=None) -> None:
                 "lastHeartbeatReceived": now_s,
                 "additionalData": {
                     "username": username,
-                    "connector": connector,
-                    "os": platform.system(),
+                    "mcpServers": {},
                 },
             }
         }
