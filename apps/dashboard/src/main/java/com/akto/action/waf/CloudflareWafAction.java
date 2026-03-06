@@ -12,6 +12,7 @@ import com.akto.dto.audit_logs.Resource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
+import com.akto.threat_utils.CloudflareWafUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -216,7 +217,7 @@ public class CloudflareWafAction extends UserAction {
     private static void updateWafRuleExpression(Config.CloudflareWafConfig config) {
         try {
             boolean isZoneLevel = "zones".equalsIgnoreCase(config.getIntegrationType());
-            Map<String, List<String>> headers = getAuthHeaders(config);
+            Map<String, List<String>> headers = CloudflareWafUtils.getAuthHeaders(config);
             String expression = buildExpression(buildListNames(config.getAccountId(), config.getListIds().size()));
 
             BasicDBObject patchPayload = new BasicDBObject();
@@ -257,30 +258,7 @@ public class CloudflareWafAction extends UserAction {
 
     // ==================== Cloudflare API Helpers ====================
 
-    public static Map<String, List<String>> getAuthHeaders(Config.CloudflareWafConfig config) {
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Content-Type", Collections.singletonList("application/json"));
-        String cfEmail = config.getEmail();
-        if (cfEmail != null && !cfEmail.isEmpty()) {
-            headers.put("X-Auth-Key", Collections.singletonList(config.getApiKey()));
-            headers.put("X-Auth-Email", Collections.singletonList(cfEmail));
-        } else {
-            headers.put("Authorization", Collections.singletonList("Bearer " + config.getApiKey()));
-        }
-        return headers;
-    }
-
-    public static String extractCfError(String body) {
-        try {
-            if (body == null) return null;
-            BasicDBObject obj = BasicDBObject.parse(body);
-            BasicDBList errors = (BasicDBList) obj.get("errors");
-            if (errors != null && !errors.isEmpty()) {
-                return ((BasicDBObject) errors.get(0)).getString("message");
-            }
-        } catch (Exception ignored) {}
-        return null;
-    }
+    // Helper methods moved to CloudflareWafUtils for shared access
 
     // --- Credential validation ---
 
@@ -291,7 +269,7 @@ public class CloudflareWafAction extends UserAction {
             if (resp.getStatusCode() <= 201 && resp.getBody() != null) {
                 return null;
             }
-            String cfErr = extractCfError(resp.getBody());
+            String cfErr = CloudflareWafUtils.extractCfError(resp.getBody());
             return cfErr != null ? cfErr : "Invalid Cloudflare credentials.";
         } catch (Exception e) {
             return "Error connecting to Cloudflare: " + e.getMessage();
@@ -334,7 +312,7 @@ public class CloudflareWafAction extends UserAction {
 
             OriginalHttpResponse resp = sendCfRequest(url, "POST", payload.toString(), config);
             if (resp.getStatusCode() > 201 || resp.getBody() == null) {
-                loggerMaker.errorAndAddToDb("Failed to create IP list: " + extractCfError(resp.getBody()));
+                loggerMaker.errorAndAddToDb("Failed to create IP list: " + CloudflareWafUtils.extractCfError(resp.getBody()));
                 return null;
             }
             BasicDBObject result = (BasicDBObject) BasicDBObject.parse(resp.getBody()).get("result");
@@ -377,7 +355,7 @@ public class CloudflareWafAction extends UserAction {
     private static String createZoneLevelRule(Config.CloudflareWafConfig config, String expression) {
         try {
             String zId = config.getZoneId();
-            Map<String, List<String>> headers = getAuthHeaders(config);
+            Map<String, List<String>> headers = CloudflareWafUtils.getAuthHeaders(config);
 
             String entrypointId = findEntrypoint("/zones/" + zId, headers);
             BasicDBObject blockRule = buildBlockRule(expression);
@@ -396,7 +374,7 @@ public class CloudflareWafAction extends UserAction {
             }
 
             if (resp.getStatusCode() > 201 || resp.getBody() == null) {
-                loggerMaker.errorAndAddToDb("Failed to create zone WAF rule: " + extractCfError(resp.getBody()));
+                loggerMaker.errorAndAddToDb("Failed to create zone WAF rule: " + CloudflareWafUtils.extractCfError(resp.getBody()));
                 return null;
             }
             return extractRuleId(resp.getBody());
@@ -413,7 +391,7 @@ public class CloudflareWafAction extends UserAction {
     private static String createAccountLevelRule(Config.CloudflareWafConfig config, String expression) {
         try {
             String accId = config.getAccountOrZoneId();
-            Map<String, List<String>> headers = getAuthHeaders(config);
+            Map<String, List<String>> headers = CloudflareWafUtils.getAuthHeaders(config);
 
             // Step 1: Create custom ruleset with block rule
             String url = CLOUDFLARE_BASE_URL + "/accounts/" + accId + "/rulesets";
@@ -427,7 +405,7 @@ public class CloudflareWafAction extends UserAction {
 
             OriginalHttpResponse resp = sendRequest(url, "POST", payload.toString(), headers);
             if (resp.getStatusCode() > 201 || resp.getBody() == null) {
-                loggerMaker.errorAndAddToDb("Failed to create account custom ruleset: " + extractCfError(resp.getBody()));
+                loggerMaker.errorAndAddToDb("Failed to create account custom ruleset: " + CloudflareWafUtils.extractCfError(resp.getBody()));
                 return null;
             }
             BasicDBObject result = (BasicDBObject) BasicDBObject.parse(resp.getBody()).get("result");
@@ -458,7 +436,7 @@ public class CloudflareWafAction extends UserAction {
             }
 
             if (resp.getStatusCode() > 201) {
-                loggerMaker.errorAndAddToDb("Failed to deploy account ruleset: " + extractCfError(resp.getBody()));
+                loggerMaker.errorAndAddToDb("Failed to deploy account ruleset: " + CloudflareWafUtils.extractCfError(resp.getBody()));
                 return null;
             }
 
@@ -472,7 +450,7 @@ public class CloudflareWafAction extends UserAction {
     private static void deleteWafRule(Config.CloudflareWafConfig config) {
         try {
             boolean isZoneLevel = "zones".equalsIgnoreCase(config.getIntegrationType());
-            Map<String, List<String>> headers = getAuthHeaders(config);
+            Map<String, List<String>> headers = CloudflareWafUtils.getAuthHeaders(config);
 
             if (isZoneLevel && config.getZoneId() != null) {
                 // Zone-level: find entrypoint, delete rule by ID
@@ -566,7 +544,7 @@ public class CloudflareWafAction extends UserAction {
     }
 
     private static OriginalHttpResponse sendCfRequest(String url, String method, String body, Config.CloudflareWafConfig config) throws Exception {
-        return sendRequest(url, method, body, getAuthHeaders(config));
+        return sendRequest(url, method, body, CloudflareWafUtils.getAuthHeaders(config));
     }
 
     private static OriginalHttpResponse sendRequest(String url, String method, String body, Map<String, List<String>> headers) throws Exception {
