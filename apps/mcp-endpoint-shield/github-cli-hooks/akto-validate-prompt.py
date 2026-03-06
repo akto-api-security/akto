@@ -7,6 +7,7 @@ import ssl
 import sys
 import time
 import urllib.request
+from datetime import datetime, timezone
 from typing import Any, Dict, Union
 from akto_machine_id import get_machine_id, get_username
 
@@ -264,7 +265,16 @@ def main():
 
     prompt = input_data.get("prompt", "")
     cwd = input_data.get("cwd", "")
-    timestamp = input_data.get("timestamp", int(time.time() * 1000))
+    raw_ts = input_data.get("timestamp")
+    if isinstance(raw_ts, str):
+        try:
+            timestamp = int(datetime.fromisoformat(raw_ts.replace("Z", "+00:00")).timestamp() * 1000)
+        except ValueError:
+            timestamp = int(time.time() * 1000)
+    elif isinstance(raw_ts, (int, float)):
+        timestamp = int(raw_ts)
+    else:
+        timestamp = int(time.time() * 1000)
 
     logger.info(f"Prompt length: {len(prompt)} chars, CWD: {cwd}")
 
@@ -278,8 +288,11 @@ def main():
         if not allowed:
             logger.warning(f"Prompt blocked: {reason}")
             ingest_request(prompt, cwd, timestamp, reason, blocked=True, cfg=cfg, logger=logger)
-            sys.stderr.write(f"⚠️  Akto Guardrails flagged prompt: {reason}\n")
+            sys.stderr.write(f"⚠️  Akto Guardrails flagged prompt: {reason or 'Policy violation'}\n")
             sys.stderr.flush()
+            output = {"continue": False, "stopReason": f"Blocked by Akto Guardrails: {reason or 'Policy violation'}"}
+            sys.stdout.write(json.dumps(output))
+            sys.stdout.flush()
             sys.exit(cfg["blocked_exit_code"])
         else:
             ingest_request(prompt, cwd, timestamp, reason, blocked=False, cfg=cfg, logger=logger)

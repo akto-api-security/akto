@@ -247,8 +247,8 @@ def main():
         result_type = "unknown"
         status_code = "200"
     else:
-        tool_name = input_data.get("toolName", "unknown")
-        tool_args = input_data.get("toolArgs", "")
+        tool_name = input_data.get("toolName") or input_data.get("tool_name", "unknown")
+        tool_args = input_data.get("toolArgs") or json.dumps(input_data.get("tool_input", {}))
         tool_result = input_data.get("toolResult", {})
         result_text = tool_result.get("textResultForLlm", "")
         result_type = tool_result.get("resultType", "unknown")
