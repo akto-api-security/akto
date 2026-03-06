@@ -929,7 +929,7 @@ public class Main {
                 }
             }
         } else {
-            loggerMaker.error("Kafka producer is null");
+            //loggerMaker.error("Kafka producer is null");
         }
     }
 
