@@ -57,17 +57,15 @@ public class Cron {
                 loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollectionId +
                         " accountId " + accountId);
 
-                if (doBodyMatch){
-                    try {
-                        MergingLogic.mergeUrlsAndSave(apiCollectionId, false, accountSettings.isAllowMergingOnVersions());
-                        loggerMaker.infoAndAddToDb("Finished merging API collection " +
-                                apiCollectionId + " accountId " + accountId + " in " + (Context.now() - start)
-                                + " seconds");
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Error merging Api collection" + apiCollectionId +
-                                " accountId " + accountId + e.getMessage(), LoggerMaker.LogDb.CYBORG);
-                    }
-                }        
+                try {
+                    MergingLogic.mergeUrlsAndSave(apiCollectionId, !doBodyMatch, accountSettings.isAllowMergingOnVersions());
+                    loggerMaker.infoAndAddToDb("Finished merging API collection " +
+                            apiCollectionId + " accountId " + accountId + " in " + (Context.now() - start)
+                            + " seconds");
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error merging Api collection" + apiCollectionId +
+                            " accountId " + accountId + e.getMessage(), LoggerMaker.LogDb.CYBORG);
+                }  
             }
             DependencyFlow dependencyFlow = new DependencyFlow();
             dependencyFlow.run(null);
