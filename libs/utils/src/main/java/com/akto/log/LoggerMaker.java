@@ -58,7 +58,8 @@ public class LoggerMaker {
     private static boolean isSendToInfraOnly() {
         if (SEND_TO_INFRA_ONLY == null) {
             // Enabled by default, set env var to "false" to disable
-            SEND_TO_INFRA_ONLY = !"false".equalsIgnoreCase(System.getenv("SEND_TO_INFRA_ONLY"));
+            String envValue = System.getenv().getOrDefault("SEND_TO_INFRA_ONLY", "true");
+            SEND_TO_INFRA_ONLY = !"false".equalsIgnoreCase(envValue);
         }
         return SEND_TO_INFRA_ONLY;
     }
