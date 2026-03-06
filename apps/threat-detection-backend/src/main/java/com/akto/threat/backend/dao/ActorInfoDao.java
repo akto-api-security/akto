@@ -85,6 +85,13 @@ public class ActorInfoDao extends AccountBasedDao<ActorInfoModel> {
             Indexes.ascending("country")
         ));
 
+        // For CloudflareWafSyncCron - filtering blocked actors by context and status
+        required.put("idx_contextSource_actorId_status", Indexes.compoundIndex(
+            Indexes.ascending("contextSource"),
+            Indexes.ascending("actorId"),
+            Indexes.ascending("status")
+        ));
+
         for (java.util.Map.Entry<String, org.bson.conversions.Bson> e : required.entrySet()) {
             if (!existing.contains(e.getKey())) {
                 IndexOptions options = new IndexOptions().name(e.getKey());

@@ -11,6 +11,7 @@ import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat_utils.CloudflareWafUtils;
 import com.akto.util.AccountTask;
 import com.akto.util.ThreatDetectionConstants;
+import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.Filters;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -92,10 +93,11 @@ public class CloudflareWafSyncCron {
     private Set<String> fetchUniqueThreatActors(int accountId, List<String> policyIds, int startTime) {
         Set<String> uniqueActorIds = new HashSet<>();
 
-        // Step 1: Query MaliciousEventsDao for unique actors matching threat policies
+        // Step 1: Query MaliciousEventsDao for unique actors matching threat policies (API context only)
         int currentTime = Context.now();
         List<Bson> pipeline = Arrays.asList(
             new Document("$match", new Document()
+                .append("contextSource", GlobalEnums.CONTEXT_SOURCE.API.name())
                 .append("filterId", new Document("$in", policyIds))
                 .append("detectedAt", new Document("$gte", startTime).append("$lte", currentTime))
             ),
@@ -115,11 +117,12 @@ public class CloudflareWafSyncCron {
 
         loggerMaker.infoAndAddToDb("Found " + uniqueActorIds.size() + " unique actors from MaliciousEventsDao for account " + accountId);
 
-        // Step 2: Single query to get all already-blocked actors
+        // Step 2: Single query to get all already-blocked actors (API context only)
         Set<String> blockedActorIds = new HashSet<>();
         ActorInfoDao.instance
             .getCollection(String.valueOf(accountId))
             .find(Filters.and(
+                Filters.eq("contextSource", GlobalEnums.CONTEXT_SOURCE.API.name()),
                 Filters.in("actorId", new ArrayList<>(uniqueActorIds)),
                 Filters.eq("status", ThreatDetectionConstants.BLOCKED)
             ))
