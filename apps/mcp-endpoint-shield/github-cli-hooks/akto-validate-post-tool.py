@@ -29,7 +29,7 @@ def detect_connector(input_data: dict) -> str:
     """Detect connector from hook payload. hookEventName is present in all VSCode payloads."""
     if "hookEventName" in input_data:
         return "vscode"
-    return os.getenv("AKTO_CONNECTOR", "github_copilot_cli")
+    return os.getenv("AKTO_CONNECTOR", "vscode")
 
 
 def get_connector_config(connector: str) -> dict:
