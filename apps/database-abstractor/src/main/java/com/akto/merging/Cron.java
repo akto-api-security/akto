@@ -50,20 +50,24 @@ public class Cron {
         loggerMaker.infoAndAddToDb("Acquired lock, starting merging process for account " + accountId);
         List<Integer> apiCollectionIds = DbLayer.fetchApiCollectionIds();
         AccountSettings accountSettings = DbLayer.fetchAccountSettings(accountId);
+        Boolean doBodyMatch = accountSettings == null || accountSettings.getBodyMatchEnabled();
         try {
             for (int apiCollectionId : apiCollectionIds) {
                 int start = Context.now();
                 loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollectionId +
                         " accountId " + accountId);
-                try {
-                    MergingLogic.mergeUrlsAndSave(apiCollectionId, false, accountSettings.isAllowMergingOnVersions());
-                    loggerMaker.infoAndAddToDb("Finished merging API collection " +
-                            apiCollectionId + " accountId " + accountId + " in " + (Context.now() - start)
-                            + " seconds");
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error merging Api collection" + apiCollectionId +
-                            " accountId " + accountId + e.getMessage(), LoggerMaker.LogDb.CYBORG);
-                }
+
+                if (doBodyMatch){
+                    try {
+                        MergingLogic.mergeUrlsAndSave(apiCollectionId, false, accountSettings.isAllowMergingOnVersions());
+                        loggerMaker.infoAndAddToDb("Finished merging API collection " +
+                                apiCollectionId + " accountId " + accountId + " in " + (Context.now() - start)
+                                + " seconds");
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error merging Api collection" + apiCollectionId +
+                                " accountId " + accountId + e.getMessage(), LoggerMaker.LogDb.CYBORG);
+                    }
+                }        
             }
             DependencyFlow dependencyFlow = new DependencyFlow();
             dependencyFlow.run(null);
