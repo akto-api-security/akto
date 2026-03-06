@@ -29,37 +29,8 @@ _AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 _HEARTBEAT_TIMEOUT = 3.0  # short timeout — must not block the hook
 
 
-def _agent_id_file(log_dir: str) -> str:
-    return os.path.join(log_dir, "agent_id")
-
-
 def _heartbeat_ts_file(log_dir: str) -> str:
     return os.path.join(log_dir, "last_heartbeat")
-
-
-def _get_or_create_agent_record(log_dir: str) -> dict:
-    """
-    Return {'id': <uuid>, 'startedTs': <unix_int>}.
-    Persisted in log_dir/agent_id so the same ID survives across hook
-    invocations (mirrors Go's globalAgentID which lives for the agent process
-    lifetime; here we use the file as the persistent process boundary).
-    """
-    path = _agent_id_file(log_dir)
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            record = json.load(f)
-            if record.get("id") and record.get("startedTs"):
-                return record
-    except Exception:
-        pass
-
-    record = {"id": str(time.time_ns()), "startedTs": int(time.time())}
-    try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(record, f)
-    except Exception:
-        pass
-    return record
 
 
 def _should_send(log_dir: str) -> bool:
@@ -85,7 +56,7 @@ def _record_send(log_dir: str) -> None:
 
 
 def _post_heartbeat(payload: dict) -> None:
-    url = f"{_DB_ABSTRACTOR_URL}/api/updateModuleInfoForHeartbeat"
+    url = f"{_DB_ABSTRACTOR_URL}/api/updateModuleInfoForHeartbeatV2"
     data = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     if _AKTO_API_TOKEN:
@@ -117,16 +88,17 @@ def send_heartbeat(log_dir: str, connector: str, logger=None) -> None:
 
         device_id = os.getenv("DEVICE_ID") or get_machine_id()
         username = get_username()
-        agent_record = _get_or_create_agent_record(log_dir)
+        agent_id = str(time.time_ns())
+        now_s = int(time.time())
 
         payload = {
             "moduleInfo": {
-                "id": agent_record["id"],
+                "id": agent_id,
                 "name": device_id,
                 "moduleType": MODULE_TYPE,
                 "currentVersion": VERSION,
-                "startedTs": agent_record["startedTs"],
-                "lastHeartbeatReceived": int(time.time()),
+                "startedTs": now_s,
+                "lastHeartbeatReceived": now_s,
                 "additionalData": {
                     "username": username,
                     "connector": connector,
@@ -140,7 +112,7 @@ def send_heartbeat(log_dir: str, connector: str, logger=None) -> None:
 
         if logger:
             logger.info(
-                f"Heartbeat sent: agentId={agent_record['id']}, "
+                f"Heartbeat sent: agentId={agent_id}, "
                 f"deviceId={device_id}, username={username}"
             )
 
