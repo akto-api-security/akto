@@ -6,6 +6,7 @@ $env:AKTO_DATA_INGESTION_URL = "{{AKTO_DATA_INGESTION_URL}}"
 $env:AKTO_SYNC_MODE = "true"
 $env:AKTO_TIMEOUT = "5"
 $env:CONTEXT_SOURCE = "ENDPOINT"
+$env:AKTO_API_TOKEN = "{{AKTO_API_TOKEN}}"
 
 # Execute Python hook script
 python .github/hooks/akto-validate-pre-tool.py @args

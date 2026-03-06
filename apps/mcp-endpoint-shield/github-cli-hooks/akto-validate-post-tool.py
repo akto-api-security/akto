@@ -9,6 +9,7 @@ import time
 import urllib.request
 from typing import Any, Dict, Union
 from akto_machine_id import get_machine_id, get_username
+from akto_heartbeat import send_heartbeat
 
 # Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -229,6 +230,7 @@ def main():
 
     log_dir = os.path.expanduser(os.getenv("LOG_DIR", cfg["log_dir_default"]))
     logger = setup_logging(log_dir)
+    send_heartbeat(log_dir, logger)
 
     logger.info(f"=== Post-Tool Use Hook - Connector: {connector}, Mode: {MODE} ===")
 

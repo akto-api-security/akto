@@ -31,6 +31,20 @@ def _generate_machine_id() -> str:
     """
     system = platform.system()
 
+    if system == "Windows":
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Cryptography"
+            )
+            guid, _ = winreg.QueryValueEx(key, "MachineGuid")
+            winreg.CloseKey(key)
+            if guid:
+                return guid.replace("-", "").lower()
+        except Exception:
+            pass
+
     if system == "Darwin":
         try:
             result = subprocess.run(
