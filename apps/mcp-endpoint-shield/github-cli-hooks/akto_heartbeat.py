@@ -15,7 +15,6 @@ import platform
 import ssl
 import time
 import urllib.request
-import uuid
 
 from akto_machine_id import get_machine_id, get_username
 
@@ -54,7 +53,7 @@ def _get_or_create_agent_record(log_dir: str) -> dict:
     except Exception:
         pass
 
-    record = {"id": str(uuid.uuid4()), "startedTs": int(time.time())}
+    record = {"id": str(time.time_ns()), "startedTs": int(time.time())}
     try:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(record, f)
