@@ -439,6 +439,15 @@ const settingRequests = {
             }
         });
     },
+    toggleDoBodyMatch(doBodyMatch) {
+        return request({
+            url: '/api/toggleDoBodyMatch',
+            method: 'post',
+            data: {
+                doBodyMatch
+            }
+        });
+    },
     updateSetupType(setupType) {
         return request({
             url: '/api/updateSetupType',

@@ -134,33 +134,13 @@ function GithubServerTable(props) {
   }, [])
 
   useEffect(()=> {
-    const urlFilter = decodeURIComponent(searchParams.get("filters") || "")
-    const storedSpaNavFilter = sessionStorage.getItem('akto_spaNavFilter')
-    const storedSpaNavPath = sessionStorage.getItem('akto_spaNavPath')
-    const storedSpaNavExpiry = parseInt(sessionStorage.getItem('akto_spaNavExpiry') || '0')
-    const isFirstSpaMount = sessionStorage.getItem('akto_spaFilterNav') === 'true'
-    // Remount case: path matches the stored SPA nav destination and context hasn't expired
-    const isNavContextActive = storedSpaNavPath !== null &&
-      window.location.pathname === storedSpaNavPath &&
-      Date.now() < storedSpaNavExpiry
-    const isSpaFilterNav = isFirstSpaMount || isNavContextActive
-
-    if (isFirstSpaMount) {
-      sessionStorage.removeItem('akto_spaFilterNav')
+    let queryFilters
+    if (performance.getEntriesByType('navigation')[0].type === 'reload') {
+      queryFilters = []
+    }else{
+      queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
     }
-    // Clear stored nav context when no longer on the SPA nav destination page or context expired
-    if (!isNavContextActive && storedSpaNavPath !== null) {
-      sessionStorage.removeItem('akto_spaNavFilter')
-      sessionStorage.removeItem('akto_spaNavPath')
-      sessionStorage.removeItem('akto_spaNavExpiry')
-    }
-
-    // Use stored filter string (not URL) during SPA nav to avoid URL timing issues with GithubSimpleTable remounts
-    const filterToApply = (isNavContextActive && storedSpaNavFilter) ? storedSpaNavFilter : urlFilter
-    const queryFilters = tableFunc.getFiltersMapFromUrl(filterToApply, props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey, isSpaFilterNav)
-    const currentFilters = isSpaFilterNav
-      ? queryFilters
-      : tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
+    const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)    
     setAppliedFilters((prev) => {
       if(func.deepComparison(prev, currentFilters)){
         return prev
@@ -596,7 +576,6 @@ function GithubServerTable(props) {
     if (props?.headings) {
       return props.headings.map((heading, index) => ({
         ...heading,
-        title: heading.titleNode ?? heading.title,
         id: heading.id || heading.value || heading.text || `heading-${index}`
       }));
     }

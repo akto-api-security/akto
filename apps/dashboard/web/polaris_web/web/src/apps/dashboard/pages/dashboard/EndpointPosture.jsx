@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useReducer } from 'react'
+import { useState, useEffect, useRef, useReducer, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { HorizontalStack, Box, Text, Spinner, Button, Card, VerticalStack, HorizontalGrid } from '@shopify/polaris'
 import { produce } from 'immer'
@@ -193,8 +193,22 @@ function EndpointPosture() {
     // Date range filter state
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3])
 
-    const containerRef = useRef(null)
     const [gridWidth, setGridWidth] = useState(1200)
+    const resizeObserverRef = useRef(null)
+    const containerRef = useCallback(node => {
+        if (resizeObserverRef.current) {
+            resizeObserverRef.current.disconnect()
+            resizeObserverRef.current = null
+        }
+        if (!node) return
+        const width = node.getBoundingClientRect().width
+        if (width > 0) setGridWidth(width)
+        resizeObserverRef.current = new ResizeObserver(entries => {
+            const w = entries[0]?.contentRect?.width
+            if (w) setGridWidth(w)
+        })
+        resizeObserverRef.current.observe(node)
+    }, [])
 
     // Load layout from localStorage or use default (strip attackFlowMap if present in saved layout)
     const [layout, setLayout] = useState(() => {
