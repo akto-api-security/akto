@@ -8,9 +8,9 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.threat.backend.dao.ActorInfoDao;
 import com.akto.threat.backend.dao.MaliciousEventDao;
-import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat_utils.CloudflareWafUtils;
 import com.akto.util.AccountTask;
+import com.akto.util.ThreatDetectionConstants;
 import com.mongodb.client.model.Filters;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -113,28 +113,29 @@ public class CloudflareWafSyncCron {
                 }
             });
 
-        loggerMaker.debugAndAddToDb("Found " + uniqueActorIds.size() + " unique actors from MaliciousEventsDao for account " + accountId);
+        loggerMaker.infoAndAddToDb("Found " + uniqueActorIds.size() + " unique actors from MaliciousEventsDao for account " + accountId);
 
-        // Step 2: Filter out already blocked actors from ActorInfoDao
-        Set<String> actorsToBlock = new HashSet<>();
-        for (String actorId : uniqueActorIds) {
-            ActorInfoModel actor = ActorInfoDao.instance
-                .getCollection(String.valueOf(accountId))
-                .find(Filters.eq("actorId", actorId))
-                .first();
+        // Step 2: Single query to get all already-blocked actors
+        Set<String> blockedActorIds = new HashSet<>();
+        ActorInfoDao.instance
+            .getCollection(String.valueOf(accountId))
+            .find(Filters.and(
+                Filters.in("actorId", new ArrayList<>(uniqueActorIds)),
+                Filters.eq("status", ThreatDetectionConstants.BLOCKED)
+            ))
+            .forEach(actor -> {
+                String actorId = actor.getActorId();
+                if (actorId != null) {
+                    blockedActorIds.add(actorId);
+                }
+            });
 
-            // Block only if actor is not already blocked
-            if (actor == null || !isBlocked(actor)) {
-                actorsToBlock.add(actorId);
-            }
-        }
+        // Step 3: Return only non-blocked actors
+        Set<String> actorsToBlock = new HashSet<>(uniqueActorIds);
+        actorsToBlock.removeAll(blockedActorIds);
 
-        loggerMaker.debugAndAddToDb("After filtering blocked actors: " + actorsToBlock.size() + " actors to block for account " + accountId);
+        loggerMaker.infoAndAddToDb("After filtering blocked actors: " + actorsToBlock.size() + " actors to block for account " + accountId);
         return actorsToBlock;
-    }
-
-    private boolean isBlocked(ActorInfoModel actor) {
-        return actor.getStatus() != null && actor.getStatus().equals("BLOCKED");
     }
 
     /**
@@ -147,7 +148,7 @@ public class CloudflareWafSyncCron {
                 loggerMaker.infoAndAddToDb("Successfully blocked " + actorIds.size() + " actors in Cloudflare WAF");
 
                 // Mark actors as BLOCKED in ActorInfoDao to prevent re-blocking on next run
-                ActorInfoDao.instance.bulkUpdateActorStatus(String.valueOf(accountId), actorIds, "BLOCKED", Context.now());
+                ActorInfoDao.instance.bulkUpdateActorStatus(String.valueOf(accountId), actorIds, ThreatDetectionConstants.BLOCKED, Context.now());
                 loggerMaker.debugAndAddToDb("Marked " + actorIds.size() + " actors as BLOCKED for account " + accountId);
             } else {
                 loggerMaker.errorAndAddToDb("Failed to block " + actorIds.size() + " actors in Cloudflare WAF");
