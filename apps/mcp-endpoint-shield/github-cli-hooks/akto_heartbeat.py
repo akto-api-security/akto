@@ -19,7 +19,7 @@ import uuid
 
 from akto_machine_id import get_machine_id, get_username
 
-MODULE_TYPE = "GITHUB_COPILOT_CLI_HOOKS"
+MODULE_TYPE = "MCP_ENDPOINT_SHIELD"
 VERSION = "1.0.0"
 HEARTBEAT_INTERVAL_S = 30
 
