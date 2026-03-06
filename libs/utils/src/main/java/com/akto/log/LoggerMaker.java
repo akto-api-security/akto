@@ -52,6 +52,17 @@ public class LoggerMaker {
     protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
     private static final boolean shouldNotSendLogs = System.getenv("BLOCK_LOGS") != null && System.getenv("BLOCK_LOGS").equals("true");
 
+    // Flag to send logs to infra only (no console output) - lazy initialized from env var
+    private static Boolean SEND_TO_INFRA_ONLY = null;
+
+    private static boolean isSendToInfraOnly() {
+        if (SEND_TO_INFRA_ONLY == null) {
+            // Enabled by default, set env var to "false" to disable
+            SEND_TO_INFRA_ONLY = !"false".equalsIgnoreCase(System.getenv("SEND_TO_INFRA_ONLY"));
+        }
+        return SEND_TO_INFRA_ONLY;
+    }
+
     private static String moduleId = "";
 
     public static void setModuleId(String moduleId) {
@@ -81,7 +92,9 @@ public class LoggerMaker {
                     Config.SlackAlertConfig slackAlertConfig = (Config.SlackAlertConfig) config;
                     slackWebhookUrl = slackAlertConfig.getSlackWebhookUrl();
                 } catch (Exception e) {
+                    if (!isSendToInfraOnly()) {
                     internalLogger.error("error in getting slack config: " + e.toString());
+                    }
                 }
             }
         }, 0, 1, TimeUnit.MINUTES);
@@ -113,7 +126,9 @@ public class LoggerMaker {
 
     private static void updateAccountSettings() {
         try {
-            internalLogger.info("Running updateAccountSettings....................................");
+            if (!isSendToInfraOnly()) {
+                internalLogger.info("Running updateAccountSettings....................................");
+            }
             accountSettings = dataActor.fetchAccountSettings();
             if (accountSettings != null &&
                     accountSettings.getFilterLogPolicy() != null &&
@@ -162,7 +177,9 @@ public class LoggerMaker {
 
     protected String basicError(String err, LogDb db) {
         err = String.format("%s\nAccount id: %d", err, Context.getActualAccountId());
-        logger.error(err);
+        if (!isSendToInfraOnly()) {
+            logger.error(err);
+        }
         try{
             insert(err, "error", db);
         } catch (Exception e){
@@ -221,7 +238,9 @@ public class LoggerMaker {
     @Deprecated
     public void infoAndAddToDb(String info, LogDb db) {
         String infoMessage = formatMessageWithAccountId(info);
-        logger.info(infoMessage);
+        if (!isSendToInfraOnly()) {
+            logger.info(infoMessage);
+        }
         try {
             if(Context.getActualAccountId() == 1764738582){
                 return;
@@ -233,7 +252,9 @@ public class LoggerMaker {
 
     private void warnAndAddToDb(String info, LogDb db) {
         String infoMessage = formatMessageWithAccountId(info);
-        logger.warn(infoMessage);
+        if (!isSendToInfraOnly()) {
+            logger.warn(infoMessage);
+        }
         try {
             insert(infoMessage, "warn", db);
         } catch (Exception e) {
@@ -242,7 +263,9 @@ public class LoggerMaker {
 
     public void insertImportantTestingLog(String info) {
         String infoMessage = formatMessageWithAccountId(info);
-        logger.info(infoMessage);
+        if (!isSendToInfraOnly()) {
+            logger.info(infoMessage);
+        }
         if(checkUpdate()){
             String text = aClass + " : " + " [" + moduleId + " ] " + info;
             Log log = new Log(text, "info", Context.now());
@@ -366,35 +389,59 @@ public class LoggerMaker {
     }
 
     public void info(String msg){
+        if (isSendToInfraOnly()) {
+            return;
+        }
         logger.info(msg);
     }
 
     public void info(String msg, Object... vars){
+        if (isSendToInfraOnly()) {
+            return;
+        }
         logger.info(msg, vars);
     }
 
      public void warn(String msg){
+        if (isSendToInfraOnly()) {
+            return;
+        }
         logger.warn(msg);
     }
 
     public void warn(String msg, Object... vars){
+        if (isSendToInfraOnly()) {
+            return;
+        }
         logger.warn(msg, vars);
     }
 
 
     public void error(String msg){
+        if (isSendToInfraOnly()) {
+            return;
+        }
         logger.error(msg);
     }
 
     public void error(String msg, Throwable t){
+        if (isSendToInfraOnly()) {
+            return;
+        }
         logger.error(msg, t);
     }
 
     public void error(String msg, Object... vars){
+        if (isSendToInfraOnly()) {
+            return;
+        }
         logger.error(msg, vars);
     }
 
     public void debug(String msg, Object... vars){
+        if (isSendToInfraOnly()) {
+            return;
+        }
         logger.debug(msg, vars);
     }
 }
