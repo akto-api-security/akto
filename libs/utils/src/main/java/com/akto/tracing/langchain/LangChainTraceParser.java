@@ -197,7 +197,14 @@ public class LangChainTraceParser implements TraceParser {
 
             // Parse timestamps from root node
             long startTimeMillis = parseTimestamp(rootNode.path(FIELD_START_TIME).asText(""));
-            long endTimeMillis = parseTimestamp(rootNode.path(FIELD_END_TIME).asText(""));
+            String rootEndTimeStr = rootNode.path(FIELD_END_TIME).asText("");
+            long rootDurationMs = rootNode.path(FIELD_DURATION_MS).asLong(0);
+            long endTimeMillis;
+            if (rootEndTimeStr == null || rootEndTimeStr.isBlank()) {
+                endTimeMillis = rootDurationMs > 0 ? startTimeMillis + rootDurationMs : startTimeMillis;
+            } else {
+                endTimeMillis = parseTimestamp(rootEndTimeStr);
+            }
 
             List<String> spanIds = spans.stream().map(Span::getId).collect(Collectors.toList());
 
@@ -392,7 +399,7 @@ public class LangChainTraceParser implements TraceParser {
             .output(extractNodeDataAsMap(node, FIELD_OUTPUTS))
             .metadata(buildSpanMetadata(node, runType))
             .modelName(modelName)
-            .depth(0) // set later via BFS
+            .depth(0) // initialized to 0; updated from runIdToDepth in parse() after buildSpan() returns
             .tags(tags)
             .build();
     }

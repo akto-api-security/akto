@@ -645,9 +645,10 @@ public class HttpCallParser {
             loggerMaker.info("parseLangChainTrace: LangChainTraceParser.canParse() = " + canParse, LogDb.RUNTIME);
 
             if (!canParse) {
-                loggerMaker.info("LangChain traffic but responsePayload is not valid trace format", LogDb.RUNTIME);
-                String preview = payload.length() > 500 ? payload.substring(0, 500) + "..." : payload;
-                loggerMaker.info("Invalid trace preview: " + preview, LogDb.RUNTIME);
+                loggerMaker.info(
+                    "LangChain traffic but responsePayload is not valid trace format. Payload length: " + payload.length(),
+                    LogDb.RUNTIME
+                );
                 return;
             }
 
