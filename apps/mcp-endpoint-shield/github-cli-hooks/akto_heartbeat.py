@@ -28,6 +28,29 @@ _AKTO_API_TOKEN = os.getenv("AKTO_API_TOKEN", "")
 _HEARTBEAT_TIMEOUT = 3.0  # short timeout — must not block the hook
 
 
+def _agent_id_file(log_dir: str) -> str:
+    return os.path.join(log_dir, "agent_id")
+
+
+def _get_or_create_agent_id(log_dir: str) -> str:
+    """Return a persistent nanosecond-timestamp agent ID, mirroring Go's time.Now().UnixNano()."""
+    path = _agent_id_file(log_dir)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            agent_id = f.read().strip()
+            if agent_id:
+                return agent_id
+    except Exception:
+        pass
+    agent_id = str(time.time_ns())
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(agent_id)
+    except Exception:
+        pass
+    return agent_id
+
+
 def _heartbeat_ts_file(log_dir: str) -> str:
     return os.path.join(log_dir, "last_heartbeat")
 
@@ -55,7 +78,7 @@ def _record_send(log_dir: str) -> None:
 
 
 def _post_heartbeat(payload: dict) -> None:
-    url = f"{_DB_ABSTRACTOR_URL}/api/updateModuleInfoForHeartbeatV2"
+    url = f"{_DB_ABSTRACTOR_URL}/api/updateModuleInfoForHeartbeat"
     data = json.dumps(payload).encode("utf-8")
     headers = {"Content-Type": "application/json"}
     if _AKTO_API_TOKEN:
@@ -86,7 +109,7 @@ def send_heartbeat(log_dir: str, logger=None) -> None:
 
         device_id = os.getenv("DEVICE_ID") or get_machine_id()
         username = get_username()
-        agent_id = str(time.time_ns())
+        agent_id = _get_or_create_agent_id(log_dir)
         now_s = int(time.time())
 
         payload = {
