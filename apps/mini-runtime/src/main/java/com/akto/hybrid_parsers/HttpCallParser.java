@@ -605,7 +605,7 @@ public class HttpCallParser {
         }
     }
 
-    private boolean isLangchainTraffic(HttpResponseParams httpResponseParam) {
+    private boolean isLangChainTraffic(HttpResponseParams httpResponseParam) {
         try {
             String tagsJson = httpResponseParam.getTags();
             if (tagsJson == null || tagsJson.isEmpty()) {
@@ -634,7 +634,7 @@ public class HttpCallParser {
      *
      * @param httpResponseParam The HTTP response containing LangChain trace data in responsePayload
      */
-    private void parseLangchainTrace(HttpResponseParams httpResponseParam) {
+    private void parseLangChainTrace(HttpResponseParams httpResponseParam) {
         try {
             String payload = httpResponseParam.getPayload();
             if (payload == null || payload.isEmpty()) {
@@ -642,7 +642,7 @@ public class HttpCallParser {
             }
 
             boolean canParse = LangChainTraceParser.getInstance().canParse(payload);
-            loggerMaker.info("parseLangchainTrace: LangChainTraceParser.canParse() = " + canParse, LogDb.RUNTIME);
+            loggerMaker.info("parseLangChainTrace: LangChainTraceParser.canParse() = " + canParse, LogDb.RUNTIME);
 
             if (!canParse) {
                 loggerMaker.info("LangChain traffic but responsePayload is not valid trace format", LogDb.RUNTIME);
@@ -1332,8 +1332,8 @@ public class HttpCallParser {
             }
 
             // Parse LangChain trace data if this is LangChain traffic
-            if (isLangchainTraffic(httpResponseParam)) {
-                parseLangchainTrace(httpResponseParam);
+            if (isLangChainTraffic(httpResponseParam)) {
+                parseLangChainTrace(httpResponseParam);
             }
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")

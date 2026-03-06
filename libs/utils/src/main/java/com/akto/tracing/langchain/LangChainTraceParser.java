@@ -140,7 +140,8 @@ public class LangChainTraceParser implements TraceParser {
             }
 
             String traceId = rootNode.path(FIELD_TRACE_ID).asText(rootNode.path(FIELD_ID).asText());
-            String agentName = rootNode.get(FIELD_NAME).asText("LangChain Agent");
+            String defaultAgentName = rootNode.path(FIELD_ID).asText("LangChain Agent");
+            String agentName = rootNode.path(FIELD_NAME).asText(defaultAgentName);
 
             List<JsonNode> sortedNodes = orderedNodes;
 
@@ -344,15 +345,18 @@ public class LangChainTraceParser implements TraceParser {
     // ------------------------------------------------------------------
 
     private Span buildSpan(String spanId, String traceId, JsonNode node, String parentSpanId) {
-        String name = node.get(FIELD_NAME).asText();
+        String name = node.path(FIELD_NAME).asText(node.path(FIELD_ID).asText("unknown"));
         String runType = node.path(FIELD_RUN_TYPE).asText("unknown");
         String status = node.path(FIELD_STATUS).asText("unknown");
 
         long startTimeMillis = parseTimestamp(node.path(FIELD_START_TIME).asText(""));
-        long endTimeMillis = parseTimestamp(node.path(FIELD_END_TIME).asText(""));
+        String endTimeStr = node.path(FIELD_END_TIME).asText("");
         long durationMs = node.path(FIELD_DURATION_MS).asLong(0);
-        if (endTimeMillis == 0 && durationMs > 0) {
+        long endTimeMillis;
+        if ((endTimeStr == null || endTimeStr.isBlank()) && durationMs > 0) {
             endTimeMillis = startTimeMillis + durationMs;
+        } else {
+            endTimeMillis = parseTimestamp(endTimeStr);
         }
 
         String errorMessage = node.has(FIELD_ERROR) && !node.get(FIELD_ERROR).isNull()
