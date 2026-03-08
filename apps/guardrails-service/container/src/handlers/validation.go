@@ -116,7 +116,7 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	// Extract session and request IDs from headers
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
 
-	slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/request - requestPayload: %s", req.RequestPayload))
+	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/request - requestPayload: %s", req.RequestPayload))
 
 	h.logger.Info("ValidateRequest - received request",
 		zap.String("path", req.Path),
@@ -166,7 +166,7 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
 
 	if resultJSON, err := json.Marshal(result); err == nil {
-		slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/request - result: %s", string(resultJSON)))
+		go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/request - result: %s", string(resultJSON)))
 	}
 
 	c.JSON(http.StatusOK, result)
