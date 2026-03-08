@@ -110,6 +110,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     // Step 9: Server settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
+    const [targetDomains, setTargetDomains] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
     const [applyOnRequest, setApplyOnRequest] = useState(false);
     
@@ -169,6 +170,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // Step 9
         selectedMcpServers,
         selectedAgentServers,
+        targetDomains,
         mcpServers,
         agentServers,
         applyOnRequest,
@@ -352,6 +354,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setTokenLimitConfidenceScore(0.7);
         setSelectedMcpServers([]);
         setSelectedAgentServers([]);
+        setTargetDomains([]);
         setApplyOnResponse(false);
         setApplyOnRequest(false);
     };
@@ -494,6 +497,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         } else {
             setSelectedAgentServers(policy.selectedAgentServers || []);
         }
+
+        setTargetDomains(policy.targetDomains || []);
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
     };
@@ -605,6 +610,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 selectedAgentServers: selectedAgentServers,
                 selectedMcpServersV2: transformedMcpServers,
                 selectedAgentServersV2: transformedAgentServers,
+                targetDomains: targetDomains,
                 applyOnResponse,
                 applyOnRequest,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
@@ -855,6 +861,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setSelectedMcpServers={setSelectedMcpServers}
                         selectedAgentServers={selectedAgentServers}
                         setSelectedAgentServers={setSelectedAgentServers}
+                        targetDomains={targetDomains}
+                        setTargetDomains={setTargetDomains}
                         applyOnResponse={applyOnResponse}
                         setApplyOnResponse={setApplyOnResponse}
                         applyOnRequest={applyOnRequest}
