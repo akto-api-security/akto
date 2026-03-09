@@ -40,6 +40,7 @@ import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.tracing.ServiceGraphBuilder;
 import com.akto.tracing.TraceParseResult;
+import com.akto.tracing.langchain.LangChainTraceParser;
 import com.akto.tracing.n8n.N8nTraceParser;
 import com.akto.usage.OrgUtils;
 import com.akto.hybrid_runtime.APICatalogSync;
@@ -601,6 +602,92 @@ public class HttpCallParser {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing N8N trace: " + e.getMessage());
+        }
+    }
+
+    private boolean isLangChainTraffic(HttpResponseParams httpResponseParam) {
+        try {
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) {
+                return false;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return false;
+            }
+
+            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            return Constants.AI_AGENT_SOURCE_LANGCHAIN.equals(source);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking if traffic is LangChain: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Parses LangChain trace data from responsePayload and stores trace/span data.
+     * The responsePayload structure is: {"output": {...}, "traces": [TraceNode, ...]}
+     * produced by the Go ai-agent-framework-shield extractor.
+     *
+     * @param httpResponseParam The HTTP response containing LangChain trace data in responsePayload
+     */
+    private void parseLangChainTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String payload = httpResponseParam.getPayload();
+            if (payload == null || payload.isEmpty()) {
+                return;
+            }
+
+            boolean canParse = LangChainTraceParser.getInstance().canParse(payload);
+            loggerMaker.info("parseLangChainTrace: LangChainTraceParser.canParse() = " + canParse, LogDb.RUNTIME);
+
+            if (!canParse) {
+                loggerMaker.info(
+                    "LangChain traffic but responsePayload is not valid trace format. Payload length: " + payload.length(),
+                    LogDb.RUNTIME
+                );
+                return;
+            }
+
+            loggerMaker.info("Found valid LangChain trace", LogDb.RUNTIME);
+
+            TraceParseResult result = LangChainTraceParser.getInstance().parse(payload);
+
+            dataActor.storeTrace(result.getTrace());
+            if (result.getSpans() != null && !result.getSpans().isEmpty()) {
+                dataActor.storeSpans(result.getSpans());
+                loggerMaker.info("Stored LangChain trace with " + result.getSpans().size() + " spans", LogDb.RUNTIME);
+            }
+
+            // Use agentName as the stable workflow identifier (traceId is unique per run)
+            String agentName = result.getTrace() != null ? result.getTrace().getAiAgentName() : null;
+            if (agentName == null || agentName.isEmpty()) {
+                agentName = result.getWorkflowId();
+            }
+            if (agentName == null || agentName.isEmpty()) {
+                loggerMaker.info("LangChain trace missing agent name, skipping service graph update", LogDb.RUNTIME);
+                return;
+            }
+
+            String hostname = getHostnameForCollection(httpResponseParam);
+            int apiCollectionId = ServiceGraphBuilder.getInstance().getApiCollectionIdFromWorkflowId(agentName, hostname);
+
+            if (apiCollectionId != -1) {
+                java.util.Map<String, ServiceGraphEdgeInfo> edges = LangChainTraceParser.getInstance().extractServiceGraph(payload);
+                if (edges != null && !edges.isEmpty()) {
+                    ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+                    loggerMaker.info("Updated service graph for LangChain agent: " + agentName
+                        + " (collection: " + apiCollectionId + ", hostname: " + hostname + ") with " + edges.size() + " edges", LogDb.RUNTIME);
+                }
+            } else {
+                loggerMaker.info("Invalid API collection ID for LangChain agent: " + agentName, LogDb.RUNTIME);
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing LangChain trace: " + e.getMessage());
         }
     }
 
@@ -1243,6 +1330,11 @@ public class HttpCallParser {
             // Parse N8N trace metadata if this is N8N traffic
             if (isN8nTraffic(httpResponseParam)) {
                 parseN8nTrace(httpResponseParam);
+            }
+
+            // Parse LangChain trace data if this is LangChain traffic
+            if (isLangChainTraffic(httpResponseParam)) {
+                parseLangChainTrace(httpResponseParam);
             }
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
