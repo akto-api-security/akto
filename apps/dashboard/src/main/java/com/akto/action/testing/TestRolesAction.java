@@ -27,6 +27,7 @@ import com.akto.dto.testing.LoginRequestAuthParam;
 import com.akto.dto.testing.RequestData;
 import com.akto.dto.testing.SampleDataAuthParam;
 import com.akto.dto.testing.TLSAuthParam;
+import com.akto.dto.testing.DigestAuthParam;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.testing.sources.AuthWithCond;
@@ -162,11 +163,41 @@ public class TestRolesAction extends UserAction {
                         param = new SampleDataAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
                             authParamDataElem.getValue(), true);
                         break;
+                    case DIGEST_AUTH:
+                        // For digest auth, we only create one param from all the data
+                        // Skip individual processing since we handle it below
+                        param = null;
+                        break;
                     default:
                         break;
                 }
 
-                authParams.add(param);
+                if (param != null) {
+                    authParams.add(param);
+                }
+            }
+
+            // Handle DIGEST_AUTH separately since it needs all parameters combined
+            if (AuthMechanismTypes.valueOf(authAutomationType.toUpperCase()) == AuthMechanismTypes.DIGEST_AUTH) {
+                String username = null, password = null, targetUrl = null, method = "GET";
+                
+                // Extract digest auth parameters from authParamData
+                for (AuthParamData data : authParamData) {
+                    if ("username".equals(data.getKey())) {
+                        username = data.getValue();
+                    } else if ("password".equals(data.getKey())) {
+                        password = data.getValue();
+                    } else if ("targetUrl".equals(data.getKey())) {
+                        targetUrl = data.getValue();
+                    } else if ("method".equals(data.getKey())) {
+                        method = data.getValue();
+                    }
+                }
+                
+                // Create single DigestAuthParam with all the information
+                DigestAuthParam digestParam = new DigestAuthParam(username, password, targetUrl, method);
+                authParams.clear(); // Remove any null entries
+                authParams.add(digestParam);
             }
 
             // Extract otpRefUuid from fetchOtpData URLs
