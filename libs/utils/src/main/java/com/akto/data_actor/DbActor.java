@@ -750,4 +750,9 @@ public class DbActor extends DataActor {
     public boolean updateServiceGraphEdges(int apiCollectionId, Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges) {
         return DbLayer.updateServiceGraphEdges(apiCollectionId, serviceGraphEdges);
     }
+
+    @Override
+    public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
+        DbLayer.storeTestingRunWebhook(testingRunWebhook);
+    }
 }

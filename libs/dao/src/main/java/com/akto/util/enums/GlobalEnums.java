@@ -161,7 +161,7 @@ public class GlobalEnums {
     }
 
     public enum CONTEXT_SOURCE {
-        API, MCP, GEN_AI, AGENTIC
+        API, MCP, GEN_AI, AGENTIC, ENDPOINT
     }
 
     /* ********************************************************************** */

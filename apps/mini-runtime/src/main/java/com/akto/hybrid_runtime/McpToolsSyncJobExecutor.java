@@ -33,6 +33,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.swagger.oas.inflector.examples.ExampleBuilder;
@@ -82,10 +83,17 @@ public class McpToolsSyncJobExecutor {
             if (CollectionUtils.isEmpty(tagsList)) {
                 continue;
             }
-            tagsList.stream()
-                .filter(t -> Constants.AKTO_MCP_SERVER_TAG.equals(t.getKeyName()))
-                .findFirst()
-                .ifPresent(c -> eligibleCollections.add(apiCollection));
+
+            boolean hasMcpServerTag = tagsList.stream()
+                .anyMatch(t -> Constants.AKTO_MCP_SERVER_TAG.equalsIgnoreCase(t.getKeyName()));
+
+            boolean sourceEndpoint = tagsList.stream()
+                .anyMatch(t -> "source".equals(t.getKeyName()) && CONTEXT_SOURCE.ENDPOINT.name()
+                    .equalsIgnoreCase(t.getValue()));
+
+            if (hasMcpServerTag && !sourceEndpoint) {
+                eligibleCollections.add(apiCollection);
+            }
         }
 
         logger.debug("Found {} collections for MCP server.", eligibleCollections.size());
