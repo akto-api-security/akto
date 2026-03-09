@@ -29,9 +29,7 @@ const UsageGuardrailsStep = ({
             <Text variant="bodyMd" tone="subdued">
                 Configure usage-based guardrails to control token limits and prevent abuse.
             </Text>
-            <OwaspTag threats={[
-                { id: "ASI08", name: "Cascading Failures" }
-            ]} />
+            <OwaspTag stepNumber={7} />
 
             <VerticalStack gap="4">
                 <Box>

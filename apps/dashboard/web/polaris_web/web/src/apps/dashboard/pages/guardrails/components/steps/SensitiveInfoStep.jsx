@@ -158,9 +158,7 @@ const SensitiveInfoStep = ({
             <Text variant="bodyMd" tone="subdued">
                 Use these filters to handle any data related to privacy.
             </Text>
-            <OwaspTag threats={[
-                { id: "ASI03", name: "Identity and Privilege Abuse" }
-            ]} />
+            <OwaspTag stepNumber={4} />
 
             <VerticalStack gap="4">
                 {/* PII Types */}

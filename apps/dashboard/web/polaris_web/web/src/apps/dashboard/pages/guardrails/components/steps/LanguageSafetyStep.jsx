@@ -42,9 +42,7 @@ const LanguageSafetyStep = ({
             <Text variant="bodyMd" tone="subdued">
                 Configure language safety filters to detect gibberish, inappropriate sentiment, profanity, and custom blocked words.
             </Text>
-            <OwaspTag threats={[
-                { id: "ASI09", name: "Human-Agent Trust Exploitation" }
-            ]} />
+            <OwaspTag stepNumber={3} />
 
             <VerticalStack gap="4">
                 {/* Gibberish Detection */}

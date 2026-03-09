@@ -32,9 +32,7 @@ const CodeDetectionStep = ({
             <Text variant="bodyMd" tone="subdued">
                 Configure code detection filters to detect and block programming code and code injection attempts in user inputs.
             </Text>
-            <OwaspTag threats={[
-                { id: "ASI05", name: "Unexpected Code Execution" }
-            ]} />
+            <OwaspTag stepNumber={5} />
 
             <VerticalStack gap="4">
                 <Box>
