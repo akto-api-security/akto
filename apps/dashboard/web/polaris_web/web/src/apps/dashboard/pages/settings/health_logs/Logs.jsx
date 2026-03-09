@@ -27,6 +27,7 @@ const Logs = () => {
         { label: "Puppeteer", value: "PUPPETEER" },
         { label: "Threat", value: "THREAT_DETECTION" },
         { label: "Data Ingestion", value: "DATA_INGESTION" },
+        { label: "AWS API Gateway", value: "AWS_API_GATEWAY" },
     ];
   
     const handleSelectLogGroup = (logGroup) => {

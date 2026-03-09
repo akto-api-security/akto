@@ -482,6 +482,7 @@ public class DaoInit {
         AgenticTestingLogsDao.instance.createIndicesIfAbsent();
         DashboardLogsDao.instance.createIndicesIfAbsent();
         DataIngestionLogsDao.instance.createIndicesIfAbsent();
+        AwsApiGatewayLogsDao.instance.createIndicesIfAbsent();
         AnalyserLogsDao.instance.createIndicesIfAbsent();
         SampleDataDao.instance.createIndicesIfAbsent();
         LoadersDao.instance.createIndicesIfAbsent();
