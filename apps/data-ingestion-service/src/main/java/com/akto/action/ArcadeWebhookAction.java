@@ -200,7 +200,7 @@ public class ArcadeWebhookAction extends ActionSupport {
 
         Map<String, String> tag = new HashMap<>();
         tag.put("gen-ai", "Gen AI");
-        tag.put("source", "arcade.dev");
+        tag.put("source", "ARCADE_DEV");
         requestData.put("tag", objectMapper.writeValueAsString(tag));
 
         requestData.put("contextSource", "AGENTIC");
