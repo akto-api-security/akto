@@ -16,7 +16,6 @@ import MetricChart from './components/MetricChart'
  * @param {Object} config - Module configuration object
  */
 function ModuleMetrics({ config }) {
-    const [sortedModuleOrder, setSortedModuleOrder] = useState([])
     const [moduleInfoData, setModuleInfoData] = useState({})
     const [orderedResult, setOrderedResult] = useState([])
     const [instanceIds, setInstanceIds] = useState([])
@@ -50,8 +49,6 @@ function ModuleMetrics({ config }) {
                 const bTime = b.startedTs || b.lastHeartbeatReceived || 0
                 return bTime - aTime
             })
-
-            setSortedModuleOrder(sortedModules.map(module => module.name))
 
             // Extract system info based on config strategy
             if (config.fetchStrategy === 'prefix') {
@@ -96,13 +93,16 @@ function ModuleMetrics({ config }) {
                     if (item.instanceId) uniqueIds.add(item.instanceId)
                 })
 
+                // Create a map of instanceId to lastHeartbeatReceived for sorting
+                const moduleHeartbeatMap = {}
+                sortedModules.forEach(module => {
+                    moduleHeartbeatMap[module.name] = module.lastHeartbeatReceived || 0
+                })
+
                 const sortedIds = Array.from(uniqueIds).sort((a, b) => {
-                    const aIndex = sortedModuleOrder.indexOf(a)
-                    const bIndex = sortedModuleOrder.indexOf(b)
-                    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
-                    if (aIndex !== -1) return -1
-                    if (bIndex !== -1) return 1
-                    return 0
+                    const aHeartbeat = moduleHeartbeatMap[a] || 0
+                    const bHeartbeat = moduleHeartbeatMap[b] || 0
+                    return bHeartbeat - aHeartbeat
                 })
 
                 const instanceIdsList = sortedIds.map(id => ({ label: id, value: id }))
