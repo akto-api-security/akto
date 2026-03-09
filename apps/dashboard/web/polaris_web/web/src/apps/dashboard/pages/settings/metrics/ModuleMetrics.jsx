@@ -20,6 +20,7 @@ function ModuleMetrics({ config }) {
     const [orderedResult, setOrderedResult] = useState([])
     const [instanceIds, setInstanceIds] = useState([])
     const [selectedInstanceId, setSelectedInstanceId] = useState(null)
+    const [sortedModules, setSortedModules] = useState([])
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
@@ -44,17 +45,18 @@ function ModuleMetrics({ config }) {
             const response = await settingRequests.fetchModuleInfo(filter)
             const modules = response?.moduleInfos || []
 
-            const sortedModules = modules.sort((a, b) => {
+            const sorted = modules.sort((a, b) => {
                 const aTime = a.startedTs || a.lastHeartbeatReceived || 0
                 const bTime = b.startedTs || b.lastHeartbeatReceived || 0
                 return bTime - aTime
             })
+            setSortedModules(sorted)
 
             // Extract system info based on config strategy
             if (config.fetchStrategy === 'prefix') {
                 // Traffic Collector: extract from moduleInfo.additionalData
                 const moduleData = {}
-                sortedModules.forEach(module => {
+                sorted.forEach(module => {
                     const extracted = config.systemInfoExtractor(module)
                     if (extracted) {
                         moduleData[module.name] = extracted
@@ -87,7 +89,7 @@ function ModuleMetrics({ config }) {
             }
 
             // Extract unique instances and set first one if not selected
-            if (instanceIds.length === 0) {
+            if (instanceIds.length === 0 && sortedModules.length > 0) {
                 const uniqueIds = new Set()
                 data.forEach(item => {
                     if (item.instanceId) uniqueIds.add(item.instanceId)
@@ -187,6 +189,7 @@ function ModuleMetrics({ config }) {
 
     useEffect(() => {
         const fetchData = async () => {
+            setInstanceIds([])
             await fetchModuleInfo()
             await fetchAndProcessMetrics()
         }
