@@ -78,6 +78,7 @@ public class AdminSettingsAction extends UserAction {
 
     public AccountSettings.SetupType setupType;
     public Boolean newMergingEnabled;
+    public Boolean doBodyMatch;
     private Set<String> privateCidrList;
 
     public Boolean enableTelemetry;
@@ -124,6 +125,16 @@ public class AdminSettingsAction extends UserAction {
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.URL_REGEX_MATCHING_ENABLED, this.newMergingEnabled),
+                new UpdateOptions().upsert(true)
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String toggleDoBodyMatch() {
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.BODY_MATCH_ENABLED, this.doBodyMatch),
                 new UpdateOptions().upsert(true)
         );
 
@@ -591,6 +602,14 @@ public class AdminSettingsAction extends UserAction {
 
     public void setNewMergingEnabled(Boolean newMergingEnabled) {
         this.newMergingEnabled = newMergingEnabled;
+    }
+
+    public Boolean getDoBodyMatch() {
+        return doBodyMatch;
+    }
+
+    public void setDoBodyMatch(Boolean doBodyMatch) {
+        this.doBodyMatch = doBodyMatch;
     }
 
     public void setEnableDebugLogs(boolean enableDebugLogs) {

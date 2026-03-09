@@ -18,19 +18,11 @@ public class TopicPublisher {
         this.config = config;
     }
 
-    /**
-     * Publishes a message to the primary topic and optionally to guardrails topic
-     *
-     * @param message The message to publish
-     * @param primaryTopic The primary destination topic
-     */
-    public void publish(String message, String primaryTopic) {
-        // Always publish to primary topic
+    public void publish(String message, String primaryTopic, boolean publishToGuardrails) {
         kafkaProducer.send(message, primaryTopic);
         IngestionAction.printLogs("Inserted to kafka: " + message);
 
-        // Conditionally publish to guardrails topic
-        if (config.isEnabled()) {
+        if (publishToGuardrails && config.isEnabled()) {
             kafkaProducer.send(message, config.getTopicName());
             IngestionAction.printLogs("Inserted to guardrails kafka: " + message);
         }

@@ -231,6 +231,9 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty());
+        for (ApiCollection c : this.apiCollections) {
+            ApiCollectionsDao.instance.ensureEnvTypeFromHostname(c);
+        }
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.empty());
         return Action.SUCCESS.toUpperCase();
     }
@@ -264,7 +267,11 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchCollection() {
         this.apiCollections = new ArrayList<>();
-        this.apiCollections.add(ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId)));
+        ApiCollection c = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId));
+        if (c != null) {
+            ApiCollectionsDao.instance.ensureEnvTypeFromHostname(c);
+            this.apiCollections.add(c);
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -1018,34 +1025,14 @@ public class ApiCollectionsAction extends UserAction {
                         }
                     }
 
-                    boolean isAddingStaging = toAdd.stream().anyMatch(tag ->
-                            "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                    "staging".equalsIgnoreCase(tag.getValue())
+                    // When adding any envType tag, remove all existing envType tags (single env type per collection)
+                    boolean isAddingEnvType = toAdd.stream().anyMatch(tag ->
+                            "envType".equalsIgnoreCase(tag.getKeyName())
                     );
-
-                    boolean isAddingProduction = toAdd.stream().anyMatch(tag ->
-                            "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                    "production".equalsIgnoreCase(tag.getValue())
-                    );
-
-                    if (isAddingStaging) {
+                    if (isAddingEnvType) {
                         tagsList.stream()
-                                .filter(tag ->
-                                        "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                                "production".equalsIgnoreCase(tag.getValue())
-                                )
-                                .findFirst()
-                                .ifPresent(toPull::add);
-                    }
-
-                    if (isAddingProduction) {
-                        tagsList.stream()
-                                .filter(tag ->
-                                        "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                                "staging".equalsIgnoreCase(tag.getValue())
-                                )
-                                .findFirst()
-                                .ifPresent(toPull::add);
+                                .filter(tag -> "envType".equalsIgnoreCase(tag.getKeyName()))
+                                .forEach(toPull::add);
                     }
                 }
 

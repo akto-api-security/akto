@@ -123,6 +123,13 @@ public class StartTestAction extends UserAction {
 
     private static final Gson gson = new Gson();
 
+
+    private BasicDBObject response = new BasicDBObject();
+
+    public BasicDBObject getResponse() {
+        return response;
+    }
+
     @Getter
     int misConfiguredTestsCount;
 
@@ -685,6 +692,11 @@ public class StartTestAction extends UserAction {
 
         this.testingRun.setTestingRunConfig(runConfig);
 
+        response.put("testingRunResultSummaries", this.testingRunResultSummaries);
+        response.put("testingRun", this.testingRun);
+        response.put("testingRunType", this.testingRunType);
+        response.put("workflowTest", this.workflowTest);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -940,6 +952,12 @@ public class StartTestAction extends UserAction {
         timeNow = Context.now();
         loggerMaker.debugAndAddToDb("fetchTestingRunResults completed in: " + (Context.now() - timeNow), LogDb.DASHBOARD);
 
+        response.put("testingRunResults", this.testingRunResults);
+        response.put("errorEnums", this.errorEnums);
+        response.put("issuesDescriptionMap", this.issuesDescriptionMap);
+        response.put("jiraIssuesMapForResults", this.jiraIssuesMapForResults);
+        response.put("devrevIssuesMapForResults", this.devrevIssuesMapForResults);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -1179,6 +1197,8 @@ public class StartTestAction extends UserAction {
 
         List<String> filterFields = new ArrayList<>(Arrays.asList("branch", "repository"));
         metadataFilters = TestingRunResultSummariesDao.instance.fetchMetadataFilters(filterFields);
+
+        response.put("metadataFilters", this.metadataFilters);
 
         return SUCCESS.toUpperCase();
     }
