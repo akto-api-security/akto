@@ -44,25 +44,19 @@ function ModuleMetrics({ config }) {
             const response = await settingRequests.fetchModuleInfo(filter)
             const modules = response?.moduleInfos || []
 
-            const sortedModules = modules.sort((a, b) => {
-                const aTime = a.startedTs || a.lastHeartbeatReceived || 0
-                const bTime = b.startedTs || b.lastHeartbeatReceived || 0
+            const sorted = modules.sort((a, b) => {
+                const aTime = a.lastHeartbeatReceived || a.startedTs || 0
+                const bTime = b.lastHeartbeatReceived || b.startedTs || 0
                 return bTime - aTime
+            }).map(module => {
+                return {
+                    label: module.name,
+                    value: module.lastHeartbeatReceived || module.startedTs,
+                }
             })
 
-            // Extract system info based on config strategy
-            if (config.fetchStrategy === 'prefix') {
-                // Traffic Collector: extract from moduleInfo.additionalData
-                const moduleData = {}
-                sortedModules.forEach(module => {
-                    const extracted = config.systemInfoExtractor(module)
-                    if (extracted) {
-                        moduleData[module.name] = extracted
-                    }
-                })
-                setModuleInfoData(moduleData)
-            }
-            // For moduleType strategy (Threat Detection), system info extracted from metrics later
+            setInstanceIds(sorted);
+            setSelectedInstanceId(sorted[0]?.label);
         } catch (error) {
             console.error("Error fetching module info:", error)
         }
@@ -85,35 +79,6 @@ function ModuleMetrics({ config }) {
                 setOrderedResult([])
                 return
             }
-
-            // Extract unique instances and set first one if not selected
-            if (instanceIds.length === 0) {
-                const uniqueIds = new Set()
-                data.forEach(item => {
-                    if (item.instanceId) uniqueIds.add(item.instanceId)
-                })
-
-                // Create a map of instanceId to lastHeartbeatReceived for sorting
-                const moduleHeartbeatMap = {}
-                sortedModules.forEach(module => {
-                    moduleHeartbeatMap[module.name] = module.lastHeartbeatReceived || 0
-                })
-
-                const sortedIds = Array.from(uniqueIds).sort((a, b) => {
-                    const aHeartbeat = moduleHeartbeatMap[a] || 0
-                    const bHeartbeat = moduleHeartbeatMap[b] || 0
-                    return bHeartbeat - aHeartbeat
-                })
-
-                const instanceIdsList = sortedIds.map(id => ({ label: id, value: id }))
-                setInstanceIds(instanceIdsList)
-
-                if (sortedIds.length > 0 && !selectedInstanceId) {
-                    setSelectedInstanceId(sortedIds[0])
-                    return // Will refetch with selected instance
-                }
-            }
-
             // For Threat Detection: extract system info from metrics
             if (config.fetchStrategy === 'moduleType' && config.systemInfoMetrics) {
                 const systemInfo = {}
@@ -187,6 +152,7 @@ function ModuleMetrics({ config }) {
 
     useEffect(() => {
         const fetchData = async () => {
+            setInstanceIds([])
             await fetchModuleInfo()
             await fetchAndProcessMetrics()
         }
@@ -222,7 +188,7 @@ function ModuleMetrics({ config }) {
                                     <Dropdown
                                         menuItems={instanceIds}
                                         initial={selectedInstanceId}
-                                        selected={(val) => setSelectedInstanceId(val)}
+                                        selected={(val) => setSelectedInstanceId(val?.label)}
                                     />
                                 )}
                             </HorizontalStack>

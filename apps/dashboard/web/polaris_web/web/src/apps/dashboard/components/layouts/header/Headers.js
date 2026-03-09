@@ -95,7 +95,7 @@ export default function Header() {
     const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
     const isRestricted = func.isModuleRestrictedOrg();
     const agenticSecurityGranted =
-        isRestricted ? false : (stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || true)
+        isRestricted ? false : (stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false)
     const mcpSecurityGranted =
         isRestricted ? false : (stiggFeatures?.MCP_SECURITY?.isGranted || true);
     const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
