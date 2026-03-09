@@ -48,6 +48,7 @@ import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.dto.TestingRunWebhook;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.config.TestScript;
@@ -3359,6 +3360,28 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void insertAwsApiGatewayLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertAwsApiGatewayLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                System.out.println("non 2xx response in insertAwsApiGatewayLog");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("error in insertAwsApiGatewayLog" + e);
+            return;
+        }
+    }
+
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         BasicDBObject obj = new BasicDBObject();
         obj.put("dependencyNodeList", dependencyNodeList);
@@ -4409,6 +4432,25 @@ public class ClientActor extends DataActor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in storeSpans" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
+    @Override
+    public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunWebhook", testingRunWebhook);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeTestingRunWebhook", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in storeTestingRunWebhook", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in storeTestingRunWebhook" + e, LoggerMaker.LogDb.RUNTIME);
             return;
         }
     }

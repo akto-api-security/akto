@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import com.akto.DaoInit;
 import com.akto.dao.AccountsDao;
+import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dao.context.Context;
 import com.akto.merging.Cron;
 import com.akto.util.filter.DictionaryFilter;
@@ -40,6 +41,7 @@ public class InitializerListener implements ServletContextListener {
                     try {
                         if (!calledOnce) {
                             DaoInit.init(new ConnectionString(mongoURI));
+                            TestingRunWebhookDao.instance.createIndicesIfAbsent();
                             calledOnce = true;
                         }
                         checkMongoConnection();
