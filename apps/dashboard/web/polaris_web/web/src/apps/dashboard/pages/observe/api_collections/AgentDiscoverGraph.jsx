@@ -3,11 +3,13 @@ import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Icon, Avatar, Spinner } from '@shopify/polaris';
 import ReactFlow, { Background, Handle, Position, getBezierPath } from 'react-flow-renderer';
 import TooltipText from '../../../components/shared/TooltipText';
+import ShowListInBadge from '../../../components/shared/ShowListInBadge';
 import api from './api';
 import {
   getNodeCategoryFromType,
   getComponentColors,
-  getComponentIcon
+  getComponentIcon,
+  buildArcadeGraph,
 } from './agentGraphUtils';
 
 // Custom Node Component following ApiDependencyNode pattern - memoized to prevent re-renders
@@ -16,6 +18,7 @@ const AgentNode = memo(function AgentNode({ data }) {
 
   const colors = getComponentColors(component.category);
   const IconComponent = getComponentIcon(component.category);
+  const isArcadeMcp = component.category === 'arcade-mcp';
 
   return (
     <>
@@ -30,7 +33,7 @@ const AgentNode = memo(function AgentNode({ data }) {
             }}>
               <Box padding={3}>
                 <VerticalStack gap={1}>
-                  <Box width='150px'>
+                  <Box width='140px'>
                     <TooltipText
                       tooltip={component.description}
                       text={component.type}
@@ -38,15 +41,28 @@ const AgentNode = memo(function AgentNode({ data }) {
                     />
                   </Box>
                   <HorizontalStack gap={1} align="center">
-                    {typeof IconComponent === 'string' ? 
-                    <Avatar source={IconComponent} size={"extraSmall"} /> : 
+                    {typeof IconComponent === 'string' ?
+                    <Avatar source={IconComponent} size={"extraSmall"} /> :
                     <Icon source={IconComponent} />}
-                    <Box width={component.category==="ai-model" ? "160px" : "110px"}>
+                    <Box width={component.category === "ai-model" ? "160px" : "110px"}>
                       <Text variant="bodySm" color="base">
                         {component.label}
                       </Text>
                     </Box>
                   </HorizontalStack>
+                  {isArcadeMcp && component.mcpServers && component.mcpServers.length > 0 && (
+                    <Box paddingBlockStart="1" width="140px">
+                      <ShowListInBadge
+                        itemsArr={component.mcpServers}
+                        maxItems={2}
+                        status="info"
+                        maxWidth="140px"
+                        itemWidth="35px"
+                        useTooltip={true}
+                        wrap
+                      />
+                    </Box>
+                  )}
                 </VerticalStack>
               </Box>
             </div>
@@ -62,16 +78,16 @@ const AgentNode = memo(function AgentNode({ data }) {
 const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
   const { edgeParam } = data || {};
 
-  // Use getBezierPath for proper edge rendering
+  // getBezierPath in react-flow-renderer v9 returns a plain string path
   const edgePath = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+  const pathD = Array.isArray(edgePath) ? edgePath[0] : edgePath;
 
-  // Calculate midpoint for label
   const midX = (sourceX + targetX) / 2;
   const midY = (sourceY + targetY) / 2;
 
   return (
-    <>
-      <g>
+    <g>
+      <svg>
         <defs>
           <marker
             id={`arrow-${id}`}
@@ -82,41 +98,27 @@ const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targe
             orient="auto"
             markerUnits="strokeWidth"
           >
-            <path d="M0,0 L6,4 L0,8" fill='none' stroke='#6b7280' />
+            <path d="M0,0 L6,4 L0,8" fill="none" stroke="#6b7280" />
           </marker>
         </defs>
-        <path
-          id={id}
-          style={{
-            ...style,
-            stroke: '#6b7280',
-            strokeWidth: '2',
-            fill: 'none'
-          }}
-          className="react-flow__edge-path"
-          d={edgePath}
-          markerEnd={`url(#arrow-${id})`}
-        />
-        {edgeParam && (
-          <foreignObject
-            x={midX - 60}
-            y={midY - 15}
-            width={120}
-            height={30}
-          >
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}>
-              <Badge size='small' status="new">
-                <TooltipText tooltip={edgeParam} text={edgeParam} />
-              </Badge>
-            </div>
-          </foreignObject>
-        )}
-      </g>
-    </>
+      </svg>
+      <path
+        id={id}
+        style={{ ...style, stroke: '#6b7280', strokeWidth: 2, fill: 'none' }}
+        className="react-flow__edge-path"
+        d={pathD}
+        markerEnd={`url(#arrow-${id})`}
+      />
+      {edgeParam && (
+        <foreignObject x={midX - 50} y={midY - 12} width={100} height={24}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Badge size="small" status="new">
+              <TooltipText tooltip={edgeParam} text={edgeParam} />
+            </Badge>
+          </div>
+        </foreignObject>
+      )}
+    </g>
   );
 });
 
@@ -128,6 +130,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
   const [loading, setLoading] = useState(true);
   const [collectionData, setCollectionData] = useState(null);
   const [serviceGraphEdges, setServiceGraphEdges] = useState({});
+  const [arcadeGraphData, setArcadeGraphData] = useState(null);
 
   // Memoize node and edge types to prevent re-creation on each render
   const nodeTypes = useMemo(() => ({ agentNode: AgentNode }), []);
@@ -186,6 +189,15 @@ function AgentDiscoverGraph({ apiCollectionId }) {
           const apiCollection = response[0];
           setCollectionData(apiCollection);
           setServiceGraphEdges(apiCollection.serviceGraphEdges || {});
+
+          // Check if this is an arcade.dev collection — metadata lives on serviceGraphEdges.ARCADE
+          const arcadeEdge = (apiCollection.serviceGraphEdges || {})['ARCADE'];
+          if (arcadeEdge) {
+            const metadata = arcadeEdge.metadata || {};
+            const mcpServers = metadata['mcp-server-names'] || [];
+            const agentName = metadata['user-agent'] || 'AI Agent';
+            setArcadeGraphData({ mcpServers, agentName });
+          }
         }
       } catch (error) {
         console.error('Error fetching collection data:', error);
@@ -199,8 +211,16 @@ function AgentDiscoverGraph({ apiCollectionId }) {
     }
   }, [apiCollectionId]);
 
+  const arcadeFormattedGraph = useMemo(() => {
+    if (!arcadeGraphData) return null;
+    return buildArcadeGraph({ ...arcadeGraphData, onNodeClick: handleNodeClick });
+  }, [arcadeGraphData, handleNodeClick]);
+
   // Memoize nodes and edges transformation to prevent unnecessary re-renders
   const { nodes: formattedNodes, edges: formattedEdges } = useMemo(() => {
+    // If arcade graph is active, use it
+    if (arcadeFormattedGraph) return arcadeFormattedGraph;
+
     const nodes = [];
     const edges = [];
 
@@ -340,7 +360,10 @@ function AgentDiscoverGraph({ apiCollectionId }) {
                 description: isAgent ? 'Central AI agent processing requests' : info.description,
                 status: isAgent ? 'active' : 'connected',
                 requestCount: info.requestCount,
-                lastSeen: info.lastSeen
+                lastSeen: info.lastSeen,
+                showBoundary: isAgent,
+                boundaryColor: '#7c3aed',
+                boundaryBg: 'rgba(124, 58, 237, 0.05)',
               },
               onNodeClick: handleNodeClick
             },
@@ -392,7 +415,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
     }
 
     return { nodes, edges };
-  }, [serviceGraphEdges, collectionData, handleNodeClick]);
+  }, [arcadeFormattedGraph, serviceGraphEdges, collectionData, handleNodeClick]);
 
   // Update state only when memoized values change
   useEffect(() => {
@@ -414,14 +437,15 @@ function AgentDiscoverGraph({ apiCollectionId }) {
     );
   }
 
-  // Don't render if no serviceGraphEdges data
-  if (!serviceGraphEdges || Object.keys(serviceGraphEdges).length === 0) {
+  // Don't render if no data at all
+  if (!arcadeGraphData && (!serviceGraphEdges || Object.keys(serviceGraphEdges).length === 0)) {
     return null;
   }
 
-  // Calculate dynamic height based on number of services
-  const serviceCount = Object.keys(serviceGraphEdges).length;
-  const dynamicHeight = Math.max(500, Math.min(800, serviceCount * 120 + 200));
+  // Calculate dynamic height
+  const dynamicHeight = arcadeGraphData
+    ? 400
+    : Math.max(500, Math.min(800, Object.keys(serviceGraphEdges).length * 120 + 200));
 
   return (
     <Card>
@@ -430,11 +454,18 @@ function AgentDiscoverGraph({ apiCollectionId }) {
           <HorizontalStack align="space-between">
             <Text variant="headingMd">Architecture</Text>
             <HorizontalStack gap="2">
-              {Object.entries(categoryStats).map(([category, count]) => (
-                <Badge key={category} status="info">
-                  {count} {category}
-                </Badge>
-              ))}
+              {arcadeGraphData ? (
+                <>
+                  <Badge status="info">1 AI Agent</Badge>
+                  <Badge status="info">{arcadeGraphData.mcpServers.length} MCP Servers</Badge>
+                </>
+              ) : (
+                Object.entries(categoryStats).map(([category, count]) => (
+                  <Badge key={category} status="info">
+                    {count} {category}
+                  </Badge>
+                ))
+              )}
             </HorizontalStack>
           </HorizontalStack>
 
@@ -461,32 +492,25 @@ function AgentDiscoverGraph({ apiCollectionId }) {
               >
                 <Background color="#e1e5e9" gap={16} />
 
-                {/* Internal System Boundary - wraps around the AI Agent */}
-                {nodes.some(n => n.data?.component?.category === 'agent') && (() => {
-                  const agentNode = nodes.find(n => n.data?.component?.category === 'agent');
-                  if (!agentNode) return null;
-
-                  const agentX = agentNode.position.x;
-                  const agentY = agentNode.position.y;
-
-                  return (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        left: `${agentX - 30}px`,
-                        top: `${Math.max(20, agentY - 30)}px`,
-                        width: '260px',
-                        height: '200px',
-                        border: '2px dashed #7c3aed',
-                        borderRadius: '12px',
-                        pointerEvents: 'none',
-                        opacity: 0.5,
-                        zIndex: 0,
-                        backgroundColor: 'rgba(124, 58, 237, 0.05)'
-                      }}
-                    />
-                  );
-                })()}
+                {/* Dashed boundary — rendered for any node with component.showBoundary = true */}
+                {nodes.filter(n => n.data?.component?.showBoundary).map(n => (
+                  <div
+                    key={`boundary-${n.id}`}
+                    style={{
+                      position: 'absolute',
+                      left: `${n.position.x - 16}px`,
+                      top: `${Math.max(16, n.position.y - 16)}px`,
+                      width: '200px',
+                      height: '130px',
+                      border: `2px dashed ${n.data.component.boundaryColor || '#7c3aed'}`,
+                      borderRadius: '12px',
+                      pointerEvents: 'none',
+                      opacity: 0.5,
+                      zIndex: 0,
+                      backgroundColor: n.data.component.boundaryBg || 'rgba(124, 58, 237, 0.05)'
+                    }}
+                  />
+                ))}
 
               </ReactFlow>
             </div>
