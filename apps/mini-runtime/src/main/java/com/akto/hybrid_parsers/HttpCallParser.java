@@ -638,6 +638,7 @@ public class HttpCallParser {
      *
      * @param httpResponseParam The HTTP response containing Arcade headers
      */
+    @SuppressWarnings("unchecked")
     private void parseArcadeServiceGraph(HttpResponseParams httpResponseParam) {
         try {
             int apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
@@ -651,17 +652,20 @@ public class HttpCallParser {
             String userAgent = getHeaderValue(requestHeaders, "user-agent");
             String toolkit = getHeaderValue(requestHeaders, "x-arcade-toolkit");
 
-            // Fetch existing edge to accumulate mcp-server-names across calls
+            // Fetch existing collection to merge mcp-server-names across calls
             List<String> mcpServerNames = new ArrayList<>();
+            Map<String, ServiceGraphEdgeInfo> existingEdges = new HashMap<>();
             ApiCollection existingCollection = dataActor.fetchApiCollectionMeta(apiCollectionId);
-            if (existingCollection != null && existingCollection.getServiceGraphEdges() != null) {
-                ServiceGraphEdgeInfo existingEdge = existingCollection.getServiceGraphEdges().get("ARCADE");
-                if (existingEdge != null && existingEdge.getMetadata() != null) {
-                    Object existing = existingEdge.getMetadata().get("mcp-server-names");
-                    if (existing instanceof List) {
-                        @SuppressWarnings("unchecked")
-                        List<String> existingNames = (List<String>) existing;
-                        mcpServerNames.addAll(existingNames);
+            if (existingCollection != null) {
+                if (existingCollection.getServiceGraphEdges() != null) {
+                    existingEdges.putAll(existingCollection.getServiceGraphEdges());
+                    ServiceGraphEdgeInfo existingEdge = existingEdges.get("ARCADE");
+                    if (existingEdge != null && existingEdge.getMetadata() != null) {
+                        Object existing = existingEdge.getMetadata().get("mcp-server-names");
+                        if (existing instanceof List) {
+                            List<String> existingNames = (List<String>) existing;
+                            mcpServerNames.addAll(existingNames);
+                        }
                     }
                 }
             }
@@ -675,11 +679,10 @@ public class HttpCallParser {
             metadata.put("user-agent", userAgent != null ? userAgent : "");
             metadata.put("mcp-server-names", mcpServerNames);
 
-            ServiceGraphEdgeInfo edge = new ServiceGraphEdgeInfo("AGENT", "ARCADE", metadata);
-            Map<String, ServiceGraphEdgeInfo> edges = new HashMap<>();
-            edges.put("ARCADE", edge);
-
-            ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+            // Replace the ARCADE edge with the fully merged one and write directly,
+            // bypassing ServiceGraphBuilder which would discard updates to existing edges.
+            existingEdges.put("ARCADE", new ServiceGraphEdgeInfo("AGENT", "ARCADE", metadata));
+            dataActor.updateServiceGraphEdges(apiCollectionId, existingEdges);
             loggerMaker.info("Updated service graph for Arcade traffic (collection: " + apiCollectionId + ") with toolkits: " + mcpServerNames, LogDb.RUNTIME);
 
         } catch (Exception e) {
