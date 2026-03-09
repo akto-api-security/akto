@@ -89,66 +89,33 @@ public class LangChainTraceParser implements TraceParser {
             String jsonStr = input instanceof String ? (String) input : OBJECT_MAPPER.writeValueAsString(input);
             JsonNode root = OBJECT_MAPPER.readTree(jsonStr);
 
-            if (!canParse(input)) {
-                throw new Exception("Invalid LangChain trace: " + jsonStr);
-            }
-
             JsonNode tracesArray = root.path(FIELD_TRACES);
-
-            Map<String, JsonNode> nodeById = new LinkedHashMap<>();
-            for (JsonNode node : tracesArray) {
-                String nodeId = node.path(FIELD_ID).asText();
-                if (!nodeId.isEmpty()) {
-                    nodeById.put(nodeId, node);
-                }
+            if (!tracesArray.isArray() || tracesArray.isEmpty()) {
+                throw new Exception("Invalid LangChain trace: no traces array");
+            }
+            JsonNode firstNode = tracesArray.get(0);
+            if (!firstNode.hasNonNull(FIELD_ID) || !firstNode.hasNonNull(FIELD_RUN_TYPE)) {
+                throw new Exception("Invalid LangChain trace: missing id or run_type");
             }
 
-            if (nodeById.isEmpty()) {
+            TraversalResult traversal = buildTraversalOrder(tracesArray);
+            if (traversal.nodeById.isEmpty()) {
                 throw new Exception("Invalid LangChain trace: no valid node ids");
             }
 
-            List<JsonNode> rootNodes = new ArrayList<>();
-            for (JsonNode node : nodeById.values()) {
-                if (extractParentRunId(node) == null) {
-                    rootNodes.add(node);
-                }
-            }
-            rootNodes.sort(this::compareNodesByDottedOrder);
-
-            JsonNode rootNode;
-            if (rootNodes.isEmpty()) {
-                rootNode = nodeById.values().iterator().next();
-                rootNodes.add(rootNode);
-            } else {
-                rootNode = rootNodes.get(0);
-            }
-
-            Map<String, List<JsonNode>> childrenByParent = buildChildrenByParent(nodeById);
-            List<JsonNode> orderedNodes = new ArrayList<>();
-            Map<String, Integer> runIdToDepth = new HashMap<>();
-            Set<String> visited = new HashSet<>();
-
-            for (JsonNode rootCandidate : rootNodes) {
-                appendNodeDepthFirst(rootCandidate, childrenByParent, orderedNodes, runIdToDepth, visited, 0);
-            }
-
-            for (JsonNode node : nodeById.values()) {
-                String nodeId = node.path(FIELD_ID).asText();
-                if (!nodeId.isEmpty() && !visited.contains(nodeId)) {
-                    appendNodeDepthFirst(node, childrenByParent, orderedNodes, runIdToDepth, visited, 0);
-                }
-            }
+            Map<String, JsonNode> nodeById = traversal.nodeById;
+            List<JsonNode> orderedNodes = traversal.orderedNodes;
+            Map<String, Integer> runIdToDepth = traversal.runIdToDepth;
+            JsonNode rootNode = traversal.rootNode;
 
             String traceId = rootNode.path(FIELD_TRACE_ID).asText(rootNode.path(FIELD_ID).asText());
             String defaultAgentName = rootNode.path(FIELD_ID).asText("LangChain Agent");
             String agentName = rootNode.path(FIELD_NAME).asText(defaultAgentName);
 
-            List<JsonNode> sortedNodes = orderedNodes;
-
             List<Span> spans = new ArrayList<>();
             Map<String, String> runIdToSpanId = new HashMap<>();
 
-            for (JsonNode node : sortedNodes) {
+            for (JsonNode node : orderedNodes) {
                 String nodeId = node.path(FIELD_ID).asText();
                 if (!nodeId.isEmpty()) {
                     runIdToSpanId.put(nodeId, UUID.randomUUID().toString());
@@ -162,7 +129,7 @@ public class LangChainTraceParser implements TraceParser {
             int totalInputTokens = 0;
             int totalOutputTokens = 0;
 
-            for (JsonNode node : sortedNodes) {
+            for (JsonNode node : orderedNodes) {
                 String nodeId = node.path(FIELD_ID).asText();
                 if (nodeId.isEmpty()) {
                     continue;
@@ -200,7 +167,7 @@ public class LangChainTraceParser implements TraceParser {
             String rootEndTimeStr = rootNode.path(FIELD_END_TIME).asText("");
             long rootDurationMs = rootNode.path(FIELD_DURATION_MS).asLong(0);
             long endTimeMillis;
-            if (rootEndTimeStr == null || rootEndTimeStr.isBlank()) {
+            if (rootEndTimeStr == null || rootEndTimeStr.trim().isEmpty()) {
                 endTimeMillis = rootDurationMs > 0 ? startTimeMillis + rootDurationMs : startTimeMillis;
             } else {
                 endTimeMillis = parseTimestamp(rootEndTimeStr);
@@ -250,89 +217,58 @@ public class LangChainTraceParser implements TraceParser {
             JsonNode tracesArray = root.path(FIELD_TRACES);
             if (!tracesArray.isArray()) return edges;
 
-            Map<String, JsonNode> nodeById = new LinkedHashMap<>();
-            for (JsonNode node : tracesArray) {
-                String nodeId = node.path(FIELD_ID).asText();
-                if (!nodeId.isEmpty()) {
-                    nodeById.put(nodeId, node);
-                }
-            }
-
-            if (nodeById.isEmpty()) {
+            TraversalResult traversal = buildTraversalOrder(tracesArray);
+            if (traversal.nodeById.isEmpty() || traversal.rootNode == null) {
                 return edges;
             }
 
-            List<JsonNode> rootNodes = new ArrayList<>();
-            for (JsonNode node : nodeById.values()) {
-                if (extractParentRunId(node) == null) {
-                    rootNodes.add(node);
-                }
-            }
-            rootNodes.sort(this::compareNodesByDottedOrder);
+            Map<String, JsonNode> nodeById = traversal.nodeById;
+            JsonNode rootNode = traversal.rootNode;
+            String rootName = resolveServiceName(rootNode, rootNode.path(FIELD_ID).asText("Agent"));
 
-            if (rootNodes.isEmpty()) {
-                rootNodes.add(nodeById.values().iterator().next());
-            }
-
-            Map<String, List<JsonNode>> childrenByParent = buildChildrenByParent(nodeById);
-            List<JsonNode> orderedNodes = new ArrayList<>();
-            Set<String> visited = new HashSet<>();
-            Map<String, Integer> ignoredDepthMap = new HashMap<>();
-            for (JsonNode rootNode : rootNodes) {
-                appendNodeDepthFirst(rootNode, childrenByParent, orderedNodes, ignoredDepthMap, visited, 0);
-            }
+            Set<String> addedServices = new HashSet<>();
 
             for (JsonNode node : nodeById.values()) {
                 String nodeId = node.path(FIELD_ID).asText();
-                if (!nodeId.isEmpty() && !visited.contains(nodeId)) {
-                    appendNodeDepthFirst(node, childrenByParent, orderedNodes, ignoredDepthMap, visited, 0);
-                }
-            }
+                if (nodeId.isEmpty()) continue;
 
-            Map<String, String> runIdToName = new HashMap<>();
-            for (JsonNode node : nodeById.values()) {
-                String runId = node.path(FIELD_ID).asText();
-                if (!runId.isEmpty()) {
-                    runIdToName.put(runId, node.path(FIELD_NAME).asText(runId));
-                }
-            }
+                // Skip the root node itself
+                if (extractParentRunId(node) == null) continue;
 
-            for (JsonNode node : orderedNodes) {
-                String nodeId = node.path(FIELD_ID).asText();
-                if (nodeId.isEmpty()) {
-                    continue;
-                }
+                String runType = node.path(FIELD_RUN_TYPE).asText("unknown");
+                String lowerRunType = runType.toLowerCase();
+
+                // Only include leaf/service nodes: llm, tool, retriever
+                if (!isServiceNode(lowerRunType)) continue;
 
                 String nodeName = resolveServiceName(node, nodeId);
-                String runType = node.path(FIELD_RUN_TYPE).asText("unknown");
+                if (nodeName == null || nodeName.trim().isEmpty()) continue;
+
+                if (addedServices.contains(nodeName)) continue;
+                addedServices.add(nodeName);
+
                 String graphType = classifyNodeTypeForGraph(node, nodeName, runType);
-
-                if (!node.has(FIELD_PARENT_RUN_ID) || node.get(FIELD_PARENT_RUN_ID).isNull()) {
-                    continue; // root has no parent edge
-                }
-
-                String parentRunId = node.get(FIELD_PARENT_RUN_ID).asText();
-                JsonNode parentNode = nodeById.get(parentRunId);
-                String parentName = parentNode != null
-                    ? resolveServiceName(parentNode, parentRunId)
-                    : runIdToName.getOrDefault(parentRunId, parentRunId);
-
-                if (parentName == null || parentName.trim().isEmpty() || nodeName == null || nodeName.trim().isEmpty()) {
-                    continue;
-                }
 
                 Map<String, Object> metadata = new HashMap<>();
                 metadata.put("type", graphType);
 
-                // Store edgeParam as a plain string (the type label) so the frontend can render it directly
                 String edgeParamLabel = determineEdgeParamType(node, runType);
                 if (edgeParamLabel != null && !edgeParamLabel.isEmpty()) {
                     metadata.put("edgeParam", edgeParamLabel);
                 }
 
-                ServiceGraphEdgeInfo edge = new ServiceGraphEdgeInfo(parentName, nodeName, metadata);
-                // Keep key aligned with target service name (same contract used by N8n parser)
+                ServiceGraphEdgeInfo edge = new ServiceGraphEdgeInfo(rootName, nodeName, metadata);
                 edges.put(nodeName, edge);
+            }
+
+            if (!edges.isEmpty()) {
+                Map<String, Object> inputMetadata = new HashMap<>();
+                inputMetadata.put("type", "input");
+                inputMetadata.put("edgeParam", TracingConstants.EdgeParamType.USER_INPUT);
+
+                String inputNodeId = rootNode.path(FIELD_ID).asText("input");
+                ServiceGraphEdgeInfo inputEdge = new ServiceGraphEdgeInfo(inputNodeId, rootName, inputMetadata);
+                edges.put(inputNodeId, inputEdge);
             }
 
             return edges;
@@ -360,7 +296,7 @@ public class LangChainTraceParser implements TraceParser {
         String endTimeStr = node.path(FIELD_END_TIME).asText("");
         long durationMs = node.path(FIELD_DURATION_MS).asLong(0);
         long endTimeMillis;
-        if ((endTimeStr == null || endTimeStr.isBlank()) && durationMs > 0) {
+        if ((endTimeStr == null || endTimeStr.trim().isEmpty()) && durationMs > 0) {
             endTimeMillis = startTimeMillis + durationMs;
         } else {
             endTimeMillis = parseTimestamp(endTimeStr);
@@ -450,6 +386,69 @@ public class LangChainTraceParser implements TraceParser {
     // ------------------------------------------------------------------
     // Tree helpers
     // ------------------------------------------------------------------
+
+    private static class TraversalResult {
+        final Map<String, JsonNode> nodeById;
+        final List<JsonNode> orderedNodes;
+        final Map<String, Integer> runIdToDepth;
+        final JsonNode rootNode;
+
+        TraversalResult(Map<String, JsonNode> nodeById, List<JsonNode> orderedNodes,
+                        Map<String, Integer> runIdToDepth, JsonNode rootNode) {
+            this.nodeById = nodeById;
+            this.orderedNodes = orderedNodes;
+            this.runIdToDepth = runIdToDepth;
+            this.rootNode = rootNode;
+        }
+    }
+
+    private TraversalResult buildTraversalOrder(JsonNode tracesArray) {
+        Map<String, JsonNode> nodeById = new LinkedHashMap<>();
+        for (JsonNode node : tracesArray) {
+            String nodeId = node.path(FIELD_ID).asText();
+            if (!nodeId.isEmpty()) {
+                nodeById.put(nodeId, node);
+            }
+        }
+
+        if (nodeById.isEmpty()) {
+            return new TraversalResult(nodeById, Collections.emptyList(), Collections.emptyMap(), null);
+        }
+
+        List<JsonNode> rootNodes = new ArrayList<>();
+        for (JsonNode node : nodeById.values()) {
+            if (extractParentRunId(node) == null) {
+                rootNodes.add(node);
+            }
+        }
+        rootNodes.sort(this::compareNodesByDottedOrder);
+
+        JsonNode rootNode;
+        if (rootNodes.isEmpty()) {
+            rootNode = nodeById.values().iterator().next();
+            rootNodes.add(rootNode);
+        } else {
+            rootNode = rootNodes.get(0);
+        }
+
+        Map<String, List<JsonNode>> childrenByParent = buildChildrenByParent(nodeById);
+        List<JsonNode> orderedNodes = new ArrayList<>();
+        Map<String, Integer> runIdToDepth = new HashMap<>();
+        Set<String> visited = new HashSet<>();
+
+        for (JsonNode rootCandidate : rootNodes) {
+            appendNodeDepthFirst(rootCandidate, childrenByParent, orderedNodes, runIdToDepth, visited, 0);
+        }
+
+        for (JsonNode node : nodeById.values()) {
+            String nodeId = node.path(FIELD_ID).asText();
+            if (!nodeId.isEmpty() && !visited.contains(nodeId)) {
+                appendNodeDepthFirst(node, childrenByParent, orderedNodes, runIdToDepth, visited, 0);
+            }
+        }
+
+        return new TraversalResult(nodeById, orderedNodes, runIdToDepth, rootNode);
+    }
 
     private String extractParentRunId(JsonNode node) {
         if (node == null || !node.has(FIELD_PARENT_RUN_ID) || node.get(FIELD_PARENT_RUN_ID).isNull()) {
@@ -599,6 +598,12 @@ public class LangChainTraceParser implements TraceParser {
         }
     }
 
+    private boolean isServiceNode(String lowerRunType) {
+        return "llm".equals(lowerRunType)
+            || "tool".equals(lowerRunType)
+            || "retriever".equals(lowerRunType);
+    }
+
     private String classifyNodeTypeForGraph(JsonNode node, String nodeName, String runType) {
         String lowerName = nodeName == null ? "" : nodeName.toLowerCase();
         String lowerRunType = runType == null ? "unknown" : runType.toLowerCase();
@@ -705,15 +710,14 @@ public class LangChainTraceParser implements TraceParser {
         return metadata;
     }
 
-    // ------------------------------------------------------------------
-    // Utility
-    // ------------------------------------------------------------------
-
     private long parseTimestamp(String timestamp) {
+        if (timestamp == null || timestamp.isEmpty()) {
+            return 0;
+        }
         try {
             return java.time.Instant.parse(timestamp).toEpochMilli();
         } catch (Exception e) {
-            return System.currentTimeMillis();
+            return 0;
         }
     }
 
