@@ -130,7 +130,6 @@ function AgentDiscoverGraph({ apiCollectionId }) {
   const [loading, setLoading] = useState(true);
   const [collectionData, setCollectionData] = useState(null);
   const [serviceGraphEdges, setServiceGraphEdges] = useState({});
-  // arcadeGraphData: { mcpServers: string[], agentName: string } | null
   const [arcadeGraphData, setArcadeGraphData] = useState(null);
 
   // Memoize node and edge types to prevent re-creation on each render

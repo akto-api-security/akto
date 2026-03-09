@@ -115,8 +115,8 @@ export const getNodeXPosition = (category) => {
 // onNodeClick is passed in from the component so it stays framework-agnostic here.
 export const buildArcadeGraph = ({ agentName, mcpServers, onNodeClick }) => {
   const centerY = 160;
-  const nodeSpacingX = 280;
-  const startX = 60;
+  const nodeSpacingX = 300;
+  const startX = 40;
 
   const makeNode = (id, x, component) => ({
     id,
@@ -152,27 +152,27 @@ export const buildArcadeGraph = ({ agentName, mcpServers, onNodeClick }) => {
       boundaryColor: '#4cbebbff',
       boundaryBg: 'rgba(76, 190, 187, 0.05)',
     }),
-    makeNode('arcade-hooks-resp', startX + nodeSpacingX * 3, {
-      label: 'Akto Hooks',
+    makeNode('arcade-tool-call', startX + nodeSpacingX * 3, {
+      label: 'Tool Call',
+      type: 'Tool Call',
+      category: 'arcade-tool-call',
+      description: 'Final tool call response returned to the AI agent after passing through Akto proxy.',
+      status: 'connected',
+    }),
+    makeNode('arcade-hooks-resp', startX + nodeSpacingX * 4, {
+      label: 'Akto Evaluation response',
       type: 'Proxy (Response)',
       category: 'akto-hooks',
       description: 'Akto intercepts incoming tool call responses, providing visibility and security before they reach the agent.',
       status: 'active',
     }),
-    makeNode('arcade-response', startX + nodeSpacingX * 4, {
-      label: 'Response',
-      type: 'Tool Response',
-      category: 'arcade-response',
-      description: 'Final tool call response returned to the AI agent after passing through Akto proxy.',
-      status: 'connected',
-    }),
   ];
 
   const edges = [
-    { id: 'ae-1', source: 'arcade-agent',      target: 'arcade-hooks-req',  type: 'agentEdge', data: { edgeParam: 'tool call' } },
-    { id: 'ae-2', source: 'arcade-hooks-req',   target: 'arcade-mcp',        type: 'agentEdge', data: { edgeParam: 'forwarded' } },
-    { id: 'ae-3', source: 'arcade-mcp',         target: 'arcade-hooks-resp', type: 'agentEdge', data: { edgeParam: 'tool result' } },
-    { id: 'ae-4', source: 'arcade-hooks-resp',  target: 'arcade-response',   type: 'agentEdge', data: { edgeParam: 'response' } },
+    { id: 'ae-1', source: 'arcade-agent',     target: 'arcade-hooks-req',  type: 'agentEdge',  data: { edgeParam: 'tool call' } },
+    { id: 'ae-2', source: 'arcade-hooks-req',  target: 'arcade-mcp',        type: 'agentEdge',  data: { edgeParam: 'Evaluated call' } },
+    { id: 'ae-3', source: 'arcade-mcp',        target: 'arcade-tool-call',  type: 'agentEdge',  data: { edgeParam: 'Make call' } },
+    { id: 'ae-4', source: 'arcade-tool-call',  target: 'arcade-hooks-resp', type: 'agentEdge',  data: { edgeParam: 'Tool response' } }
   ];
 
   return { nodes, edges };
