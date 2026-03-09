@@ -1,11 +1,10 @@
 package com.akto.tracing.vertexai;
 
 import com.akto.dto.ApiCollection.ServiceGraphEdgeInfo;
-import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.Trace;
+import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.TracingConstants;
-import com.akto.tracing.TraceParser;
-import com.akto.tracing.TraceParseResult;
+import com.akto.tracing.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -15,16 +14,17 @@ import java.util.stream.Collectors;
 /**
  * Parses Vertex AI ADK agent traces from Akto-ingested HTTP call data.
  *
- * <p>The parser expects the deserialized {@code responsePayload} map produced by
- * {@code callbacks.py}, which has the shape:
+ * <p>Expects the wrapper JSON produced by HttpCallParser.parseVertexAITrace():
  * <pre>
  * {
- *   "body":   "{\"choices\":[{\"message\":{\"role\":\"model\",\"content\":\"...\"}}]}",
  *   "traces": [
  *     {"author":"user",      "invocation_id":"e-...", "is_final":false, "parts":[{"type":"text","content":"..."}]},
- *     {"author":"model", "invocation_id":"e-...", "is_final":false, "parts":[{"type":"tool_call","name":"...","args":{}}]},
- *     {"author":"model", "invocation_id":"e-...", "is_final":false, "parts":[{"type":"tool_result","name":"...","response":{}}]}
- *   ]
+ *     {"author":"assistant", "invocation_id":"e-...", "is_final":false, "parts":[{"type":"tool_call","name":"...","args":{}}], "model":"..."},
+ *     {"author":"assistant", "invocation_id":"e-...", "is_final":false, "parts":[{"type":"tool_result","name":"...","response":{}}]},
+ *     {"author":"assistant", "invocation_id":"e-...", "is_final":true,  "parts":[{"type":"text","content":"..."}], "model":"...", "prompt_tokens":N, "completion_tokens":N, "total_tokens":N}
+ *   ],
+ *   "body": "{\"choices\":[{\"message\":{\"role\":\"model\",\"content\":\"...\"}}]}",
+ *   "metadata": {"timestamp":..., "statusCode":200, "model":"...", "agentName":"...", "reasoningEngineId":"...", "invocationId":"..."}
  * }
  * </pre>
  *
@@ -33,67 +33,99 @@ import java.util.stream.Collectors;
  *   <li>User span   (TASK,  depth=0, root)</li>
  *   <li>Agent span  (AGENT, depth=1, parent=user)</li>
  *   <li>LLM spans   (LLM,   depth=2, parent=agent) — one per model turn</li>
- *   <li>Tool spans  (TOOL,  depth=3, parent=owning LLM) — one per tool_call part</li>
+ *   <li>Tool spans  (TOOL,  depth=3, parent=owning LLM) — one per tool_call part, merged with matching tool_result</li>
  * </ul>
  */
 public class VertexAITraceParser implements TraceParser {
 
     private static final VertexAITraceParser INSTANCE = new VertexAITraceParser();
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final String SOURCE_TYPE = "vertex-ai-adk";
+    private static final String SOURCE_TYPE = "vertex-ai";
 
-    // ── responsePayload field names ────────────────────────────────────────────
-    private static final String FIELD_TRACES   = "traces";
-    private static final String FIELD_BODY     = "body";
-    private static final String FIELD_CHOICES  = "choices";
-    private static final String FIELD_MESSAGE  = "message";
-    private static final String FIELD_CONTENT  = "content";
-    private static final String FIELD_MODEL    = "model";
+    // Field names in the wrapper JSON
+    private static final String FIELD_TRACES = "traces";
+    private static final String FIELD_METADATA = "metadata";
+    private static final String FIELD_BODY = "body";
+    private static final String FIELD_AUTHOR = "author";
+    private static final String FIELD_INVOCATION_ID = "invocation_id";
+    private static final String FIELD_IS_FINAL = "is_final";
+    private static final String FIELD_PARTS = "parts";
+    private static final String FIELD_TYPE = "type";
+    private static final String FIELD_NAME = "name";
+    private static final String FIELD_CONTENT = "content";
+    private static final String FIELD_ARGS = "args";
+    private static final String FIELD_RESPONSE = "response";
+    private static final String FIELD_MODEL = "model";
+    private static final String FIELD_CHOICES = "choices";
+    private static final String FIELD_MESSAGE = "message";
 
-    // ── Trace-event field names ────────────────────────────────────────────────
-    private static final String FIELD_AUTHOR         = "author";
-    private static final String FIELD_INVOCATION_ID  = "invocation_id";
-    private static final String FIELD_IS_FINAL       = "is_final";
-    private static final String FIELD_PARTS          = "parts";
-    private static final String FIELD_TYPE           = "type";
-    private static final String FIELD_NAME           = "name";
-    private static final String FIELD_ARGS           = "args";
-    private static final String FIELD_RESPONSE       = "response";
+    // Token fields on trace events
+    private static final String FIELD_PROMPT_TOKENS = "prompt_tokens";
+    private static final String FIELD_COMPLETION_TOKENS = "completion_tokens";
+    private static final String FIELD_TOTAL_TOKENS = "total_tokens";
 
-    // ── Part-type values ───────────────────────────────────────────────────────
-    private static final String PART_TEXT        = "text";
-    private static final String PART_TOOL_CALL   = "tool_call";
-    private static final String PART_TOOL_RESULT = "tool_result";
+    // Metadata field names
+    private static final String META_TIMESTAMP = "timestamp";
+    private static final String META_STATUS_CODE = "statusCode";
+    private static final String META_MODEL = "model";
+    private static final String META_AGENT_NAME = "agentName";
+    private static final String META_REASONING_ENGINE_ID = "reasoningEngineId";
+    private static final String META_INVOCATION_ID = "invocationId";
 
-    // ── Author values ──────────────────────────────────────────────────────────
-    private static final String AUTHOR_USER      = "user";
-    private static final String AUTHOR_MODEL     = "model";
+    // Part types
+    private static final String PART_TYPE_TEXT = "text";
+    private static final String PART_TYPE_TOOL_CALL = "tool_call";
+    private static final String PART_TYPE_TOOL_RESULT = "tool_result";
+
+    // Author values
+    private static final String AUTHOR_USER = "user";
+    private static final String AUTHOR_MODEL = "model";
     private static final String AUTHOR_ASSISTANT = "assistant";
 
-    // ── Timing offset per span (ms) to ensure sequential ordering ──────────────
+    // Timing offset per span (ms) to ensure sequential ordering
     private static final long SPAN_TIME_OFFSET_MS = 10;
 
-    private VertexAITraceParser() {}
+    /**
+     * Represents a single model turn: one LLM invocation with its tool calls and results.
+     */
+    private static class LlmTurn {
+        final List<JsonNode> toolCallParts = new ArrayList<>();
+        final List<JsonNode> toolResultParts = new ArrayList<>();
+        String modelText;
+        boolean isFinal;
+        int promptTokens;
+        int completionTokens;
+        int totalTokens;
+        String modelName;
+    }
 
     public static VertexAITraceParser getInstance() {
         return INSTANCE;
     }
 
-    // ── TraceParser interface ──────────────────────────────────────────────────
+    // ------------------------------------------------------------------
+    // TraceParser interface
+    // ------------------------------------------------------------------
 
     @Override
     public boolean canParse(Object input) {
         if (input == null) return false;
+
         try {
-            String json = toJsonString(input);
-            JsonNode root = OBJECT_MAPPER.readTree(json);
-            if (!root.has(FIELD_TRACES)) return false;
+            String jsonStr = toJsonString(input);
+            JsonNode root = OBJECT_MAPPER.readTree(jsonStr);
+
+            if (!root.has(FIELD_TRACES) || !root.get(FIELD_TRACES).isArray()) {
+                return false;
+            }
+
             JsonNode traces = root.get(FIELD_TRACES);
-            if (!traces.isArray() || traces.size() == 0) return false;
-            JsonNode first = traces.get(0);
-            return first.has(FIELD_AUTHOR)
-                    && first.has(FIELD_INVOCATION_ID)
-                    && first.has(FIELD_PARTS);
+            if (traces.size() == 0) {
+                return false;
+            }
+
+            JsonNode firstTrace = traces.get(0);
+            return firstTrace.has(FIELD_INVOCATION_ID) && firstTrace.has(FIELD_PARTS);
         } catch (Exception e) {
             return false;
         }
@@ -108,48 +140,92 @@ public class VertexAITraceParser implements TraceParser {
 
             JsonNode root = OBJECT_MAPPER.readTree(toJsonString(input));
             JsonNode tracesArray = root.get(FIELD_TRACES);
+            JsonNode metadata = root.path(FIELD_METADATA);
 
-            String invocationId = tracesArray.get(0).path(FIELD_INVOCATION_ID).asText();
-            long baseTimestamp = System.currentTimeMillis();
+            // Extract metadata
+            long baseTimestamp = metadata.path(META_TIMESTAMP).asLong(System.currentTimeMillis());
+            int statusCode = metadata.path(META_STATUS_CODE).asInt(200);
+            String metadataModel = metadata.path(META_MODEL).asText(null);
+            String agentName = metadata.path(META_AGENT_NAME).asText(null);
+            String reasoningEngineId = metadata.path(META_REASONING_ENGINE_ID).asText("");
+            String invocationId = metadata.path(META_INVOCATION_ID).asText(null);
 
-            String finalLlmText = extractFinalLlmText(root);
-            if (finalLlmText == null || finalLlmText.isEmpty()) {
+            // Extract invocation_id from traces if not in metadata
+            if (invocationId == null || invocationId.isEmpty()) {
+                invocationId = tracesArray.get(0).path(FIELD_INVOCATION_ID).asText(UUID.randomUUID().toString());
+            }
+
+            // Use reasoning engine ID as agent name fallback
+            if (agentName == null || agentName.isEmpty()) {
+                agentName = reasoningEngineId.isEmpty() ? "Vertex AI Agent" : reasoningEngineId;
+            }
+
+            // Resolve model name: try body field first, then trace events, then metadata
+            String modelName = extractModelNameFromBody(root);
+            if (modelName == null) {
+                modelName = extractModelNameFromTraces(tracesArray);
+            }
+            if (modelName == null && metadataModel != null && !metadataModel.isEmpty()) {
+                modelName = metadataModel;
+            }
+
+            // Extract final LLM text: try body first, then traces
+            String finalLlmText = extractFinalLlmTextFromBody(root);
+            if (finalLlmText == null) {
                 finalLlmText = extractFinalLlmTextFromTraces(tracesArray);
             }
 
-            String modelName = extractModelName(root);
-
-            List<Span> spans = buildSpans(tracesArray, invocationId, finalLlmText, modelName, baseTimestamp);
+            // Build spans with proper hierarchy
+            List<Span> spans = buildSpans(tracesArray, invocationId, finalLlmText, modelName, agentName, baseTimestamp, statusCode);
 
             String rootSpanId = spans.isEmpty() ? null : spans.get(0).getId();
-
             long traceEndTimestamp = spans.isEmpty() ? baseTimestamp :
                     spans.stream().mapToLong(Span::getEndTimeMillis).max().orElse(baseTimestamp);
 
             boolean hasError = spans.stream().anyMatch(s -> "error".equals(s.getStatus()));
 
+            // Accumulate tokens from LLM spans
+            int totalTokens = 0;
+            int totalInputTokens = 0;
+            int totalOutputTokens = 0;
+            for (Span span : spans) {
+                if (TracingConstants.SpanKind.LLM.equals(span.getSpanKind()) && span.getMetadata() != null) {
+                    totalTokens += getIntFromMetadata(span.getMetadata(), "totalTokens");
+                    totalInputTokens += getIntFromMetadata(span.getMetadata(), "promptTokens");
+                    totalOutputTokens += getIntFromMetadata(span.getMetadata(), "completionTokens");
+                }
+            }
+
+            // Extract root input/output
+            Map<String, Object> rootInput = extractRootInput(tracesArray);
+            Map<String, Object> rootOutput = finalLlmText != null
+                    ? Collections.singletonMap("content", finalLlmText)
+                    : Collections.emptyMap();
+
+            List<String> spanIds = spans.stream().map(Span::getId).collect(Collectors.toList());
+
             Trace trace = Trace.builder()
                     .id(invocationId)
                     .rootSpanId(rootSpanId)
-                    .aiAgentName("Vertex AI ADK")
-                    .name("Vertex AI ADK")
+                    .aiAgentName(agentName)
+                    .name(agentName)
                     .startTimeMillis(baseTimestamp)
                     .endTimeMillis(traceEndTimestamp)
-                    .status(hasError ? "error" : "success")
+                    .status(hasError ? "error" : mapStatusFromHttpCode(statusCode))
                     .totalSpans(spans.size())
-                    .totalTokens(0)
-                    .totalInputTokens(0)
-                    .totalOutputTokens(0)
-                    .rootInput(extractRootInput(tracesArray))
-                    .rootOutput(buildRootOutput(finalLlmText))
-                    .spanIds(spans.stream().map(Span::getId).collect(Collectors.toList()))
-                    .metadata(buildTraceMetadata(invocationId, modelName))
+                    .totalTokens(totalTokens)
+                    .totalInputTokens(totalInputTokens)
+                    .totalOutputTokens(totalOutputTokens)
+                    .rootInput(rootInput)
+                    .rootOutput(rootOutput)
+                    .spanIds(spanIds)
+                    .metadata(buildTraceMetadata(invocationId, reasoningEngineId, modelName, statusCode))
                     .build();
 
             return TraceParseResult.builder()
                     .trace(trace)
                     .spans(spans)
-                    .workflowId(invocationId)
+                    .workflowId(reasoningEngineId)
                     .sourceIdentifier(invocationId)
                     .metadata(Collections.singletonMap("invocationId", invocationId))
                     .build();
@@ -159,10 +235,6 @@ public class VertexAITraceParser implements TraceParser {
         }
     }
 
-    /**
-     * Builds service-graph edges reflecting the full call chain:
-     * user → agent, agent → llm, and llm → each tool.
-     */
     @Override
     public Map<String, ServiceGraphEdgeInfo> extractServiceGraph(Object input) throws Exception {
         try {
@@ -170,13 +242,13 @@ public class VertexAITraceParser implements TraceParser {
             Map<String, ServiceGraphEdgeInfo> edges = new LinkedHashMap<>();
             if (!root.has(FIELD_TRACES)) return edges;
 
+            JsonNode tracesArray = root.get(FIELD_TRACES);
+
             // user → agent edge
             {
                 Map<String, Object> meta = new HashMap<>();
                 meta.put("type", TracingConstants.SpanKind.AGENT);
-                Map<String, Object> edgeParam = new HashMap<>();
-                edgeParam.put("type", TracingConstants.EdgeParamType.USER_INPUT);
-                meta.put("edgeParam", edgeParam);
+                meta.put("edgeParam", TracingConstants.EdgeParamType.USER_INPUT);
                 edges.put("user->agent", new ServiceGraphEdgeInfo("user", "agent", meta));
             }
 
@@ -184,19 +256,17 @@ public class VertexAITraceParser implements TraceParser {
             {
                 Map<String, Object> meta = new HashMap<>();
                 meta.put("type", TracingConstants.SpanKind.LLM);
-                Map<String, Object> edgeParam = new HashMap<>();
-                edgeParam.put("type", TracingConstants.EdgeParamType.LLM_PROMPT);
-                meta.put("edgeParam", edgeParam);
+                meta.put("edgeParam", TracingConstants.EdgeParamType.LLM_PROMPT);
                 edges.put("agent->llm", new ServiceGraphEdgeInfo("agent", "llm", meta));
             }
 
-            // llm → tool edges (one per unique tool)
+            // llm → tool edges (one per unique tool name, with call count)
             Map<String, Integer> toolCallCount = new LinkedHashMap<>();
-            for (JsonNode event : root.get(FIELD_TRACES)) {
+            for (JsonNode event : tracesArray) {
                 if (!isModelAuthor(event.path(FIELD_AUTHOR).asText())) continue;
                 for (JsonNode part : event.path(FIELD_PARTS)) {
-                    if (PART_TOOL_CALL.equals(part.path(FIELD_TYPE).asText())) {
-                        String toolName = part.path(FIELD_NAME).asText();
+                    if (PART_TYPE_TOOL_CALL.equals(part.path(FIELD_TYPE).asText())) {
+                        String toolName = part.path(FIELD_NAME).asText("unknown_tool");
                         toolCallCount.merge(toolName, 1, Integer::sum);
                     }
                 }
@@ -207,9 +277,7 @@ public class VertexAITraceParser implements TraceParser {
                 Map<String, Object> meta = new HashMap<>();
                 meta.put("type", TracingConstants.SpanKind.TOOL);
                 meta.put("callCount", entry.getValue());
-                Map<String, Object> edgeParam = new HashMap<>();
-                edgeParam.put("type", TracingConstants.EdgeParamType.TOOL_INPUT);
-                meta.put("edgeParam", edgeParam);
+                meta.put("edgeParam", TracingConstants.EdgeParamType.TOOL_INPUT);
                 edges.put("llm->" + toolName, new ServiceGraphEdgeInfo("llm", toolName, meta));
             }
 
@@ -225,35 +293,17 @@ public class VertexAITraceParser implements TraceParser {
         return SOURCE_TYPE;
     }
 
-    // ── Span building ──────────────────────────────────────────────────────────
+    // ------------------------------------------------------------------
+    // Span building
+    // ------------------------------------------------------------------
 
     /**
-     * Represents a single model turn: one LLM invocation with its tool calls and results.
-     */
-    private static class ModelTurn {
-        final List<JsonNode> toolCallParts = new ArrayList<>();
-        final List<JsonNode> toolResultParts = new ArrayList<>();
-        String modelText;
-        boolean isFinal;
-    }
-
-    /**
-     * Builds the span list for one invocation with multi-turn support.
-     *
-     * <p>Algorithm:
-     * <ol>
-     *   <li>Collect user text → 1 TASK span (root, depth 0).</li>
-     *   <li>Create 1 AGENT span (depth 1, parent=user).</li>
-     *   <li>Group model events into turns — each turn starts with a model event
-     *       containing tool_call or text parts.</li>
-     *   <li>For each turn: create 1 LLM span (depth 2, parent=agent)
-     *       and N TOOL spans (depth 3, parent=LLM).</li>
-     *   <li>Match tool_result parts to tool_call parts by name within the same turn.</li>
-     * </ol>
+     * Builds the span list with proper hierarchy:
+     * user (depth 0) → agent (depth 1) → LLM (depth 2) → tool (depth 3).
      */
     private List<Span> buildSpans(JsonNode tracesArray, String traceId,
-                                  String finalLlmText, String modelName,
-                                  long baseTimestamp) {
+                                  String finalLlmText, String modelName, String agentName,
+                                  long baseTimestamp, int statusCode) {
         List<Span> spans = new ArrayList<>();
         long currentTime = baseTimestamp;
 
@@ -262,7 +312,7 @@ public class VertexAITraceParser implements TraceParser {
         for (JsonNode event : tracesArray) {
             if (AUTHOR_USER.equals(event.path(FIELD_AUTHOR).asText())) {
                 for (JsonNode part : event.path(FIELD_PARTS)) {
-                    if (PART_TEXT.equals(part.path(FIELD_TYPE).asText()) && userSpan == null) {
+                    if (PART_TYPE_TEXT.equals(part.path(FIELD_TYPE).asText()) && userSpan == null) {
                         String spanId = UUID.randomUUID().toString();
                         Map<String, Object> input = new HashMap<>();
                         input.put("content", part.path(FIELD_CONTENT).asText());
@@ -301,7 +351,7 @@ public class VertexAITraceParser implements TraceParser {
                 .traceId(traceId)
                 .parentSpanId(userSpanId)
                 .spanKind(TracingConstants.SpanKind.AGENT)
-                .name("Vertex AI Agent")
+                .name(agentName)
                 .startTimeMillis(currentTime)
                 .endTimeMillis(currentTime) // updated later
                 .status("success") // updated later
@@ -315,21 +365,21 @@ public class VertexAITraceParser implements TraceParser {
         currentTime += SPAN_TIME_OFFSET_MS;
 
         // 3. Group trace events into model turns
-        List<ModelTurn> turns = groupIntoTurns(tracesArray);
+        List<LlmTurn> turns = groupIntoTurns(tracesArray);
 
-        // 4. Create LLM + TOOL spans for each turn
+        // 4. Create LLM + Tool spans for each turn
         boolean hasError = false;
         for (int turnIdx = 0; turnIdx < turns.size(); turnIdx++) {
-            ModelTurn turn = turns.get(turnIdx);
+            LlmTurn turn = turns.get(turnIdx);
             String llmSpanId = UUID.randomUUID().toString();
             boolean isLastTurn = (turnIdx == turns.size() - 1);
 
-            // LLM span input: user text for first turn, previous turn's tool results for subsequent
+            // LLM span input
             Map<String, Object> llmInput = new HashMap<>();
             if (turnIdx == 0 && userSpan != null) {
                 llmInput.putAll(userSpan.getInput());
             } else if (turnIdx > 0) {
-                ModelTurn prevTurn = turns.get(turnIdx - 1);
+                LlmTurn prevTurn = turns.get(turnIdx - 1);
                 if (!prevTurn.toolResultParts.isEmpty()) {
                     List<String> prevResults = new ArrayList<>();
                     for (JsonNode tr : prevTurn.toolResultParts) {
@@ -357,6 +407,17 @@ public class VertexAITraceParser implements TraceParser {
                 llmOutput.put("tool_calls", toolCallSummaries);
             }
 
+            // Resolve model name for this turn
+            String turnModel = turn.modelName != null ? turn.modelName : modelName;
+
+            // LLM span metadata with token counts
+            Map<String, Object> llmMeta = spanMeta(AUTHOR_MODEL, null, turnModel);
+            if (turn.totalTokens > 0) {
+                llmMeta.put("totalTokens", turn.totalTokens);
+                llmMeta.put("promptTokens", turn.promptTokens);
+                llmMeta.put("completionTokens", turn.completionTokens);
+            }
+
             String llmName = turns.size() == 1 ? "LLM Call" : "LLM Call " + (turnIdx + 1);
             Span llmSpan = Span.builder()
                     .id(llmSpanId)
@@ -369,16 +430,15 @@ public class VertexAITraceParser implements TraceParser {
                     .status("success")
                     .input(llmInput)
                     .output(llmOutput)
-                    .metadata(spanMeta(AUTHOR_MODEL, null, modelName))
-                    .modelName(modelName)
+                    .metadata(llmMeta)
+                    .modelName(turnModel)
                     .depth(2)
                     .tags(Arrays.asList(SOURCE_TYPE, "llm"))
                     .build();
             spans.add(llmSpan);
             currentTime += SPAN_TIME_OFFSET_MS;
 
-            // Tool spans for this turn
-            // Match tool_result to tool_call by name within the turn
+            // Tool spans — merge tool_call with matching tool_result by name
             Map<String, JsonNode> resultsByName = new LinkedHashMap<>();
             for (JsonNode tr : turn.toolResultParts) {
                 String name = tr.path(FIELD_NAME).asText();
@@ -387,7 +447,7 @@ public class VertexAITraceParser implements TraceParser {
 
             for (int i = 0; i < turn.toolCallParts.size(); i++) {
                 JsonNode toolCallPart = turn.toolCallParts.get(i);
-                String toolName = toolCallPart.path(FIELD_NAME).asText();
+                String toolName = toolCallPart.path(FIELD_NAME).asText("unknown_tool");
 
                 Map<String, Object> toolInput = new HashMap<>();
                 toolInput.put("name", toolName);
@@ -395,6 +455,7 @@ public class VertexAITraceParser implements TraceParser {
 
                 Map<String, Object> toolOutput = new HashMap<>();
                 String toolStatus = "success";
+                String errorMessage = null;
 
                 // Match by name first, fall back to positional index
                 JsonNode matchedResult = resultsByName.remove(toolName);
@@ -410,10 +471,9 @@ public class VertexAITraceParser implements TraceParser {
                     // Detect errors in tool result
                     if (responseNode.has("error") || responseNode.has("errorMessage")) {
                         toolStatus = "error";
-                        String errMsg = responseNode.has("error")
+                        errorMessage = responseNode.has("error")
                                 ? responseNode.path("error").asText()
                                 : responseNode.path("errorMessage").asText();
-                        toolOutput.put("errorMessage", errMsg);
                         hasError = true;
                     }
                     String responseText = responseNode.isTextual() ? responseNode.asText() : responseStr;
@@ -421,24 +481,33 @@ public class VertexAITraceParser implements TraceParser {
                             || responseText.toLowerCase().contains("traceback")
                             || responseText.toLowerCase().contains("exception"))) {
                         toolStatus = "error";
+                        if (errorMessage == null) {
+                            errorMessage = "Tool execution error detected in response";
+                        }
                         hasError = true;
                     }
                 } else {
                     toolOutput.put("response", "no result");
                 }
 
+                // MCP tool recognition
+                String spanKind = toolName.toLowerCase().contains("mcp")
+                        ? TracingConstants.SpanKind.MCP_SERVER
+                        : TracingConstants.SpanKind.TOOL;
+
                 Span toolSpan = Span.builder()
                         .id(UUID.randomUUID().toString())
                         .traceId(traceId)
                         .parentSpanId(llmSpanId)
-                        .spanKind(TracingConstants.SpanKind.TOOL)
+                        .spanKind(spanKind)
                         .name(toolName)
                         .startTimeMillis(currentTime)
                         .endTimeMillis(currentTime + SPAN_TIME_OFFSET_MS)
                         .status(toolStatus)
+                        .errorMessage(errorMessage)
                         .input(toolInput)
                         .output(toolOutput)
-                        .metadata(spanMeta(null, toolName, modelName))
+                        .metadata(spanMeta(null, toolName, turnModel))
                         .toolDefinition(Span.ToolDefinition.builder()
                                 .name(toolName).type("function").build())
                         .depth(3)
@@ -469,13 +538,13 @@ public class VertexAITraceParser implements TraceParser {
     }
 
     /**
-     * Groups trace events into sequential model turns.
-     * A new turn starts when we see a model event after processing tool results,
-     * or the first model event.
+     * Groups trace events into sequential LLM turns.
+     * A new turn starts when we see a model event with tool_call parts after processing
+     * tool results, or the first model event.
      */
-    private List<ModelTurn> groupIntoTurns(JsonNode tracesArray) {
-        List<ModelTurn> turns = new ArrayList<>();
-        ModelTurn currentTurn = null;
+    private List<LlmTurn> groupIntoTurns(JsonNode tracesArray) {
+        List<LlmTurn> turns = new ArrayList<>();
+        LlmTurn currentTurn = null;
 
         for (JsonNode event : tracesArray) {
             String author = event.path(FIELD_AUTHOR).asText();
@@ -483,88 +552,96 @@ public class VertexAITraceParser implements TraceParser {
             if (!parts.isArray()) continue;
 
             boolean isFinal = event.path(FIELD_IS_FINAL).asBoolean(false);
+            String eventModel = event.has(FIELD_MODEL) && !event.get(FIELD_MODEL).isNull()
+                    ? event.get(FIELD_MODEL).asText() : null;
+
+            // Extract token counts from event level
+            int promptTokens = event.path(FIELD_PROMPT_TOKENS).asInt(0);
+            int completionTokens = event.path(FIELD_COMPLETION_TOKENS).asInt(0);
+            int totalTokens = event.path(FIELD_TOTAL_TOKENS).asInt(0);
 
             for (JsonNode part : parts) {
                 String partType = part.path(FIELD_TYPE).asText();
 
-                if (PART_TEXT.equals(partType) && AUTHOR_USER.equals(author)) {
+                if (PART_TYPE_TEXT.equals(partType) && AUTHOR_USER.equals(author)) {
                     // Skip user text — already handled as user span
                     continue;
                 }
 
-                if (PART_TOOL_CALL.equals(partType) && isModelAuthor(author)) {
-                    // Start a new turn if we don't have one, or if current turn
-                    // already has tool results (meaning a new LLM invocation happened)
+                if (PART_TYPE_TOOL_CALL.equals(partType) && isModelAuthor(author)) {
                     if (currentTurn == null || !currentTurn.toolResultParts.isEmpty()) {
-                        currentTurn = new ModelTurn();
+                        currentTurn = new LlmTurn();
                         turns.add(currentTurn);
                     }
                     currentTurn.toolCallParts.add(part);
+                    if (eventModel != null) currentTurn.modelName = eventModel;
 
-                } else if (PART_TOOL_RESULT.equals(partType)) {
-                    // tool_result belongs to the current turn
+                } else if (PART_TYPE_TOOL_RESULT.equals(partType)) {
                     if (currentTurn == null) {
-                        currentTurn = new ModelTurn();
+                        currentTurn = new LlmTurn();
                         turns.add(currentTurn);
                     }
                     currentTurn.toolResultParts.add(part);
 
-                } else if (PART_TEXT.equals(partType) && isModelAuthor(author)) {
-                    // Model text: if we have a current turn with tool calls, this is
-                    // intermediate text. If no tool calls, this starts a new turn.
+                } else if (PART_TYPE_TEXT.equals(partType) && isModelAuthor(author)) {
                     String text = part.path(FIELD_CONTENT).asText(null);
                     if (currentTurn == null || !currentTurn.toolResultParts.isEmpty()) {
-                        currentTurn = new ModelTurn();
+                        currentTurn = new LlmTurn();
                         turns.add(currentTurn);
                     }
                     currentTurn.modelText = text;
                     currentTurn.isFinal = isFinal;
+                    if (eventModel != null) currentTurn.modelName = eventModel;
+                    // Attach token counts to this turn (final text events carry token data)
+                    if (totalTokens > 0) {
+                        currentTurn.promptTokens = promptTokens;
+                        currentTurn.completionTokens = completionTokens;
+                        currentTurn.totalTokens = totalTokens;
+                    }
                 }
             }
         }
 
-        // Ensure at least one turn exists if there were model events
+        // Ensure at least one turn exists
         if (turns.isEmpty()) {
-            turns.add(new ModelTurn());
+            turns.add(new LlmTurn());
         }
 
         return turns;
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
+    // ------------------------------------------------------------------
+    // Data extraction helpers
+    // ------------------------------------------------------------------
 
-    /**
-     * Extracts the model name from the body field.
-     * The body JSON may contain a "model" field (set by callbacks.py).
-     */
-    private String extractModelName(JsonNode root) {
+    private String extractModelNameFromBody(JsonNode root) {
         try {
             JsonNode bodyNode = root.path(FIELD_BODY);
-            String bodyStr = bodyNode.isTextual()
-                    ? bodyNode.asText()
-                    : OBJECT_MAPPER.writeValueAsString(bodyNode);
+            if (bodyNode.isMissingNode() || bodyNode.isNull()) return null;
+            String bodyStr = bodyNode.isTextual() ? bodyNode.asText() : OBJECT_MAPPER.writeValueAsString(bodyNode);
             JsonNode body = OBJECT_MAPPER.readTree(bodyStr);
             String model = body.path(FIELD_MODEL).asText(null);
-            if (model != null && !model.isEmpty()) return model;
-        } catch (Exception ignored) {}
+            return (model != null && !model.isEmpty()) ? model : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
-        // Fallback: check root-level model field
-        String rootModel = root.path(FIELD_MODEL).asText(null);
-        if (rootModel != null && !rootModel.isEmpty()) return rootModel;
-
+    private String extractModelNameFromTraces(JsonNode tracesArray) {
+        for (JsonNode event : tracesArray) {
+            if (event.has(FIELD_MODEL) && !event.get(FIELD_MODEL).isNull()) {
+                String model = event.get(FIELD_MODEL).asText();
+                if (!model.isEmpty()) return model;
+            }
+        }
         return null;
     }
 
-    /**
-     * Extracts the final model response text from {@code choices[0].message.content}
-     * in the nested {@code body} JSON string.
-     */
-    private String extractFinalLlmText(JsonNode root) {
+    private String extractFinalLlmTextFromBody(JsonNode root) {
         try {
             JsonNode bodyNode = root.path(FIELD_BODY);
-            String bodyStr = bodyNode.isTextual()
-                    ? bodyNode.asText()
-                    : OBJECT_MAPPER.writeValueAsString(bodyNode);
+            if (bodyNode.isMissingNode() || bodyNode.isNull()) return null;
+            String bodyStr = bodyNode.isTextual() ? bodyNode.asText() : OBJECT_MAPPER.writeValueAsString(bodyNode);
             JsonNode body = OBJECT_MAPPER.readTree(bodyStr);
             return body.path(FIELD_CHOICES).get(0)
                     .path(FIELD_MESSAGE).path(FIELD_CONTENT).asText(null);
@@ -573,10 +650,6 @@ public class VertexAITraceParser implements TraceParser {
         }
     }
 
-    /**
-     * Fallback: scans traces for the last text part from a model-authored event.
-     * Prefers events marked {@code is_final: true}.
-     */
     private String extractFinalLlmTextFromTraces(JsonNode tracesArray) {
         String lastModelText = null;
         String finalModelText = null;
@@ -585,7 +658,7 @@ public class VertexAITraceParser implements TraceParser {
             if (!isModelAuthor(author)) continue;
             boolean isFinal = event.path(FIELD_IS_FINAL).asBoolean(false);
             for (JsonNode part : event.path(FIELD_PARTS)) {
-                if (PART_TEXT.equals(part.path(FIELD_TYPE).asText())) {
+                if (PART_TYPE_TEXT.equals(part.path(FIELD_TYPE).asText())) {
                     String text = part.path(FIELD_CONTENT).asText(null);
                     if (text != null && !text.isEmpty()) {
                         lastModelText = text;
@@ -597,7 +670,6 @@ public class VertexAITraceParser implements TraceParser {
         return finalModelText != null ? finalModelText : lastModelText;
     }
 
-    /** Returns true if the author represents the model (ADK uses "model", OpenAI-style uses "assistant"). */
     private boolean isModelAuthor(String author) {
         return AUTHOR_MODEL.equals(author) || AUTHOR_ASSISTANT.equals(author);
     }
@@ -606,7 +678,7 @@ public class VertexAITraceParser implements TraceParser {
         for (JsonNode event : tracesArray) {
             if (!AUTHOR_USER.equals(event.path(FIELD_AUTHOR).asText())) continue;
             for (JsonNode part : event.path(FIELD_PARTS)) {
-                if (PART_TEXT.equals(part.path(FIELD_TYPE).asText())) {
+                if (PART_TYPE_TEXT.equals(part.path(FIELD_TYPE).asText())) {
                     Map<String, Object> m = new HashMap<>();
                     m.put("content", part.path(FIELD_CONTENT).asText());
                     return m;
@@ -616,19 +688,18 @@ public class VertexAITraceParser implements TraceParser {
         return Collections.emptyMap();
     }
 
-    private Map<String, Object> buildRootOutput(String finalLlmText) {
-        if (finalLlmText == null) return Collections.emptyMap();
-        Map<String, Object> m = new HashMap<>();
-        m.put("content", finalLlmText);
-        return m;
-    }
+    // ------------------------------------------------------------------
+    // Metadata builders
+    // ------------------------------------------------------------------
 
-    private Map<String, Object> buildTraceMetadata(String invocationId, String modelName) {
-        Map<String, Object> m = new HashMap<>();
-        m.put("sourceType", SOURCE_TYPE);
-        m.put("invocationId", invocationId);
-        if (modelName != null) m.put("modelName", modelName);
-        return m;
+    private Map<String, Object> buildTraceMetadata(String invocationId, String reasoningEngineId, String model, int statusCode) {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("sourceType", SOURCE_TYPE);
+        metadata.put("invocationId", invocationId);
+        metadata.put("reasoningEngineId", reasoningEngineId);
+        if (model != null) metadata.put("model", model);
+        metadata.put("statusCode", statusCode);
+        return metadata;
     }
 
     private Map<String, Object> spanMeta(String author, String toolName, String modelName) {
@@ -640,7 +711,16 @@ public class VertexAITraceParser implements TraceParser {
         return m;
     }
 
-    /** Serializes a JsonNode to a compact JSON string, falling back to toString(). */
+    // ------------------------------------------------------------------
+    // Utility
+    // ------------------------------------------------------------------
+
+    private String mapStatusFromHttpCode(int statusCode) {
+        if (statusCode >= 200 && statusCode < 300) return "success";
+        if (statusCode >= 400) return "error";
+        return "unknown";
+    }
+
     private String safeJson(JsonNode node) {
         try {
             return OBJECT_MAPPER.writeValueAsString(node);
@@ -653,5 +733,13 @@ public class VertexAITraceParser implements TraceParser {
         return input instanceof String
                 ? (String) input
                 : OBJECT_MAPPER.writeValueAsString(input);
+    }
+
+    private int getIntFromMetadata(Map<String, Object> metadata, String key) {
+        Object val = metadata.get(key);
+        if (val instanceof Number) {
+            return ((Number) val).intValue();
+        }
+        return 0;
     }
 }
