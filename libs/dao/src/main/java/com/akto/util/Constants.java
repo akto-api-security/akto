@@ -70,6 +70,7 @@ public class Constants {
     public static final String AI_AGENT_SOURCE_DATABRICS = "DATABRICKS";
     public static final String AI_AGENT_SOURCE_VERTEX = "VERTEX_AI";
     public static final String AI_AGENT_SOURCE_SNOWFLAKE = "SNOWFLAKE";
+    public static final String AI_AGENT_SOURCE_ARCADE_DEV = "ARCADE_DEV";
     public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
     public static final String AI_AGENT_TAG_SOURCE = "source";
 
