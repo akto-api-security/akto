@@ -59,6 +59,8 @@ _AKTO_SNAPSHOT_KEY = "__akto_request_snapshot"
 _AKTO_TOOL_TRACES_KEY = "__akto_tool_traces"
 # State key for the final model text response (captured in after_model_callback).
 _AKTO_FINAL_RESPONSE_KEY = "__akto_final_response"
+# State key for accumulating token usage data across model callbacks.
+_AKTO_TOKEN_USAGE_KEY = "__akto_token_usage"
 
 # Shared async HTTP client.
 _client = httpx.AsyncClient(
@@ -136,6 +138,30 @@ def _llm_response_to_dict(llm_response: LlmResponse) -> Optional[dict]:
     return {
         "choices": [{"message": {"role": role, "content": " ".join(text_parts)}}]
     }
+
+
+def _extract_token_usage(llm_response: LlmResponse) -> Optional[dict]:
+    """Extract token usage metadata from an LlmResponse.
+
+    The ADK's LlmResponse may expose usage_metadata directly or via the
+    underlying genai response object.  Returns a dict with prompt_tokens,
+    completion_tokens, total_tokens or None if unavailable.
+    """
+    try:
+        usage = getattr(llm_response, "usage_metadata", None)
+        if usage is None:
+            raw = getattr(llm_response, "_raw_response", None)
+            if raw is not None:
+                usage = getattr(raw, "usage_metadata", None)
+        if usage is None:
+            return None
+        return {
+            "prompt_tokens": getattr(usage, "prompt_token_count", 0) or 0,
+            "completion_tokens": getattr(usage, "candidates_token_count", 0) or 0,
+            "total_tokens": getattr(usage, "total_token_count", 0) or 0,
+        }
+    except Exception:
+        return None
 
 
 def _response_has_function_calls(llm_response: LlmResponse) -> bool:
@@ -309,6 +335,7 @@ def _build_payload(
         response_data["body"] = json.dumps(response_body)
     if traces:
         response_data["traces"] = traces
+    response_data["agent_name"] = agent_name
     response_payload = json.dumps(response_data)
 
     return {
@@ -469,6 +496,7 @@ async def akto_before_model_callback(
     if prev_snapshot.get("invocation_id", "") != current_inv_id:
         callback_context.state[_AKTO_TOOL_TRACES_KEY] = []
         callback_context.state[_AKTO_FINAL_RESPONSE_KEY] = None
+        callback_context.state[_AKTO_TOKEN_USAGE_KEY] = []
 
     # Extract only the latest user message for guardrails validation.
     latest_user_msg = [m for m in messages if m.get("role") == "user"][-1:] or messages[-1:]
@@ -556,10 +584,20 @@ async def akto_after_model_callback(
         if snapshot.get("blocked"):
             return None
 
+        # Capture token usage from every LLM response (both function-call and text).
+        token_data = _extract_token_usage(llm_response)
+        if token_data:
+            accumulated_tokens = callback_context.state.get(_AKTO_TOKEN_USAGE_KEY) or []
+            accumulated_tokens.append(token_data)
+            callback_context.state[_AKTO_TOKEN_USAGE_KEY] = accumulated_tokens
+
+        model_name: str = snapshot.get("model", "")
+
         # Capture function_call parts as a tool_call trace event.
         if _response_has_function_calls(llm_response):
             tool_event = _llm_response_to_tool_call_event(llm_response, callback_context)
             if tool_event:
+                tool_event["model"] = model_name
                 accumulated = callback_context.state.get(_AKTO_TOOL_TRACES_KEY) or []
                 accumulated.append(tool_event)
                 callback_context.state[_AKTO_TOOL_TRACES_KEY] = accumulated
@@ -648,7 +686,24 @@ async def akto_after_agent_callback(
                     "invocation_id": inv_id,
                     "is_final": True,
                     "parts": [{"type": "text", "content": final_text}],
+                    "model": model,
                 })
+
+        # Attach token usage data to model-authored events that have text parts.
+        token_usage_list: list = callback_context.state.get(_AKTO_TOKEN_USAGE_KEY) or []
+        if token_usage_list:
+            model_event_idx = 0
+            for trace_event in traces:
+                if trace_event.get("author") in ("model", "assistant"):
+                    has_text = any(
+                        p.get("type") == "text" for p in trace_event.get("parts", [])
+                    )
+                    if has_text and model_event_idx < len(token_usage_list):
+                        usage = token_usage_list[model_event_idx]
+                        trace_event["prompt_tokens"] = usage.get("prompt_tokens", 0)
+                        trace_event["completion_tokens"] = usage.get("completion_tokens", 0)
+                        trace_event["total_tokens"] = usage.get("total_tokens", 0)
+                        model_event_idx += 1
 
         response_dict = saved_response
 
