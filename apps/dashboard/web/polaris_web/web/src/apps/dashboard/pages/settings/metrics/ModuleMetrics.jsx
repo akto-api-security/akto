@@ -56,7 +56,7 @@ function ModuleMetrics({ config }) {
             })
 
             setInstanceIds(sorted);
-            setSelectedInstanceId(sorted[0]?.value);
+            setSelectedInstanceId(sorted[0]?.label);
         } catch (error) {
             console.error("Error fetching module info:", error)
         }
@@ -188,7 +188,7 @@ function ModuleMetrics({ config }) {
                                     <Dropdown
                                         menuItems={instanceIds}
                                         initial={selectedInstanceId}
-                                        selected={(val) => setSelectedInstanceId(val?.value)}
+                                        selected={(val) => setSelectedInstanceId(val?.label)}
                                     />
                                 )}
                             </HorizontalStack>
