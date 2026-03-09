@@ -1751,7 +1751,7 @@ function ApiEndpoints(props) {
                     redirectUrl={"/dashboard/observe/inventory"}
                     learnText={"inventory"}
                     docsUrl={ENDPOINTS_PAGE_DOCS_URL}
-                />] : showSequencesFlow ? [
+                />, <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />] : showSequencesFlow ? [
                 <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
             ] : showSwaggerDependenciesFlow ? [
                 <SwaggerDependenciesFlow key="swagger-dependencies-flow" apiCollectionId={apiCollectionId}  />
