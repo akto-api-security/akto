@@ -273,13 +273,29 @@ public class ArcadeWebhookAction extends ActionSupport {
         if (ip != null && !ip.isEmpty()) {
             // X-Forwarded-For may contain a comma-separated list; the first is the client IP
             int commaIdx = ip.indexOf(',');
-            return commaIdx >= 0 ? ip.substring(0, commaIdx).trim() : ip.trim();
+            ip = commaIdx >= 0 ? ip.substring(0, commaIdx).trim() : ip.trim();
+            return stripPort(ip);
         }
         ip = request.getHeader("X-Real-IP");
         if (ip != null && !ip.isEmpty()) {
-            return ip.trim();
+            return stripPort(ip.trim());
         }
-        return request.getRemoteAddr();
+        return stripPort(request.getRemoteAddr());
+    }
+
+    private String stripPort(String ip) {
+        if (ip == null) return null;
+        // IPv6 addresses are wrapped in brackets: [::1]:8080
+        if (ip.startsWith("[")) {
+            int bracketEnd = ip.indexOf(']');
+            return bracketEnd >= 0 ? ip.substring(1, bracketEnd) : ip;
+        }
+        // IPv4 with port: 1.2.3.4:8080
+        int lastColon = ip.lastIndexOf(':');
+        if (lastColon >= 0 && ip.indexOf(':') == lastColon) {
+            return ip.substring(0, lastColon);
+        }
+        return ip;
     }
 
     private String detectHookTypeFromPath(String requestURI) {
