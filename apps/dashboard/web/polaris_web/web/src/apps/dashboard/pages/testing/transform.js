@@ -378,6 +378,7 @@ const transform = {
     obj['cweDisplay'] = minimizeTagList(obj['cwe'])
     obj['cve'] = subCategoryMap[data.testSubType]?.cve ? subCategoryMap[data.testSubType]?.cve : []
     obj['cveDisplay'] = minimizeTagList(obj['cve'])
+    obj['superCategoryName'] = subCategoryMap[data.testSubType]?.superCategory?.name || data.testSuperType || ""
     obj['errorsList'] = data.errorsList || []
     obj['testCategoryId'] = data.testSubType
     obj['conversationId'] = data?.conversationId
@@ -536,6 +537,19 @@ const transform = {
             <HorizontalStack gap="2">
               {
                 transform.tagList(category?.cve, "CVE")
+              }
+            </HorizontalStack>
+          )
+          break;
+        case "ASI Category":
+          let asiCategories = func.getASICategoriesForAgenticCategory(category?.superCategory?.name)
+          if (asiCategories == null || asiCategories == undefined || asiCategories.length == 0) {
+            return;
+          }
+          sectionLocal.content = (
+            <HorizontalStack gap="2">
+              {
+                transform.tagList(asiCategories, "ASI")
               }
             </HorizontalStack>
           )
@@ -829,6 +843,12 @@ const transform = {
         title: "References",
         content: "",
         tooltipContent: "References for the above test"
+      },
+      {
+        icon: FraudProtectMajor,
+        title: "ASI Category",
+        content: "",
+        tooltipContent: "OWASP Agentic Security Top 10 (ASI) categories applicable to this test"
       },
       {
         icon: ResourcesMajor,

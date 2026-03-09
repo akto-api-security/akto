@@ -1,4 +1,5 @@
 import { VerticalStack, Text, Checkbox, Box, RangeSlider } from "@shopify/polaris";
+import OwaspTag from "../OwaspTag";
 
 export const UsageGuardrailsConfig = {
     number: 7,
@@ -28,6 +29,9 @@ const UsageGuardrailsStep = ({
             <Text variant="bodyMd" tone="subdued">
                 Configure usage-based guardrails to control token limits and prevent abuse.
             </Text>
+            <OwaspTag threats={[
+                { id: "ASI08", name: "Cascading Failures" }
+            ]} />
 
             <VerticalStack gap="4">
                 <Box>

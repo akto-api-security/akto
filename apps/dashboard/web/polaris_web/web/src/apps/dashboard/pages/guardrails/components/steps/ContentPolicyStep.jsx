@@ -12,6 +12,7 @@ import {
     FormLayout
 } from "@shopify/polaris";
 import { PlusMinor, EditMinor, DeleteMinor } from "@shopify/polaris-icons";
+import OwaspTag from "../OwaspTag";
 
 export const ContentPolicyConfig = {
     number: 2,
@@ -249,6 +250,10 @@ const ContentPolicyStep = ({
             <Text variant="bodyMd" tone="subdued">
                 Configure content filtering and policy guardrails to protect against harmful content and policy violations.
             </Text>
+            <OwaspTag threats={[
+                { id: "ASI01", name: "Agent Goal Hijack" },
+                { id: "ASI09", name: "Human-Agent Trust Exploitation" }
+            ]} />
 
             <VerticalStack gap="4">
                 {/* Prompt Injection Attacks */}

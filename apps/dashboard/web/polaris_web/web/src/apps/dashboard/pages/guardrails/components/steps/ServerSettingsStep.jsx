@@ -1,5 +1,6 @@
 import { VerticalStack, Text, FormLayout, Box, Checkbox } from "@shopify/polaris";
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
+import OwaspTag from "../OwaspTag";
 
 export const ServerSettingsConfig = {
     number: 9,
@@ -58,6 +59,10 @@ const ServerSettingsStep = ({
             <Text variant="bodyMd" tone="subdued">
                 Configure which servers the guardrail should be applied to and specify whether it applies to requests, responses, or both.
             </Text>
+            <OwaspTag threats={[
+                { id: "ASI04", name: "Agentic Supply Chain Vulnerabilities" },
+                { id: "ASI07", name: "Insecure Inter-Agent Communication" }
+            ]} />
 
             <FormLayout>
                 <DropdownSearch
