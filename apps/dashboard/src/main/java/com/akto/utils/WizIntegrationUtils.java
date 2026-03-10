@@ -237,7 +237,7 @@ public class WizIntegrationUtils {
         String uploadUrl = upload.getString("url");
         String systemActivityId = upload.getString("systemActivityId");
 
-        loggerMaker.infoAndAddToDb(String.format("Successfully retrieved S3 upload URL. Upload ID: %s", uploadId));
+        loggerMaker.infoAndAddToDb(String.format("Successfully retrieved S3 upload URL. Upload ID: %s. System Activity ID: %s", uploadId, systemActivityId));
 
         Map<String, String> uploadResponse = new HashMap<>();
         uploadResponse.put("id", uploadId);
@@ -332,7 +332,7 @@ public class WizIntegrationUtils {
                 String severity = testingRunIssues.getSeverity() != null ? testingRunIssues.getSeverity().toString() : "None";
                 severity = severity.substring(0, 1).toUpperCase() + severity.substring(1).toLowerCase();
 
-                assetAttackSurfaceFinding.put("severity", testingRunIssues.getSeverity().toString()); 
+                assetAttackSurfaceFinding.put("severity", severity); 
                 assetAttackSurfaceFinding.put("vulnerabilities", testInfo.getCve());
                 assetAttackSurfaceFinding.put("weaknesses", testInfo.getCwe());
 
@@ -504,7 +504,8 @@ public class WizIntegrationUtils {
         dataSource.put("assets", assetList);
 
         BasicDBObject enrichmentJSONObj = new BasicDBObject();
-        enrichmentJSONObj.put("integrationId", "placeholder-integration-id");
+        // integration id for all wiz customers as specified by wiz in the docs.
+        enrichmentJSONObj.put("integrationId", "55c176cc-d155-43a2-98ed-aa56873a1ca1");
         enrichmentJSONObj.put("dataSources", Collections.singletonList(dataSource));
 
         String enrichmentJSON = enrichmentJSONObj.toJson();

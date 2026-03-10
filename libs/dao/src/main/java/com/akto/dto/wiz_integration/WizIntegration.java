@@ -31,7 +31,7 @@ public class WizIntegration {
     private String clientSecret;
 
     // Tenant configuration
-    public  static final String ENVIRONMENT = "wiz.io"; // Fixed environment
+    public  static final String ENVIRONMENT = "app.wiz.io"; // Fixed environment
     private String tenantDataCenter;  // e.g., "us1", "us2", "eu1", "eu2"
 
     // Token management for caching
