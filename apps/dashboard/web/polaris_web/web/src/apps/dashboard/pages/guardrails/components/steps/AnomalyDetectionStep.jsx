@@ -31,10 +31,7 @@ const AnomalyDetectionStep = () => {
             <Text variant="bodyMd" tone="subdued">
                 Configure anomaly detection rules to identify unusual patterns in agent behavior, tool usage, and system metrics.
             </Text>
-            <OwaspTag threats={[
-                { id: "ASI08", name: "Cascading Failures" },
-                { id: "ASI10", name: "Rogue Agents" }
-            ]} />
+            <OwaspTag stepNumber={8} />
 
             <Banner title="Coming Soon" status="info">
                 <Text variant="bodyMd">

@@ -67,9 +67,7 @@ const CustomGuardrailsStep = ({
             <Text variant="bodyMd" tone="subdued">
                 Create custom guardrails using LLM prompts or external model endpoints.
             </Text>
-            <OwaspTag threats={[
-                { id: "ASI02", name: "Tool Misuse and Exploitation" }
-            ]} />
+            <OwaspTag stepNumber={6} />
 
             <VerticalStack gap="4">
                 {/* LLM Prompt Based Rule */}
