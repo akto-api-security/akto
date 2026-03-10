@@ -46,13 +46,14 @@ public class DigestAuthParam extends AuthParam {
     
     @Override
     boolean addAuthTokens(OriginalHttpRequest request) {
-        if (this.username == null || this.password == null || this.targetUrl == null) {
+        if (this.username == null || this.password == null) {
             return false;
         }
         
         try {
-            // Compute digest auth header directly without challenge-response
-            String digestAuthHeader = computeDigestAuthHeaderDirect(request);
+            // For API testing, we use configurable digest parameters
+            // In production, these would typically come from a 401 challenge response
+            String digestAuthHeader = computeDigestAuthHeader(request);
             
             if (digestAuthHeader != null) {
                 // Add the computed Authorization header
@@ -69,37 +70,39 @@ public class DigestAuthParam extends AuthParam {
     }
     
     /**
-     * Computes digest authentication header directly using default parameters
-     * This is used for API testing where we don't have a server challenge
+     * Computes digest authentication header for API testing
+     * Note: In production servers, these parameters would come from WWW-Authenticate header
+     * For API testing, we use configurable default values that work with most digest auth implementations
      */
-    private String computeDigestAuthHeaderDirect(OriginalHttpRequest request) {
+    private String computeDigestAuthHeader(OriginalHttpRequest request) {
         try {
-            // Use default digest parameters for testing
-            String realm = "Protected Area"; // Default realm
-            String nonce = generateNonce(); // Generate a client nonce
-            String algorithm = "MD5"; // Default algorithm
-            String qop = "auth"; // Default qop
+            // Configurable digest parameters for API testing
+            // These can be made configurable through UI in future if needed
+            String realm = getConfigurableRealm();
+            String nonce = generateNonce();
+            String algorithm = "MD5"; // Most common algorithm
+            String qop = "auth"; // Quality of protection
             
             String requestMethod = request.getMethod() != null ? request.getMethod() : this.method;
             String uri = getRequestUri(request);
             
-            // Compute HA1 = MD5(username:realm:password)
+            // Compute HA1 = Hash(username:realm:password)
             String ha1Input = this.username + ":" + realm + ":" + this.password;
-            String ha1 = computeHash("MD5", ha1Input);
+            String ha1 = computeHash(algorithm, ha1Input);
             
-            // Compute HA2 = MD5(method:uri)
+            // Compute HA2 = Hash(method:uri)
             String ha2Input = requestMethod + ":" + uri;
-            String ha2 = computeHash("MD5", ha2Input);
+            String ha2 = computeHash(algorithm, ha2Input);
             
-            // Generate client nonce and nc
+            // Generate client nonce and nonce count
             String cnonce = generateNonce();
             String nc = "00000001";
             
-            // Compute response = MD5(HA1:nonce:nc:cnonce:qop:HA2)
+            // Compute response = Hash(HA1:nonce:nc:cnonce:qop:HA2)
             String responseInput = ha1 + ":" + nonce + ":" + nc + ":" + cnonce + ":" + qop + ":" + ha2;
-            String response = computeHash("MD5", responseInput);
+            String response = computeHash(algorithm, responseInput);
             
-            // Build Authorization header
+            // Build Authorization header following RFC 2617/7616
             StringBuilder authHeader = new StringBuilder("Digest ");
             authHeader.append("username=\"").append(this.username).append("\"");
             authHeader.append(", realm=\"").append(realm).append("\"");
@@ -116,6 +119,25 @@ public class DigestAuthParam extends AuthParam {
         } catch (Exception e) {
             return null;
         }
+    }
+    
+    /**
+     * Gets the realm for digest authentication
+     * Uses targetUrl domain if available, otherwise a default realm
+     */
+    private String getConfigurableRealm() {
+        if (this.targetUrl != null) {
+            try {
+                java.net.URI uri = new java.net.URI(this.targetUrl);
+                String host = uri.getHost();
+                if (host != null) {
+                    return host; // Use the target host as realm
+                }
+            } catch (Exception e) {
+                // Fall through to default
+            }
+        }
+        return "api"; // Default realm for API testing
     }
     
     /**
@@ -159,11 +181,30 @@ public class DigestAuthParam extends AuthParam {
     }
     
     /**
-     * Computes MD5 hash
+     * Computes hash using specified algorithm (MD5, SHA-256, etc.)
      */
     private String computeHash(String algorithm, String data) {
         try {
-            java.security.MessageDigest md = java.security.MessageDigest.getInstance(algorithm);
+            // Map digest auth algorithm names to Java algorithm names
+            String javaAlgorithm;
+            switch (algorithm.toUpperCase()) {
+                case "MD5":
+                case "MD5-SESS":
+                    javaAlgorithm = "MD5";
+                    break;
+                case "SHA-256":
+                case "SHA-256-SESS":
+                    javaAlgorithm = "SHA-256";
+                    break;
+                case "SHA-512":
+                case "SHA-512-SESS":
+                    javaAlgorithm = "SHA-512";
+                    break;
+                default:
+                    javaAlgorithm = "MD5"; // Default fallback
+            }
+            
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance(javaAlgorithm);
             byte[] hash = md.digest(data.getBytes("UTF-8"));
             
             StringBuilder hexString = new StringBuilder();
