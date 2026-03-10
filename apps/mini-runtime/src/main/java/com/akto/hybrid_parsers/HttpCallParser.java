@@ -25,6 +25,7 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.gen_ai.GenAiCollectionUtils;
+import com.akto.tracing.copilot.CopilotTraceParser;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
@@ -522,6 +523,33 @@ public class HttpCallParser {
         }
     }
 
+    private boolean isCopilotTraffic(HttpResponseParams httpResponseParam) {
+        try {
+
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) {
+                return false;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return false;
+            }
+
+            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            if(source != null && Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(source)){
+                return true;
+            }
+
+            String path = httpResponseParam.getRequestParams().getURL();
+            return path != null && path.toLowerCase().contains("copilot");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking if traffic is Copilot Studio: " + e.getMessage());
+            return false;
+        }
+    }
+
     /**
      * Parses N8N trace metadata from responsePayload and stores trace/span data.
      * The responsePayload structure is: {"output": {...}, "n8nTraceMetadata": {...}}
@@ -601,6 +629,75 @@ public class HttpCallParser {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing N8N trace: " + e.getMessage());
+        }
+    }
+
+    private void parseCopilotTrace(HttpResponseParams httpResponseParam) {
+        try {
+            // Response body (ingest responsePayload). Request body is via getRequestParams().getPayload().
+            String responsePayload = httpResponseParam.getPayload();
+            String path = httpResponseParam.getRequestParams() != null ? httpResponseParam.getRequestParams().getURL() : null;
+
+            String toolName = CopilotTraceParser.extractToolNameFromRequest(httpResponseParam);
+            boolean responseHasTraceMetadata = responsePayload != null && responsePayload.contains("copilotTraceMetadata");
+
+            String copilotTraceJson = null;
+            if (responseHasTraceMetadata) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> payloadMap = gson.fromJson(responsePayload, Map.class);
+                if (payloadMap != null && payloadMap.containsKey("copilotTraceMetadata")) {
+                    Object copilotTraceMetadata = payloadMap.get("copilotTraceMetadata");
+                    if (copilotTraceMetadata != null) {
+                        copilotTraceJson = gson.toJson(copilotTraceMetadata);
+                    } else {
+                        loggerMaker.info("parseCopilotTrace: copilotTraceMetadata key present but value null", LogDb.RUNTIME);
+                    }
+                } else {
+                    loggerMaker.info("parseCopilotTrace: response contains copilotTraceMetadata string but parse failed or key missing", LogDb.RUNTIME);
+                }
+            } else {
+                loggerMaker.info("parseCopilotTrace: no trace metadata in response, will update service graph only", LogDb.RUNTIME);
+            }
+
+            String workflowId = "copilot";
+            if (copilotTraceJson != null) {
+                boolean canParse = CopilotTraceParser.getInstance().canParse(copilotTraceJson);
+                if (!canParse) {
+                    copilotTraceJson = null;
+                } else {
+                    TraceParseResult result = CopilotTraceParser.getInstance().parse(copilotTraceJson);
+                    if (result.getWorkflowId() != null && !result.getWorkflowId().isEmpty()) {
+                        workflowId = result.getWorkflowId();
+                    }
+                    dataActor.storeTrace(result.getTrace());
+                    int spanCount = result.getSpans() != null ? result.getSpans().size() : 0;
+                    if (spanCount > 0) {
+                        dataActor.storeSpans(result.getSpans());
+                    } else {
+                        loggerMaker.info("parseCopilotTrace: stored trace, no spans", LogDb.RUNTIME);
+                    }
+                }
+            }
+
+            // Always update service graph for Copilot traffic (tool call, chat, or trace): User -> VSCode -> Guardrail -> LLM/Tool
+            String hostname = getHostnameForCollection(httpResponseParam);
+            int apiCollectionId = ServiceGraphBuilder.getInstance().getApiCollectionIdFromWorkflowId(workflowId, hostname);
+            if (apiCollectionId != -1) {
+                java.util.Map<String, Object> copilotInput = new HashMap<>();
+                copilotInput.put(CopilotTraceParser.INPUT_KEY_TRACE, copilotTraceJson != null ? copilotTraceJson : "{}");
+                copilotInput.put(CopilotTraceParser.INPUT_KEY_TOOL_NAME, toolName);
+                java.util.Map<String, ServiceGraphEdgeInfo> edges = CopilotTraceParser.getInstance().extractServiceGraph(copilotInput);
+                if (edges != null && !edges.isEmpty()) {
+                    ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+                    loggerMaker.info("parseCopilotTrace: updated service graph, collection=" + apiCollectionId + ", edges=" + edges.size(), LogDb.RUNTIME);
+                } else {
+                    loggerMaker.info("parseCopilotTrace: extractServiceGraph returned null or empty edges, skip update", LogDb.RUNTIME);
+                }
+            } else {
+                loggerMaker.info("parseCopilotTrace: no apiCollectionId for workflowId=" + workflowId + " hostname=" + hostname + ", skip service graph", LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "parseCopilotTrace: error " + e.getMessage());
         }
     }
 
@@ -1243,6 +1340,10 @@ public class HttpCallParser {
             // Parse N8N trace metadata if this is N8N traffic
             if (isN8nTraffic(httpResponseParam)) {
                 parseN8nTrace(httpResponseParam);
+            }
+
+            if(isCopilotTraffic(httpResponseParam)){
+                parseCopilotTrace(httpResponseParam);
             }
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
