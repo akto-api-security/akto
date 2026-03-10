@@ -198,6 +198,7 @@ const transform = {
     let ret = list?.map((tag, index) => {
 
       let linkUrl = ""
+      let badgeContent = tag
       switch (linkType) {
         case "CWE":
           linkUrl = getCweLink(tag)
@@ -205,13 +206,17 @@ const transform = {
         case "CVE":
           linkUrl = getCveLink(tag)
           break;
+        case "ASI":
+          linkUrl = typeof tag === "object" && tag?.url ? tag.url : ""
+          badgeContent = typeof tag === "object" && tag?.label != null ? tag.label : (typeof tag === "string" ? tag : "")
+          break;
         default:
           break;
       }
 
       return (
         <Link key={index} url={linkUrl} target="_blank">
-          <Badge progress="complete" key={index}>{tag}</Badge>
+          <Badge progress="complete" key={index}>{badgeContent}</Badge>
         </Link>
       )
     })
