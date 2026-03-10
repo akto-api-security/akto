@@ -50,8 +50,8 @@ function ModuleMetrics({ config }) {
                 return bTime - aTime
             }).map(module => {
                 return {
-                    label: module.name,
-                    value: module.name,
+                    label: module?.name || module?.id,
+                    value: module?.name || module?.id,
                 }
             })
 
