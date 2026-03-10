@@ -243,24 +243,27 @@ public class VertexAITraceParser implements TraceParser {
             if (!root.has(FIELD_TRACES)) return edges;
 
             JsonNode tracesArray = root.get(FIELD_TRACES);
+            JsonNode metadata = root.path(FIELD_METADATA);
+            String agentName = metadata.path(META_AGENT_NAME).asText("AI Agent");
+            String model = metadata.path(META_MODEL).asText("LLM");
 
-            // user → agent edge
+            // User → Agent edge
             {
                 Map<String, Object> meta = new HashMap<>();
-                meta.put("type", TracingConstants.SpanKind.AGENT);
+                meta.put("type", TracingConstants.SpanKind.USER);
                 meta.put("edgeParam", TracingConstants.EdgeParamType.USER_INPUT);
-                edges.put("user->agent", new ServiceGraphEdgeInfo("user", "agent", meta));
+                edges.put("User", new ServiceGraphEdgeInfo("User", agentName, meta));
             }
 
-            // agent → llm edge
+            // Agent → Model edge
             {
                 Map<String, Object> meta = new HashMap<>();
                 meta.put("type", TracingConstants.SpanKind.LLM);
                 meta.put("edgeParam", TracingConstants.EdgeParamType.LLM_PROMPT);
-                edges.put("agent->llm", new ServiceGraphEdgeInfo("agent", "llm", meta));
+                edges.put(model, new ServiceGraphEdgeInfo(agentName, model, meta));
             }
 
-            // llm → tool edges (one per unique tool name, with call count)
+            // Agent → Tool edges (one per unique tool name, with call count)
             Map<String, Integer> toolCallCount = new LinkedHashMap<>();
             for (JsonNode event : tracesArray) {
                 if (!isModelAuthor(event.path(FIELD_AUTHOR).asText())) continue;
@@ -278,7 +281,7 @@ public class VertexAITraceParser implements TraceParser {
                 meta.put("type", TracingConstants.SpanKind.TOOL);
                 meta.put("callCount", entry.getValue());
                 meta.put("edgeParam", TracingConstants.EdgeParamType.TOOL_INPUT);
-                edges.put("llm->" + toolName, new ServiceGraphEdgeInfo("llm", toolName, meta));
+                edges.put(toolName, new ServiceGraphEdgeInfo(agentName, toolName, meta));
             }
 
             return edges;
