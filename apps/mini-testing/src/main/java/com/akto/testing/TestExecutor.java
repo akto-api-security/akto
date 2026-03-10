@@ -1126,6 +1126,21 @@ public class TestExecutor {
 
         VariableResolver.resolveWordList(varMap, sampleMessageStore.getSampleDataMap(), apiInfoKey);
 
+        // Add SSRF tracking values to varMap
+        if(testRunId != null) {
+            varMap.put("testRunId", testRunId.toHexString());
+        }
+        if(testRunResultSummaryId != null) {
+            varMap.put("testRunResultSummaryId", testRunResultSummaryId.toHexString());
+        }
+        varMap.put("accountId", Context.accountId.get());
+        if(apiInfoKey != null) {
+            varMap.put("apiInfoKey", apiInfoKey.toString());
+        }
+        if(testSubType != null) {
+            varMap.put("testSubType", testSubType);
+        }
+
         String testExecutionLogId = UUID.randomUUID().toString();
         
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 

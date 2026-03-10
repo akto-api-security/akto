@@ -1413,6 +1413,10 @@ public class DbLayer {
         SpanDao.instance.insertMany(spans);
     }
 
+    public static void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
+        TestingRunWebhookDao.instance.insertOne(testingRunWebhook);
+    }
+
     public static boolean updateServiceGraphEdges(int apiCollectionId, Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges) {
         try {
             org.bson.conversions.Bson filter = com.mongodb.client.model.Filters.eq(ApiCollection.ID, apiCollectionId);

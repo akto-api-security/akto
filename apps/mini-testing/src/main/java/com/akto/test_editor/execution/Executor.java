@@ -16,9 +16,11 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
+import com.akto.dto.TestingRunWebhook;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.AuthParam.Location;
 import com.akto.testing.*;
+import com.akto.testing.ApiExecutor;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.test_editor.*;
@@ -695,6 +697,7 @@ public class Executor {
     }
 
     private static ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
+    private static final int ROLE_FETCH_THROTTLE_SECS = 1 * 60; // 1 minute
 
     public static TestRoles fetchOrFindAttackerRole() {
         return fetchOrFindTestRole("ATTACKER_TOKEN_ALL", false);
@@ -704,19 +707,24 @@ public class Executor {
         if (roleCache == null) {
             roleCache = new ConcurrentHashMap<>();
         }
-        if (roleCache.containsKey(name)) {
+        TestRoles cached = roleCache.get(name);
+        if (cached != null) {
+            int now = Context.now();
+            if (cached.getLastFetched() > 0 && (now - cached.getLastFetched()) < ROLE_FETCH_THROTTLE_SECS) {
+                return roleCache.get(name);
+            }
+        }
+        TestRoles fresh = isId ? dataActor.fetchTestRolesforId(name) : dataActor.fetchTestRole(name);
+        if (fresh == null) {
             return roleCache.get(name);
         }
-
-        if(!isId){
-            TestRoles testRole = dataActor.fetchTestRole(name);
-            roleCache.put(name, testRole);
-            return roleCache.get(name);
-        }else{
-            TestRoles testRole = dataActor.fetchTestRolesforId(name);
-            roleCache.put(name, testRole);
+        if (cached != null && fresh.getLastUpdatedTs() <= cached.getLastUpdatedTs()) {
+            cached.setLastFetched(Context.now());
             return roleCache.get(name);
         }
+        fresh.setLastFetched(Context.now());
+        roleCache.put(name, fresh);
+        return roleCache.get(name);
     }
 
     public static void clearRoleCache() {
@@ -753,6 +761,33 @@ public class Executor {
                 String generatedUUID =  UUID.randomUUID().toString();
                 uuidList.add(generatedUUID);
                 varMap.put("random_uuid", uuidList);
+
+                // Store UUID mapping in common database for SSRF hit tracking
+                try {
+                    String testRunIdStr = (String) varMap.get("testRunId");
+                    String testRunResultSummaryIdStr = (String) varMap.get("testRunResultSummaryId");
+                    Integer accountId = (Integer) varMap.get("accountId");
+                    String apiInfoKeyStr = (String) varMap.get("apiInfoKey");
+                    String testSubTypeStr = (String) varMap.get("testSubType");
+                    
+                    if (testRunIdStr != null && testRunResultSummaryIdStr != null && accountId != null && 
+                        apiInfoKeyStr != null && testSubTypeStr != null) {
+                        // Create SsrfTestTracking object
+                        TestingRunWebhook testingRunWebhook = new TestingRunWebhook(
+                            generatedUUID,
+                            accountId,
+                            new org.bson.types.ObjectId(testRunIdStr),
+                            new org.bson.types.ObjectId(testRunResultSummaryIdStr),
+                            apiInfoKeyStr,
+                            testSubTypeStr,
+                            Context.now()
+                        );
+                        // Use DataActor which handles both mini-testing (HTTP) and regular testing (DAO) modes
+                        dataActor.storeTestingRunWebhook(testingRunWebhook);
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error storing SSRF UUID mapping: " + e.getMessage(), LogDb.TESTING);
+                }
 
                 BasicDBObject response = OrgUtils.getBillingTokenForAuth();
                 if(response.getString("token") != null){
