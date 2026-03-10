@@ -2,7 +2,6 @@ import { Page, LegacyCard, Text, HorizontalStack, VerticalStack } from "@shopify
 import { useEffect, useReducer, useState } from "react"
 import { produce } from "immer"
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter"
-import Dropdown from "../../../components/layouts/Dropdown"
 import settingFunctions from "../module"
 import settingRequests from "../api"
 import values from '@/util/values'
@@ -10,6 +9,7 @@ import func from "@/util/func"
 import { useChartOptions } from './hooks/useChartOptions'
 import SystemInfoBox from './components/SystemInfoBox'
 import MetricChart from './components/MetricChart'
+import DropdownSearch from "../../../components/shared/DropdownSearch"
 
 /**
  * Base component for displaying module metrics
@@ -51,27 +51,29 @@ function ModuleMetrics({ config }) {
             }).map(module => {
                 return {
                     label: module.name,
-                    value: module.lastHeartbeatReceived || module.startedTs,
+                    value: module.name,
                 }
             })
 
             setInstanceIds(sorted);
-            setSelectedInstanceId(sorted[0]?.label);
+            setSelectedInstanceId(sorted[0]?.value);
+
+            await fetchAndProcessMetrics(sorted[0]?.value);
         } catch (error) {
             console.error("Error fetching module info:", error)
         }
     }
 
-    const fetchAndProcessMetrics = async() => {
+    const fetchAndProcessMetrics = async(instanceId) => {
         try {
             let data
             if (config.fetchStrategy === 'prefix') {
                 data = await settingFunctions.fetchAllMetricsData(
-                    startTime, endTime, config.metricPrefix, selectedInstanceId
+                    startTime, endTime, config.metricPrefix, instanceId
                 )
             } else if (config.fetchStrategy === 'moduleType') {
                 data = await settingFunctions.fetchMetricsDataByModule(
-                    startTime, endTime, config.moduleType, selectedInstanceId
+                    startTime, endTime, config.moduleType, instanceId
                 )
             }
 
@@ -154,11 +156,10 @@ function ModuleMetrics({ config }) {
         const fetchData = async () => {
             setInstanceIds([])
             await fetchModuleInfo()
-            await fetchAndProcessMetrics()
         }
 
         fetchData()
-    }, [currDateRange, selectedInstanceId])
+    }, [currDateRange])
 
     return (
         <Page
@@ -185,10 +186,13 @@ function ModuleMetrics({ config }) {
                                     })}
                                 />
                                 {instanceIds.length > 1 && (
-                                    <Dropdown
-                                        menuItems={instanceIds}
-                                        initial={selectedInstanceId}
-                                        selected={(val) => setSelectedInstanceId(val?.label)}
+                                    <DropdownSearch
+                                        placeholder="Select module"
+                                        optionsList={instanceIds}
+                                        setSelected={async(val) => {setSelectedInstanceId(val); await fetchAndProcessMetrics(val)}}
+                                        preSelected={[selectedInstanceId]}
+                                        value={selectedInstanceId}
+                                        sliceMaxVal={10}
                                     />
                                 )}
                             </HorizontalStack>
