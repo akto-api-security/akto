@@ -1,4 +1,5 @@
 import React, { useEffect, useReducer, useState, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
 import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Text, VerticalStack, Badge } from '@shopify/polaris';
 import SummaryCard from '../dashboard/new_components/SummaryCard';
@@ -47,7 +48,29 @@ function ThreatDashboardPage() {
     const [topAttackedApis, setTopAttackedApis] = useState([])
 
 
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
+    const [searchParams] = useSearchParams();
+    const getInitialDateRange = () => {
+        const rangeAlias = searchParams.get('range');
+        if (rangeAlias) {
+            const preset = values.ranges.find((r) => r.alias === rangeAlias);
+            if (preset) return preset;
+        }
+        const sinceParam = searchParams.get('since');
+        const untilParam = searchParams.get('until');
+        if (sinceParam != null && untilParam != null) {
+            const sinceTs = parseInt(sinceParam, 10);
+            const untilTs = parseInt(untilParam, 10);
+            if (!Number.isNaN(sinceTs) && !Number.isNaN(untilTs)) {
+                const sinceDate = new Date(sinceTs * 1000);
+                const untilDate = new Date(untilTs * 1000);
+                const title = sinceDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) + " - " + untilDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                return { alias: "custom", title, period: { since: sinceDate, until: untilDate } };
+            }
+        }
+        return values.ranges[2];
+    };
+    const initialDateRange = getInitialDateRange();
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialDateRange);
 
 
     const getTimeEpoch = (key) => {

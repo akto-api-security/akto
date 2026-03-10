@@ -1,4 +1,4 @@
-import { Button, HorizontalStack, Text, Box, Icon, TextField, Checkbox } from "@shopify/polaris"
+import { Button, HorizontalStack, Text, Box, Icon, TextField, Checkbox, Tabs } from "@shopify/polaris"
 import { EditMinor,SearchMinor } from '@shopify/polaris-icons';
 import { useEffect, useMemo, useState } from "react";
 import TestSuiteRow from "./TestSuiteRow";
@@ -15,23 +15,29 @@ function FlyLayoutSuite(props) {
     const [testSearchValue, setTestSearchValue] = useState("");
     const [categories, setCategories] = useState([]);
     const [filteredCategories, setFilteredCategories] = useState([]);
+    const [inactiveCategories, setInactiveCategories] = useState([]);
+    const [filteredInactiveCategories, setFilteredInactiveCategories] = useState([]);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [activeViewTab, setActiveViewTab] = useState(0);
 
     const handleExit = () => {
         setShow(false);
         setTestSearchValue("");
         setIsEditMode(false);
+        setActiveViewTab(0);
         if(createNewMode===true) setCreateNewMode(false);
     }
 
-    const getFlyLayoutListRows = async () => {
-        const subCategoryMap = await transform.getSubCategoryMap(LocalStore);
-        const testSuiteSubCategoryMap = Object.values(subCategoryMap).map(tests => ({
+    const buildCategoryList = (subCategoryMap) =>
+        Object.values(subCategoryMap).map(tests => ({
             tests,
             displayName: tests[0]?.categoryName || "",
-            selected: false
+            selected: false,
         }));
-        return testSuiteSubCategoryMap;
+
+    const getFlyLayoutListRows = async () => {
+        const { activeSubCategoryMap } = await transform.getSubCategoryMap(LocalStore);
+        return buildCategoryList(activeSubCategoryMap);
     }
 
 
@@ -76,33 +82,26 @@ function FlyLayoutSuite(props) {
     }
 
 
+    const filterToTestSuite = (categoryList, selectedTestSuiteTestsSet) =>
+        categoryList.map(subCat => {
+            const filteredTests = subCat.tests.filter(test => selectedTestSuiteTestsSet.has(test.value));
+            if (filteredTests.length === 0) return null;
+            return { ...subCat, tests: filteredTests };
+        }).filter(Boolean);
+
     const updateTestSuite = async () => {
+        const { activeSubCategoryMap, inactiveSubCategoryMap } = await transform.getSubCategoryMap(LocalStore);
+
         if (!selectedTestSuite?.tests) {
             setCategories([]);
+            setInactiveCategories(buildCategoryList(inactiveSubCategoryMap));
             setTestSuiteName("");
             return;
         }
-        
+
         const selectedTestSuiteTestsSet = new Set(selectedTestSuite.tests);
-
-        // Updates the test suite categories and name state based on the selected test suite.  
-        // This state is used to render rows in the flyout when not in edit mode.
-        let testSuiteSubCategoryMap = await getFlyLayoutListRows();
-
-        testSuiteSubCategoryMap = testSuiteSubCategoryMap.map((subCat) => {
-            const filteredTests = subCat?.tests.filter(test => selectedTestSuiteTestsSet.has(test.value));
-            if (filteredTests.length === 0) return null;
-            return {
-                ...subCat,
-                tests: filteredTests,
-            };
-        }).filter(Boolean);
-        // if (testSuiteSubCategoryMap.length > 0) {
-        //     testSuiteSubCategoryMap[0].selected = testSuiteSubCategoryMap[0].tests.length > 0;
-        // }
-        
-
-        setCategories(testSuiteSubCategoryMap);
+        setCategories(filterToTestSuite(buildCategoryList(activeSubCategoryMap), selectedTestSuiteTestsSet));
+        setInactiveCategories(buildCategoryList(inactiveSubCategoryMap));
         setTestSuiteName(selectedTestSuite.testSuiteName || "");
     };
 
@@ -119,53 +118,49 @@ function FlyLayoutSuite(props) {
     }, [createNewMode]);
 
 
-    const filteredList = (value) =>{
-        // Expands the row when a search is performed  
-        // and updates setCategories, which in turn updates filteredCategories as a side effect.
-
-        if (value.length > 0) {
-            setCategories((prev) => {
-                const updatedCategories = [...prev];
-                updatedCategories.forEach(category => {
-                    if (category.tests.some((test) => test.label.toLowerCase().includes(value.toLowerCase()))) {
+    const expandMatchingCategories = (setter, value) => {
+        setter(prev => {
+            const updated = [...prev];
+            updated.forEach(category => {
+                if (value.length > 0) {
+                    if (category.tests.some(test => test.label.toLowerCase().includes(value.toLowerCase()))) {
                         category.selected = true;
                     }
-                }
-                );
-                return updatedCategories;
-            });
-        }
-        else {
-            setCategories((prev) => {
-                const updatedCategories = [...prev];
-                updatedCategories.forEach(category => {
+                } else {
                     category.selected = false;
                 }
-                );
-                return updatedCategories;
             });
-        }
+            return updated;
+        });
+    };
+
+    const filteredList = (value) => {
+        expandMatchingCategories(setCategories, value);
+        expandMatchingCategories(setInactiveCategories, value);
     }
 
-    // filter the categories based on the search value
-    useEffect(() => {
-        let deepCopy = [];
-        if (categories && Array.isArray(categories)) {
-            deepCopy = JSON.parse(JSON.stringify(categories));
-        }
-        let updatedCategories = [...deepCopy];
-        updatedCategories = updatedCategories.filter(category => {
+    const applySearchFilter = (source, searchValue) => {
+        const deepCopy = source && Array.isArray(source) ? JSON.parse(JSON.stringify(source)) : [];
+        return deepCopy.filter(category => {
             const tests = category.tests.filter(test =>
-                test.label.toLowerCase().includes(testSearchValue.toLowerCase())
+                test.label.toLowerCase().includes(searchValue.toLowerCase())
             );
-            if(tests.length > 0){
+            if (tests.length > 0) {
                 category.tests = tests;
                 return true;
             }
             return false;
         });
-        setFilteredCategories(updatedCategories);
+    };
+
+    // filter the categories based on the search value
+    useEffect(() => {
+        setFilteredCategories(applySearchFilter(categories, testSearchValue));
     }, [categories]);
+
+    useEffect(() => {
+        setFilteredInactiveCategories(applySearchFilter(inactiveCategories, testSearchValue));
+    }, [inactiveCategories]);
 
 
     async function handleSwitchMode() {
@@ -173,6 +168,8 @@ function FlyLayoutSuite(props) {
             updateTestSuite();
             return;
         }
+
+        setInactiveCategories([]);
 
         const testSuiteSubCategoryMap = await getFlyLayoutListRows();
 
@@ -191,14 +188,18 @@ function FlyLayoutSuite(props) {
     }, [isEditMode]);
 
 
-    function checkExpand() {
-        return filteredCategories.some(category => !category.selected);
-    }
-
     const countSearchResults = () => {
         let count = 0;
         filteredCategories.forEach(category => { count += category.tests.length });
+        filteredInactiveCategories.forEach(category => { count += category.tests.length });
         return count;
+    }
+
+    const isInactiveTab = !isEditMode && activeViewTab === 1;
+
+    function checkExpand() {
+        const list = isInactiveTab ? filteredInactiveCategories : filteredCategories;
+        return list.some(category => !category.selected);
     }
 
     const debouncedSearch = useMemo(() => debounce(filteredList, 500), []);
@@ -227,19 +228,13 @@ function FlyLayoutSuite(props) {
     )
 
     function extendAllHandler() {
-        setCategories(prev => {
-            return prev.map(category => ({ ...category, selected: true }));
-        });
+        const setter = isInactiveTab ? setInactiveCategories : setCategories;
+        setter(prev => prev.map(category => ({ ...category, selected: true })));
     }
 
     function collapseAllHandler() {
-        setCategories(prev => {
-            return prev.map(category => ({ ...category, selected: false }));
-        });
-    }
-
-    function totalSelectedTestsCount() {
-        return filteredCategories.reduce((count, category) => count + category.tests.length, 0);
+        const setter = isInactiveTab ? setInactiveCategories : setCategories;
+        setter(prev => prev.map(category => ({ ...category, selected: false })));
     }
 
     function switchMode() {
@@ -319,37 +314,71 @@ function FlyLayoutSuite(props) {
 
     }
 
+    const activeTestsCount = filteredCategories.reduce((sum, cat) => sum + cat.tests.length, 0);
+    const inactiveTestsCount = filteredInactiveCategories.reduce((sum, cat) => sum + cat.tests.length, 0);
+
+    const viewTabs = [
+        { id: "active", content: `Active (${activeTestsCount})` },
+        { id: "inactive", content: `Inactive (${inactiveTestsCount})` },
+    ];
+
     const listComponents = (
-        <div style={{ margin: "20px", borderRadius: "0.5rem", boxShadow: " 0px 0px 5px 0px #0000000D, 0px 1px 2px 0px #00000026" }}>
-            <Box borderRadius="2" borderColor="border-subdued" >
+        <Box borderRadius="2" borderColor="border-subdued" style={{ margin: "20px", boxShadow: "0px 0px 5px 0px #0000000D, 0px 1px 2px 0px #00000026" }}>
+                {!isEditMode && (
+                    <Tabs tabs={viewTabs} selected={activeViewTab} onSelect={setActiveViewTab} />
+                )}
                 <Box borderColor="border-subdued" paddingBlockEnd={3} paddingBlockStart={3} paddingInlineStart={5} paddingInlineEnd={5}>
                     <HorizontalStack align="space-between">
                         <HorizontalStack align="start">
-                            {(isEditMode)?<Checkbox checked={checkAllCategoriesSelected()} onChange={() => { selectAllCategories()}} />:null}
-                            <Text color="subdued" fontWeight="semibold" as="h3">{testSearchValue.length > 0 ? `Showing ${countSearchResults()} result` : !isEditMode? `${filteredCategories.length} ${filteredCategories.length > 1 ? 'categories' : 'category'} & ${totalSelectedTestsCount()} tests` :`${countSelectedTest()} from ${countSelectedCategories()} selected`}</Text>
+                            {isEditMode && <Checkbox checked={checkAllCategoriesSelected()} onChange={() => { selectAllCategories()}} />}
+                            <Text color="subdued" fontWeight="semibold" as="h3">
+                                {testSearchValue.length > 0
+                                    ? `Showing ${countSearchResults()} result`
+                                    : isEditMode
+                                        ? `${countSelectedTest()} from ${countSelectedCategories()} selected`
+                                        : activeViewTab === 0
+                                            ? `${filteredCategories.length} ${filteredCategories.length > 1 ? 'categories' : 'category'} & ${activeTestsCount} tests`
+                                            : `${filteredInactiveCategories.length} ${filteredInactiveCategories.length > 1 ? 'categories' : 'category'} & ${inactiveTestsCount} tests`}
+                            </Text>
                         </HorizontalStack>
-                        {testSearchValue.trim().length === 0 ? <Button onClick={() => { checkExpand() ? extendAllHandler() : collapseAllHandler() }} plain><Text>{checkExpand() ? "Expand all" : "Collapse all"}</Text></Button> : <></>}
+                        {testSearchValue.trim().length === 0 && <Button onClick={() => { checkExpand() ? extendAllHandler() : collapseAllHandler() }} plain><Text>{checkExpand() ? "Expand all" : "Collapse all"}</Text></Button>}
                     </HorizontalStack>
                 </Box>
-                {filteredCategories.length > 0 && filteredCategories.map((category, index) => {
-                    return (
-                        <TestSuiteRow filteredCategories={filteredCategories} categories={categories} isEditMode={isEditMode} isLast={index === filteredCategories.length - 1} key={index} category={category} setCategories={setCategories} setFilteredCategories={setFilteredCategories} />
-                    )
-                })}
-            </Box>
-        </div>
+                {(isEditMode || activeViewTab === 0) && filteredCategories.map((category, index) => (
+                    <TestSuiteRow
+                        filteredCategories={filteredCategories}
+                        categories={categories}
+                        isEditMode={isEditMode}
+                        isLast={index === filteredCategories.length - 1}
+                        key={index}
+                        category={category}
+                        setCategories={setCategories}
+                        setFilteredCategories={setFilteredCategories}
+                    />
+                ))}
+                {!isEditMode && activeViewTab === 1 && filteredInactiveCategories.map((category, index) => (
+                    <TestSuiteRow
+                        filteredCategories={filteredInactiveCategories}
+                        categories={inactiveCategories}
+                        isEditMode={false}
+                        isLast={index === filteredInactiveCategories.length - 1}
+                        key={`inactive-${index}`}
+                        category={category}
+                        setCategories={setInactiveCategories}
+                        setFilteredCategories={setFilteredInactiveCategories}
+                    />
+                ))}
+        </Box>
     );
 
     const footer = isEditMode ? (
-        <div style={{ position: "fixed", bottom: "0", opacity: "1", background: "white", zIndex: 10, width:"50vw" }}>
-            <Box borderColor="border-subdued" borderBlockStartWidth="1" padding={"4"} >
-                <HorizontalStack align="end" gap="3">
-                    <Button onClick={switchMode}>Cancel</Button>
-                    <Button primary onClick={() => handleTestSuiteSave()}>Save</Button>
-                </HorizontalStack>
-            </Box>
-        </div>
-    ):null;
+        <Box background="bg" borderColor="border-subdued" borderBlockStartWidth="1" padding="4" style={{ position: "fixed", bottom: "0", zIndex: 10, width: "50vw" }}>
+            <HorizontalStack align="end" gap="3">
+                <Button onClick={switchMode}>Cancel</Button>
+                <Button primary onClick={() => handleTestSuiteSave()}>Save</Button>
+            </HorizontalStack>
+        </Box>
+    ) : null;
 
 
     const components = [headingComponents, listComponents,footer].filter(Boolean);

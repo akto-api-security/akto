@@ -114,10 +114,14 @@ public class HttpRequestResponseUtils {
                 return convertGRPCEncodedToJson(rawRequest);
             } else if (acceptableContentType.equals(MULTIPART_FORM_DATA_CONTENT_TYPE)) {
                 // For multipart, we need the full header value with boundary parameter
-                // getAcceptableContentType() returns only the constant, so get the actual header value
                 String contentTypeHeader = getHeaderValue(requestHeaders, CONTENT_TYPE);
                 String boundary = extractBoundary(contentTypeHeader);
-                return convertMultipartToJson(rawRequest, boundary);
+                // Payload must be actual multipart (contains boundary); e.g. Postman exports formdata as key=value&
+                if (boundary != null && rawRequest.contains("--" + boundary)) {
+                    return convertMultipartToJson(rawRequest, boundary);
+                }
+                // Else payload is not raw multipart (e.g. from Postman formdata → key=value&); preserve as JSON
+                return convertFormUrlEncodedToJson(rawRequest);
             } else if (acceptableContentType.contains(XML) || acceptableContentType.contains(SOAP) ) {
                 return convertXmlToJson(rawRequest);
             }

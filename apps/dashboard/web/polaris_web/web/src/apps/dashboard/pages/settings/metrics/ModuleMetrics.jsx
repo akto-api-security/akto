@@ -2,7 +2,6 @@ import { Page, LegacyCard, Text, HorizontalStack, VerticalStack } from "@shopify
 import { useEffect, useReducer, useState } from "react"
 import { produce } from "immer"
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter"
-import Dropdown from "../../../components/layouts/Dropdown"
 import settingFunctions from "../module"
 import settingRequests from "../api"
 import values from '@/util/values'
@@ -10,13 +9,13 @@ import func from "@/util/func"
 import { useChartOptions } from './hooks/useChartOptions'
 import SystemInfoBox from './components/SystemInfoBox'
 import MetricChart from './components/MetricChart'
+import DropdownSearch from "../../../components/shared/DropdownSearch"
 
 /**
  * Base component for displaying module metrics
  * @param {Object} config - Module configuration object
  */
 function ModuleMetrics({ config }) {
-    const [sortedModuleOrder, setSortedModuleOrder] = useState([])
     const [moduleInfoData, setModuleInfoData] = useState({})
     const [orderedResult, setOrderedResult] = useState([])
     const [instanceIds, setInstanceIds] = useState([])
@@ -45,42 +44,36 @@ function ModuleMetrics({ config }) {
             const response = await settingRequests.fetchModuleInfo(filter)
             const modules = response?.moduleInfos || []
 
-            const sortedModules = modules.sort((a, b) => {
-                const aTime = a.startedTs || a.lastHeartbeatReceived || 0
-                const bTime = b.startedTs || b.lastHeartbeatReceived || 0
+            const sorted = modules.sort((a, b) => {
+                const aTime = a.lastHeartbeatReceived || a.startedTs || 0
+                const bTime = b.lastHeartbeatReceived || b.startedTs || 0
                 return bTime - aTime
+            }).map(module => {
+                return {
+                    label: module?.name || module?.id,
+                    value: module?.name || module?.id,
+                }
             })
 
-            setSortedModuleOrder(sortedModules.map(module => module.name))
+            setInstanceIds(sorted);
+            setSelectedInstanceId(sorted[0]?.value);
 
-            // Extract system info based on config strategy
-            if (config.fetchStrategy === 'prefix') {
-                // Traffic Collector: extract from moduleInfo.additionalData
-                const moduleData = {}
-                sortedModules.forEach(module => {
-                    const extracted = config.systemInfoExtractor(module)
-                    if (extracted) {
-                        moduleData[module.name] = extracted
-                    }
-                })
-                setModuleInfoData(moduleData)
-            }
-            // For moduleType strategy (Threat Detection), system info extracted from metrics later
+            await fetchAndProcessMetrics(sorted[0]?.value);
         } catch (error) {
             console.error("Error fetching module info:", error)
         }
     }
 
-    const fetchAndProcessMetrics = async() => {
+    const fetchAndProcessMetrics = async(instanceId) => {
         try {
             let data
             if (config.fetchStrategy === 'prefix') {
                 data = await settingFunctions.fetchAllMetricsData(
-                    startTime, endTime, config.metricPrefix, selectedInstanceId
+                    startTime, endTime, config.metricPrefix, instanceId
                 )
             } else if (config.fetchStrategy === 'moduleType') {
                 data = await settingFunctions.fetchMetricsDataByModule(
-                    startTime, endTime, config.moduleType, selectedInstanceId
+                    startTime, endTime, config.moduleType, instanceId
                 )
             }
 
@@ -88,32 +81,6 @@ function ModuleMetrics({ config }) {
                 setOrderedResult([])
                 return
             }
-
-            // Extract unique instances and set first one if not selected
-            if (instanceIds.length === 0) {
-                const uniqueIds = new Set()
-                data.forEach(item => {
-                    if (item.instanceId) uniqueIds.add(item.instanceId)
-                })
-
-                const sortedIds = Array.from(uniqueIds).sort((a, b) => {
-                    const aIndex = sortedModuleOrder.indexOf(a)
-                    const bIndex = sortedModuleOrder.indexOf(b)
-                    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
-                    if (aIndex !== -1) return -1
-                    if (bIndex !== -1) return 1
-                    return 0
-                })
-
-                const instanceIdsList = sortedIds.map(id => ({ label: id, value: id }))
-                setInstanceIds(instanceIdsList)
-
-                if (sortedIds.length > 0 && !selectedInstanceId) {
-                    setSelectedInstanceId(sortedIds[0])
-                    return // Will refetch with selected instance
-                }
-            }
-
             // For Threat Detection: extract system info from metrics
             if (config.fetchStrategy === 'moduleType' && config.systemInfoMetrics) {
                 const systemInfo = {}
@@ -187,12 +154,12 @@ function ModuleMetrics({ config }) {
 
     useEffect(() => {
         const fetchData = async () => {
+            setInstanceIds([])
             await fetchModuleInfo()
-            await fetchAndProcessMetrics()
         }
 
         fetchData()
-    }, [currDateRange, selectedInstanceId])
+    }, [currDateRange])
 
     return (
         <Page
@@ -219,10 +186,13 @@ function ModuleMetrics({ config }) {
                                     })}
                                 />
                                 {instanceIds.length > 1 && (
-                                    <Dropdown
-                                        menuItems={instanceIds}
-                                        initial={selectedInstanceId}
-                                        selected={(val) => setSelectedInstanceId(val)}
+                                    <DropdownSearch
+                                        placeholder="Select module"
+                                        optionsList={instanceIds}
+                                        setSelected={async(val) => {setSelectedInstanceId(val); await fetchAndProcessMetrics(val)}}
+                                        preSelected={[selectedInstanceId]}
+                                        value={selectedInstanceId}
+                                        sliceMaxVal={10}
                                     />
                                 )}
                             </HorizontalStack>

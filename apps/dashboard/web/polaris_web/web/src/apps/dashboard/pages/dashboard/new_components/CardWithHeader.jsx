@@ -9,11 +9,15 @@ function CardWithHeader({
     hasData,
     emptyMessage,
     minHeight = "250px",
+    useFlexContent = false,
     children
 }) {
     return (
         <Card>
-            <VerticalStack gap={4}>
+            <VerticalStack
+                gap={4}
+                {...(useFlexContent && { style: { height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 } })}
+            >
                 <ComponentHeader
                     title={title}
                     itemId={itemId}
@@ -21,7 +25,13 @@ function CardWithHeader({
                     tooltipContent={tooltipContent}
                 />
                 {hasData ? (
-                    children
+                    useFlexContent ? (
+                        <Box minHeight={0} style={{ flex: 1 }}>
+                            {children}
+                        </Box>
+                    ) : (
+                        children
+                    )
                 ) : (
                     <Box minHeight={minHeight} display="flex" alignItems="center" justifyContent="center">
                         <Text alignment='center' color='subdued'>{emptyMessage}</Text>

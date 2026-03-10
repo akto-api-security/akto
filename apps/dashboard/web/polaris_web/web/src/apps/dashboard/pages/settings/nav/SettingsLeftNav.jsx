@@ -1,9 +1,10 @@
-import { Navigation } from "@shopify/polaris"
+import { Navigation, Box } from "@shopify/polaris"
 import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ComposeMajor, ProfileMajor} from "@shopify/polaris-icons"
 import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
-import { VariantMajor, VocabularyMajor, AdjustMinor, UndoMajor, CodeMajor } from "@shopify/polaris-icons"
+import { VariantMajor, VocabularyMajor, AdjustMinor, UndoMajor, CodeMajor, GlobeMajor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 import func from "@/util/func"
+import Store from "../../../store";
 
 const SettingsLeftNav = () => {
     const navigate = useNavigate()
@@ -13,6 +14,8 @@ const SettingsLeftNav = () => {
     const page = path.substring(path.lastIndexOf('/') + 1)
     let rbacAccess = func.checkForRbacFeatureBasic();
     let rbacAccessAdvanced = func.checkForRbacFeature();
+    const accounts = Store(state => state.accounts) || {};
+    const activeAccount = Store(state => state.activeAccount);
 
     const usersArr = window.USER_ROLE !== 'GUEST' ? [{
         label: 'Users',
@@ -86,6 +89,13 @@ const SettingsLeftNav = () => {
             <Navigation.Section
                 items={[
                     {
+                        label: (
+                            <Box paddingBlockEnd={"2"}>
+                                {`Account Name: ${accounts[activeAccount]}`}
+                            </Box>
+                        )
+                    },
+                    {
                         label: 'About',
                         icon: StoreDetailsFilledMinor,
                         selected: page === "about",
@@ -113,7 +123,12 @@ const SettingsLeftNav = () => {
                         selected: page === "integrations",
                         onClick: () => navigate("/dashboard/settings/integrations")
                     },
-                    
+                    {
+                        label: 'Browser Extension',
+                        icon: GlobeMajor,
+                        selected: page === "browser-extension",
+                        onClick: () => navigate("/dashboard/settings/browser-extension")
+                    },
                     ...logsArr,
                     ...moduleInfoArr,
                     ...metricsArr,

@@ -91,6 +91,7 @@ function TestRunResultPage(props) {
   const [aiSummary, setAiSummary] = useState(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false)
+  const [aiSummaryChecked, setAiSummaryChecked] = useState(false)
 
   const useFlyout = location.pathname.includes("test-editor") ? false : true
 
@@ -153,15 +154,16 @@ function TestRunResultPage(props) {
         vulnerable: selectedTestRunResult?.vulnerable,
         severity: issueDetails?.severity,
         url: selectedTestRunResult?.url || "",
-        sampleRequest: selectedTestRunResult?.testResults?.[0]?.originalMessage?.substring(0, 2000) || null,
-        sampleResponse: selectedTestRunResult?.testResults?.[0]?.message?.substring(0, 2000) || null,
+        originalMessage: selectedTestRunResult?.testResults?.[0]?.originalMessage || null,
+        attemptMessage: selectedTestRunResult?.testResults?.[0]?.message || null,
       }
     };
   }
 
   async function handleGenerateAiOverview() {
-    if (aiSummary || aiSummaryLoading) return;
+    if (aiSummary || aiSummaryLoading || aiSummaryChecked) return;
     setAiSummaryLoading(true);
+    setAiSummaryChecked(true);
     try {
       const metaData = buildTestResultMetadata();
       const response = await sendQuery(
@@ -177,7 +179,7 @@ function TestRunResultPage(props) {
         setAiSummary(response.response);
       }
     } catch (err) {
-      console.error("Failed to generate AI overview:", err);
+      setAiSummary("Unable to generate AI overview. Please try again later.");
     } finally {
       setAiSummaryLoading(false);
     }
@@ -204,7 +206,6 @@ function TestRunResultPage(props) {
         setAiMessages(prev => [...prev, aiMsg]);
       }
     } catch (err) {
-      console.error("Failed to send follow-up:", err);
     } finally {
       setAiLoading(false);
     }
@@ -373,8 +374,10 @@ function TestRunResultPage(props) {
     setAiSummary(null);
     setAiLoading(false);
     setAiSummaryLoading(false);
+    setAiSummaryChecked(false);
+    setSelectedTestRunResult({});
     fetchData();
-  }, [subCategoryMap, subCategoryFromSourceConfigMap, props, hexId2])
+  }, [subCategoryMap, subCategoryFromSourceConfigMap, props?.testingRunResult, props?.runIssues, hexId2])
 
   return (
     useFlyout ?

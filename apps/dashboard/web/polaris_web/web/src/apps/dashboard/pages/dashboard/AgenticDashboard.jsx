@@ -502,6 +502,7 @@ const AgenticDashboard = () => {
                     const maxAge = Math.max(...severityData.map(s => averageIssueAge[s.key] || 0), 42);
                     setAverageIssueAgeData(severityData.map(s => ({
                         label: s.label,
+                        severity: s.key.toUpperCase(),
                         days: Math.round(averageIssueAge[s.key] || 0),
                         progress: maxAge > 0 ? Math.round(((averageIssueAge[s.key] || 0) / maxAge) * 100) : 0,
                         color: s.color
@@ -895,6 +896,17 @@ const AgenticDashboard = () => {
     }
 
     // Handler for clicking on lines in the security posture chart
+    const buildUrlParamsWithDateRange = (extraParams = {}) => {
+        const getTimeEpoch = (key) => {
+            if (!currDateRange.period || !currDateRange.period[key]) return 0;
+            return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
+        };
+        const params = new URLSearchParams({ since: String(getTimeEpoch("since")), until: String(getTimeEpoch("until")) });
+        Object.entries(extraParams).forEach(([k, v]) => params.set(k, v));
+        if (currDateRange.alias) params.set('range', currDateRange.alias);
+        return params;
+    };
+
     const handleSecurityPostureLineClick = (event) => {
         if (!event || !event.point || !event.point.series) return;
         
@@ -906,20 +918,80 @@ const AgenticDashboard = () => {
         let url = null;
         
         if (clickedSeriesName === apiIssuesSeriesName) {
-            // API Issues line -> redirect to issues page
-            url = `${window.location.origin}/dashboard/reports/issues#open`;
+            url = `${window.location.origin}/dashboard/reports/issues?${buildUrlParamsWithDateRange({ filters: 'activeCollections__true,true' }).toString()}#open`;
         } else if (clickedSeriesName === apiEndpointsSeriesName) {
-            // API Endpoints Discovered line -> redirect to changes page
-            url = `${window.location.origin}/dashboard/observe/changes?filters=#new_endpoints`;
+            url = `${window.location.origin}/dashboard/observe/changes?${buildUrlParamsWithDateRange().toString()}#new_endpoints`;
         } else if (clickedSeriesName === threatRequestsSeriesName) {
-            // Threat Requests flagged line -> redirect to threat activity page
             url = `${window.location.origin}/dashboard/protection/threat-activity?filters=#active`;
         }
         
         if (url) {
             window.open(url, '_blank');
         }
-    }
+    };
+
+    const handleApiDiscoveryPieClick = () => {
+        window.location.href = `${window.location.origin}/dashboard/observe/inventory`;
+    };
+
+    const handleIssuesPieClick = (segmentName) => {
+        const severity = (segmentName || '').toUpperCase();
+        if (!severity) return;
+        const params = buildUrlParamsWithDateRange({ filters: `activeCollections__true,true&severity__${severity}` });
+        window.open(`${window.location.origin}/dashboard/reports/issues?${params.toString()}#open`, '_blank');
+    };
+
+    const handleComplianceClick = (complianceName) => {
+        if (!complianceName) return;
+        const params = buildUrlParamsWithDateRange({ filters: 'activeCollections__true', compliance: complianceName });
+        window.open(`${window.location.origin}/dashboard/reports/compliance?${params.toString()}#open`, '_blank');
+    };
+
+    const handleThreatDetectionPieClick = () => {
+        const params = buildUrlParamsWithDateRange();
+        window.open(`${window.location.origin}/dashboard/protection/threat-dashboard?${params.toString()}`, '_blank');
+    };
+
+    const handleTestedVsNonTestedClick = () => {
+        window.open(`${window.location.origin}/dashboard/observe/inventory`, '_blank');
+    };
+
+    const handleOpenResolvedIssuesLineClick = (event) => {
+        if (!event?.point?.series?.name) return;
+        const clickedSeriesName = event.point.series.name;
+        const hash = clickedSeriesName === 'Resolved Issues' ? '#fixed' : '#open';
+        const params = buildUrlParamsWithDateRange({ filters: 'activeCollections__true,true' });
+        window.open(`${window.location.origin}/dashboard/reports/issues?${params.toString()}${hash}`, '_blank');
+    };
+
+    const handleTopIssuesByCategoryClick = () => {
+        const params = buildUrlParamsWithDateRange({ filters: 'activeCollections__true,true' });
+        window.open(`${window.location.origin}/dashboard/reports/issues?${params.toString()}#open`, '_blank');
+    };
+
+    const handleTopHostnamesByIssuesClick = (item) => {
+        const filtersStr = 'activeCollections__true,true&severity__CRITICAL,HIGH';
+        const params = buildUrlParamsWithDateRange({ filters: filtersStr });
+        window.open(`${window.location.origin}/dashboard/reports/issues?${params.toString()}#open`, '_blank');
+    };
+
+    const handleTopThreatsByCategoryClick = (item) => {
+        if (!item?.name) return;
+        const params = buildUrlParamsWithDateRange({ filters: `latestAttack__${encodeURIComponent(item.name)}` });
+        window.open(`${window.location.origin}/dashboard/protection/threat-api?${params.toString()}`, '_blank');
+    };
+
+    const handleTopAttackHostsClick = (item) => {
+        if (!item?.name) return;
+        const params = buildUrlParamsWithDateRange({ filters: `host__${encodeURIComponent(item.name)}` });
+        window.open(`${window.location.origin}/dashboard/protection/threat-activity?${params.toString()}#active`, '_blank');
+    };
+
+    const handleTopBadActorsClick = (item) => {
+        if (!item?.name) return;
+        const params = buildUrlParamsWithDateRange({ filters: `actorId__${encodeURIComponent(item.name)}` });
+        window.open(`${window.location.origin}/dashboard/protection/threat-actor?${params.toString()}`, '_blank');
+    };
 
     const onLayoutChange = (newLayout) => {
         setLayout(prevLayout => {
@@ -1037,6 +1109,7 @@ const AgenticDashboard = () => {
                 itemId='api-discovery-pie'
                 onRemoveComponent={removeComponent}
                 tooltipContent={dashboardCategory === 'AGENTIC' ? 'Distribution of discovered agentic components including AI agents, MCP servers, and LLMs' : 'Distribution of discovered APIs categorized by shadow, sensitive, no auth, and normal'}
+                onSegmentClick={handleApiDiscoveryPieClick}
             />
         ),
         'issues-pie': isPieChartDataEmpty(issuesData) ? (
@@ -1055,6 +1128,7 @@ const AgenticDashboard = () => {
                 itemId='issues-pie'
                 onRemoveComponent={removeComponent}
                 tooltipContent="Distribution of security issues by severity level (Critical, High, Medium, Low)"
+                onSegmentClick={handleIssuesPieClick}
             />
         ),
         'threat-detection-pie': isPieChartDataEmpty(threatData) ? (
@@ -1073,6 +1147,7 @@ const AgenticDashboard = () => {
                 itemId='threat-detection-pie'
                 onRemoveComponent={removeComponent}
                 tooltipContent="Distribution of flagged threat requests by severity level"
+                onSegmentClick={handleThreatDetectionPieClick}
             />
         ),
         'average-issue-age': isArrayDataEmpty(averageIssueAgeData) ? (
@@ -1089,6 +1164,7 @@ const AgenticDashboard = () => {
                 itemId='average-issue-age'
                 onRemoveComponent={removeComponent}
                 tooltipContent="Average number of days security issues have been open, categorized by severity"
+                onSeverityClick={handleIssuesPieClick}
             />
         ),
         'compliance-at-risks': isArrayDataEmpty(complianceData) ? (
@@ -1105,6 +1181,7 @@ const AgenticDashboard = () => {
                 itemId='compliance-at-risks'
                 onRemoveComponent={removeComponent}
                 tooltipContent="Top compliance frameworks at risk based on failing test percentages"
+                onComplianceClick={handleComplianceClick}
             />
         ),
         'tested-vs-non-tested': isLineChartDataEmpty(testedVsNonTestedChartData) ? (
@@ -1126,6 +1203,7 @@ const AgenticDashboard = () => {
                 itemId='tested-vs-non-tested'
                 onRemoveComponent={removeComponent}
                 tooltipContent="Track the number of APIs that have been tested vs those that haven't been tested over time"
+                graphPointClick={handleTestedVsNonTestedClick}
             />
         ),
         'open-resolved-issues': isLineChartDataEmpty(openResolvedChartData) ? (
@@ -1147,6 +1225,7 @@ const AgenticDashboard = () => {
                 itemId='open-resolved-issues'
                 onRemoveComponent={removeComponent}
                 tooltipContent="Trend of open vs resolved security issues over time"
+                graphPointClick={handleOpenResolvedIssuesLineClick}
             />
         ),
         'threat-requests-chart': isLineChartDataEmpty(threatRequestsChartData) ? (
@@ -1208,6 +1287,7 @@ const AgenticDashboard = () => {
                 onRemoveComponent={removeComponent}
                 tooltipContent="Top vulnerability categories by percentage of total issues"
                 columnHeaders={['Issues', 'By %']}
+                onRowClick={handleTopIssuesByCategoryClick}
             />
         ),
         'top-apis-issues': isArrayDataEmpty(topHostnamesByIssues) ? (
@@ -1228,6 +1308,7 @@ const AgenticDashboard = () => {
                 onRemoveComponent={removeComponent}
                 tooltipContent="Hostnames with the highest number of critical and high severity security issues"
                 columnHeaders={['Hostnames', 'Issues']}
+                onRowClick={handleTopHostnamesByIssuesClick}
             />
         ),
         'top-requests-by-type': isArrayDataEmpty(topThreatsByCategory) ? (
@@ -1247,6 +1328,7 @@ const AgenticDashboard = () => {
                 onRemoveComponent={removeComponent}
                 tooltipContent="Most common threat types detected by percentage"
                 columnHeaders={['Threat Category', 'By %']}
+                onRowClick={handleTopThreatsByCategoryClick}
             />
         ),
         'top-attacked-apis': isArrayDataEmpty(topAttackHosts) ? (
@@ -1267,6 +1349,7 @@ const AgenticDashboard = () => {
                 onRemoveComponent={removeComponent}
                 tooltipContent="Hostnames that have received the most threat requests"
                 columnHeaders={['Hostnames', 'Threats']}
+                onRowClick={handleTopAttackHostsClick}
             />
         ),
         'top-bad-actors': isArrayDataEmpty(topBadActors) ? (
@@ -1286,6 +1369,7 @@ const AgenticDashboard = () => {
                 onRemoveComponent={removeComponent}
                 tooltipContent="IP addresses or actors that have triggered the most threats"
                 columnHeaders={['Bad Actors', 'Threats']}
+                onRowClick={handleTopBadActorsClick}
             />
         )
     }

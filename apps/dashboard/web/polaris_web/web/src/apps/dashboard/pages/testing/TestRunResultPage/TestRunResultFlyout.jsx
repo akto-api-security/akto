@@ -5,8 +5,8 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, ActionList } from '@shopify/polaris'
-import { EditMinor } from '@shopify/polaris-icons'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, Tooltip, VerticalStack, Link, ActionList } from '@shopify/polaris'
+import { EditMinor, FileMinor } from '@shopify/polaris-icons'
 import CompulsoryDescriptionModal from "../../issues/components/CompulsoryDescriptionModal.jsx"
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
@@ -28,10 +28,16 @@ import ForbiddenRole from '../../../components/shared/ForbiddenRole'
 import LegendLabel from './LegendLabel.jsx'
 import TestRunResultChat from './TestRunResultChat.jsx'
 import AskAktoSection from './AskAktoSection.jsx'
+import PersistStore from '../../../../main/PersistStore'
+
+const SKIPPED_TEST_DOCS_URL = "https://docs.akto.io/api-security-testing/concepts/skipped-test-cases";
+const SKIP_ERROR_KEYWORDS = ["skipping execution"];
+
+function isSkippedTestError(errorText) {
+  return SKIP_ERROR_KEYWORDS.some(keyword => errorText?.includes(keyword));
+}
 
 function TestRunResultFlyout(props) {
-
-
     const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
@@ -78,6 +84,8 @@ function TestRunResultFlyout(props) {
         noTimeToFix: false,
         acceptableFix: false
     })
+
+    const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
 
     const fetchRemediationInfo = useCallback(async (testId) => {
         if (testId && testId.length > 0) {
@@ -409,10 +417,23 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
+    const openUrlInTestEditor = () => {
+        const apiInfoKey = issueDetails?.id?.apiInfoKey
+        if (!apiInfoKey) return
+        setSelectedSampleApi({
+            apiCollectionId: apiInfoKey.apiCollectionId,
+            url: apiInfoKey.url,
+            method: { "_name": apiInfoKey.method }
+        })
+        const navUrl = window.location.origin + "/dashboard/test-editor/" + selectedTestRunResult.testCategoryId
+        window.open(navUrl, "_blank")
+    }
+
     const categoryKey = selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] || selectedTestRunResult?.testCategory;
     const owaspData = func.categoryMapping[categoryKey] || {};
     const owaspMapping = owaspData.label || "";
     const owaspUrl = owaspData.url || "";
+    const asiCategories = func.getASICategoriesForAgenticCategory(selectedTestRunResult?.superCategoryName || "");
 
     function ActionsComp() {
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
@@ -508,6 +529,15 @@ function TestRunResultFlyout(props) {
                                         <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
                                     </Link>
                                 ) : null}
+                                {asiCategories.length > 0 ? (
+                                    <HorizontalStack gap="1" wrap>
+                                        {asiCategories.map((asi, index) => (
+                                            <Link key={index} onClick={() => window.open(asi.url, '_blank')}>
+                                                <Badge size="small">{asi.label}</Badge>
+                                            </Link>
+                                        ))}
+                                    </HorizontalStack>
+                                ) : null}
                             </VerticalStack>
                         </div>
                         {
@@ -544,6 +574,11 @@ function TestRunResultFlyout(props) {
                     <ApiGroups collectionIds={apiInfo?.collectionIds} />
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
+                    {issueDetails?.id?.apiInfoKey && (
+                        <Tooltip content="Open URL in test editor" dismissOnMouseOut>
+                            <Button monochrome onClick={openUrlInTestEditor} icon={FileMinor} />
+                        </Tooltip>
+                    )}
                     <ActionsComp />
 
                     {selectedTestRunResult && selectedTestRunResult.vulnerable &&
@@ -624,7 +659,7 @@ function TestRunResultFlyout(props) {
     const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
 
     // Component that handles vulnerability analysis only when mounted
-    const ValuesTabContent = React.memo(() => {
+    const ValuesTabContent = React.memo(({ isAgentic = false } = {}) => {
 
         useEffect(() => {
             // Check if vulnerability highlighting is enabled (use existing GPT feature flag)
@@ -644,7 +679,6 @@ function TestRunResultFlyout(props) {
                             try {
                                 messageObj = JSON.parse(messageObj);
                             } catch (e) {
-                                console.error('Failed to parse message string for idx', idx, e);
                                 return null;
                             }
                         }
@@ -707,7 +741,6 @@ function TestRunResultFlyout(props) {
                                 }
                                 return { idx, success: true };
                             } catch (error) {
-                                console.error('Failed to analyze vulnerability for result', idx, error);
                                 return { idx, success: false };
                             }
                         }
@@ -730,6 +763,9 @@ function TestRunResultFlyout(props) {
             return null;
         }
 
+        const firstError = selectedTestRunResult?.testResults?.find(result =>
+          result.errors && result.errors.length > 0
+        )?.errors?.join(", ");
 
         return (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
@@ -737,36 +773,51 @@ function TestRunResultFlyout(props) {
                     <Box padding="3" background="bg-surface-secondary" borderRadius="2">
                         <LegendLabel />
                     </Box>
-                    <SampleDataList
-                        key="Sample values"
-                        heading={"Attempt"}
-                        minHeight={"30vh"}
-                        vertical={true}
-                        sampleData={
-                            selectedTestRunResult?.testResults.map((result, idx) => {
-                                if (result.errors && result.errors.length > 0) {
-                                    let errorList = result.errors.join(", ");
-                                    return { errorList: errorList }
-                                }
-                                // Add vulnerability highlights only for response
-                                let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
-                                if (result.originalMessage || result.message) {
-                                    return {
-                                        originalMessage: result.originalMessage,
-                                        message: result.message,
-                                        vulnerabilitySegments
+                    <VerticalStack gap="0">
+                        <SampleDataList
+                            key="Sample values"
+                            heading={"Attempt"}
+                            minHeight={"30vh"}
+                            vertical={true}
+                            sampleData={
+                                selectedTestRunResult?.testResults.map((result, idx) => {
+                                    if (result.errors && result.errors.length > 0) {
+                                        let errorList = result.errors.join(", ");
+                                        return { errorList: errorList }
                                     }
-                                }
-                                return { errorList: "No data found" }
-                            })}
-                        isNewDiff={true}
-                        vulnerable={selectedTestRunResult?.vulnerable}
-                        vulnerabilityAnalysisError={vulnerabilityAnalysisError}
-                    />
+                                    // Add vulnerability highlights only for response
+                                    let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
+                                    if (result.originalMessage || result.message) {
+                                        if(isAgentic){
+                                            return {
+                                                originalMessage: result.message,
+                                                message: result.message
+                                            }
+                                        }
+                                        return {
+                                            originalMessage: result.originalMessage,
+                                            message: result.message,
+                                            vulnerabilitySegments
+                                        }
+                                    }
+                                    return { errorList: "No data found" }
+                                })}
+                            isNewDiff={true}
+                            vulnerable={selectedTestRunResult?.vulnerable}
+                            vulnerabilityAnalysisError={vulnerabilityAnalysisError}
+                        />
+                        {firstError && isSkippedTestError(firstError) && (
+                            <Box paddingBlockStart="2" paddingInlineStart="2">
+                                <Link url={SKIPPED_TEST_DOCS_URL} external>Learn more about skipped tests</Link>
+                            </Box>
+                        )}
+                    </VerticalStack>
                 </VerticalStack>
             </Box>
         );
     });
+
+    const hasConversations = conversations?.length > 0
 
     const conversationTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
@@ -778,7 +829,6 @@ function TestRunResultFlyout(props) {
         // TODO: Implement real message sending handler
         // Replace with actual API call when chat endpoint is available
         const handleSendMessage = (msg) => {
-            console.log("TODO: Send message to backend:", msg);
             // Future: Call testingApi.sendChatMessage(issueDetails.id, msg)
         };
 
@@ -790,9 +840,21 @@ function TestRunResultFlyout(props) {
                 conversations={conversations}
                 onSendMessage={handleSendMessage}
                 isStreaming={false}
+                testResults={selectedTestRunResult?.testResults || []}
             />
         }
     }, [selectedTestRunResult, conversations])
+
+    const attemptTabForConversations = useMemo(() => {
+        if (!hasConversations) return null;
+        const hasTestResultsMessages = selectedTestRunResult?.testResults?.some(result => result.message);
+        if(!hasTestResultsMessages) return null;
+        return {
+            id: 'attempt',
+            content: "Attempt",
+            component: <ValuesTabContent isAgentic />
+        };
+    }, [hasConversations, selectedTestRunResult])
 
     const ValuesTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
@@ -803,7 +865,11 @@ function TestRunResultFlyout(props) {
         }
     }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag])
 
-    const finalResultTab = conversations?.length > 0 ? conversationTab : ValuesTab
+    const resultTabs = hasConversations
+        ? [conversationTab, attemptTabForConversations].filter(Boolean)
+        : [ValuesTab]
+
+    const finalResultTab = hasConversations ? conversationTab : ValuesTab
 
     function RowComp({ cardObj }) {
         const { title, value, tooltipContent } = cardObj
@@ -958,7 +1024,7 @@ function TestRunResultFlyout(props) {
     const tabsComponent = (
         <LayoutWithTabs
             key={issueDetails?.id}
-            tabs={issueDetails?.id ? [overviewTab, timelineTab, finalResultTab, remediationTab].filter(Boolean) : [attemptTab]}
+            tabs={issueDetails?.id ? [overviewTab, timelineTab, ...resultTabs, remediationTab].filter(Boolean) : (hasConversations ? [conversationTab, attemptTabForConversations].filter(Boolean) : [attemptTab])}
             currTab={() => { }}
         />
     )

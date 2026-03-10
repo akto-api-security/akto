@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -115,6 +116,8 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	// Extract session and request IDs from headers
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
 
+	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/request - requestPayload: %s", req.RequestPayload))
+
 	h.logger.Info("ValidateRequest - received request",
 		zap.String("path", req.Path),
 		zap.String("method", req.Method),
@@ -161,6 +164,10 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
 		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
+
+	if resultJSON, err := json.Marshal(result); err == nil {
+		go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/request - result: %s", string(resultJSON)))
+	}
 
 	c.JSON(http.StatusOK, result)
 }

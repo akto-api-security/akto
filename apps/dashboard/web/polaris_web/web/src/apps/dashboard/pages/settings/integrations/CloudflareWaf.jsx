@@ -6,6 +6,7 @@ import settingRequests from '../api';
 import func from '@/util/func'
 import DropdownSearch from '../../../components/shared/DropdownSearch';
 import SeverityLevelDropdown from '../../../components/shared/SeverityLevelDropdown';
+import ThreatPoliciesDropdown from '../../../components/shared/ThreatPoliciesDropdown';
 
 function CloudflareWaf() {
     const [accountOrZoneId, setAccountOrZoneId] = useState('');
@@ -14,6 +15,7 @@ function CloudflareWaf() {
     const [email, setEmail] = useState('');
     const [zoneId, setZoneId] = useState('');
     const [severityLevels, setSeverityLevels] = useState(['CRITICAL']);
+    const [threatPolicies, setThreatPolicies] = useState([]);
 
     const isZoneLevel = integrationType === "zones";
 
@@ -49,13 +51,17 @@ function CloudflareWaf() {
                   severityLevels={severityLevels}
                   setSeverityLevels={setSeverityLevels}
                 />
+                <ThreatPoliciesDropdown
+                  threatPolicies={threatPolicies}
+                  setThreatPolicies={setThreatPolicies}
+                />
             </VerticalStack>
           </LegacyCard.Section>
         </LegacyCard>
     )
 
     async function addCloudflareWafIntegration(){
-      await settingRequests.addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels)
+      await settingRequests.addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels, threatPolicies)
       func.setToast(true, false, "Successfully added Cloudflare Waf Integration")
       fetchIntegration()
     }
@@ -78,6 +84,7 @@ function CloudflareWaf() {
       setIntegrationType(resp?.cloudflareWafConfig?.integrationType || "zones")
       setZoneId(resp?.cloudflareWafConfig?.zoneId || "")
       setSeverityLevels(resp?.cloudflareWafConfig?.severityLevels || ['CRITICAL'])
+      setThreatPolicies(resp?.cloudflareWafConfig?.threatPolicies || [])
     }
 
     useEffect(() => {

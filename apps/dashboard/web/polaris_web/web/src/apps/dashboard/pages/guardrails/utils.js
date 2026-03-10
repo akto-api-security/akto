@@ -1,3 +1,12 @@
+export const SEVERITY = {
+    CRITICAL: { label: "Critical", value: "CRITICAL" },
+    HIGH: { label: "High", value: "HIGH" },
+    MEDIUM: { label: "Medium", value: "MEDIUM" },
+    LOW: { label: "Low", value: "LOW" },
+};
+
+export const SEVERITY_OPTIONS = Object.values(SEVERITY);
+
 /**
  * Helper function to transform frontend field names to backend DTO field names
  * Transforms: piiFilters -> piiTypes, contentFilters -> contentFiltering

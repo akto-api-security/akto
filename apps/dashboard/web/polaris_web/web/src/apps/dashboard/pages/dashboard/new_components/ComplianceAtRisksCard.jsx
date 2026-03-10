@@ -1,7 +1,7 @@
 import { Card, VerticalStack, Box, HorizontalStack, HorizontalGrid, Text, Tooltip } from '@shopify/polaris'
 import ComponentHeader from './ComponentHeader'
 
-const ComplianceAtRisksCard = ({ complianceData = [], itemId = "", onRemoveComponent, tooltipContent = "" }) => {
+const ComplianceAtRisksCard = ({ complianceData = [], itemId = "", onRemoveComponent, tooltipContent = "", onComplianceClick }) => {
     return (
         <Card>
             <Box paddingBlockEnd="500">
@@ -13,46 +13,68 @@ const ComplianceAtRisksCard = ({ complianceData = [], itemId = "", onRemoveCompo
                         {complianceData.map((compliance, idx) => (
                             <VerticalStack key={idx} gap="300" align='center' inlineAlign='center'>
                                 <Box width='100%' height='80px' display='flex' alignItems='center' justifyContent='center'>
-                                    <div style={{
-                                        width: '100px',
-                                        height: '80px',
-                                        backgroundImage: `url("${compliance.icon}")`,
-                                        backgroundRepeat: 'no-repeat',
-                                        backgroundPosition: 'center center',
-                                        backgroundSize: 'contain',
-                                        margin: '0 auto'
-                                    }} />
+                                    <div
+                                        style={{
+                                            width: '100px',
+                                            height: '80px',
+                                            backgroundImage: `url("${compliance.icon}")`,
+                                            backgroundRepeat: 'no-repeat',
+                                            backgroundPosition: 'center center',
+                                            backgroundSize: 'contain',
+                                            margin: '0 auto',
+                                            cursor: onComplianceClick ? 'pointer' : undefined
+                                        }}
+                                        onClick={onComplianceClick ? () => onComplianceClick(compliance.name) : undefined}
+                                        onKeyDown={onComplianceClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } } : undefined}
+                                        role={onComplianceClick ? 'button' : undefined}
+                                        tabIndex={onComplianceClick ? 0 : undefined}
+                                    />
                                 </Box>
 
                                 <Box width='100%'>
                                     <VerticalStack gap={1} align='center' inlineAlign='center'>
                                         <Box width='100%' minHeight='40px' display='flex' alignItems='center' justifyContent='center'>
                                             <Tooltip content={compliance.name} preferredPosition="above">
-                                                <Text 
-                                                    variant='headingSm' 
-                                                    alignment='center' 
-                                                    fontWeight='semibold'
-                                                    truncate
+                                                <div
                                                     style={{
                                                         maxWidth: '100%',
                                                         overflow: 'hidden',
                                                         textOverflow: 'ellipsis',
-                                                        whiteSpace: 'nowrap'
+                                                        whiteSpace: 'nowrap',
+                                                        cursor: onComplianceClick ? 'pointer' : undefined
                                                     }}
+                                                    onClick={onComplianceClick ? () => onComplianceClick(compliance.name) : undefined}
+                                                    onKeyDown={onComplianceClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onComplianceClick(compliance.name); } } : undefined}
+                                                    role={onComplianceClick ? 'button' : undefined}
+                                                    tabIndex={onComplianceClick ? 0 : undefined}
                                                 >
-                                                    {compliance.name}
-                                                </Text>
+                                                    <Text 
+                                                        variant='headingSm' 
+                                                        alignment='center' 
+                                                        fontWeight='semibold'
+                                                        truncate
+                                                    >
+                                                        {compliance.name}
+                                                    </Text>
+                                                </div>
                                             </Tooltip>
                                         </Box>
                                         <Box width='100%'>
                                             <HorizontalStack gap={2} align='space-between' blockAlign='center'>
-                                                <div style={{
-                                                    flex: 1,
-                                                    height: '5px',
-                                                    backgroundColor: '#E5E7EB',
-                                                    borderRadius: '3px',
-                                                    overflow: 'hidden'
-                                                }}>
+                                                <div
+                                                    style={{
+                                                        flex: 1,
+                                                        height: '5px',
+                                                        backgroundColor: '#E5E7EB',
+                                                        borderRadius: '3px',
+                                                        overflow: 'hidden',
+                                                        cursor: onComplianceClick ? 'pointer' : undefined
+                                                    }}
+                                                    onClick={onComplianceClick ? () => onComplianceClick(compliance.name) : undefined}
+                                                    onKeyDown={onComplianceClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onComplianceClick(compliance.name); } } : undefined}
+                                                    role={onComplianceClick ? 'button' : undefined}
+                                                    tabIndex={onComplianceClick ? 0 : undefined}
+                                                >
                                                     <div style={{
                                                         width: `${compliance.percentage}%`,
                                                         height: '100%',

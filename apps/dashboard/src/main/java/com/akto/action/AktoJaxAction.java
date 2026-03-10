@@ -27,6 +27,7 @@ import com.akto.notifications.slack.SlackAlerts;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.RecordedLoginFlowUtil;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.mongodb.BasicDBList;
@@ -493,6 +494,9 @@ public class AktoJaxAction extends UserAction {
 
             // Create testing run with the config ID
             String testName = "Auto-test after crawl: " + crawlerRun.getHostname();
+            // Get dashboard context from Context.contextSource
+            CONTEXT_SOURCE dashboardContext = Context.contextSource.get();
+            
             TestingRun testingRun = new TestingRun(
                 Context.now(),                  // scheduleTimestamp
                 crawlerRun.getStartedBy(),      // userEmail
@@ -506,7 +510,8 @@ public class AktoJaxAction extends UserAction {
                 false,                          // sendSlackAlert
                 false,                          // sendMsTeamsAlert
                 miniTestingServiceName,         // miniTestingServiceName (can be null)
-                0                               // selectedSlackChannelId
+                0,                              // selectedSlackChannelId
+                dashboardContext               // dashboardContext (can be null if unknown)
             );
 
             testingRun.setTriggeredBy("DAST_CRAWLER_AUTO_TEST");

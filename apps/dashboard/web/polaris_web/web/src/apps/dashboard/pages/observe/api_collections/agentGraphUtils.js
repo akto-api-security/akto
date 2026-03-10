@@ -48,6 +48,12 @@ export const getComponentColors = (category) => {
       return { borderColor: '#e91e63', backgroundColor: '#fce4ec' }; // Pink (webhook theme)
     case 'user':
       return { borderColor: '#10b981', backgroundColor: '#ecfdf5' }; // Green
+    case 'akto-hooks':
+      return { borderColor: '#0ea5e9', backgroundColor: '#f0f9ff' }; // Sky blue - Akto proxy
+    case 'arcade-mcp':
+      return { borderColor: '#4cbebbff', backgroundColor: '#ecfdf5' }; // Same as mcp - teal/green
+    case 'arcade-response':
+      return { borderColor: '#10b981', backgroundColor: '#f0fdf4' }; // Green - success/response
     default:
       return { borderColor: '#6b7280', backgroundColor: '#f9fafb' }; // Gray
   }
@@ -63,9 +69,14 @@ export const getComponentIcon = (category) => {
     case 'ai-model':
       return MagicMajor;
     case "mcp":
+    case 'arcade-mcp':
       return MCPIcon;
     case 'webhook':
       return WebhookIcon;
+    case 'akto-hooks':
+      return WebhookIcon;
+    case 'arcade-response':
+      return AutomationMajor;
     default:
       return CustomersMinor;
   }
@@ -105,6 +116,74 @@ export const getNodeXPosition = (category) => {
   return 400;
 };
 
+
+// Build the fixed 5-node linear arcade graph:
+// AI Agent → Akto Hooks (req) → MCP Server → Akto Hooks (resp) → Response
+// onNodeClick is passed in from the component so it stays framework-agnostic here.
+export const buildArcadeGraph = ({ agentName, mcpServers, onNodeClick }) => {
+  const centerY = 160;
+  const nodeSpacingX = 300;
+  const startX = 40;
+
+  const makeNode = (id, x, component) => ({
+    id,
+    type: 'agentNode',
+    position: { x, y: centerY },
+    draggable: false,
+    data: { component: { id, ...component }, onNodeClick },
+  });
+
+  const nodes = [
+    makeNode('arcade-agent', startX, {
+      label: agentName,
+      type: 'AI Agent',
+      category: 'agent',
+      description: `AI Agent: ${agentName}`,
+      status: 'active',
+    }),
+    makeNode('arcade-hooks-req', startX + nodeSpacingX, {
+      label: 'Akto Hooks',
+      type: 'Proxy (Request)',
+      category: 'akto-hooks',
+      description: 'Akto intercepts outgoing tool call requests, providing visibility and security before they reach MCP servers.',
+      status: 'active',
+    }),
+    makeNode('arcade-mcp', startX + nodeSpacingX * 2, {
+      label: 'ARCADE registry',
+      type: 'MCP Server',
+      category: 'arcade-mcp',
+      description: `MCP servers discovered via arcade.dev: ${mcpServers.join(', ') || 'None'}`,
+      status: 'connected',
+      mcpServers,
+      showBoundary: true,
+      boundaryColor: '#4cbebbff',
+      boundaryBg: 'rgba(76, 190, 187, 0.05)',
+    }),
+    makeNode('arcade-tool-call', startX + nodeSpacingX * 3, {
+      label: 'Tool Call',
+      type: 'Tool Call',
+      category: 'arcade-tool-call',
+      description: 'Final tool call response returned to the AI agent after passing through Akto proxy.',
+      status: 'connected',
+    }),
+    makeNode('arcade-hooks-resp', startX + nodeSpacingX * 4, {
+      label: 'Akto Evaluation response',
+      type: 'Proxy (Response)',
+      category: 'akto-hooks',
+      description: 'Akto intercepts incoming tool call responses, providing visibility and security before they reach the agent.',
+      status: 'active',
+    }),
+  ];
+
+  const edges = [
+    { id: 'ae-1', source: 'arcade-agent',     target: 'arcade-hooks-req',  type: 'agentEdge',  data: { edgeParam: 'tool call' } },
+    { id: 'ae-2', source: 'arcade-hooks-req',  target: 'arcade-mcp',        type: 'agentEdge',  data: { edgeParam: 'Evaluated call' } },
+    { id: 'ae-3', source: 'arcade-mcp',        target: 'arcade-tool-call',  type: 'agentEdge',  data: { edgeParam: 'Make call' } },
+    { id: 'ae-4', source: 'arcade-tool-call',  target: 'arcade-hooks-resp', type: 'agentEdge',  data: { edgeParam: 'Tool response' } }
+  ];
+
+  return { nodes, edges };
+};
 
 export const CATEGORY_ORDER = ['ai-model', 'mcp', 'ai-tool', 'webhook', 'internal'];
 

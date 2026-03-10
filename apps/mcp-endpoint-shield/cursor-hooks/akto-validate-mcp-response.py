@@ -12,7 +12,7 @@ import sys
 import urllib.request
 from typing import Any, Dict, Union
 
-from akto_machine_id import get_machine_id
+from akto_machine_id import get_machine_id, get_username
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.cursor/akto/mcp-logs"))
@@ -192,10 +192,6 @@ def extract_mcp_server_name(input_data: Dict[str, Any]) -> str:
                 return parts[1]
     return "cursor-unknown"
 
-def uuid_to_ipv6_simple(uuid_str):
-    hex_str = uuid_str.replace("-", "").lower()
-    return ":".join(hex_str[i:i+4] for i in range(0, 32, 4))
-
 def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: str) -> Dict[str, Any]:
     """Build the request body for data ingestion."""
     import time
@@ -245,7 +241,7 @@ def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: 
         "method": "POST",
         "requestPayload": request_payload,
         "responsePayload": response_payload,
-        "ip": uuid_to_ipv6_simple(device_id),
+        "ip": get_username(),
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": "200",

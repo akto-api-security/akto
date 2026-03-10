@@ -15,6 +15,7 @@ import { DeleteMajor } from '@shopify/polaris-icons';
 import { useState, useEffect } from 'react';
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
 import observeApi from "../../../observe/api";
+import OwaspTag from "../OwaspTag";
 
 // Helper function to format label with domain count
 const formatPiiLabel = (name, domainCount) => {
@@ -157,6 +158,7 @@ const SensitiveInfoStep = ({
             <Text variant="bodyMd" tone="subdued">
                 Use these filters to handle any data related to privacy.
             </Text>
+            <OwaspTag stepNumber={4} />
 
             <VerticalStack gap="4">
                 {/* PII Types */}
