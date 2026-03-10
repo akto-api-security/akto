@@ -431,9 +431,11 @@ function TestRunResultFlyout(props) {
 
     const categoryKey = selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] || selectedTestRunResult?.testCategory;
     const owaspData = func.categoryMapping[categoryKey] || {};
-    const owaspMapping = owaspData.label || "";
+    const owaspMapping = owaspData.label || ""; 
     const owaspUrl = owaspData.url || "";
     const asiCategories = func.getASICategoriesForAgenticCategory(selectedTestRunResult?.superCategoryName || "");
+    const mcpCategories = func.getMCPCategoriesForCategory(selectedTestRunResult?.superCategoryName || "");
+    const llmCategories = func.getLLMCategoriesForCategory(selectedTestRunResult?.superCategoryName || "");
 
     function ActionsComp() {
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
@@ -529,15 +531,33 @@ function TestRunResultFlyout(props) {
                                         <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
                                     </Link>
                                 ) : null}
-                                {asiCategories.length > 0 ? (
+                                {asiCategories.length > 0 && (
                                     <HorizontalStack gap="1" wrap>
                                         {asiCategories.map((asi, index) => (
-                                            <Link key={index} onClick={() => window.open(asi.url, '_blank')}>
+                                            <Link key={"asi-"+index} onClick={() => window.open(asi.url, '_blank')}>
                                                 <Badge size="small">{asi.label}</Badge>
                                             </Link>
                                         ))}
                                     </HorizontalStack>
-                                ) : null}
+                                )}
+                                {mcpCategories.length > 0 && (
+                                    <HorizontalStack gap="1" wrap>
+                                        {mcpCategories.map((mcp, index) => (
+                                            <Link key={"mcp-"+index} onClick={() => window.open(mcp.url, '_blank')}>
+                                                <Badge size="small">{mcp.label}</Badge>
+                                            </Link>
+                                        ))}
+                                    </HorizontalStack>
+                                )}
+                                {llmCategories.length > 0 && (
+                                    <HorizontalStack gap="1" wrap>
+                                        {llmCategories.map((llm, index) => (
+                                            <Link key={"llm-"+index} onClick={() => window.open(llm.url, '_blank')}>
+                                                <Badge size="small">{llm.label}</Badge>
+                                            </Link>
+                                        ))}
+                                    </HorizontalStack>
+                                )}
                             </VerticalStack>
                         </div>
                         {
