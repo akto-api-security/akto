@@ -10,6 +10,7 @@ import {
   getComponentColors,
   getComponentIcon,
   buildArcadeGraph,
+  buildVSCodeGraph,
 } from './agentGraphUtils';
 
 // Custom Node Component following ApiDependencyNode pattern - memoized to prevent re-renders
@@ -23,6 +24,7 @@ const AgentNode = memo(function AgentNode({ data }) {
   return (
     <>
       <Handle type="target" position={Position.Left} />
+      <Handle type="target" position={Position.Top} id="top" />
       <div onClick={() => onNodeClick && onNodeClick(component)} style={{ cursor: "pointer" }}>
         <VerticalStack gap={2}>
           <Card padding={0}>
@@ -70,6 +72,7 @@ const AgentNode = memo(function AgentNode({ data }) {
         </VerticalStack>
       </div>
       <Handle type="source" position={Position.Right} id="b" />
+      <Handle type="source" position={Position.Bottom} id="bottom" />
     </>
   );
 });
@@ -110,7 +113,7 @@ const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targe
         markerEnd={`url(#arrow-${id})`}
       />
       {edgeParam && (
-        <foreignObject x={midX - 50} y={midY - 12} width={100} height={24}>
+        <foreignObject x={midX - 95} y={midY - 12} width={190} height={28}>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <Badge size="small" status="new">
               <TooltipText tooltip={edgeParam} text={edgeParam} />
@@ -131,6 +134,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
   const [collectionData, setCollectionData] = useState(null);
   const [serviceGraphEdges, setServiceGraphEdges] = useState({});
   const [arcadeGraphData, setArcadeGraphData] = useState(null);
+  const [vscodeGraphData, setVSCodeGraphData] = useState(null);
 
   // Memoize node and edge types to prevent re-creation on each render
   const nodeTypes = useMemo(() => ({ agentNode: AgentNode }), []);
@@ -197,6 +201,19 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             const mcpServers = metadata['mcp-server-names'] || [];
             const agentName = metadata['user-agent'] || 'AI Agent';
             setArcadeGraphData({ mcpServers, agentName });
+            setVSCodeGraphData(null);
+          } else {
+            // Check if this is a VSCode / GitHub Copilot collection — hub-and-spoke data flow
+            const copilotEdge = (apiCollection.serviceGraphEdges || {})['Tool'];
+            const name = (apiCollection.displayName || apiCollection.name || apiCollection.hostName || '').toLowerCase();
+            const isVSCode = copilotEdge && (name.includes('vscode') || name.includes('copilot'));
+            if (isVSCode) {
+              setVSCodeGraphData(true);
+              setArcadeGraphData(null);
+            } else {
+              setVSCodeGraphData(null);
+              setArcadeGraphData(null);
+            }
           }
         }
       } catch (error) {
@@ -216,10 +233,17 @@ function AgentDiscoverGraph({ apiCollectionId }) {
     return buildArcadeGraph({ ...arcadeGraphData, onNodeClick: handleNodeClick });
   }, [arcadeGraphData, handleNodeClick]);
 
+  const vscodeFormattedGraph = useMemo(() => {
+    if (!vscodeGraphData) return null;
+    return buildVSCodeGraph({ onNodeClick: handleNodeClick });
+  }, [vscodeGraphData, handleNodeClick]);
+
   // Memoize nodes and edges transformation to prevent unnecessary re-renders
   const { nodes: formattedNodes, edges: formattedEdges } = useMemo(() => {
-    // If arcade graph is active, use it
+    // If arcade graph is active, use it (linear chain)
     if (arcadeFormattedGraph) return arcadeFormattedGraph;
+    // If VSCode graph is active, use hub-and-spoke data flow
+    if (vscodeFormattedGraph) return vscodeFormattedGraph;
 
     const nodes = [];
     const edges = [];
@@ -415,7 +439,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
     }
 
     return { nodes, edges };
-  }, [arcadeFormattedGraph, serviceGraphEdges, collectionData, handleNodeClick]);
+  }, [arcadeFormattedGraph, vscodeFormattedGraph, serviceGraphEdges, collectionData, handleNodeClick]);
 
   // Update state only when memoized values change
   useEffect(() => {
@@ -438,14 +462,16 @@ function AgentDiscoverGraph({ apiCollectionId }) {
   }
 
   // Don't render if no data at all
-  if (!arcadeGraphData && (!serviceGraphEdges || Object.keys(serviceGraphEdges).length === 0)) {
+  if (!arcadeGraphData && !vscodeGraphData && (!serviceGraphEdges || Object.keys(serviceGraphEdges).length === 0)) {
     return null;
   }
 
-  // Calculate dynamic height
+  // Calculate dynamic height (VSCode needs more vertical space for elongated edges)
   const dynamicHeight = arcadeGraphData
     ? 400
-    : Math.max(500, Math.min(800, Object.keys(serviceGraphEdges).length * 120 + 200));
+    : vscodeGraphData
+      ? 520
+      : Math.max(500, Math.min(800, Object.keys(serviceGraphEdges).length * 120 + 200));
 
   return (
     <Card>
@@ -458,6 +484,14 @@ function AgentDiscoverGraph({ apiCollectionId }) {
                 <>
                   <Badge status="info">1 AI Agent</Badge>
                   <Badge status="info">{arcadeGraphData.mcpServers.length} MCP Servers</Badge>
+                </>
+              ) : vscodeGraphData ? (
+                <>
+                  <Badge status="info">1 User</Badge>
+                  <Badge status="info">1 VSCode</Badge>
+                  <Badge status="info">1 LLM</Badge>
+                  <Badge status="info">1 Guardrail</Badge>
+                  <Badge status="info">1 Tool Call</Badge>
                 </>
               ) : (
                 Object.entries(categoryStats).map(([category, count]) => (
