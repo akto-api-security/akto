@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import TestingStore from "../testingStore";
-import { Divider, LegacyCard, TextField, VerticalStack, Text, FormLayout } from "@shopify/polaris";
+import { Divider, LegacyCard, TextField, VerticalStack, Text, FormLayout, Select } from "@shopify/polaris";
 
 function DigestAuth(props) {
     const { setInformation } = props;
@@ -10,7 +10,8 @@ function DigestAuth(props) {
         username: "",
         password: "",
         targetUrl: "",
-        method: "GET"
+        method: "GET",
+        algorithm: "SHA-256"
     }]);
 
     useEffect(() => {
@@ -22,7 +23,8 @@ function DigestAuth(props) {
                     username: existingParam.username || "",
                     password: existingParam.password || "",
                     targetUrl: existingParam.targetUrl || "",
-                    method: existingParam.method || "GET"
+                    method: existingParam.method || "GET",
+                    algorithm: existingParam.algorithm || "SHA-256"
                 }]);
             }
         }
@@ -32,7 +34,7 @@ function DigestAuth(props) {
         // Transform digest auth data to the format expected by backend
         const digestAuthParams = [];
         const param = authParams[0];
-        
+
         // Always push all parameters to maintain structure
         digestAuthParams.push({
             key: 'username',
@@ -54,7 +56,12 @@ function DigestAuth(props) {
             value: param.method || 'GET',
             where: 'HEADER'
         });
-        
+        digestAuthParams.push({
+            key: 'algorithm',
+            value: param.algorithm || 'SHA-256',
+            where: 'HEADER'
+        });
+
         setInformation({ authParams: digestAuthParams });
     }, [authParams, setInformation]);
 
@@ -112,6 +119,17 @@ function DigestAuth(props) {
                                 placeholder="GET"
                                 helpText="HTTP method for the initial challenge request (default: GET)"
                                 autoComplete="off"
+                            />
+
+                            <Select
+                                label="Algorithm"
+                                options={[
+                                    { label: "SHA-256", value: "SHA-256" },
+                                    { label: "MD5", value: "MD5" }
+                                ]}
+                                value={authParams[0].algorithm}
+                                onChange={(value) => updateAuthParam(0, 'algorithm', value)}
+                                helpText="Hashing algorithm for digest authentication"
                             />
                         </FormLayout>
                         

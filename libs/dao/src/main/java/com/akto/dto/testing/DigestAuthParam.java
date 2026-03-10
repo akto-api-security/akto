@@ -146,7 +146,7 @@ public class DigestAuthParam extends AuthParam {
      * Parse WWW-Authenticate header (following your JS parseWWWAuthenticate function)
      */
     private DigestChallenge parseWWWAuthenticate(String authHeader) {
-        if (!authHeader.toLowerCase().startsWith("digest ")) {
+        if (!authHeader.toLowerCase().startsWith("digest")) {
             return null;
         }
         
