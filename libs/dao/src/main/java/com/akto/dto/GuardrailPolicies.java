@@ -83,6 +83,9 @@ public class GuardrailPolicies {
     // Step 8: Review and Finish
     private boolean active;
 
+    // Whether this policy is the default policy
+    private boolean defaultPolicy;
+
     // Context source - to identify which dashboard created this guardrail
     private CONTEXT_SOURCE contextSource;
 
