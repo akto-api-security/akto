@@ -25,6 +25,10 @@ export const getNodeCategoryFromType = (type) => {
     return { category: 'webhook', type: 'Webhook Tool', description: 'Webhook Handler' };
   }
 
+  if (typeLower.includes('user')) {
+    return { category: 'user', type: 'User', description: 'User Input' };
+  }
+
   return { category: 'internal', type: 'Internal Service', description: 'Internal Service' };
 };
 
@@ -42,6 +46,8 @@ export const getComponentColors = (category) => {
       return { borderColor: '#8b5cf6', backgroundColor: '#f5f3ff' }; // Purple
     case 'webhook':
       return { borderColor: '#e91e63', backgroundColor: '#fce4ec' }; // Pink (webhook theme)
+    case 'user':
+      return { borderColor: '#10b981', backgroundColor: '#ecfdf5' }; // Green
     default:
       return { borderColor: '#6b7280', backgroundColor: '#f9fafb' }; // Gray
   }
@@ -50,6 +56,7 @@ export const getComponentColors = (category) => {
 export const getComponentIcon = (category) => {
   switch (category) {
     case 'external':
+    case 'user':
       return CustomersMinor;
     case 'agent':
       return AutomationMajor;
