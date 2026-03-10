@@ -179,23 +179,31 @@ public class TestRolesAction extends UserAction {
 
             // Handle DIGEST_AUTH separately since it needs all parameters combined
             if (AuthMechanismTypes.valueOf(authAutomationType.toUpperCase()) == AuthMechanismTypes.DIGEST_AUTH) {
-                String username = null, password = null, targetUrl = null, method = "GET";
+                String username = null, password = null, targetUrl = null, method = "GET", algorithm = "SHA-256";
                 
                 // Extract digest auth parameters from authParamData
                 for (AuthParamData data : authParamData) {
-                    if ("username".equals(data.getKey())) {
-                        username = data.getValue();
-                    } else if ("password".equals(data.getKey())) {
-                        password = data.getValue();
-                    } else if ("targetUrl".equals(data.getKey())) {
-                        targetUrl = data.getValue();
-                    } else if ("method".equals(data.getKey())) {
-                        method = data.getValue();
+                    switch (data.getKey()) {
+                        case DigestAuthParam.USERNAME_KEY:
+                            username = data.getValue();
+                            break;
+                        case DigestAuthParam.PASSWORD_KEY:
+                            password = data.getValue();
+                            break;
+                        case DigestAuthParam.TARGET_URL_KEY:
+                            targetUrl = data.getValue();
+                            break;
+                        case DigestAuthParam.METHOD_KEY:
+                            method = data.getValue();
+                            break;
+                        case DigestAuthParam.ALGORITHM_KEY:
+                            algorithm = data.getValue();
+                            break;
                     }
                 }
                 
                 // Create single DigestAuthParam with all the information
-                DigestAuthParam digestParam = new DigestAuthParam(username, password, targetUrl, method);
+                DigestAuthParam digestParam = new DigestAuthParam(username, password, targetUrl, method, algorithm);
                 authParams.clear(); // Remove any null entries
                 authParams.add(digestParam);
             }

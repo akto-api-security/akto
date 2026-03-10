@@ -1,14 +1,26 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.OriginalHttpRequest;
+import lombok.Getter;
+import lombok.Setter;
 
+@Getter
+@Setter
 public class DigestAuthParam extends AuthParam {
+    
+    // Constants for field names
+    public static final String USERNAME_KEY = "username";
+    public static final String PASSWORD_KEY = "password";
+    public static final String TARGET_URL_KEY = "targetUrl";
+    public static final String METHOD_KEY = "method";
+    public static final String ALGORITHM_KEY = "algorithm";
     
     // Digest-specific fields
     private String username;
     private String password;
     private String targetUrl;
     private String method;
+    private String algorithm;
     
     // Standard AuthParam fields - must be present for MongoDB compatibility
     private Location where;
@@ -28,11 +40,17 @@ public class DigestAuthParam extends AuthParam {
     
     // Constructor for creating new instances with digest credentials
     public DigestAuthParam(String username, String password, String targetUrl, String method) {
+        this(username, password, targetUrl, method, "SHA-256"); // Default to SHA-256
+    }
+    
+    // Constructor with algorithm parameter
+    public DigestAuthParam(String username, String password, String targetUrl, String method, String algorithm) {
         this(); // Call default constructor to set defaults
         this.username = username;
         this.password = password;
         this.targetUrl = targetUrl;
         this.method = method != null ? method : "GET";
+        this.algorithm = algorithm != null ? algorithm : "SHA-256"; // Default to SHA-256
     }
     
     // Standard constructor matching other AuthParam classes
@@ -46,14 +64,20 @@ public class DigestAuthParam extends AuthParam {
     
     @Override
     boolean addAuthTokens(OriginalHttpRequest request) {
-        if (this.username == null || this.password == null) {
+        if (this.username == null || this.password == null || this.targetUrl == null) {
             return false;
         }
         
         try {
-            // For API testing, we use configurable digest parameters
-            // In production, these would typically come from a 401 challenge response
-            String digestAuthHeader = computeDigestAuthHeader(request);
+            // Step 1: Get 401 challenge from server (following your JS implementation)
+            DigestChallenge challenge = getDigestChallenge();
+            
+            if (challenge == null) {
+                return false;
+            }
+            
+            // Step 2: Build digest header using server's challenge parameters
+            String digestAuthHeader = buildDigestHeader(request, challenge);
             
             if (digestAuthHeader != null) {
                 // Add the computed Authorization header
@@ -70,51 +94,48 @@ public class DigestAuthParam extends AuthParam {
     }
     
     /**
-     * Computes digest authentication header for API testing
-     * Note: In production servers, these parameters would come from WWW-Authenticate header
-     * For API testing, we use configurable default values that work with most digest auth implementations
+     * Challenge parameters from server's WWW-Authenticate header
      */
-    private String computeDigestAuthHeader(OriginalHttpRequest request) {
+    private static class DigestChallenge {
+        String realm;
+        String nonce;
+        String algorithm;
+        String qop;
+        String opaque;
+        
+        DigestChallenge(String realm, String nonce, String algorithm, String qop, String opaque) {
+            this.realm = realm;
+            this.nonce = nonce;
+            this.algorithm = algorithm != null ? algorithm.toUpperCase() : "SHA-256";
+            this.qop = qop != null ? qop.toLowerCase() : null;
+            this.opaque = opaque;
+        }
+    }
+    
+    /**
+     * Step 1: Get digest challenge from server (like your JS probe request)
+     */
+    private DigestChallenge getDigestChallenge() {
         try {
-            // Configurable digest parameters for API testing
-            // These can be made configurable through UI in future if needed
-            String realm = getConfigurableRealm();
-            String nonce = generateNonce();
-            String algorithm = "MD5"; // Most common algorithm
-            String qop = "auth"; // Quality of protection
+            // Make initial request to get 401 challenge (following your JS code)
+            java.net.URL url = new java.net.URL(this.targetUrl);
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+            conn.setRequestMethod(this.method != null ? this.method : "GET");
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
             
-            String requestMethod = request.getMethod() != null ? request.getMethod() : this.method;
-            String uri = getRequestUri(request);
+            // Get response (should be 401)
+            int responseCode = conn.getResponseCode();
             
-            // Compute HA1 = Hash(username:realm:password)
-            String ha1Input = this.username + ":" + realm + ":" + this.password;
-            String ha1 = computeHash(algorithm, ha1Input);
+            if (responseCode == 401) {
+                // Parse WWW-Authenticate header (like your parseWWWAuthenticate function)
+                String wwwAuth = conn.getHeaderField("WWW-Authenticate");
+                if (wwwAuth != null) {
+                    return parseWWWAuthenticate(wwwAuth);
+                }
+            }
             
-            // Compute HA2 = Hash(method:uri)
-            String ha2Input = requestMethod + ":" + uri;
-            String ha2 = computeHash(algorithm, ha2Input);
-            
-            // Generate client nonce and nonce count
-            String cnonce = generateNonce();
-            String nc = "00000001";
-            
-            // Compute response = Hash(HA1:nonce:nc:cnonce:qop:HA2)
-            String responseInput = ha1 + ":" + nonce + ":" + nc + ":" + cnonce + ":" + qop + ":" + ha2;
-            String response = computeHash(algorithm, responseInput);
-            
-            // Build Authorization header following RFC 2617/7616
-            StringBuilder authHeader = new StringBuilder("Digest ");
-            authHeader.append("username=\"").append(this.username).append("\"");
-            authHeader.append(", realm=\"").append(realm).append("\"");
-            authHeader.append(", nonce=\"").append(nonce).append("\"");
-            authHeader.append(", uri=\"").append(uri).append("\"");
-            authHeader.append(", response=\"").append(response).append("\"");
-            authHeader.append(", algorithm=").append(algorithm);
-            authHeader.append(", qop=").append(qop);
-            authHeader.append(", nc=").append(nc);
-            authHeader.append(", cnonce=\"").append(cnonce).append("\"");
-            
-            return authHeader.toString();
+            return null;
             
         } catch (Exception e) {
             return null;
@@ -122,30 +143,148 @@ public class DigestAuthParam extends AuthParam {
     }
     
     /**
-     * Gets the realm for digest authentication
-     * Uses targetUrl domain if available, otherwise a default realm
+     * Parse WWW-Authenticate header (following your JS parseWWWAuthenticate function)
      */
-    private String getConfigurableRealm() {
-        if (this.targetUrl != null) {
-            try {
-                java.net.URI uri = new java.net.URI(this.targetUrl);
-                String host = uri.getHost();
-                if (host != null) {
-                    return host; // Use the target host as realm
+    private DigestChallenge parseWWWAuthenticate(String authHeader) {
+        if (!authHeader.toLowerCase().startsWith("digest ")) {
+            return null;
+        }
+        
+        String realm = null;
+        String nonce = null;
+        String algorithm = null;
+        String qop = null;
+        String opaque = null;
+        
+        // Parse parameters (following your JS regex approach)
+        String params = authHeader.substring(7); // Remove "Digest "
+        
+        // Split by comma but respect quoted strings
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(?:[^\\s,\"]+|\"(?:\\\\.|[^\"])*\")+");
+        java.util.regex.Matcher matcher = pattern.matcher(params);
+        
+        while (matcher.find()) {
+            String part = matcher.group().trim();
+            String[] kv = part.split("=", 2);
+            if (kv.length == 2) {
+                String key = kv[0].trim();
+                String value = kv[1].trim().replaceAll("^\"|\"$", ""); // Remove quotes
+                
+                switch (key.toLowerCase()) {
+                    case "realm": realm = value; break;
+                    case "nonce": nonce = value; break;
+                    case "algorithm": algorithm = value; break;
+                    case "qop": qop = value; break;
+                    case "opaque": opaque = value; break;
                 }
-            } catch (Exception e) {
-                // Fall through to default
             }
         }
-        return "api"; // Default realm for API testing
+        
+        if (realm != null && nonce != null) {
+            return new DigestChallenge(realm, nonce, algorithm, qop, opaque);
+        }
+        
+        return null;
     }
     
     /**
-     * Generates a random nonce
+     * Step 2: Build digest header using server challenge (like your buildDigestHeader function)
      */
-    private String generateNonce() {
+    private String buildDigestHeader(OriginalHttpRequest request, DigestChallenge challenge) {
+        try {
+            String method = request.getMethod() != null ? request.getMethod() : this.method;
+            String uri = getRequestUri(request);
+            String nc = "00000001";
+            String cnonce = makeCnonce(8);
+            
+            // Determine QOP (following your JS logic)
+            String qop = null;
+            if (challenge.qop != null) {
+                String[] qops = challenge.qop.split(",");
+                for (String q : qops) {
+                    q = q.trim();
+                    if ("auth".equals(q)) {
+                        qop = "auth";
+                        break;
+                    } else if ("auth-int".equals(q)) {
+                        qop = "auth-int";
+                        break;
+                    }
+                }
+            }
+            
+            // Use user-specified algorithm, with fallback to challenge algorithm
+            String hashAlgo = getEffectiveAlgorithm(challenge.algorithm);
+            String ha1 = computeHash(hashAlgo, this.username + ":" + challenge.realm + ":" + this.password);
+            String ha2 = computeHash(hashAlgo, method + ":" + uri);
+            
+            // Compute response (following your JS logic)
+            String response;
+            if (qop != null) {
+                response = computeHash(hashAlgo, ha1 + ":" + challenge.nonce + ":" + nc + ":" + cnonce + ":" + qop + ":" + ha2);
+            } else {
+                response = computeHash(hashAlgo, ha1 + ":" + challenge.nonce + ":" + ha2);
+            }
+            
+            // Build header
+            java.util.List<String> kv = new java.util.ArrayList<>();
+            kv.add("username=\"" + this.username + "\"");
+            kv.add("realm=\"" + challenge.realm + "\"");
+            kv.add("nonce=\"" + challenge.nonce + "\"");
+            kv.add("uri=\"" + uri + "\"");
+            kv.add("response=\"" + response + "\"");
+            kv.add("algorithm=\"" + challenge.algorithm + "\"");
+            
+            if (challenge.opaque != null) {
+                kv.add("opaque=\"" + challenge.opaque + "\"");
+            }
+            
+            if (qop != null) {
+                kv.add("qop=\"" + qop + "\"");
+                kv.add("nc=" + nc);
+                kv.add("cnonce=\"" + cnonce + "\"");
+            }
+            
+            return "Digest " + String.join(", ", kv);
+            
+        } catch (Exception e) {
+            return null;
+        }
+    }
+    
+    /**
+     * Get effective algorithm to use for digest computation
+     * Priority: user-specified algorithm > server challenge algorithm > default
+     */
+    private String getEffectiveAlgorithm(String challengeAlgorithm) {
+        // Use user-specified algorithm if available and valid
+        if (this.algorithm != null && isValidAlgorithm(this.algorithm)) {
+            return this.algorithm;
+        }
+        // Fall back to challenge algorithm if valid
+        if (challengeAlgorithm != null && isValidAlgorithm(challengeAlgorithm)) {
+            return challengeAlgorithm;
+        }
+        // Default to SHA-256 (more secure than MD5)
+        return "SHA-256";
+    }
+    
+    /**
+     * Check if algorithm is supported (MD5 or SHA-256 as per PR comment)
+     */
+    private boolean isValidAlgorithm(String algorithm) {
+        if (algorithm == null) return false;
+        String upperAlgo = algorithm.toUpperCase();
+        return "MD5".equals(upperAlgo) || "SHA-256".equals(upperAlgo) || 
+               "MD5-SESS".equals(upperAlgo) || "SHA-256-SESS".equals(upperAlgo);
+    }
+
+    /**
+     * Generate cnonce (like your JS makeCnonce function)
+     */
+    private String makeCnonce(int len) {
         java.security.SecureRandom random = new java.security.SecureRandom();
-        byte[] bytes = new byte[16];
+        byte[] bytes = new byte[len];
         random.nextBytes(bytes);
         
         StringBuilder sb = new StringBuilder();
@@ -201,7 +340,7 @@ public class DigestAuthParam extends AuthParam {
                     javaAlgorithm = "SHA-512";
                     break;
                 default:
-                    javaAlgorithm = "MD5"; // Default fallback
+                    javaAlgorithm = "SHA-256"; // Default fallback
             }
             
             java.security.MessageDigest md = java.security.MessageDigest.getInstance(javaAlgorithm);
@@ -227,7 +366,6 @@ public class DigestAuthParam extends AuthParam {
         if (this.key == null) return false;
         // Remove any existing Authorization header
         request.getHeaders().remove(this.key.toLowerCase());
-        request.getHeaders().remove("X-Akto-Digest-Auth");
         return true;
     }
 
@@ -236,38 +374,6 @@ public class DigestAuthParam extends AuthParam {
         return Utils.isRequestKeyPresent(this.key, request, where);
     }
 
-    // Digest-specific getters and setters
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public String getTargetUrl() {
-        return targetUrl;
-    }
-
-    public void setTargetUrl(String targetUrl) {
-        this.targetUrl = targetUrl;
-    }
-
-    public String getMethod() {
-        return method;
-    }
-
-    public void setMethod(String method) {
-        this.method = method;
-    }
 
     // Standard AuthParam interface implementations
     @Override
@@ -295,17 +401,7 @@ public class DigestAuthParam extends AuthParam {
         this.value = value;
     }
     
-    public void setKey(String key) {
-        this.key = key;
-    }
-    
-    public void setWhere(Location where) {
-        this.where = where;
-    }
-    
-    public void setShowHeader(Boolean showHeader) {
-        this.showHeader = showHeader;
-    }
+    // setKey, setWhere, setShowHeader are generated by @Setter Lombok annotation
     
     @Override
     public String toString() {
