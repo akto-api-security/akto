@@ -17,12 +17,10 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.notifications.slack.TestingRunWebhookAlert;
-import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -31,7 +29,6 @@ import lombok.Setter;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import java.util.Arrays;
 
 @Getter
 @Setter
@@ -195,26 +192,36 @@ public class ToolsAction extends ActionSupport {
         TestRunIssueStatus status = (existingIssue != null && existingIssue.getTestRunIssueStatus() == TestRunIssueStatus.IGNORED)
             ? TestRunIssueStatus.IGNORED
             : TestRunIssueStatus.OPEN;
-        
-        // Single updateOne with upsert handles both create and update cases
-        TestingRunIssuesDao.instance.getMCollection().updateOne(
-            issueFilter,
-            Updates.combine(
-                // Always update these fields
-                Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, status),
-                Updates.set(TestingRunIssues.LAST_SEEN, now),
-                Updates.set(TestingRunIssues.LAST_UPDATED, now),
-                Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testResult.getTestRunResultSummaryId()),
-                Updates.set(TestingRunIssues.UNREAD, false),
-                // Only set these on insert (when document doesn't exist)
-                Updates.setOnInsert("_id", issueId),
-                Updates.setOnInsert(TestingRunIssues.KEY_SEVERITY, severity),
-                Updates.setOnInsert(TestingRunIssues.CREATION_TIME, now),
-                Updates.setOnInsert(TestingRunIssues.COLLECTION_IDS, Arrays.asList(testResult.getApiInfoKey().getApiCollectionId()))
-            ),
-            new UpdateOptions().upsert(true)
-        );
-        
+
+        if (existingIssue != null) {
+            // Update existing document: only set mutable fields (never _id)
+            Bson updateFilter = Filters.eq("_id", existingIssue.getId());
+            TestingRunIssuesDao.instance.updateOneNoUpsert(
+                updateFilter,
+                Updates.combine(
+                    Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, status),
+                    Updates.set(TestingRunIssues.LAST_SEEN, now),
+                    Updates.set(TestingRunIssues.LAST_UPDATED, now),
+                    Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testResult.getTestRunResultSummaryId()),
+                    Updates.set(TestingRunIssues.UNREAD, false)
+                )
+            );
+        } else {
+            // Insert new document with _id set at insert time
+            TestingRunIssues newIssue = new TestingRunIssues(
+                issueId,
+                severity,
+                status,
+                now,
+                now,
+                testResult.getTestRunResultSummaryId(),
+                null,
+                now,
+                false
+            );
+            TestingRunIssuesDao.instance.insertOne(newIssue);
+        }
+
         loggerMaker.infoAndAddToDb("Created/updated issue for vulnerability: " + issueId.toString(), LogDb.DASHBOARD);
     }
 }
