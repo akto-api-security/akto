@@ -3692,6 +3692,7 @@ public class DbAction extends ActionSupport {
                 apiInfoMap.put("updatedAt", apiInfo.getLastSeen() * 1000L); // Convert seconds to milliseconds
                 apiInfoMap.put("isDeleted", false); // ApiInfo doesn't have isDeleted field, default to false
                 apiInfoMap.put("apiCollectionId", apiInfoKey.getApiCollectionId()); // Include collection ID
+                apiInfoMap.put(ApiInfo.GUARDRAIL_SCHEMA, apiInfo.getGuardrailSchema());
 
                 results.add(apiInfoMap);
             }

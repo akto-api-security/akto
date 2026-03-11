@@ -70,6 +70,51 @@ public class ApiInfo {
     public static final String AGENT_PROXY_GUARDRAIL_ENABLED = "agentProxyGuardrailEnabled";
     private boolean agentProxyGuardrailEnabled;
 
+    public static class MessageFieldEntry {
+        private String fieldPath;
+        private String description;
+
+        public MessageFieldEntry() {}
+
+        public MessageFieldEntry(String fieldPath, String description) {
+            this.fieldPath = fieldPath;
+            this.description = description;
+        }
+
+        public String getFieldPath() { return fieldPath; }
+        public void setFieldPath(String fieldPath) { this.fieldPath = fieldPath; }
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
+    }
+
+    public static class GuardrailSchema {
+        private List<MessageFieldEntry> requestMessageFields;
+        private List<MessageFieldEntry> responseMessageFields;
+        private Integer blockedResponseCode;
+        private String blockedResponseBody;
+        private String blockedResponseContentType;
+
+        public GuardrailSchema() {}
+
+        public List<MessageFieldEntry> getRequestMessageFields() { return requestMessageFields; }
+        public void setRequestMessageFields(List<MessageFieldEntry> requestMessageFields) { this.requestMessageFields = requestMessageFields; }
+
+        public List<MessageFieldEntry> getResponseMessageFields() { return responseMessageFields; }
+        public void setResponseMessageFields(List<MessageFieldEntry> responseMessageFields) { this.responseMessageFields = responseMessageFields; }
+
+        public Integer getBlockedResponseCode() { return blockedResponseCode; }
+        public void setBlockedResponseCode(Integer blockedResponseCode) { this.blockedResponseCode = blockedResponseCode; }
+
+        public String getBlockedResponseBody() { return blockedResponseBody; }
+        public void setBlockedResponseBody(String blockedResponseBody) { this.blockedResponseBody = blockedResponseBody; }
+
+        public String getBlockedResponseContentType() { return blockedResponseContentType; }
+        public void setBlockedResponseContentType(String blockedResponseContentType) { this.blockedResponseContentType = blockedResponseContentType; }
+    }
+
+    public static final String GUARDRAIL_SCHEMA = "guardrailSchema";
+    private GuardrailSchema guardrailSchema;
+
     public static class AuthType {
         public static final String UNAUTHENTICATED = "UNAUTHENTICATED";
         public static final String BASIC = "BASIC";
@@ -517,4 +562,7 @@ public class ApiInfo {
     public void setAgentProxyGuardrailEnabled(boolean agentProxyGuardrailEnabled) {
         this.agentProxyGuardrailEnabled = agentProxyGuardrailEnabled;
     }
+
+    public GuardrailSchema getGuardrailSchema() { return guardrailSchema; }
+    public void setGuardrailSchema(GuardrailSchema guardrailSchema) { this.guardrailSchema = guardrailSchema; }
 }
