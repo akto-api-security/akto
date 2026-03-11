@@ -1109,11 +1109,11 @@ const trueFoundryImportObj = {
     icon: '/public/trueFoundry.svg',
     label: "TrueFoundry",
     text: "Import your TrueFoundry proxy traffic, seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/truefoundry',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/truefoundry',
     key: "TRUEFOUNDRY",
     component: <BannerComponent
         content="Import your TrueFoundry proxy traffic, seamlessly in AKTO."
-        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/truefoundry'
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/truefoundry'
     />
 }
 
