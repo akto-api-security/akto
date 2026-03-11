@@ -16,6 +16,8 @@ import { useState, useEffect } from 'react';
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
 import observeApi from "../../../observe/api";
 import OwaspTag from "../OwaspTag";
+import RuleLabelWithTag from "../RuleLabelWithTag";
+import { RULE_OWASP_THREATS } from "../owaspConfig";
 
 // Helper function to format label with domain count
 const formatPiiLabel = (name, domainCount) => {
@@ -164,7 +166,7 @@ const SensitiveInfoStep = ({
                 {/* PII Types */}
                 <Box>
                     <Checkbox
-                        label="Personally Identifiable Information (PII) types"
+                        label={<RuleLabelWithTag name="Personally Identifiable Information (PII) types" threats={RULE_OWASP_THREATS.pii} />}
                         checked={enablePiiTypes}
                         onChange={setEnablePiiTypes}
                         helpText="Specify the types of PII to be filtered and the desired guardrail behavior."
@@ -259,7 +261,7 @@ const SensitiveInfoStep = ({
                 {/* Regex Patterns */}
                 <Box>
                     <Checkbox
-                        label="Regex patterns"
+                        label={<RuleLabelWithTag name="Regex patterns" threats={RULE_OWASP_THREATS.regex} />}
                         checked={enableRegexPatterns}
                         onChange={setEnableRegexPatterns}
                         helpText="Add up to 10 regex patterns to filter custom types of sensitive information for your specific use case."
@@ -327,7 +329,7 @@ const SensitiveInfoStep = ({
                 {/* Secrets Detection */}
                 <Box>
                     <Checkbox
-                        label="Enable secrets detection"
+                        label={<RuleLabelWithTag name="Enable secrets detection" threats={RULE_OWASP_THREATS.secrets} />}
                         checked={enableSecrets}
                         onChange={setEnableSecrets}
                         helpText="Detect and block secrets, API keys, passwords, and other sensitive information in user inputs."
@@ -354,7 +356,7 @@ const SensitiveInfoStep = ({
                 {/* Sensitive Data Anonymization */}
                 <Box>
                     <Checkbox
-                        label="Enable sensitive data anonymization"
+                        label={<RuleLabelWithTag name="Enable sensitive data anonymization" threats={RULE_OWASP_THREATS.anonymize} />}
                         checked={enableAnonymize}
                         onChange={setEnableAnonymize}
                         helpText="Detect and automatically anonymize sensitive data (emails, credit cards, phone numbers, SSN, etc.) in user inputs by replacing them with placeholders like [REDACTED_EMAIL_1]. Original values are stored securely for later restoration if needed."
