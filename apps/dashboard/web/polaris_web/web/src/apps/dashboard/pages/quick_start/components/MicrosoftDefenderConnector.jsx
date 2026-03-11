@@ -3,7 +3,7 @@ import React from 'react'
 
 function MicrosoftDefenderConnector() {
     const goToDocs = () => {
-        window.open("https://docs.microsoft.com/en-us/microsoft-365/security/defender-endpoint/", '_blank')
+        window.open("https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender", '_blank')
     }
 
     return (

@@ -538,7 +538,7 @@ const microsoftDefenderObj = {
     icon: '/public/microsoft_defender.svg',
     label: "Microsoft Defender for Endpoint",
     text: "Connect your Microsoft Defender for Endpoint account to Akto for enhanced security insights.",
-    docsUrl: 'https://docs.microsoft.com/en-us/microsoft-365/security/defender-endpoint/',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
     key: "MICROSOFT_DEFENDER",
     component: <MicrosoftDefenderConnector/>
 }
