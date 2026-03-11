@@ -64,19 +64,6 @@ public class DigestAuthParam extends AuthParam {
         this.algorithm = algorithm != null ? algorithm : "SHA-256"; // Default to SHA-256
     }
 
-    // Constructor without algorithm parameter (defaults to SHA-256)
-    public DigestAuthParam(String username, String password, String targetUrl, String method) {
-        this(username, password, targetUrl, method, "SHA-256");
-    }
-
-    // Location-based constructor for AuthParam compatibility
-    public DigestAuthParam(Location where, String key, String value, Boolean showHeader) {
-        this(); // Call default constructor to set defaults
-        this.where = where;
-        this.key = key;
-        this.value = value;
-        this.showHeader = showHeader;
-    }
 
 
     @Override
