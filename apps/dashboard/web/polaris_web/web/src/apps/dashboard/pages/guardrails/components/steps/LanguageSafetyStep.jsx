@@ -1,6 +1,8 @@
 import { VerticalStack, Text, Checkbox, HorizontalStack, Button, TextField, Box, DataTable, RangeSlider } from "@shopify/polaris";
 import { DeleteMajor } from '@shopify/polaris-icons';
 import OwaspTag from "../OwaspTag";
+import RuleLabelWithTag from "../RuleLabelWithTag";
+import { RULE_OWASP_THREATS } from "../owaspConfig";
 
 export const LanguageSafetyConfig = {
     number: 3,
@@ -48,7 +50,7 @@ const LanguageSafetyStep = ({
                 {/* Gibberish Detection */}
                 <Box>
                     <Checkbox
-                        label="Enable gibberish detection"
+                        label={<RuleLabelWithTag name="Enable gibberish detection" threats={RULE_OWASP_THREATS.gibberish} />}
                         checked={enableGibberishDetection}
                         onChange={setEnableGibberishDetection}
                         helpText="Detect and block gibberish or nonsensical text in user inputs. This helps prevent meaningless prompts that could confuse the AI or be used as attack vectors."
@@ -75,7 +77,7 @@ const LanguageSafetyStep = ({
                 {/* Sentiment Detection */}
                 <Box>
                     <Checkbox
-                        label="Enable sentiment detection"
+                        label={<RuleLabelWithTag name="Enable sentiment detection" threats={RULE_OWASP_THREATS.sentiment} />}
                         checked={enableSentiment}
                         onChange={setEnableSentiment}
                         helpText="Analyze sentiment in user inputs to detect negative, toxic, or inappropriate emotional content."
@@ -102,7 +104,7 @@ const LanguageSafetyStep = ({
                 {/* Profanity */}
                 <Box>
                     <Checkbox
-                        label="Profanity"
+                        label={<RuleLabelWithTag name="Profanity" threats={RULE_OWASP_THREATS.wordFilters} />}
                         checked={wordFilters.profanity}
                         onChange={(checked) => setWordFilters({ ...wordFilters, profanity: checked })}
                         helpText="Redacts profanity words that are considered offensive."
