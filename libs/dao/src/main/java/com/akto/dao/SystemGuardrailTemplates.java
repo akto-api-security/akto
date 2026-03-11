@@ -18,6 +18,7 @@ public final class SystemGuardrailTemplates {
     public static final String NAME_HARMFUL_CONTENT = "Akto-HarmfulContentFilter";
     public static final String NAME_SENSITIVE_DATA = "Akto-SensitiveDataGuard";
     public static final String NAME_PROMPT_INJECTION = "Akto-PromptInjectionGuard";
+    public static final String NAME_SENTIMENT_GUARD = "Akto-SentimentGuard";
 
     private static final String BLOCKED_MSG = "Sorry, the request is blocked due to security reasons";
 
@@ -42,6 +43,9 @@ public final class SystemGuardrailTemplates {
             case NAME_PROMPT_INJECTION:
                 applyPromptInjectionGuard(p);
                 break;
+            case NAME_SENTIMENT_GUARD:
+                applySentimentGuard(p);
+                break;
             default:
                 throw new IllegalArgumentException("Unknown system guardrail template: " + name);
         }
@@ -54,6 +58,7 @@ public final class SystemGuardrailTemplates {
         names.add(NAME_HARMFUL_CONTENT);
         names.add(NAME_SENSITIVE_DATA);
         names.add(NAME_PROMPT_INJECTION);
+        names.add(NAME_SENTIMENT_GUARD);
         return names;
     }
 
@@ -150,5 +155,16 @@ public final class SystemGuardrailTemplates {
         contentFiltering.put("code", null);
         contentFiltering.put("promptAttacks", promptAttacks);
         p.setContentFiltering(contentFiltering);
+    }
+
+    private static void applySentimentGuard(GuardrailPolicies p) {
+        p.setSeverity("MEDIUM");
+        p.setPiiTypes(new ArrayList<>());
+        Map<String, Object> contentFiltering = new HashMap<>();
+        contentFiltering.put("harmfulCategories", null);
+        contentFiltering.put("code", null);
+        contentFiltering.put("promptAttacks", null);
+        p.setContentFiltering(contentFiltering);
+        p.setSentimentDetection(new GuardrailPolicies.SentimentDetection(true, 0.7));
     }
 }

@@ -3622,7 +3622,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    private void ensureSystemGuardrailsExist() {
+    public static void ensureSystemGuardrailsExist() {
         try {
             GuardrailPoliciesDao.instance.createIndicesIfAbsent();
             List<String> names = SystemGuardrailTemplates.getAllSystemTemplateNames();

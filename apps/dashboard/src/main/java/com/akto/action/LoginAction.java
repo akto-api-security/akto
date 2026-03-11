@@ -219,6 +219,17 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             session.setAttribute("username", user.getLogin());
             session.setAttribute("user", user);
             session.setAttribute("login", Context.now());
+            service.submit(() -> {
+                try {
+                    for (String accountIdStr : user.getAccounts().keySet()) {
+                        int accountId = Integer.parseInt(accountIdStr);
+                        Context.accountId.set(accountId);
+                        InitializerListener.ensureSystemGuardrailsExist();
+                    }
+                } catch (Exception e) {
+                    logger.errorAndAddToDb(e, "Error ensuring system guardrails on login: " + e.getMessage(), LogDb.DASHBOARD);
+                }
+            });
             if (signedUp) {
                 User tempUser = UsersDao.instance.getMCollection().findOneAndUpdate(
                         Filters.eq("_id", user.getId()),
