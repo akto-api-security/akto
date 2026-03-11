@@ -56,6 +56,7 @@ const headings = [
     title: "Created by",
     value: "createdBy",
     type: CellType.TEXT,
+    sortActive: true,
   },
   {
     text: "Updated by",
@@ -111,6 +112,20 @@ const sortOptions = [
     directionLabel: "Inactive first",
     sortKey: "status",
     columnIndex: 3,
+  },
+  {
+    label: "Created by",
+    value: "createdBy asc",
+    directionLabel: "A–Z",
+    sortKey: "createdBy",
+    columnIndex: 6,
+  },
+  {
+    label: "Created by",
+    value: "createdBy desc",
+    directionLabel: "Z–A",
+    sortKey: "createdBy",
+    columnIndex: 6,
   },
 ];
 
