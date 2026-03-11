@@ -78,7 +78,8 @@ export const STEP_CONFIG = [
         title: "Anomaly Detection",
         owaspThreats: [
             { id: "ASI08", name: "Cascading Failures" },
-            { id: "ASI10", name: "Rogue Agents" }
+            { id: "ASI10", name: "Rogue Agents" },
+            { id: "ASI07", name: "Insecure Inter-Agent Communication" }
         ],
         ruleViolatedPrefixes: ["Anomaly", "anomaly", "behavioral", "statistical"]
     },
@@ -121,10 +122,7 @@ export const RULE_OWASP_THREATS = {
     promptInjection: [{ id: "ASI01", name: "Agent Goal Hijack" }],
     contextPoisoning: [{ id: "ASI06", name: "Memory & Context Poisoning" }],
     intentVerification: [{ id: "ASI01", name: "Agent Goal Hijack" }, { id: "ASI09", name: "Human-Agent Trust Exploitation" }],
-    // Step 3
-    gibberish: [{ id: "ASI09", name: "Human-Agent Trust Exploitation" }],
-    sentiment: [{ id: "ASI09", name: "Human-Agent Trust Exploitation" }],
-    wordFilters: [{ id: "ASI09", name: "Human-Agent Trust Exploitation" }],
+
     // Step 4
     pii: [{ id: "ASI03", name: "Identity and Privilege Abuse" }],
     regex: [{ id: "ASI03", name: "Identity and Privilege Abuse" }],
