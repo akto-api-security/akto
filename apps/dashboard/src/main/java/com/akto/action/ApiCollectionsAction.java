@@ -348,7 +348,7 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         // Add context-specific tags based on the dashboard from which collection is created 
-        // The below adds a bug where API-Security and ARGUS can have same collection name but the unique name check is applied within respective dashboards not across dashboards.
+        // Limitation : API-Security and ARGUS can have same collection name but the unique name check is applied within respective dashboards not across dashboards.
         addContextSpecificTags(apiCollection.getId());
 
         ActivitiesDao.instance.insertActivity("Collection created", "new Collection " + this.collectionName + " created");
