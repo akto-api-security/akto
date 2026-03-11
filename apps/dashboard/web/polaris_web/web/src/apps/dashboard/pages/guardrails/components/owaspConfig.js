@@ -29,14 +29,6 @@ export const STEP_CONFIG = [
         ruleViolatedPrefixes: ["PromptInjection", "IntentAnalysis", "BanTopics", "Toxicity", "BanSubstrings", "BanCompetitors", "ContextPoisoning", "context_poisoning", "prompt_injection", "intent", "denied_topic", "harmful", "base_prompt"]
     },
     {
-        stepNumber: 3,
-        title: "Language Safety & Abuse Guardrails",
-        owaspThreats: [
-            { id: "ASI09", name: "Human-Agent Trust Exploitation" }
-        ],
-        ruleViolatedPrefixes: ["Gibberish", "Sentiment", "Language", "gibberish", "sentiment", "profanity", "word_filter"]
-    },
-    {
         stepNumber: 4,
         title: "Sensitive Information Guardrails",
         owaspThreats: [
@@ -57,23 +49,6 @@ export const STEP_CONFIG = [
         ruleViolatedPrefixes: ["BanCode", "Code", "ban_code", "code_detection"]
     },
     {
-        stepNumber: 6,
-        title: "Custom Guardrails",
-        owaspThreats: [
-            { id: "ASI02", name: "Tool Misuse and Exploitation" }
-        ],
-        // UserDefinedLLMRule = custom LLM prompt rule, CustomURLRule = external model URL
-        ruleViolatedPrefixes: ["UserDefinedLLMRule", "CustomURLRule", "llm_rule", "custom_url", "custom_guardrail"]
-    },
-    {
-        stepNumber: 7,
-        title: "Usage based Guardrails",
-        owaspThreats: [
-            { id: "ASI08", name: "Cascading Failures" }
-        ],
-        ruleViolatedPrefixes: ["TokenLimit", "token_limit", "rate_limit", "usage"]
-    },
-    {
         stepNumber: 8,
         title: "Anomaly Detection",
         owaspThreats: [
@@ -87,19 +62,11 @@ export const STEP_CONFIG = [
         stepNumber: 9,
         title: "Tools Guardrails",
         owaspThreats: [
-            { id: "ASI02", name: "Tool Misuse and Exploitation" }
+            { id: "ASI02", name: "Tool Misuse and Exploitation" },
+            { id: "ASI04", name: "Agentic Supply Chain Vulnerabilities" }
         ],
         ruleViolatedPrefixes: ["ToolMisuse", "tool_misuse", "tool misuse"]
     },
-    {
-        stepNumber: 10,
-        title: "Server and application settings",
-        owaspThreats: [
-            { id: "ASI04", name: "Agentic Supply Chain Vulnerabilities" },
-            { id: "ASI07", name: "Insecure Inter-Agent Communication" }
-        ],
-        ruleViolatedPrefixes: ["McpServer", "AgentServer", "mcp", "inter_agent", "supply_chain", "server"]
-    }
 ];
 
 /**
@@ -131,14 +98,12 @@ export const RULE_OWASP_THREATS = {
     // Step 5
     codeFilter: [{ id: "ASI05", name: "Unexpected Code Execution" }],
     banCode: [{ id: "ASI05", name: "Unexpected Code Execution" }],
-    // Step 7
-    tokenLimit: [{ id: "ASI08", name: "Cascading Failures" }],
     // Step 8
     anomaly: [{ id: "ASI08", name: "Cascading Failures" }, { id: "ASI10", name: "Rogue Agents" }],
     // Step 9
     toolMisuse: [{ id: "ASI02", name: "Tool Misuse and Exploitation" }],
-    maliciousTools: [{ id: "ASI02", name: "Tool Misuse and Exploitation" }],
-    toolNameDescriptionMismatch: [{ id: "ASI02", name: "Tool Misuse and Exploitation" }],
+    maliciousTools: [{ id: "ASI04", name: "Agentic Supply Chain Vulnerabilities" }],
+    toolNameDescriptionMismatch: [{ id: "ASI04", name: "Agentic Supply Chain Vulnerabilities" }],
     // Step 10
     server: [{ id: "ASI04", name: "Agentic Supply Chain Vulnerabilities" }, { id: "ASI07", name: "Insecure Inter-Agent Communication" }]
 };
