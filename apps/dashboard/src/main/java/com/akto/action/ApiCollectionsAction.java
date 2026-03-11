@@ -347,9 +347,52 @@ public class ApiCollectionsAction extends UserAction {
         } catch(Exception e){
         }
 
+        // Add context-specific tags based on the dashboard from which collection is created
+        addContextSpecificTags(apiCollection.getId());
+
         ActivitiesDao.instance.insertActivity("Collection created", "new Collection " + this.collectionName + " created");
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private void addContextSpecificTags(int collectionId) {
+        try {
+            CONTEXT_SOURCE currentContextSource = Context.contextSource.get();
+            
+            if (currentContextSource == null) {
+                return; // No context source set, skip tagging
+            }
+            
+            CollectionTags tagToAdd = null;
+            
+            switch (currentContextSource) {
+                case AGENTIC:
+                    // Collections created from ARGUS (Agentic Security) should have gen-ai tag
+                    // This makes them show up in the ARGUS dashboard
+                    tagToAdd = new CollectionTags(
+                        Context.now(),
+                        Constants.AKTO_GEN_AI_TAG,
+                        "Gen AI",
+                        CollectionTags.TagSource.USER
+                    );
+                    break;
+            }
+            
+            if (tagToAdd != null) {
+                // Add the tag to the collection
+                ApiCollectionsDao.instance.getMCollection().updateOne(
+                    Filters.eq(ApiCollection.ID, collectionId),
+                    Updates.addToSet(ApiCollection.TAGS_STRING, tagToAdd)
+                );
+                
+                loggerMaker.info("Added context-specific tag '" + tagToAdd.getKeyName() + "=" + tagToAdd.getValue() + 
+                               "' to collection ID: " + collectionId + " (context: " + currentContextSource.name() + ")",
+                               LogDb.DASHBOARD);
+            }
+        } catch (Exception e) {
+            loggerMaker.error("Error adding context-specific tags to collection " + collectionId + ": " + e.getMessage(),
+                            LogDb.DASHBOARD);
+        }
     }
 
     public String deleteCollection() {
