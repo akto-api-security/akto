@@ -451,11 +451,11 @@ export default {
         })
         return resp
     },
-    async bulkAgentProxyGuardrail(apiInfoIds, enabled) {
+    async bulkAgentProxyGuardrail(apiInfoIds, enabled, schemaConfig = {}) {
         const resp = await request({
             url: '/api/apiInfo/bulkAgentProxyGuardrail',
             method: 'post',
-            data: { apiInfoIds, enabled }
+            data: { apiInfoIds, enabled, ...schemaConfig }
         })
         return resp
     },
