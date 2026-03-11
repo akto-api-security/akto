@@ -16,7 +16,7 @@ const OwaspTag = ({ stepNumber, threats, idOnly = false }) => {
             rel="noopener noreferrer"
             style={{ textDecoration: "none" }}
         >
-            <Tag>{idOnly ? id : `OWASP Agentic ${id} - ${name}`}</Tag>
+            <Tag>{idOnly ? `OWASP ${id}` : `OWASP Agentic ${id} - ${name}`}</Tag>
         </a>
     ));
 
