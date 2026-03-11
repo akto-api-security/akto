@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { EmptySearchResult, VerticalStack, Button, Badge, Text } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
-import CreateGuardrailModal from "./components/CreateGuardrailModal";
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
@@ -133,13 +132,11 @@ function GuardrailPolicies() {
             if (response && response.guardrailPolicies) {
                 const formattedPolicies = response.guardrailPolicies
                     .sort((a, b) => {
-                        // System guardrails first (API already sorts; client reinforces)
+                        // System guardrails first (sticky); then custom by active, then timestamp
                         const aSystem = Boolean(a.systemGuardrail);
                         const bSystem = Boolean(b.systemGuardrail);
                         if (aSystem !== bSystem) return (aSystem ? 0 : 1) - (bSystem ? 0 : 1);
-                        // Then by active status (active first)
                         if (a.active !== b.active) return (b.active ? 1 : 0) - (a.active ? 1 : 0);
-                        // Then by timestamp (latest first)
                         return (b.updatedTimestamp || b.createdTimestamp) - (a.updatedTimestamp || a.createdTimestamp);
                     })
                     .map(policy => ({
@@ -537,6 +534,16 @@ function GuardrailPolicies() {
         );
     }
 
+    // Sticky system guardrails: always on top; column sort applies only to custom policies
+    const modifyDataForStickySystem = (filters, dataSortKey, sortOrder) => {
+        const system = policyData.filter((p) => p.originalData?.systemGuardrail);
+        const custom = policyData.filter((p) => !p.originalData?.systemGuardrail);
+        const sortedCustom = dataSortKey
+            ? func.sortFunc([...custom], dataSortKey, sortOrder, false)
+            : custom;
+        return [...system, ...sortedCustom];
+    };
+
     const components = [
         <GithubSimpleTable
             key={`policies-table-${policyData.length}`}
@@ -549,6 +556,8 @@ function GuardrailPolicies() {
             hidePagination={true}
             showFooter={false}
             sortOptions={sortOptions}
+            customFilters={true}
+            modifyData={modifyDataForStickySystem}
             emptyStateMarkup={emptyStateMarkup}
             onRowClick={rowClicked}
             rowClickable={true}
