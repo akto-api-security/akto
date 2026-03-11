@@ -1,11 +1,12 @@
-const TYPE_TAG_KEYS = { MCP_SERVER: 'mcp-server', GEN_AI: 'gen-ai', BROWSER_LLM: 'browser-llm' };
+const TYPE_TAG_KEYS = { MCP_SERVER: 'mcp-server', GEN_AI: 'gen-ai', BROWSER_LLM: 'browser-llm', SKILL: 'skill' };
 const ASSET_TAG_KEYS = { MCP_CLIENT: 'mcp-client', AI_AGENT: 'ai-agent', BROWSER_LLM_AGENT: 'browser-llm-agent' };
-const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server' };
+const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server', SKILL: 'Skill' };
 const ROW_TYPES = { AGENT: 'agent', SERVICE: 'service' };
 const TYPE_TAG_TO_DISPLAY = {
     [TYPE_TAG_KEYS.MCP_SERVER]: CLIENT_TYPES.MCP_SERVER,
     [TYPE_TAG_KEYS.GEN_AI]: CLIENT_TYPES.AI_AGENT,
     [TYPE_TAG_KEYS.BROWSER_LLM]: CLIENT_TYPES.LLM,
+    [TYPE_TAG_KEYS.SKILL]: CLIENT_TYPES.SKILL,
 };
 
 // Known clients: keyword -> { displayName, domain, agentType }

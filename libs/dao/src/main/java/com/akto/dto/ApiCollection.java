@@ -543,6 +543,13 @@ public class ApiCollection {
         return false;
     }
 
+    public boolean isSkillCollection() {
+        if (!CollectionUtils.isEmpty(this.getTagsList())) {
+            return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_SKILL_TAG.equals(t.getKeyName()));
+        }
+        return false;
+    }
+
     public boolean isDastCollection() {
         if (!CollectionUtils.isEmpty(this.getTagsList())) {
             return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_DAST_TAG.equals(t.getKeyName()));
