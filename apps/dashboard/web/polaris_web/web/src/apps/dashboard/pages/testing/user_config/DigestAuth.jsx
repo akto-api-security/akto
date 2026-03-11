@@ -108,7 +108,7 @@ function DigestAuth(props) {
                                 value={authParams[0].targetUrl}
                                 onChange={(value) => updateAuthParam(0, 'targetUrl', value)}
                                 placeholder="https://api.example.com/endpoint"
-                                helpText="Enter the complete URL of the API endpoint that requires digest auth"
+                                helpText="Enter the complete URL that provides digest auth"
                                 autoComplete="off"
                             />
                             
