@@ -18,6 +18,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import PersistStore from "../../../../main/PersistStore"
 import { CollectionIcon } from "../../../components/shared/CollectionIcon"
 import transform from "../transform"
+import GuardrailSchemaModal from "./GuardrailSchemaModal"
 import { CellType } from "../../../components/tables/rows/GithubRow"
 import {ApiGroupModal, Operation} from "./ApiGroupModal"
 import TooltipText from "../../../components/shared/TooltipText"
@@ -173,7 +174,8 @@ const headings = [
         title: "Description",
         filterKey: "description",
         tooltipContent: "Description of the API",
-    }
+    },
+    { title: '', type: CellType.ACTION }
 ]
 
 let headers = JSON.parse(JSON.stringify(headings))
@@ -288,6 +290,9 @@ function ApiEndpoints(props) {
     const [bulkGuardrailEnabled, setBulkGuardrailEnabled] = useState(false)
     const [bulkGuardrailApiIds, setBulkGuardrailApiIds] = useState([])
     const [updatingGuardrails, setUpdatingGuardrails] = useState(false)
+    const [showGuardrailSchemaModal, setShowGuardrailSchemaModal] = useState(false)
+    const [selectedEndpointForSchema, setSelectedEndpointForSchema] = useState(null)
+    const [savingGuardrailSchema, setSavingGuardrailSchema] = useState(false)
 
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
@@ -1548,6 +1553,23 @@ function ApiEndpoints(props) {
         }
     }
 
+    async function handleSaveGuardrailSchema(schemaConfig) {
+        const item = selectedEndpointForSchema
+        const apiInfoId = `${item.apiCollectionId} ${item.endpoint} ${item.method}`
+        setSavingGuardrailSchema(true)
+        try {
+            const payload = schemaConfig === null ? { clearGuardrailSchema: true } : { guardrailSchema: schemaConfig }
+            await api.bulkAgentProxyGuardrail([apiInfoId], item.agentProxyGuardrailEnabled, payload)
+            func.setToast(true, false, schemaConfig === null ? 'Guardrail schema cleared' : 'Guardrail schema updated successfully')
+            setShowGuardrailSchemaModal(false)
+            setTimeout(() => { fetchData() }, 500)
+        } catch (error) {
+            func.setToast(true, true, `Error updating guardrail schema: ${error.message || 'Unknown error'}`)
+        } finally {
+            setSavingGuardrailSchema(false)
+        }
+    }
+
     let modal = (
         <Modal
             open={showRedactModal}
@@ -1673,6 +1695,13 @@ function ApiEndpoints(props) {
                     }
                 })
             }
+            actions.push({
+                content: 'Configure guardrail schema',
+                onAction: () => {
+                    setSelectedEndpointForSchema(item)
+                    setShowGuardrailSchemaModal(true)
+                }
+            })
         }
         
         return actions.length > 0 ? [{ items: actions }] : []
@@ -1782,7 +1811,16 @@ function ApiEndpoints(props) {
                   modal,
                   deleteApiModal,
                   bulkDeMergeModal,
-                  bulkGuardrailModal
+                  bulkGuardrailModal,
+                  <GuardrailSchemaModal
+                      key="guardrail-schema-modal"
+                      open={showGuardrailSchemaModal}
+                      onClose={() => setShowGuardrailSchemaModal(false)}
+                      endpoint={selectedEndpointForSchema ? `${selectedEndpointForSchema.method} ${selectedEndpointForSchema.endpoint}` : ''}
+                      initialData={selectedEndpointForSchema}
+                      onSave={handleSaveGuardrailSchema}
+                      saving={savingGuardrailSchema}
+                  />
             ]
         )
       ]

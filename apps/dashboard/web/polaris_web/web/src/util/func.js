@@ -1222,6 +1222,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               lastTested: apiInfoMap[key] ? apiInfoMap[key]["lastTested"] : 0,
               isThreatEnabled: apiInfoMap[key] ? apiInfoMap[key]["threatScore"] > 0 : false,
               agentProxyGuardrailEnabled: apiInfoMap[key] ? (apiInfoMap[key]["agentProxyGuardrailEnabled"] || false) : false,
+              guardrailSchema: apiInfoMap[key] ? (apiInfoMap[key]["guardrailSchema"] || null) : null,
           }
 
       }
