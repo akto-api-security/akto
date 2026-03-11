@@ -3626,27 +3626,29 @@ public class InitializerListener implements ServletContextListener {
             List<String> names = SystemGuardrailTemplates.getAllSystemTemplateNames();
             List<CONTEXT_SOURCE> contextSources = Arrays.asList(CONTEXT_SOURCE.ENDPOINT, CONTEXT_SOURCE.AGENTIC);
             List<GuardrailPolicies> existing = GuardrailPoliciesDao.instance.findSystemGuardrails(names, contextSources);
-            Set<String> existingKeys = new HashSet<>();
+            Map<String, GuardrailPolicies> existingByKey = new HashMap<>();
             for (GuardrailPolicies p : existing) {
                 if (p.getName() != null && p.getContextSource() != null) {
-                    existingKeys.add(p.getName() + "\t" + p.getContextSource().name());
+                    existingByKey.put(p.getName() + "\t" + p.getContextSource().name(), p);
                 }
             }
             int now = Context.now();
-            List<GuardrailPolicies> toInsert = new ArrayList<>();
+            int currentVersion = SystemGuardrailTemplates.CURRENT_TEMPLATE_VERSION;
             for (String name : names) {
                 for (CONTEXT_SOURCE contextSource : contextSources) {
-                    if (existingKeys.contains(name + "\t" + contextSource.name())) {
+                    String key = name + "\t" + contextSource.name();
+                    GuardrailPolicies existingPolicy = existingByKey.get(key);
+                    Integer existingVersion = existingPolicy != null ? existingPolicy.getTemplateVersion() : null;
+                    boolean needUpsert = existingVersion == null || existingVersion < currentVersion;
+                    if (!needUpsert) {
                         continue;
                     }
                     GuardrailPolicies policy = SystemGuardrailTemplates.getTemplate(name, contextSource);
                     policy.setCreatedTimestamp(now);
                     policy.setUpdatedTimestamp(now);
-                    toInsert.add(policy);
+                    ObjectId existingId = existingPolicy != null ? existingPolicy.getId() : null;
+                    GuardrailPoliciesDao.instance.upsertSystemGuardrail(policy, existingId);
                 }
-            }
-            if (!toInsert.isEmpty()) {
-                GuardrailPoliciesDao.instance.insertMany(toInsert);
             }
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error ensuring system guardrails exist for account " + Context.accountId.get() + ": " + e.getMessage(), LogDb.DASHBOARD);

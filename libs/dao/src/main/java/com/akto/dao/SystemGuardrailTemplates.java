@@ -20,6 +20,9 @@ public final class SystemGuardrailTemplates {
     public static final String NAME_PROMPT_INJECTION = "Akto-PromptInjectionGuard";
     public static final String NAME_SENTIMENT_GUARD = "Akto-SentimentGuard";
 
+    /** Bump when template defaults or structure change; existing docs with lower version get upserted. */
+    public static final int CURRENT_TEMPLATE_VERSION = 1;
+
     private static final String BLOCKED_MSG = "Sorry, the request is blocked due to security reasons";
 
     private SystemGuardrailTemplates() {}
@@ -74,6 +77,7 @@ public final class SystemGuardrailTemplates {
         p.setConfidenceScore(0.0);
         p.setContextSource(contextSource);
         p.setSystemGuardrail(true);
+        p.setTemplateVersion(CURRENT_TEMPLATE_VERSION);
         p.setCreatedBy("system");
         p.setUpdatedBy("system");
         p.setDeniedTopics(new ArrayList<>());

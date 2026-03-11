@@ -6,7 +6,9 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.ReplaceOptions;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 import java.util.List;
 
@@ -65,15 +67,33 @@ public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> 
         return instance.findOne(filter);
     }
 
-    /** One query to find existing system guardrails for given names and context sources (projection: name, contextSource). */
+    /** One query to find existing system guardrails for given names and context sources (projection: _id, name, contextSource, templateVersion). */
     public List<GuardrailPolicies> findSystemGuardrails(List<String> names, List<CONTEXT_SOURCE> contextSources) {
         Bson filter = Filters.and(
                 Filters.eq("systemGuardrail", true),
                 Filters.in("name", names),
                 Filters.in("contextSource", contextSources)
         );
-        Bson projection = Projections.include("name", "contextSource");
+        Bson projection = Projections.include("_id", "name", "contextSource", "templateVersion");
         return instance.findAll(filter, 0, names.size() * contextSources.size(), null, projection);
+    }
+
+    /**
+     * Upsert a system guardrail (insert if missing, replace if present). Call only when insert or update is required.
+     * When existingId is non-null, replaces by _id (update only). When null, replaces by filter with upsert (insert).
+     */
+    public void upsertSystemGuardrail(GuardrailPolicies template, ObjectId existingId) {
+        if (existingId != null) {
+            template.setId(existingId);
+            instance.getMCollection().replaceOne(Filters.eq("_id", existingId), template, new ReplaceOptions().upsert(false));
+        } else {
+            Bson filter = Filters.and(
+                    Filters.eq("name", template.getName()),
+                    Filters.eq("contextSource", template.getContextSource()),
+                    Filters.eq("systemGuardrail", true)
+            );
+            instance.replaceOne(filter, template);
+        }
     }
 
     public List<GuardrailPolicies> findAllSortedByCreatedTimestamp(int skip, int limit) {

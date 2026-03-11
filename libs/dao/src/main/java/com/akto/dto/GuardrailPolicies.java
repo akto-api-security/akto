@@ -91,6 +91,9 @@ public class GuardrailPolicies {
     // Context source - to identify which dashboard created this guardrail
     private CONTEXT_SOURCE contextSource;
 
+    // Template version for system guardrails; null or < current means needs update
+    private Integer templateVersion;
+
     public String getHexId() {
         if (this.id != null) {
             return this.id.toHexString();
