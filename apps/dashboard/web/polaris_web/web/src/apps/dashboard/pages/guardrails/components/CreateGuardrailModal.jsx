@@ -172,7 +172,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         mcpServers,
         agentServers,
         applyOnRequest,
-        applyOnResponse
+        applyOnResponse,
+        systemGuardrail: Boolean(editingPolicy?.systemGuardrail)
     });
 
     const getStepsWithSummary = () => {
@@ -601,10 +602,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 },
                 url: enableExternalModel ? (url || null) : null,
                 confidenceScore: enableExternalModel ? confidenceScore : null,
-                selectedMcpServers: selectedMcpServers,
-                selectedAgentServers: selectedAgentServers,
-                selectedMcpServersV2: transformedMcpServers,
-                selectedAgentServersV2: transformedAgentServers,
+                selectedMcpServers: editingPolicy?.systemGuardrail ? [] : selectedMcpServers,
+                selectedAgentServers: editingPolicy?.systemGuardrail ? [] : selectedAgentServers,
+                selectedMcpServersV2: editingPolicy?.systemGuardrail ? [] : transformedMcpServers,
+                selectedAgentServersV2: editingPolicy?.systemGuardrail ? [] : transformedAgentServers,
                 applyOnResponse,
                 applyOnRequest,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
@@ -862,6 +863,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         mcpServers={mcpServers}
                         agentServers={agentServers}
                         collectionsLoading={collectionsLoading}
+                        systemGuardrail={Boolean(editingPolicy?.systemGuardrail)}
                     />
                 );
             default:

@@ -1,7 +1,6 @@
 package com.akto.dao;
 
 import com.akto.dto.GuardrailPolicies;
-import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dao.context.Context;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
@@ -52,6 +51,29 @@ public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> 
 
         fieldNames = new String[]{"contextSource", "updatedTimestamp"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        fieldNames = new String[]{"systemGuardrail", "createdTimestamp"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+    }
+
+    public GuardrailPolicies findByNameAndContextSourceAndSystemGuardrail(String name, CONTEXT_SOURCE contextSource, boolean systemGuardrail) {
+        Bson filter = Filters.and(
+                Filters.eq("name", name),
+                Filters.eq("contextSource", contextSource),
+                Filters.eq("systemGuardrail", systemGuardrail)
+        );
+        return instance.findOne(filter);
+    }
+
+    /** One query to find existing system guardrails for given names and context sources (projection: name, contextSource). */
+    public List<GuardrailPolicies> findSystemGuardrails(List<String> names, List<CONTEXT_SOURCE> contextSources) {
+        Bson filter = Filters.and(
+                Filters.eq("systemGuardrail", true),
+                Filters.in("name", names),
+                Filters.in("contextSource", contextSources)
+        );
+        Bson projection = Projections.include("name", "contextSource");
+        return instance.findAll(filter, 0, names.size() * contextSources.size(), null, projection);
     }
 
     public List<GuardrailPolicies> findAllSortedByCreatedTimestamp(int skip, int limit) {

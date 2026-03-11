@@ -116,10 +116,18 @@ public class GuardrailPoliciesAction extends UserAction {
             }
 
             // Use upsert operation
-            Bson filter = (hexId != null && !hexId.isEmpty()) 
+            Bson filter = (hexId != null && !hexId.isEmpty())
                 ? Filters.eq(Constants.ID, new ObjectId(hexId))
-                : Filters.eq("name", policy.getName()); // or use another unique identifier
-            
+                : Filters.eq("name", policy.getName());
+
+            boolean forceEmptyServerLists = false;
+            if (hexId != null && !hexId.isEmpty()) {
+                GuardrailPolicies existing = GuardrailPoliciesDao.instance.findOne(filter);
+                if (existing != null && Boolean.TRUE.equals(existing.getSystemGuardrail())) {
+                    forceEmptyServerLists = true;
+                }
+            }
+
             List<Bson> updates = new ArrayList<>();
             updates.add(Updates.set("name", policy.getName()));
             updates.add(Updates.set("description", policy.getDescription()));
@@ -132,6 +140,7 @@ public class GuardrailPoliciesAction extends UserAction {
             updates.add(Updates.set("regexPatterns", policy.getRegexPatterns()));
             updates.add(Updates.set("regexPatternsV2", policy.getRegexPatternsV2()));
             updates.add(Updates.set("contentFiltering", policy.getContentFiltering()));
+            updates.add(Updates.set("wordFilters", policy.getWordFilters()));
             updates.add(Updates.set("llmRule", policy.getLlmRule()));
             updates.add(Updates.set("basePromptRule", policy.getBasePromptRule()));
             updates.add(Updates.set("gibberishDetection", policy.getGibberishDetection()));
@@ -140,10 +149,11 @@ public class GuardrailPoliciesAction extends UserAction {
             updates.add(Updates.set("secretsDetection", policy.getSecretsDetection()));
             updates.add(Updates.set("sentimentDetection", policy.getSentimentDetection()));
             updates.add(Updates.set("tokenLimitDetection", policy.getTokenLimitDetection()));
-            updates.add(Updates.set("selectedMcpServers", policy.getSelectedMcpServers()));
-            updates.add(Updates.set("selectedAgentServers", policy.getSelectedAgentServers()));
-            updates.add(Updates.set("selectedMcpServersV2", policy.getSelectedMcpServersV2()));
-            updates.add(Updates.set("selectedAgentServersV2", policy.getSelectedAgentServersV2()));
+            List<GuardrailPolicies.SelectedServer> emptyServers = new ArrayList<>();
+            updates.add(Updates.set("selectedMcpServers", forceEmptyServerLists ? new ArrayList<String>() : policy.getSelectedMcpServers()));
+            updates.add(Updates.set("selectedAgentServers", forceEmptyServerLists ? new ArrayList<String>() : policy.getSelectedAgentServers()));
+            updates.add(Updates.set("selectedMcpServersV2", forceEmptyServerLists ? emptyServers : policy.getSelectedMcpServersV2()));
+            updates.add(Updates.set("selectedAgentServersV2", forceEmptyServerLists ? emptyServers : policy.getSelectedAgentServersV2()));
             updates.add(Updates.set("applyOnResponse", policy.isApplyOnResponse()));
             updates.add(Updates.set("applyOnRequest", policy.isApplyOnRequest()));
             updates.add(Updates.set("url", policy.getUrl()));
@@ -193,7 +203,15 @@ public class GuardrailPoliciesAction extends UserAction {
                 objectIds.add(new ObjectId(id));
             }
 
-            Bson filter = Filters.in(GuardrailPoliciesDao.ID, objectIds);
+            Bson filter = Filters.in(Constants.ID, objectIds);
+            List<GuardrailPolicies> toDelete = GuardrailPoliciesDao.instance.findAll(filter);
+            for (GuardrailPolicies p : toDelete) {
+                if (Boolean.TRUE.equals(p.getSystemGuardrail())) {
+                    loggerMaker.errorAndAddToDb("Cannot delete system guardrail policy: " + p.getName(), LogDb.DASHBOARD);
+                    return ERROR.toUpperCase();
+                }
+            }
+
             GuardrailPoliciesDao.instance.getMCollection().deleteMany(filter);
 
             loggerMaker.info("Deleted " + policyIds.size() + " guardrail policies by user: " + user.getLogin());

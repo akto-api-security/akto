@@ -10,7 +10,8 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ selectedMcpServers, selectedAgentServers, mcpServers, agentServers, applyOnRequest, applyOnResponse }) => {
+    getSummary: ({ selectedMcpServers, selectedAgentServers, mcpServers, agentServers, applyOnRequest, applyOnResponse, systemGuardrail }) => {
+        if (systemGuardrail) return "All MCP servers, All Agent servers";
         if (selectedMcpServers?.length > 0 || selectedAgentServers?.length > 0) {
             const serverSummary = [];
             if (selectedMcpServers.length > 0) {
@@ -52,7 +53,8 @@ const ServerSettingsStep = ({
     setApplyOnRequest,
     mcpServers,
     agentServers,
-    collectionsLoading
+    collectionsLoading,
+    systemGuardrail = false
 }) => {
     return (
         <VerticalStack gap="4">
@@ -62,27 +64,36 @@ const ServerSettingsStep = ({
             <OwaspTag stepNumber={9} />
 
             <FormLayout>
-                <DropdownSearch
-                    label="Select MCP Servers"
-                    placeholder="Choose MCP servers where guardrail should be applied"
-                    optionsList={mcpServers}
-                    setSelected={setSelectedMcpServers}
-                    preSelected={selectedMcpServers}
-                    allowMultiple={true}
-                    showSelectAllMinOptions={1}
-                    disabled={collectionsLoading}
-                />
+                {systemGuardrail ? (
+                    <>
+                        <Text variant="bodyMd" fontWeight="medium">MCP Servers: All</Text>
+                        <Text variant="bodyMd" fontWeight="medium">Agent Servers: All</Text>
+                    </>
+                ) : (
+                    <>
+                        <DropdownSearch
+                            label="Select MCP Servers"
+                            placeholder="Choose MCP servers where guardrail should be applied"
+                            optionsList={mcpServers}
+                            setSelected={setSelectedMcpServers}
+                            preSelected={selectedMcpServers}
+                            allowMultiple={true}
+                            showSelectAllMinOptions={1}
+                            disabled={collectionsLoading}
+                        />
 
-                <DropdownSearch
-                    label="Select Agent Servers"
-                    placeholder="Choose agent servers where guardrail should be applied"
-                    optionsList={agentServers}
-                    setSelected={setSelectedAgentServers}
-                    preSelected={selectedAgentServers}
-                    allowMultiple={true}
-                    showSelectAllMinOptions={1}
-                    disabled={collectionsLoading}
-                />
+                        <DropdownSearch
+                            label="Select Agent Servers"
+                            placeholder="Choose agent servers where guardrail should be applied"
+                            optionsList={agentServers}
+                            setSelected={setSelectedAgentServers}
+                            preSelected={selectedAgentServers}
+                            allowMultiple={true}
+                            showSelectAllMinOptions={1}
+                            disabled={collectionsLoading}
+                        />
+                    </>
+                )}
 
                 <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <VerticalStack gap="3">

@@ -50,6 +50,9 @@ public class GuardrailPolicies {
     // Step 5: Content Filtering
     private Map<String, Object> contentFiltering;
 
+    // Word filters (profanity + custom words) - Language Safety / Offensive Words
+    private Map<String, Object> wordFilters;
+
     private LLMRule llmRule;
 
     // Step 6.5: Base Prompt Rule - for checking intent of user input in agent base prompts with placeholders
@@ -83,8 +86,7 @@ public class GuardrailPolicies {
     // Step 8: Review and Finish
     private boolean active;
 
-    // Whether this policy is the default policy
-    private boolean defaultPolicy;
+    private Boolean systemGuardrail;
 
     // Context source - to identify which dashboard created this guardrail
     private CONTEXT_SOURCE contextSource;

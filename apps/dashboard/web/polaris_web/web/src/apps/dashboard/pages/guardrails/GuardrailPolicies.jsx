@@ -133,16 +133,20 @@ function GuardrailPolicies() {
             if (response && response.guardrailPolicies) {
                 const formattedPolicies = response.guardrailPolicies
                     .sort((a, b) => {
-                        // First sort by active status (active first)
-                        if (a.active !== b.active) {
-                            return b.active - a.active;
-                        }
+                        // System guardrails first (API already sorts; client reinforces)
+                        const aSystem = Boolean(a.systemGuardrail);
+                        const bSystem = Boolean(b.systemGuardrail);
+                        if (aSystem !== bSystem) return (aSystem ? 0 : 1) - (bSystem ? 0 : 1);
+                        // Then by active status (active first)
+                        if (a.active !== b.active) return (b.active ? 1 : 0) - (a.active ? 1 : 0);
                         // Then by timestamp (latest first)
                         return (b.updatedTimestamp || b.createdTimestamp) - (a.updatedTimestamp || a.createdTimestamp);
                     })
                     .map(policy => ({
                         id: policy.hexId,
-                        policy: policy.name,
+                        policy: policy.systemGuardrail
+                            ? <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>{policy.name}</span><Badge size="small" tone="info">System</Badge></span>
+                            : policy.name,
                         category: determineCategoryFromPolicy(policy),
                         status: policy.active ? "Active" : "Inactive",
                         statusWithSummary: generateStatusWithSummary(policy),
@@ -248,11 +252,11 @@ function GuardrailPolicies() {
         }
 
         // Word filters
-        const wordFilters = [];
-        if (policy.wordFilters?.profanity) wordFilters.push("Profanity");
-        if (policy.wordFilters?.custom?.length > 0) wordFilters.push(`${policy.wordFilters.custom.length} Custom Words`);
-        if (wordFilters.length > 0) {
-            details.push({ label: "Word Filters", value: wordFilters.join(", ") });
+        const wordFilterLabels = [];
+        if (policy.wordFilters?.profanity) wordFilterLabels.push("Profanity");
+        if (policy.wordFilters?.custom?.length > 0) wordFilterLabels.push(`${policy.wordFilters.custom.length} Custom Words`);
+        if (wordFilterLabels.length > 0) {
+            details.push({ label: "Word Filters", value: wordFilterLabels.join(", ") });
         }
 
         // Sensitive information filters (PII types and regex patterns)
@@ -374,15 +378,24 @@ function GuardrailPolicies() {
     }
 
     const promotedBulkActions = (selectedPolicies) => {
+        const nonSystemIds = selectedPolicies.filter(id => !policyData.find(p => p.id === id)?.originalData?.systemGuardrail);
+        const systemCount = selectedPolicies.length - nonSystemIds.length;
+        const deletableCount = nonSystemIds.length;
         return [
             {
                 content: `Delete ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}`,
                 onAction: async () => {
-                    const deleteConfirmationMessage = `Are you sure you want to delete ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}?`;
+                    if (systemCount > 0) {
+                        func.setToast(true, true, "System guardrails cannot be deleted.");
+                        if (deletableCount === 0) return;
+                    }
+                    const toDelete = deletableCount > 0 ? nonSystemIds : [];
+                    if (toDelete.length === 0) return;
+                    const deleteConfirmationMessage = `Are you sure you want to delete ${toDelete.length} polic${toDelete.length > 1 ? "ies" : "y"}?`;
                     func.showConfirmationModal(deleteConfirmationMessage, "Delete", async () => {
                         try {
-                            await api.deleteGuardrailPolicies(selectedPolicies);
-                            func.setToast(true, false, `${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"} deleted successfully`);
+                            await api.deleteGuardrailPolicies(toDelete);
+                            func.setToast(true, false, `${toDelete.length} polic${toDelete.length > 1 ? "ies" : "y"} deleted successfully`);
                             window.location.reload();
                         } catch (error) {
                             console.error("Error deleting policies:", error);
@@ -443,6 +456,7 @@ function GuardrailPolicies() {
                 // Use transformed field names from shared utility
                 piiTypes: guardrailData.piiTypes,
                 contentFiltering: guardrailData.contentFiltering,
+                wordFilters: guardrailData.wordFilters,
                 // Add LLM policy if present
                 ...(guardrailData.llmRule ? { llmRule: guardrailData.llmRule } : {}),
                 // Add Base Prompt Rule if present

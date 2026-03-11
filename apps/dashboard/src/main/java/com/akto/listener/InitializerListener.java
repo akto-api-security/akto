@@ -3596,6 +3596,8 @@ public class InitializerListener implements ServletContextListener {
             insertPiiSources();
             logger.warnAndAddToDb("PII sources inserted set for " + Context.accountId.get(), LogDb.DASHBOARD);
 
+            ensureSystemGuardrailsExist();
+
             // AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             // dropSampleDataIfEarlierNotDroped(accountSettings);
 
@@ -3616,6 +3618,39 @@ public class InitializerListener implements ServletContextListener {
                 OrganizationTask.instance.executeTask(job::run, "telemetry-cron");
             }, 0, 1, TimeUnit.MINUTES);
             logger.debugAndAddToDb("Registered telemetry cron", LogDb.DASHBOARD);
+        }
+    }
+
+    private void ensureSystemGuardrailsExist() {
+        try {
+            GuardrailPoliciesDao.instance.createIndicesIfAbsent();
+            List<String> names = SystemGuardrailTemplates.getAllSystemTemplateNames();
+            List<CONTEXT_SOURCE> contextSources = Arrays.asList(CONTEXT_SOURCE.ENDPOINT, CONTEXT_SOURCE.AGENTIC);
+            List<GuardrailPolicies> existing = GuardrailPoliciesDao.instance.findSystemGuardrails(names, contextSources);
+            Set<String> existingKeys = new HashSet<>();
+            for (GuardrailPolicies p : existing) {
+                if (p.getName() != null && p.getContextSource() != null) {
+                    existingKeys.add(p.getName() + "\t" + p.getContextSource().name());
+                }
+            }
+            int now = Context.now();
+            List<GuardrailPolicies> toInsert = new ArrayList<>();
+            for (String name : names) {
+                for (CONTEXT_SOURCE contextSource : contextSources) {
+                    if (existingKeys.contains(name + "\t" + contextSource.name())) {
+                        continue;
+                    }
+                    GuardrailPolicies policy = SystemGuardrailTemplates.getTemplate(name, contextSource);
+                    policy.setCreatedTimestamp(now);
+                    policy.setUpdatedTimestamp(now);
+                    toInsert.add(policy);
+                }
+            }
+            if (!toInsert.isEmpty()) {
+                GuardrailPoliciesDao.instance.insertMany(toInsert);
+            }
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error ensuring system guardrails exist for account " + Context.accountId.get() + ": " + e.getMessage(), LogDb.DASHBOARD);
         }
     }
 
