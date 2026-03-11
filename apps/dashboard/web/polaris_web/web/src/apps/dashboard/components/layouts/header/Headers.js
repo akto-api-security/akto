@@ -103,6 +103,9 @@ export default function Header() {
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];
+        if(func.checkLocal()){
+            return disabled;
+        }
         if (mcpSecurityGranted === false) {
             disabled.push("MCP Security");
         }
