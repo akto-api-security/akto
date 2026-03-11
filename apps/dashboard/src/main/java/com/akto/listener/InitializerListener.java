@@ -3597,8 +3597,6 @@ public class InitializerListener implements ServletContextListener {
             insertPiiSources();
             logger.warnAndAddToDb("PII sources inserted set for " + Context.accountId.get(), LogDb.DASHBOARD);
 
-            ensureSystemGuardrailsExist();
-
             // AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             // dropSampleDataIfEarlierNotDroped(accountSettings);
 
