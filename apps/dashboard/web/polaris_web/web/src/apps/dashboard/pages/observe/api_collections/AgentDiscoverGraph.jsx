@@ -203,12 +203,24 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             setArcadeGraphData({ mcpServers, agentName });
             setVSCodeGraphData(null);
           } else {
-            // Check if this is a VSCode / GitHub Copilot collection — hub-and-spoke data flow
+            const tagsList = apiCollection?.tagsList || [];
+            const hasAiAgent = tagsList.some(tag => tag.keyName === 'ai-agent');
+            const hasMcpServer = tagsList.some(tag => tag.keyName === 'mcp-server');
+            const hasBrowserLlm = tagsList.some(tag => tag.keyName === 'browser-llm');
+            const hasGenAiOrAiAgent = tagsList.some(tag => tag.keyName === 'gen-ai' || tag.keyName === 'ai-agent');
+            const source = (tagsList.find(tag => tag.keyName === 'source') || {}).value || null;
             const copilotEdge = (apiCollection.serviceGraphEdges || {})['Tool'];
-            const name = (apiCollection.displayName || apiCollection.name || apiCollection.hostName || '').toLowerCase();
-            const isVSCode = copilotEdge && (name.includes('vscode') || name.includes('copilot'));
-            if (isVSCode) {
-              setVSCodeGraphData(true);
+            const agentLabel = copilotEdge?.sourceService || '';
+            const shouldRenderAtlasGraph = copilotEdge && source === 'ENDPOINT';
+
+
+            if (shouldRenderAtlasGraph) {
+              setVSCodeGraphData({
+                agentLabel,
+                hasMcpServer,
+                hasBrowserLlm,
+                hasGenAiOrAiAgent,
+              });
               setArcadeGraphData(null);
             } else {
               setVSCodeGraphData(null);
@@ -235,7 +247,13 @@ function AgentDiscoverGraph({ apiCollectionId }) {
 
   const vscodeFormattedGraph = useMemo(() => {
     if (!vscodeGraphData) return null;
-    return buildVSCodeGraph({ onNodeClick: handleNodeClick });
+    return buildVSCodeGraph({
+      onNodeClick: handleNodeClick,
+      agentLabel: vscodeGraphData.agentLabel,
+      hasMcpServer: vscodeGraphData.hasMcpServer,
+      hasBrowserLlm: vscodeGraphData.hasBrowserLlm,
+      hasGenAiOrAiAgent: vscodeGraphData.hasGenAiOrAiAgent,
+    });
   }, [vscodeGraphData, handleNodeClick]);
 
   // Memoize nodes and edges transformation to prevent unnecessary re-renders
@@ -488,7 +506,6 @@ function AgentDiscoverGraph({ apiCollectionId }) {
               ) : vscodeGraphData ? (
                 <>
                   <Badge status="info">1 User</Badge>
-                  <Badge status="info">1 VSCode</Badge>
                   <Badge status="info">1 LLM</Badge>
                   <Badge status="info">1 Guardrail</Badge>
                   <Badge status="info">1 Tool Call</Badge>

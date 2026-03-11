@@ -187,9 +187,10 @@ export const buildArcadeGraph = ({ agentName, mcpServers, onNodeClick }) => {
   return { nodes, edges };
 };
 
-// Build hub-and-spoke VSCode graph: User → VSCode (center) → LLM, Tool call (right) | Guardrail (below VSCode)
-// Guardrail is directly below VSCode, separate from LLM and Tool call.
-export const buildVSCodeGraph = ({ onNodeClick }) => {
+// Build hub-and-spoke VSCode graph: User → Agent (center) → LLM, Tool call (right) | Proxy/Hooks (below)
+// Center label from sourceService; guardrail node varies by tags: mcp-server→Proxy, browser-llm→Proxy, gen-ai/ai-agent→Hooks.
+export const buildVSCodeGraph = ({ onNodeClick, agentLabel = 'VSCode', hasMcpServer, hasBrowserLlm, hasGenAiOrAiAgent }) => {
+  const guardrailType = hasMcpServer ? 'Proxy (MCP)' : hasGenAiOrAiAgent ? 'Hooks' : hasBrowserLlm ? 'Proxy' : 'Hooks';
   const leftX = 40;
   const centerX = 280;
   const rightX = 620;
@@ -209,13 +210,13 @@ export const buildVSCodeGraph = ({ onNodeClick }) => {
   const nodes = [
     makeNode('vscode-user', leftX, centerY, {
       label: 'User',
-      type: 'Internal Service',
+      type: '',
       category: 'internal',
       description: 'User initiates prompts and receives responses from the agent.',
       status: 'active',
     }),
     makeNode('vscode-hub', centerX, centerY, {
-      label: 'VSCode',
+      label: agentLabel,
       type: 'AI Agent',
       category: 'vscode-hub',
       description: 'VS Code with GitHub Copilot - orchestrates LLM calls, guardrail checks, and tool execution.',
@@ -226,9 +227,15 @@ export const buildVSCodeGraph = ({ onNodeClick }) => {
     }),
     makeNode('vscode-guardrail', centerX, guardrailY, {
       label: 'Guardrail service',
-      type: 'Proxy',
+      type: guardrailType,
       category: 'akto-hooks',
-      description: 'Akto guardrails validate prompts and tool calls for security and policy compliance.',
+      description: hasMcpServer
+        ? 'Akto proxy validates MCP tool calls for security and policy compliance.'
+        : hasGenAiOrAiAgent
+          ? 'Akto hooks validate prompts and tool calls for gen-ai/ai-agent flows.'
+          : hasBrowserLlm
+            ? 'Akto proxy validates browser LLM traffic for security and policy compliance.'
+            : 'Akto guardrails validate prompts and tool calls for security and policy compliance.',
       status: 'active',
     }),
     makeNode('vscode-llm', rightX, rightStartY, {
@@ -249,9 +256,9 @@ export const buildVSCodeGraph = ({ onNodeClick }) => {
 
   const edges = [
     { id: 've-1', source: 'vscode-user', target: 'vscode-hub', type: 'agentEdge', data: { edgeParam: 'prompt' } },
-    { id: 've-2', source: 'vscode-hub', target: 'vscode-llm', type: 'agentEdge', data: { edgeParam: 'filtered llm call' } },
+    { id: 've-2', source: 'vscode-hub', target: 'vscode-llm', type: 'agentEdge', data: { edgeParam: 'valid llm call' } },
     { id: 've-3', source: 'vscode-hub', target: 'vscode-guardrail', type: 'agentEdge', data: { edgeParam: 'validate' }, sourceHandle: 'bottom', targetHandle: 'top' },
-    { id: 've-4', source: 'vscode-hub', target: 'vscode-tool-call', type: 'agentEdge', data: { edgeParam: 'filtered tool call' } },
+    { id: 've-4', source: 'vscode-hub', target: 'vscode-tool-call', type: 'agentEdge', data: { edgeParam: 'valid tool call' } },
   ];
 
   return { nodes, edges };

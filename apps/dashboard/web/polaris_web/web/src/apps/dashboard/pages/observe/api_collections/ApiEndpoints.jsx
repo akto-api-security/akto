@@ -1743,6 +1743,7 @@ function ApiEndpoints(props) {
                     endpointsList={loading ? [] : endpointData["all"]}
                 />
             ] : showEmptyScreen && !(showSequencesFlow || showSwaggerDependenciesFlow || showSchemaView) ? [
+                <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
                 <EmptyScreensLayout key={"emptyScreen"}
                     iconSrc={"/public/file_plus.svg"}
                     headingText={getEmptyScreenText(collectionsObj).headingText}
@@ -1751,7 +1752,7 @@ function ApiEndpoints(props) {
                     redirectUrl={"/dashboard/observe/inventory"}
                     learnText={"inventory"}
                     docsUrl={ENDPOINTS_PAGE_DOCS_URL}
-                />, <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />] : showSequencesFlow ? [
+                />] : showSequencesFlow ? [
                 <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
             ] : showSwaggerDependenciesFlow ? [
                 <SwaggerDependenciesFlow key="swagger-dependencies-flow" apiCollectionId={apiCollectionId}  />
