@@ -97,7 +97,7 @@ export default function Header() {
     const mcpSecurityGranted =(stiggFeatures?.MCP_SECURITY?.isGranted || true);
     const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
     let endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted;
-    const endpointSecurityGranted = stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY") ? endpointSecurityFromStigg : true;
+    const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true;
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];
