@@ -252,6 +252,7 @@ public class DaoInit {
         ClassModel<OrganizationFlags> OrganizationFlagsClassModel = ClassModel.builder(OrganizationFlags.class).enableDiscriminator(true).build();
         ClassModel<JobParams> jobParams = ClassModel.builder(JobParams.class).enableDiscriminator(true).build();
         ClassModel<TLSAuthParam> tlsAuthClassModel = ClassModel.builder(TLSAuthParam.class).enableDiscriminator(true).build();
+        ClassModel<DigestAuthParam> digestAuthParamClassModel = ClassModel.builder(DigestAuthParam.class).enableDiscriminator(true).build();
         ClassModel<CollectionTags> collectionTagsModel = ClassModel.builder(CollectionTags.class).enableDiscriminator(true).build();
         ClassModel<McpReconResult> mcpReconResultClassModel = ClassModel.builder(McpReconResult.class).enableDiscriminator(true).build();
         ClassModel<McpReconRequest> mcpReconRequestClassModel = ClassModel.builder(McpReconRequest.class).enableDiscriminator(true).build();
@@ -287,7 +288,7 @@ public class DaoInit {
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
-                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, jobParams, tlsAuthClassModel, collectionTagsModel, mcpReconResultClassModel
+                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, jobParams, tlsAuthClassModel, digestAuthParamClassModel, collectionTagsModel, mcpReconResultClassModel
                 , mcpReconRequestClassModel, agentConversationResultClassModel, agentTrafficLogClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
