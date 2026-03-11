@@ -304,7 +304,7 @@ const ContentPolicyStep = ({
                 {/* Denied Topics */}
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Add denied topics" threats={RULE_OWASP_THREATS.deniedTopics} />}
+                        label="Add denied topics"
                         checked={enableDeniedTopics}
                         onChange={setEnableDeniedTopics}
                         helpText="Add up to 30 denied topics to block user inputs or model responses associated with the topic."
@@ -328,7 +328,7 @@ const ContentPolicyStep = ({
                 {/* Harmful Categories */}
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="Enable harmful categories filters" threats={RULE_OWASP_THREATS.harmfulCategories} />}
+                        label="Enable harmful categories filters"
                         checked={enableHarmfulCategories}
                         onChange={setEnableHarmfulCategories}
                         helpText="Detect and block harmful user inputs and model responses."

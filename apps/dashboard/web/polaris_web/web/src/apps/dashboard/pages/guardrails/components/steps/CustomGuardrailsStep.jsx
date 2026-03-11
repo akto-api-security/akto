@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
-import RuleLabelWithTag from "../RuleLabelWithTag";
-import { RULE_OWASP_THREATS } from "../owaspConfig";
 
 // URL validation function
 const validateUrl = (url) => {
@@ -75,7 +73,7 @@ const CustomGuardrailsStep = ({
                 {/* LLM Prompt Based Rule */}
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="LLM prompt based rule" threats={RULE_OWASP_THREATS.llmPromptRule} />}
+                        label="LLM prompt based rule"
                         checked={enableLlmPrompt}
                         onChange={setEnableLlmPrompt}
                         helpText="Create a custom rule using a prompt that is evaluated against user inputs or model responses."
@@ -110,7 +108,7 @@ const CustomGuardrailsStep = ({
                 {/* External Model Based Evaluation */}
                 <Box>
                     <Checkbox
-                        label={<RuleLabelWithTag name="External model based evaluation" threats={RULE_OWASP_THREATS.externalModel} />}
+                        label="External model based evaluation"
                         checked={enableExternalModel}
                         onChange={setEnableExternalModel}
                         helpText="Configure an external model endpoint to evaluate content against custom criteria."
