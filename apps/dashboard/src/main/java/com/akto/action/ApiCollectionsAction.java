@@ -376,6 +376,8 @@ public class ApiCollectionsAction extends UserAction {
                         CollectionTags.TagSource.USER
                     );
                     break;
+                default:
+                    break;
             }
             
             if (tagToAdd != null) {
