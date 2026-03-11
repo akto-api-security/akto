@@ -3,6 +3,7 @@ package com.akto.dto.testing;
 import com.akto.dto.OriginalHttpRequest;
 import lombok.Getter;
 import lombok.Setter;
+import com.akto.util.http_util.CoreHTTPClient;
 import org.apache.hc.client5.http.auth.AuthScope;
 import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
 import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
@@ -27,6 +28,8 @@ public class DigestAuthParam extends AuthParam {
     public static final String TARGET_URL_KEY = "targetUrl";
     public static final String METHOD_KEY = "method";
     public static final String ALGORITHM_KEY = "algorithm";
+    public static final String AUTHORIZATION = "Authorization";
+
     
     // Digest-specific fields
     private String username;
@@ -45,17 +48,12 @@ public class DigestAuthParam extends AuthParam {
     public DigestAuthParam() {
         // Set defaults to prevent null issues
         this.where = Location.HEADER;
-        this.key = "Authorization";
+        this.key = AUTHORIZATION;
         this.value = "";
         this.showHeader = true;
         this.method = "GET";
     }
-    
-    // Constructor for creating new instances with digest credentials
-    public DigestAuthParam(String username, String password, String targetUrl, String method) {
-        this(username, password, targetUrl, method, "SHA-256"); // Default to SHA-256
-    }
-    
+
     // Constructor with algorithm parameter
     public DigestAuthParam(String username, String password, String targetUrl, String method, String algorithm) {
         this(); // Call default constructor to set defaults
@@ -65,16 +63,22 @@ public class DigestAuthParam extends AuthParam {
         this.method = method != null ? method : "GET";
         this.algorithm = algorithm != null ? algorithm : "SHA-256"; // Default to SHA-256
     }
-    
-    // Standard constructor matching other AuthParam classes
+
+    // Constructor without algorithm parameter (defaults to SHA-256)
+    public DigestAuthParam(String username, String password, String targetUrl, String method) {
+        this(username, password, targetUrl, method, "SHA-256");
+    }
+
+    // Location-based constructor for AuthParam compatibility
     public DigestAuthParam(Location where, String key, String value, Boolean showHeader) {
+        this(); // Call default constructor to set defaults
         this.where = where;
         this.key = key;
         this.value = value;
         this.showHeader = showHeader;
-        this.method = "GET";
     }
-    
+
+
     @Override
     boolean addAuthTokens(OriginalHttpRequest request) {
         if (this.username == null || this.password == null || this.targetUrl == null) {
@@ -101,7 +105,9 @@ public class DigestAuthParam extends AuthParam {
             );
 
             // Build HttpClient with digest authentication support
-            // Apache HttpClient automatically handles digest auth through its interceptors
+            // Note: We use Apache HttpClient 5 here because CoreHTTPClient (OkHttp3) doesn't support
+            // built-in digest authentication. Apache HttpClient automatically handles digest auth
+            // through its interceptors and respects system proxy settings like CoreHTTPClient and will read variables (HTTP_PROXY_HOST, HTTPS_PROXY_HOST, etc.).
             CloseableHttpClient httpClient = HttpClients.custom()
                     .setDefaultCredentialsProvider(credentialsProvider)
                     .build();
@@ -119,14 +125,14 @@ public class DigestAuthParam extends AuthParam {
                 try {
                     // The Authorization header was computed and sent by the client
                     // Extract it from the request that was sent (after digest computation)
-                    Header[] authHeaders = httpRequest.getHeaders("Authorization");
+                    Header[] authHeaders = httpRequest.getHeaders(AUTHORIZATION);
 
                     if (authHeaders != null && authHeaders.length > 0) {
                         String authHeader = authHeaders[0].getValue();
                         // Add the Authorization header to the original request
                         List<String> authList = new ArrayList<>();
                         authList.add(authHeader);
-                        request.getHeaders().put("Authorization", authList);
+                        request.getHeaders().put(AUTHORIZATION, authList);
                         return true;
                     }
 
