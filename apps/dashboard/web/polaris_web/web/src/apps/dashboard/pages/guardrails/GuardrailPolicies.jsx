@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { EmptySearchResult, VerticalStack, Button, Badge, Text } from '@shopify/polaris';
+import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailModal from "./components/CreateGuardrailModal";
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
@@ -114,6 +114,16 @@ const sortOptions = [
   },
 ];
 
+const isSystemPolicy = (row) => (row.createdBy || "").toLowerCase().includes("system");
+
+const sortPinnedSystemPolicies = (systemRows) =>
+  [...systemRows].sort((a, b) => {
+    if (a.status !== b.status) return a.status === "Active" ? -1 : 1;
+    const tsA = a.originalData?.updatedTimestamp ?? a.originalData?.createdTimestamp ?? 0;
+    const tsB = b.originalData?.updatedTimestamp ?? b.originalData?.createdTimestamp ?? 0;
+    return tsB - tsA;
+  });
+
 function GuardrailPolicies() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [policyData, setPolicyData] = useState([]);
@@ -131,18 +141,17 @@ function GuardrailPolicies() {
         try {
             const response = await api.fetchGuardrailPolicies();
             if (response && response.guardrailPolicies) {
-                const formattedPolicies = response.guardrailPolicies
-                    .sort((a, b) => {
-                        // First sort by active status (active first)
-                        if (a.active !== b.active) {
-                            return b.active - a.active;
-                        }
-                        // Then by timestamp (latest first)
-                        return (b.updatedTimestamp || b.createdTimestamp) - (a.updatedTimestamp || a.createdTimestamp);
-                    })
-                    .map(policy => ({
+                const showSystemTag = func.isDemoAccount();
+                let formattedPolicies = response.guardrailPolicies.map(policy => ({
                         id: policy.hexId,
-                        policy: policy.name,
+                        policy: showSystemTag && (policy.createdBy || "").toLowerCase().includes("system")
+                            ? (
+                                <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                                    <Tag>Default</Tag>
+                                    <Text as="span" style={{ fontWeight: "medium" }}>{policy.name}</Text>
+                                </HorizontalStack>
+                            )
+                            : policy.name,
                         category: determineCategoryFromPolicy(policy),
                         status: policy.active ? "Active" : "Inactive",
                         statusWithSummary: generateStatusWithSummary(policy),
@@ -158,6 +167,13 @@ function GuardrailPolicies() {
                         updatedBy: policy.updatedBy || "-",
                         originalData: policy
                     }));
+                if (!func.isDemoAccount()) {
+                    formattedPolicies = formattedPolicies.sort((a, b) => {
+                        if (a.status !== b.status) return a.status === "Active" ? -1 : 1;
+                        return (b.originalData?.updatedTimestamp ?? b.originalData?.createdTimestamp ?? 0) -
+                            (a.originalData?.updatedTimestamp ?? a.originalData?.createdTimestamp ?? 0);
+                    });
+                }
                 setPolicyData(formattedPolicies);
             }
         } catch (error) {
@@ -166,6 +182,22 @@ function GuardrailPolicies() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const modifyData = (filters, dataSortKey, sortOrder) => {
+        const systemRows = policyData.filter(isSystemPolicy);
+        const customRows = policyData.filter((row) => !isSystemPolicy(row));
+        const pinned = sortPinnedSystemPolicies(systemRows);
+        const custom =
+            dataSortKey && customRows.length > 0
+                ? func.sortFunc([...customRows], dataSortKey, sortOrder, false)
+                : [...customRows].sort((a, b) => {
+                        if (a.status !== b.status) return a.status === "Active" ? -1 : 1;
+                        const tsA = a.originalData?.updatedTimestamp ?? a.originalData?.createdTimestamp ?? 0;
+                        const tsB = b.originalData?.updatedTimestamp ?? b.originalData?.createdTimestamp ?? 0;
+                        return tsB - tsA;
+                    });
+        return [...pinned, ...custom];
     };
 
     const determineCategoryFromPolicy = (policy) => {
@@ -544,6 +576,7 @@ function GuardrailPolicies() {
             loading={loading}
             selectable={true}
             promotedBulkActions={promotedBulkActions}
+            {...(func.isDemoAccount() && { customFilters: true, modifyData })}
         />
     ];
 
