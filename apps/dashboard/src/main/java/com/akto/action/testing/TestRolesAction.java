@@ -78,17 +78,54 @@ public class TestRolesAction extends UserAction {
     }
 
     public void addAuthMechanism(TestRoles role){
-        if (authParamData != null) {            
+        if (authParamData != null) {
             List<AuthParam> authParams = new ArrayList<>();
 
             for (AuthParamData authParamDataElem : authParamData) {
                 AuthParam param = null;
                 if (authAutomationType.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
                     param = new HardcodedAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(), authParamDataElem.getValue(), true);
+                } else if (authAutomationType.equals(LoginFlowEnums.AuthMechanismTypes.DIGEST_AUTH.toString())) {
+                    // For digest auth, we only create one param from all the data
+                    // Skip individual processing since we handle it below
+                    param = null;
                 } else {
                     param = new LoginRequestAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(), authParamDataElem.getValue(), authParamDataElem.getShowHeader());
                 }
-                authParams.add(param);
+                if (param != null) {
+                    authParams.add(param);
+                }
+            }
+
+            // Handle DIGEST_AUTH separately since it needs all parameters combined
+            if (LoginFlowEnums.AuthMechanismTypes.valueOf(authAutomationType.toUpperCase()) == LoginFlowEnums.AuthMechanismTypes.DIGEST_AUTH) {
+                String username = null, password = null, targetUrl = null, method = "GET", algorithm = "SHA-256";
+
+                // Extract digest auth parameters from authParamData
+                for (AuthParamData data : authParamData) {
+                    switch (data.getKey()) {
+                        case DigestAuthParam.USERNAME_KEY:
+                            username = data.getValue();
+                            break;
+                        case DigestAuthParam.PASSWORD_KEY:
+                            password = data.getValue();
+                            break;
+                        case DigestAuthParam.TARGET_URL_KEY:
+                            targetUrl = data.getValue();
+                            break;
+                        case DigestAuthParam.METHOD_KEY:
+                            method = data.getValue();
+                            break;
+                        case DigestAuthParam.ALGORITHM_KEY:
+                            algorithm = data.getValue();
+                            break;
+                    }
+                }
+
+                // Create single DigestAuthParam with all the information
+                DigestAuthParam digestParam = new DigestAuthParam(username, password, targetUrl, method, algorithm);
+                authParams.clear(); // Remove any null entries
+                authParams.add(digestParam);
             }
 
             AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType, null);
