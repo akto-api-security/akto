@@ -201,6 +201,15 @@ function SampleDataComponent(props) {
         let items = []
         // Use editor content if available, otherwise fall back to message
         const contentToUse = data.editorContent ? data.editorContent : data.message
+        if (simpleJson) {
+            if (contentToUse) {
+                items.push({
+                    content: 'Copy',
+                    onAction: () => { copyRequest(type, "RESPONSE", contentToUse) },
+                })
+            }
+            return items;
+        }
 
         if (type == "request") {
             if (contentToUse) {
@@ -232,7 +241,7 @@ function SampleDataComponent(props) {
         } else {
             if (contentToUse) {
                 items.push({
-                    content: 'Copy',
+                    content: 'Copy response',
                     onAction: () => { copyRequest(type, "RESPONSE", contentToUse) },
                 })
             }
@@ -242,7 +251,7 @@ function SampleDataComponent(props) {
                 }
                 if(data?.originalMessage != data?.message){
                 items.push({
-                    content: 'Copy original',
+                    content: 'Copy original response',
                     onAction: () => { copyRequest(type, "RESPONSE", data.originalMessage) },
                 })
                 }
@@ -287,17 +296,17 @@ function SampleDataComponent(props) {
     }
 
     return (
-
         <Box id='sample-data-editor-container'>
             <LegacyCard.Section flush>
                 <Box padding={"2"}>
                     <HorizontalStack padding="2" align='space-between'>
                         <Text variant="bodyMd" fontWeight="semibold">
+                            {/* Hide the word 'response' if simpleJson is true */}
                             {!simpleJson && func.toSentenceCase(type)}
-                            { type==="response" && responseTime ? (` (${responseTime} ms)`) : "" }
-                            { type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ?
+                            {!simpleJson && type==="response" && responseTime ? (` (${responseTime} ms)`) : ""}
+                            {!simpleJson && type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ?
                                 (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`)
-                                : "" }
+                                : ""}
                         </Text>
                         <HorizontalStack gap={2}>
                         {isNewDiff && lineNumbers[type]?.length > 0 ? <HorizontalStack gap="2">
@@ -325,7 +334,7 @@ function SampleDataComponent(props) {
                                 accessibilityLabel={`Expand ${type}`}
                                 disabled={!currentMessage}
                             />
-                            <Tooltip content={`Copy ${type}`}>
+                            <Tooltip content={simpleJson ? "Copy" : `Copy ${type}`}>
                             <Popover
                                 zIndexOverride={"600"}
                                 active={popoverActive[type]}
@@ -348,7 +357,7 @@ function SampleDataComponent(props) {
                 {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage={simpleJson ? "json" : "custom_http"} currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={handleEditorData}/> : null}
             </LegacyCard.Section>
 
-            <Modal open={expanded} onClose={() => setExpanded(false)} title={func.toSentenceCase(type)} large>
+            <Modal open={expanded} onClose={() => setExpanded(false)} title={simpleJson ? " " : func.toSentenceCase(type)} large>
                 <Modal.Section>
                     {sampleJsonData[type] ? <SampleData
                         data={sampleJsonData[type]}
