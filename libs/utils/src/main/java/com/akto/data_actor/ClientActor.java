@@ -2460,6 +2460,9 @@ public class ClientActor extends DataActor {
                     case "TLS_AUTH":
                         authParam.put("_t", "com.akto.dto.testing.TLSAuthParam");
                         break;
+                    case "DIGEST_AUTH":
+                        authParam.put("_t", "com.akto.dto.testing.DigestAuthParam");
+                        break;
                     default:
                         break;
                 }
@@ -2481,6 +2484,9 @@ public class ClientActor extends DataActor {
                         break;
                     case "TLS_AUTH":
                         defaultAuthParam.put("_t", "com.akto.dto.testing.TLSAuthParam");
+                        break;
+                    case "DIGEST_AUTH":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.DigestAuthParam");
                         break;
                     default:
                         break;

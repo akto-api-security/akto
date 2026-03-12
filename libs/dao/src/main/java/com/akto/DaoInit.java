@@ -119,6 +119,7 @@ public class DaoInit {
                 .enableDiscriminator(true).build();
         ClassModel<ResponseCodeRuntimeFilter> responseCodeRuntimeFilterClassModel = ClassModel
                 .builder(ResponseCodeRuntimeFilter.class).enableDiscriminator(true).build();
+        ClassModel<DigestAuthParam> digestAuthParamClassModel = ClassModel.builder(DigestAuthParam.class).enableDiscriminator(true).build();
         ;
         ClassModel<RuntimeFilter> runtimeFilterClassModel = ClassModel.builder(RuntimeFilter.class)
                 .enableDiscriminator(true).build();
@@ -286,7 +287,7 @@ public class DaoInit {
                 thirdPartyAccessClassModel, credentialClassModel, apiTokenClassModel, apiInfoClassModel,
                 apiInfoKeyClassModel, customFilterClassModel, runtimeFilterClassModel, filterSampleDataClassModel,
                 predicateClassModel, conditionsClassModel, regexPredicateClassModel, startsWithPredicateClassModel,
-                endsWithPredicateClassModel,
+                endsWithPredicateClassModel,digestAuthParamClassModel,
                 fieldExistsFilterClassModel, accountSettingsClassModel, responseCodeRuntimeFilterClassModel,
                 cappedListClassModel,
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel,
