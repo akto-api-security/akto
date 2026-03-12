@@ -1,10 +1,7 @@
 package com.akto.dto.testing;
 
 import com.akto.dto.OriginalHttpRequest;
-import lombok.Getter;
-import lombok.Setter;
 
-@Getter @Setter
 public abstract class AuthParam {
 
     public abstract boolean addAuthTokens(OriginalHttpRequest request);
