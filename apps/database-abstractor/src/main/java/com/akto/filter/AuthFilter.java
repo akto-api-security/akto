@@ -41,8 +41,8 @@ public class AuthFilter implements Filter {
         String requestURI = httpServletRequest.getRequestURI();
 
         try {
-         //   Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
-            Context.accountId.set(1000000);
+            Jws<Claims> claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
+            Context.accountId.set((int) claims.getBody().get(ACCOUNT_ID));
         } catch (Exception e) {
             if (shouldSkipAuth(e, requestURI)) {
                 chain.doFilter(servletRequest, servletResponse);
