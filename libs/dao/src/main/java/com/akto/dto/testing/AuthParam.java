@@ -18,12 +18,6 @@ public abstract class AuthParam {
 
     public abstract void setValue(String value);
 
-    private String username;
-    private String password;
-    private String targetUrl;
-    private String method;
-    private String algorithm;
-
     public enum Location {
         HEADER,
         BODY,
