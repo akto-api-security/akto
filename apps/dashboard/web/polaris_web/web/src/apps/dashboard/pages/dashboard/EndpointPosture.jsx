@@ -19,11 +19,12 @@ import api from '../observe/api'
 import func from '@/util/func'
 import values from '@/util/values'
 import { getTypeFromTags, CLIENT_TYPES, formatDisplayName, getMcpServerDisplayName, getFriendlyLlmName } from '../observe/agentic/mcpClientHelper'
-import { extractEndpointId } from '../observe/agentic/constants'
+import { extractEndpointId, AGENTIC_ASSETS_PATH, AGENTIC_ASSETS_FILTER_KEY } from '../observe/agentic/constants'
 import { GridLayout, verticalCompactor } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
 import './endpoint-posture.css'
+import PersistStore from '../../../main/PersistStore'
 
 const cleanHostname = (hostname) => {
     if (!hostname) return hostname
@@ -180,6 +181,8 @@ const defaultLayout = [
 
 function EndpointPosture() {
     const navigate = useNavigate()
+    const filtersMap = PersistStore(state => state.filtersMap)
+    const setFiltersMap = PersistStore(state => state.setFiltersMap)
     const [summaryInfoData, setSummaryInfoData] = useState([])
     const [commonMcpServers, setCommonMcpServers] = useState([])
     const [commonLlmsInBrowsers, setCommonLlmsInBrowsers] = useState([])
@@ -512,16 +515,22 @@ function EndpointPosture() {
 
 
     const handleAgenticItemClick = (filterGroupName) => {
-        if (!filterGroupName) {
-            navigate('/dashboard/observe/agentic-assets')
-            return
+        const updatedFiltersMap = { ...filtersMap }
+        if (filterGroupName) {
+            updatedFiltersMap[AGENTIC_ASSETS_FILTER_KEY] = {
+                filters: [{
+                    key: 'groupName',
+                    value: { values: [filterGroupName], negated: false },
+                    label: filterGroupName,
+                    onRemove: () => {}
+                }],
+                sort: []
+            }
+        } else {
+            delete updatedFiltersMap[AGENTIC_ASSETS_FILTER_KEY]
         }
-        const filterStr = `groupName__${filterGroupName}`
-        sessionStorage.setItem('akto_spaFilterNav', 'true')
-        sessionStorage.setItem('akto_spaNavFilter', filterStr)
-        sessionStorage.setItem('akto_spaNavPath', '/dashboard/observe/agentic-assets')
-        sessionStorage.setItem('akto_spaNavExpiry', String(Date.now() + 15000))
-        navigate(`/dashboard/observe/agentic-assets?filters=${encodeURIComponent(filterStr)}`)
+        setFiltersMap(updatedFiltersMap)
+        navigate(AGENTIC_ASSETS_PATH)
     }
 
     const mcpServersComponent = (

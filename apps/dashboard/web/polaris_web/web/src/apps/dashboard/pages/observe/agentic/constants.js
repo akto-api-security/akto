@@ -14,6 +14,8 @@ import func from "@/util/func";
 // Route constants
 export const INVENTORY_PATH = '/dashboard/observe/inventory';
 export const INVENTORY_FILTER_KEY = '/dashboard/observe/inventory/';
+export const AGENTIC_ASSETS_PATH = '/dashboard/observe/agentic-assets';
+export const AGENTIC_ASSETS_FILTER_KEY = '/dashboard/observe/agentic-assets/';
 export const ASSET_TAG_KEY_VALUES = Object.values(ASSET_TAG_KEYS);
 
 // Table headers with all columns

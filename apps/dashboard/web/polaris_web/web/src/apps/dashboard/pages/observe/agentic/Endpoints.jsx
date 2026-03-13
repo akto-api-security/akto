@@ -17,6 +17,7 @@ import {
     resourceName, 
     INVENTORY_PATH, 
     INVENTORY_FILTER_KEY, 
+    AGENTIC_ASSETS_FILTER_KEY,
     groupCollectionsByAgent, 
     groupCollectionsByService,
     createEnvTypeFilter,
@@ -135,7 +136,13 @@ function Endpoints() {
     useEffect(() => {
         const isMountedRef = { current: true };
         fetchData(isMountedRef);
-        return () => { isMountedRef.current = false; };
+        return () => {
+            isMountedRef.current = false;
+            const current = PersistStore.getState().filtersMap;
+            const updated = { ...current };
+            delete updated[AGENTIC_ASSETS_FILTER_KEY];
+            PersistStore.getState().setFiltersMap(updated);
+        };
     }, []);
 
     const disambiguateLabel = useCallback((key, value) => {
