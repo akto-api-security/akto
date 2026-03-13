@@ -62,7 +62,13 @@ import {
     DESCRIPTION_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
     DOCS_URL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
     INTERVAL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
-    VERTEX_AI_CUSTOM_DEPLOYED_MODEL_FIELDS
+    VERTEX_AI_CUSTOM_DEPLOYED_MODEL_FIELDS,
+    CONNECTOR_TYPE_SALESFORCE,
+    CONNECTOR_NAME_SALESFORCE,
+    DESCRIPTION_SALESFORCE,
+    DOCS_URL_SALESFORCE,
+    INTERVAL_SALESFORCE,
+    SALESFORCE_FIELDS
 } from "./constants/aiAgentConnectorConstants"
 import DataDogConnector from "./components/DataDogConnector"
 
@@ -1049,6 +1055,22 @@ const vertexAICustomDeployedModelImportObj = {
     />
 }
 
+const salesforceImportObj = {
+    icon: '/public/salesforce.svg',
+    label: "Salesforce",
+    text: "Import Salesforce agents seamlessly into AKTO.",
+    docsUrl: DOCS_URL_SALESFORCE,
+    key: "SALESFORCE_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_SALESFORCE}
+        connectorName={CONNECTOR_NAME_SALESFORCE}
+        description={DESCRIPTION_SALESFORCE}
+        fields={SALESFORCE_FIELDS}
+        docsUrl={DOCS_URL_SALESFORCE}
+        recurringIntervalSeconds={INTERVAL_SALESFORCE}
+    />
+}
+
 const litellmImportObj = {
     icon: '/public/litellm.svg',
     label: "LiteLLM",
@@ -1784,7 +1806,7 @@ const quickStartFunc = {
         const aiAgentConnectors = [
             awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, snowflakeObj,
-            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj
+            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, salesforceImportObj
         ]
 
         // MCP Scan
@@ -1890,7 +1912,7 @@ const quickStartFunc = {
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
                 awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, trueFoundryImportObj, arcadeImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
             ])
         }
