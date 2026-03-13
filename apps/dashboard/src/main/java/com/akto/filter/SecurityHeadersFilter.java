@@ -59,6 +59,15 @@ public class SecurityHeadersFilter implements Filter {
         httpServletResponse.addHeader("X-Content-Type-Options", "nosniff");
         httpServletResponse.addHeader("cache-control", "no-cache, no-store, must-revalidate, pre-check=0, post-check=0");
 
+        // On non-SaaS deployments, open up CORS to any origin (self-hosted users may be on any domain)
+        if (!IS_SAAS) {
+            String origin = httpServletRequest.getHeader("Origin");
+            if (origin != null) {
+                httpServletResponse.setHeader("Access-Control-Allow-Origin", origin);
+                httpServletResponse.setHeader("Vary", "Origin");
+            }
+        }
+
         // Apply stricter security headers only for SaaS deployments
         if (IS_SAAS) {
             httpServletResponse.addHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
