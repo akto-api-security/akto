@@ -50,7 +50,7 @@ public class Cron {
         loggerMaker.infoAndAddToDb("Acquired lock, starting merging process for account " + accountId);
         List<Integer> apiCollectionIds = DbLayer.fetchApiCollectionIds();
         AccountSettings accountSettings = DbLayer.fetchAccountSettings(accountId);
-        Boolean doBodyMatch = accountSettings == null || accountSettings.getBodyMatchEnabled();
+        Boolean doBodyMatch = accountSettings != null && accountSettings.getBodyMatchEnabled();
         try {
             for (int apiCollectionId : apiCollectionIds) {
                 int start = Context.now();
