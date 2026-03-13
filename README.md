@@ -15,7 +15,11 @@
 <br/> 
 <a href="https://github.com/akto-api-security/akto/commits/master" _target="blank">
   <img src="https://img.shields.io/github/commit-activity/m/akto-api-security/akto?label=commits&logo=github"/>
-</a>  
+</a>
+
+<a href="https://cloud.bluecave.io/projects/gh/akto-api-security/akto" target="_blank">
+  <img src="https://cloud.bluecave.io/badges/gh/akto-api-security/akto/analysis.svg"/>
+</a>
 
 <a href="https://github.com/akto-api-security/akto/releases" _target="blank">
   <img src="https://img.shields.io/github/release-date/akto-api-security/akto?label=latest%20release&logo=docker"/>
