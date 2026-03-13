@@ -10,6 +10,7 @@ export const CONNECTOR_TYPE_COPILOT_STUDIO = 'COPILOT_STUDIO';
 export const CONNECTOR_TYPE_DATABRICKS = 'DATABRICKS';
 export const CONNECTOR_TYPE_SNOWFLAKE = 'SNOWFLAKE';
 export const CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'VERTEX_AI_CUSTOM_DEPLOYED_MODEL';
+export const CONNECTOR_TYPE_SALESFORCE = 'SALESFORCE';
 
 // Connector Names (Display)
 export const CONNECTOR_NAME_N8N = 'N8N';
@@ -18,6 +19,7 @@ export const CONNECTOR_NAME_COPILOT_STUDIO = 'Copilot Studio';
 export const CONNECTOR_NAME_DATABRICKS = 'Databricks';
 export const CONNECTOR_NAME_SNOWFLAKE = 'Snowflake';
 export const CONNECTOR_NAME_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'Vertex AI Custom Deployed Model';
+export const CONNECTOR_NAME_SALESFORCE = 'Salesforce';
 
 // Documentation URLs
 export const DOCS_URL_N8N = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/n8n';
@@ -26,6 +28,7 @@ export const DOCS_URL_COPILOT_STUDIO = 'https://ai-security-docs.akto.io/akto-ar
 export const DOCS_URL_DATABRICKS = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/databrics';
 export const DOCS_URL_SNOWFLAKE = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/snowflake';
 export const DOCS_URL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/vertex-ai-custom-deployed-model';
+export const DOCS_URL_SALESFORCE = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/salesforce';
 
 // Recurring Interval Seconds (in seconds)
 export const INTERVAL_N8N = 300; // 5 minutes
@@ -34,6 +37,7 @@ export const INTERVAL_COPILOT_STUDIO = 300; // 5 minutes
 export const INTERVAL_DATABRICKS = 300; // 5 minutes
 export const INTERVAL_SNOWFLAKE = 300; // 5 minutes
 export const INTERVAL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 300; // 5 minutes
+export const INTERVAL_SALESFORCE = 300; // 5 minutes
 
 // Field Names
 export const FIELD_N8N_URL = 'n8nUrl';
@@ -62,6 +66,10 @@ export const FIELD_SNOWFLAKE_PRIVATE_KEY_PASSPHRASE = 'snowflakePrivateKeyPassph
 export const FIELD_SNOWFLAKE_WAREHOUSE = 'snowflakeWarehouse';
 export const FIELD_SNOWFLAKE_DATABASE = 'snowflakeDatabase';
 export const FIELD_SNOWFLAKE_SCHEMA = 'snowflakeSchema';
+export const FIELD_SALESFORCE_URL = 'salesforceUrl';
+export const FIELD_SALESFORCE_CONSUMER_KEY = 'salesforceConsumerKey';
+export const FIELD_SALESFORCE_CONSUMER_SECRET = 'salesforceConsumerSecret';
+export const FIELD_INGESTION_API_KEY = 'ingestionApiKey';
 export const FIELD_DATA_INGESTION_URL = 'dataIngestionUrl';
 
 // Vertex AI Custom Deployed Model Fields
@@ -89,6 +97,7 @@ export const DESCRIPTION_COPILOT_STUDIO = 'Use our Copilot Studio feature to cap
 export const DESCRIPTION_DATABRICKS = 'Import Databricks agents seamlessly into AKTO.';
 export const DESCRIPTION_SNOWFLAKE = 'Connect to your Snowflake account to discover agents using Cortex and automatically fetch data for all Snowflake agents.';
 export const DESCRIPTION_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'Connect to your GCP BigQuery to import Vertex AI Custom Deployed Model prediction logs into AKTO.';
+export const DESCRIPTION_SALESFORCE = 'Connect to your Salesforce instance to import agents and AI capabilities seamlessly into AKTO.';
 
 // N8N Field Configuration
 export const N8N_FIELDS = [
@@ -389,6 +398,54 @@ export const VERTEX_AI_CUSTOM_DEPLOYED_MODEL_FIELDS = [
         type: FIELD_TYPE_URL,
         placeholder: 'https://ingestion.example.com',
         helpText: 'URL of your Akto data ingestion service',
+        required: true
+    }
+];
+
+// Salesforce Field Configuration
+export const SALESFORCE_FIELDS = [
+    {
+        name: FIELD_SALESFORCE_URL,
+        label: 'Salesforce URL',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://your-domain.my.salesforce.com',
+        configKey: FIELD_SALESFORCE_URL,
+        helpText: 'Your Salesforce instance URL',
+        required: true
+    },
+    {
+        name: FIELD_SALESFORCE_CONSUMER_KEY,
+        label: 'Consumer Key',
+        type: FIELD_TYPE_TEXT,
+        placeholder: 'xxxxxxxxxxxxxxxxxxxxxxxx',
+        configKey: FIELD_SALESFORCE_CONSUMER_KEY,
+        helpText: 'OAuth 2.0 Consumer Key from your Salesforce connected app',
+        required: true
+    },
+    {
+        name: FIELD_SALESFORCE_CONSUMER_SECRET,
+        label: 'Consumer Secret',
+        type: FIELD_TYPE_PASSWORD,
+        placeholder: '*******',
+        configKey: FIELD_SALESFORCE_CONSUMER_SECRET,
+        helpText: 'OAuth 2.0 Consumer Secret from your Salesforce connected app',
+        required: true
+    },
+    {
+        name: FIELD_DATA_INGESTION_URL,
+        label: 'URL for Data Ingestion Service',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://ingestion.example.com',
+        helpText: 'URL of your Akto data ingestion service',
+        required: true
+    },
+    {
+        name: FIELD_INGESTION_API_KEY,
+        label: 'Ingestion API Key',
+        type: FIELD_TYPE_PASSWORD,
+        placeholder: '*******',
+        configKey: FIELD_INGESTION_API_KEY,
+        helpText: 'API key for authenticating with the data ingestion service (X-API-KEY header)',
         required: true
     }
 ];
