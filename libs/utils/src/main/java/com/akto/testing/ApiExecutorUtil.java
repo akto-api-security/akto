@@ -16,6 +16,7 @@ import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.config.TestScript;
@@ -30,8 +31,12 @@ public class ApiExecutorUtil {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutorUtil.class, LogDb.TESTING);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
-    private static Map<Integer, Integer> lastFetchedMap = new HashMap<>();
-    private static Map<Integer, TestScript> testScriptMap = new HashMap<>();
+    private static Map<String, Integer> lastFetchedMap = new HashMap<>();
+    private static Map<String, TestScript> testScriptMap = new HashMap<>();
+
+    private static String scriptCacheKey(int accountId, TestScript.Type type) {
+        return accountId + "_" + (type != null ? type.name() : "ANY");
+    }
 
     /** Cache of script results per conversationId when executeOncePerConversation = true. */
     private static final Map<String, ScriptResultCache> conversationScriptCache = new ConcurrentHashMap<>();
@@ -49,13 +54,14 @@ public class ApiExecutorUtil {
             }
 
             String script;
-            TestScript testScript = testScriptMap.getOrDefault(accountId, null);
-            int lastTestScriptFetched = lastFetchedMap.getOrDefault(accountId, 0);
+            String cacheKey = scriptCacheKey(accountId, TestScript.Type.PRE_REQUEST);
+            TestScript testScript = testScriptMap.getOrDefault(cacheKey, null);
+            int lastTestScriptFetched = lastFetchedMap.getOrDefault(cacheKey, 0);
             if (Context.now() - lastTestScriptFetched > 5 * 60) {
-                testScript = dataActor.fetchTestScript();
+                testScript = dataActor.fetchTestScript(TestScript.Type.PRE_REQUEST);
                 lastTestScriptFetched = Context.now();
-                testScriptMap.put(accountId, testScript);
-                lastFetchedMap.put(accountId, Context.now());
+                testScriptMap.put(cacheKey, testScript);
+                lastFetchedMap.put(cacheKey, Context.now());
             }
             if (testScript != null && testScript.getJavascript() != null) {
                 script = testScript.getJavascript();
@@ -165,6 +171,73 @@ public class ApiExecutorUtil {
             this.cachedUrl = cachedUrl;
             this.cachedPayload = cachedPayload;
             this.cachedQueryParams = cachedQueryParams;
+        }
+    }
+
+    /**
+     * Runs the POST_REQUEST test script on the response (e.g. to extract tokens from response).
+     * Script context: statusCode, headers, body. Script may set statusCode, headers, body to modify the response.
+     */
+    public static OriginalHttpResponse runPostRequestScript(OriginalHttpResponse response, boolean executeScript,
+            TestingRunConfig testingRunConfig) {
+        if (!executeScript || response == null) {
+            return response;
+        }
+        try {
+            int accountId = Context.getActualAccountId();
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "TEST_POST_SCRIPT");
+            if (!featureAccess.getIsGranted()) {
+                return response;
+            }
+
+            String cacheKey = scriptCacheKey(accountId, TestScript.Type.POST_REQUEST);
+            TestScript testScript = testScriptMap.getOrDefault(cacheKey, null);
+            int lastTestScriptFetched = lastFetchedMap.getOrDefault(cacheKey, 0);
+            if (Context.now() - lastTestScriptFetched > 5 * 60) {
+                testScript = dataActor.fetchTestScript(TestScript.Type.POST_REQUEST);
+                lastTestScriptFetched = Context.now();
+                testScriptMap.put(cacheKey, testScript);
+                lastFetchedMap.put(cacheKey, Context.now());
+            }
+            if (testScript == null || testScript.getJavascript() == null || testScript.getJavascript().isEmpty()) {
+                return response;
+            }
+
+            String script = testScript.getJavascript();
+            loggerMaker.infoAndAddToDb("Starting runPostRequestScript");
+
+            ScriptEngineManager manager = new ScriptEngineManager();
+            ScriptEngine engine = manager.getEngineByName("nashorn");
+
+            SimpleScriptContext sctx = ((SimpleScriptContext) engine.get("context"));
+            sctx.setAttribute("statusCode", response.getStatusCode(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("headers", response.getHeaders(), ScriptContext.ENGINE_SCOPE);
+            sctx.setAttribute("body", response.getBody(), ScriptContext.ENGINE_SCOPE);
+            engine.eval(script);
+
+            Object statusCodeObj = sctx.getAttribute("statusCode");
+            Map<String, Object> headers = (Map) sctx.getAttribute("headers");
+            String body = (String) sctx.getAttribute("body");
+
+            int statusCode = response.getStatusCode();
+            if (statusCodeObj != null) {
+                if (statusCodeObj instanceof Number) {
+                    statusCode = ((Number) statusCodeObj).intValue();
+                }
+            }
+            Map<String, List<String>> responseHeaders = response.getHeaders();
+            if (headers != null) {
+                responseHeaders = convertHeadersFromScript(headers);
+            }
+            if (body == null) {
+                body = response.getBody();
+            }
+
+            return new OriginalHttpResponse(body, responseHeaders, statusCode);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in runPostRequestScript " + e.getMessage());
+            e.printStackTrace();
+            return response;
         }
     }
 
