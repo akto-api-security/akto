@@ -643,7 +643,7 @@ public class DbActor extends DataActor {
     }
 
     public TestScript fetchTestScript(){
-        return DbLayer.fetchTestScript();
+        return DbLayer.fetchTestScript(null);
     }
 
     public List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod){
