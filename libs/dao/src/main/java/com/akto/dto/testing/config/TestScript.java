@@ -18,7 +18,8 @@ public class TestScript {
 
     public static final String JAVASCRIPT = "javascript";
     private String javascript;
-    
+
+    public static final String TYPE = "type";
     private Type type;
 
     public static final String AUTHOR = "author";

@@ -401,6 +401,10 @@ public class ApiExecutor {
             loggerMaker.infoAndAddToDb("Response Payload " + response.getBody(), LogDb.TESTING);
         }
 
+        if (executeScript) {
+            response = ApiExecutorUtil.runPostRequestScript(response, true, testingRunConfig);
+        }
+
         request.setBody(tempPayload);
         return response;
     }
