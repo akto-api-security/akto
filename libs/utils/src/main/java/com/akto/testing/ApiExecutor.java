@@ -402,7 +402,7 @@ public class ApiExecutor {
         }
 
         if (executeScript) {
-            response = ApiExecutorUtil.runPostRequestScript(response, true, testingRunConfig);
+            response = ApiExecutorUtil.runPostRequestScript(request, response, true, testingRunConfig);
         }
 
         request.setBody(tempPayload);
