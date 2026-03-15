@@ -27,6 +27,8 @@ import jdk.nashorn.api.scripting.ScriptObjectMirror;
 public class ApiExecutorUtil {
 
     private static final String EXECUTE_ONCE_PER_CONVERSATION = "executeOncePerConversation = true";
+    private static final String FEATURE_TEST_PRE_SCRIPT = "TEST_PRE_SCRIPT";
+    private static final int SCRIPT_CACHE_TTL_SECONDS = 5 * 60;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutorUtil.class, LogDb.TESTING);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
@@ -41,6 +43,46 @@ public class ApiExecutorUtil {
     /** Cache of script results per conversationId when executeOncePerConversation = true. */
     private static final Map<String, ScriptResultCache> conversationScriptCache = new ConcurrentHashMap<>();
 
+    /**
+     * Returns the script JavaScript for the given type, using 5-min cache. Returns null if feature not granted, or no script.
+     */
+    private static String getCachedScript(int accountId, TestScript.Type type) {
+        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, FEATURE_TEST_PRE_SCRIPT);
+        if (!featureAccess.getIsGranted()) {
+            return null;
+        }
+        String cacheKey = scriptCacheKey(accountId, type);
+        TestScript testScript = testScriptMap.getOrDefault(cacheKey, null);
+        int lastTestScriptFetched = lastFetchedMap.getOrDefault(cacheKey, 0);
+        if (Context.now() - lastTestScriptFetched > SCRIPT_CACHE_TTL_SECONDS) {
+            testScript = dataActor.fetchTestScript(type);
+            lastFetchedMap.put(cacheKey, Context.now());
+            testScriptMap.put(cacheKey, testScript);
+        }
+        if (testScript == null || testScript.getJavascript() == null || testScript.getJavascript().isEmpty()) {
+            return null;
+        }
+        return testScript.getJavascript();
+    }
+
+    /**
+     * Sets bindings on the script context, runs the script, returns a map of the given output keys from the context.
+     */
+    private static Map<String, Object> runScript(String script, Map<String, Object> inputBindings, String... outputKeys) throws Exception {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("nashorn");
+        SimpleScriptContext sctx = ((SimpleScriptContext) engine.get("context"));
+        for (Map.Entry<String, Object> e : inputBindings.entrySet()) {
+            sctx.setAttribute(e.getKey(), e.getValue(), ScriptContext.ENGINE_SCOPE);
+        }
+        engine.eval(script);
+        Map<String, Object> out = new HashMap<>();
+        for (String key : outputKeys) {
+            out.put(key, sctx.getAttribute(key));
+        }
+        return out;
+    }
+
     public static String calculateHashAndAddAuth(OriginalHttpRequest originalHttpRequest, boolean executeScript,
             TestingRunConfig testingRunConfig) {
         if (!executeScript) {
@@ -48,24 +90,8 @@ public class ApiExecutorUtil {
         }
         try {
             int accountId = Context.getActualAccountId();
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "TEST_PRE_SCRIPT");
-            if (!featureAccess.getIsGranted()) {
-                return originalHttpRequest.getBody();
-            }
-
-            String script;
-            String cacheKey = scriptCacheKey(accountId, TestScript.Type.PRE_REQUEST);
-            TestScript testScript = testScriptMap.getOrDefault(cacheKey, null);
-            int lastTestScriptFetched = lastFetchedMap.getOrDefault(cacheKey, 0);
-            if (Context.now() - lastTestScriptFetched > 5 * 60) {
-                testScript = dataActor.fetchTestScript(TestScript.Type.PRE_REQUEST);
-                lastTestScriptFetched = Context.now();
-                testScriptMap.put(cacheKey, testScript);
-                lastFetchedMap.put(cacheKey, Context.now());
-            }
-            if (testScript != null && testScript.getJavascript() != null) {
-                script = testScript.getJavascript();
-            } else {
+            String script = getCachedScript(accountId, TestScript.Type.PRE_REQUEST);
+            if (script == null) {
                 return originalHttpRequest.getBody();
             }
             
@@ -80,29 +106,28 @@ public class ApiExecutorUtil {
 
             loggerMaker.infoAndAddToDb("Starting calculateHashAndAddAuth");
 
-            ScriptEngineManager manager = new ScriptEngineManager();
-            ScriptEngine engine = manager.getEngineByName("nashorn");
+            Map<String, Object> bindings = new HashMap<>();
+            bindings.put("method", originalHttpRequest.getMethod());
+            bindings.put("headers", originalHttpRequest.getHeaders());
+            bindings.put("url", originalHttpRequest.getUrl());
+            bindings.put("payload", originalHttpRequest.getBody());
+            bindings.put("queryParams", originalHttpRequest.getQueryParams());
 
-            SimpleScriptContext sctx = ((SimpleScriptContext) engine.get("context"));
-            sctx.setAttribute("method", originalHttpRequest.getMethod(), ScriptContext.ENGINE_SCOPE);
-            sctx.setAttribute("headers", originalHttpRequest.getHeaders(), ScriptContext.ENGINE_SCOPE);
-            sctx.setAttribute("url", originalHttpRequest.getUrl(), ScriptContext.ENGINE_SCOPE);
-            sctx.setAttribute("payload", originalHttpRequest.getBody(), ScriptContext.ENGINE_SCOPE);
-            sctx.setAttribute("queryParams", originalHttpRequest.getQueryParams(), ScriptContext.ENGINE_SCOPE);
-            engine.eval(script);
+            Map<String, Object> out = runScript(script, bindings,
+                    "method", "headers", "url", "payload", "queryParams",
+                    "parsedPayloadTemp", "cachedMethod", "cachedHeaders", "cachedUrl", "cachedPayload", "cachedQueryParams");
 
-            String method = (String) sctx.getAttribute("method");
-            Map<String, Object> headers = (Map) sctx.getAttribute("headers");
-            String url = (String) sctx.getAttribute("url");
-            String payload = (String) sctx.getAttribute("payload");
-            String queryParams = (String) sctx.getAttribute("queryParams");
-            String parsedPayloadTemp = (String) sctx.getAttribute("parsedPayloadTemp");
-            String cachedMethod = (String) sctx.getAttribute("cachedMethod");
-            Map<String, Object> cachedHeaders = (Map) sctx.getAttribute("cachedHeaders");
-            String cachedUrl = (String) sctx.getAttribute("cachedUrl");
-            String cachedPayload = (String) sctx.getAttribute("cachedPayload");
-            String cachedQueryParams = (String) sctx.getAttribute("cachedQueryParams");
-
+            String method = (String) out.get("method");
+            Map<String, Object> headers = (Map) out.get("headers");
+            String url = (String) out.get("url");
+            String payload = (String) out.get("payload");
+            String queryParams = (String) out.get("queryParams");
+            String parsedPayloadTemp = (String) out.get("parsedPayloadTemp");
+            String cachedMethod = (String) out.get("cachedMethod");
+            Map<String, Object> cachedHeaders = (Map) out.get("cachedHeaders");
+            String cachedUrl = (String) out.get("cachedUrl");
+            String cachedPayload = (String) out.get("cachedPayload");
+            String cachedQueryParams = (String) out.get("cachedQueryParams");
 
             Map<String, List<String>> hs = convertHeadersFromScript(headers);
             Map<String, List<String>> cachedHs = convertHeadersFromScript(cachedHeaders);
@@ -176,54 +201,44 @@ public class ApiExecutorUtil {
 
     /**
      * Runs the POST_REQUEST test script on the response (e.g. to extract tokens from response).
-     * Script context: statusCode, headers, body. Script may set statusCode, headers, body to modify the response.
+     * Script context: request (method, headers, url, payload, queryParams), response (statusCode, headers, body).
+     * Script may set statusCode, headers, body to modify the response.
      */
-    public static OriginalHttpResponse runPostRequestScript(OriginalHttpResponse response, boolean executeScript,
+    public static OriginalHttpResponse runPostRequestScript(OriginalHttpRequest request, OriginalHttpResponse response, boolean executeScript,
             TestingRunConfig testingRunConfig) {
         if (!executeScript || response == null) {
             return response;
         }
         try {
             int accountId = Context.getActualAccountId();
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "TEST_POST_SCRIPT");
-            if (!featureAccess.getIsGranted()) {
+            String script = getCachedScript(accountId, TestScript.Type.POST_REQUEST);
+            if (script == null) {
                 return response;
             }
 
-            String cacheKey = scriptCacheKey(accountId, TestScript.Type.POST_REQUEST);
-            TestScript testScript = testScriptMap.getOrDefault(cacheKey, null);
-            int lastTestScriptFetched = lastFetchedMap.getOrDefault(cacheKey, 0);
-            if (Context.now() - lastTestScriptFetched > 5 * 60) {
-                testScript = dataActor.fetchTestScript(TestScript.Type.POST_REQUEST);
-                lastTestScriptFetched = Context.now();
-                testScriptMap.put(cacheKey, testScript);
-                lastFetchedMap.put(cacheKey, Context.now());
-            }
-            if (testScript == null || testScript.getJavascript() == null || testScript.getJavascript().isEmpty()) {
-                return response;
-            }
-
-            String script = testScript.getJavascript();
             loggerMaker.infoAndAddToDb("Starting runPostRequestScript");
 
-            ScriptEngineManager manager = new ScriptEngineManager();
-            ScriptEngine engine = manager.getEngineByName("nashorn");
+            Map<String, Object> bindings = new HashMap<>();
+            bindings.put("statusCode", response.getStatusCode());
+            bindings.put("headers", response.getHeaders());
+            bindings.put("body", response.getBody());
+            if (request != null) {
+                bindings.put("method", request.getMethod());
+                bindings.put("requestHeaders", request.getHeaders());
+                bindings.put("url", request.getUrl());
+                bindings.put("payload", request.getBody());
+                bindings.put("queryParams", request.getQueryParams());
+            }
 
-            SimpleScriptContext sctx = ((SimpleScriptContext) engine.get("context"));
-            sctx.setAttribute("statusCode", response.getStatusCode(), ScriptContext.ENGINE_SCOPE);
-            sctx.setAttribute("headers", response.getHeaders(), ScriptContext.ENGINE_SCOPE);
-            sctx.setAttribute("body", response.getBody(), ScriptContext.ENGINE_SCOPE);
-            engine.eval(script);
+            Map<String, Object> out = runScript(script, bindings, "statusCode", "headers", "body");
 
-            Object statusCodeObj = sctx.getAttribute("statusCode");
-            Map<String, Object> headers = (Map) sctx.getAttribute("headers");
-            String body = (String) sctx.getAttribute("body");
+            Object statusCodeObj = out.get("statusCode");
+            Map<String, Object> headers = (Map) out.get("headers");
+            String body = (String) out.get("body");
 
             int statusCode = response.getStatusCode();
-            if (statusCodeObj != null) {
-                if (statusCodeObj instanceof Number) {
-                    statusCode = ((Number) statusCodeObj).intValue();
-                }
+            if (statusCodeObj != null && statusCodeObj instanceof Number) {
+                statusCode = ((Number) statusCodeObj).intValue();
             }
             Map<String, List<String>> responseHeaders = response.getHeaders();
             if (headers != null) {
