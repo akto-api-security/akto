@@ -141,6 +141,8 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForOverageInfo;
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
+    @Getter @Setter
+    String testScriptType;
     String openApiSchema;
     @Getter @Setter
     private String importType;
@@ -3188,7 +3190,16 @@ public class DbAction extends ActionSupport {
 
     public String fetchTestScript() {
         try {
-            testScript = DbLayer.fetchTestScript();
+            TestScript.Type type = null;
+            if (testScriptType != null && !testScriptType.isEmpty()) {
+                try {
+                    type = TestScript.Type.valueOf(testScriptType);
+                } catch (IllegalArgumentException e) {
+                    loggerMaker.errorAndAddToDb(e, "Invalid testScriptType in fetchTestScript: " + testScriptType);
+                    return Action.ERROR.toUpperCase();
+                }
+            }
+            testScript = DbLayer.fetchTestScript(type);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchTestScript " + e.toString());
             return Action.ERROR.toUpperCase();

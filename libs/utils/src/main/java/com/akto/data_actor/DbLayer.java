@@ -2287,8 +2287,8 @@ public class DbLayer {
         return TestingRunResultSummariesDao.instance.count(filter);
     }
 
-    public static TestScript fetchTestScript(){
-        return TestScriptsDao.instance.fetchTestScript();
+    public static TestScript fetchTestScript(TestScript.Type type){
+        return TestScriptsDao.instance.fetchTestScript(type);
     }
 
     public static List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod) {
