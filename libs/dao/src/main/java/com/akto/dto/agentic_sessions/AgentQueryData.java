@@ -22,7 +22,8 @@ public class AgentQueryData {
     public static final String OUTPUT_TOKENS = "outputTokens";
 
     private String serviceId;
-    private String uniqueUserId;
+    private String deviceId;
+    private String userName;
     private String sessionIdentifier;
     private String queryPayload;
     private String responsePayload;

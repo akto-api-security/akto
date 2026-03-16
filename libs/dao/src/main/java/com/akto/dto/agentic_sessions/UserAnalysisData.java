@@ -15,18 +15,35 @@ import java.util.Map;
 public class UserAnalysisData {
 
     public static final String SERVICE_ID = "serviceId";
-    public static final String UNIQUE_USER_ID = "uniqueUserId";
-    public static final String COMPUTED_AT = "computedAt";
 
-    private String serviceId;
-    private String uniqueUserId;
-    private long windowStart;
-    private long windowEnd;
+    public static class UserAnalysisDataKey {
+        private String serviceId;
+        private String deviceId;
+
+        public UserAnalysisDataKey(String serviceId, String deviceId) {
+            this.serviceId = serviceId;
+            this.deviceId = deviceId;
+        }
+
+        public String getServiceId() {
+            return serviceId;
+        }
+
+        public String getDeviceId() {
+            return deviceId;
+        }
+
+        public void setServiceId(String serviceId) {
+            this.serviceId = serviceId;
+        }
+    }
+
+    private UserAnalysisDataKey id;
+    private String userName;
     private List<String> dominantTopics;
-    private Map<String, Integer> topicFrequency;
-    private int totalQueries;
     private long totalInputTokens;
     private long totalOutputTokens;
     private String aiSummary;
-    private long computedAt;
+    private long lastUpdatedAt;
+    Map<String, Object> harmfulTopics;
 }

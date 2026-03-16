@@ -1,7 +1,9 @@
 package com.akto.action.monitoring;
 
 import com.akto.action.UserAction;
+import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.monitoring.EndpointShieldServer;
 import com.akto.dto.monitoring.EndpointShieldLog;
 import com.akto.dto.monitoring.ModuleInfo;
@@ -23,6 +25,7 @@ public class EndpointShieldAgentAction extends UserAction {
     private List<Log> agentLogs;
     private int startTime;
     private int endTime;
+    private UserAnalysisData userAnalysis;
 
 
     public String getMcpServersByAgent() {
@@ -223,5 +226,33 @@ public class EndpointShieldAgentAction extends UserAction {
 
     public void setEndTime(int endTime) {
         this.endTime = endTime;
+    }
+
+    public String getUserAnalysis() {
+        if (agentId == null || agentId.trim().isEmpty()) {
+            addActionError("Agent ID is required");
+            return ERROR.toUpperCase();
+        }
+        if (deviceId == null || deviceId.trim().isEmpty()) {
+            addActionError("Device ID is required");
+            return ERROR.toUpperCase();
+        }
+
+        userAnalysis = UserAnalysisDataDao.instance.findOne(
+            Filters.and(
+                Filters.eq("_id.serviceId", agentId),
+                Filters.eq("_id.deviceId", deviceId)
+            )
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public UserAnalysisData getUserAnalysisData() {
+        return userAnalysis;
+    }
+
+    public void setUserAnalysisData(UserAnalysisData userAnalysis) {
+        this.userAnalysis = userAnalysis;
     }
 }

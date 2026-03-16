@@ -2,6 +2,7 @@ package com.akto.dao.monitoring;
 
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.MCollection;
 import com.akto.dto.monitoring.ModuleInfo;
 
 public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
@@ -16,5 +17,19 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
     @Override
     public Class<ModuleInfo> getClassT() {
         return ModuleInfo.class;
+    }
+
+    public void createIndicesIfAbsent() {
+        // moduleType is the most common single-field filter
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[]{ ModuleInfo.MODULE_TYPE }, false);
+
+        // moduleType + lastHeartbeatReceived — used in heartbeat threshold queries
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[]{ ModuleInfo.MODULE_TYPE, ModuleInfo.LAST_HEARTBEAT_RECEIVED }, false);
+
+        // moduleType + name — used when looking up by deviceId (name field)
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[]{ ModuleInfo.MODULE_TYPE, ModuleInfo.NAME }, false);
     }
 }
