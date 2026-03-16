@@ -81,6 +81,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForOverageInfo;
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
+    String testScriptType;
     @Setter @Getter
     McpAuditInfo auditInfo;
 
@@ -1833,7 +1834,11 @@ public class DbAction extends ActionSupport {
 
     public String fetchTestScript() {
         try {
-            testScript = DbLayer.fetchTestScript();
+            TestScript.Type type = null;
+            if (testScriptType != null && !testScriptType.isEmpty()) {
+                type = TestScript.Type.valueOf(testScriptType);
+            }
+            testScript = DbLayer.fetchTestScript(type);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             System.out.println("Error in fetchTestScript " + e.toString());
@@ -2817,6 +2822,14 @@ public class DbAction extends ActionSupport {
 
     public TestScript getTestScript() {
         return testScript;
+    }
+
+    public void setTestScriptType(String testScriptType) {
+        this.testScriptType = testScriptType;
+    }
+
+    public String getTestScriptType() {
+        return testScriptType;
     }
 
     public void setFilter(Bson filter) {
