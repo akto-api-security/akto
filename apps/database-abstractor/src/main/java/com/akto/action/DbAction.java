@@ -5084,6 +5084,9 @@ public class DbAction extends ActionSupport {
                                 List<HttpResponseParams> responses = new ArrayList<>();
                                 for (String message : msgs) {
                                     HttpResponseParams responseParams = HttpCallParser.parseKafkaMessage(message);
+                                    if (Method.OPTIONS.name().equalsIgnoreCase(responseParams.getRequestParams().getMethod())) {
+                                        continue; // ignore OPTIONS APIs when uploading OpenAPI spec
+                                    }
                                     responseParams.getRequestParams().setApiCollectionId(colId);
                                     responses.add(responseParams);
                                 }
