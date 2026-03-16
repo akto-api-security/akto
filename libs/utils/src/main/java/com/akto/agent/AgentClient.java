@@ -105,7 +105,7 @@ public class AgentClient {
         Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest);
 
         Call call = agentHttpClient.newCall(request);
-        call.timeout().timeout(120, TimeUnit.SECONDS);
+        call.timeout().timeout(5, TimeUnit.MINUTES);
         
         try (Response response = call.execute()) {
             if (!response.isSuccessful()) {
