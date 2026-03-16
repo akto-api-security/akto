@@ -2,7 +2,7 @@ package com.akto.dao.testing.config;
 
 import com.akto.dao.*;
 import com.akto.dto.testing.config.TestScript;
-import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
 public class TestScriptsDao extends AccountsContextDao<TestScript> {
 
@@ -10,8 +10,8 @@ public class TestScriptsDao extends AccountsContextDao<TestScript> {
 
     private TestScriptsDao() {}
 
-    public TestScript fetchTestScript() {
-        return TestScriptsDao.instance.findOne(new BasicDBObject());
+    public TestScript fetchTestScript(TestScript.Type type) {
+        return TestScriptsDao.instance.findOne(Filters.eq(TestScript.TYPE, type.name()));
     }
 
     @Override

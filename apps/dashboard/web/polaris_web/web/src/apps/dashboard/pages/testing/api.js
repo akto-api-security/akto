@@ -481,18 +481,18 @@ export default {
             data: {reportId, organizationName, reportDate, reportUrl, username, firstPollRequest}
         })
     },
-    fetchScript() {
+    fetchScript(scriptType = 'PRE_REQUEST') {
         return request({
             url: '/api/fetchScript',
             method: 'post',
-            data: {}
+            data: { scriptType }
         })
     },
-    addScript({javascript}) {
+    addScript({ javascript, scriptType = 'PRE_REQUEST' }) {
         return request({
             url: '/api/addScript',
             method: 'post',
-            data: {testScript:{javascript}}
+            data: { testScript: { javascript, type: scriptType } }
         })
     },
     updateScript(id, javascript) {
