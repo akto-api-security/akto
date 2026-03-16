@@ -23,7 +23,7 @@ public class SsrfUrlHitFilter extends DataOperandsImpl {
         }
 
         for (String queryString: querySet) {
-            if(Utils.sendRequestToSsrfServer(queryString)){
+            if(Utils.sendRequestToWebhookService(queryString)){
                 result = true;
                 break;
             }

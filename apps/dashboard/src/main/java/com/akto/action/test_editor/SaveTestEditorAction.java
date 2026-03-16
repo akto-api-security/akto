@@ -17,6 +17,7 @@ import com.akto.dao.test_editor.info.InfoParser;
 import com.akto.dao.testing.AgentConversationResultDao;
 import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
@@ -39,6 +40,7 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.TestingRunWebhook;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.listener.InitializerListener;
@@ -103,6 +105,8 @@ public class SaveTestEditorAction extends UserAction {
     private HashMap<String, Integer> testCountMap;
     private String testingRunPlaygroundHexId;
     private State testingRunPlaygroundStatus;
+    private List<String> callbackUuids;
+    private boolean callbackHit;
     @Getter @Setter
     private String miniTestingName;
     @Getter @Setter
@@ -429,6 +433,10 @@ public class SaveTestEditorAction extends UserAction {
                     Context.now(), new ObjectId(), null, testLogs
             );
         }
+        // capture callback UUIDs (if any) for editor polling
+        if (testingRunResult != null && testingRunResult.getCallbackUuids() != null && !testingRunResult.getCallbackUuids().isEmpty()) {
+            this.callbackUuids = testingRunResult.getCallbackUuids();
+        }
         generateTestingRunResultAndIssue(testConfig, infoKey, testingRunResult);
 
         return SUCCESS.toUpperCase();
@@ -483,6 +491,37 @@ public class SaveTestEditorAction extends UserAction {
                 this.testingRunResult = failedResult;
             }
         }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchCallbackStatusForTestEditor() {
+        if (callbackUuids == null || callbackUuids.isEmpty()) {
+            addActionError("callbackUuids cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        boolean hit = false;
+        for (String uuid : callbackUuids) {
+            if (uuid == null || uuid.isEmpty()) {
+                continue;
+            }
+            try {
+                TestingRunWebhook mapping = TestingRunWebhookDao.instance.findByUuid(uuid);
+                if (mapping != null && mapping.isUrlHit()) {
+                    hit = true;
+                    break;
+                }
+                if (com.akto.test_editor.Utils.sendRequestToWebhookService(uuid)) {
+                    hit = true;
+                    TestingRunWebhookDao.instance.markUrlHit(uuid);
+                    break;
+                }
+            } catch (Exception e) {
+                logger.errorAndAddToDb("Error while checking callback status for uuid " + uuid + ": " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }
+
+        this.callbackHit = hit;
         return SUCCESS.toUpperCase();
     }
 
@@ -854,6 +893,22 @@ public class SaveTestEditorAction extends UserAction {
 
     public String getTestingRunPlaygroundHexId() {
         return testingRunPlaygroundHexId;
+    }
+
+    public List<String> getCallbackUuids() {
+        return callbackUuids;
+    }
+
+    public void setCallbackUuids(List<String> callbackUuids) {
+        this.callbackUuids = callbackUuids;
+    }
+
+    public boolean isCallbackHit() {
+        return callbackHit;
+    }
+
+    public void setCallbackHit(boolean callbackHit) {
+        this.callbackHit = callbackHit;
     }
 
 }

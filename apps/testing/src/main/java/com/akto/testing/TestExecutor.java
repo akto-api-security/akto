@@ -1276,6 +1276,14 @@ public class TestExecutor {
             vulnerable,singleTypeInfos,confidencePercentage,startTime,
             endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs);  
 
+        // Attach any callback UUIDs captured during execution for editor polling
+        Object callbackUuidsObj = varMap.get("random_uuid");
+        if (callbackUuidsObj instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> callbackUuids = (List<String>) callbackUuidsObj;
+            ret.setCallbackUuids(callbackUuids);
+        }
+
         if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
             try {
                 cleanUpTestArtifacts(Collections.singletonList(ret), apiInfoKey, sampleMessageStore, testingRunConfig);

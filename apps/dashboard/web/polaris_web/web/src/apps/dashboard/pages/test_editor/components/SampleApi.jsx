@@ -20,7 +20,8 @@ import { mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import EmptySampleApi from "./EmptySampleApi";
 import Store from "../../../store";
 import LocalStore from "../../../../main/LocalStorageStore";
-import observeFunc from "../../observe/transform"
+import observeFunc from "../../observe/transform";
+import { CALLBACK_STATUS_MESSAGES, getCallbackCheckError, getResultColor, getResultDescription, isCallbackTest, markTestResultVulnerable, normalizeCallbackUuids, startCallbackPolling, startPlaygroundPolling } from "../webhookCallbackUtils"
 
 const SampleApi = () => {
 
@@ -40,6 +41,9 @@ const SampleApi = () => {
     const [showTestResult, setShowTestResult] = useState(false);
     const [editorData, setEditorData] = useState({message: ''})
     const [showEmptyLayout, setShowEmptyLayout] = useState(false)
+    const [callbackStatus, setCallbackStatus] = useState(null)
+    const [callbackUuids, setCallbackUuids] = useState([])
+    const [isCheckingCallback, setIsCheckingCallback] = useState(false)
 
     const currentContent = TestEditorStore(state => state.currentContent)
     const selectedTest = TestEditorStore(state => state.selectedTest)
@@ -289,12 +293,49 @@ const SampleApi = () => {
 
     const intervalRef = useRef(null);
 
+
+    const stopCallbackPollingRef = useRef(null);
+
+    const stopCallbackPolling = () => {
+        if (stopCallbackPollingRef.current) {
+            stopCallbackPollingRef.current()
+            stopCallbackPollingRef.current = null
+        }
+        setIsCheckingCallback(false)
+    }
+
+    const checkCallbackHit = () => {
+        const err = getCallbackCheckError(testResult, callbackUuids)
+        if (err) {
+            setToastConfig({ isActive: true, isError: true, message: err })
+            return
+        }
+        stopCallbackPolling()
+        setCallbackStatus("pending")
+        setIsCheckingCallback(true)
+        stopCallbackPollingRef.current = startCallbackPolling({
+            uuids: callbackUuids,
+            fetchStatus: testEditorRequests.fetchCallbackStatusForTestEditor,
+            onHit: () => {
+                stopCallbackPollingRef.current = null
+                setIsCheckingCallback(false)
+                setCallbackStatus("hit")
+                setTestResult(prev => markTestResultVulnerable(prev))
+            },
+            onNotHit: () => {
+                stopCallbackPollingRef.current = null
+                setIsCheckingCallback(false)
+                setCallbackStatus("not_hit")
+            },
+        })
+    }
     const runTest = async()=>{
         if(isChatBotOpen) {
             setChatBotModal(true)
             return;
         }
         setLoading(true)
+        setCallbackStatus(null)
         const apiKeyInfo = {
             ...func.toMethodUrlObject(selectedApiEndpoint),
             apiCollectionId: selectedCollectionId
@@ -307,39 +348,29 @@ const SampleApi = () => {
             testRoleId: selectedRole || undefined
         };
         let resp = await testEditorRequests.runTestForTemplate(currentContent, apiKeyInfo, sampleDataList, selectedMiniTestingServiceName, testingRunConfig)
-            if(resp.testingRunPlaygroundHexId !== null && resp?.testingRunPlaygroundHexId !== undefined) {
+            if(resp?.testingRunPlaygroundHexId != null) {
                 await new Promise((resolve) => {
-                    let maxAttempts = 100;
-                    let pollInterval = 3000;
-                    let attempts = 0;
-    
-                    intervalRef.current = setInterval(async () => {
-                        if (attempts >= maxAttempts) {
-                            clearInterval(intervalRef.current);
-                            intervalRef.current = null;
-                            setToastConfig({ isActive: true, isError: true, message: "Error while running the test" });
-                            resolve();
-                            return;
-                        }
-    
-                        try {
-                            const result = await testEditorRequests.fetchTestingRunPlaygroundStatus(resp?.testingRunPlaygroundHexId);
-                            if (result?.testingRunPlaygroundStatus === "COMPLETED") {
-                                clearInterval(intervalRef.current);
-                                intervalRef.current = null;
-                                setTestResult(result);
-                                resolve();
-                                return;
-                            }
-                        } catch (err) {
-                            console.error("Error fetching updateResult:", err);
-                        }
-    
-                        attempts++;
-                    }, pollInterval);
-                });
+                    intervalRef.current = startPlaygroundPolling({
+                        playgroundHexId: resp.testingRunPlaygroundHexId,
+                        fetchStatus: testEditorRequests.fetchTestingRunPlaygroundStatus,
+                        onComplete: (result) => {
+                            if (intervalRef.current) intervalRef.current()
+                            intervalRef.current = null
+                            setTestResult(result)
+                            resolve()
+                        },
+                        onTimeout: () => {
+                            intervalRef.current = null
+                            setToastConfig({ isActive: true, isError: true, message: "Error while running the test" })
+                            resolve()
+                        },
+                    })
+                })
             }
-            else setTestResult(resp)
+            else {
+                setTestResult(resp)
+                setCallbackUuids(normalizeCallbackUuids(resp))
+            }
             if(resp?.agentConversationResults?.length > 0){
                 let result = testingFunc.prepareConversationsList(resp?.agentConversationResults)
                 setConversationsList(result.conversations)
@@ -351,11 +382,10 @@ const SampleApi = () => {
 
     useEffect(() => {
         return () => {
-            if (intervalRef.current) {
-                clearInterval(intervalRef.current);
-            }
-        };
-    }, []);
+            if (intervalRef.current) intervalRef.current()
+            if (stopCallbackPollingRef.current) stopCallbackPollingRef.current()
+        }
+    }, [])
 
     const showResults = () => {
         if(testResult?.agentConversationResults?.length > 0){
@@ -365,41 +395,8 @@ const SampleApi = () => {
         setShowTestResult(!showTestResult);
     }
 
-    function getColor(){
-        if(testResult){
-            if(testResult.testingRunResult.vulnerable){
-                let status = func.getRunResultSeverity(testResult.testingRunResult, testResult.subCategoryMap)
-                status = status.toUpperCase();
-                switch(status){
-                    case "HIGH" : return "bg-critical";
-                    case "MEDIUM": return "bg-caution";
-                    case "LOW": return "bg-info";
-                    default:
-                        return "bg";
-                }
-            } else {
-                return "bg-success"
-            }
-        } else {
-            return "bg";
-        }
-    }
-
-    function getResultDescription() {
-        if(isChatBotOpen) {
-            return "Chat with the agent"
-        }
-        if (testResult) {
-            if(testResult.testingRunResult.vulnerable){
-                let status = func.getRunResultSeverity(testResult.testingRunResult, testResult.subCategoryMap)
-                return func.toSentenceCase(status) + " vulnerability found";
-            } else {
-                return "No vulnerability found"
-            }
-        } else {
-            return `${mapLabel('Run test', getDashboardCategory())} to see Results`
-        }
-    }
+    const getColor = () => getResultColor(testResult)
+    const getDescription = () => getResultDescription({ testResult, callbackStatus, isChatBotOpen, mapLabel, getDashboardCategory })
 
     const closeModal = () => {
         setShowTestResult(!showTestResult)
@@ -411,13 +408,14 @@ const SampleApi = () => {
             <Button id={"test-results"} removeUnderline monochrome plain 
             onClick={testResult ? showResults : () => {}}
             icon={testResult ? ChevronUpMinor : undefined}>
-                {getResultDescription()}
+                {getDescription()}
             </Button>
         </Box>
 
     )
 
-    const currentSeverity = selectedTest?.value !== undefined ? subCategoryMap[selectedTest?.value]?.superCategory?.severity._name : "HIGH";
+    const currentSeverity = selectedTest?.value !== undefined ? subCategoryMap[selectedTest?.value]?.superCategory?.severity._name : "HIGH"
+    const copyEndpointLabel = copySelectedApiEndpoint == null ? "No endpoints selected" : func.toMethodUrlString({ ...func.toMethodUrlObject(copySelectedApiEndpoint), shouldParse: true })
 
     return (
         <div>
@@ -428,8 +426,8 @@ const SampleApi = () => {
                 <HorizontalStack gap={2}>
                     <Button id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">
                         <Box maxWidth="200px">
-                            <Tooltip content={func.toMethodUrlString({...func.toMethodUrlObject(copySelectedApiEndpoint), shouldParse: true})} hoverDelay={"100"}>
-                                <Text variant="bodyMd" truncate>{func.toMethodUrlString({...func.toMethodUrlObject(copySelectedApiEndpoint), shouldParse: true})}</Text>
+                            <Tooltip content={copyEndpointLabel} hoverDelay={"100"}>
+                                <Text variant="bodyMd" truncate>{copyEndpointLabel}</Text>
                             </Tooltip>
                         </Box>
                     </Button>
@@ -471,6 +469,16 @@ const SampleApi = () => {
                     testId={selectedTest?.value}
                     source="editor"
                 />
+                {testResult && isCallbackTest(testResult) && callbackUuids?.length > 0 && (
+                    <Box paddingBlockStart={"4"}>
+                        <HorizontalStack gap={2}>
+                            <Button size="slim" onClick={checkCallbackHit} loading={isCheckingCallback} disabled={isCheckingCallback}>
+                                {isCheckingCallback ? "Checking webhook hit..." : "Check webhook hit"}
+                            </Button>
+                            {callbackStatus && <Text variant="bodySm">{CALLBACK_STATUS_MESSAGES[callbackStatus]}</Text>}
+                        </HorizontalStack>
+                    </Box>
+                )}
                 </Box>
                 </Frame>
             </Modal>
@@ -512,7 +520,7 @@ const SampleApi = () => {
                         placeholder="Select API endpoint"
                         optionsList={apiEndpointsOptions}
                         setSelected={setCopySelectedApiEndpoint}
-                        value={copySelectedApiEndpoint==null ? "No endpoints selected" : func.toMethodUrlString({...func.toMethodUrlObject(copySelectedApiEndpoint), shouldParse: true})}
+                        value={copyEndpointLabel}
                         preSelected={[copySelectedApiEndpoint]}
                     />
 
@@ -530,10 +538,7 @@ const SampleApi = () => {
                         placeholder="Select role"
                         optionsList={testRolesOptions}
                         setSelected={setSelectedRole}
-                        value={(() => {
-                            const found = testRolesOptions.find(r => r.value === selectedRole)
-                            return found ? found.label : ''
-                        })()}
+                        value={testRolesOptions.find(r => r.value === selectedRole)?.label ?? ''}
                         preSelected={selectedRole ? [selectedRole] : []}
                     />
 

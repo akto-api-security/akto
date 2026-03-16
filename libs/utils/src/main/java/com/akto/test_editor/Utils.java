@@ -850,7 +850,75 @@ public class Utils {
         return result;
     }
 
-    public static ExecutorSingleOperationResp sendRequestToSsrfServer(String requestUrl, String redirectUrl, String tokenVal){
+    public static boolean isWebhookService() {
+        String base = System.getenv("SSRF_SERVICE_NAME");
+        if (base == null || base.isEmpty()) {
+            return false;
+        }
+        String lower = base.toLowerCase();
+        return lower.contains("test-util.akto.io")
+                || lower.contains("webhook.test-util.akto.io");
+    }
+
+    /**
+     * Subdomain base for webhook DNS callback (e.g. webhook.test-util.akto.io -> test-util.akto.io).
+     * URL form: https://{uuid}.{subdomainBase}/anything
+     */
+    public static String getWebhookSubdomainBase(String baseUrl) {
+        if (baseUrl == null || baseUrl.isEmpty()) {
+            return null;
+        }
+        try {
+            URI uri = new URI(baseUrl.contains("://") ? baseUrl : "https://" + baseUrl);
+            String host = uri.getHost();
+            if (host == null) {
+                return null;
+            }
+            if (host.startsWith("webhook.")) {
+                return host.substring("webhook.".length());
+            }
+            return host;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Create a webhook.site token via POST /token. Returns the uuid for the capture URL, or null on failure.
+     */
+    public static String createWebhookSiteToken() {
+        String base = System.getenv("SSRF_SERVICE_NAME");
+        if (base == null || base.isEmpty()) {
+            return null;
+        }
+        String tokenUrl = (base.endsWith("/") ? base : base + "/") + "token";
+        RequestBody emptyBody = RequestBody.create(new byte[]{}, null);
+        Request request = new Request.Builder()
+            .url(tokenUrl)
+            .post(emptyBody)
+            .build();
+        Response okResponse = null;
+        try {
+            okResponse = client.newCall(request).execute();
+            if (!okResponse.isSuccessful() || okResponse.body() == null) {
+                return null;
+            }
+            BasicDBObject bd = BasicDBObject.parse(okResponse.body().string());
+            Object uuid = bd.get("uuid");
+            return uuid != null ? uuid.toString() : null;
+        } catch (Exception e) {
+            return null;
+        } finally {
+            if (okResponse != null) {
+                okResponse.close();
+            }
+        }
+    }
+
+    public static ExecutorSingleOperationResp sendRequestToWebhookService(String requestUrl, String redirectUrl, String tokenVal){
+        if (isWebhookService()) {
+            return new ExecutorSingleOperationResp(true, "");
+        }
         RequestBody emptyBody = RequestBody.create(new byte[]{}, null);
         
         Request request = new Request.Builder()
@@ -876,36 +944,39 @@ public class Utils {
         }
     }
 
-    public static Boolean sendRequestToSsrfServer(String url){
-        String requestUrl = "";
-        if(!(url.startsWith("http"))){
-            String hostName ="https://test-services.akto.io/";
-            if(System.getenv("SSRF_SERVICE_NAME") != null && System.getenv("SSRF_SERVICE_NAME").length() > 0){
-                hostName = System.getenv("SSRF_SERVICE_NAME");
-            }
-            requestUrl = hostName + "validate/" + url;
+    public static Boolean sendRequestToWebhookService(String url){
+        String hostName = System.getenv("SSRF_SERVICE_NAME");
+        if (hostName == null || hostName.isEmpty()) {
+            return false;
         }
+        if (url.startsWith("http")) {
+            return false;
+        }
+        String requestUrl = (hostName.endsWith("/") ? hostName : hostName + "/") + "token/" + url + "/requests";
 
         Request request = new Request.Builder()
             .url(requestUrl)
             .get()
             .build();
-            Response okResponse = null;
+        Response okResponse = null;
         
         try {
             okResponse = client.newCall(request).execute();
             if (!okResponse.isSuccessful()) {
                 return false;
-            }else{
-                ResponseBody responseBody = okResponse.body();
-                BasicDBObject bd = BasicDBObject.parse(responseBody.string());
-                return bd.getBoolean("url-hit");
             }
-        }catch (Exception e){
+            ResponseBody responseBody = okResponse.body();
+            if (responseBody == null) {
+                return false;
+            }
+            BasicDBObject bd = BasicDBObject.parse(responseBody.string());
+            Object total = bd.get("total");
+            return total != null && (total instanceof Number) && ((Number) total).intValue() > 0;
+        } catch (Exception e) {
             return false;
         } finally {
             if (okResponse != null) {
-                okResponse.close(); // Manually close the response body
+                okResponse.close();
             }
         }
     }

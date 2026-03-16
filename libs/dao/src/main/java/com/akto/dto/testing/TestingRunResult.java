@@ -56,6 +56,9 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public static final String REQUIRES_CONFIG = TEST_RESULTS + ".0." + TestResult.REQUIRES_CONFIG;
 
+    @BsonIgnore
+    private List<String> callbackUuids;
+
     public static final String WORKFLOW_TEST = "workflowTest";
     private WorkflowTest workflowTest;
 
@@ -354,6 +357,14 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setErrorsList(List<String> errorsList) {
         this.errorsList = errorsList;
+    }
+
+    public List<String> getCallbackUuids() {
+        return callbackUuids;
+    }
+
+    public void setCallbackUuids(List<String> callbackUuids) {
+        this.callbackUuids = callbackUuids;
     }
 
     public boolean isIgnoredResult() {

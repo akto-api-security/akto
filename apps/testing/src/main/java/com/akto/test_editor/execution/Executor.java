@@ -3,8 +3,8 @@ package com.akto.test_editor.execution;
 import com.akto.agent.AgentClient;
 import com.akto.billing.UsageMetricUtils;
 
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.TestingRunWebhookDao;
+import com.akto.dao.billing.OrganizationsDao;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -741,46 +741,109 @@ public class Executor {
                 if (isMcpRequest) {
                     return new ExecutorSingleOperationResp(false, "SSRF is not supported for MCP requests");
                 }
-                String keyValue = key.toString().replaceAll("\\$\\{random_uuid\\}", "");
-                String url = Utils.extractValue(keyValue, "url=");
-                String redirectUrl = Utils.extractValue(keyValue, "redirect_url=");
+                String base = System.getenv("SSRF_SERVICE_NAME");
+                if (base == null || base.isEmpty()) {
+                    return new ExecutorSingleOperationResp(false, "SSRF_SERVICE_NAME is required");
+                }
+                base = base.endsWith("/") ? base : base + "/";
+
+                List<String> callbackUrls = new ArrayList<>();
                 List<String> uuidList = (List<String>) varMap.getOrDefault("random_uuid", new ArrayList<>());
-                String generatedUUID =  UUID.randomUUID().toString();
-                uuidList.add(generatedUUID);
-                varMap.put("random_uuid", uuidList);
 
-                // Store UUID mapping in common database for SSRF hit tracking
-                try {
-                    String testRunIdStr = (String) varMap.get("testRunId");
-                    String testRunResultSummaryIdStr = (String) varMap.get("testRunResultSummaryId");
-                    Integer accountId = (Integer) varMap.get("accountId");
-                    String apiInfoKeyStr = (String) varMap.get("apiInfoKey");
-                    String testSubType = (String) varMap.get("testSubType");
-                    
-                    if (testRunIdStr != null && testRunResultSummaryIdStr != null && accountId != null && 
-                        apiInfoKeyStr != null && testSubType != null) {
-                        TestingRunWebhook mapping = new TestingRunWebhook(
-                            generatedUUID,
-                            accountId,
-                            new ObjectId(testRunIdStr),
-                            new ObjectId(testRunResultSummaryIdStr),
-                            apiInfoKeyStr,
-                            testSubType,
-                            Context.now()
-                        );
-                        TestingRunWebhookDao.instance.insertOne(mapping);
+                if (Utils.isWebhookService()) {
+                    String pathUuid = Utils.createWebhookSiteToken();
+                    String subdomainUuid = Utils.createWebhookSiteToken();
+                    if (pathUuid == null || subdomainUuid == null) {
+                        return new ExecutorSingleOperationResp(false, "Could not create webhook tokens");
                     }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error storing SSRF UUID mapping: " + e.getMessage(), LogDb.TESTING);
+                    String pathUrl = base + pathUuid;
+                    if (pathUrl.endsWith("//")) {
+                        pathUrl = pathUrl.substring(0, pathUrl.length() - 1);
+                    }
+                    callbackUrls.add(pathUrl);
+                    String subdomainBase = Utils.getWebhookSubdomainBase(base);
+                    if (subdomainBase != null) {
+                        callbackUrls.add("https://" + subdomainUuid + "." + subdomainBase + "/anything");
+                    }
+                    uuidList.add(pathUuid);
+                    uuidList.add(subdomainUuid);
+
+                    try {
+                        String testRunIdStr = (String) varMap.get("testRunId");
+                        String testRunResultSummaryIdStr = (String) varMap.get("testRunResultSummaryId");
+                        Integer accountId = (Integer) varMap.get("accountId");
+                        String apiInfoKeyStr = (String) varMap.get("apiInfoKey");
+                        String testSubType = (String) varMap.get("testSubType");
+                        if (testRunIdStr != null && testRunResultSummaryIdStr != null && accountId != null &&
+                                apiInfoKeyStr != null && testSubType != null) {
+                            for (String uuid : Arrays.asList(pathUuid, subdomainUuid)) {
+                                TestingRunWebhook mapping = new TestingRunWebhook(
+                                    uuid,
+                                    accountId,
+                                    new ObjectId(testRunIdStr),
+                                    new ObjectId(testRunResultSummaryIdStr),
+                                    apiInfoKeyStr,
+                                    testSubType,
+                                    Context.now()
+                                );
+                                TestingRunWebhookDao.instance.insertOne(mapping);
+                            }
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error storing SSRF UUID mapping: " + e.getMessage(), LogDb.TESTING);
+                    }
+                } else {
+                    // TODO: remove legacy test-services.akto.io flow once all tenants are migrated to webhook service.
+                    String legacyUuid = java.util.UUID.randomUUID().toString();
+                    String legacyUrl = base + "store_uuid/" + legacyUuid;
+                    if (legacyUrl.endsWith("//")) {
+                        legacyUrl = legacyUrl.substring(0, legacyUrl.length() - 1);
+                    }
+                    callbackUrls.add(legacyUrl);
+                    uuidList.add(legacyUuid);
+
+                    if (key instanceof Map) {
+                        Map<?, ?> keyMap = (Map<?, ?>) key;
+                        Object redirectUrlObj = keyMap.get("redirect_url");
+                        if (redirectUrlObj != null) {
+                            String redirectUrl = null;
+                            if (redirectUrlObj instanceof String) {
+                                String s = (String) redirectUrlObj;
+                                if (s.contains("${")) {
+                                    List<Object> resolved = VariableResolver.resolveExpression(varMap, s);
+                                    redirectUrl = (resolved != null && !resolved.isEmpty()) ? resolved.get(0).toString() : null;
+                                } else {
+                                    redirectUrl = s;
+                                }
+                            } else if (redirectUrlObj instanceof List && !((List<?>) redirectUrlObj).isEmpty()) {
+                                Object first = ((List<?>) redirectUrlObj).get(0);
+                                redirectUrl = first != null ? first.toString() : null;
+                            }
+                            if (redirectUrl != null && !redirectUrl.isEmpty()) {
+                                String requestUrl = base + "store_uuid/" + legacyUuid;
+                                if (requestUrl.endsWith("//")) {
+                                    requestUrl = requestUrl.substring(0, requestUrl.length() - 1);
+                                }
+                                String tokenVal = "";
+                                try {
+                                    BasicDBObject tokenResponse = OrganizationsDao.getBillingTokenForAuth();
+                                    if (tokenResponse != null && tokenResponse.getString("token") != null) {
+                                        tokenVal = tokenResponse.getString("token");
+                                    }
+                                } catch (Exception e) {
+                                    loggerMaker.errorAndAddToDb("Error getting billing token for SSRF redirect: " + e.getMessage(), LogDb.TESTING);
+                                }
+                                Utils.sendRequestToWebhookService(requestUrl, redirectUrl, tokenVal);
+                            }
+                        }
+                    }
                 }
 
-                BasicDBObject response = OrganizationsDao.getBillingTokenForAuth();
-                if(response.getString("token") != null){
-                    String tokenVal = response.getString("token");
-                    return Utils.sendRequestToSsrfServer(url + generatedUUID, redirectUrl, tokenVal);
-                }else{
-                    return new ExecutorSingleOperationResp(false, response.getString("error"));
-                }
+                varMap.put("random_uuid", uuidList);
+                varMap.put("wordList_url", callbackUrls);
+                varMap.put("url", callbackUrls.isEmpty() ? "" : callbackUrls.get(0));
+
+                return new ExecutorSingleOperationResp(true, "");
             case "conversations_list":
                 // conversations list will be the variable of wordlists, hence it will come in key after being resolved
                 // we need to use them in AgentClient so just add those in any request headers of raw-api
