@@ -25,7 +25,8 @@ import LocalStore from "../../../main/LocalStorageStore";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import JiraTicketDisplay from "../../components/shared/JiraTicketDisplay";
 import { getMethod } from "../observe/GetPrettifyEndpoint";
-import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, CATEGORY_API_SECURITY, CATEGORY_DAST } from "../../../main/labelHelper";
+import TooltipWithLink from "../../components/shared/TooltipWithLink";
 
 let headers = [
   {
@@ -65,6 +66,7 @@ let headers = [
   },
 ]
 
+const SKIPPED_TESTS_DOCS_URL = "https://docs.akto.io/api-security-testing/concepts/skipped-test-cases";
 const MAX_SEVERITY_THRESHOLD = 100000;
 
 function getStatus(state) {
@@ -196,6 +198,7 @@ const transform = {
     let ret = list?.map((tag, index) => {
 
       let linkUrl = ""
+      let badgeContent = tag
       switch (linkType) {
         case "CWE":
           linkUrl = getCweLink(tag)
@@ -203,13 +206,17 @@ const transform = {
         case "CVE":
           linkUrl = getCveLink(tag)
           break;
+        case "ASI":
+          linkUrl = typeof tag === "object" && tag?.url ? tag.url : ""
+          badgeContent = typeof tag === "object" && tag?.label != null ? tag.label : (typeof tag === "string" ? tag : "")
+          break;
         default:
           break;
       }
 
       return (
         <Link key={index} url={linkUrl} target="_blank">
-          <Badge progress="complete" key={index}>{tag}</Badge>
+          <Badge progress="complete" key={index}>{badgeContent}</Badge>
         </Link>
       )
     })
@@ -376,6 +383,7 @@ const transform = {
     obj['cweDisplay'] = minimizeTagList(obj['cwe'])
     obj['cve'] = subCategoryMap[data.testSubType]?.cve ? subCategoryMap[data.testSubType]?.cve : []
     obj['cveDisplay'] = minimizeTagList(obj['cve'])
+    obj['superCategoryName'] = subCategoryMap[data.testSubType]?.superCategory?.name || data.testSuperType || ""
     obj['errorsList'] = data.errorsList || []
     obj['testCategoryId'] = data.testSubType
     obj['conversationId'] = data?.conversationId
@@ -534,6 +542,19 @@ const transform = {
             <HorizontalStack gap="2">
               {
                 transform.tagList(category?.cve, "CVE")
+              }
+            </HorizontalStack>
+          )
+          break;
+        case "ASI Category":
+          let asiCategories = func.getASICategoriesForAgenticCategory(category?.superCategory?.name)
+          if (asiCategories == null || asiCategories == undefined || asiCategories.length == 0) {
+            return;
+          }
+          sectionLocal.content = (
+            <HorizontalStack gap="2">
+              {
+                transform.tagList(asiCategories, "ASI")
               }
             </HorizontalStack>
           )
@@ -827,6 +848,12 @@ const transform = {
         title: "References",
         content: "",
         tooltipContent: "References for the above test"
+      },
+      {
+        icon: FraudProtectMajor,
+        title: "ASI Category",
+        content: "",
+        tooltipContent: "OWASP Agentic Security Top 10 (ASI) categories applicable to this test"
       },
       {
         icon: ResourcesMajor,
@@ -1343,14 +1370,36 @@ const transform = {
       case "no_vulnerability_found":
         return headers.filter((header) => header.title !== "Severity")
 
-      case "skipped":
+      case "skipped": {
+        const category = getDashboardCategory();
+        // Add agentic security docsUrl here when available
+        const docsUrl = [CATEGORY_API_SECURITY, CATEGORY_DAST].includes(category)
+          ? SKIPPED_TESTS_DOCS_URL
+          : null;
         return headers.filter((header) => header.title !== "CWE tags").map((header) => {
           if (header.title === "Severity") {
-            // Modify the object as needed
-            return { type: CellType.TEXT, title: "Error message", value: 'errorMessage' };
+            return {
+              type: CellType.TEXT,
+              title: "Error message",
+              titleNode: docsUrl
+                ? <HorizontalStack gap="1" blockAlign="center">
+                    <span>Error message</span>
+                    <TooltipWithLink
+                      content={<Link url={docsUrl} target="_blank">Common reasons for skipped tests</Link>}
+                      preferredPosition="top"
+                    >
+                      <div className='reduce-size'>
+                        <Avatar shape="round" size="extraSmall" source='/public/info_filled_icon.svg'/>
+                      </div>
+                    </TooltipWithLink>
+                  </HorizontalStack>
+                : undefined,
+              value: 'errorMessage'
+            };
           }
           return header;
-        })
+        });
+      }
 
       case "need_configurations":
         return headers.filter((header) => header.title !== "CWE tags").map((header) => {
@@ -1425,6 +1474,7 @@ const transform = {
       recurringWeekly: testRun.recurringWeekly,
       recurringMonthly: testRun.recurringMonthly,
       miniTestingServiceName: testRun.miniTestingServiceName,
+      allowedMiniTestingServiceNames: testRun.miniTestingServiceNames,
       testSuiteIds: testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
       selectedSlackChannelId: testRun?.slackChannel || 0,
@@ -1454,25 +1504,27 @@ const transform = {
         ...commonObj,
         _id: "user_" + conversation.prompt,
         message: conversation?.finalSentPrompt || conversation.prompt,
+        originalPrompt: conversation.prompt,
         validation:conversation?.validation,
         role: "user"
       })
 
-      // Check if response contains "## ROOT CAUSE ANALYSIS"
       let systemMessage = conversation.response
       if(!isGeneric) {
-        extractedRemediationText = conversation.remediationMessage || "";
+        let currentRemediation = conversation.remediationMessage || "";
 
         if (systemMessage && typeof systemMessage === 'string') {
           const rootCauseIndex = systemMessage.indexOf('ROOT CAUSE ANALYSIS')
           if (rootCauseIndex !== -1) {
-            // Extract remediation text (from "## ROOT CAUSE ANALYSIS" to the end)
-            if (!extractedRemediationText) {
-              extractedRemediationText = systemMessage.substring(rootCauseIndex)
+            if (!currentRemediation) {
+              currentRemediation = systemMessage.substring(rootCauseIndex)
             }
-            // Keep only the part before "## ROOT CAUSE ANALYSIS" for the conversation
             systemMessage = systemMessage.substring(0, rootCauseIndex).trim()
           }
+        }
+
+        if (currentRemediation && currentRemediation.trim().toLowerCase() !== 'null') {
+          extractedRemediationText = currentRemediation
         }
   
         const validationMessage = conversation?.validationMessage;

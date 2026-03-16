@@ -6,6 +6,7 @@ import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.Config;
+import com.akto.threat_utils.CloudflareWafUtils;
 import com.akto.dto.Config.AwsWafConfig;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -392,10 +393,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         return config != null && config.getListIds() != null && !config.getListIds().isEmpty();
     }
 
-    private static String getLastListId(Config.CloudflareWafConfig config) {
-        return config.getListIds().get(config.getListIds().size() - 1);
-    }
-
     public String modifyThreatActorStatusCloudflare() {
         Config.CloudflareWafConfig cloudflareWafConfig = getCloudflareConfig();
 
@@ -406,9 +403,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
         boolean result;
         if (status.equalsIgnoreCase("blocked")) {
-            result = addIPsToList(cloudflareWafConfig, Collections.singletonList(actorIp));
+            result = CloudflareWafUtils.blockActorIps(cloudflareWafConfig, Collections.singletonList(actorIp));
         } else {
-            result = removeIPsFromLists(cloudflareWafConfig, Collections.singletonList(actorIp));
+            result = CloudflareWafUtils.unblockActorIps(cloudflareWafConfig, Collections.singletonList(actorIp));
         }
 
         if (result) {
@@ -435,9 +432,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
         boolean result;
         if ("blocked".equalsIgnoreCase(status)) {
-            result = addIPsToList(cloudflareWafConfig, actorIps);
+            result = CloudflareWafUtils.blockActorIps(cloudflareWafConfig, actorIps);
         } else {
-            result = removeIPsFromLists(cloudflareWafConfig, actorIps);
+            result = CloudflareWafUtils.unblockActorIps(cloudflareWafConfig, actorIps);
         }
 
         if (!result) {
@@ -448,138 +445,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         return SUCCESS.toUpperCase();
     }
 
-    // ==================== Cloudflare List Operations ====================
-
-    /**
-     * Adds IPs to the last list. If list is full, creates overflow list and retries.
-     */
-    private boolean addIPsToList(Config.CloudflareWafConfig config, List<String> ips) {
-        try {
-            String currentListId = getLastListId(config);
-            Map<String, List<String>> headers = CloudflareWafAction.getAuthHeaders(config);
-
-            BasicDBList items = new BasicDBList();
-            for (String ip : ips) {
-                BasicDBObject ipItem = new BasicDBObject();
-                ipItem.put("ip", ip);
-                items.add(ipItem);
-            }
-
-            String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
-                    + "/rules/lists/" + currentListId + "/items";
-            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", items.toString(), headers, "");
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-
-            if (response.getStatusCode() > 201 || response.getBody() == null) {
-                String cfErr = CloudflareWafAction.extractCfError(response.getBody());
-
-                // Check if list is at capacity — create overflow list and retry
-                if (cfErr != null && cfErr.toLowerCase().contains("maximum")) {
-                    String newListId = CloudflareWafAction.createOverflowList(config);
-                    if (newListId == null) {
-                        addActionError("Failed to create overflow IP list.");
-                        return false;
-                    }
-                    // Retry with new list
-                    url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
-                            + "/rules/lists/" + newListId + "/items";
-                    request = new OriginalHttpRequest(url, "", "POST", items.toString(), headers, "");
-                    response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-                    if (response.getStatusCode() > 201 || response.getBody() == null) {
-                        addActionError(CloudflareWafAction.extractCfError(response.getBody()));
-                        return false;
-                    }
-                    return true;
-                }
-
-                addActionError(cfErr != null ? cfErr : "Unable to block IP(s).");
-                return false;
-            }
-            return true;
-        } catch (Exception e) {
-            addActionError("Unable to block IP(s). Try again later.");
-            loggerMaker.errorAndAddToDb("Error adding IPs to Cloudflare list: " + e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Removes IPs by searching across ALL lists and deleting from whichever contains them.
-     */
-    private boolean removeIPsFromLists(Config.CloudflareWafConfig config, List<String> ips) {
-        try {
-            Map<String, List<String>> headers = CloudflareWafAction.getAuthHeaders(config);
-
-            // Group items to delete by their list ID
-            Map<String, BasicDBList> deleteByList = new HashMap<>();
-            for (String ip : ips) {
-                String[] found = findItemAcrossLists(ip, config);
-                if (found != null) {
-                    String foundListId = found[0];
-                    String itemId = found[1];
-                    deleteByList.computeIfAbsent(foundListId, k -> new BasicDBList());
-                    BasicDBObject itemObj = new BasicDBObject();
-                    itemObj.put("id", itemId);
-                    deleteByList.get(foundListId).add(itemObj);
-                }
-            }
-
-            if (deleteByList.isEmpty()) {
-                addActionError("None of the IPs were found in the block list(s).");
-                return false;
-            }
-
-            // Delete from each list in one call per list
-            for (Map.Entry<String, BasicDBList> entry : deleteByList.entrySet()) {
-                String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
-                        + "/rules/lists/" + entry.getKey() + "/items";
-                BasicDBObject deletePayload = new BasicDBObject();
-                deletePayload.put("items", entry.getValue());
-
-                OriginalHttpRequest request = new OriginalHttpRequest(url, "", "DELETE", deletePayload.toString(), headers, "");
-                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-
-                if (response.getStatusCode() > 201 || response.getBody() == null) {
-                    String cfErr = CloudflareWafAction.extractCfError(response.getBody());
-                    addActionError(cfErr != null ? cfErr : "Unable to unblock IP(s).");
-                    return false;
-                }
-            }
-            return true;
-        } catch (Exception e) {
-            addActionError("Unable to unblock IP(s). Try again later.");
-            loggerMaker.errorAndAddToDb("Error removing IPs from Cloudflare lists: " + e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Searches for an IP across all lists. Returns [listId, itemId] or null.
-     */
-    private static String[] findItemAcrossLists(String actorIp, Config.CloudflareWafConfig config) {
-        Map<String, List<String>> headers = CloudflareWafAction.getAuthHeaders(config);
-        for (String listId : config.getListIds()) {
-            try {
-                String url = CLOUDFLARE_WAF_BASE_URL + "/accounts/" + config.getAccountOrZoneId()
-                        + "/rules/lists/" + listId + "/items?search=" + actorIp;
-                OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", "", headers, "");
-                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-
-                if (response.getStatusCode() > 201 || response.getBody() == null) continue;
-
-                BasicDBList result = (BasicDBList) BasicDBObject.parse(response.getBody()).get("result");
-                if (result != null && !result.isEmpty()) {
-                    String itemId = ((BasicDBObject) result.get(0)).getString("id");
-                    if (itemId != null) {
-                        return new String[]{listId, itemId};
-                    }
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error searching list " + listId + " for IP: " + e.getMessage());
-            }
-        }
-        return null;
-    }
 
     public List<String> getActorIps() {
         return actorIps;

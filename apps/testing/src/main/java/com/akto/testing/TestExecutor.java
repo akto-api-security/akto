@@ -1163,6 +1163,14 @@ public class TestExecutor {
         Map<String, Object> varMap = new HashMap<>();
         String severity = testConfig.getInfo().getSeverity();
 
+        // Add test context to varMap for SSRF UUID mapping
+        if(testRunId != null && testRunResultSummaryId != null) {
+            varMap.put("testRunId", testRunId.toHexString());
+            varMap.put("testRunResultSummaryId", testRunResultSummaryId.toHexString());
+            varMap.put("accountId", Context.accountId.get());
+            varMap.put("apiInfoKey", apiInfoKey.toString());
+            varMap.put("testSubType", testSubType);
+        }
         for (String key: wordListsMap.keySet()) {
             varMap.put("wordList_" + key, wordListsMap.get(key));
         }
@@ -1487,7 +1495,18 @@ public class TestExecutor {
     private boolean prefetchAuthWithRetry(TestRoles testRole, RawApi rawApi, int maxAttempts) {
         AuthMechanism authMechanism = testRole.findMatchingAuthMechanism(rawApi);
         
-        if (authMechanism == null || !LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanism.getType())) {
+        if (authMechanism == null) {
+            return true; // No auth mechanism, no prefetch needed
+        }
+        
+        String authType = authMechanism.getType();
+        
+        // Handle digest authentication
+        if (LoginFlowEnums.AuthMechanismTypes.DIGEST_AUTH.toString().equalsIgnoreCase(authType)) {
+            return true; // Digest auth doesn't require prefetch - works directly via DigestAuthParam.addAuthTokens()
+        }
+        
+        if (!LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authType)) {
             return true; // Not a login request type, no prefetch needed
         }
         
@@ -1520,5 +1539,5 @@ public class TestExecutor {
         
         return false;
     }
-    
+
 }

@@ -6,8 +6,8 @@ export MODE="atlas"
 export AKTO_DATA_INGESTION_URL="{{AKTO_DATA_INGESTION_URL}}"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
-export AKTO_CONNECTOR="github_copilot_cli"
 export CONTEXT_SOURCE="ENDPOINT"
+export AKTO_API_TOKEN="{{AKTO_API_TOKEN}}"
 
 # Execute Python hook script
-exec python3 "$HOME/.github/hooks/akto-validate-prompt.py" "$@"
+exec python3 "./.github/hooks/akto-validate-prompt.py" "$@"

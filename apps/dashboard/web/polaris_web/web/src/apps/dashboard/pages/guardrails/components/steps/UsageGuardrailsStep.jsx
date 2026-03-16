@@ -1,4 +1,7 @@
 import { VerticalStack, Text, Checkbox, Box, RangeSlider } from "@shopify/polaris";
+import OwaspTag from "../OwaspTag";
+import RuleLabelWithTag from "../RuleLabelWithTag";
+import { RULE_OWASP_THREATS } from "../owaspConfig";
 
 export const UsageGuardrailsConfig = {
     number: 7,
@@ -28,11 +31,12 @@ const UsageGuardrailsStep = ({
             <Text variant="bodyMd" tone="subdued">
                 Configure usage-based guardrails to control token limits and prevent abuse.
             </Text>
+            <OwaspTag stepNumber={7} />
 
             <VerticalStack gap="4">
                 <Box>
                     <Checkbox
-                        label="Enable token limit detection"
+                        label={<RuleLabelWithTag name="Enable token limit detection" threats={RULE_OWASP_THREATS.tokenLimit} />}
                         checked={enableTokenLimit}
                         onChange={setEnableTokenLimit}
                         helpText="Detect when user inputs exceed token limits and block overly long inputs."

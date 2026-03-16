@@ -439,6 +439,9 @@ public class ApiExecutor {
             loggerMaker.debugAndAddToDb("Received response from: " + url, LogDb.TESTING);
         }
 
+        if (response != null) {
+            ApiExecutorUtil.applyPostRequestScript(request, response, executeScript);
+        }
         return response;
     }
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
@@ -993,7 +996,9 @@ public class ApiExecutor {
         // Return SSE message as JSON (not as a string)
         JsonNode sseJson = objectMapper.readTree(sseMsg);
         String jsonBody = objectMapper.writeValueAsString(sseJson);
-        return new OriginalHttpResponse(jsonBody, resp.getHeaders(), resp.getStatusCode());
+        OriginalHttpResponse sseResponse = new OriginalHttpResponse(jsonBody, resp.getHeaders(), resp.getStatusCode());
+        ApiExecutorUtil.applyPostRequestScript(request, sseResponse, testingRunConfig != null);
+        return sseResponse;
     }
 
     private static boolean shouldInitiateSSEStream(OriginalHttpRequest request) {

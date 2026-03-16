@@ -62,13 +62,17 @@ public class ArcadeWebhookAction extends ActionSupport {
         try {
             loggerMaker.info("Arcade webhook received");
 
-            String requestURI = ServletActionContext.getRequest().getRequestURI();
+            javax.servlet.http.HttpServletRequest request = ServletActionContext.getRequest();
+            String requestURI = request.getRequestURI();
             String hookType = detectHookTypeFromPath(requestURI);
             loggerMaker.info("Detected Arcade hook type from path: " + hookType + " (URI: " + requestURI + ")");
 
+            String ip = extractClientIp(request);
+            String userAgent = request.getHeader("User-Agent");
+
             parseJsonBody();
 
-            Map<String, Object> requestData = buildRequestData(hookType);
+            Map<String, Object> requestData = buildRequestData(hookType, ip, userAgent);
             Map<String, Object> gatewayResponse = gateway.processHttpProxy(requestData);
 
             if (gatewayResponse != null && gatewayResponse.containsKey("guardrailsResult")) {
@@ -151,7 +155,7 @@ public class ArcadeWebhookAction extends ActionSupport {
         }
     }
 
-    private Map<String, Object> buildRequestData(String hookType) throws Exception {
+    private Map<String, Object> buildRequestData(String hookType, String ip, String userAgent) throws Exception {
         Map<String, Object> requestData = new HashMap<>();
 
         String toolName = extractToolName();
@@ -163,14 +167,14 @@ public class ArcadeWebhookAction extends ActionSupport {
         switch (hookType) {
             case HOOK_TYPE_ACCESS:
                 path = "/access";
-                headers = buildRequestHeaders(hookType, null);
+                headers = buildRequestHeaders(hookType, null, userAgent);
                 requestBody.put("user_id", user_id);
                 if (toolkits != null) requestBody.put("toolkits", toolkits);
                 break;
 
             case HOOK_TYPE_POST:
                 path = "/tools/" + toolName;
-                headers = buildRequestHeaders(hookType, toolName);
+                headers = buildRequestHeaders(hookType, toolName, userAgent);
                 if (tool != null) requestBody.put("tool", tool);
                 if (inputs != null) requestBody.put("inputs", inputs);
 
@@ -183,7 +187,7 @@ public class ArcadeWebhookAction extends ActionSupport {
             case HOOK_TYPE_PRE:
             default:
                 path = "/tools/" + toolName;
-                headers = buildRequestHeaders(hookType, toolName);
+                headers = buildRequestHeaders(hookType, toolName, userAgent);
                 if (tool != null) requestBody.put("tool", tool);
                 if (inputs != null) requestBody.put("inputs", inputs);
                 break;
@@ -196,10 +200,11 @@ public class ArcadeWebhookAction extends ActionSupport {
 
         Map<String, String> tag = new HashMap<>();
         tag.put("gen-ai", "Gen AI");
+        tag.put("source", "ARCADE_DEV");
         requestData.put("tag", objectMapper.writeValueAsString(tag));
 
         requestData.put("contextSource", "AGENTIC");
-        requestData.put("ip", DEFAULT_IP);
+        requestData.put("ip", ip != null && !ip.isEmpty() ? ip : DEFAULT_IP);
         requestData.put("time", String.valueOf(System.currentTimeMillis() / 1000));
         requestData.put("type", "HTTP/1.1");
         requestData.put("akto_account_id", DEFAULT_AKTO_ACCOUNT_ID);
@@ -217,10 +222,13 @@ public class ArcadeWebhookAction extends ActionSupport {
         return requestData;
     }
 
-    private Map<String, Object> buildRequestHeaders(String hookType, String toolName) {
+    private Map<String, Object> buildRequestHeaders(String hookType, String toolName, String userAgent) {
         Map<String, Object> headers = new HashMap<>();
         headers.put("host", ARCADE_HOST);
         headers.put("content-type", "application/json");
+        if (userAgent != null && !userAgent.isEmpty()) {
+            headers.put("user-agent", userAgent);
+        }
         headers.put("x-arcade-event", hookType);
         if (execution_id != null) {
             headers.put("x-arcade-execution-id", execution_id);
@@ -258,6 +266,36 @@ public class ArcadeWebhookAction extends ActionSupport {
             }
         }
         return headers;
+    }
+
+    private String extractClientIp(javax.servlet.http.HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip != null && !ip.isEmpty()) {
+            // X-Forwarded-For may contain a comma-separated list; the first is the client IP
+            int commaIdx = ip.indexOf(',');
+            ip = commaIdx >= 0 ? ip.substring(0, commaIdx).trim() : ip.trim();
+            return stripPort(ip);
+        }
+        ip = request.getHeader("X-Real-IP");
+        if (ip != null && !ip.isEmpty()) {
+            return stripPort(ip.trim());
+        }
+        return stripPort(request.getRemoteAddr());
+    }
+
+    private String stripPort(String ip) {
+        if (ip == null) return null;
+        // IPv6 addresses are wrapped in brackets: [::1]:8080
+        if (ip.startsWith("[")) {
+            int bracketEnd = ip.indexOf(']');
+            return bracketEnd >= 0 ? ip.substring(1, bracketEnd) : ip;
+        }
+        // IPv4 with port: 1.2.3.4:8080
+        int lastColon = ip.lastIndexOf(':');
+        if (lastColon >= 0 && ip.indexOf(':') == lastColon) {
+            return ip.substring(0, lastColon);
+        }
+        return ip;
     }
 
     private String detectHookTypeFromPath(String requestURI) {

@@ -123,6 +123,13 @@ public class StartTestAction extends UserAction {
 
     private static final Gson gson = new Gson();
 
+
+    private BasicDBObject response = new BasicDBObject();
+
+    public BasicDBObject getResponse() {
+        return response;
+    }
+
     @Getter
     int misConfiguredTestsCount;
 
@@ -243,7 +250,7 @@ public class StartTestAction extends UserAction {
         return testingRun;
     }
 
-    String selectedMiniTestingServiceName;
+    List<String> selectedMiniTestingServiceNames;
     int selectedSlackWebhook;
     private List<String> selectedTests;
     private List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings;
@@ -291,7 +298,11 @@ public class StartTestAction extends UserAction {
         }
         if (localTestingRun == null) {
             try {
-                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly), selectedMiniTestingServiceName, selectedSlackWebhook);
+                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly), null, selectedSlackWebhook);
+                // Set the new list field
+                if (selectedMiniTestingServiceNames != null && !selectedMiniTestingServiceNames.isEmpty()) {
+                    localTestingRun.setAllowedMiniTestingServiceNames(selectedMiniTestingServiceNames);
+                }
                 // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
                 if (this.continuousTesting) {
                     localTestingRun.setPeriodInSeconds(-1);
@@ -681,6 +692,11 @@ public class StartTestAction extends UserAction {
 
         this.testingRun.setTestingRunConfig(runConfig);
 
+        response.put("testingRunResultSummaries", this.testingRunResultSummaries);
+        response.put("testingRun", this.testingRun);
+        response.put("testingRunType", this.testingRunType);
+        response.put("workflowTest", this.workflowTest);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -936,6 +952,12 @@ public class StartTestAction extends UserAction {
         timeNow = Context.now();
         loggerMaker.debugAndAddToDb("fetchTestingRunResults completed in: " + (Context.now() - timeNow), LogDb.DASHBOARD);
 
+        response.put("testingRunResults", this.testingRunResults);
+        response.put("errorEnums", this.errorEnums);
+        response.put("issuesDescriptionMap", this.issuesDescriptionMap);
+        response.put("jiraIssuesMapForResults", this.jiraIssuesMapForResults);
+        response.put("devrevIssuesMapForResults", this.devrevIssuesMapForResults);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -1175,6 +1197,8 @@ public class StartTestAction extends UserAction {
 
         List<String> filterFields = new ArrayList<>(Arrays.asList("branch", "repository"));
         metadataFilters = TestingRunResultSummariesDao.instance.fetchMetadataFilters(filterFields);
+
+        response.put("metadataFilters", this.metadataFilters);
 
         return SUCCESS.toUpperCase();
     }
@@ -1483,6 +1507,14 @@ public class StartTestAction extends UserAction {
 
                     if(editableTestingRunConfig.getMiniTestingServiceName() != null && !editableTestingRunConfig.getMiniTestingServiceName().isEmpty()){
                         updates.add(Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, editableTestingRunConfig.getMiniTestingServiceName()));
+                    }
+                    
+                    if (editableTestingRunConfig.getAllowedMiniTestingServiceNames() != null
+                            && !editableTestingRunConfig.getAllowedMiniTestingServiceNames().isEmpty()) {
+                        updates.add(Updates.set(
+                            TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES,
+                            editableTestingRunConfig.getAllowedMiniTestingServiceNames()
+                        ));
                     }
 
                     updates.add(Updates.set(TestingRun.SELECTED_SLACK_CHANNEL_ID, editableTestingRunConfig.getSelectedSlackChannelId()));
@@ -2131,8 +2163,8 @@ public class StartTestAction extends UserAction {
         this.miniTestingServiceNames = miniTestingServiceNames;
     }
 
-    public void setSelectedMiniTestingServiceName(String selectedMiniTestingServiceName) {
-        this.selectedMiniTestingServiceName = selectedMiniTestingServiceName;
+    public void setSelectedMiniTestingServiceNames(List<String> selectedMiniTestingServiceNames) {
+        this.selectedMiniTestingServiceNames = selectedMiniTestingServiceNames;
     }
 
     public Map<String, String> getIssuesDescriptionMap() {

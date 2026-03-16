@@ -2,6 +2,7 @@ package com.akto.log;
 
 import com.akto.dao.AgenticTestingLogsDao;
 import com.akto.dao.AnalyserLogsDao;
+import com.akto.dao.AwsApiGatewayLogsDao;
 import com.akto.dao.BillingLogsDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.DashboardLogsDao;
@@ -22,6 +23,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import com.slack.api.Slack;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,7 +96,7 @@ public class LoggerMaker  {
     }
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD, AGENTIC_TESTING
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD, AGENTIC_TESTING, AWS_API_GATEWAY
     }
 
     private static AccountSettings accountSettings = null;
@@ -337,6 +339,9 @@ public class LoggerMaker  {
                 break;
             case AGENTIC_TESTING:
                 logs = AgenticTestingLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            case AWS_API_GATEWAY:
+                logs = AwsApiGatewayLogsDao.instance.findAll(filters, 0, 1_000_000, Sorts.descending(Log.TIMESTAMP), Projections.include("log", Log.TIMESTAMP));
                 break;
             default:
                 break;

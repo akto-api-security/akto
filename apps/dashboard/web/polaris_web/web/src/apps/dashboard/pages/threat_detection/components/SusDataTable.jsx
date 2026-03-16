@@ -653,14 +653,19 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         .map(x => ({ label: x, value: x }));
     }
 
-    const attackTypeChoices = (isAgenticSecurityCategory() || isEndpointSecurityCategory())
-      ? (res?.subCategory || []).map(x => ({ label: x, value: x }))
-      : Object.keys(threatFiltersMap).length === 0 ? [] : Object.entries(threatFiltersMap).map(([key, value]) => {
-          return {
-            label: value?._id || key,
-            value: value?._id || key
-          }
-        })
+    // Policy triggered (latestAttack): merge subCategory from API (actual data) with threatFiltersMap (configured templates)
+    const subCategoryFromApi = (res?.subCategory || []).map(x => ({ label: x, value: x }));
+    const fromThreatFiltersMap = Object.entries(threatFiltersMap || {}).map(([key, value]) => ({
+      label: value?._id || key,
+      value: value?._id || key
+    }));
+    const uniqueByValue = new Map();
+    [...subCategoryFromApi, ...fromThreatFiltersMap].forEach(({ label, value }) => {
+      if (value && !uniqueByValue.has(value)) {
+        uniqueByValue.set(value, { label: label || value, value });
+      }
+    });
+    const attackTypeChoices = Array.from(uniqueByValue.values());
 
     filters = [
       {
@@ -718,6 +723,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     switch (key) {
       case "apiCollectionId":
         return func.convertToDisambiguateLabelObj(value, collectionsMap, 2);
+      case "latestAttack":
+        const latestAttackLabelMap = Object.fromEntries(
+          Object.entries(threatFiltersMap || {}).map(([k, v]) => [
+            v?._id || k,
+            v?.category?.name || v?._id || k
+          ])
+        );
+        return func.convertToDisambiguateLabelObj(value, latestAttackLabelMap, 2);
       default:
         return func.convertToDisambiguateLabelObj(value, null, 2);
     }
