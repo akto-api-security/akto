@@ -5113,8 +5113,9 @@ public class DbAction extends ActionSupport {
                                     callParser.apiCatalogSync.getDbState(colId), colId);
                                 loggerMaker.infoAndAddToDb("importOpenApiSpec accountId=" + accountId + " colId=" + colId + " step=after_updateApiCollectionCount");
 
-                                loggerMaker.infoAndAddToDb("importOpenApiSpec completed accountId=" + accountId + " colId=" + colId + " apiCount=" + msgs.size());
-                                loggerMaker.sendCyborgSlackAsync("importOpenApiSpec completed accountId=" + accountId + " colId=" + colId + " apiCount=" + msgs.size());
+                                String message = "importOpenApiSpec completed accountId=" + accountId + " colId=" + colId + " apiCount=" + responses.size();
+                                loggerMaker.infoAndAddToDb(message);
+                                loggerMaker.sendCyborgSlackAsync(message);
 
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e, "Error in importOpenApiSpec. accountId=" + accountId + ", error=" + e.toString());
