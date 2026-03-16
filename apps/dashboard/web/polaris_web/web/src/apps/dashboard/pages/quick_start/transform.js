@@ -71,6 +71,7 @@ import {
     SALESFORCE_FIELDS
 } from "./constants/aiAgentConnectorConstants"
 import DataDogConnector from "./components/DataDogConnector"
+import MicrosoftDefenderConnector from "./components/MicrosoftDefenderConnector"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -537,6 +538,15 @@ const agenticShieldObj = {
     docsUrl: 'https://docs.akto.io/agentic-shield',
     key: "AGENTIC_SHIELD",
     component: <AgenticShield/>
+}
+
+const microsoftDefenderObj = {
+    icon: '/public/microsoft_defender.svg',
+    label: "Microsoft Defender for Endpoint",
+    text: "Connect your Microsoft Defender for Endpoint account to Akto for enhanced security insights.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
+    key: "MICROSOFT_DEFENDER",
+    component: <MicrosoftDefenderConnector/>
 }
 
 const mcpScanObj = {
@@ -1786,7 +1796,7 @@ const quickStartFunc = {
 
         // Manual
         const manual = [
-            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj, impervaImportObj, dataDogConnectorObj
+            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj, impervaImportObj, dataDogConnectorObj, microsoftDefenderObj
         ];
 
         // Crawler
@@ -1905,7 +1915,8 @@ const quickStartFunc = {
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
-            cloudflareWarpObj, zscalerObj, snowflakeObj
+            cloudflareWarpObj, zscalerObj, snowflakeObj,
+            microsoftDefenderObj
         ]
 
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
