@@ -8,7 +8,7 @@ import sys
 import time
 import urllib.request
 from typing import Any, Dict, Optional, Tuple, Union
-from akto_machine_id import get_machine_id
+from akto_machine_id import get_machine_id, get_username
 
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.gemini/akto/chat-logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -146,7 +146,7 @@ def build_akto_request(
         "method": "POST",
         "requestPayload": request_payload,
         "responsePayload": response_payload,
-        "ip": uuid_to_ipv6_simple(device_id),
+        "ip": get_username(),
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": "200",
