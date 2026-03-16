@@ -76,7 +76,6 @@ Edit `~/.claude/settings.json`:
     ],
     "PreToolUse": [
       {
-        "matcher": "mcp__.*",
         "hooks": [
           {
             "type": "command",
@@ -88,7 +87,6 @@ Edit `~/.claude/settings.json`:
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__.*",
         "hooks": [
           {
             "type": "command",
@@ -135,16 +133,15 @@ Block response format:
 
 ### MCP Tool Hooks
 
-#### Before MCP Tool Execution (`akto-validate-mcp-request.py`)
+#### Before Tool Execution (`akto-validate-mcp-request.py`)
 
-- Trigger: `PreToolUse` with matcher `mcp__.*`
-- Validates MCP tool input against Akto guardrails
+- Trigger: `PreToolUse`
+- Validates tool input against Akto guardrails before execution
 - Can block tool execution
 
 Input contract:
 
-- Reads `hook_specific_input.tool_name` and `hook_specific_input.tool_input`
-- Also accepts camelCase fallback: `hookSpecificInput.toolName`, `hookSpecificInput.toolInput`
+- Reads `tool_name` and `tool_input` directly from hook input (snake_case, top-level)
 
 Block response contract:
 
@@ -159,20 +156,28 @@ Allow contract:
 
 - Prints no output and exits `0`
 
-#### After MCP Tool Execution (`akto-validate-mcp-response.py`)
+#### After Tool Execution (`akto-validate-mcp-response.py`)
 
-- Trigger: `PostToolUse` with matcher `mcp__.*`
-- Reads MCP tool input/output and ingests to Akto
+- Trigger: `PostToolUse`
+- Reads tool input/output and ingests to Akto for observability
+- Encodes `requestPayload` as `{"body": {"toolName": ..., "toolArgs": {...}}}`
+- Encodes `responsePayload` as `{"body": {"result": {...}}}`
 - Observational only (never blocks)
 
 Input contract:
 
-- Reads `hook_specific_input.tool_name`, `hook_specific_input.tool_input`, `hook_specific_input.tool_response`
-- Also accepts camelCase fallback: `hookSpecificInput.toolName`, `hookSpecificInput.toolInput`, `hookSpecificInput.toolResponse`
+- Reads `tool_name`, `tool_input`, `tool_response` directly from hook input (snake_case, top-level)
 
 Response contract:
 
 - Prints no output and exits `0`
+
+#### Tool source tagging
+
+The `mcp_server_name` tag in ingested data is derived from `tool_name`:
+
+- MCP tools (`mcp__<server>__<tool>`) → tagged with the server name (e.g. `filesystem`, `github`)
+- Built-in tools (`Bash`, `Write`, `Read`, etc.) → tagged as `claude-built-in`
 
 ## Configuration Options
 

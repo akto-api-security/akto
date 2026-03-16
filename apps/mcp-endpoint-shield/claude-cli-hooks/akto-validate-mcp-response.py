@@ -5,10 +5,11 @@ import logging
 import os
 import ssl
 import sys
+import time
 import urllib.request
 from typing import Any, Dict, Union
 
-from akto_machine_id import get_machine_id
+from akto_machine_id import get_machine_id, get_username
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
@@ -49,48 +50,6 @@ else:
 
 
 def create_ssl_context():
-    """
-    Create SSL context with graceful fallback strategy.
-
-    Attempts in order:
-    1. Custom SSL_CERT_PATH if provided
-    2. System default SSL context
-    3. Python certifi bundle (if available)
-    4. Unverified context (last resort)
-    """
-    if not SSL_VERIFY:
-        logger.warning("SSL verification disabled via SSL_VERIFY=false - INSECURE!")
-        return ssl._create_unverified_context()
-
-    if SSL_CERT_PATH:
-        try:
-            context = ssl.create_default_context(cafile=SSL_CERT_PATH)
-            logger.info(f"Using custom SSL certificate: {SSL_CERT_PATH}")
-            return context
-        except Exception as e:
-            logger.warning(f"Failed to load custom SSL certificate from {SSL_CERT_PATH}: {e}")
-
-    try:
-        context = ssl.create_default_context()
-        logger.debug("Using system default SSL context")
-        return context
-    except Exception as e:
-        logger.warning(f"Failed to create default SSL context: {e}")
-
-    try:
-        import certifi
-
-        context = ssl.create_default_context(cafile=certifi.where())
-        logger.info("Using Python certifi SSL bundle")
-        return context
-    except ImportError:
-        logger.debug("certifi package not available")
-    except Exception as e:
-        logger.warning(f"Failed to create SSL context with certifi: {e}")
-
-    logger.error("WARNING: All SSL verification methods failed! Falling back to UNVERIFIED context - INSECURE!")
-    logger.error("This connection is vulnerable to Man-in-the-Middle attacks!")
-    logger.error("Fix: Install proper certificates or set SSL_CERT_PATH environment variable")
     return ssl._create_unverified_context()
 
 
@@ -112,8 +71,6 @@ def generate_curl_command(url: str, payload: Dict[str, Any], headers: Dict[str, 
 
 
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
-    import time
-
     logger.info(f"API CALL: POST {url}")
     if LOG_PAYLOADS:
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
@@ -151,77 +108,23 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         raise
 
 
-def get_hook_specific_input(input_data: Dict[str, Any]) -> Dict[str, Any]:
-    hook_input = input_data.get("hook_specific_input")
-    if isinstance(hook_input, dict):
-        return hook_input
-
-    hook_input = input_data.get("hookSpecificInput")
-    if isinstance(hook_input, dict):
-        return hook_input
-
-    return {}
-
-
-def extract_tool_fields(input_data: Dict[str, Any]) -> tuple[str, Any, Any]:
-    hook_input = get_hook_specific_input(input_data)
-
-    tool_name = (
-        hook_input.get("tool_name")
-        or hook_input.get("toolName")
-        or input_data.get("tool_name")
-        or input_data.get("toolName")
-        or ""
-    )
-    tool_input = hook_input.get("tool_input")
-    if tool_input is None:
-        tool_input = hook_input.get("toolInput")
-    if tool_input is None:
-        tool_input = input_data.get("tool_input")
-    if tool_input is None:
-        tool_input = input_data.get("toolInput")
-
-    tool_response = hook_input.get("tool_response")
-    if tool_response is None:
-        tool_response = hook_input.get("toolResponse")
-    if tool_response is None:
-        tool_response = input_data.get("tool_response")
-    if tool_response is None:
-        tool_response = input_data.get("toolResponse")
-
-    return str(tool_name), tool_input, tool_response
-
-
 def extract_mcp_server_name(tool_name: str) -> str:
     if not tool_name.startswith("mcp__"):
-        return "claude-unknown"
+        return "claude-built-in"
     parts = tool_name.split("__")
     if len(parts) >= 3 and parts[1]:
         return parts[1]
-    return "claude-unknown"
-
-
-def normalize_payload(value: Any) -> str:
-    if isinstance(value, str):
-        stripped = value.strip()
-        return stripped if stripped else "{}"
-    try:
-        return json.dumps(value if value is not None else {})
-    except Exception:
-        return "{}"
-
-
-def uuid_to_ipv6_simple(uuid_str: str) -> str:
-    hex_str = uuid_str.replace("-", "").lower()
-    return ":".join(hex_str[i:i + 4] for i in range(0, len(hex_str), 4))
+    return "claude-built-in"
 
 
 def build_ingestion_payload(
     tool_name: str, tool_input: str, tool_response: str, mcp_server_name: str
 ) -> Dict[str, Any]:
-    import time
-
-    tags = {"gen-ai": "Gen AI", "mcp_server_name": mcp_server_name}
+    tags = {
+        "gen-ai": "Gen AI",
+        "tool-use": "Tool Execution",
+        "mcp_server_name": mcp_server_name,
+    }
     if MODE == "atlas":
         tags["ai-agent"] = "claudecli"
         tags["source"] = CONTEXT_SOURCE
@@ -239,8 +142,12 @@ def build_ingestion_payload(
     response_headers = json.dumps(
         {"x-claude-hook": "PostToolUse", "content-type": "application/json"}
     )
-    request_payload = json.dumps({"body": tool_input, "toolName": tool_name})
-    response_payload = json.dumps({"body": tool_response})
+    request_payload = json.dumps(
+        {"body": json.dumps({"toolName": tool_name, "toolArgs": json.loads(tool_input)})}
+    )
+    response_payload = json.dumps(
+        {"body": json.dumps({"result": json.loads(tool_response)})}
+    )
 
     return {
         "path": "/v1/messages",
@@ -249,11 +156,11 @@ def build_ingestion_payload(
         "method": "POST",
         "requestPayload": request_payload,
         "responsePayload": response_payload,
-        "ip": uuid_to_ipv6_simple(device_id),
+        "ip": get_username(),
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": "200",
-        "type": None,
+        "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
         "akto_vxlan_id": device_id,
@@ -308,14 +215,10 @@ def main():
         logger.error(f"Invalid JSON input: {e}")
         sys.exit(0)
 
-    tool_name, raw_tool_input, raw_tool_response = extract_tool_fields(input_data)
-    if not tool_name.startswith("mcp__"):
-        logger.info(f"Skipping non-MCP tool: {tool_name or 'unknown'}")
-        sys.exit(0)
-
+    tool_name = str(input_data.get("tool_name") or "")
     mcp_server_name = extract_mcp_server_name(tool_name)
-    tool_input = normalize_payload(raw_tool_input)
-    tool_response = normalize_payload(raw_tool_response)
+    tool_input = json.dumps(input_data.get("tool_input") or {})
+    tool_response = json.dumps(input_data.get("tool_response") or {})
 
     logger.info(f"Processing MCP tool response: {tool_name} (server: {mcp_server_name})")
     send_ingestion_data(tool_name, tool_input, tool_response, mcp_server_name)

@@ -5,7 +5,7 @@ import os
 import ssl
 import sys
 import urllib.request
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Union
 import time
 
 
@@ -39,7 +39,7 @@ MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-AKTO_CONNECTOR = "claude_code_cli"
+AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 
 # SSL Configuration
@@ -57,54 +57,6 @@ else:
 
 
 def create_ssl_context():
-    """
-    Create SSL context with graceful fallback strategy.
-
-    Attempts in order:
-    1. Custom SSL_CERT_PATH if provided
-    2. System default SSL context
-    3. Python certifi bundle (if available)
-    4. Unverified context (last resort)
-
-    Returns:
-        ssl.SSLContext or None
-    """
-    if not SSL_VERIFY:
-        logger.warning("SSL verification disabled via SSL_VERIFY=false - INSECURE!")
-        return ssl._create_unverified_context()
-
-    # Try 1: Custom certificate path
-    if SSL_CERT_PATH:
-        try:
-            context = ssl.create_default_context(cafile=SSL_CERT_PATH)
-            logger.info(f"Using custom SSL certificate: {SSL_CERT_PATH}")
-            return context
-        except Exception as e:
-            logger.warning(f"Failed to load custom SSL certificate from {SSL_CERT_PATH}: {e}")
-
-    # Try 2: System default context
-    try:
-        context = ssl.create_default_context()
-        logger.debug("Using system default SSL context")
-        return context
-    except Exception as e:
-        logger.warning(f"Failed to create default SSL context: {e}")
-
-    # Try 3: Python certifi bundle
-    try:
-        import certifi
-        context = ssl.create_default_context(cafile=certifi.where())
-        logger.info("Using Python certifi SSL bundle")
-        return context
-    except ImportError:
-        logger.debug("certifi package not available")
-    except Exception as e:
-        logger.warning(f"Failed to create SSL context with certifi: {e}")
-
-    # Try 4: Unverified context (last resort)
-    logger.error("WARNING: All SSL verification methods failed! Falling back to UNVERIFIED context - INSECURE!")
-    logger.error("This connection is vulnerable to Man-in-the-Middle attacks!")
-    logger.error("Fix: Install proper certificates or set SSL_CERT_PATH environment variable")
     return ssl._create_unverified_context()
 
 
@@ -206,7 +158,7 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": "200",
-        "type": None,
+        "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
         "akto_vxlan_id": device_id,

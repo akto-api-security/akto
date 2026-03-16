@@ -24,7 +24,6 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "mcp__.*",
         "hooks": [
           {
             "type": "command",
@@ -36,7 +35,6 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__.*",
         "hooks": [
           {
             "type": "command",
