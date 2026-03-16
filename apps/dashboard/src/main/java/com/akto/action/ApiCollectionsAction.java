@@ -466,6 +466,20 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String deleteUntrackedCollections() {
+        if (apiCollectionIds == null || apiCollectionIds.isEmpty()) {
+            return SUCCESS.toUpperCase();
+        }
+        List<Integer> accessibleCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if (accessibleCollectionIds != null) {
+            apiCollectionIds.removeIf(id -> !accessibleCollectionIds.contains(id));
+        }
+        if (!apiCollectionIds.isEmpty()) {
+            UningestedApiOverageDao.instance.deleteByApiCollectionIds(apiCollectionIds);
+        }
+        return SUCCESS.toUpperCase();
+    }
+
     public String addApisToCustomCollection(){
 
         if(apiList.isEmpty()){
