@@ -63,21 +63,12 @@ def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
     return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
 
 
-def generate_curl_command(url: str, payload: Dict[str, Any], headers: Dict[str, str]) -> str:
-    payload_json = json.dumps(payload)
-    headers_str = " ".join([f"-H '{k}: {v}'" for k, v in headers.items()])
-    payload_escaped = payload_json.replace("'", "'\\''")
-    return f"curl -X POST {headers_str} -d '{payload_escaped}' '{url}'"
-
-
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
     logger.info(f"API CALL: POST {url}")
     if LOG_PAYLOADS:
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
-    curl_cmd = generate_curl_command(url, payload, headers)
-    logger.debug(f"CURL EQUIVALENT:\n{curl_cmd}")
 
     request = urllib.request.Request(
         url,
@@ -142,12 +133,8 @@ def build_ingestion_payload(
     response_headers = json.dumps(
         {"x-claude-hook": "PostToolUse", "content-type": "application/json"}
     )
-    request_payload = json.dumps(
-        {"body": json.dumps({"toolName": tool_name, "toolArgs": json.loads(tool_input)})}
-    )
-    response_payload = json.dumps(
-        {"body": json.dumps({"result": json.loads(tool_response)})}
-    )
+    request_payload = json.dumps({"body": {"toolName": tool_name, "toolArgs": tool_input}})
+    response_payload = json.dumps({"body": {"result": tool_response}})
 
     return {
         "path": "/v1/messages",
@@ -177,23 +164,23 @@ def build_ingestion_payload(
     }
 
 
-def send_ingestion_data(tool_name: str, tool_input: str, tool_response: str, mcp_server_name: str):
+def send_ingestion_data(tool_name: str, tool_input: Any, tool_response: Any, mcp_server_name: str):
     if not AKTO_DATA_INGESTION_URL:
         logger.info("AKTO_DATA_INGESTION_URL not set, skipping ingestion")
         return
 
-    if not tool_input.strip() or tool_input == "{}":
+    if not tool_input:
         logger.info("Skipping ingestion due to empty tool input")
         return
 
-    if not tool_response.strip() or tool_response == "{}":
+    if not tool_response:
         logger.info("Skipping ingestion due to empty tool response")
         return
 
     logger.info(f"Ingesting MCP response for tool: {tool_name} (server: {mcp_server_name})")
     if LOG_PAYLOADS:
-        logger.debug(f"Tool input: {tool_input[:500]}...")
-        logger.debug(f"Tool response: {tool_response[:500]}...")
+        logger.debug(f"Tool input: {json.dumps(tool_input)[:500]}...")
+        logger.debug(f"Tool response: {json.dumps(tool_response)[:500]}...")
 
     try:
         request_body = build_ingestion_payload(tool_name, tool_input, tool_response, mcp_server_name)
@@ -217,8 +204,8 @@ def main():
 
     tool_name = str(input_data.get("tool_name") or "")
     mcp_server_name = extract_mcp_server_name(tool_name)
-    tool_input = json.dumps(input_data.get("tool_input") or {})
-    tool_response = json.dumps(input_data.get("tool_response") or {})
+    tool_input = input_data.get("tool_input") or {}
+    tool_response = input_data.get("tool_response") or {}
 
     logger.info(f"Processing MCP tool response: {tool_name} (server: {mcp_server_name})")
     send_ingestion_data(tool_name, tool_input, tool_response, mcp_server_name)

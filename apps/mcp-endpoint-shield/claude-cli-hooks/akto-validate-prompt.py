@@ -4,6 +4,7 @@ import logging
 import os
 import ssl
 import sys
+import time
 import urllib.request
 from typing import Any, Dict, Tuple, Union
 
@@ -69,8 +70,6 @@ def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
 
 
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
-    import time
-
     logger.info(f"API CALL: POST {url}")
     if LOG_PAYLOADS:
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
@@ -107,39 +106,29 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 
 
 def build_validation_request(query: str) -> dict:
-    """Build the request body for guardrails validation."""
-    import time
-
-    # Build tags based on mode
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
         tags["ai-agent"] = "claudecli"
         tags["source"] = CONTEXT_SOURCE
 
-    # Get device ID
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
 
-    # Build host from CLAUDE_API_URL
     host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
 
-    # Build request headers as JSON string
     request_headers = json.dumps({
         "host": host,
         "x-claude-hook": "UserPromptSubmit",
         "content-type": "application/json"
     })
 
-    # Build response headers as JSON string
     response_headers = json.dumps({
         "x-claude-hook": "UserPromptSubmit"
     })
 
-    # Build request payload as JSON string
     request_payload = json.dumps({
         "body": query.strip()
     })
 
-    # Response payload is empty for before hooks
     response_payload = json.dumps({})
 
     return {

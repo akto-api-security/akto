@@ -71,8 +71,6 @@ def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
 
 
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
-    import time
-
     logger.info(f"API CALL: POST {url}")
     if LOG_PAYLOADS:
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
@@ -109,40 +107,30 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 
 
 def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, Any]:
-    """Build the request body for data ingestion."""
-    import time
-
-    # Build tags based on mode
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
         tags["ai-agent"] = "claudecli"
         tags["source"] = CONTEXT_SOURCE
 
-    # Get device ID
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
 
-    # Build host from CLAUDE_API_URL
     host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
 
-    # Build request headers as JSON string
     request_headers = json.dumps({
         "host": host,
         "x-claude-hook": "Stop",
         "content-type": "application/json"
     })
 
-    # Build response headers as JSON string
     response_headers = json.dumps({
         "x-claude-hook": "Stop",
         "content-type": "application/json"
     })
 
-    # Build request payload as JSON string
     request_payload = json.dumps({
         "body": user_prompt
     })
 
-    # Build response payload as JSON string
     response_payload = json.dumps({
         "body": response_text
     })
@@ -190,56 +178,26 @@ def extract_text_from_entry(entry: Dict[str, Any]) -> str:
     return ""
 
 
-def get_last_interaction(transcript_path: str) -> tuple[str, str]:
+def get_last_user_prompt(transcript_path: str) -> str:
     if not os.path.exists(transcript_path):
-        return "", ""
+        return ""
 
     try:
-        events = []
+        last_user = ""
         with open(transcript_path, "r") as f:
             for line in f:
                 try:
                     entry = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-
-                entry_type = entry.get("type")
-                if entry_type not in ("user", "assistant"):
-                    continue
-
-                text = extract_text_from_entry(entry)
-                if not text:
-                    continue
-                events.append((entry_type, text))
-
-        if not events:
-            return "", ""
-
-        last_assistant_idx = -1
-        last_user_idx = -1
-        for idx in range(len(events) - 1, -1, -1):
-            if last_assistant_idx == -1 and events[idx][0] == "assistant":
-                last_assistant_idx = idx
-            if last_user_idx == -1 and events[idx][0] == "user":
-                last_user_idx = idx
-            if last_assistant_idx != -1 and last_user_idx != -1:
-                break
-
-        if last_assistant_idx == -1:
-            return "", ""
-
-        # If the latest user has no assistant yet, avoid mixing turns.
-        if last_user_idx > last_assistant_idx:
-            return "", ""
-
-        for idx in range(last_assistant_idx - 1, -1, -1):
-            if events[idx][0] == "user":
-                return events[idx][1], events[last_assistant_idx][1]
-
-        return "", ""
+                if entry.get("type") == "user":
+                    text = extract_text_from_entry(entry)
+                    if text:
+                        last_user = text
+        return last_user
     except Exception as e:
         logger.error(f"Error reading transcript: {e}")
-        return "", ""
+        return ""
 
 
 def send_ingestion_data(user_prompt: str, response_text: str):
@@ -287,14 +245,9 @@ def main():
         transcript_path = os.path.expanduser(transcript_path)
         logger.info(f"Reading transcript from: {transcript_path}")
 
-        user_prompt, response_text = "", ""
-        for attempt in range(3):
-            user_prompt, response_text = get_last_interaction(transcript_path)
-            if user_prompt and response_text:
-                break
-            if attempt < 2:
-                # Wait briefly for the latest transcript line to be flushed.
-                time.sleep(0.2)
+        response_text = input_data.get("last_assistant_message", "").strip()
+
+        user_prompt = get_last_user_prompt(transcript_path)
 
         if not user_prompt or not response_text:
             logger.info("No complete interaction found in transcript")

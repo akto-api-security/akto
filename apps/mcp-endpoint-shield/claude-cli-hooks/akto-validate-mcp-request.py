@@ -63,21 +63,12 @@ def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
     return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
 
 
-def generate_curl_command(url: str, payload: Dict[str, Any], headers: Dict[str, str]) -> str:
-    payload_json = json.dumps(payload)
-    headers_str = " ".join([f"-H '{k}: {v}'" for k, v in headers.items()])
-    payload_escaped = payload_json.replace("'", "'\\''")
-    return f"curl -X POST {headers_str} -d '{payload_escaped}' '{url}'"
-
-
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
     logger.info(f"API CALL: POST {url}")
     if LOG_PAYLOADS:
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
-    curl_cmd = generate_curl_command(url, payload, headers)
-    logger.debug(f"CURL EQUIVALENT:\n{curl_cmd}")
 
     request = urllib.request.Request(
         url,
@@ -117,7 +108,7 @@ def extract_mcp_server_name(tool_name: str) -> str:
     return "claude-built-in"
 
 
-def build_validation_request(tool_name: str, tool_input: str, mcp_server_name: str) -> Dict[str, Any]:
+def build_validation_request(tool_name: str, tool_input: Any, mcp_server_name: str) -> Dict[str, Any]:
     tags = {"gen-ai": "Gen AI", "mcp_server_name": mcp_server_name}
     if MODE == "atlas":
         tags["ai-agent"] = "claudecli"
@@ -134,7 +125,7 @@ def build_validation_request(tool_name: str, tool_input: str, mcp_server_name: s
         }
     )
     response_headers = json.dumps({"x-claude-hook": "PreToolUse"})
-    request_payload = json.dumps({"body": json.loads(tool_input), "toolName": tool_name})
+    request_payload = json.dumps({"body": tool_input, "toolName": tool_name})
     response_payload = json.dumps({})
 
     return {
@@ -165,8 +156,8 @@ def build_validation_request(tool_name: str, tool_input: str, mcp_server_name: s
     }
 
 
-def call_guardrails(tool_name: str, tool_input: str, mcp_server_name: str) -> Tuple[bool, str]:
-    if not tool_input.strip() or tool_input == "{}":
+def call_guardrails(tool_name: str, tool_input: Any, mcp_server_name: str) -> Tuple[bool, str]:
+    if not tool_input:
         return True, ""
 
     if not AKTO_DATA_INGESTION_URL:
@@ -175,7 +166,7 @@ def call_guardrails(tool_name: str, tool_input: str, mcp_server_name: str) -> Tu
 
     logger.info(f"Validating MCP request for tool: {tool_name} (server: {mcp_server_name})")
     if LOG_PAYLOADS:
-        logger.debug(f"Tool input payload: {tool_input[:500]}...")
+        logger.debug(f"Tool input payload: {json.dumps(tool_input)[:500]}...")
 
     try:
         request_body = build_validation_request(tool_name, tool_input, mcp_server_name)
@@ -200,7 +191,7 @@ def call_guardrails(tool_name: str, tool_input: str, mcp_server_name: str) -> Tu
         return True, ""
 
 
-def ingest_blocked_request(tool_name: str, tool_input: str, mcp_server_name: str, reason: str):
+def ingest_blocked_request(tool_name: str, tool_input: Any, mcp_server_name: str, reason: str):
     if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
         return
 
@@ -214,11 +205,7 @@ def ingest_blocked_request(tool_name: str, tool_input: str, mcp_server_name: str
             }
         )
         request_body["responsePayload"] = json.dumps(
-            {
-                "body": json.dumps(
-                    {"x-blocked-by": "Akto Proxy", "reason": reason or "Policy violation"}
-                )
-            }
+            {"body": {"x-blocked-by": "Akto Proxy", "reason": reason or "Policy violation"}}
         )
         request_body["statusCode"] = "403"
         request_body["status"] = "403"
@@ -241,7 +228,7 @@ def main():
         sys.exit(0)
 
     tool_name = str(input_data.get("tool_name") or "")
-    tool_input = json.dumps(input_data.get("tool_input") or {})
+    tool_input = input_data.get("tool_input") or {}
     mcp_server_name = extract_mcp_server_name(tool_name)
 
     logger.info(f"Processing MCP tool request: {tool_name} (server: {mcp_server_name})")
