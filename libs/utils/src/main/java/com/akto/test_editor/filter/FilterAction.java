@@ -256,23 +256,43 @@ public final class FilterAction {
         varMap.put(querySet.get(0), respCode);
     }
 
-    // apply filter on test types
+    // apply filter on test types (supports both API collections and API_GROUPs with agentic tags)
     public DataOperandsFilterResponse applyFilterOnTestType(FilterActionRequest filterActionRequest) {
         RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
         if (rawApi == null || rawApi.getRequest() == null) {
             return new DataOperandsFilterResponse(false, null, null, null);
         }
-        int apiCollectionId = filterActionRequest.getApiInfoKey().getApiCollectionId();
-        ApiCollection apiCollection = dataActor.fetchApiCollectionMeta(apiCollectionId);
-        if (apiCollection == null) {
-            return new DataOperandsFilterResponse(false, null, null, null, "API collection not found");
-        }
-        if (apiCollection.isGenAICollection() ||
-                apiCollection.isMcpCollection() ||
-                apiCollection.isGuardRailCollection()) {
+        int primaryCollectionId = filterActionRequest.getApiInfoKey().getApiCollectionId();
+
+        // Check primary collection first
+        if (isAgenticCollection(primaryCollectionId)) {
             return new DataOperandsFilterResponse(true, null, null, null);
         }
+
+        // Also check API_GROUPs (and any other collections) this API belongs to
+        ApiInfo apiInfo = dataActor.fetchApiInfo(filterActionRequest.getApiInfoKey());
+        if (apiInfo != null && apiInfo.getCollectionIds() != null) {
+            for (Integer collectionId : apiInfo.getCollectionIds()) {
+                if (collectionId == null || collectionId == primaryCollectionId) {
+                    continue;
+                }
+                if (isAgenticCollection(collectionId)) {
+                    return new DataOperandsFilterResponse(true, null, null, null);
+                }
+            }
+        }
+
         return new DataOperandsFilterResponse(false, null, null, null, "The request is not an Agentic request");
+    }
+
+    private boolean isAgenticCollection(int apiCollectionId) {
+        ApiCollection apiCollection = dataActor.fetchApiCollectionMeta(apiCollectionId);
+        if (apiCollection == null) {
+            return false;
+        }
+        return apiCollection.isGenAICollection()
+                || apiCollection.isMcpCollection()
+                || apiCollection.isGuardRailCollection();
     }
 
     public DataOperandsFilterResponse applyFilterOnRequestPayload(FilterActionRequest filterActionRequest) {
