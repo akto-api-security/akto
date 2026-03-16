@@ -17,7 +17,7 @@ function GuardrailSchemaModal({ open, onClose, endpoint, initialData, onSave, sa
         setBlockedResponseContentType(schema?.blockedResponseContentType || '')
     }, [initialData])
 
-    const addField = (setter) => setter(prev => [...prev, { fieldPath: '', description: '' }])
+    const addField = (setter) => setter(prev => [...prev, { id: Date.now() + Math.random(), fieldPath: '', description: '' }])
     const removeField = (setter, index) => setter(prev => prev.filter((_, i) => i !== index))
     const updateField = (setter, index, key, value) =>
         setter(prev => prev.map((f, i) => i === index ? { ...f, [key]: value } : f))
@@ -32,7 +32,7 @@ function GuardrailSchemaModal({ open, onClose, endpoint, initialData, onSave, sa
                 <Text variant="bodyMd" color="subdued">No fields configured. Click "Add field" to specify JSON paths.</Text>
             )}
             {fields.map((field, idx) => (
-                <HorizontalStack key={`field-${idx}-${field.fieldPath}`} gap="2" align="fill">
+                <HorizontalStack key={field.id} gap="2" align="fill">
                     <Box width="45%">
                         <TextField
                             label="JSON path"

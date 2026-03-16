@@ -16,6 +16,7 @@ import PersistStore from '../../../../main/PersistStore';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
 import guardrailApi from '../api';
 import { transformPolicyForBackend, SEVERITY } from '../utils';
+import func from "@/util/func";
 import {
     PolicyDetailsStep,
     PolicyDetailsConfig,
@@ -33,6 +34,8 @@ import {
     UsageGuardrailsConfig,
     AnomalyDetectionStep,
     AnomalyDetectionConfig,
+    ToolsGuardrailsStep,
+    ToolsGuardrailsConfig,
     ServerSettingsStep,
     ServerSettingsConfig
 } from './steps';
@@ -59,6 +62,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Step 2: Content & Policy Guardrails
     const [enablePromptAttacks, setEnablePromptAttacks] = useState(false);
     const [promptAttackLevel, setPromptAttackLevel] = useState("high");
+    const [enableContextPoisoning, setEnableContextPoisoning] = useState(false);
     const [enableDeniedTopics, setEnableDeniedTopics] = useState(false);
     const [deniedTopics, setDeniedTopics] = useState([]);
     const [enableHarmfulCategories, setEnableHarmfulCategories] = useState(false);
@@ -113,7 +117,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableTokenLimit, setEnableTokenLimit] = useState(false);
     const [tokenLimitConfidenceScore, setTokenLimitConfidenceScore] = useState(0.7);
 
-    // Step 8: Server settings
+    // Step 9: Tools Guardrails
+    const [enableToolMisuse, setEnableToolMisuse] = useState(true);
+    const [enableMaliciousTools, setEnableMaliciousTools] = useState(true);
+    const [enableToolNameDescriptionMismatch, setEnableToolNameDescriptionMismatch] = useState(true);
+
+    // Step 10: Server settings
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
@@ -136,6 +145,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // Step 2
         enablePromptAttacks,
         promptAttackLevel,
+        enableContextPoisoning,
         enableDeniedTopics,
         deniedTopics,
         enableHarmfulCategories,
@@ -172,7 +182,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // Step 7
         enableTokenLimit,
         tokenLimitConfidenceScore,
-        // Step 8
+        // Step 9
+        enableToolMisuse,
+        enableMaliciousTools,
+        enableToolNameDescriptionMismatch,
+        // Step 10
         selectedMcpServers,
         selectedAgentServers,
         mcpServers,
@@ -183,8 +197,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     const getStepsWithSummary = () => {
         const storedStateData = getStoredStateData();
+        const isDemo = func.isDemoAccount();
 
-        return [
+        const steps = [
             {
                 number: PolicyDetailsConfig.number,
                 title: PolicyDetailsConfig.title,
@@ -232,14 +247,26 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 title: AnomalyDetectionConfig.title,
                 summary: AnomalyDetectionConfig.getSummary(storedStateData),
                 ...AnomalyDetectionConfig.validate(storedStateData)
-            },
-            {
-                number: ServerSettingsConfig.number,
-                title: ServerSettingsConfig.title,
-                summary: ServerSettingsConfig.getSummary(storedStateData),
-                ...ServerSettingsConfig.validate(storedStateData)
             }
         ];
+
+        if (isDemo) {
+            steps.push({
+                number: ToolsGuardrailsConfig.number,
+                title: ToolsGuardrailsConfig.title,
+                summary: ToolsGuardrailsConfig.getSummary(storedStateData),
+                ...ToolsGuardrailsConfig.validate(storedStateData)
+            });
+        }
+
+        steps.push({
+            number: ServerSettingsConfig.number,
+            title: ServerSettingsConfig.title,
+            summary: ServerSettingsConfig.getSummary(storedStateData),
+            ...ServerSettingsConfig.validate(storedStateData)
+        });
+
+        return steps;
     };
 
     const steps = getStepsWithSummary();
@@ -322,6 +349,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setPlaygroundMessages([]);
         setEnablePromptAttacks(false);
         setPromptAttackLevel("high");
+        setEnableContextPoisoning(false);
         setEnableDeniedTopics(false);
         setDeniedTopics([]);
         setEnableHarmfulCategories(false);
@@ -365,6 +393,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setConfidenceScore(25);
         setEnableTokenLimit(false);
         setTokenLimitConfidenceScore(0.7);
+        setEnableToolMisuse(true);
+        setEnableMaliciousTools(true);
+        setEnableToolNameDescriptionMismatch(true);
         setSelectedMcpServers([]);
         setSelectedAgentServers([]);
         setApplyOnResponse(false);
@@ -494,14 +525,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     };
 
     const handleNext = () => {
-        if (currentStep < steps.length) {
-            setCurrentStep(currentStep + 1);
+        const idx = steps.findIndex(s => s.number === currentStep);
+        if (idx >= 0 && idx < steps.length - 1) {
+            setCurrentStep(steps[idx + 1].number);
         }
     };
 
     const handlePrevious = () => {
-        if (currentStep > 1) {
-            setCurrentStep(currentStep - 1);
+        const idx = steps.findIndex(s => s.number === currentStep);
+        if (idx > 0) {
+            setCurrentStep(steps[idx - 1].number);
         }
     };
 
@@ -638,6 +671,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnablePromptAttacks={setEnablePromptAttacks}
                         promptAttackLevel={promptAttackLevel}
                         setPromptAttackLevel={setPromptAttackLevel}
+                        enableContextPoisoning={enableContextPoisoning}
+                        setEnableContextPoisoning={setEnableContextPoisoning}
                         enableDeniedTopics={enableDeniedTopics}
                         setEnableDeniedTopics={setEnableDeniedTopics}
                         deniedTopics={deniedTopics}
@@ -736,6 +771,17 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     <AnomalyDetectionStep />
                 );
             case 9:
+                return (
+                    <ToolsGuardrailsStep
+                        enableToolMisuse={enableToolMisuse}
+                        setEnableToolMisuse={setEnableToolMisuse}
+                        enableMaliciousTools={enableMaliciousTools}
+                        setEnableMaliciousTools={setEnableMaliciousTools}
+                        enableToolNameDescriptionMismatch={enableToolNameDescriptionMismatch}
+                        setEnableToolNameDescriptionMismatch={setEnableToolNameDescriptionMismatch}
+                    />
+                );
+            case 10:
                 return (
                     <ServerSettingsStep
                         selectedMcpServers={selectedMcpServers}
@@ -1012,7 +1058,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                 Previous
                             </Button>
                             <HorizontalStack gap="2">
-                                <Button onClick={handleNext} disabled={currentStep === steps.length}>
+                                <Button onClick={handleNext} disabled={steps.findIndex(s => s.number === currentStep) >= steps.length - 1}>
                                     Next
                                 </Button>
                                 <Button

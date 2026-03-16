@@ -21,6 +21,7 @@ function SampleDataComponent(props) {
     const [responseTime, setResponseTime] = useState(undefined)
     const [ipObj, setIpObj] = useState({sourceIP: "", destIP: ""})
     const [expanded, setExpanded] = useState(false)
+    const [editorContent, setEditorContent] = useState("")
 
     const ref = useRef(null)
 
@@ -130,9 +131,23 @@ function SampleDataComponent(props) {
         }
     }, [sampleData, metadata, isNewDiff, showResponse, simpleJson, type])
 
-    const copyContent = async(type,completeData) => {
+    const copyContent = async(type, completeData, isSimpleJson = false) => {
         let copyString = "";
         let snackBarMessage = ""
+        
+        // For simple JSON mode, just copy the raw content
+        if (isSimpleJson) {
+            try {
+                // Try to parse and pretty-print, or use raw content
+                const parsed = JSON.parse(completeData);
+                copyString = JSON.stringify(parsed, null, 2);
+            } catch {
+                copyString = completeData;
+            }
+            snackBarMessage = "Content copied to clipboard";
+            return {copyString, snackBarMessage};
+        }
+        
         completeData = JSON.parse(completeData);
         if (type=="RESPONSE") {
             let responsePayload = {}
@@ -175,7 +190,7 @@ function SampleDataComponent(props) {
     }
 
     async function copyRequest(reqType, type, completeData) {
-        let { copyString, snackBarMessage } = await copyContent(type, completeData)
+        let { copyString, snackBarMessage } = await copyContent(type, completeData, simpleJson)
         if (copyString) {
             func.copyToClipboard(copyString, ref, snackBarMessage)
             setPopoverActive({ [reqType]: !popoverActive[reqType] })
@@ -184,16 +199,27 @@ function SampleDataComponent(props) {
 
     function getItems(type, data) {
         let items = []
+        // Use editor content if available, otherwise fall back to message
+        const contentToUse = data.editorContent ? data.editorContent : data.message
+        if (simpleJson) {
+            if (contentToUse) {
+                items.push({
+                    content: 'Copy',
+                    onAction: () => { copyRequest(type, "RESPONSE", contentToUse) },
+                })
+            }
+            return items;
+        }
 
         if (type == "request") {
-            if (data.message) {
+            if (contentToUse) {
                 items.push({
                     content: 'Copy request as curl',
-                    onAction: () => { copyRequest(type, "CURL", data.message) },
+                    onAction: () => { copyRequest(type, "CURL", contentToUse) },
                 },
                     {
                         content: 'Copy request as burp',
-                        onAction: () => { copyRequest(type, "BURP", data.message) },
+                        onAction: () => { copyRequest(type, "BURP", contentToUse) },
                     })
             }
             if (data.originalMessage) {
@@ -213,10 +239,10 @@ function SampleDataComponent(props) {
                 }
             }
         } else {
-            if (data.message) {
+            if (contentToUse) {
                 items.push({
                     content: 'Copy response',
-                    onAction: () => { copyRequest(type, "RESPONSE", data.message) },
+                    onAction: () => { copyRequest(type, "RESPONSE", contentToUse) },
                 })
             }
             if (data.originalMessage) {
@@ -263,17 +289,25 @@ function SampleDataComponent(props) {
 
     let currentLineActive = lineNumbers && lineNumbers[type].length > 0 ? lineNumbers[type][currentIndex[type]] : 1
     const currentMessage = sampleJsonData?.[type]?.message
-    return (
+    
+    const handleEditorData = (data) => {
+        setEditorContent(data)
+        getEditorData(data)
+    }
 
+    return (
         <Box id='sample-data-editor-container'>
             <LegacyCard.Section flush>
                 <Box padding={"2"}>
                     <HorizontalStack padding="2" align='space-between'>
-                        {func.toSentenceCase(type)} 
-                        { type==="response" && responseTime ? (` (${responseTime} ms)`) : "" }
-                        { type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ? 
-                            (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`) 
-                            : "" }
+                        <Text variant="bodyMd" fontWeight="semibold">
+                            {/* Hide the word 'response' if simpleJson is true */}
+                            {!simpleJson && func.toSentenceCase(type)}
+                            {!simpleJson && type==="response" && responseTime ? (` (${responseTime} ms)`) : ""}
+                            {!simpleJson && type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ?
+                                (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`)
+                                : ""}
+                        </Text>
                         <HorizontalStack gap={2}>
                         {isNewDiff && lineNumbers[type]?.length > 0 ? <HorizontalStack gap="2">
                                 <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="1">
@@ -300,7 +334,7 @@ function SampleDataComponent(props) {
                                 accessibilityLabel={`Expand ${type}`}
                                 disabled={!currentMessage}
                             />
-                            <Tooltip content={`Copy ${type}`}>
+                            <Tooltip content={simpleJson ? "Copy" : `Copy ${type}`}>
                             <Popover
                                 zIndexOverride={"600"}
                                 active={popoverActive[type]}
@@ -311,7 +345,7 @@ function SampleDataComponent(props) {
                                 <div ref={ref}/>
                                 <ActionList
                                     actionRole="menuitem"
-                                    items={getItems(type, sampleData)}
+                                    items={getItems(type, {...sampleData, editorContent})}
                                 />
                             </Popover>
                             </Tooltip>
@@ -320,10 +354,10 @@ function SampleDataComponent(props) {
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage={simpleJson ? "json" : "custom_http"} currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={getEditorData}/> : null}
+                {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage={simpleJson ? "json" : "custom_http"} currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={handleEditorData}/> : null}
             </LegacyCard.Section>
 
-            <Modal open={expanded} onClose={() => setExpanded(false)} title={func.toSentenceCase(type)} large>
+            <Modal open={expanded} onClose={() => setExpanded(false)} title={simpleJson ? " " : func.toSentenceCase(type)} large>
                 <Modal.Section>
                     {sampleJsonData[type] ? <SampleData
                         data={sampleJsonData[type]}

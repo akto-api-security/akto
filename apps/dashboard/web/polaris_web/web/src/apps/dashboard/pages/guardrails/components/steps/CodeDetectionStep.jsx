@@ -1,5 +1,7 @@
 import { VerticalStack, Text, Checkbox, Box, RangeSlider } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
+import RuleLabelWithTag from "../RuleLabelWithTag";
+import { RULE_OWASP_THREATS } from "../owaspConfig";
 
 export const CodeDetectionConfig = {
     number: 5,
@@ -37,7 +39,7 @@ const CodeDetectionStep = ({
             <VerticalStack gap="4">
                 <Box>
                     <Checkbox
-                        label="Enable code detection filter"
+                        label={<RuleLabelWithTag name="Enable code detection filter" threats={RULE_OWASP_THREATS.codeFilter} />}
                         checked={enableCodeFilter}
                         onChange={setEnableCodeFilter}
                         helpText="Enable language-specific code detection that identifies and blocks code in specific programming languages (Python, Java, JavaScript, etc.). Provides granular control over which programming languages to allow or block."
@@ -65,7 +67,7 @@ const CodeDetectionStep = ({
 
                 <Box>
                     <Checkbox
-                        label="Enable ban code detection"
+                        label={<RuleLabelWithTag name="Enable ban code detection" threats={RULE_OWASP_THREATS.banCode} />}
                         checked={enableBanCode}
                         onChange={setEnableBanCode}
                         helpText="Enable binary code detection that blocks all code regardless of programming language. This is a simple, strict filter that treats any code as a violation without language-specific filtering."
