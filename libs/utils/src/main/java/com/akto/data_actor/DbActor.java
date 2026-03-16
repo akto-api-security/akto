@@ -644,8 +644,8 @@ public class DbActor extends DataActor {
         return DbLayer.countTestingRunResultSummaries(filter);
     }
 
-    public TestScript fetchTestScript(){
-        return DbLayer.fetchTestScript();
+    public TestScript fetchTestScript(TestScript.Type type){
+        return DbLayer.fetchTestScript(type);
     }
 
     public List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod){
