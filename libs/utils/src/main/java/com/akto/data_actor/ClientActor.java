@@ -2128,6 +2128,7 @@ public class ClientActor extends DataActor {
                 apiCollection.remove("displayName");
                 apiCollection.remove("urlsCount");
                 apiCollection.remove("envType");
+                apiCollection.remove("conditions");
                 return objectMapper.readValue(apiCollection.toJson(), ApiCollection.class);
             } catch(Exception e) {
                 return null;
