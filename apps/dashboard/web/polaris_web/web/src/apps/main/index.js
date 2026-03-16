@@ -28,11 +28,10 @@ const signupPages = ['/check-inbox', '/business-email', '/signup', '/sso-login',
 const currentPath = window.location.pathname;
 const isSignupPage = signupPages.some(page => currentPath.startsWith(page));
 const isWhitelisted = func.isWhiteListedOrganization();
-const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 let free = false
-if(isWhitelisted || isSignupPage || isLocalDev) {
-  free = false; // Whitelisted users, signup pages & local dev should not block user
+if(isWhitelisted || isSignupPage) {
+  free = false; // Whitelisted users & Signup pages should not block user
 } else {
   // For non-whitelisted, non-signup users, check plan type
   if(window.PLAN_TYPE && ALLOWED_PLANS.includes(window.PLAN_TYPE.toLowerCase())) {
