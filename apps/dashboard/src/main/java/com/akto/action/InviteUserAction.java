@@ -126,8 +126,7 @@ public class InviteUserAction extends UserAction{
         }
 
         Integer accountId = Context.accountId.get();
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(accountId));
-        if (Utils.shouldEnforceSsoRestrictions(accountSettings, getSUser())) {
+        if (Utils.shouldEnforceSsoRestrictions(accountId, getSUser())) {
             addActionError("Inviting new users is not allowed for this account.");
             return ERROR.toUpperCase();
         }

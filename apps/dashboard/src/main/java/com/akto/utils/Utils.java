@@ -75,7 +75,7 @@ public class Utils {
     public static final String SSO_ONLY_LOGIN = "SSO_ONLY_LOGIN";
 
     /** Returns true if user has at least one SSO signup (OKTA, AZURE, GOOGLE_SAML). */
-    public static boolean hasSSOSignup(User user) {
+    private static boolean hasSSOSignup(User user) {
         if (user == null || user.getSignupInfoMap() == null || user.getSignupInfoMap().isEmpty()) {
             return false;
         }
@@ -87,9 +87,11 @@ public class Utils {
         return false;
     }
 
-    /** True when account has enforceSsoOnlyRestrictions and user has SSO signup. Use for login block and invite block. */
-    public static boolean shouldEnforceSsoRestrictions(AccountSettings accountSettings, User user) {
-        return accountSettings != null && accountSettings.isEnforceSsoOnlyRestrictions() && hasSSOSignup(user);
+    public static boolean shouldEnforceSsoRestrictions(int accountId, User user) {
+        if (!isSsoOnlyLoginEnabled(accountId)) {
+            return false;
+        }
+        return hasSSOSignup(user);
     }
 
     /**
@@ -116,9 +118,7 @@ public class Utils {
 
     /** Inverted: returns true when blocked. */
     private static boolean isLoginAllowedUnderSsoOnlyForAccount(int accountId, User user, boolean currentSigninIsSso) {
-        FeatureAccess ssoOnlyLoginAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, SSO_ONLY_LOGIN);
-        boolean featureAllowed = ssoOnlyLoginAccess != null && ssoOnlyLoginAccess.getIsGranted();
-        if (!featureAllowed) {
+        if (!isSsoOnlyLoginEnabled(accountId)) {
             return false;
         }
         boolean isNewUser = user == null || (user.getSignupInfoMap() != null && user.getSignupInfoMap().size() == 1);
@@ -127,6 +127,11 @@ public class Utils {
         }
         boolean userHasSso = hasSSOSignup(user);
         return userHasSso && !currentSigninIsSso;
+    }
+
+    private static boolean isSsoOnlyLoginEnabled(int accountId) {
+        FeatureAccess ssoOnlyLoginAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, SSO_ONLY_LOGIN);
+        return ssoOnlyLoginAccess != null && ssoOnlyLoginAccess.getIsGranted();
     }
 
     /** Resolves org by user email domain (e.g. user@company.com -> company.com), returns one accountId for that org or null. */
