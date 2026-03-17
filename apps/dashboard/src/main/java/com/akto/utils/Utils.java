@@ -1,5 +1,6 @@
 package com.akto.utils;
 
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
@@ -12,6 +13,7 @@ import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.*;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.*;
@@ -81,6 +83,24 @@ public class Utils {
     /** True when account has enforceSsoOnlyRestrictions and user has SSO signup. Use for login block and invite block. */
     public static boolean shouldEnforceSsoRestrictions(AccountSettings accountSettings, User user) {
         return accountSettings != null && accountSettings.isEnforceSsoOnlyRestrictions() && hasSSOSignup(user);
+    }
+
+    /** Feature label for org-level SSO-only login; when granted, only SSO signup/sign-in is allowed. */
+    public static final String SSO_ONLY_LOGIN = "SSO_ONLY_LOGIN";
+
+    /**
+     * When SSO_ONLY_LOGIN is enabled: allow only if user has SSO, else block.
+     * When feature not enabled: allow.
+     */
+    public static boolean checkSsoOnlyLoginAllowed(int accountId, User user) {
+        if (accountId <= 0) {
+            return true;
+        }
+        FeatureAccess ssoOnlyLoginAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, SSO_ONLY_LOGIN);
+        if (ssoOnlyLoginAccess == null || !ssoOnlyLoginAccess.getIsGranted()) {
+            return true;
+        }
+        return user != null && hasSSOSignup(user);
     }
 
     public static Map<String, String> getAuthMap(JsonNode auth, Map<String, String> variableMap) {

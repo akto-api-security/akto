@@ -47,6 +47,7 @@ import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.OrganizationCache;
 import com.akto.utils.sso.CustomSamlSettings;
 import com.akto.util.Pair;
+import com.akto.utils.Utils;
 import com.akto.utils.sso.SsoUtils;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
@@ -94,6 +95,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public static final String BUSINESS_EMAIL_REQUIRED_ERROR = "BUSINESS_EMAIL_REQUIRED";
     public static final String ERROR_STR = "error";
     public static final String ERROR_DESCRIPTION = "error_description";
+
+    /** Redirect to login with SSO-only required error. */
+    private static final String LOGIN_SSO_ONLY_REQUIRED_REDIRECT = "/login?error=sso_only_required";
 
     public String getCode() {
         return code;
@@ -1276,6 +1280,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[createUserAndRedirect] Path: NEW USER + shouldLogin=false -> Creating signup record without full account");
             SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo, invitationToAccount);
             logger.info("[createUserAndRedirect] Signup record created, logging in user");
+            if (!Utils.checkSsoOnlyLoginAllowed(invitationToAccount, signupUserInfo.getUser())) {
+                servletResponse.sendRedirect(LOGIN_SSO_ONLY_REQUIRED_REDIRECT);
+                return;
+            }
             LoginAction.loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
             servletRequest.setAttribute("username", userEmail);
             logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to /dashboard/onboarding");
@@ -1422,6 +1430,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     logger.info("[createUserAndRedirect] Set session accountId to: " + accountId);
                 }
 
+                if (!Utils.checkSsoOnlyLoginAllowed(accountId, user)) {
+                    servletResponse.sendRedirect(LOGIN_SSO_ONLY_REQUIRED_REDIRECT);
+                    return;
+                }
                 logger.info("[createUserAndRedirect] Logging in existing user and redirecting to /dashboard/observe/inventory");
                 LoginAction.loginUser(user, servletResponse, true, servletRequest, signupInfo);
                 servletResponse.sendRedirect("/dashboard/observe/inventory");
@@ -1439,6 +1451,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
             logger.infoAndAddToDb("[createUserAndRedirect] Account initialized successfully for accountId: " + accountId);
 
+            if (!Utils.checkSsoOnlyLoginAllowed(accountId, user)) {
+                servletResponse.sendRedirect(LOGIN_SSO_ONLY_REQUIRED_REDIRECT);
+                return;
+            }
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);
             logger.info("[createUserAndRedirect] Set session attributes - user and accountId: " + accountId);
