@@ -20,6 +20,8 @@ public class UserAnalysisData {
         private String serviceId;
         private String deviceId;
 
+        public UserAnalysisDataKey() {}
+
         public UserAnalysisDataKey(String serviceId, String deviceId) {
             this.serviceId = serviceId;
             this.deviceId = deviceId;

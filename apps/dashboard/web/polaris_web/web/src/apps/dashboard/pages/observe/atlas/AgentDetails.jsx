@@ -1,4 +1,4 @@
-import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip, Avatar } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip, Avatar, List } from "@shopify/polaris"
 import { useRef, useMemo, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from 'framer-motion'
@@ -9,6 +9,8 @@ import FlyLayout from "../../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
+import TitleWithInfo from "../../../components/shared/TitleWithInfo";
+import transform from "../transform"
 
 const ANIMATION_DURATION = 0.2;
 const LOG_LEVEL_TONES = {
@@ -241,6 +243,21 @@ function AgentDetails({
         panelID: 'agent-logs-panel',
     };
 
+    const getInputTokenLabel = (tokens) => {
+        if (tokens < 10000) return { label: "Light user", tone: "success" };
+        if (tokens < 100000) return { label: "Moderate user", tone: "attention" };
+        return { label: "Heavy user", tone: "critical" };
+    };
+
+    const getOutputTokenLabel = (inputTokens, outputTokens) => {
+        if (outputTokens > inputTokens * 3) return { label: "High output amplifier", tone: "critical" };
+        if (outputTokens > inputTokens * 1.5) return { label: "Verbose responder", tone: "attention" };
+        return { label: "Balanced output", tone: "success" };
+    };
+
+    const humanizeTopicKey = (key) =>
+        key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
     const UserAnalysisTab = {
         id: 'user-analysis',
         content: 'User Analysis',
@@ -254,31 +271,74 @@ function AgentDetails({
                     <VerticalStack gap="4">
                         {userAnalysis.aiSummary && (
                             <VerticalStack gap="1">
-                                <Text variant="headingSm">AI Summary</Text>
+                                <TitleWithInfo
+                                    titleText="User Analysis Summary"
+                                    textProps={{ variant: "headingMd" }}
+                                    tooltipContent="An overview summary of the user using the current agent."
+                                />
                                 <Text variant="bodyMd">{userAnalysis.aiSummary}</Text>
                             </VerticalStack>
                         )}
                         <HorizontalStack gap="6">
                             <VerticalStack gap="1">
-                                <Text variant="headingSm">Input Tokens</Text>
-                                <Text variant="bodyMd">{userAnalysis.totalInputTokens ?? 0}</Text>
+                                <TitleWithInfo
+                                    titleText="Input Tokens"
+                                    textProps={{ variant: "headingMd" }}
+                                    tooltipContent={`Total input tokens. (${getInputTokenLabel(userAnalysis.totalInputTokens ?? 0).label})`}
+                                />
+                                <Box>
+                                    <Badge status={getInputTokenLabel(userAnalysis.totalInputTokens ?? 0).tone}>
+                                        {transform.formatNumberWithCommas(userAnalysis.totalInputTokens ?? 0)}
+                                    </Badge>
+                                </Box>
                             </VerticalStack>
                             <VerticalStack gap="1">
-                                <Text variant="headingSm">Output Tokens</Text>
-                                <Text variant="bodyMd">{userAnalysis.totalOutputTokens ?? 0}</Text>
+                                <TitleWithInfo
+                                    titleText="Output Tokens"
+                                    textProps={{ variant: "headingMd" }}
+                                    tooltipContent={`Total output tokens. (${getOutputTokenLabel(userAnalysis.totalInputTokens ?? 0, userAnalysis.totalOutputTokens ?? 0).label})`}
+                                />
+                                <Box>
+                                    <Badge status={getOutputTokenLabel(userAnalysis.totalInputTokens ?? 0, userAnalysis.totalOutputTokens ?? 0).tone}>
+                                        {transform.formatNumberWithCommas(userAnalysis.totalOutputTokens ?? 0)}
+                                    </Badge>
+                                </Box>
                             </VerticalStack>
                         </HorizontalStack>
                         {userAnalysis.harmfulTopics && Object.keys(userAnalysis.harmfulTopics).length > 0 && (
                             <VerticalStack gap="2">
-                                <Text variant="headingSm">Harmful Topics</Text>
-                                <VerticalStack gap="1">
-                                    {Object.entries(userAnalysis.harmfulTopics).map(([topic, count]) => (
-                                        <HorizontalStack key={topic} gap="2" align="start">
-                                            <Badge tone="critical">{topic}</Badge>
-                                            <Text variant="bodySm" color="subdued">{String(count)}</Text>
-                                        </HorizontalStack>
+                                <TitleWithInfo
+                                    titleText="Queries Flagged"
+                                    textProps={{ variant: "headingMd" }}
+                                    tooltipContent="Queries identified as potentially harmful or policy-violating."
+                                />
+                                <List type="bullet" gap="extraTight">
+                                    {Object.entries(userAnalysis.harmfulTopics).map(([topic, data]) => (
+                                        <List.Item key={topic}>
+                                            <VerticalStack gap="1">
+                                                <HorizontalStack gap="2" blockAlign="center">
+                                                    <Text variant="bodyMd" fontWeight="bold" color="critical">
+                                                        {humanizeTopicKey(topic)}
+                                                    </Text>
+                                                    {data.timestamp && (
+                                                        <Text variant="bodySm" color="subdued">
+                                                            {func.prettifyEpoch(
+                                                                typeof data.timestamp === "object" && data.timestamp.$numberLong
+                                                                    ? parseInt(data.timestamp.$numberLong)
+                                                                    : data.timestamp
+                                                            )}
+                                                        </Text>
+                                                    )}
+                                                </HorizontalStack>
+                                                {data.prompt && (
+                                                    <Text variant="bodySm" fontWeight="regular" color="subdued" as="p">
+                                                        {data.prompt}
+                                                    </Text>
+                                                )}
+                                            </VerticalStack>
+                                        </List.Item>
                                     ))}
-                                </VerticalStack>
+                                </List>
                             </VerticalStack>
                         )}
                     </VerticalStack>

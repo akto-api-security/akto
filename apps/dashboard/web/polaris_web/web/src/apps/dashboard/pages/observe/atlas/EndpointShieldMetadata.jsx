@@ -7,7 +7,6 @@ import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import { CellType } from "../../../components/tables/rows/GithubRow";
-import { getAgentLogs } from "../dummyData";
 import settingRequests from "../../settings/api";
 import PersistStore from "../../../../main/PersistStore";
 import { mapLabel } from "../../../../main/labelHelper";
@@ -150,8 +149,6 @@ function EndpointShieldMetadata() {
             return sortedLogs;
         } catch (error) {
             console.error("Error fetching agent logs:", error);
-            const logsData = getAgentLogs(agentId);
-            return logsData.slice(0, LOG_LIMITS.MAX_LOGS_FETCHED);
         }
     }, []);
 
