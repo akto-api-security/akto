@@ -150,9 +150,9 @@ public class APICatalogSync {
 
         requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp);
 
-        // Skip sample data if x-akto-skip-sample-update header is present
+        // Skip sample data if x-akto-discovery-only header is present
         Map<String, List<String>> reqHeaders = requestParams.getHeaders();
-        boolean skipSampleData = reqHeaders != null && reqHeaders.get("x-akto-skip-sample-update") != null;
+        boolean skipSampleData = reqHeaders != null && reqHeaders.get("x-akto-discovery-only") != null;
 
         BasicDBObject requestPayload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
         if (requestPayload != null && !skipSampleData) {
@@ -189,7 +189,7 @@ public class APICatalogSync {
                 payload = BasicDBObject.parse("{}");
             }
 
-            // Skip sample data if x-akto-skip-sample-update header is present
+            // Skip sample data if x-akto-discovery-only header is present
             if (!skipSampleData) {
                 deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
             }
