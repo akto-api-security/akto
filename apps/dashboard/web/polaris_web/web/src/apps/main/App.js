@@ -74,6 +74,7 @@ import TestRoleAccessMatrix from "../dashboard/pages/testing/TestRoleAccessMatri
 import SignupPage from "../signup/pages/SignupPage";
 import PageCheckInbox from "../signup/pages/PageCheckInbox"
 import PageBusinessEmail from "../signup/pages/PageBusinessEmail"
+import PageSsoOnlyLogin from "../signup/pages/PageSsoOnlyLogin"
 import TokenValidator from "./TokenValidator"
 import {TableContextProvider} from "@/apps/dashboard/components/tables/TableContext";
 import VulnerabilityReport from "../dashboard/pages/testing/vulnerability_report/VulnerabilityReport";
@@ -626,6 +627,10 @@ const router = createBrowserRouter([
     {
         path: "/business-email",
         element: <PageBusinessEmail/>
+    },
+    {
+        path: "/sso-only-login",
+        element: <PageSsoOnlyLogin/>
     },
     {
         path: "/sso-login",

@@ -1,6 +1,7 @@
 package com.akto.utils;
 
 import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
@@ -14,6 +15,7 @@ import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.*;
 import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.*;
@@ -33,6 +35,8 @@ import com.akto.runtime.APICatalogSync;
 import com.akto.testing.ApiExecutor;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
+import com.akto.util.OrganizationInfo;
+import com.akto.utils.crons.OrganizationCache;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -89,18 +93,59 @@ public class Utils {
     }
 
     /**
-     * When SSO_ONLY_LOGIN is enabled: allow only if user has SSO, else block.
-     * When feature not enabled: allow.
+     * Inverted check: returns true when login should be blocked under SSO-only. Use as: if (isLoginAllowedUnderSsoOnly(...)) redirect.
+     * When org has SSO_ONLY_LOGIN: existing user → block when (user has SSO AND sign-in is non-SSO); new user → block when sign-in is non-SSO.
      */
-    public static boolean checkSsoOnlyLoginAllowed(int accountId, User user) {
-        if (accountId <= 0) {
-            return true;
+    public static boolean isLoginAllowedUnderSsoOnly(int accountId, User user, SignupInfo currentSignupInfo) {
+        if (user == null && currentSignupInfo == null) {
+            return false;
         }
+        boolean currentSigninIsSso = currentSignupInfo != null && Config.isConfigSSOType(currentSignupInfo.getConfigType());
+        if (accountId > 0) {
+            return isLoginAllowedUnderSsoOnlyForAccount(accountId, user, currentSigninIsSso);
+        }
+        if (user == null) {
+            return false;
+        }
+        Integer accountIdFromDomain = getAccountIdFromUserEmailDomain(user.getLogin());
+        if (accountIdFromDomain == null) {
+            return false;
+        }
+        return isLoginAllowedUnderSsoOnlyForAccount(accountIdFromDomain, user, currentSigninIsSso);
+    }
+
+    /** Inverted: returns true when blocked. */
+    private static boolean isLoginAllowedUnderSsoOnlyForAccount(int accountId, User user, boolean currentSigninIsSso) {
         FeatureAccess ssoOnlyLoginAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, SSO_ONLY_LOGIN);
-        if (ssoOnlyLoginAccess == null || !ssoOnlyLoginAccess.getIsGranted()) {
-            return true;
+        boolean featureAllowed = ssoOnlyLoginAccess != null && ssoOnlyLoginAccess.getIsGranted();
+        if (!featureAllowed) {
+            return false;
         }
-        return user != null && hasSSOSignup(user);
+        boolean isNewUser = user == null || (user.getSignupInfoMap() != null && user.getSignupInfoMap().size() == 1);
+        if (isNewUser) {
+            return !currentSigninIsSso;
+        }
+        boolean userHasSso = hasSSOSignup(user);
+        return userHasSso && !currentSigninIsSso;
+    }
+
+    /** Resolves org by user email domain (e.g. user@company.com -> company.com), returns one accountId for that org or null. */
+    private static Integer getAccountIdFromUserEmailDomain(String login) {
+        if (login == null || !login.contains("@")) {
+            return null;
+        }
+        String domain = login.split("@")[1].toLowerCase();
+        OrganizationInfo orgInfo = OrganizationCache.getOrganizationInfoByDomain(domain);
+        if (orgInfo == null) {
+            return null;
+        }
+        Organization org = OrganizationsDao.instance.findOne(
+                Filters.eq(Organization.ID, orgInfo.getOrganizationId()),
+                Projections.include(Organization.ACCOUNTS));
+        if (org == null || org.getAccounts() == null || org.getAccounts().isEmpty()) {
+            return null;
+        }
+        return org.getAccounts().iterator().next();
     }
 
     public static Map<String, String> getAuthMap(JsonNode auth, Map<String, String> variableMap) {
