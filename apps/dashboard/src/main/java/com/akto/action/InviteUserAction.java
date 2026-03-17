@@ -17,6 +17,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
+import com.akto.utils.Utils;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
@@ -126,7 +127,7 @@ public class InviteUserAction extends UserAction{
 
         Integer accountId = Context.accountId.get();
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(accountId));
-        if (LoginAction.shouldEnforceSsoRestrictions(accountSettings, getSUser())) {
+        if (Utils.shouldEnforceSsoRestrictions(accountSettings, getSUser())) {
             addActionError("Inviting new users is not allowed for this account.");
             return ERROR.toUpperCase();
         }

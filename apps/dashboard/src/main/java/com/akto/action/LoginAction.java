@@ -79,24 +79,6 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
     BasicDBObject loginResult = new BasicDBObject();
 
-    /** Returns true if user has at least one SSO signup (OKTA, AZURE, GOOGLE_SAML). Used to block password login when user was signed up using SSO. */
-    public static boolean hasSSOSignup(User user) {
-        if (user == null || user.getSignupInfoMap() == null || user.getSignupInfoMap().isEmpty()) {
-            return false;
-        }
-        for (SignupInfo info : user.getSignupInfoMap().values()) {
-            if (Config.isConfigSSOType(info.getConfigType())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** True when account has enforceSsoOnlyRestrictions and user has SSO signup. Use for login block and invite block. */
-    public static boolean shouldEnforceSsoRestrictions(AccountSettings accountSettings, User user) {
-        return accountSettings != null && accountSettings.isEnforceSsoOnlyRestrictions() && hasSSOSignup(user);
-    }
-
     @Override
     public String execute() throws IOException {
         logger.debug("LoginAction Hit");

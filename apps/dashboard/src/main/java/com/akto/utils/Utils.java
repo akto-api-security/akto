@@ -65,6 +65,24 @@ public class Utils {
     ;
     private final static ObjectMapper mapper = new ObjectMapper();
 
+    /** Returns true if user has at least one SSO signup (OKTA, AZURE, GOOGLE_SAML). */
+    public static boolean hasSSOSignup(User user) {
+        if (user == null || user.getSignupInfoMap() == null || user.getSignupInfoMap().isEmpty()) {
+            return false;
+        }
+        for (SignupInfo info : user.getSignupInfoMap().values()) {
+            if (Config.isConfigSSOType(info.getConfigType())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** True when account has enforceSsoOnlyRestrictions and user has SSO signup. Use for login block and invite block. */
+    public static boolean shouldEnforceSsoRestrictions(AccountSettings accountSettings, User user) {
+        return accountSettings != null && accountSettings.isEnforceSsoOnlyRestrictions() && hasSSOSignup(user);
+    }
+
     public static Map<String, String> getAuthMap(JsonNode auth, Map<String, String> variableMap) {
         Map<String, String> result = new HashMap<>();
 
