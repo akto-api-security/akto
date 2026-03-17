@@ -2,11 +2,13 @@ package com.akto.action;
 
 import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.SignupDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dto.BackwardCompatibility;
@@ -33,6 +35,7 @@ import com.mongodb.client.model.PushOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+import com.opensymphony.xwork2.ActionSupport;
 import com.sendgrid.helpers.mail.Mail;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
@@ -62,7 +65,7 @@ import com.akto.util.enums.GlobalEnums;
 // Generates access token jwt using the refresh token
 // Adds the refresh token to http-only cookie
 // Adds the access token to header
-public class LoginAction implements Action, ServletResponseAware, ServletRequestAware {
+public class LoginAction extends ActionSupport implements ServletResponseAware, ServletRequestAware {
 
     private static final LoggerMaker logger = new LoggerMaker(LoginAction.class, LogDb.DASHBOARD);
     
@@ -77,6 +80,25 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     }
 
     BasicDBObject loginResult = new BasicDBObject();
+
+    /** Returns true if user has at least one SSO signup (OKTA, AZURE, GOOGLE_SAML). Used to block password login when user was signed up using SSO. */
+    public static boolean hasSSOSignup(User user) {
+        if (user == null || user.getSignupInfoMap() == null || user.getSignupInfoMap().isEmpty()) {
+            return false;
+        }
+        for (SignupInfo info : user.getSignupInfoMap().values()) {
+            if (Config.isConfigSSOType(info.getConfigType())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** True when account has enforceSsoOnlyRestrictions and user has SSO signup. Use for login block and invite block. */
+    public static boolean shouldEnforceSsoRestrictions(AccountSettings accountSettings, User user) {
+        return accountSettings != null && accountSettings.isEnforceSsoOnlyRestrictions() && hasSSOSignup(user);
+    }
+
     @Override
     public String execute() throws IOException {
         logger.debug("LoginAction Hit");
@@ -87,8 +109,24 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
         User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, username));
 
+        if (user != null && hasSSOSignup(user)) {
+            boolean anyAccountEnforces = false;
+            for (String accountIdStr : user.getAccounts().keySet()) {
+                int accountId = Integer.parseInt(accountIdStr);
+                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(accountId));
+                if (shouldEnforceSsoRestrictions(accountSettings, user)) {
+                    anyAccountEnforces = true;
+                    break;
+                }
+            }
+            if (anyAccountEnforces) {
+                addActionError("This account uses SSO. Please sign in with your organization's SSO.");
+                return Action.ERROR.toUpperCase();
+            }
+        }
+
         if (user != null && user.getSignupInfoMap()!=null && user.getSignupInfoMap().containsKey(Config.ConfigType.PASSWORD + Config.CONFIG_SALT)){
-            SignupInfo.PasswordHashInfo signupInfo = (SignupInfo.PasswordHashInfo) user.getSignupInfoMap().get(Config.ConfigType.PASSWORD + "-ankush");
+            SignupInfo.PasswordHashInfo signupInfo = (SignupInfo.PasswordHashInfo) user.getSignupInfoMap().get(Config.ConfigType.PASSWORD + Config.CONFIG_SALT);
             String salt = signupInfo.getSalt();
             String passHash = Integer.toString((salt + password).hashCode());
             if (!passHash.equals(signupInfo.getPasshash())) {
@@ -101,7 +139,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
             if (signupUserInfo != null) {
                 SignupInfo.PasswordHashInfo passInfo =
-                        (SignupInfo.PasswordHashInfo) signupUserInfo.getUser().getSignupInfoMap().get(Config.ConfigType.PASSWORD + "-ankush");
+                        (SignupInfo.PasswordHashInfo) signupUserInfo.getUser().getSignupInfoMap().get(Config.ConfigType.PASSWORD + Config.CONFIG_SALT);
 
                 String passHash = Integer.toString((passInfo.getSalt() + password).hashCode());
 

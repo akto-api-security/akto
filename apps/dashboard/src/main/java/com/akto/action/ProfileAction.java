@@ -201,6 +201,9 @@ public class ProfileAction extends UserAction {
                 .append("isAwsWafIntegrated", awsWafCount != 0)
                 .append("isCloudflareWafIntegrated", cloudflareWafCount != 0);
 
+        boolean inviteDisabledForSSO = LoginAction.shouldEnforceSsoRestrictions(accountSettings, user);
+        userDetails.append("inviteDisabledForSSO", inviteDisabledForSSO);
+
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));
         }
