@@ -163,7 +163,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 List<String> errors = new ArrayList<>();
                 List<GenericTestResult> testResults = new ArrayList<>();
                 if (testResultsList != null && !testResultsList.isEmpty()) {
-                    BasicDBObject genericTestResult = (BasicDBObject)testResultsList.get(0);
+                    BasicDBObject genericTestResult = (BasicDBObject)testResultsList.get(testResultsList.size()-1);
                     String confidence = "";
                     if (genericTestResult.get(GenericTestResult._CONFIDENCE)!=null) {
                         TestResult testResult = new TestResult();
@@ -180,8 +180,8 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                                     if (response != null) {
                                         Object statusCode = response.get("statusCode");
                                         String body = response.getString("body");
-                                        String bodyPreview = (body != null && body.length() > 100)
-                                                ? body.substring(0, 100) : body;
+                                        String bodyPreview = (body != null && body.length() > 50)
+                                                ? body.substring(0, 50) : body;
                                         Document lightDoc = new Document("response",
                                                 new Document("statusCode", statusCode).append("body", bodyPreview));
                                         lightweightMessage = lightDoc.toJson();
