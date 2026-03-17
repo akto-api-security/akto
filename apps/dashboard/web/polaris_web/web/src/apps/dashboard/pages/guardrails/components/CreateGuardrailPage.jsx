@@ -243,7 +243,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     const steps = getStepsWithSummary();
 
-    // Filter collections when component mounts or allCollections changes
+    useEffect(() => {
+        document.body.classList.add('guardrail-page-open');
+        return () => document.body.classList.remove('guardrail-page-open');
+    }, []);
+
     useEffect(() => {
         if (allCollections && allCollections.length > 0) {
             filterCollections();
@@ -961,7 +965,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                 >
                                     <div className={`step-indicator ${
                                         step.number === currentStep ? 'current' :
-                                        step.number < currentStep ? (step.isValid ? 'completed' : 'error') : 'pending'
+                                        !step.isValid ? 'error' :
+                                        (step.summary && step.summary !== 'Coming soon') ? 'configured' : 'pending'
                                     }`} />
                                     <div style={{ flex: 1, paddingTop: '4px' }}>
                                         <Text
@@ -970,6 +975,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                         >
                                             {step.title}
                                         </Text>
+                                        {step.summary && (
+                                            <Text variant="bodySm" color="subdued" truncate>
+                                                <span className="guardrail-nav-summary" title={step.summary}>{step.summary}</span>
+                                            </Text>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -1047,7 +1057,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                         borderRadius='3'
                                                         borderRadiusStartEnd='1'
                                                     >
-                                                        <Text variant="bodyMd" color="subdued">
+                                                        <Text variant="bodyMd">
                                                             {message.userPrompt}
                                                         </Text>
                                                     </Box>
@@ -1056,7 +1066,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                 <Box paddingBlockStart="1">
                                                     <Text
                                                         variant="bodyMd"
-                                                        color={message.action === 'Blocked' ? 'success' : 'subdued'}
+                                                        color={message.action === 'Blocked' || message.action === 'Error' ? 'critical' : 'success'}
                                                     >
                                                         {message.action}
                                                         {message.reason && ` - ${message.reason}`}

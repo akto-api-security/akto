@@ -73,9 +73,10 @@ public class ApiExecutor {
             HTTPClientHandler.initHttpClientHandler(isSaasDeployment);
         }
 
+        boolean isHttps = request.url().isHttps();
         OkHttpClient client = debug ?
-                HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol) :
-                HTTPClientHandler.instance.getHTTPClient(followRedirects, requestProtocol);
+                HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol, isHttps) :
+                HTTPClientHandler.instance.getHTTPClient(isHttps, followRedirects, requestProtocol);
 
         if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
@@ -697,18 +698,18 @@ public class ApiExecutor {
             }
         } else if (contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
             try {
-                loggerMaker.infoAndAddToDb("encoding to grpc payload:" + payload, LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("encoding to grpc payload:" + payload);
                 payload = ProtoBufUtils.base64EncodedJsonToProtobuf(payload);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Unable to encode grpc payload:" + payload, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Unable to encode grpc payload:" + payload);
                 payload = request.getBody();
             }
             try {// trying decoding payload
                 byte[] payloadByteArray = Base64.getDecoder().decode(payload);
-                loggerMaker.infoAndAddToDb("Final base64 encoded payload:"+ payload, LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Final base64 encoded payload:"+ payload);
                 body = RequestBody.create(payloadByteArray, MediaType.parse(contentType));
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Unable to decode grpc payload:" + payload, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Unable to decode grpc payload:" + payload);
             }
         }else if(contentType.contains(HttpRequestResponseUtils.SOAP) || contentType.contains(HttpRequestResponseUtils.XML)){
             // here we are assuming that the request is in xml format

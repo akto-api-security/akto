@@ -99,7 +99,7 @@ public class Gateway {
         Map<String, Object> guardrailsResponse = guardrailsClient.callValidateRequest(validateRequest);
 
         logger.info("Guardrails response - allowed: {}",
-            guardrailsResponse != null ? guardrailsResponse.get("allowed") : "null");
+            guardrailsResponse != null ? guardrailsResponse.get("Allowed") : "null");
 
         return guardrailsResponse;
     }

@@ -782,8 +782,6 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
     }
 
     public long fetchEndpointsCount(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections, boolean useRbacUserCollections) {
-        long methodStart = System.currentTimeMillis();
-
         long prep1Start = System.currentTimeMillis();
         List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
         nonHostApiCollectionIds.addAll(deactivatedCollections);
@@ -796,96 +794,55 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         long prep1Time = System.currentTimeMillis() - prep1Start;
         System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Prep1 (fetch collections): time=" + prep1Time + "ms, nonHostCount=" + nonHostApiCollectionIds.size() + ", existingCount=" + existingCollectionIds.size());
 
-        // OPTIMIZATION: Fetch RBAC collections once and reuse for all queries
-        List<Integer> rbacCollectionIds = null;
+        Bson userCollectionFilter = Filters.empty();
+        Bson collectionFilter = Filters.in(SingleTypeInfo._API_COLLECTION_ID, existingCollectionIds);
         if (useRbacUserCollections) {
             try {
-                rbacCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-                System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Fetched RBAC collections: " +
-                    (rbacCollectionIds != null ? rbacCollectionIds.size() : "null"));
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
+                        Context.accountId.get());
+                if (collectionIds != null) {
+                    System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] RBAC filter applied: collectionIds size=" + collectionIds.size());
+                    userCollectionFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds);
+                } else {
+                    System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] RBAC filter: collectionIds is null");
+                }
             } catch (Exception e) {
                 System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Exception getting RBAC collectionIds: " + e.getMessage());
             }
         }
 
-        // OPTIMIZATION: Take intersection of RBAC collections with existing collections
-        // This allows us to filter on apiCollectionId only (not the slow array field collectionIds)
-        // We did this because total count of unique api's = count of unique api's from
-        //  non group collections and hence we don't need collectionids filter
-        List<Integer> finalCollectionIds = existingCollectionIds;
-        if (useRbacUserCollections && rbacCollectionIds != null) {
-            // Take intersection: only collections that are in BOTH lists
-            Set<Integer> rbacSet = new HashSet<>(rbacCollectionIds);
-            finalCollectionIds = existingCollectionIds.stream()
-                .filter(rbacSet::contains)
-                .collect(Collectors.toList());
-
-            System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query1 RBAC intersection: rbac=" +
-                rbacCollectionIds.size() + ", existing=" + existingCollectionIds.size() +
-                ", final=" + finalCollectionIds.size());
-        } else {
-            System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query1: using all existing collections (rbac disabled or null)");
-        }
-
-        // Now filter ONLY on apiCollectionId (not the slow collectionIds array field)
-        Bson userCollectionFilter = Filters.empty();
-        Bson collectionFilter = Filters.in(SingleTypeInfo._API_COLLECTION_ID, finalCollectionIds);
-
-        // OPTIMIZED APPROACH: Count all, then subtract excluded (total - excluded)
-        // This is much faster than using $nin with large arrays
-
         // Query 1: Count ALL documents matching host filter + timestamp
         Bson filterAllWithTs = Filters.and(
                 hostFilterQ,
                 Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
-                Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp)
+                Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
+                userCollectionFilter,
+                collectionFilter
         );
 
-        long query1Start = System.currentTimeMillis();
         long totalCount = 0;
-        totalCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterAllWithTs);
-        // if (useRbacUserCollections) {
-        //     totalCount = SingleTypeInfoDao.instance.count(filterAllWithTs);
-        // } else {
-        //     totalCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterAllWithTs);
-        // }
-        long query1Time = System.currentTimeMillis() - query1Start;
-        System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query1 (count all with ts): time=" + query1Time + "ms, result=" + totalCount + ", useRbac=" + useRbacUserCollections);
+        if (useRbacUserCollections) {
+            totalCount = SingleTypeInfoDao.instance.count(filterAllWithTs);
+        } else {
+            totalCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterAllWithTs);
+        }
 
         // Query 2: Count EXCLUDED collections using $in (much faster than $nin)
         long excludedCount = 0;
         if (!nonHostApiCollectionIds.isEmpty()) {
-            // OPTIMIZATION: Take intersection of nonHostApiCollectionIds with RBAC collections (if applicable)
-            // REUSE rbacCollectionIds from above (already fetched)
-            List<Integer> finalNonHostIds = nonHostApiCollectionIds;
-            if (useRbacUserCollections && rbacCollectionIds != null) {
-                Set<Integer> rbacSet = new HashSet<>(rbacCollectionIds);
-                finalNonHostIds = nonHostApiCollectionIds.stream()
-                    .filter(rbacSet::contains)
-                    .collect(Collectors.toList());
-                System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query2 RBAC intersection: nonHost=" +
-                    nonHostApiCollectionIds.size() + ", final=" + finalNonHostIds.size());
-            }
-
             Bson filterExcludedWithTs = Filters.and(
                     hostFilterQ,
                     Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
                     Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
-                    Filters.in(SingleTypeInfo._API_COLLECTION_ID, finalNonHostIds)
-                    // REMOVED: userCollectionFilter (no longer needed, intersection already applied)
+                    Filters.in(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
+                    userCollectionFilter
             );
 
-            long query2Start = System.currentTimeMillis();
-            excludedCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterExcludedWithTs);
-            // if (useRbacUserCollections) {
-            //     excludedCount = SingleTypeInfoDao.instance.count(filterExcludedWithTs);
-            // } else {
-            //     excludedCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterExcludedWithTs);
-            // }
-            long query2Time = System.currentTimeMillis() - query2Start;
-            System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query2 (count excluded): time=" + query2Time + "ms, result=" + excludedCount + ", nonHostCount=" + nonHostApiCollectionIds.size());
-        } else {
-            System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query2 (count excluded): skipped, nonHostApiCollectionIds is empty");
+            if (useRbacUserCollections) {
+                excludedCount = SingleTypeInfoDao.instance.count(filterExcludedWithTs);
+            } else {
+                excludedCount = SingleTypeInfoDao.instance.getMCollection().countDocuments(filterExcludedWithTs);
+            }
         }
 
         long count = totalCount - excludedCount;
@@ -896,10 +853,15 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             List<Bson> pipeline = new ArrayList<>();
 
             pipeline.add(Aggregates.match(Filters.in("apiCollectionId", nonHostApiCollectionIds)));
-            // REUSE rbacCollectionIds from above (already fetched)
-            if (useRbacUserCollections && rbacCollectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, rbacCollectionIds)));
-                System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query3 (aggregation): added RBAC filter with " + rbacCollectionIds.size() + " collections");
+            if (useRbacUserCollections) {
+                try {
+                    List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
+                            Context.accountId.get());
+                    if (collectionIds != null) {
+                        pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                    }
+                } catch (Exception e) {
+                }
             }
 
             BasicDBObject groupedId = 
@@ -912,21 +874,13 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
             pipeline.add(Aggregates.count());
 
-            long query3Start = System.currentTimeMillis();
             MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
             while (endpointsCursor.hasNext()) {
                 count += endpointsCursor.next().getInt(_COUNT);
                 break;
             }
-            long query3Time = System.currentTimeMillis() - query3Start;
-            System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query3 (aggregation non-host): time=" + query3Time + "ms, additionalCount=" + (count - (totalCount - excludedCount)) + ", pipelineStages=" + pipeline.size());
-        } else {
-            System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Query3 (aggregation non-host): skipped, nonHostApiCollectionIds is empty after removing deactivated");
         }
-
-        long totalTime = System.currentTimeMillis() - methodStart;
-        System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Total method time: " + totalTime + "ms, finalCount=" + count + ", startTs=" + startTimestamp + ", endTs=" + endTimestamp);
 
         return count;
     }

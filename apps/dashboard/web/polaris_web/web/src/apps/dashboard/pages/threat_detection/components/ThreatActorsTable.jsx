@@ -384,6 +384,22 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     return baseHeaders;
   };
 
+  const promotedBulkActions = (selectedIps) => {
+    return [
+      {
+        content: `Block ${selectedIps.length} IP${selectedIps.length > 1 ? 's' : ''}`,
+        onAction: async () => {
+          try {
+            await api.bulkModifyThreatActorStatusCloudflare(selectedIps, "blocked");
+            func.setToast(true, false, `Successfully blocked ${selectedIps.length} IP(s)`);
+          } catch (e) {
+            func.setToast(true, true, "Failed to block IPs");
+          }
+        },
+      },
+    ];
+  };
+
   return (
     <GithubServerTable
       onRowClick={(data) => onRowClick(data)}
@@ -396,7 +412,8 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
       loading={loading}
       fetchData={fetchData}
       filters={filters}
-      selectable={false}
+      selectable={true}
+      promotedBulkActions={promotedBulkActions}
       hasRowActions={true}
       getActions={() => { }}
       hideQueryField={true}

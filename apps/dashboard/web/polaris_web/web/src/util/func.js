@@ -2386,6 +2386,14 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   isLimitedAccount(){
     return window?.ACTIVE_ACCOUNT === 1753372418
   },
+
+  isModuleRestrictedOrg(){
+    const restrictedOrgIds = [
+      '11ea8bfd-0997-4bf9-9c4c-76f9640af7a2'
+    ];
+    const orgId = window?.STIGG_CUSTOMER_ID || '';
+    return restrictedOrgIds.includes(orgId);
+  },
   /**
    * Validates if a string is a valid URL with http or https protocol
    * @param {string} url - The URL string to validate
