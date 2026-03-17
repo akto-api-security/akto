@@ -2,7 +2,6 @@ package com.akto.action;
 
 import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
 
-import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.SignupDao;
 import com.akto.dao.SingleTypeInfoDao;
@@ -35,7 +34,6 @@ import com.mongodb.client.model.PushOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
-import com.opensymphony.xwork2.ActionSupport;
 import com.sendgrid.helpers.mail.Mail;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
@@ -65,7 +63,7 @@ import com.akto.util.enums.GlobalEnums;
 // Generates access token jwt using the refresh token
 // Adds the refresh token to http-only cookie
 // Adds the access token to header
-public class LoginAction extends ActionSupport implements ServletResponseAware, ServletRequestAware {
+public class LoginAction implements Action, ServletResponseAware, ServletRequestAware {
 
     private static final LoggerMaker logger = new LoggerMaker(LoginAction.class, LogDb.DASHBOARD);
     
@@ -108,22 +106,6 @@ public class LoginAction extends ActionSupport implements ServletResponseAware, 
         }
 
         User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, username));
-
-        if (user != null && hasSSOSignup(user)) {
-            boolean anyAccountEnforces = false;
-            for (String accountIdStr : user.getAccounts().keySet()) {
-                int accountId = Integer.parseInt(accountIdStr);
-                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(accountId));
-                if (shouldEnforceSsoRestrictions(accountSettings, user)) {
-                    anyAccountEnforces = true;
-                    break;
-                }
-            }
-            if (anyAccountEnforces) {
-                addActionError("This account uses SSO. Please sign in with your organization's SSO.");
-                return Action.ERROR.toUpperCase();
-            }
-        }
 
         if (user != null && user.getSignupInfoMap()!=null && user.getSignupInfoMap().containsKey(Config.ConfigType.PASSWORD + Config.CONFIG_SALT)){
             SignupInfo.PasswordHashInfo signupInfo = (SignupInfo.PasswordHashInfo) user.getSignupInfoMap().get(Config.ConfigType.PASSWORD + Config.CONFIG_SALT);
