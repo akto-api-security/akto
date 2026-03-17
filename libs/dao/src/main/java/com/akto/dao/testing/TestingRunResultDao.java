@@ -82,8 +82,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 TestingRunResult.END_TIMESTAMP,
                 TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
                 TestingRunResult.TEST_RESULTS + "." + GenericTestResult._CONFIDENCE,
-                TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS,
-                TestingRunResult.TEST_RESULTS + "." + TestResult._MESSAGE
+                TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS
         );
     }
 
