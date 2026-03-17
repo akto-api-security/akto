@@ -223,7 +223,7 @@ function EndpointShieldMetadata() {
 
         try {
             const analysisResponse = await settingRequests.getUserAnalysis(agent.agentId, agent.deviceId);
-            setUserAnalysis(analysisResponse.userAnalysisData || null);
+            setUserAnalysis(analysisResponse || null);
         } catch (error) {
             console.error("Error fetching user analysis:", error);
             setUserAnalysis(null);
