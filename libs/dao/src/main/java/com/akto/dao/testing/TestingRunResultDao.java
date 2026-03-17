@@ -82,7 +82,8 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 TestingRunResult.END_TIMESTAMP,
                 TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
                 TestingRunResult.TEST_RESULTS + "." + GenericTestResult._CONFIDENCE,
-                TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS
+                TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS,
+                TestingRunResult.TEST_RESULTS + "." + TestResult._MESSAGE
         );
     }
 
@@ -164,15 +165,32 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 if (testResultsList != null && !testResultsList.isEmpty()) {
                     BasicDBObject genericTestResult = (BasicDBObject)testResultsList.get(0);
                     String confidence = "";
-                    String message;
                     if (genericTestResult.get(GenericTestResult._CONFIDENCE)!=null) {
                         TestResult testResult = new TestResult();
                         confidence = genericTestResult.getString(GenericTestResult._CONFIDENCE);
 
                         try {
                             testResult.setConfidence(Confidence.valueOf(confidence));
-                            message = genericTestResult.getString(TestResult._MESSAGE, null);
-                            testResult.setMessage(message);
+                            String fullMessage = genericTestResult.getString(TestResult._MESSAGE, null);
+                            String lightweightMessage = null;
+                            if (fullMessage != null) {
+                                try {
+                                    Document msgDoc = Document.parse(fullMessage);
+                                    Document response = (Document) msgDoc.get("response");
+                                    if (response != null) {
+                                        Object statusCode = response.get("statusCode");
+                                        String body = response.getString("body");
+                                        String bodyPreview = (body != null && body.length() > 100)
+                                                ? body.substring(0, 100) : body;
+                                        Document lightDoc = new Document("response",
+                                                new Document("statusCode", statusCode).append("body", bodyPreview));
+                                        lightweightMessage = lightDoc.toJson();
+                                    }
+                                } catch (Exception parseException) {
+                                    // Parsing failed; null is fine — frontend handles missing message gracefully
+                                }
+                            }
+                            testResult.setMessage(lightweightMessage);
                         } catch(Exception e){
                         }
                         testResults.add(testResult);
