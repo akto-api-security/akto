@@ -67,6 +67,9 @@ public class Utils {
     ;
     private final static ObjectMapper mapper = new ObjectMapper();
 
+    /** Feature label for org-level SSO-only login; when granted, only SSO signup/sign-in is allowed. */
+    public static final String SSO_ONLY_LOGIN = "SSO_ONLY_LOGIN";
+
     /** Returns true if user has at least one SSO signup (OKTA, AZURE, GOOGLE_SAML). */
     public static boolean hasSSOSignup(User user) {
         if (user == null || user.getSignupInfoMap() == null || user.getSignupInfoMap().isEmpty()) {
@@ -84,9 +87,6 @@ public class Utils {
     public static boolean shouldEnforceSsoRestrictions(AccountSettings accountSettings, User user) {
         return accountSettings != null && accountSettings.isEnforceSsoOnlyRestrictions() && hasSSOSignup(user);
     }
-
-    /** Feature label for org-level SSO-only login; when granted, only SSO signup/sign-in is allowed. */
-    public static final String SSO_ONLY_LOGIN = "SSO_ONLY_LOGIN";
 
     /**
      * When SSO_ONLY_LOGIN is enabled: allow only if user has SSO, else block.
