@@ -31,11 +31,11 @@ const MetadataField = ({ icon, tooltip, value }) => {
     if (!value || value === DEFAULT_VALUE) return null;
     return (
         <HorizontalStack wrap={false} gap="1">
-            <div style={ICON_SIZE}>
+            <Box maxWidth={ICON_SIZE.maxWidth} minHeight={ICON_SIZE.maxHeight}>
                 <Tooltip content={tooltip} dismissOnMouseOut>
                     <Icon source={icon} color="subdued" />
                 </Tooltip>
-            </div>
+            </Box>
             <Text variant="bodySm" color="subdued">{value}</Text>
         </HorizontalStack>
     );

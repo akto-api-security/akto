@@ -10,7 +10,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class AgenticUsers {
-    private String id; // same as uniqueUserId in user_analysis_data
+    private String id; // same as username
     private String userName;
     private String userEmail;
     private String userRole;

@@ -120,7 +120,6 @@ function EndpointShieldMetadata() {
             }));
             setEndpointShieldData({ agents });
         } catch (error) {
-            console.error("Error fetching module info:", error);
         }
     }, []);
 

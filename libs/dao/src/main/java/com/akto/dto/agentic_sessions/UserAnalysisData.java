@@ -14,7 +14,10 @@ import java.util.Map;
 @Setter
 public class UserAnalysisData {
 
+    public static final String ID_SERVICE_ID = "_id.serviceId";
+    public static final String ID_DEVICE_ID = "_id.deviceId";
     public static final String SERVICE_ID = "serviceId";
+    public static final String DEVICE_ID = "deviceId";
 
     public static class UserAnalysisDataKey {
         private String serviceId;
@@ -37,6 +40,10 @@ public class UserAnalysisData {
 
         public void setServiceId(String serviceId) {
             this.serviceId = serviceId;
+        }
+
+        public void setDeviceId(String deviceId) {
+            this.deviceId = deviceId;
         }
     }
 

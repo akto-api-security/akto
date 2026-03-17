@@ -11,6 +11,9 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dto.Log;
 import com.mongodb.client.model.Filters;
+
+import lombok.Getter;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +28,8 @@ public class EndpointShieldAgentAction extends UserAction {
     private List<Log> agentLogs;
     private int startTime;
     private int endTime;
+
+    @Getter
     private UserAnalysisData userAnalysis;
 
 
@@ -228,7 +233,7 @@ public class EndpointShieldAgentAction extends UserAction {
         this.endTime = endTime;
     }
 
-    public String getUserAnalysis() {
+    public String fetchUserAnalysis() {
         if (agentId == null || agentId.trim().isEmpty()) {
             addActionError("Agent ID is required");
             return ERROR.toUpperCase();
@@ -240,19 +245,11 @@ public class EndpointShieldAgentAction extends UserAction {
 
         userAnalysis = UserAnalysisDataDao.instance.findOne(
             Filters.and(
-                Filters.eq("_id.serviceId", agentId),
-                Filters.eq("_id.deviceId", deviceId)
+                Filters.eq(UserAnalysisData.ID_SERVICE_ID, agentId),
+                Filters.eq(UserAnalysisData.ID_DEVICE_ID, deviceId)
             )
         );
 
         return SUCCESS.toUpperCase();
-    }
-
-    public UserAnalysisData getUserAnalysisData() {
-        return userAnalysis;
-    }
-
-    public void setUserAnalysisData(UserAnalysisData userAnalysis) {
-        this.userAnalysis = userAnalysis;
     }
 }

@@ -565,7 +565,7 @@
             </result>
         </action>
 
-        <action name="api/getUserAnalysis" class="com.akto.action.monitoring.EndpointShieldAgentAction" method="getUserAnalysis">
+        <action name="api/getUserAnalysis" class="com.akto.action.monitoring.EndpointShieldAgentAction" method="fetchUserAnalysis">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -579,7 +579,9 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
 
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="root">userAnalysis</param>
+            </result>
 
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

@@ -27,9 +27,5 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
         // moduleType + lastHeartbeatReceived — used in heartbeat threshold queries
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[]{ ModuleInfo.MODULE_TYPE, ModuleInfo.LAST_HEARTBEAT_RECEIVED }, false);
-
-        // moduleType + name — used when looking up by deviceId (name field)
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-            new String[]{ ModuleInfo.MODULE_TYPE, ModuleInfo.NAME }, false);
     }
 }
