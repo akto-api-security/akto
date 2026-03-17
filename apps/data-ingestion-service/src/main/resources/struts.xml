@@ -39,6 +39,13 @@
             </result>
         </action>
 
+        <action name="api/auth-check" class="com.akto.action.IngestionAction" method="authCheck">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^success</param>
+            </result>
+        </action>
+
         <action name="api/http-proxy" class="com.akto.action.HttpProxyAction" method="httpProxy">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
