@@ -163,17 +163,34 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 List<String> errors = new ArrayList<>();
                 List<GenericTestResult> testResults = new ArrayList<>();
                 if (testResultsList != null && !testResultsList.isEmpty()) {
-                    BasicDBObject genericTestResult = (BasicDBObject)testResultsList.get(0);
+                    BasicDBObject genericTestResult = (BasicDBObject)testResultsList.get(testResultsList.size()-1);
                     String confidence = "";
-                    String message;
                     if (genericTestResult.get(GenericTestResult._CONFIDENCE)!=null) {
                         TestResult testResult = new TestResult();
                         confidence = genericTestResult.getString(GenericTestResult._CONFIDENCE);
 
                         try {
                             testResult.setConfidence(Confidence.valueOf(confidence));
-                            message = genericTestResult.getString(TestResult._MESSAGE, null);
-                            testResult.setMessage(message);
+                            String fullMessage = genericTestResult.getString(TestResult._MESSAGE, null);
+                            String lightweightMessage = null;
+                            if (fullMessage != null) {
+                                try {
+                                    Document msgDoc = Document.parse(fullMessage);
+                                    Document response = (Document) msgDoc.get("response");
+                                    if (response != null) {
+                                        Object statusCode = response.get("statusCode");
+                                        String body = response.getString("body");
+                                        String bodyPreview = (body != null && body.length() > 50)
+                                                ? body.substring(0, 50) : body;
+                                        Document lightDoc = new Document("response",
+                                                new Document("statusCode", statusCode).append("body", bodyPreview));
+                                        lightweightMessage = lightDoc.toJson();
+                                    }
+                                } catch (Exception parseException) {
+                                    // Parsing failed; null is fine — frontend handles missing message gracefully
+                                }
+                            }
+                            testResult.setMessage(lightweightMessage);
                         } catch(Exception e){
                         }
                         testResults.add(testResult);
