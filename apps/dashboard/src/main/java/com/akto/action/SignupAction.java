@@ -88,7 +88,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     private static final LoggerMaker logger = new LoggerMaker(SignupAction.class, LogDb.DASHBOARD);
     public static final String CHECK_INBOX_URI = "/check-inbox";
     public static final String BUSINESS_EMAIL_URI = "/business-email";
-    public static final String SSO_ONLY_LOGIN_URI = "/sso-only-login";
     public static final String TEST_EDITOR_URL = "/tools/test-editor";
     public static final String SSO_URL = "/sso-login";
     public static final String ACCESS_DENIED_ERROR = "access_denied";
@@ -1280,7 +1279,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo, invitationToAccount);
             logger.info("[createUserAndRedirect] Signup record created, logging in user");
             if (Utils.isLoginAllowedUnderSsoOnly(invitationToAccount, signupUserInfo.getUser(), signupInfo)) {
-                servletResponse.sendRedirect(SSO_ONLY_LOGIN_URI);
+                servletResponse.sendRedirect(SSO_URL);
                 return;
             }
             LoginAction.loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
@@ -1430,7 +1429,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 }
 
                 if (Utils.isLoginAllowedUnderSsoOnly(accountId, user, signupInfo)) {
-                    servletResponse.sendRedirect(SSO_ONLY_LOGIN_URI);
+                    servletResponse.sendRedirect(SSO_URL);
                     return;
                 }
                 logger.info("[createUserAndRedirect] Logging in existing user and redirecting to /dashboard/observe/inventory");
@@ -1451,7 +1450,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[createUserAndRedirect] Account initialized successfully for accountId: " + accountId);
 
             if (Utils.isLoginAllowedUnderSsoOnly(accountId, user, signupInfo)) {
-                servletResponse.sendRedirect(SSO_ONLY_LOGIN_URI);
+                servletResponse.sendRedirect(SSO_URL);
                 return;
             }
             servletRequest.getSession().setAttribute("user", user);
