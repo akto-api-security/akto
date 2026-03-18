@@ -373,11 +373,15 @@ const settingRequests = {
         })
     },
 
-    saveOktaGroupRoleMapping(groupRoleMapping, oktaRoleMapping) {
+    saveOktaGroupRoleMapping(mappingType, mapping) {
         return request({
             url: '/api/saveOktaGroupRoleMapping',
             method: 'post',
-            data: { groupRoleMapping, oktaRoleMapping }
+            data: {
+                mappingType,
+                groupRoleMapping: mappingType === 'GROUP' ? mapping : null,
+                oktaRoleMapping: mappingType === 'ROLE' ? mapping : null
+            }
         })
     },
 

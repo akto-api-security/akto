@@ -377,6 +377,9 @@ public abstract class Config {
 
     @BsonDiscriminator
     public static class OktaConfig extends Config {
+
+        public enum MappingType { GROUP, ROLE }
+
         private String clientId;
         private String clientSecret;
         private String oktaDomainUrl;
@@ -387,9 +390,8 @@ public abstract class Config {
         public static final String ACCOUNT_ID = "accountId";
         private int accountId;
         private String apiToken;
-        // Maps Okta group name → Akto role (ADMIN, MEMBER, DEVELOPER, GUEST)
+        private MappingType mappingType;
         private Map<String, String> groupRoleMapping;
-        // Maps Okta role type → Akto role (e.g. "SUPER_ADMIN" → "ADMIN")
         private Map<String, String> oktaRoleMapping;
 
         public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
@@ -435,6 +437,15 @@ public abstract class Config {
             this.authorisationServerId = authorisationServerId;
         }
 
+        public String getOAuthDomainUrl() {
+            String base = "https://" + oktaDomainUrl + "/oauth2/";
+            return base + (authorisationServerId == null || authorisationServerId.isEmpty() ? "/v1" : authorisationServerId + "/v1");
+        }
+
+        public String getManagementBaseUrl() {
+            return "https://" + oktaDomainUrl;
+        }
+
         public String getRedirectUri() {
             return redirectUri;
         }
@@ -462,6 +473,13 @@ public abstract class Config {
         }
         public void setApiToken(String apiToken) {
             this.apiToken = apiToken;
+        }
+
+        public MappingType getMappingType() {
+            return mappingType;
+        }
+        public void setMappingType(MappingType mappingType) {
+            this.mappingType = mappingType;
         }
 
         public Map<String, String> getGroupRoleMapping() {

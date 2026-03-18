@@ -141,6 +141,7 @@ function OktaIntegration() {
                     setOktaRoleMapping(roleMap)
                     setSavedGroupMapping(grpMap)
                     setSavedRoleMapping(roleMap)
+                    if (Object.keys(roleMap).length > 0) setSelectedTab(1)
                     setComponentType(2)
                 }
             })
@@ -185,9 +186,19 @@ function OktaIntegration() {
     }
 
     const handleSaveMapping = async() => {
-        await settingRequests.saveOktaGroupRoleMapping(groupRoleMapping, oktaRoleMapping)
-        setSavedGroupMapping({ ...groupRoleMapping })
-        setSavedRoleMapping({ ...oktaRoleMapping })
+        const isGroupBased = selectedTab === 0
+        const mappingType = isGroupBased ? 'GROUP' : 'ROLE'
+        const activeMapping = isGroupBased ? groupRoleMapping : oktaRoleMapping
+        await settingRequests.saveOktaGroupRoleMapping(mappingType, activeMapping)
+        if (isGroupBased) {
+            setSavedGroupMapping({ ...groupRoleMapping })
+            setSavedRoleMapping({})
+            setOktaRoleMapping({})
+        } else {
+            setSavedRoleMapping({ ...oktaRoleMapping })
+            setSavedGroupMapping({})
+            setGroupRoleMapping({})
+        }
         setEditMode(false)
         func.setToast(true, false, "Role mappings saved successfully!")
     }

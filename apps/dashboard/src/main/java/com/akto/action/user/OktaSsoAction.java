@@ -32,6 +32,7 @@ public class OktaSsoAction extends UserAction {
     private Map<String, String> groupRoleMapping;
     private Map<String, String> oktaRoleMapping;
     private List<String> oktaGroups;
+    private String mappingType;
 
     public String addOktaSso() {
         if (SsoUtils.isAnySsoActive()) {
@@ -79,10 +80,16 @@ public class OktaSsoAction extends UserAction {
             addActionError("Okta SSO is not configured.");
             return ERROR.toUpperCase();
         }
-        String validationError = validateRoleMappingValues(groupRoleMapping);
-        if (validationError == null) {
-            validationError = validateRoleMappingValues(oktaRoleMapping);
+        OktaConfig.MappingType type;
+        try {
+            type = OktaConfig.MappingType.valueOf(mappingType);
+        } catch (IllegalArgumentException e) {
+            addActionError("Invalid mappingType: " + mappingType + ". Valid values are GROUP, ROLE.");
+            return ERROR.toUpperCase();
         }
+        boolean isGroupBased = type == OktaConfig.MappingType.GROUP;
+        Map<String, String> activeMapping = isGroupBased ? groupRoleMapping : oktaRoleMapping;
+        String validationError = validateRoleMappingValues(activeMapping);
         if (validationError != null) {
             addActionError(validationError);
             return ERROR.toUpperCase();
@@ -90,8 +97,9 @@ public class OktaSsoAction extends UserAction {
         ConfigsDao.instance.updateOne(
             Filters.eq(Constants.ID, OktaConfig.getOktaId(accountId)),
             Updates.combine(
-                Updates.set("groupRoleMapping", groupRoleMapping),
-                Updates.set("oktaRoleMapping", oktaRoleMapping)
+                Updates.set("mappingType", type.name()),
+                Updates.set("groupRoleMapping", isGroupBased ? activeMapping : null),
+                Updates.set("oktaRoleMapping", isGroupBased ? null : activeMapping)
             )
         );
         return SUCCESS.toUpperCase();
@@ -212,6 +220,13 @@ public class OktaSsoAction extends UserAction {
 
     public List<String> getOktaGroups() {
         return oktaGroups;
+    }
+
+    public String getMappingType() {
+        return mappingType;
+    }
+    public void setMappingType(String mappingType) {
+        this.mappingType = mappingType;
     }
 
 }
