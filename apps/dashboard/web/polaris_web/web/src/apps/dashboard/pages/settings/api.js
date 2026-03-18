@@ -357,11 +357,19 @@ const settingRequests = {
         })
     },
 
-    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
+    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri, managementApiToken) {
         return request({
             url: '/api/addOktaSso',
             method: 'post',
-            data: {clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri}
+            data: {clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri, managementApiToken}
+        })
+    },
+
+    saveOktaManagementApiToken(managementApiToken) {
+        return request({
+            url: '/api/saveOktaManagementApiToken',
+            method: 'post',
+            data: {managementApiToken}
         })
     },
 
@@ -373,23 +381,11 @@ const settingRequests = {
         })
     },
 
-    saveOktaGroupRoleMapping(mappingType, mapping) {
+    saveOktaGroupRoleMapping(groupRoleMapping) {
         return request({
             url: '/api/saveOktaGroupRoleMapping',
             method: 'post',
-            data: {
-                mappingType,
-                groupRoleMapping: mappingType === 'GROUP' ? mapping : null,
-                oktaRoleMapping: mappingType === 'ROLE' ? mapping : null
-            }
-        })
-    },
-
-    fetchOktaGroups() {
-        return request({
-            url: '/api/fetchOktaGroups',
-            method: 'post',
-            data: {}
+            data: { groupRoleMapping }
         })
     },
 

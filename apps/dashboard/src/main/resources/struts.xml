@@ -835,12 +835,16 @@
             </result>
         </action>
 
-        <action name="api/fetchOktaGroups" class="com.akto.action.user.OktaSsoAction" method="fetchOktaGroups">
+        <action name="api/saveOktaManagementApiToken" class="com.akto.action.user.OktaSsoAction" method="saveOktaManagementApiToken">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AKTO_SSO</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User saved Okta Management API token</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -851,6 +855,11 @@
             <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>

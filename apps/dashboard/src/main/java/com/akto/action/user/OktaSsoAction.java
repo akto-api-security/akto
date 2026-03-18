@@ -1,7 +1,7 @@
 package com.akto.action.user;
 
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
 import java.util.Map;
 
 import org.bson.conversions.Bson;
@@ -15,7 +15,6 @@ import com.akto.dto.Config.OktaConfig;
 import com.akto.dto.RBAC;
 import com.akto.dto.User;
 import com.akto.util.Constants;
-import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.sso.SsoUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -23,16 +22,16 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 
 public class OktaSsoAction extends UserAction {
-    
+
     private String clientId;
     private String clientSecret;
     private String authorisationServerId;
     private String oktaDomain;
     private String redirectUri;
+    /** Optional: Okta API token (SSWS) to read user group membership when groups are not in the access token. */
+    private String managementApiToken;
+    private boolean oktaApiTokenConfigured;
     private Map<String, String> groupRoleMapping;
-    private Map<String, String> oktaRoleMapping;
-    private List<String> oktaGroups;
-    private String mappingType;
 
     public String addOktaSso() {
         if (SsoUtils.isAnySsoActive()) {
@@ -49,11 +48,32 @@ public class OktaSsoAction extends UserAction {
         oktaConfig.setOktaDomainUrl(oktaDomain);
         oktaConfig.setRedirectUri(redirectUri);
         oktaConfig.setAccountId(Context.accountId.get());
+        if (managementApiToken != null && !managementApiToken.trim().isEmpty()) {
+            oktaConfig.setApiToken(managementApiToken.trim());
+        }
         String userLogin = getSUser().getLogin();
         String domain = userLogin.split("@")[1];
         oktaConfig.setOrganizationDomain(domain);
         ConfigsDao.instance.insertOne(oktaConfig);
 
+        return SUCCESS.toUpperCase();
+    }
+
+    public String saveOktaManagementApiToken() {
+        int accountId = Context.accountId.get();
+        OktaConfig oktaConfig = (OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(accountId));
+        if (oktaConfig == null) {
+            addActionError("Okta SSO is not configured.");
+            return ERROR.toUpperCase();
+        }
+        if (managementApiToken == null || managementApiToken.trim().isEmpty()) {
+            addActionError("API token is required. Create in Okta: Security → API → Tokens.");
+            return ERROR.toUpperCase();
+        }
+        ConfigsDao.instance.updateOne(
+                Filters.eq(Constants.ID, OktaConfig.getOktaId(accountId)),
+                Updates.set("apiToken", managementApiToken.trim()));
+        oktaApiTokenConfigured = true;
         return SUCCESS.toUpperCase();
     }
 
@@ -80,15 +100,7 @@ public class OktaSsoAction extends UserAction {
             addActionError("Okta SSO is not configured.");
             return ERROR.toUpperCase();
         }
-        OktaConfig.MappingType type;
-        try {
-            type = OktaConfig.MappingType.valueOf(mappingType);
-        } catch (IllegalArgumentException e) {
-            addActionError("Invalid mappingType: " + mappingType + ". Valid values are GROUP, ROLE.");
-            return ERROR.toUpperCase();
-        }
-        boolean isGroupBased = type == OktaConfig.MappingType.GROUP;
-        Map<String, String> activeMapping = isGroupBased ? groupRoleMapping : oktaRoleMapping;
+        Map<String, String> activeMapping = groupRoleMapping != null ? groupRoleMapping : Collections.<String, String>emptyMap();
         String validationError = validateRoleMappingValues(activeMapping);
         if (validationError != null) {
             addActionError(validationError);
@@ -97,9 +109,9 @@ public class OktaSsoAction extends UserAction {
         ConfigsDao.instance.updateOne(
             Filters.eq(Constants.ID, OktaConfig.getOktaId(accountId)),
             Updates.combine(
-                Updates.set("mappingType", type.name()),
-                Updates.set("groupRoleMapping", isGroupBased ? activeMapping : null),
-                Updates.set("oktaRoleMapping", isGroupBased ? null : activeMapping)
+                Updates.set("mappingType", OktaConfig.MappingType.GROUP.name()),
+                Updates.set("groupRoleMapping", activeMapping),
+                Updates.set("oktaRoleMapping", null)
             )
         );
         return SUCCESS.toUpperCase();
@@ -115,38 +127,6 @@ public class OktaSsoAction extends UserAction {
             }
         }
         return null;
-    }
-
-    @SuppressWarnings("unchecked")
-    public String fetchOktaGroups() {
-        int accountId = Context.accountId.get();
-        OktaConfig oktaConfig = (OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(accountId));
-        if (oktaConfig == null) {
-            addActionError("Okta SSO is not configured.");
-            return ERROR.toUpperCase();
-        }
-        if (oktaConfig.getApiToken() == null || oktaConfig.getApiToken().isEmpty()) {
-            addActionError("Okta API token is not configured. Set apiToken in the Okta config to fetch groups.");
-            return ERROR.toUpperCase();
-        }
-        try {
-            String url = "https://" + oktaConfig.getOktaDomainUrl() + "/api/v1/groups";
-            String auth = "SSWS " + oktaConfig.getApiToken();
-            List<Map<String, Object>> groupsList = CustomHttpRequest.getRequestAsList(url, auth);
-            this.oktaGroups = new ArrayList<>();
-            if (groupsList != null) {
-                for (Map<String, Object> group : groupsList) {
-                    Map<String, Object> profile = (Map<String, Object>) group.get("profile");
-                    if (profile != null && profile.get("name") != null) {
-                        this.oktaGroups.add(String.valueOf(profile.get("name")));
-                    }
-                }
-            }
-        } catch (Exception e) {
-            addActionError("Failed to fetch groups from Okta: " + e.getMessage());
-            return ERROR.toUpperCase();
-        }
-        return SUCCESS.toUpperCase();
     }
 
     @Override
@@ -165,7 +145,8 @@ public class OktaSsoAction extends UserAction {
             this.authorisationServerId = oktaConfig.getAuthorisationServerId();
             this.redirectUri = oktaConfig.getRedirectUri();
             this.groupRoleMapping = oktaConfig.getGroupRoleMapping();
-            this.oktaRoleMapping = oktaConfig.getOktaRoleMapping();
+            String tok = oktaConfig.getApiToken();
+            this.oktaApiTokenConfigured = tok != null && !tok.isEmpty();
         }
 
         return SUCCESS.toUpperCase();
@@ -174,11 +155,11 @@ public class OktaSsoAction extends UserAction {
     public String getOktaDomain() {
         return oktaDomain;
     }
-    
+
     public void setOktaDomain(String oktaDomain) {
         this.oktaDomain = oktaDomain;
     }
-    
+
     public String getAuthorisationServerId() {
         return authorisationServerId;
     }
@@ -211,22 +192,12 @@ public class OktaSsoAction extends UserAction {
         this.groupRoleMapping = groupRoleMapping;
     }
 
-    public Map<String, String> getOktaRoleMapping() {
-        return oktaRoleMapping;
-    }
-    public void setOktaRoleMapping(Map<String, String> oktaRoleMapping) {
-        this.oktaRoleMapping = oktaRoleMapping;
+    public void setManagementApiToken(String managementApiToken) {
+        this.managementApiToken = managementApiToken;
     }
 
-    public List<String> getOktaGroups() {
-        return oktaGroups;
-    }
-
-    public String getMappingType() {
-        return mappingType;
-    }
-    public void setMappingType(String mappingType) {
-        this.mappingType = mappingType;
+    public boolean isOktaApiTokenConfigured() {
+        return oktaApiTokenConfigured;
     }
 
 }
