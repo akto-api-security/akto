@@ -2,8 +2,10 @@ package com.akto.dto;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import lombok.Getter;
@@ -384,6 +386,11 @@ public abstract class Config {
         private String organizationDomain;
         public static final String ACCOUNT_ID = "accountId";
         private int accountId;
+        private String apiToken;
+        // Maps Okta group name → Akto role (ADMIN, MEMBER, DEVELOPER, GUEST)
+        private Map<String, String> groupRoleMapping;
+        // Maps Okta role type → Akto role (e.g. "SUPER_ADMIN" → "ADMIN")
+        private Map<String, String> oktaRoleMapping;
 
         public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
 
@@ -448,6 +455,27 @@ public abstract class Config {
         }
         public void setAccountId(int accountId) {
             this.accountId = accountId;
+        }
+
+        public String getApiToken() {
+            return apiToken;
+        }
+        public void setApiToken(String apiToken) {
+            this.apiToken = apiToken;
+        }
+
+        public Map<String, String> getGroupRoleMapping() {
+            return groupRoleMapping;
+        }
+        public void setGroupRoleMapping(Map<String, String> groupRoleMapping) {
+            this.groupRoleMapping = groupRoleMapping;
+        }
+
+        public Map<String, String> getOktaRoleMapping() {
+            return oktaRoleMapping;
+        }
+        public void setOktaRoleMapping(Map<String, String> oktaRoleMapping) {
+            this.oktaRoleMapping = oktaRoleMapping;
         }
     }
 

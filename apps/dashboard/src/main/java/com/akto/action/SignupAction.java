@@ -655,16 +655,38 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("========== [registerViaOkta] API CALL 1: TOKEN ENDPOINT ==========");
             logger.infoAndAddToDb("Making POST request to: " + domainUrl + "/token");
             Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl +"/token",params);
-            logger.infoAndAddToDb("Token response received, checking for access_token");
+            logger.infoAndAddToDb("Token response received. Keys: " + tokenData.keySet() +
+                " | token_type: " + tokenData.get("token_type") +
+                " | scope: " + tokenData.get("scope") +
+                " | expires_in: " + tokenData.get("expires_in") +
+                " | access_token present: " + (tokenData.get("access_token") != null) +
+                " | id_token present: " + (tokenData.get("id_token") != null) +
+                " | error: " + tokenData.get("error") +
+                " | error_description: " + tokenData.get("error_description"));
             String accessToken = tokenData.get("access_token").toString();
-            logger.info("Access token retrieved: " + (accessToken != null && !accessToken.isEmpty() ? "present (length: " + accessToken.length() + ")" : "null/empty"));
+            logger.infoAndAddToDb("Access token retrieved, length: " + accessToken.length());
             logger.infoAndAddToDb("========== [registerViaOkta] API CALL 2: USERINFO ENDPOINT ==========");
             logger.infoAndAddToDb("Making GET request to: " + domainUrl + "/userinfo");
             Map<String,Object> userInfo = CustomHttpRequest.getRequest( domainUrl + "/userinfo","Bearer " + accessToken);
-            logger.infoAndAddToDb("UserInfo response received");
+            logger.infoAndAddToDb("UserInfo response received. Full userInfo map keys: " + userInfo.keySet());
+            logger.infoAndAddToDb("[OktaUserInfo] sub: " + userInfo.get("sub"));
+            logger.infoAndAddToDb("[OktaUserInfo] email: " + userInfo.get("email"));
+            logger.infoAndAddToDb("[OktaUserInfo] email_verified: " + userInfo.get("email_verified"));
+            logger.infoAndAddToDb("[OktaUserInfo] name: " + userInfo.get("name"));
+            logger.infoAndAddToDb("[OktaUserInfo] given_name: " + userInfo.get("given_name"));
+            logger.infoAndAddToDb("[OktaUserInfo] family_name: " + userInfo.get("family_name"));
+            logger.infoAndAddToDb("[OktaUserInfo] preferred_username: " + userInfo.get("preferred_username"));
+            logger.infoAndAddToDb("[OktaUserInfo] groups: " + userInfo.get("groups"));
+            logger.infoAndAddToDb("[OktaUserInfo] roles: " + userInfo.get("roles"));
+            logger.infoAndAddToDb("[OktaUserInfo] zoneinfo: " + userInfo.get("zoneinfo"));
+            logger.infoAndAddToDb("[OktaUserInfo] locale: " + userInfo.get("locale"));
+            logger.infoAndAddToDb("[OktaUserInfo] updated_at: " + userInfo.get("updated_at"));
+            logger.infoAndAddToDb("[OktaUserInfo] ALL FIELDS DUMP: " + userInfo);
             String email = userInfo.get("email").toString();
             String username = userInfo.get("preferred_username").toString();
             logger.infoAndAddToDb("Extracted user info - email: " + email + ", preferred_username: " + username);
+
+            String oktaUserId = userInfo.get("sub") != null ? userInfo.get("sub").toString() : null;
 
             if (oktaConfig.getOrganizationDomain() != null && !oktaConfig.getOrganizationDomain().isEmpty()) {
                 logger.info("Organization domain validation required: " + oktaConfig.getOrganizationDomain());
@@ -712,8 +734,19 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             SignupInfo.OktaSignupInfo oktaSignupInfo= new SignupInfo.OktaSignupInfo(accessToken, username);
             shouldLogin = "true";
             logger.info("Setting shouldLogin to true");
-            logger.info("Calling createUserAndRedirectWithDefaultRole for email: " + email + ", accountId: " + accountId);
-            createUserAndRedirectWithDefaultRole(email, username, oktaSignupInfo, accountId, Config.ConfigType.OKTA.toString());
+
+            User existingUser = UsersDao.instance.findOne(eq("login", email));
+            boolean isNewUser = existingUser == null;
+            logger.infoAndAddToDb("[OktaRoleMapping] User existence check for email " + email + ": " + (isNewUser ? "NEW USER" : "EXISTING USER"));
+
+            String resolvedRole = fetchOktaRole(oktaConfig, oktaUserId);
+            logger.infoAndAddToDb("[OktaRoleMapping] Role resolved from Okta groups: " + resolvedRole);
+
+            if (!isNewUser) {
+                updateExistingUserRole(existingUser, accountId, resolvedRole);
+            }
+
+            createUserAndRedirect(email, username, oktaSignupInfo, accountId, Config.ConfigType.OKTA.toString(), resolvedRole);
             code = "";
             logger.info("registerViaOkta completed successfully");
         } catch (Exception e) {
@@ -739,6 +772,174 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.error("Error while setting default role to " + fallbackDefault);
         }
         return fallbackDefault;
+    }
+
+    /**
+     * Updates the RBAC role of an existing user for the given account if it differs from the resolved role.
+     */
+    private void updateExistingUserRole(User user, int accountId, String resolvedRole) {
+        try {
+            RBAC existingRbac = RBACDao.instance.findOne(
+                Filters.and(
+                    Filters.eq(RBAC.USER_ID, user.getId()),
+                    Filters.eq(RBAC.ACCOUNT_ID, accountId)
+                )
+            );
+            if (existingRbac == null || resolvedRole.equals(existingRbac.getRole())) return;
+            RBACDao.instance.updateOne(
+                Filters.and(
+                    Filters.eq(RBAC.USER_ID, user.getId()),
+                    Filters.eq(RBAC.ACCOUNT_ID, accountId)
+                ),
+                Updates.set(RBAC.ROLE, resolvedRole)
+            );
+            logger.infoAndAddToDb("[OktaRoleMapping] Updated existing user role from " + existingRbac.getRole() + " to " + resolvedRole);
+        } catch (Exception e) {
+            logger.errorAndAddToDb("[OktaRoleMapping] Failed to update existing user role: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
+    /**
+     * Fetches the user's Okta groups via the Management API and maps them to an Akto RBAC role.
+     * Defaults to MEMBER (Security Engineer) if no recognised group is found or API token is not configured.
+     *
+     * Priority: custom mapping > akto_* convention > MEMBER (default)
+     */
+    private String fetchOktaRole(Config.OktaConfig oktaConfig, String oktaUserId) {
+        if (oktaConfig.getApiToken() == null || oktaConfig.getApiToken().isEmpty() || oktaUserId == null) {
+            logger.infoAndAddToDb("[OktaRoleMapping] apiToken not configured or sub missing - defaulting to MEMBER");
+            return RBAC.Role.MEMBER.name();
+        }
+        String managementBase = "https://" + oktaConfig.getOktaDomainUrl();
+        String ssws = "SSWS " + oktaConfig.getApiToken();
+        try {
+            logger.infoAndAddToDb("========== [OktaRoleMapping] Fetching groups for new user: " + oktaUserId + " ==========");
+            List<Map<String, Object>> groupsList = CustomHttpRequest.getRequestAsList(
+                managementBase + "/api/v1/users/" + oktaUserId + "/groups", ssws);
+            logger.infoAndAddToDb("[OktaRoleMapping] Total groups fetched: " + (groupsList != null ? groupsList.size() : 0));
+            if (groupsList != null) {
+                for (Map<String, Object> group : groupsList) {
+                    Map<String, Object> profile = (Map<String, Object>) group.get("profile");
+                    String groupName = profile != null ? String.valueOf(profile.get("name")) : "unknown";
+                    logger.infoAndAddToDb("[OktaRoleMapping] Group found: " + groupName);
+                }
+            }
+            Map<String, String> customGroupMapping = oktaConfig.getGroupRoleMapping();
+            if (customGroupMapping != null && !customGroupMapping.isEmpty()) {
+                String customRole = resolveRoleFromCustomMapping(groupsList, customGroupMapping);
+                if (customRole != null) {
+                    logger.infoAndAddToDb("[OktaRoleMapping] Role resolved from custom group mapping: " + customRole);
+                    return customRole;
+                }
+                logger.infoAndAddToDb("[OktaRoleMapping] No custom group mapping match found");
+            }
+            Map<String, String> customRoleMapping = oktaConfig.getOktaRoleMapping();
+            if (customRoleMapping != null && !customRoleMapping.isEmpty()) {
+                String roleFromOktaRoles = resolveRoleFromOktaRoles(managementBase, ssws, oktaUserId, customRoleMapping);
+                if (roleFromOktaRoles != null) {
+                    logger.infoAndAddToDb("[OktaRoleMapping] Role resolved from custom Okta role mapping: " + roleFromOktaRoles);
+                    return roleFromOktaRoles;
+                }
+                logger.infoAndAddToDb("[OktaRoleMapping] No custom Okta role mapping match found");
+            }
+            return mapOktaGroupsToAktoRole(groupsList);
+        } catch (Exception e) {
+            logger.errorAndAddToDb("[OktaRoleMapping] Failed to fetch groups: " + e.getMessage(), LogDb.DASHBOARD);
+            return RBAC.Role.MEMBER.name();
+        }
+    }
+
+    /**
+     * Checks each Okta group the user belongs to against the admin-configured mapping.
+     * Returns the highest-priority matched Akto role, or null if nothing matches.
+     */
+    private String resolveRoleFromCustomMapping(List<Map<String, Object>> groupsList, Map<String, String> customMapping) {
+        if (groupsList == null || groupsList.isEmpty()) return null;
+        int bestPriority = Integer.MAX_VALUE;
+        String bestRole = null;
+        for (Map<String, Object> group : groupsList) {
+            Map<String, Object> profile = (Map<String, Object>) group.get("profile");
+            if (profile == null) continue;
+            String groupName = String.valueOf(profile.get("name"));
+            String mappedRole = customMapping.get(groupName);
+            if (mappedRole == null) continue;
+            int priority = getAktoRolePriority(mappedRole);
+            if (priority < bestPriority) {
+                bestPriority = priority;
+                bestRole = mappedRole;
+            }
+        }
+        return bestRole;
+    }
+
+    /**
+     * Fetches the user's Okta admin roles and resolves an Akto role using the custom role mapping.
+     * Returns the highest-priority matched Akto role, or null if nothing matches.
+     */
+    private String resolveRoleFromOktaRoles(String managementBase, String ssws, String oktaUserId, Map<String, String> customRoleMapping) {
+        try {
+            List<Map<String, Object>> rolesList = CustomHttpRequest.getRequestAsList(
+                managementBase + "/api/v1/users/" + oktaUserId + "/roles", ssws);
+            if (rolesList == null || rolesList.isEmpty()) return null;
+            int bestPriority = Integer.MAX_VALUE;
+            String bestRole = null;
+            for (Map<String, Object> role : rolesList) {
+                String roleType = String.valueOf(role.get("type"));
+                String mappedRole = customRoleMapping.get(roleType);
+                if (mappedRole == null) continue;
+                int priority = getAktoRolePriority(mappedRole);
+                if (priority < bestPriority) {
+                    bestPriority = priority;
+                    bestRole = mappedRole;
+                }
+            }
+            return bestRole;
+        } catch (Exception e) {
+            logger.errorAndAddToDb("[OktaRoleMapping] Failed to fetch Okta roles: " + e.getMessage(), LogDb.DASHBOARD);
+            return null;
+        }
+    }
+
+    // Lower number = higher privilege
+    private int getAktoRolePriority(String role) {
+        switch (role) {
+            case "ADMIN":     return 0;
+            case "MEMBER":    return 1;
+            case "DEVELOPER": return 2;
+            case "GUEST":     return 3;
+            default:          return Integer.MAX_VALUE;
+        }
+    }
+
+    /**
+     * Maps a list of Okta groups to the highest-priority Akto RBAC role.
+     * Priority order: ADMIN > MEMBER > DEVELOPER > GUEST > MEMBER (default fallback).
+     */
+    private String mapOktaGroupsToAktoRole(List<Map<String, Object>> groupsList) {
+        if (groupsList == null || groupsList.isEmpty()) {
+            return RBAC.Role.MEMBER.name();
+        }
+        boolean hasMember = false;
+        boolean hasDeveloper = false;
+        boolean hasGuest = false;
+        for (Map<String, Object> group : groupsList) {
+            Map<String, Object> profile = (Map<String, Object>) group.get("profile");
+            if (profile == null) continue;
+            String groupName = String.valueOf(profile.get("name")).toLowerCase();
+            if ("akto_admin".equals(groupName)) {
+                return RBAC.Role.ADMIN.name();
+            } else if ("akto_security_engineer".equals(groupName)) {
+                hasMember = true;
+            } else if ("akto_developer".equals(groupName)) {
+                hasDeveloper = true;
+            } else if ("akto_guest".equals(groupName)) {
+                hasGuest = true;
+            }
+        }
+        if (hasMember) return RBAC.Role.MEMBER.name();
+        if (hasDeveloper) return RBAC.Role.DEVELOPER.name();
+        if (hasGuest) return RBAC.Role.GUEST.name();
+        return RBAC.Role.MEMBER.name();
     }
 
     private int accountId;

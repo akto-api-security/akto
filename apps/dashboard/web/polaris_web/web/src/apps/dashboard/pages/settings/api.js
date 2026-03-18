@@ -373,6 +373,22 @@ const settingRequests = {
         })
     },
 
+    saveOktaGroupRoleMapping(groupRoleMapping, oktaRoleMapping) {
+        return request({
+            url: '/api/saveOktaGroupRoleMapping',
+            method: 'post',
+            data: { groupRoleMapping, oktaRoleMapping }
+        })
+    },
+
+    fetchOktaGroups() {
+        return request({
+            url: '/api/fetchOktaGroups',
+            method: 'post',
+            data: {}
+        })
+    },
+
     fetchAzureSso(configType) {
         return request({
             url: '/api/fetchSAMLSso',

@@ -1,6 +1,8 @@
 package com.akto.action.user;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 import org.bson.conversions.Bson;
 
@@ -9,9 +11,11 @@ import com.akto.dao.ConfigsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
-import com.akto.dto.User;
 import com.akto.dto.Config.OktaConfig;
+import com.akto.dto.RBAC;
+import com.akto.dto.User;
 import com.akto.util.Constants;
+import com.akto.util.http_request.CustomHttpRequest;
 import com.akto.utils.sso.SsoUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -25,6 +29,9 @@ public class OktaSsoAction extends UserAction {
     private String authorisationServerId;
     private String oktaDomain;
     private String redirectUri;
+    private Map<String, String> groupRoleMapping;
+    private Map<String, String> oktaRoleMapping;
+    private List<String> oktaGroups;
 
     public String addOktaSso() {
         if (SsoUtils.isAnySsoActive()) {
@@ -65,6 +72,75 @@ public class OktaSsoAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String saveOktaGroupRoleMapping() {
+        int accountId = Context.accountId.get();
+        OktaConfig oktaConfig = (OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(accountId));
+        if (oktaConfig == null) {
+            addActionError("Okta SSO is not configured.");
+            return ERROR.toUpperCase();
+        }
+        String validationError = validateRoleMappingValues(groupRoleMapping);
+        if (validationError == null) {
+            validationError = validateRoleMappingValues(oktaRoleMapping);
+        }
+        if (validationError != null) {
+            addActionError(validationError);
+            return ERROR.toUpperCase();
+        }
+        ConfigsDao.instance.updateOne(
+            Filters.eq(Constants.ID, OktaConfig.getOktaId(accountId)),
+            Updates.combine(
+                Updates.set("groupRoleMapping", groupRoleMapping),
+                Updates.set("oktaRoleMapping", oktaRoleMapping)
+            )
+        );
+        return SUCCESS.toUpperCase();
+    }
+
+    private String validateRoleMappingValues(Map<String, String> mapping) {
+        if (mapping == null) return null;
+        for (String role : mapping.values()) {
+            try {
+                RBAC.Role.valueOf(role);
+            } catch (IllegalArgumentException e) {
+                return "Invalid Akto role: " + role + ". Valid values are ADMIN, MEMBER, DEVELOPER, GUEST.";
+            }
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    public String fetchOktaGroups() {
+        int accountId = Context.accountId.get();
+        OktaConfig oktaConfig = (OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(accountId));
+        if (oktaConfig == null) {
+            addActionError("Okta SSO is not configured.");
+            return ERROR.toUpperCase();
+        }
+        if (oktaConfig.getApiToken() == null || oktaConfig.getApiToken().isEmpty()) {
+            addActionError("Okta API token is not configured. Set apiToken in the Okta config to fetch groups.");
+            return ERROR.toUpperCase();
+        }
+        try {
+            String url = "https://" + oktaConfig.getOktaDomainUrl() + "/api/v1/groups";
+            String auth = "SSWS " + oktaConfig.getApiToken();
+            List<Map<String, Object>> groupsList = CustomHttpRequest.getRequestAsList(url, auth);
+            this.oktaGroups = new ArrayList<>();
+            if (groupsList != null) {
+                for (Map<String, Object> group : groupsList) {
+                    Map<String, Object> profile = (Map<String, Object>) group.get("profile");
+                    if (profile != null && profile.get("name") != null) {
+                        this.oktaGroups.add(String.valueOf(profile.get("name")));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            addActionError("Failed to fetch groups from Okta: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
     @Override
     public String execute() throws Exception {
         int accountId = Context.accountId.get();
@@ -80,6 +156,8 @@ public class OktaSsoAction extends UserAction {
             this.oktaDomain = oktaConfig.getOktaDomainUrl();
             this.authorisationServerId = oktaConfig.getAuthorisationServerId();
             this.redirectUri = oktaConfig.getRedirectUri();
+            this.groupRoleMapping = oktaConfig.getGroupRoleMapping();
+            this.oktaRoleMapping = oktaConfig.getOktaRoleMapping();
         }
 
         return SUCCESS.toUpperCase();
@@ -116,6 +194,24 @@ public class OktaSsoAction extends UserAction {
     }
     public void setRedirectUri(String redirectUri) {
         this.redirectUri = redirectUri;
+    }
+
+    public Map<String, String> getGroupRoleMapping() {
+        return groupRoleMapping;
+    }
+    public void setGroupRoleMapping(Map<String, String> groupRoleMapping) {
+        this.groupRoleMapping = groupRoleMapping;
+    }
+
+    public Map<String, String> getOktaRoleMapping() {
+        return oktaRoleMapping;
+    }
+    public void setOktaRoleMapping(Map<String, String> oktaRoleMapping) {
+        this.oktaRoleMapping = oktaRoleMapping;
+    }
+
+    public List<String> getOktaGroups() {
+        return oktaGroups;
     }
 
 }

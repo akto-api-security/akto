@@ -4,6 +4,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.mongodb.BasicDBObject;
 
 import okhttp3.FormBody;
@@ -13,7 +14,10 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.apache.http.*;
 import org.apache.http.client.HttpResponseException;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class CustomHttpRequest {
@@ -30,6 +34,18 @@ public class CustomHttpRequest {
                 .build();
 
         return s(request);
+    }
+
+    public static List<Map<String, Object>> getRequestAsList(String url, String authHeader) throws HttpResponseException {
+        Request request = new Request.Builder()
+                .url(url)
+                .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                .header(HttpHeaders.AUTHORIZATION, authHeader)
+                .build();
+        String jsonData = executeAndGetBody(request);
+        if (jsonData == null) return new ArrayList<>();
+        Type listType = new TypeToken<List<Map<String, Object>>>(){}.getType();
+        return new Gson().fromJson(jsonData, listType);
     }
 
     public static RequestBody createFormEncodedRequestBody(BasicDBObject params) {
@@ -130,39 +146,32 @@ public class CustomHttpRequest {
         }
     }
 
-    public static Map<String, Object> s(Request request) throws HttpResponseException {
-        // Log request details before executing
+    private static String executeAndGetBody(Request request) throws HttpResponseException {
         logRequestDetails(request);
-
-        //Execute and get the response.
         Response response = null;
-        Map<String, Object> jsonMap = new HashMap<>();
-        String jsonData = null;
         try {
             response = httpClient.newCall(request).execute();
-            if (response == null) {
-                loggerMaker.infoAndAddToDb("response null");
-                return null;
-            }
-
-            jsonData = response.body().string();
-
-            // Log response details
+            if (response == null) return null;
+            String jsonData = response.body().string();
             logResponseDetails(response, jsonData);
-
             if (!response.isSuccessful()) {
                 throw new HttpResponseException(response.code(), response.message());
             }
-
-            jsonMap = new Gson().fromJson(jsonData, Map.class);
-
+            return jsonData;
+        } catch (HttpResponseException e) {
+            throw e;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in sending requests in SSO auth");
+            return null;
         } finally {
-            if (response != null) {
-                response.close();
-            }
+            if (response != null) response.close();
         }
-        return jsonMap;
+    }
+
+    public static Map<String, Object> s(Request request) throws HttpResponseException {
+        String jsonData = executeAndGetBody(request);
+        if (jsonData == null) return new HashMap<>();
+        Type mapType = new TypeToken<Map<String, Object>>(){}.getType();
+        return new Gson().fromJson(jsonData, mapType);
     }
 }

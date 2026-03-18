@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react'
 import CopyCommand from '../../../components/shared/CopyCommand';
 import IntegrationsLayout from './IntegrationsLayout';
-import { Button, Form, FormLayout, HorizontalStack, LegacyCard, Link, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Badge, Box, Button, Divider, Form, FormLayout, HorizontalStack, LegacyCard, Link, Tabs, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { DeleteMinor, EditMinor, RefreshMajor } from '@shopify/polaris-icons';
 import func from "@/util/func"
 import settingRequests from '../api';
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import StepsComponent from './components/StepsComponent';
 import Details from './components/Details';
 import DeleteModal from './components/DeleteModal';
+import DropdownSearch from '../../../components/shared/DropdownSearch';
 
 function OktaIntegration() {
 
@@ -23,6 +25,36 @@ function OktaIntegration() {
     const [authorizationServerId, setAuthorizationServerId] = useState('')
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [nextButtonActive,setNextButtonActive] = useState(true)
+
+    const [groupRoleMapping, setGroupRoleMapping] = useState({})
+    const [oktaRoleMapping, setOktaRoleMapping] = useState({})
+    const [editMode, setEditMode] = useState(false)
+    const [selectedTab, setSelectedTab] = useState(0)
+    const [newSourceName, setNewSourceName] = useState('')
+    const [newAktoRole, setNewAktoRole] = useState('MEMBER')
+    const [oktaGroups, setOktaGroups] = useState([])
+    const [syncing, setSyncing] = useState(false)
+    const [savedGroupMapping, setSavedGroupMapping] = useState({})
+    const [savedRoleMapping, setSavedRoleMapping] = useState({})
+
+    const aktoRoleOptions = [
+        { label: 'Admin', value: 'ADMIN' },
+        { label: 'Security Engineer', value: 'MEMBER' },
+        { label: 'Developer', value: 'DEVELOPER' },
+        { label: 'Guest', value: 'GUEST' },
+    ]
+
+    const oktaAdminRoles = [
+        { label: 'Super Administrator', value: 'SUPER_ADMIN' },
+        { label: 'Organization Administrator', value: 'ORG_ADMIN' },
+        { label: 'Application Administrator', value: 'APP_ADMIN' },
+        { label: 'User Administrator', value: 'USER_ADMIN' },
+        { label: 'Help Desk Administrator', value: 'HELP_DESK_ADMIN' },
+        { label: 'Read Only Administrator', value: 'READ_ONLY_ADMIN' },
+        { label: 'API Access Management Admin', value: 'API_ACCESS_MANAGEMENT_ADMIN' },
+        { label: 'Report Administrator', value: 'REPORT_ADMIN' },
+        { label: 'Group Membership Admin', value: 'GROUP_MEMBERSHIP_ADMIN' },
+    ]
 
     const redirectUri = hostname + "/authorization-code/callback"
     const initiateLoginUri = hostname + "/okta-initiate-login?accountId=" + window.ACTIVE_ACCOUNT
@@ -103,6 +135,12 @@ function OktaIntegration() {
                     setClientId(resp.clientId)
                     setAuthorizationServerId(resp.authorisationServerId)
                     setOktaDomain(resp.oktaDomain)
+                    const grpMap = resp.groupRoleMapping || {}
+                    const roleMap = resp.oktaRoleMapping || {}
+                    setGroupRoleMapping(grpMap)
+                    setOktaRoleMapping(roleMap)
+                    setSavedGroupMapping(grpMap)
+                    setSavedRoleMapping(roleMap)
                     setComponentType(2)
                 }
             })
@@ -111,7 +149,76 @@ function OktaIntegration() {
             setNextButtonActive(false)
             setLoading(false)
         }
-        
+    }
+
+    const mappingMode = selectedTab === 0 ? 'group' : 'role'
+
+    const handleAddMapping = () => {
+        const trimmed = newSourceName.trim()
+        if (!trimmed) {
+            func.setToast(true, true, (mappingMode === 'group' ? 'Group' : 'Role') + " name cannot be empty")
+            return
+        }
+        if (mappingMode === 'group') {
+            setGroupRoleMapping(prev => ({ ...prev, [trimmed]: newAktoRole }))
+        } else {
+            setOktaRoleMapping(prev => ({ ...prev, [trimmed]: newAktoRole }))
+        }
+        setNewSourceName('')
+        setNewAktoRole('MEMBER')
+    }
+
+    const handleRemoveGroupMapping = (name) => {
+        setGroupRoleMapping(prev => {
+            const updated = { ...prev }
+            delete updated[name]
+            return updated
+        })
+    }
+
+    const handleRemoveRoleMapping = (name) => {
+        setOktaRoleMapping(prev => {
+            const updated = { ...prev }
+            delete updated[name]
+            return updated
+        })
+    }
+
+    const handleSaveMapping = async() => {
+        await settingRequests.saveOktaGroupRoleMapping(groupRoleMapping, oktaRoleMapping)
+        setSavedGroupMapping({ ...groupRoleMapping })
+        setSavedRoleMapping({ ...oktaRoleMapping })
+        setEditMode(false)
+        func.setToast(true, false, "Role mappings saved successfully!")
+    }
+
+    const handleCancelEdit = () => {
+        setGroupRoleMapping({ ...savedGroupMapping })
+        setOktaRoleMapping({ ...savedRoleMapping })
+        setEditMode(false)
+        setNewSourceName('')
+        setNewAktoRole('MEMBER')
+    }
+
+    const syncOktaData = async() => {
+        setSyncing(true)
+        try {
+            const resp = await settingRequests.fetchOktaGroups()
+            if (resp.oktaGroups) {
+                setOktaGroups(resp.oktaGroups)
+                func.setToast(true, false, "Synced " + resp.oktaGroups.length + " groups from Okta")
+            }
+        } catch (error) {
+            func.setToast(true, true, "Failed to sync. Ensure API token is configured.")
+        }
+        setSyncing(false)
+    }
+
+    const handleEditClick = async() => {
+        setEditMode(true)
+        setSavedGroupMapping({ ...groupRoleMapping })
+        setSavedRoleMapping({ ...oktaRoleMapping })
+        await syncOktaData()
     }
 
     const handleDelete = async() => {
@@ -153,12 +260,180 @@ function OktaIntegration() {
     )
 
     
+    const unmappedGroups = oktaGroups.filter(g => !groupRoleMapping[g])
+    const unmappedRoles = oktaAdminRoles.filter(r => !oktaRoleMapping[r.value])
+
+    const groupOptions = unmappedGroups.map(g => ({ label: g, value: g }))
+    const roleOptions = unmappedRoles.map(r => ({ label: r.label, value: r.value }))
+
+    const currentMapping = mappingMode === 'group' ? groupRoleMapping : oktaRoleMapping
+    const handleRemoveCurrent = mappingMode === 'group' ? handleRemoveGroupMapping : handleRemoveRoleMapping
+    const hasCurrentMappings = Object.keys(currentMapping).length > 0
+    const hasGroupMappings = Object.keys(groupRoleMapping).length > 0
+    const hasRoleMappings = Object.keys(oktaRoleMapping).length > 0
+
+    const mappingTabs = [
+        { id: 'group-mapping', content: 'Map by Group' },
+        { id: 'role-mapping', content: 'Map by Role' },
+    ]
+
+    const getLabelForRole = (name) => oktaAdminRoles.find(r => r.value === name)?.label || name
+    const getAktoRoleLabel = (role) => aktoRoleOptions.find(r => r.value === role)?.label || role
+
+    const renderMappingRows = (mapping, labelFn, removeFn) => (
+        Object.entries(mapping).map(([name, role], index) => (
+            <React.Fragment key={name}>
+                {index > 0 && <Divider />}
+                <Box paddingBlockStart="2" paddingBlockEnd="2">
+                    <HorizontalStack align="space-between" blockAlign="center">
+                        <Box width="40%">
+                            <Text variant="bodyMd" fontWeight="medium">{labelFn(name)}</Text>
+                        </Box>
+                        <HorizontalStack gap="3" blockAlign="center">
+                            <Badge>{getAktoRoleLabel(role)}</Badge>
+                            {editMode && (
+                                <Button plain destructive icon={DeleteMinor} onClick={() => removeFn(name)} accessibilityLabel="Remove mapping" />
+                            )}
+                        </HorizontalStack>
+                    </HorizontalStack>
+                </Box>
+            </React.Fragment>
+        ))
+    )
+
+    const renderMappingSection = (title, sourceLabel, mapping, labelFn, removeFn) => {
+        if (Object.keys(mapping).length === 0) return null
+        return (
+            <VerticalStack gap="2">
+                <Text fontWeight="semibold" variant="headingXs" color="subdued">{title}</Text>
+                <Box borderWidth="1" borderColor="border-subdued" borderRadius="2" padding="3">
+                    <VerticalStack gap="0">
+                        <Box paddingBlockEnd="2">
+                            <HorizontalStack align="space-between" blockAlign="center">
+                                <Box width="40%">
+                                    <Text variant="bodySm" fontWeight="semibold" color="subdued">{sourceLabel}</Text>
+                                </Box>
+                                <Text variant="bodySm" fontWeight="semibold" color="subdued">Akto Role</Text>
+                            </HorizontalStack>
+                        </Box>
+                        <Divider />
+                        {renderMappingRows(mapping, labelFn, removeFn)}
+                    </VerticalStack>
+                </Box>
+            </VerticalStack>
+        )
+    }
+
+    const viewModeContent = (
+        <VerticalStack gap="4">
+            {renderMappingSection("Group Mappings", "Okta Group", groupRoleMapping, (name) => name, handleRemoveGroupMapping)}
+            {renderMappingSection("Role Mappings", "Okta Role", oktaRoleMapping, getLabelForRole, handleRemoveRoleMapping)}
+            {!hasGroupMappings && !hasRoleMappings && (
+                <Box padding="4" borderWidth="1" borderColor="border-subdued" borderRadius="2">
+                    <Text variant="bodyMd" color="subdued" alignment="center">
+                        No custom mappings configured. The default convention (akto_admin, akto_security_engineer, akto_developer, akto_guest) will be used.
+                    </Text>
+                </Box>
+            )}
+        </VerticalStack>
+    )
+
+    const editModeContent = (
+        <VerticalStack gap="4">
+            <Tabs tabs={mappingTabs} selected={selectedTab} onSelect={(idx) => { setSelectedTab(idx); setNewSourceName(''); }} fitted>
+                <Box paddingBlockStart="4">
+                    <VerticalStack gap="4">
+                        {hasCurrentMappings && (
+                            <Box borderWidth="1" borderColor="border-subdued" borderRadius="2" padding="3">
+                                <VerticalStack gap="0">
+                                    {renderMappingRows(
+                                        currentMapping,
+                                        mappingMode === 'role' ? getLabelForRole : (name) => name,
+                                        handleRemoveCurrent
+                                    )}
+                                </VerticalStack>
+                            </Box>
+                        )}
+
+                        <Divider />
+                        <Text fontWeight="semibold" variant="headingXs">Add new mapping</Text>
+                        <HorizontalStack gap="3" blockAlign="end">
+                            <Box width="100%" maxWidth="45%">
+                                <DropdownSearch
+                                    id={mappingMode === 'group' ? 'okta-group-search' : 'okta-role-search'}
+                                    label={mappingMode === 'group' ? 'Okta Group' : 'Okta Role'}
+                                    placeholder={mappingMode === 'group' ? 'Search groups...' : 'Search roles...'}
+                                    optionsList={mappingMode === 'group' ? groupOptions : roleOptions}
+                                    setSelected={setNewSourceName}
+                                    value={newSourceName}
+                                    preSelected={newSourceName ? [newSourceName] : []}
+                                />
+                            </Box>
+                            <Box width="100%" maxWidth="45%">
+                                <DropdownSearch
+                                    id="akto-role-search"
+                                    label="Akto Role"
+                                    placeholder="Search roles..."
+                                    optionsList={aktoRoleOptions}
+                                    setSelected={setNewAktoRole}
+                                    value={newAktoRole}
+                                    preSelected={[newAktoRole]}
+                                />
+                            </Box>
+                            <Box paddingBlockStart="6">
+                                <Button onClick={handleAddMapping}>Add</Button>
+                            </Box>
+                        </HorizontalStack>
+
+                        <Box paddingBlockStart="2">
+                            <HorizontalStack align="end" gap="2">
+                                <Button onClick={handleCancelEdit}>Cancel</Button>
+                                <Button primary onClick={handleSaveMapping}>Save Mappings</Button>
+                            </HorizontalStack>
+                        </Box>
+                    </VerticalStack>
+                </Box>
+            </Tabs>
+        </VerticalStack>
+    )
+
+    const roleMappingCard = (
+        <LegacyCard>
+            <LegacyCard.Section>
+                <HorizontalStack align="space-between" blockAlign="center">
+                    <VerticalStack gap="1">
+                        <Text fontWeight="semibold" variant="headingSm">Role Mapping</Text>
+                        <Text variant="bodyMd" color="subdued">
+                            Map Okta groups or roles to Akto roles. If no mapping is configured, the default convention is used.
+                        </Text>
+                    </VerticalStack>
+                    {editMode ? (
+                        <Button icon={RefreshMajor} onClick={syncOktaData} loading={syncing} size="slim">
+                            Sync from Okta
+                        </Button>
+                    ) : (
+                        <Button icon={EditMinor} onClick={handleEditClick} size="slim" primary>
+                            Edit
+                        </Button>
+                    )}
+                </HorizontalStack>
+            </LegacyCard.Section>
+            <Divider />
+            <LegacyCard.Section>
+                {editMode ? editModeContent : viewModeContent}
+            </LegacyCard.Section>
+        </LegacyCard>
+    )
+
     const oktaSSOComponent = (
         loading ? <SpinnerCentered /> :
-        <LegacyCard title="Okta SSO">
-            {componentType === 0 ? <StepsComponent integrationSteps={integrationSteps} onClickFunc={()=> setComponentType(1)} buttonActive={nextButtonActive}/> 
-            : componentType === 1 ? formComponent : <Details values={listValues} onClickFunc={() => setShowDeleteModal(true)} /> }
-        </LegacyCard>
+        <VerticalStack gap="4">
+            <LegacyCard title="Okta SSO">
+                {componentType === 0 ? <StepsComponent integrationSteps={integrationSteps} onClickFunc={()=> setComponentType(1)} buttonActive={nextButtonActive}/> 
+                : componentType === 1 ? formComponent : <Details values={listValues} onClickFunc={() => setShowDeleteModal(true)} /> }
+            </LegacyCard>
+            {componentType === 2 && roleMappingCard}
+        </VerticalStack>
     )
 
     return (
