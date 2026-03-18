@@ -117,6 +117,7 @@ public class Utils {
 
         if (accountId <= 0) {
             Integer resolved = getAccountIdFromUserEmailDomain(userEmail);
+            loggerMaker.infoAndAddToDb("[shouldBlockNonSsoLogin] Resolved accountId from user email domain: " + resolved);
             if (resolved == null) {
                 return false;
             }
@@ -144,12 +145,14 @@ public class Utils {
         String domain = login.split("@")[1].toLowerCase();
         OrganizationInfo orgInfo = OrganizationCache.getOrganizationInfoByDomain(domain);
         if (orgInfo == null) {
+            loggerMaker.infoAndAddToDb("[getAccountIdFromUserEmailDomain] No organization info found for domain: " + domain);
             return null;
         }
         Organization org = OrganizationsDao.instance.findOne(
                 Filters.eq(Organization.ID, orgInfo.getOrganizationId()),
                 Projections.include(Organization.ACCOUNTS));
         if (org == null || org.getAccounts() == null || org.getAccounts().isEmpty()) {
+            loggerMaker.infoAndAddToDb("[getAccountIdFromUserEmailDomain] No accounts found for organization: " + orgInfo.getOrganizationId());
             return null;
         }
         return org.getAccounts().iterator().next();
