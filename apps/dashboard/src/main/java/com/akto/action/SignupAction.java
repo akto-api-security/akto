@@ -1305,9 +1305,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[createUserAndRedirect] Is SSO login: " + isSSOLogin + " (configType: " + signupInfo.getConfigType() + ")");
 
             if (Utils.shouldBlockNonSsoLogin(accountId, user, userEmail, isSSOLogin)) {
+                logger.infoAndAddToDb("[createUserAndRedirect] Blocking non-SSO login for user: " + userEmail);
                 if (user != null && user.getSignupInfoMap() != null && user.getSignupInfoMap().containsKey("AUTH0")) {
+                    logger.infoAndAddToDb("[createUserAndRedirect] Unsetting AUTH0 signup info for user: " + userEmail);
                     UsersDao.instance.updateOne(eq("login", userEmail), Updates.unset(User.SIGNUP_INFO_MAP + ".AUTH0"));
                 }
+                logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to SSO login page");
                 servletResponse.sendRedirect(SSO_URL);
                 return;
             }
