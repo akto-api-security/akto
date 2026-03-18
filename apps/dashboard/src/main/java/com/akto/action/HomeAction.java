@@ -2,7 +2,6 @@ package com.akto.action;
 
 import static com.akto.action.SignupAction.BUSINESS_EMAIL_URI;
 import static com.akto.action.SignupAction.CHECK_INBOX_URI;
-import static com.akto.action.SignupAction.SSO_ONLY_LOGIN_URI;
 import static com.akto.action.SignupAction.SSO_URL;
 import static com.akto.action.SignupAction.TEST_EDITOR_URL;
 import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
@@ -120,7 +119,6 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
 
         if(servletRequest.getRequestURI().equals(CHECK_INBOX_URI) ||
             servletRequest.getRequestURI().contains(BUSINESS_EMAIL_URI) ||
-            servletRequest.getRequestURI().equals(SSO_ONLY_LOGIN_URI) ||
             servletRequest.getRequestURI().contains(TEST_EDITOR_URL) || 
             servletRequest.getRequestURI().contains(SSO_URL)
             ) {
