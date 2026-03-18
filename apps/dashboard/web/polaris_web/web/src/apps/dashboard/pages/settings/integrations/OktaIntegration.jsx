@@ -15,6 +15,13 @@ function dashboardActionError(err, fallback) {
     return (list && list[0]) || fallback
 }
 
+/** Editable mask when a token exists; user selects all + Delete to clear, or paste to replace. */
+const TOKEN_EDIT_MASK = '**********'
+
+function managementTokenStatusFromResponse(resp) {
+    return resp?.managementApiTokenStatus === 'CONFIGURED' ? 'CONFIGURED' : 'NOT_SET'
+}
+
 const AKTO_ROLE_OPTIONS = [
     { label: 'Admin', value: 'ADMIN' },
     { label: 'Security Engineer', value: 'MEMBER' },
@@ -30,7 +37,12 @@ function OktaIntegration() {
     const [clientId, setClientId] = useState('')
     const [clientSecret, setClientSecret] = useState('')
     const [setupApiToken, setSetupApiToken] = useState('')
-    const [oktaApiTokenConfigured, setOktaApiTokenConfigured] = useState(false)
+    /** CONFIGURED | NOT_SET — from server (stored apiToken); single source of truth. */
+    const [managementApiTokenStatus, setManagementApiTokenStatus] = useState('NOT_SET')
+    const hasSavedManagementToken = managementApiTokenStatus === 'CONFIGURED'
+    const managementApiTokenDisplay = hasSavedManagementToken
+        ? 'Configured (SSWS token stored — not shown)'
+        : 'Not set (optional)'
     const [editApiToken, setEditApiToken] = useState('')
     const [savingSettings, setSavingSettings] = useState(false)
     const [oktaDomain, setOktaDomain] = useState('')
@@ -78,7 +90,7 @@ function OktaIntegration() {
             setupApiToken.trim() || undefined
         )
         func.setToast(true, false, "Okta SSO saved successfully!")
-        setOktaApiTokenConfigured(!!setupApiToken.trim())
+        setManagementApiTokenStatus(setupApiToken.trim() ? 'CONFIGURED' : 'NOT_SET')
         setSetupApiToken('')
         setComponentType(2)
     }
@@ -118,7 +130,7 @@ function OktaIntegration() {
                 setClientId(resp.clientId)
                 setAuthorizationServerId(resp.authorisationServerId)
                 setOktaDomain(resp.oktaDomain)
-                setOktaApiTokenConfigured(!!resp.oktaApiTokenConfigured)
+                setManagementApiTokenStatus(managementTokenStatusFromResponse(resp))
                 const grpMap = resp.groupRoleMapping || {}
                 setGroupRoleMapping(grpMap)
                 setSavedGroupMapping(grpMap)
@@ -152,30 +164,40 @@ function OktaIntegration() {
     const handleSaveSettings = async () => {
         setSavingSettings(true)
         try {
-            await settingRequests.saveOktaGroupRoleMapping(groupRoleMapping)
-            setSavedGroupMapping({ ...groupRoleMapping })
-        } catch (e) {
-            func.setToast(true, true, dashboardActionError(e, 'Could not save group mappings.'))
-            setSavingSettings(false)
-            return
-        }
-        const token = editApiToken.trim()
-        if (token) {
-            try {
-                await settingRequests.saveOktaManagementApiToken(token)
-                setOktaApiTokenConfigured(true)
-                setEditApiToken('')
-            } catch (e) {
-                func.setToast(true, true, dashboardActionError(e, 'Mappings saved, but API token could not be updated. Try again.'))
-                setSavingSettings(false)
-                return
+            let toastMsg = 'Group mappings saved successfully!'
+            let resp
+            if (!hasSavedManagementToken) {
+                const t = editApiToken.trim()
+                resp = await settingRequests.saveOktaGroupRoleMapping(groupRoleMapping, t ? { managementApiToken: t } : {})
+                if (t) toastMsg = 'Group mappings and API token saved.'
+            } else {
+                const v = editApiToken
+                if (v === TOKEN_EDIT_MASK) {
+                    resp = await settingRequests.saveOktaGroupRoleMapping(groupRoleMapping, {})
+                } else if (!v.trim()) {
+                    resp = await settingRequests.saveOktaGroupRoleMapping(groupRoleMapping, { clearManagementApiToken: true })
+                    toastMsg = 'Group mappings saved. Management API token removed.'
+                } else {
+                    if (v.trim().length < 20) {
+                        func.setToast(true, true, 'Paste the full SSWS token from Okta, or delete all characters to remove the saved token.')
+                        setSavingSettings(false)
+                        return
+                    }
+                    resp = await settingRequests.saveOktaGroupRoleMapping(groupRoleMapping, { managementApiToken: v.trim() })
+                    toastMsg = 'Group mappings and API token updated.'
+                }
             }
+            setManagementApiTokenStatus(managementTokenStatusFromResponse(resp))
+            setSavedGroupMapping({ ...groupRoleMapping })
+            setEditMode(false)
+            resetMappingDraft()
+            setEditApiToken('')
+            func.setToast(true, false, toastMsg)
+        } catch (e) {
+            func.setToast(true, true, dashboardActionError(e, 'Could not save settings.'))
+        } finally {
+            setSavingSettings(false)
         }
-        setEditMode(false)
-        resetMappingDraft()
-        setEditApiToken('')
-        func.setToast(true, false, token ? 'Group mappings and API token saved.' : 'Group mappings saved successfully!')
-        setSavingSettings(false)
     }
 
     const handleCancelEdit = () => {
@@ -188,7 +210,7 @@ function OktaIntegration() {
     const handleEditClick = () => {
         setEditMode(true)
         setSavedGroupMapping({ ...groupRoleMapping })
-        setEditApiToken('')
+        setEditApiToken(hasSavedManagementToken ? TOKEN_EDIT_MASK : '')
     }
 
     const handleDelete = async () => {
@@ -202,7 +224,7 @@ function OktaIntegration() {
         { title: "Client Id", value: clientId },
         { title: "Authorisation server Id", value: authorizationServerId },
         { title: "Domain name", value: oktaDomain },
-        { title: "Management API token", value: oktaApiTokenConfigured ? "Configured" : "Not set (optional)" },
+        { title: "Management API token", value: managementApiTokenDisplay },
     ]
 
     useEffect(() => { fetchData() }, [])
@@ -256,8 +278,8 @@ function OktaIntegration() {
             )}
             <HorizontalStack gap="2" blockAlign="center" wrap>
                 <Text variant="bodySm" fontWeight="semibold" color="subdued">Management API token</Text>
-                <Badge status={oktaApiTokenConfigured ? 'success' : 'info'}>
-                    {oktaApiTokenConfigured ? 'Configured' : 'Not set'}
+                <Badge status={hasSavedManagementToken ? 'success' : 'info'}>
+                    {hasSavedManagementToken ? 'Configured' : 'Not set'}
                 </Badge>
                 <Text variant="bodySm" color="subdued">Used only when the access token has no groups claim.</Text>
             </HorizontalStack>
@@ -292,13 +314,17 @@ function OktaIntegration() {
             <Divider />
             <Text fontWeight="semibold" variant="headingXs">Management API token (optional)</Text>
             <Text variant="bodySm" color="subdued">
-                Akto uses groups from the access token first. If that claim is empty, a token loads group membership at login (Security → API → Tokens).
-                {oktaApiTokenConfigured ? ' Leave blank to keep the current token; enter a new value to replace it.' : ''}
+                Akto uses groups from the access token first. If that claim is empty, a saved SSWS token loads group membership at login (Okta: Security → API → Tokens).
             </Text>
             <TextField
-                label="API token" type="password" value={editApiToken} onChange={setEditApiToken}
-                autoComplete="new-password" name="okta-sso-management-api-token-edit"
-                placeholder={oktaApiTokenConfigured ? 'Leave blank or paste new token' : 'Paste token if needed'}
+                label="API token"
+                type="password"
+                value={editApiToken}
+                onChange={setEditApiToken}
+                autoComplete="new-password"
+                name="okta-sso-management-api-token-edit"
+                placeholder={hasSavedManagementToken ? undefined : 'Paste SSWS token if needed'}
+                helpText={hasSavedManagementToken ? undefined : 'Optional. Paste SSWS token from Okta if users’ access tokens do not include a groups claim.'}
             />
             <HorizontalStack align="end" gap="2">
                 <Button onClick={handleCancelEdit}>Cancel</Button>
@@ -321,10 +347,10 @@ function OktaIntegration() {
                         {!editMode && (
                             <Box flexShrink={0}>
                                 <Button
-                                    icon={hasGroupMappings || oktaApiTokenConfigured ? EditMinor : PlusMinor}
+                                    icon={hasGroupMappings || hasSavedManagementToken ? EditMinor : PlusMinor}
                                     onClick={handleEditClick} primary size="medium"
                                 >
-                                    {hasGroupMappings || oktaApiTokenConfigured ? 'Edit' : 'Set up'}
+                                    {hasGroupMappings || hasSavedManagementToken ? 'Edit' : 'Set up'}
                                 </Button>
                             </Box>
                         )}

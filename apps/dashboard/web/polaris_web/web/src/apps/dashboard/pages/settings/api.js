@@ -365,14 +365,6 @@ const settingRequests = {
         })
     },
 
-    saveOktaManagementApiToken(managementApiToken) {
-        return request({
-            url: '/api/saveOktaManagementApiToken',
-            method: 'post',
-            data: {managementApiToken}
-        })
-    },
-
     deleteOktaSso() {
         return request({
             url: '/api/deleteOktaSso',
@@ -381,11 +373,15 @@ const settingRequests = {
         })
     },
 
-    saveOktaGroupRoleMapping(groupRoleMapping) {
+    saveOktaGroupRoleMapping(groupRoleMapping, opts = {}) {
+        const { managementApiToken, clearManagementApiToken } = opts
+        const data = { groupRoleMapping }
+        if (managementApiToken) data.managementApiToken = managementApiToken
+        if (clearManagementApiToken) data.clearManagementApiToken = true
         return request({
             url: '/api/saveOktaGroupRoleMapping',
             method: 'post',
-            data: { groupRoleMapping }
+            data
         })
     },
 

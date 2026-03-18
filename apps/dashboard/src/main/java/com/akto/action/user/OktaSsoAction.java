@@ -2,6 +2,7 @@ package com.akto.action.user;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 import org.bson.conversions.Bson;
@@ -30,8 +31,16 @@ public class OktaSsoAction extends UserAction {
     private String redirectUri;
     /** Optional: Okta API token (SSWS) to read user group membership when groups are not in the access token. */
     private String managementApiToken;
-    private boolean oktaApiTokenConfigured;
+    private boolean clearManagementApiToken;
+    /** CONFIGURED | NOT_SET — from stored apiToken only. */
+    private String managementApiTokenStatus = "NOT_SET";
     private Map<String, String> groupRoleMapping;
+
+    private static String managementApiTokenStatusFrom(OktaConfig c) {
+        if (c == null) return "NOT_SET";
+        String t = c.getApiToken();
+        return (t != null && !t.isEmpty()) ? "CONFIGURED" : "NOT_SET";
+    }
 
     public String addOktaSso() {
         if (SsoUtils.isAnySsoActive()) {
@@ -56,24 +65,6 @@ public class OktaSsoAction extends UserAction {
         oktaConfig.setOrganizationDomain(domain);
         ConfigsDao.instance.insertOne(oktaConfig);
 
-        return SUCCESS.toUpperCase();
-    }
-
-    public String saveOktaManagementApiToken() {
-        int accountId = Context.accountId.get();
-        OktaConfig oktaConfig = (OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(accountId));
-        if (oktaConfig == null) {
-            addActionError("Okta SSO is not configured.");
-            return ERROR.toUpperCase();
-        }
-        if (managementApiToken == null || managementApiToken.trim().isEmpty()) {
-            addActionError("API token is required. Create in Okta: Security → API → Tokens.");
-            return ERROR.toUpperCase();
-        }
-        ConfigsDao.instance.updateOne(
-                Filters.eq(Constants.ID, OktaConfig.getOktaId(accountId)),
-                Updates.set("apiToken", managementApiToken.trim()));
-        oktaApiTokenConfigured = true;
         return SUCCESS.toUpperCase();
     }
 
@@ -106,14 +97,26 @@ public class OktaSsoAction extends UserAction {
             addActionError(validationError);
             return ERROR.toUpperCase();
         }
+        List<Bson> bsonUpdates = new ArrayList<>();
+        bsonUpdates.add(Updates.set("mappingType", OktaConfig.MappingType.GROUP.name()));
+        bsonUpdates.add(Updates.set("groupRoleMapping", activeMapping));
+        bsonUpdates.add(Updates.set("oktaRoleMapping", null));
+        if (clearManagementApiToken) {
+            bsonUpdates.add(Updates.unset("apiToken"));
+        } else if (managementApiToken != null && !managementApiToken.trim().isEmpty()) {
+            String tok = managementApiToken.trim();
+            if (tok.length() < 20) {
+                addActionError("API token is too short. Paste the full SSWS token from Okta (Security → API → Tokens).");
+                return ERROR.toUpperCase();
+            }
+            bsonUpdates.add(Updates.set("apiToken", tok));
+        }
         ConfigsDao.instance.updateOne(
             Filters.eq(Constants.ID, OktaConfig.getOktaId(accountId)),
-            Updates.combine(
-                Updates.set("mappingType", OktaConfig.MappingType.GROUP.name()),
-                Updates.set("groupRoleMapping", activeMapping),
-                Updates.set("oktaRoleMapping", null)
-            )
+            Updates.combine(bsonUpdates.toArray(new Bson[0]))
         );
+        OktaConfig refreshed = (OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(accountId));
+        this.managementApiTokenStatus = managementApiTokenStatusFrom(refreshed);
         return SUCCESS.toUpperCase();
     }
 
@@ -145,8 +148,7 @@ public class OktaSsoAction extends UserAction {
             this.authorisationServerId = oktaConfig.getAuthorisationServerId();
             this.redirectUri = oktaConfig.getRedirectUri();
             this.groupRoleMapping = oktaConfig.getGroupRoleMapping();
-            String tok = oktaConfig.getApiToken();
-            this.oktaApiTokenConfigured = tok != null && !tok.isEmpty();
+            this.managementApiTokenStatus = managementApiTokenStatusFrom(oktaConfig);
         }
 
         return SUCCESS.toUpperCase();
@@ -196,8 +198,12 @@ public class OktaSsoAction extends UserAction {
         this.managementApiToken = managementApiToken;
     }
 
-    public boolean isOktaApiTokenConfigured() {
-        return oktaApiTokenConfigured;
+    public void setClearManagementApiToken(boolean clearManagementApiToken) {
+        this.clearManagementApiToken = clearManagementApiToken;
+    }
+
+    public String getManagementApiTokenStatus() {
+        return managementApiTokenStatus;
     }
 
 }
