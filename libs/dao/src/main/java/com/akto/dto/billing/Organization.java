@@ -60,6 +60,9 @@ public class Organization {
     public static final String NAME_LAST_UPDATE = "nameLastUpdate";
     private int nameLastUpdate;
 
+    public static final String COLLECTIN_ACCESS_TYPE_ENABLED = "collectionAccessTypeEnabled";
+    private boolean collectionAccessTypeEnabled;
+
     public Organization() { }
 
     public Organization(String id, String name, String adminEmail, Set<Integer> accounts, boolean onPrem) {
@@ -69,6 +72,7 @@ public class Organization {
         this.accounts = accounts;
         this.syncedWithAkto = false;
         this.onPrem = onPrem;
+        this.collectionAccessTypeEnabled=true;
     }
 
     public String getId() {
@@ -220,5 +224,13 @@ public class Organization {
 
     public void setNameLastUpdate(int nameLastUpdate) {
         this.nameLastUpdate = nameLastUpdate;
+    }
+
+    public boolean getCollectionAccessTypeEnabled() {
+        return collectionAccessTypeEnabled;
+    }
+
+    public void setCollectionAccessTypeEnabled(boolean collectionAccessTypeEnabled) {
+        this.collectionAccessTypeEnabled = collectionAccessTypeEnabled;
     }
 }
