@@ -657,7 +657,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             Map<String,Object> userInfo = CustomHttpRequest.getRequest( domainUrl + "/userinfo","Bearer " + accessToken);
             String email = userInfo.get("email").toString();
             String username = userInfo.get("preferred_username").toString();
-            logger.infoAndAddToDb("Trying to login with okta sso for email: " + email);
+            logger.infoAndAddToDb("Trying to login with okta sso for email: " + email + ", accountId: " + accountId);
 
             String oktaUserId = userInfo.get("sub") != null ? userInfo.get("sub").toString() : null;
 
@@ -708,15 +708,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             shouldLogin = "true";
             logger.info("Setting shouldLogin to true");
 
-            User existingUser = UsersDao.instance.findOne(eq("login", email));
-            boolean isNewUser = existingUser == null;
-
             String resolvedRole = fetchOktaRole(oktaConfig, oktaUserId);
-
-            if (!isNewUser) {
-                updateExistingUserRole(existingUser, accountId, resolvedRole);
-            }
-
             createUserAndRedirect(email, username, oktaSignupInfo, accountId, Config.ConfigType.OKTA.toString(), resolvedRole);
             code = "";
             logger.info("registerViaOkta completed successfully");
@@ -743,31 +735,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.error("Error while setting default role to " + fallbackDefault);
         }
         return fallbackDefault;
-    }
-
-    /**
-     * Updates the RBAC role of an existing user for the given account if it differs from the resolved role.
-     */
-    private void updateExistingUserRole(User user, int accountId, String resolvedRole) {
-        try {
-            RBAC existingRbac = RBACDao.instance.findOne(
-                Filters.and(
-                    Filters.eq(RBAC.USER_ID, user.getId()),
-                    Filters.eq(RBAC.ACCOUNT_ID, accountId)
-                )
-            );
-            if (existingRbac == null || resolvedRole.equals(existingRbac.getRole())) return;
-            RBACDao.instance.updateOne(
-                Filters.and(
-                    Filters.eq(RBAC.USER_ID, user.getId()),
-                    Filters.eq(RBAC.ACCOUNT_ID, accountId)
-                ),
-                Updates.set(RBAC.ROLE, resolvedRole)
-            );
-            logger.infoAndAddToDb("[OktaRoleMapping] Updated existing user role from " + existingRbac.getRole() + " to " + resolvedRole);
-        } catch (Exception e) {
-            logger.errorAndAddToDb("[OktaRoleMapping] Failed to update existing user role: " + e.getMessage(), LogDb.DASHBOARD);
-        }
     }
 
     /**
@@ -1557,8 +1524,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         String accountName = account != null ? account.getName() : "My account";
                         user = UsersDao.addAccount(user.getLogin(), accountId, accountName);
                         logger.infoAndAddToDb("[createUserAndRedirect] Successfully added account " + accountId + " to existing user " + user.getLogin());
-                    } else {
-                        logger.info("[createUserAndRedirect] Account already exists for user, skipping RBAC/account addition");
+                    } else if (invitedRole != null) {
+                        RBAC existingRbac = RBACDao.instance.findOne(
+                            Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId))
+                        );
+                        if (existingRbac != null && !invitedRole.equals(existingRbac.getRole())) {
+                            RBACDao.instance.updateOne(
+                                Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId)),
+                                Updates.set(RBAC.ROLE, invitedRole)
+                            );
+                            logger.infoAndAddToDb("[createUserAndRedirect] Updated role from " + existingRbac.getRole() + " to " + invitedRole + " for user " + user.getLogin());
+                        }
                     }
 
                     servletRequest.getSession().setAttribute("accountId", accountId);
