@@ -333,8 +333,12 @@ public class WizIntegrationUtils {
                 severity = severity.substring(0, 1).toUpperCase() + severity.substring(1).toLowerCase();
 
                 assetAttackSurfaceFinding.put("severity", severity); 
-                assetAttackSurfaceFinding.put("vulnerabilities", testInfo.getCve());
-                assetAttackSurfaceFinding.put("weaknesses", testInfo.getCwe());
+
+                List<String> vulnerabilities = testInfo.getCve() != null ? testInfo.getCve() : new ArrayList<>();
+                assetAttackSurfaceFinding.put("vulnerabilities", vulnerabilities);
+
+                List<String> weaknesses = testInfo.getCwe() != null ? testInfo.getCwe() : new ArrayList<>();
+                assetAttackSurfaceFinding.put("weaknesses", weaknesses);
 
                 assetAttackSurfaceFinding.put("assessmentDetails", testingIssuesId.getTestErrorSource().name());
 
