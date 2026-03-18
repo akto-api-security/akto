@@ -163,9 +163,6 @@ public class AccountSettings {
     private List<String> filterLogPolicy;
     public static final String FILTER_LOG_POLICY = "filterLogPolicy";
 
-    public static final String ENFORCE_SSO_ONLY_RESTRICTIONS = "enforceSsoOnlyRestrictions";
-    private boolean enforceSsoOnlyRestrictions;
-
     public AccountSettings() {
     }
 
@@ -541,13 +538,5 @@ public class AccountSettings {
 
     public void setCompulsoryDescription(Map<String, Boolean> compulsoryDescription) {
         this.compulsoryDescription = compulsoryDescription;
-    }
-
-    public boolean isEnforceSsoOnlyRestrictions() {
-        return enforceSsoOnlyRestrictions;
-    }
-
-    public void setEnforceSsoOnlyRestrictions(boolean enforceSsoOnlyRestrictions) {
-        this.enforceSsoOnlyRestrictions = enforceSsoOnlyRestrictions;
     }
 }
