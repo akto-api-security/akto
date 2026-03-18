@@ -117,6 +117,9 @@ public class BackwardCompatibility {
 
     public static final String FILL_LAST_TESTED_FIELD = "fillLastTestedField";
 
+    public static final String PRODUCT_SCOPES_MIGRATION = "productScopesMigration";
+    private int productScopesMigration;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -496,5 +499,13 @@ public class BackwardCompatibility {
 
     public void setFillQueryParams(int fillQueryParams) {
         this.fillQueryParams = fillQueryParams;
+    }
+
+    public int getProductScopesMigration() {
+        return productScopesMigration;
+    }
+
+    public void setProductScopesMigration(int productScopesMigration) {
+        this.productScopesMigration = productScopesMigration;
     }
 }

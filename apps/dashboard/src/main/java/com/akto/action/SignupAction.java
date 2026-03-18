@@ -282,6 +282,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             PendingInviteCode pendingInviteCode = PendingInviteCodesDao.instance.findOne(filter);
             if (pendingInviteCode != null && pendingInviteCode.getInviteeEmailId().equals(email)) {
                 PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
+
+                // Extract product scopes from invitation
+                this.inviteeProductScopes = pendingInviteCode.getProductScopes();
+                if (this.inviteeProductScopes == null || this.inviteeProductScopes.isEmpty()) {
+                    this.inviteeProductScopes = new ArrayList<>(Arrays.asList("API"));
+                }
+
                 if(user != null){
                     AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId(), pendingInviteCode.getInviteeRole());
                 }
@@ -315,6 +322,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     String password;
     String email;
     String invitationCode;
+    List<String> inviteeProductScopes;
 
     public String registerViaEmail() {
         code = "";
@@ -327,6 +335,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         }
         int invitedToAccountId = 0;
         String inviteeRole = null;
+        this.inviteeProductScopes = null;
         if (!invitationCode.isEmpty()) {
             Jws<Claims> jws;
             try {
@@ -354,6 +363,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
             invitedToAccountId = pendingInviteCode.getAccountId();
             inviteeRole = pendingInviteCode.getInviteeRole();
+            this.inviteeProductScopes = pendingInviteCode.getProductScopes();
+            if (this.inviteeProductScopes == null || this.inviteeProductScopes.isEmpty()) {
+                this.inviteeProductScopes = new ArrayList<>(Arrays.asList("API"));
+            }
 
         } else {
             if (!InitializerListener.isSaas) {
@@ -701,6 +714,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
                     accountId = pendingInviteCode.getAccountId();
                     logger.info("Updated accountId from invite: " + accountId);
+
+                    // Extract product scopes from invitation
+                    this.inviteeProductScopes = pendingInviteCode.getProductScopes();
+                    if (this.inviteeProductScopes == null || this.inviteeProductScopes.isEmpty()) {
+                        this.inviteeProductScopes = new ArrayList<>(Arrays.asList("API"));
+                    }
+                    logger.info("Extracted product scopes from invite: " + this.inviteeProductScopes);
                 } else {
                     logger.info("Invite code does not match or invitee email mismatch");
                 }
@@ -1050,6 +1070,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 if (pendingInviteCode != null && pendingInviteCode.getInviteeEmailId().equals(email)) {
                     PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
                     invitedToAccountId = pendingInviteCode.getAccountId();
+
+                    // Extract product scopes from invitation
+                    this.inviteeProductScopes = pendingInviteCode.getProductScopes();
+                    if (this.inviteeProductScopes == null || this.inviteeProductScopes.isEmpty()) {
+                        this.inviteeProductScopes = new ArrayList<>(Arrays.asList("API"));
+                    }
                 }
             }
 
@@ -1408,9 +1434,14 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
                     if(!exists){
                         logger.info("[createUserAndRedirect] Adding new account to existing user with role: " + invitedRole);
-                        RBACDao.instance.insertOne(
-                            new RBAC(user.getId(), invitedRole, accountId)
-                        );
+                        RBAC rbacEntry = new RBAC(user.getId(), invitedRole, accountId);
+                        // Set product scopes from invitation if available
+                        if (this.inviteeProductScopes != null && !this.inviteeProductScopes.isEmpty()) {
+                            rbacEntry.setProductScopes(this.inviteeProductScopes);
+                        } else {
+                            rbacEntry.setProductScopes(new ArrayList<>(Arrays.asList("API")));
+                        }
+                        RBACDao.instance.insertOne(rbacEntry);
                         String accountName = account != null ? account.getName() : "My account";
                         user = UsersDao.addAccount(user.getLogin(), accountId, accountName);
                         logger.infoAndAddToDb("[createUserAndRedirect] Successfully added account " + accountId + " to existing user " + user.getLogin());
@@ -1438,6 +1469,22 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 user = AccountAction.initializeAccount(userEmail, accountId, "My account", invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN.name() : invitedRole);
             }
             logger.infoAndAddToDb("[createUserAndRedirect] Account initialized successfully for accountId: " + accountId);
+
+            // Set product scopes for newly initialized user if available from invitation
+            if (this.inviteeProductScopes != null && !this.inviteeProductScopes.isEmpty()) {
+                try {
+                    RBACDao.instance.getMCollection().updateOne(
+                        Filters.and(
+                            Filters.eq(RBAC.USER_ID, user.getId()),
+                            Filters.eq(RBAC.ACCOUNT_ID, accountId)
+                        ),
+                        Updates.set(RBAC.PRODUCT_SCOPES, this.inviteeProductScopes)
+                    );
+                    logger.info("[createUserAndRedirect] Set product scopes for new user: " + this.inviteeProductScopes);
+                } catch (Exception e) {
+                    logger.errorAndAddToDb(e, "[createUserAndRedirect] Error setting product scopes for new user: " + e.getMessage());
+                }
+            }
 
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);

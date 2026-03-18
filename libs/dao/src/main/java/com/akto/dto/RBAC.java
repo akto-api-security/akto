@@ -30,9 +30,14 @@ public class RBAC {
 
     public static final String ALLOWED_FEATURES_FOR_USER = "allowedFeaturesForUser";
 
-    @Getter 
+    @Getter
     @Setter
     private List<String> allowedFeaturesForUser;
+
+    public static final String PRODUCT_SCOPES = "productScopes";
+    @Getter
+    @Setter
+    private List<String> productScopes;
 
     // special features for RBAC, we can add more features here when needed
     public static final List<String> SPECIAL_FEATURES_FOR_RBAC = Arrays.asList(
@@ -44,7 +49,9 @@ public class RBAC {
         ADMIN("ADMIN",new AdminRoleStrategy()),
         MEMBER("SECURITY ENGINEER", new MemberRoleStrategy()),
         DEVELOPER("DEVELOPER", new DeveloperRoleStrategy()),
-        GUEST("GUEST", new GuestRoleStrategy());
+        GUEST("GUEST", new GuestRoleStrategy()),
+        THREAT_ENGINEER("THREAT ENGINEER", new ThreatEngineerRoleStrategy()),
+        THREAT_VIEWER("THREAT VIEWER", new ThreatViewerRoleStrategy());
 
         private final RoleStrategy roleStrategy;
         private String name;
@@ -78,6 +85,7 @@ public class RBAC {
         this.userId = userId;
         this.role = role;
         this.apiCollectionsId = new ArrayList<>();
+        this.productScopes = new ArrayList<>();
     }
 
     public RBAC(int userId, String role, int accountId) {
@@ -86,6 +94,7 @@ public class RBAC {
         this.accountId = accountId;
         this.apiCollectionsId = new ArrayList<>();
         this.allowedFeaturesForUser = new ArrayList<>();
+        this.productScopes = new ArrayList<>();
     }
 
     public RBAC() {
