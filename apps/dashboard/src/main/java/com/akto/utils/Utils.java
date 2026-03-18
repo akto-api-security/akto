@@ -121,8 +121,7 @@ public class Utils {
         if (!isSsoOnlyLoginEnabled(accountId)) {
             return false;
         }
-        boolean isNewUser = user == null || (user.getSignupInfoMap() != null && user.getSignupInfoMap().size() == 1);
-        if (isNewUser) {
+        if (user == null) {
             return !currentSigninIsSso;
         }
         boolean userHasSso = hasSSOSignup(user);
