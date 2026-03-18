@@ -816,7 +816,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String groupName = String.valueOf(profile.get("name"));
             String mappedRole = customMapping.get(groupName);
             if (mappedRole == null) continue;
-            int priority = getAktoRolePriority(mappedRole);
+            int priority = RBAC.Role.valueOf(mappedRole).ordinal();
             if (priority < bestPriority) {
                 bestPriority = priority;
                 bestRole = mappedRole;
@@ -840,7 +840,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 String roleType = String.valueOf(role.get("type"));
                 String mappedRole = customRoleMapping.get(roleType);
                 if (mappedRole == null) continue;
-                int priority = getAktoRolePriority(mappedRole);
+                int priority = RBAC.Role.valueOf(mappedRole).ordinal();
                 if (priority < bestPriority) {
                     bestPriority = priority;
                     bestRole = mappedRole;
@@ -850,17 +850,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         } catch (Exception e) {
             logger.errorAndAddToDb("[OktaRoleMapping] Failed to fetch Okta roles: " + e.getMessage(), LogDb.DASHBOARD);
             return null;
-        }
-    }
-
-    // Lower number = higher privilege
-    private int getAktoRolePriority(String role) {
-        switch (role) {
-            case "ADMIN":     return 0;
-            case "MEMBER":    return 1;
-            case "DEVELOPER": return 2;
-            case "GUEST":     return 3;
-            default:          return Integer.MAX_VALUE;
         }
     }
 
