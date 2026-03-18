@@ -373,9 +373,9 @@ const settingRequests = {
         })
     },
 
-    saveOktaGroupRoleMapping(groupRoleMapping, opts = {}) {
+    saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, opts = {}) {
         const { managementApiToken, clearManagementApiToken } = opts
-        const data = { groupRoleMapping }
+        const data = { oktaGroupToAktoUserRoleMap }
         if (managementApiToken) data.managementApiToken = managementApiToken
         if (clearManagementApiToken) data.clearManagementApiToken = true
         return request({

@@ -34,7 +34,7 @@ public class OktaSsoAction extends UserAction {
     private boolean clearManagementApiToken;
     /** CONFIGURED | NOT_SET — from stored apiToken only. */
     private String managementApiTokenStatus = "NOT_SET";
-    private Map<String, String> groupRoleMapping;
+    private Map<String, String> oktaGroupToAktoUserRoleMap;
 
     private static String managementApiTokenStatusFrom(OktaConfig c) {
         if (c == null) return "NOT_SET";
@@ -91,16 +91,16 @@ public class OktaSsoAction extends UserAction {
             addActionError("Okta SSO is not configured.");
             return ERROR.toUpperCase();
         }
-        Map<String, String> activeMapping = groupRoleMapping != null ? groupRoleMapping : Collections.<String, String>emptyMap();
+        Map<String, String> activeMapping = oktaGroupToAktoUserRoleMap != null ? oktaGroupToAktoUserRoleMap : Collections.<String, String>emptyMap();
         String validationError = validateRoleMappingValues(activeMapping);
         if (validationError != null) {
             addActionError(validationError);
             return ERROR.toUpperCase();
         }
         List<Bson> bsonUpdates = new ArrayList<>();
-        bsonUpdates.add(Updates.set("mappingType", OktaConfig.MappingType.GROUP.name()));
-        bsonUpdates.add(Updates.set("groupRoleMapping", activeMapping));
-        bsonUpdates.add(Updates.set("oktaRoleMapping", null));
+        bsonUpdates.add(Updates.set("oktaGroupToAktoUserRoleMap", activeMapping));
+        bsonUpdates.add(Updates.unset("groupRoleMapping"));
+        bsonUpdates.add(Updates.unset("oktaRoleMapping"));
         if (clearManagementApiToken) {
             bsonUpdates.add(Updates.unset("apiToken"));
         } else if (managementApiToken != null && !managementApiToken.trim().isEmpty()) {
@@ -147,7 +147,7 @@ public class OktaSsoAction extends UserAction {
             this.oktaDomain = oktaConfig.getOktaDomainUrl();
             this.authorisationServerId = oktaConfig.getAuthorisationServerId();
             this.redirectUri = oktaConfig.getRedirectUri();
-            this.groupRoleMapping = oktaConfig.getGroupRoleMapping();
+            this.oktaGroupToAktoUserRoleMap = oktaConfig.getOktaGroupToAktoUserRoleMap();
             this.managementApiTokenStatus = managementApiTokenStatusFrom(oktaConfig);
         }
 
@@ -187,11 +187,11 @@ public class OktaSsoAction extends UserAction {
         this.redirectUri = redirectUri;
     }
 
-    public Map<String, String> getGroupRoleMapping() {
-        return groupRoleMapping;
+    public Map<String, String> getOktaGroupToAktoUserRoleMap() {
+        return oktaGroupToAktoUserRoleMap;
     }
-    public void setGroupRoleMapping(Map<String, String> groupRoleMapping) {
-        this.groupRoleMapping = groupRoleMapping;
+    public void setOktaGroupToAktoUserRoleMap(Map<String, String> oktaGroupToAktoUserRoleMap) {
+        this.oktaGroupToAktoUserRoleMap = oktaGroupToAktoUserRoleMap;
     }
 
     public void setManagementApiToken(String managementApiToken) {

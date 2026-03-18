@@ -50,11 +50,12 @@ function OktaIntegration() {
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [nextButtonActive, setNextButtonActive] = useState(true)
 
-    const [groupRoleMapping, setGroupRoleMapping] = useState({})
+    /** Okta group → Akto user role (how that Okta user is represented in Akto) */
+    const [oktaGroupToAktoUserRoleMap, setOktaGroupToAktoUserRoleMap] = useState({})
     const [editMode, setEditMode] = useState(false)
     const [newGroupName, setNewGroupName] = useState('')
     const [newAktoRole, setNewAktoRole] = useState('MEMBER')
-    const [savedGroupMapping, setSavedGroupMapping] = useState({})
+    const [savedOktaGroupToAktoUserRoleMap, setSavedOktaGroupToAktoUserRoleMap] = useState({})
 
     const redirectUri = `${hostname}/authorization-code/callback`
     const initiateLoginUri = `${hostname}/okta-initiate-login?accountId=${window.ACTIVE_ACCOUNT}`
@@ -131,9 +132,9 @@ function OktaIntegration() {
                 setAuthorizationServerId(resp.authorisationServerId)
                 setOktaDomain(resp.oktaDomain)
                 setManagementApiTokenStatus(managementTokenStatusFromResponse(resp))
-                const grpMap = resp.groupRoleMapping || {}
-                setGroupRoleMapping(grpMap)
-                setSavedGroupMapping(grpMap)
+                const grpMap = resp.oktaGroupToAktoUserRoleMap || {}
+                setOktaGroupToAktoUserRoleMap(grpMap)
+                setSavedOktaGroupToAktoUserRoleMap(grpMap)
                 setComponentType(2)
             }
         } catch {
@@ -149,12 +150,12 @@ function OktaIntegration() {
             func.setToast(true, true, "Group name cannot be empty")
             return
         }
-        setGroupRoleMapping(prev => ({ ...prev, [trimmed]: newAktoRole }))
+        setOktaGroupToAktoUserRoleMap(prev => ({ ...prev, [trimmed]: newAktoRole }))
         resetMappingDraft()
     }
 
     const handleRemoveGroupMapping = (name) => {
-        setGroupRoleMapping(prev => {
+        setOktaGroupToAktoUserRoleMap(prev => {
             const next = { ...prev }
             delete next[name]
             return next
@@ -168,14 +169,14 @@ function OktaIntegration() {
             let resp
             if (!hasSavedManagementToken) {
                 const t = editApiToken.trim()
-                resp = await settingRequests.saveOktaGroupRoleMapping(groupRoleMapping, t ? { managementApiToken: t } : {})
+                resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, t ? { managementApiToken: t } : {})
                 if (t) toastMsg = 'Group mappings and API token saved.'
             } else {
                 const v = editApiToken
                 if (v === TOKEN_EDIT_MASK) {
-                    resp = await settingRequests.saveOktaGroupRoleMapping(groupRoleMapping, {})
+                    resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, {})
                 } else if (!v.trim()) {
-                    resp = await settingRequests.saveOktaGroupRoleMapping(groupRoleMapping, { clearManagementApiToken: true })
+                    resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, { clearManagementApiToken: true })
                     toastMsg = 'Group mappings saved. Management API token removed.'
                 } else {
                     if (v.trim().length < 20) {
@@ -183,12 +184,12 @@ function OktaIntegration() {
                         setSavingSettings(false)
                         return
                     }
-                    resp = await settingRequests.saveOktaGroupRoleMapping(groupRoleMapping, { managementApiToken: v.trim() })
+                    resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, { managementApiToken: v.trim() })
                     toastMsg = 'Group mappings and API token updated.'
                 }
             }
             setManagementApiTokenStatus(managementTokenStatusFromResponse(resp))
-            setSavedGroupMapping({ ...groupRoleMapping })
+            setSavedOktaGroupToAktoUserRoleMap({ ...oktaGroupToAktoUserRoleMap })
             setEditMode(false)
             resetMappingDraft()
             setEditApiToken('')
@@ -201,7 +202,7 @@ function OktaIntegration() {
     }
 
     const handleCancelEdit = () => {
-        setGroupRoleMapping({ ...savedGroupMapping })
+        setOktaGroupToAktoUserRoleMap({ ...savedOktaGroupToAktoUserRoleMap })
         setEditMode(false)
         setEditApiToken('')
         resetMappingDraft()
@@ -209,7 +210,7 @@ function OktaIntegration() {
 
     const handleEditClick = () => {
         setEditMode(true)
-        setSavedGroupMapping({ ...groupRoleMapping })
+        setSavedOktaGroupToAktoUserRoleMap({ ...oktaGroupToAktoUserRoleMap })
         setEditApiToken(hasSavedManagementToken ? TOKEN_EDIT_MASK : '')
     }
 
@@ -230,9 +231,9 @@ function OktaIntegration() {
     useEffect(() => { fetchData() }, [])
 
     const getAktoRoleLabel = (role) => AKTO_ROLE_OPTIONS.find(r => r.value === role)?.label || role
-    const hasGroupMappings = Object.keys(groupRoleMapping).length > 0
+    const hasGroupMappings = Object.keys(oktaGroupToAktoUserRoleMap).length > 0
 
-    const mappingRows = Object.entries(groupRoleMapping).map(([name, role], index) => (
+    const mappingRows = Object.entries(oktaGroupToAktoUserRoleMap).map(([name, role], index) => (
         <React.Fragment key={name}>
             {index > 0 && <Divider />}
             <Box paddingBlockStart="2" paddingBlockEnd="2">

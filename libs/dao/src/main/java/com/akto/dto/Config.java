@@ -11,6 +11,7 @@ import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+import org.bson.codecs.pojo.annotations.BsonProperty;
 
 import com.akto.dao.ConfigsDao;
 import com.mongodb.client.model.Filters;
@@ -378,8 +379,6 @@ public abstract class Config {
     @BsonDiscriminator
     public static class OktaConfig extends Config {
 
-        public enum MappingType { GROUP, ROLE }
-
         private String clientId;
         private String clientSecret;
         private String oktaDomainUrl;
@@ -390,9 +389,8 @@ public abstract class Config {
         public static final String ACCOUNT_ID = "accountId";
         private int accountId;
         private String apiToken;
-        private MappingType mappingType;
-        private Map<String, String> groupRoleMapping;
-        private Map<String, String> oktaRoleMapping;
+        /** Okta group name → Akto user role. Stored in Mongo as {@code oktaGroupToAktoUserRoleMap}. */
+        private Map<String, String> oktaGroupToAktoUserRoleMap;
 
         public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
 
@@ -475,25 +473,11 @@ public abstract class Config {
             this.apiToken = apiToken;
         }
 
-        public MappingType getMappingType() {
-            return mappingType;
+        public Map<String, String> getOktaGroupToAktoUserRoleMap() {
+            return oktaGroupToAktoUserRoleMap;
         }
-        public void setMappingType(MappingType mappingType) {
-            this.mappingType = mappingType;
-        }
-
-        public Map<String, String> getGroupRoleMapping() {
-            return groupRoleMapping;
-        }
-        public void setGroupRoleMapping(Map<String, String> groupRoleMapping) {
-            this.groupRoleMapping = groupRoleMapping;
-        }
-
-        public Map<String, String> getOktaRoleMapping() {
-            return oktaRoleMapping;
-        }
-        public void setOktaRoleMapping(Map<String, String> oktaRoleMapping) {
-            this.oktaRoleMapping = oktaRoleMapping;
+        public void setOktaGroupToAktoUserRoleMap(Map<String, String> oktaGroupToAktoUserRoleMap) {
+            this.oktaGroupToAktoUserRoleMap = oktaGroupToAktoUserRoleMap;
         }
     }
 

@@ -627,15 +627,14 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     /**
-     * Maps Okta group names to an Akto role: custom {@code groupRoleMapping} first, then naming convention
-     * ({@link #OKTA_CONVENTION_ROLE_MAP}), else MEMBER.
+     * Resolves Akto user role from Okta group membership: custom {@code oktaGroupToAktoUserRoleMap} first, then convention.
      */
-    private String resolveAktoRoleFromOktaGroupNames(List<String> groupNames, Map<String, String> groupRoleMapping) {
+    private String resolveAktoRoleFromOktaGroupNames(List<String> groupNames, Map<String, String> oktaGroupToAktoUserRoleMap) {
         if (groupNames == null || groupNames.isEmpty()) {
             return RBAC.Role.MEMBER.name();
         }
-        if (groupRoleMapping != null && !groupRoleMapping.isEmpty()) {
-            String role = resolveHighestPriorityRole(groupNames, groupRoleMapping);
+        if (oktaGroupToAktoUserRoleMap != null && !oktaGroupToAktoUserRoleMap.isEmpty()) {
+            String role = resolveHighestPriorityRole(groupNames, oktaGroupToAktoUserRoleMap);
             if (role != null) return role;
         }
         List<String> normalized = new ArrayList<>();
@@ -651,10 +650,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
      */
     private String fetchOktaRole(Config.OktaConfig oktaConfig, String oktaUserId, String accessToken) {
         List<String> groupsFromToken = getGroupsFromAccessToken(accessToken);
-        Map<String, String> groupRoleMapping = oktaConfig.getGroupRoleMapping();
+        Map<String, String> oktaGroupToAktoUserRoleMap = oktaConfig.getOktaGroupToAktoUserRoleMap();
 
         if (!groupsFromToken.isEmpty()) {
-            return resolveAktoRoleFromOktaGroupNames(groupsFromToken, groupRoleMapping);
+            return resolveAktoRoleFromOktaGroupNames(groupsFromToken, oktaGroupToAktoUserRoleMap);
         }
 
         if (StringUtils.isEmpty(oktaConfig.getApiToken()) || oktaUserId == null) {
@@ -665,9 +664,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         try {
             List<Map<String, Object>> groupsList = CustomHttpRequest.getRequestAsList(
                     managementBase + "/api/v1/users/" + oktaUserId + "/groups", ssws);
-            return resolveAktoRoleFromOktaGroupNames(extractOktaGroupNamesFromApiResponse(groupsList), groupRoleMapping);
+            return resolveAktoRoleFromOktaGroupNames(extractOktaGroupNamesFromApiResponse(groupsList), oktaGroupToAktoUserRoleMap);
         } catch (Exception e) {
-            logger.errorAndAddToDb("[OktaRoleMapping] Failed to fetch Okta groups for user " + oktaUserId + ": " + e.getMessage(), LogDb.DASHBOARD);
+            logger.errorAndAddToDb("[Okta SSO] Failed to fetch Okta groups for user " + oktaUserId + ": " + e.getMessage(), LogDb.DASHBOARD);
             return RBAC.Role.MEMBER.name();
         }
     }
