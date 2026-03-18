@@ -95,37 +95,26 @@ public class Utils {
     }
 
     /**
-     * Inverted check: returns true when login should be blocked under SSO-only. Use as: if (isLoginAllowedUnderSsoOnly(...)) redirect.
-     * When org has SSO_ONLY_LOGIN: existing user → block when (user has SSO AND sign-in is non-SSO); new user → block when sign-in is non-SSO.
+     * Returns true when login should be blocked under SSO-only policy.
      */
-    public static boolean isLoginAllowedUnderSsoOnly(int accountId, User user, SignupInfo currentSignupInfo, boolean isNewUser) {
-        if (user == null && currentSignupInfo == null) {
+    public static boolean isLoginAllowedUnderSsoOnly(int accountId, User user, String userEmail, boolean isSSOLogin) {
+        if (isSSOLogin) {
             return false;
         }
-        boolean currentSigninIsSso = currentSignupInfo != null && Config.isConfigSSOType(currentSignupInfo.getConfigType());
-        if (accountId > 0) {
-            return isLoginAllowedUnderSsoOnlyForAccount(accountId, user, currentSigninIsSso, isNewUser);
-        }
-        if (user == null) {
-            return false;
-        }
-        Integer accountIdFromDomain = getAccountIdFromUserEmailDomain(user.getLogin());
-        if (accountIdFromDomain == null) {
-            return false;
-        }
-        return isLoginAllowedUnderSsoOnlyForAccount(accountIdFromDomain, user, currentSigninIsSso, isNewUser);
-    }
 
-    /** Inverted: returns true when blocked. */
-    private static boolean isLoginAllowedUnderSsoOnlyForAccount(int accountId, User user, boolean currentSigninIsSso, boolean isNewUser) {
+        if (accountId <= 0) {
+            Integer resolved = getAccountIdFromUserEmailDomain(userEmail);
+            if (resolved == null) {
+                return false;
+            }
+            accountId = resolved;
+        }
+
         if (!isSsoOnlyLoginEnabled(accountId)) {
             return false;
         }
-        if (isNewUser) {
-            return !currentSigninIsSso;
-        }
-        boolean userHasSso = hasSSOSignup(user);
-        return userHasSso && !currentSigninIsSso;
+
+        return user == null || hasSSOSignup(user);
     }
 
     private static boolean isSsoOnlyLoginEnabled(int accountId) {

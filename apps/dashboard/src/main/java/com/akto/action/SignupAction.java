@@ -1304,7 +1304,14 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             boolean isSSOLogin = Config.isConfigSSOType(signupInfo.getConfigType());
             logger.infoAndAddToDb("[createUserAndRedirect] Is SSO login: " + isSSOLogin + " (configType: " + signupInfo.getConfigType() + ")");
 
-            boolean isNewUser = false;
+            if (Utils.isLoginAllowedUnderSsoOnly(accountId, user, userEmail, isSSOLogin)) {
+                if (user != null && user.getSignupInfoMap() != null && user.getSignupInfoMap().containsKey("AUTH0")) {
+                    UsersDao.instance.updateOne(eq("login", userEmail), Updates.unset(User.SIGNUP_INFO_MAP + ".AUTH0"));
+                }
+                servletResponse.sendRedirect(SSO_URL);
+                return;
+            }
+
             if (user == null) {
                 logger.infoAndAddToDb("[createUserAndRedirect] Creating NEW USER account");
 
@@ -1390,7 +1397,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
                 logger.info("[createUserAndRedirect] Calling UsersDao.instance.insertSignUp to create user record");
                 user = UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
-                isNewUser = true;
                 logger.infoAndAddToDb("[createUserAndRedirect] NEW USER CREATED SUCCESSFULLY - userId: " + user.getId() + ", accountId: " + accountId);
 
             } else if (StringUtils.isEmpty(code) && !isSSOLogin) {
@@ -1426,11 +1432,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     logger.info("[createUserAndRedirect] Set session accountId to: " + accountId);
                 }
 
-                if (Utils.isLoginAllowedUnderSsoOnly(accountId, user, signupInfo, isNewUser)) {
-                    // delete signup info for auth0
-                    servletResponse.sendRedirect(SSO_URL);
-                    return;
-                }
                 logger.info("[createUserAndRedirect] Logging in existing user and redirecting to /dashboard/observe/inventory");
                 LoginAction.loginUser(user, servletResponse, true, servletRequest, signupInfo);
                 servletResponse.sendRedirect("/dashboard/observe/inventory");
@@ -1448,10 +1449,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
             logger.infoAndAddToDb("[createUserAndRedirect] Account initialized successfully for accountId: " + accountId);
 
-            if (Utils.isLoginAllowedUnderSsoOnly(accountId, user, signupInfo, isNewUser)) {
-                servletResponse.sendRedirect(SSO_URL);
-                return;
-            }
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);
             logger.info("[createUserAndRedirect] Set session attributes - user and accountId: " + accountId);
