@@ -1278,10 +1278,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[createUserAndRedirect] Path: NEW USER + shouldLogin=false -> Creating signup record without full account");
             SignupUserInfo signupUserInfo = SignupDao.instance.insertSignUp(userEmail, username, signupInfo, invitationToAccount);
             logger.info("[createUserAndRedirect] Signup record created, logging in user");
-            if (Utils.isLoginAllowedUnderSsoOnly(invitationToAccount, signupUserInfo.getUser(), signupInfo)) {
-                servletResponse.sendRedirect(SSO_URL);
-                return;
-            }
             LoginAction.loginUser(signupUserInfo.getUser(), servletResponse, false, servletRequest);
             servletRequest.setAttribute("username", userEmail);
             logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to /dashboard/onboarding");
@@ -1308,6 +1304,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             boolean isSSOLogin = Config.isConfigSSOType(signupInfo.getConfigType());
             logger.infoAndAddToDb("[createUserAndRedirect] Is SSO login: " + isSSOLogin + " (configType: " + signupInfo.getConfigType() + ")");
 
+            boolean isNewUser = false;
             if (user == null) {
                 logger.infoAndAddToDb("[createUserAndRedirect] Creating NEW USER account");
 
@@ -1393,6 +1390,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
                 logger.info("[createUserAndRedirect] Calling UsersDao.instance.insertSignUp to create user record");
                 user = UsersDao.instance.insertSignUp(userEmail, username, signupInfo, accountId);
+                isNewUser = true;
                 logger.infoAndAddToDb("[createUserAndRedirect] NEW USER CREATED SUCCESSFULLY - userId: " + user.getId() + ", accountId: " + accountId);
 
             } else if (StringUtils.isEmpty(code) && !isSSOLogin) {
@@ -1428,7 +1426,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     logger.info("[createUserAndRedirect] Set session accountId to: " + accountId);
                 }
 
-                if (Utils.isLoginAllowedUnderSsoOnly(accountId, user, signupInfo)) {
+                if (Utils.isLoginAllowedUnderSsoOnly(accountId, user, signupInfo, isNewUser)) {
+                    // delete signup info for auth0
                     servletResponse.sendRedirect(SSO_URL);
                     return;
                 }
@@ -1449,7 +1448,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
             logger.infoAndAddToDb("[createUserAndRedirect] Account initialized successfully for accountId: " + accountId);
 
-            if (Utils.isLoginAllowedUnderSsoOnly(accountId, user, signupInfo)) {
+            if (Utils.isLoginAllowedUnderSsoOnly(accountId, user, signupInfo, isNewUser)) {
                 servletResponse.sendRedirect(SSO_URL);
                 return;
             }
