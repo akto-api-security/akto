@@ -884,6 +884,16 @@ const settingRequests = {
             }
         })
     },
+    getUserAnalysis(agentId, deviceId) {
+        return request({
+            url: '/api/getUserAnalysis',
+            method: 'post',
+            data: {
+                agentId,
+                deviceId
+            }
+        })
+    },
     addMcpRegistryIntegration(registries) {
         return request({
             url: '/api/addMcpRegistryIntegration',

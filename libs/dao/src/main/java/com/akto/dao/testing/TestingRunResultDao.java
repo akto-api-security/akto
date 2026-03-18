@@ -163,17 +163,44 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 List<String> errors = new ArrayList<>();
                 List<GenericTestResult> testResults = new ArrayList<>();
                 if (testResultsList != null && !testResultsList.isEmpty()) {
-                    BasicDBObject genericTestResult = (BasicDBObject)testResultsList.get(0);
+                    BasicDBObject genericTestResult = (BasicDBObject)testResultsList.get(testResultsList.size()-1);
                     String confidence = "";
-                    String message;
                     if (genericTestResult.get(GenericTestResult._CONFIDENCE)!=null) {
                         TestResult testResult = new TestResult();
                         confidence = genericTestResult.getString(GenericTestResult._CONFIDENCE);
 
                         try {
                             testResult.setConfidence(Confidence.valueOf(confidence));
-                            message = genericTestResult.getString(TestResult._MESSAGE, null);
-                            testResult.setMessage(message);
+                            String fullMessage = genericTestResult.getString(TestResult._MESSAGE, null);
+                            String lightweightMessage = null;
+                            if (fullMessage != null && fullMessage.length() <= 10240) {  // 10KB
+                                try {
+                                    long startTime = System.currentTimeMillis();
+                                    long timeoutMs = 100;  // 100ms timeout for parsing
+
+                                    Document msgDoc = Document.parse(fullMessage);
+
+                                    // Check if parsing took too long
+                                    if (System.currentTimeMillis() - startTime > timeoutMs) {
+                                        lightweightMessage = null;  // Timeout, skip extraction
+                                    } else {
+                                        Document response = (Document) msgDoc.get("response");
+                                        if (response != null) {
+                                            Object statusCode = response.get("statusCode");
+                                            String body = response.getString("body");
+                                            String bodyPreview = (body != null && body.length() > 50)
+                                                    ? body.substring(0, 50) : body;
+                                            Document lightDoc = new Document("response",
+                                                    new Document("statusCode", statusCode).append("body", bodyPreview));
+                                            lightweightMessage = lightDoc.toJson();
+                                        }
+                                    }
+                                } catch (Exception parseException) {
+                                    // Parsing failed or timed out; null is fine — frontend handles gracefully
+                                    lightweightMessage = null;
+                                }
+                            }
+                            testResult.setMessage(lightweightMessage);
                         } catch(Exception e){
                         }
                         testResults.add(testResult);

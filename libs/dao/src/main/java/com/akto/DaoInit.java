@@ -8,6 +8,7 @@ import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.monitoring.EndpointShieldLogsDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -91,6 +92,7 @@ import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.DependencyNode.ParamInfo;
+import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.agents.Model;
 import com.akto.dto.agents.ModelType;
 import com.akto.dto.agents.State;
@@ -333,7 +335,7 @@ public class DaoInit {
         ClassModel<Trace> traceClassModel = ClassModel.builder(Trace.class).enableDiscriminator(true).build();
         ClassModel<Span> spanClassModel = ClassModel.builder(Span.class).enableDiscriminator(true).build();
         ClassModel<Span.ToolDefinition> toolDefinitionClassModel = ClassModel.builder(Span.ToolDefinition.class).enableDiscriminator(true).build();
-
+        ClassModel<UserAnalysisData.UserAnalysisDataKey> userAnalysisDataKeyClassModel = ClassModel.builder(UserAnalysisData.UserAnalysisDataKey.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -376,7 +378,7 @@ public class DaoInit {
                 jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, testingIssueTicketsModel, tlsAuthClassModel,
                 ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
-                traceClassModel, spanClassModel, toolDefinitionClassModel)
+                traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -518,6 +520,7 @@ public class DaoInit {
         McpReconRequestDao.instance.createIndicesIfAbsent();
         GuardrailPoliciesDao.instance.createIndicesIfAbsent();
         EndpointShieldLogsDao.instance.createIndicesIfAbsent();
+        ModuleInfoDao.instance.createIndicesIfAbsent();
         AgentConversationDao.instance.createIndexIfAbsent();
         AgentConversationResultDao.instance.createIndexIfAbsent();
         IpReputationScoreDao.instance.createIndicesIfAbsent();
