@@ -629,10 +629,6 @@ const router = createBrowserRouter([
         element: <PageBusinessEmail/>
     },
     {
-        path: "/sso-only-login",
-        element: <PageSsoOnlyLogin/>
-    },
-    {
         path: "/sso-login",
         element: <SignUpWithSSO/>
     },
