@@ -201,7 +201,7 @@ public class ProfileAction extends UserAction {
                 .append("isAwsWafIntegrated", awsWafCount != 0)
                 .append("isCloudflareWafIntegrated", cloudflareWafCount != 0);
 
-        boolean inviteDisabledForSSO = com.akto.utils.Utils.shouldEnforceSsoRestrictions(sessionAccId, user);
+        boolean inviteDisabledForSSO = com.akto.utils.Utils.allowNewUserInviteViaDashboard(sessionAccId, user);
         userDetails.append("inviteDisabledForSSO", inviteDisabledForSSO);
 
         if (DashboardMode.isOnPremDeployment()) {

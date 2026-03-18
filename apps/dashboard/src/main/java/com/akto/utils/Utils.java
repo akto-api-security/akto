@@ -34,7 +34,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.testing.ApiExecutor;
 import com.akto.usage.UsageMetricCalculator;
-import com.akto.util.Constants;
+import com.akto.util.DashboardMode;
 import com.akto.util.OrganizationInfo;
 import com.akto.utils.crons.OrganizationCache;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -74,8 +74,8 @@ public class Utils {
     /** Feature label for org-level SSO-only login; when granted, only SSO signup/sign-in is allowed. */
     public static final String SSO_ONLY_LOGIN = "SSO_ONLY_LOGIN";
 
-    /** Returns true if user has at least one SSO signup (OKTA, AZURE, GOOGLE_SAML). */
-    private static boolean hasSSOSignup(User user) {
+    /** if user has at least one SSO signup (OKTA, AZURE, GOOGLE_SAML). */
+    private static boolean hasUserEverSignedUpViaSSO(User user) {
         if (user == null || user.getSignupInfoMap() == null || user.getSignupInfoMap().isEmpty()) {
             return false;
         }
@@ -87,17 +87,30 @@ public class Utils {
         return false;
     }
 
-    public static boolean shouldEnforceSsoRestrictions(int accountId, User user) {
-        if (!isSsoOnlyLoginEnabled(accountId)) {
+    // If SSO login is enabled, then new users are added via the SSO directory and not via the invite user flow in the dashboard
+    // Dont allow such users to invite new users via dashboard
+    public static boolean allowNewUserInviteViaDashboard(int accountId, User user) {
+        if (!isSsoOnlyLoginEnabledForOrg(accountId)) {
             return false;
         }
-        return hasSSOSignup(user);
+        return hasUserEverSignedUpViaSSO(user);
     }
 
     /**
-     * Returns true when login should be blocked under SSO-only policy.
+     * Conditions:
+     * 1. Org has SSO_ONLY_LOGIN feature enabled
+     * 2. User already signed up via SSO (OKTA, AZURE, GOOGLE_SAML)
+     * 3. User is trying to sign up via non-SSO login (auth0)
+     * 
+     * Then block the login and redirect to SSO login page
+     * 
+     * If any of the above conditions are not met, then allow the login
      */
-    public static boolean isLoginAllowedUnderSsoOnly(int accountId, User user, String userEmail, boolean isSSOLogin) {
+    public static boolean shouldBlockNonSsoLogin(int accountId, User user, String userEmail, boolean isSSOLogin) {
+        if (DashboardMode.isOnPremDeployment()) {
+            return false;
+        }
+
         if (isSSOLogin) {
             return false;
         }
@@ -110,14 +123,15 @@ public class Utils {
             accountId = resolved;
         }
 
-        if (!isSsoOnlyLoginEnabled(accountId)) {
+        if (!isSsoOnlyLoginEnabledForOrg(accountId)) {
             return false;
         }
 
-        return user == null || hasSSOSignup(user);
+        return user == null || hasUserEverSignedUpViaSSO(user);
     }
 
-    private static boolean isSsoOnlyLoginEnabled(int accountId) {
+    /** Check if Org has SSO_ONLY_LOGIN feature enabled via Stigg */
+    private static boolean isSsoOnlyLoginEnabledForOrg(int accountId) {
         FeatureAccess ssoOnlyLoginAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, SSO_ONLY_LOGIN);
         return ssoOnlyLoginAccess != null && ssoOnlyLoginAccess.getIsGranted();
     }

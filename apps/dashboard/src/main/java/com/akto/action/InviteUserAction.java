@@ -126,7 +126,7 @@ public class InviteUserAction extends UserAction{
         }
 
         Integer accountId = Context.accountId.get();
-        if (Utils.shouldEnforceSsoRestrictions(accountId, getSUser())) {
+        if (Utils.allowNewUserInviteViaDashboard(accountId, getSUser())) {
             addActionError("Inviting new users is not allowed for this account.");
             return ERROR.toUpperCase();
         }

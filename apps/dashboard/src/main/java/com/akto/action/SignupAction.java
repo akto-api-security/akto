@@ -1304,7 +1304,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             boolean isSSOLogin = Config.isConfigSSOType(signupInfo.getConfigType());
             logger.infoAndAddToDb("[createUserAndRedirect] Is SSO login: " + isSSOLogin + " (configType: " + signupInfo.getConfigType() + ")");
 
-            if (Utils.isLoginAllowedUnderSsoOnly(accountId, user, userEmail, isSSOLogin)) {
+            if (Utils.shouldBlockNonSsoLogin(accountId, user, userEmail, isSSOLogin)) {
                 if (user != null && user.getSignupInfoMap() != null && user.getSignupInfoMap().containsKey("AUTH0")) {
                     UsersDao.instance.updateOne(eq("login", userEmail), Updates.unset(User.SIGNUP_INFO_MAP + ".AUTH0"));
                 }
