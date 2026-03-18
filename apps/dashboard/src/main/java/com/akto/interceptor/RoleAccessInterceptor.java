@@ -5,6 +5,7 @@ import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.dto.audit_logs.ApiAuditLogs;
@@ -19,6 +20,9 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.policies.UserAgentTypePolicy;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DashboardMode;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionInvocation;
@@ -28,6 +32,7 @@ import com.opensymphony.xwork2.config.entities.ActionConfig;
 import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
@@ -67,6 +72,67 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             return accountId;
         } catch (Exception e) {
             throw new Exception("unable to parse account id: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Map CONTEXT_SOURCE enum to user-friendly display names
+     * @param contextSource the CONTEXT_SOURCE enum value
+     * @return friendly display name (e.g., "Akto ATLAS", "Akto ARGUS")
+     */
+    private String getContextSourceDisplayName(CONTEXT_SOURCE contextSource) {
+        if (contextSource == null) {
+            return "API Security";
+        }
+
+        switch(contextSource) {
+            case API:
+                return "API Security";
+            case ENDPOINT:
+                return "Akto ATLAS";
+            case AGENTIC:
+                return "Akto ARGUS";
+            case DAST:
+                return "DAST";
+            default:
+                return contextSource.toString();
+        }
+    }
+
+    /**
+     * Get the list of product scopes that the user has access to.
+     * If user doesn't have product scopes set or list is empty, default to ["API"]
+     * @param userId the user ID
+     * @param accountId the account ID
+     * @return list of product scopes (e.g., ["API", "MCP", "AGENTIC"])
+     */
+    private List<String> getUserProductScopes(int userId, int accountId) {
+        try {
+            RBAC rbac = RBACDao.instance.findOne(
+                Filters.and(
+                    Filters.eq(RBAC.USER_ID, userId),
+                    Filters.eq(RBAC.ACCOUNT_ID, accountId)
+                ),
+                Projections.include(RBAC.PRODUCT_SCOPES)
+            );
+
+            if (rbac == null) {
+                loggerMaker.debug("RBAC entry not found for userId: " + userId + ", accountId: " + accountId
+                        + ". Defaulting to API scope.");
+                return new ArrayList<>(java.util.Arrays.asList("API"));
+            }
+
+            List<String> productScopes = rbac.getProductScopes();
+            if (productScopes == null || productScopes.isEmpty()) {
+                loggerMaker.debug("No product scopes set for userId: " + userId + ". Defaulting to API scope.");
+                return new ArrayList<>(java.util.Arrays.asList("API"));
+            }
+
+            return productScopes;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error getting product scopes for userId: " + userId
+                    + ", accountId: " + accountId + ". Defaulting to API scope. Error: " + e.getMessage());
+            return new ArrayList<>(java.util.Arrays.asList("API"));
         }
     }
 
@@ -121,6 +187,36 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             if(userRole == null || userRole.isEmpty()) {
                 throw new Exception("User role not found");
             }
+
+            // ===== PRODUCT SCOPE VALIDATION =====
+            // Check if user has access to the current product scope (context source)
+            CONTEXT_SOURCE contextSource = Context.contextSource.get();
+            logger.debug("DEBUG RoleAccessInterceptor: Context.contextSource.get() returned: " + contextSource);
+            if (contextSource == null) {
+                logger.debug("DEBUG RoleAccessInterceptor: contextSource is null, defaulting to API");
+                contextSource = CONTEXT_SOURCE.API;  // Default to API
+            }
+
+            // ADMIN role has universal access across all product scopes
+            if (!userRole.equals(Role.ADMIN.name())) {
+                List<String> userProductScopes = getUserProductScopes(userId, sessionAccId);
+                String contextSourceStr = contextSource.toString();
+                logger.debug("DEBUG RoleAccessInterceptor: Checking contextSourceStr=" + contextSourceStr + " against userProductScopes=" + userProductScopes);
+
+                if (!userProductScopes.contains(contextSourceStr)) {
+                    // User doesn't have access to this product scope
+                    String scopeDisplayName = getContextSourceDisplayName(contextSource);
+                    String errorMessage = "You don't have access to " + scopeDisplayName
+                            + ". Please contact your admin to grant access or navigate to an accessible product scope.";
+                    ((ActionSupport) invocation.getAction()).addActionError(errorMessage);
+
+                    logger.debug("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr);
+                    loggerMaker.infoAndAddToDb("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr + " (" + scopeDisplayName + "). User scopes: " + userProductScopes);
+                    // Block the request - return FORBIDDEN instead of invoking
+                    return FORBIDDEN;
+                }
+            }
+            // ===== END PRODUCT SCOPE VALIDATION =====
 
             Feature featureType = Feature.valueOf(this.featureLabel.toUpperCase());
 

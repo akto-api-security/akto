@@ -25,6 +25,14 @@ const rolesOptions = [
     {
         label: 'Guest',
         value: 'GUEST',
+    },
+    {
+        label: 'Threat Engineer',
+        value: 'THREAT_ENGINEER',
+    },
+    {
+        label: 'Threat Viewer',
+        value: 'THREAT_VIEWER',
     }]
 
 const getRoleDisplayName = (role) => {

@@ -1,12 +1,13 @@
 package com.akto.dto;
 
 import org.bson.types.ObjectId;
+import java.util.List;
 
 public class PendingInviteCode {
 
     private ObjectId id;
     private String inviteCode;
-    public static final String INVITE_CODE = "inviteCode";    
+    public static final String INVITE_CODE = "inviteCode";
     private int issuer;
     public static final String _ISSUER = "issuer";
     private String inviteeEmailId;
@@ -17,6 +18,8 @@ public class PendingInviteCode {
     public static final String ACCOUNT_ID = "accountId";
     private String inviteeRole;
     public static final String INVITEE_ROLE = "inviteeRole";
+    private List<String> productScopes;
+    public static final String PRODUCT_SCOPES = "productScopes";
 
     public PendingInviteCode() {
     }
@@ -92,5 +95,13 @@ public class PendingInviteCode {
 
     public void setInviteeRole(String inviteeRole) {
         this.inviteeRole = inviteeRole;
+    }
+
+    public List<String> getProductScopes() {
+        return productScopes;
+    }
+
+    public void setProductScopes(List<String> productScopes) {
+        this.productScopes = productScopes;
     }
 }
