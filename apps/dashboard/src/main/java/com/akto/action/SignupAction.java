@@ -512,7 +512,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl + "/token", params);
             String accessToken = tokenData.get("access_token").toString();
-            Map<String,Object> userInfo = CustomHttpRequest.getRequest(domainUrl + "/userinfo", "Bearer " + accessToken);
+            Map<String,Object> userInfo = CustomHttpRequest.getRequest(domainUrl + "/userinfo", "Bearer " + accessToken, false);
             String email = userInfo.get("email").toString();
             String username = userInfo.get("preferred_username").toString();
             logger.infoAndAddToDb("Trying to login with okta sso for email: " + email + ", accountId: " + accountId);
