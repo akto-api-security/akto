@@ -24,7 +24,7 @@ if (
 }
 
 // Bypass FreeApp for signup/login related pages
-const signupPages = ['/check-inbox', '/business-email', '/sso-only-login', '/signup', '/sso-login', '/addUserToAccount', '/login'];
+const signupPages = ['/check-inbox', '/business-email', '/signup', '/sso-login', '/addUserToAccount', '/login'];
 const currentPath = window.location.pathname;
 const isSignupPage = signupPages.some(page => currentPath.startsWith(page));
 const isWhitelisted = func.isWhiteListedOrganization();
