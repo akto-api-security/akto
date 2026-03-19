@@ -853,17 +853,19 @@ public class Utils {
         return result;
     }
 
+    private static final String SSRF_WEBHOOK_SERVICE_DEFAULT_BASE = "https://webhook.test-util.akto.io";
+
     /**
      * Dedicated base URL for the new webhook SSRF service (POST /token, callback UUIDs).
      * When set, enables webhook SSRF mode even if {@code SSRF_SERVICE_NAME} is the legacy test-services URL.
+     * Falls back to {@value #SSRF_WEBHOOK_SERVICE_DEFAULT_BASE} when env var is not set.
      */
     public static String getSsrfWebhookServiceBase() {
         String w = System.getenv("SSRF_WEBHOOK_SERVICE_NAME");
-        if (w == null) {
-            return null;
+        if (w == null || w.trim().isEmpty()) {
+            return SSRF_WEBHOOK_SERVICE_DEFAULT_BASE;
         }
-        w = w.trim();
-        return w.isEmpty() ? null : w;
+        return w.trim();
     }
 
     /**
