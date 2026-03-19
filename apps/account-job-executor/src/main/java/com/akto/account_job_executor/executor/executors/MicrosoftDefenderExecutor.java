@@ -38,7 +38,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
     private static final String KQL_QUERY =
         "DeviceProcessEvents" +
         "| where ProcessCommandLine has_any (\"openclaw\", \"clawdbot\", \"moltbot\", \"gateway\")" +
-        "| project Timestamp, DeviceName, AccountName, AccountDomain, FileName, ProcessCommandLine, InitiatingProcessFileName" +
+        "| project Timestamp, DeviceId, DeviceName, AccountName, AccountDomain, FileName, ProcessCommandLine, InitiatingProcessFileName" +
         "| order by Timestamp desc";
 
     private MicrosoftDefenderExecutor() {}
@@ -131,7 +131,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
     private Map<String, Object> toIngestionRecord(Map<String, Object> row, int accountId) throws IOException {
         Map<String, Object> record = new HashMap<>();
 
-        String deviceName = getStringOrDefault(row, "DeviceName", "unknown-device");
+        String deviceName = getStringOrDefault(row, "DeviceName", "");
         record.put("path", "/defender/process-events/" + deviceName);
         record.put("method", "GET");
         record.put("statusCode", "200");
@@ -168,8 +168,8 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         Map<String, String> tagMap = new HashMap<>();
         tagMap.put("gen-ai", "Gen AI");
         tagMap.put("source", "DEFENDER");
-        String accountName = getStringOrDefault(row, "AccountName", "");
-        tagMap.put("bot-name", accountName + "." + deviceName);
+        String deviceId = getStringOrDefault(row, "DeviceId", "");
+        tagMap.put("bot-name", buildBotName(deviceName, deviceId));
         tagMap.put("agent-name", "openclaw");
         record.put("tag", OBJECT_MAPPER.writeValueAsString(tagMap));
 
@@ -181,7 +181,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
             return "DeviceProcessEvents" +
                 "| where Timestamp > datetime(" + lastQueriedAt + ")" +
                 "| where ProcessCommandLine has_any (\"openclaw\", \"clawdbot\", \"moltbot\", \"gateway\")" +
-                "| project Timestamp, DeviceName, AccountName, AccountDomain, FileName, ProcessCommandLine, InitiatingProcessFileName" +
+                "| project Timestamp, DeviceId, DeviceName, AccountName, AccountDomain, FileName, ProcessCommandLine, InitiatingProcessFileName" +
                 "| order by Timestamp desc";
         }
         return KQL_QUERY;
@@ -273,6 +273,15 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
                 return rows;
             }
         }
+    }
+
+    private String buildBotName(String deviceName, String deviceId) {
+        boolean hasDeviceName = deviceName != null && !deviceName.isEmpty();
+        boolean hasDeviceId = deviceId != null && !deviceId.isEmpty();
+        if (hasDeviceName && hasDeviceId) return deviceName + "." + deviceId;
+        if (hasDeviceName) return deviceName;
+        if (hasDeviceId) return deviceId;
+        return "";
     }
 
     private String getStringOrDefault(Map<String, Object> map, String key, String defaultValue) {
