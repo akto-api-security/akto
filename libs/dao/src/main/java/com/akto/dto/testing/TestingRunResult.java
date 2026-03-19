@@ -62,6 +62,12 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     @BsonIgnore
     private List<TestLog> testLogs = new ArrayList<>();
 
+    /** SSRF / webhook callback UUIDs for test-editor "Check webhook hit" polling; not persisted on result doc. */
+    @BsonIgnore
+    private List<String> callbackUuids;
+    @BsonIgnore
+    private boolean callbackCheckPending;
+
     public boolean isRerun() {
         return rerun;
     }
@@ -376,6 +382,22 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setMultiExecTestResults(List<MultiExecTestResult> multiExecTestResults) {
         this.multiExecTestResults = multiExecTestResults;
+    }
+
+    public List<String> getCallbackUuids() {
+        return callbackUuids;
+    }
+
+    public void setCallbackUuids(List<String> callbackUuids) {
+        this.callbackUuids = callbackUuids;
+    }
+
+    public boolean isCallbackCheckPending() {
+        return callbackCheckPending;
+    }
+
+    public void setCallbackCheckPending(boolean callbackCheckPending) {
+        this.callbackCheckPending = callbackCheckPending;
     }
 
 }
