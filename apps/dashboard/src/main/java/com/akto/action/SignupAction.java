@@ -47,6 +47,7 @@ import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.OrganizationCache;
 import com.akto.utils.sso.CustomSamlSettings;
 import com.akto.util.Pair;
+import com.akto.utils.Utils;
 import com.akto.utils.sso.SsoUtils;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
@@ -94,6 +95,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public static final String BUSINESS_EMAIL_REQUIRED_ERROR = "BUSINESS_EMAIL_REQUIRED";
     public static final String ERROR_STR = "error";
     public static final String ERROR_DESCRIPTION = "error_description";
+
 
     public String getCode() {
         return code;
@@ -1301,6 +1303,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             boolean isSSOLogin = Config.isConfigSSOType(signupInfo.getConfigType());
             logger.infoAndAddToDb("[createUserAndRedirect] Is SSO login: " + isSSOLogin + " (configType: " + signupInfo.getConfigType() + ")");
+
+            if (Utils.shouldBlockNonSsoLogin(accountId, user, userEmail, isSSOLogin)) {
+                logger.infoAndAddToDb("[createUserAndRedirect] Blocking non-SSO login for user: " + userEmail);
+                if (user != null && user.getSignupInfoMap() != null && user.getSignupInfoMap().containsKey("AUTH0")) {
+                    logger.infoAndAddToDb("[createUserAndRedirect] Unsetting AUTH0 signup info for user: " + userEmail);
+                    UsersDao.instance.updateOne(eq("login", userEmail), Updates.unset(User.SIGNUP_INFO_MAP + ".AUTH0"));
+                }
+                logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to SSO login page");
+                servletResponse.sendRedirect(SSO_URL);
+                return;
+            }
 
             if (user == null) {
                 logger.infoAndAddToDb("[createUserAndRedirect] Creating NEW USER account");
