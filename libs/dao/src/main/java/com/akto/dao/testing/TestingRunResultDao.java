@@ -42,6 +42,9 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
 
     public static final String ERRORS_KEY = TestingRunResult.TEST_RESULTS+".0."+TestResult.ERRORS+".0";
 
+    // For this account, skip message field entirely — too many results, full message causes timeouts
+    private static final int SKIP_MESSAGE_ACCOUNT_ID = 1722380534;
+
     @Override
     public String getCollName() {
         return "testing_run_result";
@@ -71,7 +74,13 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
     }
 
     private Bson getLatestTestingRunResultProjections() {
-        return Projections.include(
+        Integer accountId = Context.accountId.get();
+        boolean includeMessage = accountId == null || accountId != SKIP_MESSAGE_ACCOUNT_ID;
+        return getLatestTestingRunResultProjections(includeMessage);
+    }
+
+    private Bson getLatestTestingRunResultProjections(boolean includeMessage) {
+        List<String> fields = new ArrayList<>(java.util.Arrays.asList(
                 TestingRunResult.TEST_RUN_ID,
                 TestingRunResult.API_INFO_KEY,
                 TestingRunResult.TEST_SUPER_TYPE,
@@ -82,9 +91,12 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 TestingRunResult.END_TIMESTAMP,
                 TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
                 TestingRunResult.TEST_RESULTS + "." + GenericTestResult._CONFIDENCE,
-                TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS,
-                TestingRunResult.TEST_RESULTS + "." + TestResult._MESSAGE
-        );
+                TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS
+        ));
+        if (includeMessage) {
+            fields.add(TestingRunResult.TEST_RESULTS + "." + TestResult._MESSAGE);
+        }
+        return Projections.include(fields);
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit) {
@@ -172,35 +184,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                         try {
                             testResult.setConfidence(Confidence.valueOf(confidence));
                             String fullMessage = genericTestResult.getString(TestResult._MESSAGE, null);
-                            String lightweightMessage = null;
-                            if (fullMessage != null && fullMessage.length() <= 10240) {  // 10KB
-                                try {
-                                    long startTime = System.currentTimeMillis();
-                                    long timeoutMs = 100;  // 100ms timeout for parsing
-
-                                    Document msgDoc = Document.parse(fullMessage);
-
-                                    // Check if parsing took too long
-                                    if (System.currentTimeMillis() - startTime > timeoutMs) {
-                                        lightweightMessage = null;  // Timeout, skip extraction
-                                    } else {
-                                        Document response = (Document) msgDoc.get("response");
-                                        if (response != null) {
-                                            Object statusCode = response.get("statusCode");
-                                            String body = response.getString("body");
-                                            String bodyPreview = (body != null && body.length() > 50)
-                                                    ? body.substring(0, 50) : body;
-                                            Document lightDoc = new Document("response",
-                                                    new Document("statusCode", statusCode).append("body", bodyPreview));
-                                            lightweightMessage = lightDoc.toJson();
-                                        }
-                                    }
-                                } catch (Exception parseException) {
-                                    // Parsing failed or timed out; null is fine — frontend handles gracefully
-                                    lightweightMessage = null;
-                                }
-                            }
-                            testResult.setMessage(lightweightMessage);
+                            testResult.setMessage(extractLightweightMessage(fullMessage));
                         } catch(Exception e){
                         }
                         testResults.add(testResult);
@@ -224,6 +208,58 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         }
 
         return testingRunResults;
+    }
+
+    /**
+     * Extracts a lightweight message JSON containing only response.statusCode and the first 50 chars of response.body.
+     * Uses fast string search (indexOf) instead of full JSON parsing — suitable for 500k+ result sets.
+     * Returns null if message is null, malformed, or has no response section.
+     */
+    private static String extractLightweightMessage(String fullMessage) {
+        if (fullMessage == null || fullMessage.isEmpty()) return null;
+        try {
+            // Locate the "response" key; everything before it is the request section
+            int responseIdx = fullMessage.indexOf("\"response\"");
+            if (responseIdx < 0) return null;
+
+            // Extract statusCode: find "statusCode": <number> after the response key
+            Integer statusCode = null;
+            int scIdx = fullMessage.indexOf("\"statusCode\"", responseIdx);
+            if (scIdx > 0) {
+                int colon = fullMessage.indexOf(':', scIdx + 12);
+                if (colon > 0) {
+                    int start = colon + 1;
+                    while (start < fullMessage.length() && fullMessage.charAt(start) == ' ') start++;
+                    int end = start;
+                    while (end < fullMessage.length() && Character.isDigit(fullMessage.charAt(end))) end++;
+                    if (end > start) {
+                        statusCode = Integer.parseInt(fullMessage.substring(start, end));
+                    }
+                }
+            }
+
+            // Extract body preview: find "body": "<value>" after the response key
+            String bodyPreview = null;
+            int bodyIdx = fullMessage.indexOf("\"body\"", responseIdx);
+            if (bodyIdx > 0) {
+                int colon = fullMessage.indexOf(':', bodyIdx + 6);
+                if (colon > 0) {
+                    int start = colon + 1;
+                    while (start < fullMessage.length() && fullMessage.charAt(start) == ' ') start++;
+                    if (start < fullMessage.length() && fullMessage.charAt(start) == '"') {
+                        start++; // skip opening quote
+                        int end = Math.min(start + 50, fullMessage.length());
+                        bodyPreview = fullMessage.substring(start, end);
+                    }
+                }
+            }
+
+            if (statusCode == null && bodyPreview == null) return null;
+            return new Document("response",
+                    new Document("statusCode", statusCode).append("body", bodyPreview)).toJson();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public Map<ObjectId,String> mapSummaryIdToTestingResultHexId(Set<String> testingRunResultHexIds){
