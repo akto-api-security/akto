@@ -89,7 +89,7 @@ public class Utils {
 
     // If SSO login is enabled, then new users are added via the SSO directory and not via the invite user flow in the dashboard
     // Dont allow such users to invite new users via dashboard
-    public static boolean allowNewUserInviteViaDashboard(int accountId, User user) {
+    public static boolean blockNewUserInviteViaDashboard(int accountId, User user) {
         if (!isSsoOnlyLoginEnabledForOrg(accountId)) {
             return false;
         }
