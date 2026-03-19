@@ -72,7 +72,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
 
     private Bson getLatestTestingRunResultProjections() {
         // For specific account, exclude message to improve performance
-        if (Context.accountId.get() == 1770839433) {
+        if (Context.accountId.get() == 1710118493) {
             return Projections.include(
                     TestingRunResult.TEST_RUN_ID,
                     TestingRunResult.API_INFO_KEY,
@@ -193,7 +193,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
 
                             // Skip message processing for specific account to improve performance
                             int accountId = Context.accountId.get();
-                            if (accountId != 1770839433) {
+                            if (accountId != 1710118493) {
                                 String fullMessage = genericTestResult.getString(TestResult._MESSAGE, null);
                                 if (fullMessage != null && fullMessage.length() <= 10240) {  // 10KB
                                     try {
