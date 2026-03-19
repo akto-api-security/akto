@@ -86,12 +86,20 @@ public class UsersCollectionsList {
         // since this function is used everywhere for the queries, taking context collections into account here
         Set<Integer> contextCollections = getContextCollectionsForUser(accountId, Context.contextSource.get());
         if(collectionList == null) {
-            collectionList = contextCollections.stream()
-                .collect(Collectors.toList());
+            // ADMIN role - see all collections in the current scope
+            collectionList = contextCollections != null ? contextCollections.stream()
+                .collect(Collectors.toList()) : new ArrayList<>();
+        } else if (collectionList.isEmpty()) {
+            // Non-admin with NO explicit collections - see all collections in their product scope
+            collectionList = contextCollections != null ? new ArrayList<>(contextCollections) : new ArrayList<>();
         } else if (contextCollections != null && !contextCollections.isEmpty()) {
+            // Non-admin with explicit collections - see intersection of their collections AND their product scope
             collectionList = collectionList.stream()
                 .filter(contextCollections::contains)
                 .collect(Collectors.toList());
+        } else {
+            // contextCollections is null or empty - no collections for this scope
+            collectionList = new ArrayList<>();
         }
         return collectionList;
     }
