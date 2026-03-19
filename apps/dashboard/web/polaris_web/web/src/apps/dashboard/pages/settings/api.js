@@ -1,4 +1,5 @@
 import request from "@/util/request"
+import { ALL_STORED_LOG_KEYS } from "./health_logs/logKeysConstants"
 
 const settingRequests = {
     inviteUsers(apiSpec) {
@@ -105,14 +106,16 @@ const settingRequests = {
             }
         })
     },
-    fetchLogsFromDb(startTime, endTime, logDb) {
+    fetchLogsFromDb(startTime, endTime, logDb, logKeys) {
+        const sendKeys = Array.isArray(logKeys) && logKeys.length > 0 && logKeys.length < ALL_STORED_LOG_KEYS.length
         return request({
             url: '/api/fetchLogsFromDb',
             method: 'post',
             data: {
                 startTime,
                 endTime,
-                logDb
+                logDb,
+                ...(sendKeys ? { logKeys } : {}),
             }
         })
     },
@@ -357,11 +360,13 @@ const settingRequests = {
         })
     },
 
-    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
+    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri, managementApiToken) {
+        const data = { clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri }
+        if (managementApiToken) data.managementApiToken = managementApiToken
         return request({
             url: '/api/addOktaSso',
             method: 'post',
-            data: {clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri}
+            data
         })
     },
 
@@ -370,6 +375,28 @@ const settingRequests = {
             url: '/api/deleteOktaSso',
             method: 'post',
             data: {}
+        })
+    },
+
+    fetchOktaGroups() {
+        return request({
+            url: '/api/fetchOktaGroups',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, opts = {}) {
+        const data = { oktaGroupToAktoUserRoleMap }
+        if (Object.prototype.hasOwnProperty.call(opts, 'managementApiToken')) {
+            const t = opts.managementApiToken
+            // Struts cannot distinguish JSON null from omitted String fields; send "" to mean "clear stored token".
+            data.managementApiToken = t == null || String(t).trim() === '' ? '' : t
+        }
+        return request({
+            url: '/api/saveOktaGroupRoleMapping',
+            method: 'post',
+            data
         })
     },
 
@@ -881,6 +908,16 @@ const settingRequests = {
                 agentId,
                 startTime,
                 endTime
+            }
+        })
+    },
+    getUserAnalysis(agentId, deviceId) {
+        return request({
+            url: '/api/getUserAnalysis',
+            method: 'post',
+            data: {
+                agentId,
+                deviceId
             }
         })
     },

@@ -1087,6 +1087,9 @@ public class StartTestAction extends UserAction {
     private TestingRunResult testingRunResult;
 
     public String fetchTestRunResultDetails() {
+        if (testingRunResultHexId == null || testingRunResultHexId.isEmpty() || !ObjectId.isValid(testingRunResultHexId)) {
+            return Action.ERROR;
+        }
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
         this.testingRunResult = VulnerableTestingRunResultDao.instance.findOneWithComparison(Filters.eq(Constants.ID, testingRunResultId), null);
         List<GenericTestResult> runResults = new ArrayList<>();
@@ -1107,6 +1110,9 @@ public class StartTestAction extends UserAction {
     private TestingRunIssues runIssues;
 
     public String fetchIssueFromTestRunResultDetails() {
+        if (testingRunResultHexId == null || testingRunResultHexId.isEmpty() || !ObjectId.isValid(testingRunResultHexId)) {
+            return Action.ERROR;
+        }
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
         TestingRunResult result = VulnerableTestingRunResultDao.instance.findOneWithComparison(Filters.eq(Constants.ID, testingRunResultId), null);
         try {

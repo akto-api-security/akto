@@ -11,31 +11,47 @@ import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import { CollectionIcon } from "../../../components/shared/CollectionIcon";
-import { 
-    getHeaders, 
-    sortOptions, 
-    resourceName, 
-    INVENTORY_PATH, 
-    INVENTORY_FILTER_KEY, 
-    groupCollectionsByAgent, 
+import useTable from "@/apps/dashboard/components/tables/TableContext";
+import {
+    getHeaders,
+    sortOptions,
+    resourceName,
+    INVENTORY_PATH,
+    INVENTORY_FILTER_KEY,
+    groupCollectionsByAgent,
     groupCollectionsByService,
     createEnvTypeFilter,
     createHostnameFilter,
     extractEndpointId,
     ROW_TYPES
 } from "./constants";
+import { CLIENT_TYPES } from "./mcpClientHelper";
+
+const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs'];
 
 function Endpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
-    const [data, setData] = useState([]);
+    const [data, setData] = useState({ all: [], 'ai_agents': [], 'mcp_servers': [], llms: [] });
     const [summaryData, setSummaryData] = useState({ totalAssets: 0, totalEndpoints: 0 });
+
+    const { tabsInfo } = useTable();
+    const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
+    const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
+    const initialSelectedTab = tableSelectedTab[window.location.pathname] || "ai_agents";
+    const [selectedTab, setSelectedTab] = useState(initialSelectedTab);
+    const [selected, setSelected] = useState(func.getTableTabIndexById(1, definedTableTabs, initialSelectedTab));
 
     const setAllCollections = PersistStore((state) => state.setAllCollections);
     const filtersMap = PersistStore((state) => state.filtersMap);
     const setFiltersMap = PersistStore((state) => state.setFiltersMap);
-    const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
-    const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
+
+    const tableCountObj = func.getTabsCount(definedTableTabs, data);
+    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo);
+
+    const handleSelectedTab = (selectedIndex) => {
+        setSelected(selectedIndex);
+    };
 
     const headers = useMemo(() => getHeaders(), []);
 
@@ -123,9 +139,14 @@ function Endpoints() {
             setSummaryData({
                 totalAssets: allData.length,
                 totalEndpoints: uniqueEndpointIds.size
+            })
+    
+            setData({
+                all: allData,
+                ai_agents: allData.filter(r => r.clientType === CLIENT_TYPES.AI_AGENT),
+                mcp_servers: allData.filter(r => r.clientType === CLIENT_TYPES.MCP_SERVER),
+                llms: allData.filter(r => r.clientType === CLIENT_TYPES.LLM),
             });
-
-            setData(allData);
             setLoading(false);
         } catch {
             setLoading(false);
@@ -189,21 +210,24 @@ function Endpoints() {
     const tableComponent = useMemo(() => (
         <GithubSimpleTable
             pageLimit={100}
-            data={data}
+            data={data[selectedTab]}
             sortOptions={sortOptions}
             resourceName={resourceName}
             filters={[]}
             headers={headers}
             selectable={false}
-            mode={IndexFiltersMode.Filtering}
+            mode={IndexFiltersMode.Default}
             headings={headers}
             useNewRow={true}
             condensedHeight={true}
             disambiguateLabel={disambiguateLabel}
             prettifyPageData={(pageData) => pageData}
             onRowClick={handleRowClick}
+            tableTabs={tableTabs}
+            onSelect={handleSelectedTab}
+            selected={selected}
         />
-    ), [data, headers, disambiguateLabel, handleRowClick]);
+    ), [data, selectedTab, headers, disambiguateLabel, handleRowClick, tableTabs, selected]);
 
     const pageTitle = useMemo(() => (
         <TitleWithInfo
