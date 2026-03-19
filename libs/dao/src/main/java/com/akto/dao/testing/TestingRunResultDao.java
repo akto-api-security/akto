@@ -43,7 +43,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
     public static final String ERRORS_KEY = TestingRunResult.TEST_RESULTS+".0."+TestResult.ERRORS+".0";
 
     // For this account, skip message field entirely — too many results, full message causes timeouts
-    private static final int SKIP_MESSAGE_ACCOUNT_ID = 1722380534;
+    private static final int SKIP_MESSAGE_ACCOUNT_ID = 1710118493;
 
     @Override
     public String getCollName() {
