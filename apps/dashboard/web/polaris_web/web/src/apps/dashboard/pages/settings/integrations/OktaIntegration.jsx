@@ -9,7 +9,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import StepsComponent from './components/StepsComponent';
 import Details from './components/Details';
 import DeleteModal from './components/DeleteModal';
-import { BASE_ROLE_OPTIONS, getBaseRoleDisplayName } from '../roles/baseRoleOptions';
+import { rolesOptions, getRoleDisplayName } from '../roles/Roles';
 
 function dashboardActionError(err, fallback) {
     const list = err?.response?.data?.actionErrors
@@ -272,7 +272,7 @@ function OktaIntegration() {
                         <Text variant="bodyMd" fontWeight="medium">{name}</Text>
                     </Box>
                     <HorizontalStack gap="3" blockAlign="center">
-                        <Badge>{getBaseRoleDisplayName(role)}</Badge>
+                        <Badge>{getRoleDisplayName(role)}</Badge>
                         {editMode && (
                             <Button plain destructive icon={DeleteMinor} onClick={() => handleRemoveGroupMapping(name)} accessibilityLabel="Remove mapping" />
                         )}
@@ -318,7 +318,7 @@ function OktaIntegration() {
     )
 
     const usedRolesForAdd = Object.values(oktaGroupToAktoUserRoleMap)
-    const availableRoleOptions = BASE_ROLE_OPTIONS.filter((r) => !usedRolesForAdd.includes(r.value))
+    const availableRoleOptions = rolesOptions.filter((r) => !usedRolesForAdd.includes(r.value))
     const roleAutocompleteQuery = (aktoRoleText || '').trim().toLowerCase()
     const roleAutocompleteOptions = availableRoleOptions
         .filter((r) => !roleAutocompleteQuery || r.label.toLowerCase().includes(roleAutocompleteQuery) || r.value.toLowerCase().includes(roleAutocompleteQuery))
@@ -383,7 +383,7 @@ function OktaIntegration() {
                         onSelect={(selected) => {
                             const v = selected.length > 0 ? selected[0] : ''
                             setNewAktoRole(v)
-                            setAktoRoleText(v ? getBaseRoleDisplayName(v) : '')
+                            setAktoRoleText(v ? getRoleDisplayName(v) : '')
                         }}
                         textField={
                             <Autocomplete.TextField

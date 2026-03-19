@@ -8,7 +8,24 @@ import PersistStore from "../../../../main/PersistStore";
 import SearchableResourceList from "../../../components/shared/SearchableResourceList";
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
 import Dropdown from "../../../components/layouts/Dropdown";
-import { BASE_ROLE_OPTIONS, getBaseRoleDisplayName } from "./baseRoleOptions";
+
+const rolesOptions = [
+    { label: 'Admin', value: 'ADMIN' },
+    { label: 'Security Engineer', value: 'MEMBER' },
+    { label: 'Developer', value: 'DEVELOPER' },
+    { label: 'Guest', value: 'GUEST' },
+]
+
+function getRoleDisplayName(role) {
+    for (const item of rolesOptions) {
+        if (item.value === role) {
+            return item.label
+        }
+    }
+    return role
+}
+
+export { rolesOptions, getRoleDisplayName }
 
 const Roles = () => {
 
@@ -165,14 +182,14 @@ const Roles = () => {
                                 content: (
                                     <ResourceListModal
                                         title={`Update ${name} role`}
-                                        activatorPlaceaholder={`${(getRoleItems(name, "apiCollectionsId") || []).length} collections accessible, ${getBaseRoleDisplayName(baseRole)} permissions${defaultInviteRole ? ', Default invite role' : ''}`}
+                                        activatorPlaceaholder={`${(getRoleItems(name, "apiCollectionsId") || []).length} collections accessible, ${getRoleDisplayName(baseRole)} permissions${defaultInviteRole ? ', Default invite role' : ''}`}
                                         isColoredActivator={true}
                                         component={<VerticalStack gap={4}>
                                             <Box paddingBlockStart={4}>
                                                 <HorizontalStack gap={6} align="center" blockAlign="center">
                                                     <OperatorDropdown
-                                                        items={BASE_ROLE_OPTIONS}
-                                                        label={getBaseRoleDisplayName(baseRole)}
+                                                        items={rolesOptions}
+                                                        label={getRoleDisplayName(baseRole)}
                                                         designer={true}
                                                         selected={(value) => {
                                                             updateBaseRole(name, value)
