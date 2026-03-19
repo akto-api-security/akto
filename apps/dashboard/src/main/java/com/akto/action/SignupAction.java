@@ -646,6 +646,53 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     }
 
     /**
+     * Fetches all Okta group names from the Okta Management API (GET /api/v1/groups).
+     * Use when adding mappings from the dashboard (no user ID available). Requires API token.
+     *
+     * @param managementBaseUrl Okta Management API base URL (e.g. https://your-domain.okta.com)
+     * @param apiToken          Okta API token (SSWS)
+     * @return list of group names; empty list if any param is null/empty or on API failure
+     */
+    public static List<String> fetchAllOktaGroupNamesFromManagementApi(String managementBaseUrl, String apiToken) {
+        if (StringUtils.isEmpty(managementBaseUrl) || StringUtils.isEmpty(apiToken)) {
+            return Collections.emptyList();
+        }
+        String url = managementBaseUrl + "/api/v1/groups";
+        String ssws = "SSWS " + apiToken;
+        try {
+            List<Map<String, Object>> groupsList = CustomHttpRequest.getRequestAsList(url, ssws);
+            return extractOktaGroupNamesFromApiResponse(groupsList);
+        } catch (Exception e) {
+            logger.errorAndAddToDb("[Okta SSO] Failed to fetch Okta groups list: " + e.getMessage(), LogDb.DASHBOARD);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Fetches Okta group names for a user from the Okta Management API.
+     * Call this when groups are not available in the access token (e.g. when the token scope does not include groups).
+     *
+     * @param managementBaseUrl Okta Management API base URL (e.g. https://your-domain.okta.com)
+     * @param apiToken          Okta API token (SSWS)
+     * @param oktaUserId        Okta user ID
+     * @return list of group names; empty list if any param is null/empty or on API failure
+     */
+    public static List<String> fetchOktaGroupsFromManagementApi(String managementBaseUrl, String apiToken, String oktaUserId) {
+        if (StringUtils.isEmpty(managementBaseUrl) || StringUtils.isEmpty(apiToken) || oktaUserId == null || oktaUserId.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String url = managementBaseUrl + "/api/v1/users/" + oktaUserId + "/groups";
+        String ssws = "SSWS " + apiToken;
+        try {
+            List<Map<String, Object>> groupsList = CustomHttpRequest.getRequestAsList(url, ssws);
+            return extractOktaGroupNamesFromApiResponse(groupsList);
+        } catch (Exception e) {
+            logger.errorAndAddToDb("[Okta SSO] Failed to fetch Okta groups for user " + oktaUserId + ": " + e.getMessage(), LogDb.DASHBOARD);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
      * Uses JWT {@code groups} first; if empty and an API token is configured, loads groups from Okta Management API.
      */
     private String fetchOktaRole(Config.OktaConfig oktaConfig, String oktaUserId, String accessToken) {
@@ -659,16 +706,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         if (StringUtils.isEmpty(oktaConfig.getApiToken()) || oktaUserId == null) {
             return RBAC.Role.MEMBER.name();
         }
-        String managementBase = oktaConfig.getManagementBaseUrl();
-        String ssws = "SSWS " + oktaConfig.getApiToken();
-        try {
-            List<Map<String, Object>> groupsList = CustomHttpRequest.getRequestAsList(
-                    managementBase + "/api/v1/users/" + oktaUserId + "/groups", ssws);
-            return resolveAktoRoleFromOktaGroupNames(extractOktaGroupNamesFromApiResponse(groupsList), oktaGroupToAktoUserRoleMap);
-        } catch (Exception e) {
-            logger.errorAndAddToDb("[Okta SSO] Failed to fetch Okta groups for user " + oktaUserId + ": " + e.getMessage(), LogDb.DASHBOARD);
-            return RBAC.Role.MEMBER.name();
-        }
+        List<String> groupsFromApi = fetchOktaGroupsFromManagementApi(
+                oktaConfig.getManagementBaseUrl(), oktaConfig.getApiToken(), oktaUserId);
+        return resolveAktoRoleFromOktaGroupNames(groupsFromApi, oktaGroupToAktoUserRoleMap);
     }
 
     private static List<String> extractOktaGroupNamesFromApiResponse(List<Map<String, Object>> groupsList) {

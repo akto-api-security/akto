@@ -2,11 +2,14 @@ package com.akto.action.user;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.bson.conversions.Bson;
 
+import com.akto.action.SignupAction;
 import com.akto.action.UserAction;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.UsersDao;
@@ -35,6 +38,8 @@ public class OktaSsoAction extends UserAction {
     /** CONFIGURED | NOT_SET — from stored apiToken only. */
     private String managementApiTokenStatus = "NOT_SET";
     private Map<String, String> oktaGroupToAktoUserRoleMap;
+    /** Fetched from Okta Management API (for autosuggest in dashboard). */
+    private List<String> oktaGroupNames;
 
     private static String managementApiTokenStatusFrom(OktaConfig c) {
         if (c == null) return "NOT_SET";
@@ -84,6 +89,26 @@ public class OktaSsoAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    /**
+     * Fetches Okta group names for autosuggest when adding mappings from the dashboard.
+     * Uses all-groups API (no user ID). Requires API token to be configured.
+     */
+    public String fetchOktaGroups() {
+        int accountId = Context.accountId.get();
+        OktaConfig oktaConfig = (OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(accountId));
+        if (oktaConfig == null) {
+            addActionError("Okta SSO is not configured.");
+            return ERROR.toUpperCase();
+        }
+        if (oktaConfig.getApiToken() == null || oktaConfig.getApiToken().isEmpty()) {
+            addActionError("Management API token is not configured. Configure it in Edit to fetch Okta groups.");
+            return ERROR.toUpperCase();
+        }
+        this.oktaGroupNames = SignupAction.fetchAllOktaGroupNamesFromManagementApi(
+                oktaConfig.getManagementBaseUrl(), oktaConfig.getApiToken());
+        return SUCCESS.toUpperCase();
+    }
+
     public String saveOktaGroupRoleMapping() {
         int accountId = Context.accountId.get();
         OktaConfig oktaConfig = (OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(accountId));
@@ -122,11 +147,16 @@ public class OktaSsoAction extends UserAction {
 
     private String validateRoleMappingValues(Map<String, String> mapping) {
         if (mapping == null) return null;
-        for (String role : mapping.values()) {
+        Set<String> rolesSeen = new HashSet<>();
+        for (Map.Entry<String, String> e : mapping.entrySet()) {
+            String role = e.getValue();
             try {
                 RBAC.Role.valueOf(role);
-            } catch (IllegalArgumentException e) {
+            } catch (IllegalArgumentException ex) {
                 return "Invalid Akto role: " + role + ". Valid values are ADMIN, MEMBER, DEVELOPER, GUEST.";
+            }
+            if (!rolesSeen.add(role)) {
+                return "One-to-one mapping required: each Akto role can be assigned to only one Okta group. Role " + role + " is mapped more than once.";
             }
         }
         return null;
@@ -204,6 +234,10 @@ public class OktaSsoAction extends UserAction {
 
     public String getManagementApiTokenStatus() {
         return managementApiTokenStatus;
+    }
+
+    public List<String> getOktaGroupNames() {
+        return oktaGroupNames != null ? oktaGroupNames : Collections.<String>emptyList();
     }
 
 }

@@ -373,6 +373,14 @@ const settingRequests = {
         })
     },
 
+    fetchOktaGroups() {
+        return request({
+            url: '/api/fetchOktaGroups',
+            method: 'post',
+            data: {}
+        })
+    },
+
     saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, opts = {}) {
         const { managementApiToken, clearManagementApiToken } = opts
         const data = { oktaGroupToAktoUserRoleMap }

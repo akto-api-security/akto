@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import CopyCommand from '../../../components/shared/CopyCommand';
 import IntegrationsLayout from './IntegrationsLayout';
-import { Badge, Box, Button, Divider, Form, FormLayout, HorizontalStack, LegacyCard, Link, Select, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Autocomplete, Badge, Box, Button, Divider, Form, FormLayout, HorizontalStack, LegacyCard, Link, Text, TextField, VerticalStack } from '@shopify/polaris';
 import { DeleteMinor, EditMinor, PlusMinor } from '@shopify/polaris-icons';
 import func from "@/util/func"
 import settingRequests from '../api';
@@ -29,6 +29,10 @@ const AKTO_ROLE_OPTIONS = [
     { label: 'Guest', value: 'GUEST' },
 ]
 
+function getAktoRoleOptionLabel(value) {
+    return AKTO_ROLE_OPTIONS.find((r) => r.value === value)?.label || value
+}
+
 function OktaIntegration() {
     const hostname = window.location.origin
 
@@ -54,8 +58,13 @@ function OktaIntegration() {
     const [oktaGroupToAktoUserRoleMap, setOktaGroupToAktoUserRoleMap] = useState({})
     const [editMode, setEditMode] = useState(false)
     const [newGroupName, setNewGroupName] = useState('')
-    const [newAktoRole, setNewAktoRole] = useState('MEMBER')
+    const [newAktoRole, setNewAktoRole] = useState('')
+    /** Text shown in Akto role Autocomplete (matches Okta group name field UX). */
+    const [aktoRoleText, setAktoRoleText] = useState('')
     const [savedOktaGroupToAktoUserRoleMap, setSavedOktaGroupToAktoUserRoleMap] = useState({})
+    /** Fetched from Okta Management API (all groups) when Edit + API token; used to autosuggest group name. */
+    const [oktaGroupNames, setOktaGroupNames] = useState([])
+    const [loadingOktaGroups, setLoadingOktaGroups] = useState(false)
 
     const redirectUri = `${hostname}/authorization-code/callback`
     const initiateLoginUri = `${hostname}/okta-initiate-login?accountId=${window.ACTIVE_ACCOUNT}`
@@ -74,7 +83,8 @@ function OktaIntegration() {
 
     const resetMappingDraft = () => {
         setNewGroupName('')
-        setNewAktoRole('MEMBER')
+        setNewAktoRole('')
+        setAktoRoleText('')
     }
 
     const handleSubmit = async () => {
@@ -150,7 +160,21 @@ function OktaIntegration() {
             func.setToast(true, true, "Group name cannot be empty")
             return
         }
-        setOktaGroupToAktoUserRoleMap(prev => ({ ...prev, [trimmed]: newAktoRole }))
+        if (!newAktoRole) {
+            func.setToast(true, true, 'Select an Akto role from the suggestions or type the full role name.')
+            return
+        }
+        const usedRoles = Object.values(oktaGroupToAktoUserRoleMap)
+        if (usedRoles.includes(newAktoRole)) {
+            func.setToast(true, true, "One-to-one mapping only: this Akto role is already assigned to another Okta group.")
+            return
+        }
+        if (oktaGroupToAktoUserRoleMap[trimmed]) {
+            func.setToast(true, true, "This Okta group is already mapped. Remove it first to change.")
+            return
+        }
+        const nextMap = { ...oktaGroupToAktoUserRoleMap, [trimmed]: newAktoRole }
+        setOktaGroupToAktoUserRoleMap(nextMap)
         resetMappingDraft()
     }
 
@@ -205,13 +229,30 @@ function OktaIntegration() {
         setOktaGroupToAktoUserRoleMap({ ...savedOktaGroupToAktoUserRoleMap })
         setEditMode(false)
         setEditApiToken('')
+        setOktaGroupNames([])
         resetMappingDraft()
     }
 
-    const handleEditClick = () => {
+    const handleEditClick = async () => {
         setEditMode(true)
         setSavedOktaGroupToAktoUserRoleMap({ ...oktaGroupToAktoUserRoleMap })
         setEditApiToken(hasSavedManagementToken ? TOKEN_EDIT_MASK : '')
+        setOktaGroupNames([])
+        setNewGroupName('')
+        setNewAktoRole('')
+        setAktoRoleText('')
+        if (hasSavedManagementToken) {
+            setLoadingOktaGroups(true)
+            try {
+                const resp = await settingRequests.fetchOktaGroups()
+                const names = resp?.oktaGroupNames || []
+                setOktaGroupNames(Array.isArray(names) ? names : [])
+            } catch (e) {
+                func.setToast(true, true, dashboardActionError(e, 'Could not fetch Okta groups.'))
+            } finally {
+                setLoadingOktaGroups(false)
+            }
+        }
     }
 
     const handleDelete = async () => {
@@ -230,7 +271,6 @@ function OktaIntegration() {
 
     useEffect(() => { fetchData() }, [])
 
-    const getAktoRoleLabel = (role) => AKTO_ROLE_OPTIONS.find(r => r.value === role)?.label || role
     const hasGroupMappings = Object.keys(oktaGroupToAktoUserRoleMap).length > 0
 
     const mappingRows = Object.entries(oktaGroupToAktoUserRoleMap).map(([name, role], index) => (
@@ -242,7 +282,7 @@ function OktaIntegration() {
                         <Text variant="bodyMd" fontWeight="medium">{name}</Text>
                     </Box>
                     <HorizontalStack gap="3" blockAlign="center">
-                        <Badge>{getAktoRoleLabel(role)}</Badge>
+                        <Badge>{getAktoRoleOptionLabel(role)}</Badge>
                         {editMode && (
                             <Button plain destructive icon={DeleteMinor} onClick={() => handleRemoveGroupMapping(name)} accessibilityLabel="Remove mapping" />
                         )}
@@ -287,6 +327,13 @@ function OktaIntegration() {
         </VerticalStack>
     )
 
+    const usedRolesForAdd = Object.values(oktaGroupToAktoUserRoleMap)
+    const availableRoleOptions = AKTO_ROLE_OPTIONS.filter((r) => !usedRolesForAdd.includes(r.value))
+    const roleAutocompleteQuery = (aktoRoleText || '').trim().toLowerCase()
+    const roleAutocompleteOptions = availableRoleOptions
+        .filter((r) => !roleAutocompleteQuery || r.label.toLowerCase().includes(roleAutocompleteQuery) || r.value.toLowerCase().includes(roleAutocompleteQuery))
+        .map((r) => ({ label: r.label, value: r.value }))
+
     const editModeContent = (
         <VerticalStack gap="4">
             <Text fontWeight="semibold" variant="headingXs">Group → role mappings</Text>
@@ -301,14 +348,72 @@ function OktaIntegration() {
             )}
             <Text fontWeight="semibold" variant="headingXs">Add mapping</Text>
             <Text variant="bodySm" color="subdued">
+                One-to-one mapping: each Okta group maps to one Akto role, and each role can be used only once.
                 Use the exact Okta group name (from the access token or from Okta when using the Management API).
+                {hasSavedManagementToken && oktaGroupNames.length > 0 && ' Suggestions are loaded from Okta.'}
             </Text>
             <HorizontalStack gap="3" blockAlign="end" wrap={false}>
                 <Box minWidth="200px" width="100%">
-                    <TextField label="Okta group name" placeholder="e.g. Akto Admin" value={newGroupName} onChange={setNewGroupName} autoComplete="off" />
+                    {hasSavedManagementToken && oktaGroupNames.length > 0 ? (
+                        <Autocomplete
+                            options={oktaGroupNames
+                                .filter((name) => {
+                                    const q = (newGroupName || '').trim().toLowerCase()
+                                    return !q || name.toLowerCase().includes(q)
+                                })
+                                .map((name) => ({ label: name, value: name }))}
+                            selected={newGroupName && oktaGroupNames.includes(newGroupName) ? [newGroupName] : []}
+                            onSelect={(selected) => setNewGroupName(selected.length > 0 ? selected[0] : '')}
+                            textField={
+                                <Autocomplete.TextField
+                                    label="Okta group name"
+                                    value={newGroupName}
+                                    onChange={setNewGroupName}
+                                    placeholder={loadingOktaGroups ? 'Loading groups…' : 'e.g. Akto Admin'}
+                                    autoComplete="off"
+                                    disabled={loadingOktaGroups}
+                                />
+                            }
+                        />
+                    ) : (
+                        <TextField
+                            label="Okta group name"
+                            placeholder={loadingOktaGroups ? 'Loading groups…' : 'e.g. Akto Admin'}
+                            value={newGroupName}
+                            onChange={setNewGroupName}
+                            autoComplete="off"
+                            disabled={loadingOktaGroups}
+                        />
+                    )}
                 </Box>
                 <Box minWidth="200px" width="100%">
-                    <Select label="Akto role" options={AKTO_ROLE_OPTIONS} value={newAktoRole} onChange={setNewAktoRole} />
+                    <Autocomplete
+                        options={roleAutocompleteOptions}
+                        selected={newAktoRole && availableRoleOptions.some((r) => r.value === newAktoRole) ? [newAktoRole] : []}
+                        onSelect={(selected) => {
+                            const v = selected.length > 0 ? selected[0] : ''
+                            setNewAktoRole(v)
+                            setAktoRoleText(v ? getAktoRoleOptionLabel(v) : '')
+                        }}
+                        textField={
+                            <Autocomplete.TextField
+                                label="Akto role"
+                                value={aktoRoleText}
+                                onChange={(v) => {
+                                    setAktoRoleText(v)
+                                    const vTrim = v.trim()
+                                    const exact = availableRoleOptions.find(
+                                        (r) => r.label.toLowerCase() === vTrim.toLowerCase()
+                                            || r.value.toLowerCase() === vTrim.toLowerCase()
+                                    )
+                                    if (exact) setNewAktoRole(exact.value)
+                                    else setNewAktoRole('')
+                                }}
+                                placeholder="Search or select Akto role"
+                                autoComplete="off"
+                            />
+                        }
+                    />
                 </Box>
                 <Box paddingBlockStart="6"><Button onClick={handleAddMapping}>Add</Button></Box>
             </HorizontalStack>
@@ -325,7 +430,7 @@ function OktaIntegration() {
                 autoComplete="new-password"
                 name="okta-sso-management-api-token-edit"
                 placeholder={hasSavedManagementToken ? undefined : 'Paste SSWS token if needed'}
-                helpText={hasSavedManagementToken ? undefined : 'Optional. Paste SSWS token from Okta if users’ access tokens do not include a groups claim.'}
+                helpText={hasSavedManagementToken ? undefined : 'Optional. Paste SSWS token from Okta if users access tokens do not include a groups claim.'}
             />
             <HorizontalStack align="end" gap="2">
                 <Button onClick={handleCancelEdit}>Cancel</Button>
