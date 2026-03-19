@@ -21,7 +21,7 @@ import EmptySampleApi from "./EmptySampleApi";
 import Store from "../../../store";
 import LocalStore from "../../../../main/LocalStorageStore";
 import observeFunc from "../../observe/transform";
-import { CALLBACK_STATUS_MESSAGES, getCallbackCheckError, getResultColor, getResultDescription, isCallbackTest, markTestResultVulnerable, normalizeCallbackUuids, startCallbackPolling, startPlaygroundPolling } from "../webhookCallbackUtils"
+import { getCallbackCheckError, getResultColor, getResultDescription, isCallbackTest, markTestResultVulnerable, normalizeCallbackUuids, startCallbackPolling, startPlaygroundPolling } from "../webhookCallbackUtils"
 
 const SampleApi = () => {
 
@@ -42,7 +42,6 @@ const SampleApi = () => {
     const [editorData, setEditorData] = useState({message: ''})
     const [showEmptyLayout, setShowEmptyLayout] = useState(false)
     const [callbackStatus, setCallbackStatus] = useState(null)
-    const [callbackUuids, setCallbackUuids] = useState([])
     const [isCheckingCallback, setIsCheckingCallback] = useState(false)
 
     const currentContent = TestEditorStore(state => state.currentContent)
@@ -189,10 +188,15 @@ const SampleApi = () => {
 
     useEffect(()=> {
         if(testResult){
-            let temp =  testResult?.agentConversationResults ? testResult?.agentConversationResults?.length > 0 : false;
-            setShowTestResult(!temp);
-            setChatBotModal(temp);
-            
+            const hasAgentChat = testResult?.agentConversationResults?.length > 0
+            if (hasAgentChat) {
+                setChatBotModal(true)
+                setShowTestResult(false)
+            } else {
+                setChatBotModal(false)
+                const hasCallbackTokens = normalizeCallbackUuids(testResult).length > 0 && isCallbackTest(testResult)
+                setShowTestResult(!hasCallbackTokens)
+            }
         } else {
             setShowTestResult(false);
         }
@@ -304,17 +308,12 @@ const SampleApi = () => {
         setIsCheckingCallback(false)
     }
 
-    const checkCallbackHit = () => {
-        const err = getCallbackCheckError(testResult, callbackUuids)
-        if (err) {
-            setToastConfig({ isActive: true, isError: true, message: err })
-            return
-        }
+    const startCallbackPollingWithUuids = (uuids) => {
         stopCallbackPolling()
         setCallbackStatus("pending")
         setIsCheckingCallback(true)
         stopCallbackPollingRef.current = startCallbackPolling({
-            uuids: callbackUuids,
+            uuids,
             fetchStatus: testEditorRequests.fetchCallbackStatusForTestEditor,
             onHit: () => {
                 stopCallbackPollingRef.current = null
@@ -328,6 +327,19 @@ const SampleApi = () => {
                 setCallbackStatus("not_hit")
             },
         })
+    }
+
+    const callbackUuidsFromResult = testResult ? normalizeCallbackUuids(testResult) : []
+    const showCallbackButton = testResult && isCallbackTest(testResult) && callbackUuidsFromResult.length > 0 && !testResult?.testingRunResult?.vulnerable
+
+    const checkCallbackHit = () => {
+        const uuids = callbackUuidsFromResult
+        const err = getCallbackCheckError(testResult, uuids)
+        if (err) {
+            setToastConfig({ isActive: true, isError: true, message: err })
+            return
+        }
+        startCallbackPollingWithUuids(uuids)
     }
     const runTest = async()=>{
         if(isChatBotOpen) {
@@ -357,6 +369,10 @@ const SampleApi = () => {
                             if (intervalRef.current) intervalRef.current()
                             intervalRef.current = null
                             setTestResult(result)
+                            const uuids = normalizeCallbackUuids(result)
+                            if (uuids.length > 0 && isCallbackTest(result) && !result?.testingRunResult?.vulnerable) {
+                                startCallbackPollingWithUuids(uuids)
+                            }
                             resolve()
                         },
                         onTimeout: () => {
@@ -369,7 +385,10 @@ const SampleApi = () => {
             }
             else {
                 setTestResult(resp)
-                setCallbackUuids(normalizeCallbackUuids(resp))
+                const uuids = normalizeCallbackUuids(resp)
+                if (uuids.length > 0 && isCallbackTest(resp) && !resp?.testingRunResult?.vulnerable) {
+                    startCallbackPollingWithUuids(uuids)
+                }
             }
             if(resp?.agentConversationResults?.length > 0){
                 let result = testingFunc.prepareConversationsList(resp?.agentConversationResults)
@@ -395,7 +414,7 @@ const SampleApi = () => {
         setShowTestResult(!showTestResult);
     }
 
-    const getColor = () => getResultColor(testResult)
+    const getColor = () => getResultColor(testResult, callbackStatus)
     const getDescription = () => getResultDescription({ testResult, callbackStatus, isChatBotOpen, mapLabel, getDashboardCategory })
 
     const closeModal = () => {
@@ -405,13 +424,23 @@ const SampleApi = () => {
 
     const resultComponent = (
         <Box background={getColor()} width="100%" padding={"2"}>
-            <Button id={"test-results"} removeUnderline monochrome plain 
-            onClick={testResult ? showResults : () => {}}
-            icon={testResult ? ChevronUpMinor : undefined}>
-                {getDescription()}
-            </Button>
+            <HorizontalStack gap="2" blockAlign="center" wrap align="space-between">
+                <Box className="test-result-strip-label">
+                    <Button id={"test-results"} removeUnderline monochrome plain
+                        onClick={testResult ? showResults : () => {}}
+                        icon={testResult ? ChevronUpMinor : undefined}>
+                        {getDescription()}
+                    </Button>
+                </Box>
+                {showCallbackButton && (
+                    <Tooltip content="Re-check if the app triggered the callback (e.g. slow SSRF). The result above is from the validate block at run time.">
+                        <Button size="slim" onClick={checkCallbackHit} loading={isCheckingCallback} disabled={isCheckingCallback}>
+                            {isCheckingCallback ? "Checking webhook hit..." : "Check webhook hit"}
+                        </Button>
+                    </Tooltip>
+                )}
+            </HorizontalStack>
         </Box>
-
     )
 
     const currentSeverity = selectedTest?.value !== undefined ? subCategoryMap[selectedTest?.value]?.superCategory?.severity._name : "HIGH"
@@ -469,16 +498,6 @@ const SampleApi = () => {
                     testId={selectedTest?.value}
                     source="editor"
                 />
-                {testResult && isCallbackTest(testResult) && callbackUuids?.length > 0 && (
-                    <Box paddingBlockStart={"4"}>
-                        <HorizontalStack gap={2}>
-                            <Button size="slim" onClick={checkCallbackHit} loading={isCheckingCallback} disabled={isCheckingCallback}>
-                                {isCheckingCallback ? "Checking webhook hit..." : "Check webhook hit"}
-                            </Button>
-                            {callbackStatus && <Text variant="bodySm">{CALLBACK_STATUS_MESSAGES[callbackStatus]}</Text>}
-                        </HorizontalStack>
-                    </Box>
-                )}
                 </Box>
                 </Frame>
             </Modal>

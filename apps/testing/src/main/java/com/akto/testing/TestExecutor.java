@@ -1163,13 +1163,13 @@ public class TestExecutor {
         Map<String, Object> varMap = new HashMap<>();
         String severity = testConfig.getInfo().getSeverity();
 
-        // Add test context to varMap for SSRF UUID mapping
-        if(testRunId != null && testRunResultSummaryId != null) {
+        // Add test context to varMap for SSRF UUID mapping (batch runs and test editor)
+        varMap.put("accountId", Context.accountId.get());
+        varMap.put("apiInfoKey", apiInfoKey.toString());
+        varMap.put("testSubType", testSubType);
+        if (testRunId != null && testRunResultSummaryId != null) {
             varMap.put("testRunId", testRunId.toHexString());
             varMap.put("testRunResultSummaryId", testRunResultSummaryId.toHexString());
-            varMap.put("accountId", Context.accountId.get());
-            varMap.put("apiInfoKey", apiInfoKey.toString());
-            varMap.put("testSubType", testSubType);
         }
         for (String key: wordListsMap.keySet()) {
             varMap.put("wordList_" + key, wordListsMap.get(key));
@@ -1282,6 +1282,10 @@ public class TestExecutor {
             @SuppressWarnings("unchecked")
             List<String> callbackUuids = (List<String>) callbackUuidsObj;
             ret.setCallbackUuids(callbackUuids);
+            // Validate block ran immediately; callback hit may arrive later. Mark result as pending so UI can poll.
+            if (!vulnerable && !callbackUuids.isEmpty()) {
+                ret.setCallbackCheckPending(true);
+            }
         }
 
         if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {

@@ -54,6 +54,8 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
+
+import static com.akto.test_editor.Utils.sendRequestToWebhookService;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -486,6 +488,9 @@ public class SaveTestEditorAction extends UserAction {
         }else {
             if(testingRunPlayGround.getTestingRunResult() != null) {
                 this.testingRunResult = testingRunPlayGround.getTestingRunResult();
+                if (this.testingRunResult.getCallbackUuids() != null && !this.testingRunResult.getCallbackUuids().isEmpty()) {
+                    this.callbackUuids = this.testingRunResult.getCallbackUuids();
+                }
                 generateTestingRunResultAndIssue(testConfig, infoKey, testingRunResult);
             } else {
                 this.testingRunResult = failedResult;
@@ -511,7 +516,7 @@ public class SaveTestEditorAction extends UserAction {
                     hit = true;
                     break;
                 }
-                if (com.akto.test_editor.Utils.sendRequestToWebhookService(uuid)) {
+                if (sendRequestToWebhookService(uuid)) {
                     hit = true;
                     TestingRunWebhookDao.instance.markUrlHit(uuid);
                     break;

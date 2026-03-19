@@ -1,6 +1,3 @@
-/**
- * Utils for webhook callback (e.g. SSRF) polling and status in the test editor.
- */
 import func from "@/util/func"
 
 export const CALLBACK_STATUS_MESSAGES = {
@@ -24,8 +21,11 @@ export const PLAYGROUND_POLL_CONFIG = {
 export const isCallbackTest = (testResult) =>
     testResult?.testingRunResult?.testSubType?.toLowerCase().includes("ssrf")
 
-export const normalizeCallbackUuids = (resp) =>
-    Array.isArray(resp?.callbackUuids) && resp.callbackUuids.length > 0 ? resp.callbackUuids : []
+export const normalizeCallbackUuids = (resp) => {
+    if (Array.isArray(resp?.callbackUuids) && resp.callbackUuids.length > 0) return resp.callbackUuids
+    const fromResult = resp?.testingRunResult?.callbackUuids
+    return Array.isArray(fromResult) && fromResult.length > 0 ? fromResult : []
+}
 
 export const getCallbackStatusMessage = (status) =>
     status ? (CALLBACK_STATUS_MESSAGES[status] || "No webhook callback observed") : null
@@ -57,23 +57,17 @@ export function startCallbackPolling({ uuids, fetchStatus, onHit, onNotHit }) {
     }
 }
 
-/** Returns error message if callback check is not allowed, null otherwise. */
 export const getCallbackCheckError = (testResult, callbackUuids) => {
     const uuids = callbackUuids || []
     if (!testResult || uuids.length === 0) return CALLBACK_NO_TOKENS_MESSAGE
     return null
 }
 
-/** Returns test result with vulnerable set to true, or same result if unchanged. */
 export const markTestResultVulnerable = (prevResult) =>
     prevResult?.testingRunResult
         ? { ...prevResult, testingRunResult: { ...prevResult.testingRunResult, vulnerable: true } }
         : prevResult
 
-/**
- * Polls playground status until COMPLETED or max attempts. Returns stop() to clear the interval.
- * @param {{ playgroundHexId: string, fetchStatus: (id: string) => Promise<{ testingRunPlaygroundStatus?: string }>, onComplete: (result: any) => void, onTimeout: () => void }}
- */
 export function startPlaygroundPolling({ playgroundHexId, fetchStatus, onComplete, onTimeout }) {
     let attempts = 0
     const intervalId = setInterval(async () => {
@@ -99,9 +93,15 @@ export function startPlaygroundPolling({ playgroundHexId, fetchStatus, onComplet
 
 export const SEVERITY_CLASS = { HIGH: "bg-critical", MEDIUM: "bg-caution", LOW: "bg-info" }
 
-export const getResultColor = (testResult) => {
+export const getResultColor = (testResult, callbackStatus) => {
     if (!testResult) return "bg"
-    if (!testResult.testingRunResult.vulnerable) return "bg-success"
+    if (!testResult.testingRunResult.vulnerable) {
+        if (isCallbackTest(testResult)) {
+            const isPending = callbackStatus === "pending" || testResult.testingRunResult.callbackCheckPending
+            return isPending ? "bg" : "bg-success"
+        }
+        return "bg-success"
+    }
     const status = func.getRunResultSeverity(testResult.testingRunResult, testResult.subCategoryMap)?.toUpperCase()
     return SEVERITY_CLASS[status] || "bg"
 }
@@ -109,10 +109,11 @@ export const getResultColor = (testResult) => {
 export const getResultDescription = ({ testResult, callbackStatus, isChatBotOpen, mapLabel, getDashboardCategory }) => {
     if (isChatBotOpen) return "Chat with the agent"
     if (!testResult) return `${mapLabel('Run test', getDashboardCategory())} to see Results`
-    if (isCallbackTest(testResult) && callbackStatus) return getCallbackStatusMessage(callbackStatus)
     if (testResult.testingRunResult.vulnerable) {
         const status = func.getRunResultSeverity(testResult.testingRunResult, testResult.subCategoryMap)
         return func.toSentenceCase(status) + " vulnerability found"
     }
+    if (isCallbackTest(testResult) && callbackStatus) return getCallbackStatusMessage(callbackStatus)
+    if (testResult.testingRunResult?.callbackCheckPending) return CALLBACK_STATUS_MESSAGES.pending
     return "No vulnerability found"
 }
