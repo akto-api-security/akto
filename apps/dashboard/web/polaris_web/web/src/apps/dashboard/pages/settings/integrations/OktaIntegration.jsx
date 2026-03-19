@@ -17,9 +17,11 @@ function dashboardActionError(err, fallback) {
 
 /** Editable mask when a token exists; user selects all + Delete to clear, or paste to replace. */
 const TOKEN_EDIT_MASK = '**********'
+/** Shown in details list when a token is stored (value is never returned from API). */
+const MANAGEMENT_API_TOKEN_CONFIGURED_DISPLAY = '*****'
 
-function managementTokenStatusFromResponse(resp) {
-    return resp?.managementApiTokenStatus === 'CONFIGURED' ? 'CONFIGURED' : 'NOT_SET'
+function managementTokenConfiguredFromResponse(resp) {
+    return resp?.managementApiTokenStatus === true
 }
 
 const AKTO_ROLE_OPTIONS = [
@@ -41,11 +43,11 @@ function OktaIntegration() {
     const [clientId, setClientId] = useState('')
     const [clientSecret, setClientSecret] = useState('')
     const [setupApiToken, setSetupApiToken] = useState('')
-    /** CONFIGURED | NOT_SET — from server (stored apiToken); single source of truth. */
-    const [managementApiTokenStatus, setManagementApiTokenStatus] = useState('NOT_SET')
-    const hasSavedManagementToken = managementApiTokenStatus === 'CONFIGURED'
+    /** From server: whether a non-empty Management API token is stored. */
+    const [managementApiTokenConfigured, setManagementApiTokenConfigured] = useState(false)
+    const hasSavedManagementToken = managementApiTokenConfigured
     const managementApiTokenDisplay = hasSavedManagementToken
-        ? 'Configured (SSWS token stored — not shown)'
+        ? MANAGEMENT_API_TOKEN_CONFIGURED_DISPLAY
         : 'Not set (optional)'
     const [editApiToken, setEditApiToken] = useState('')
     const [savingSettings, setSavingSettings] = useState(false)
@@ -101,7 +103,7 @@ function OktaIntegration() {
             setupApiToken.trim() || undefined
         )
         func.setToast(true, false, "Okta SSO saved successfully!")
-        setManagementApiTokenStatus(setupApiToken.trim() ? 'CONFIGURED' : 'NOT_SET')
+        setManagementApiTokenConfigured(Boolean(setupApiToken.trim()))
         setSetupApiToken('')
         setComponentType(2)
     }
@@ -141,7 +143,7 @@ function OktaIntegration() {
                 setClientId(resp.clientId)
                 setAuthorizationServerId(resp.authorisationServerId)
                 setOktaDomain(resp.oktaDomain)
-                setManagementApiTokenStatus(managementTokenStatusFromResponse(resp))
+                setManagementApiTokenConfigured(managementTokenConfiguredFromResponse(resp))
                 const grpMap = resp.oktaGroupToAktoUserRoleMap || {}
                 setOktaGroupToAktoUserRoleMap(grpMap)
                 setSavedOktaGroupToAktoUserRoleMap(grpMap)
@@ -212,7 +214,7 @@ function OktaIntegration() {
                     toastMsg = 'Group mappings and API token updated.'
                 }
             }
-            setManagementApiTokenStatus(managementTokenStatusFromResponse(resp))
+            setManagementApiTokenConfigured(managementTokenConfiguredFromResponse(resp))
             setSavedOktaGroupToAktoUserRoleMap({ ...oktaGroupToAktoUserRoleMap })
             setEditMode(false)
             resetMappingDraft()

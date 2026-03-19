@@ -35,16 +35,16 @@ public class OktaSsoAction extends UserAction {
     /** Optional: Okta API token (SSWS) to read user group membership when groups are not in the access token. */
     private String managementApiToken;
     private boolean clearManagementApiToken;
-    /** CONFIGURED | NOT_SET — from stored apiToken only. */
-    private String managementApiTokenStatus = "NOT_SET";
+    /** True when a non-empty Management API token (SSWS) is stored. */
+    private boolean managementApiTokenStatus;
     private Map<String, String> oktaGroupToAktoUserRoleMap;
     /** Fetched from Okta Management API (for autosuggest in dashboard). */
     private List<String> oktaGroupNames;
 
-    private static String managementApiTokenStatusFrom(OktaConfig c) {
-        if (c == null) return "NOT_SET";
+    private static boolean managementApiTokenStatusFrom(OktaConfig c) {
+        if (c == null) return false;
         String t = c.getApiToken();
-        return (t != null && !t.isEmpty()) ? "CONFIGURED" : "NOT_SET";
+        return t != null && !t.isEmpty();
     }
 
     public String addOktaSso() {
@@ -232,7 +232,7 @@ public class OktaSsoAction extends UserAction {
         this.clearManagementApiToken = clearManagementApiToken;
     }
 
-    public String getManagementApiTokenStatus() {
+    public boolean isManagementApiTokenStatus() {
         return managementApiTokenStatus;
     }
 
