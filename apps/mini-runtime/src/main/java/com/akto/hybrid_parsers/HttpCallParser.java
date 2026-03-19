@@ -320,6 +320,7 @@ public class HttpCallParser {
                     && !source.equals(Constants.AI_AGENT_SOURCE_DATABRICS)
                     && !source.equals(Constants.AI_AGENT_SOURCE_VERTEX)
                     && !source.equals(Constants.AI_AGENT_SOURCE_SNOWFLAKE)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)
                     )) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
@@ -331,6 +332,11 @@ public class HttpCallParser {
                 // No bot name provided, log warning and use base hostname as-is
                 loggerMaker.infoAndAddToDb("AI agent traffic from " + source + " missing bot-name in tags. Using base hostname: " + baseHostname, LogDb.RUNTIME);
                 return baseHostname;
+            }
+
+            // Microsoft Defender traffic: collection name is bot-name.openclaw.defender.com
+            if (source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)) {
+                return botName + ".openclaw.defender.com";
             }
 
             // Reconstruct full hostname: bot-name.base-hostname
