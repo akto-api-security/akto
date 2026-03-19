@@ -1,4 +1,5 @@
 import request from "@/util/request"
+import { ALL_STORED_LOG_KEYS } from "./health_logs/logKeysConstants"
 
 const settingRequests = {
     inviteUsers(apiSpec) {
@@ -105,14 +106,16 @@ const settingRequests = {
             }
         })
     },
-    fetchLogsFromDb(startTime, endTime, logDb) {
+    fetchLogsFromDb(startTime, endTime, logDb, logKeys) {
+        const sendKeys = Array.isArray(logKeys) && logKeys.length > 0 && logKeys.length < ALL_STORED_LOG_KEYS.length
         return request({
             url: '/api/fetchLogsFromDb',
             method: 'post',
             data: {
                 startTime,
                 endTime,
-                logDb
+                logDb,
+                ...(sendKeys ? { logKeys } : {}),
             }
         })
     },

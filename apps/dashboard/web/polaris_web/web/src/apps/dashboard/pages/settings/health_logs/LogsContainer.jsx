@@ -1,4 +1,4 @@
-import { Scrollable, Spinner, VerticalStack } from "@shopify/polaris";
+import { Scrollable, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import { tokens } from "@shopify/polaris-tokens"
 
