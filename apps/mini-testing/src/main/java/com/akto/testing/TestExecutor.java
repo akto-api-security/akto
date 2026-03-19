@@ -1181,7 +1181,17 @@ public class TestExecutor {
         TestingRunResult ret = new TestingRunResult(
             testRunId, apiInfoKey, testSuperType, testSubType ,testResults.getTestResults(),
             vulnerable,singleTypeInfos,confidencePercentage,startTime,
-            endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs);  
+            endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs);
+
+        Object callbackUuidsObj = varMap.get("random_uuid");
+        if (callbackUuidsObj instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> callbackUuids = (List<String>) callbackUuidsObj;
+            ret.setCallbackUuids(callbackUuids);
+            if (!vulnerable && callbackUuids != null && !callbackUuids.isEmpty()) {
+                ret.setCallbackCheckPending(true);
+            }
+        }
 
         if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
             try {
