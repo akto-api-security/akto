@@ -15,6 +15,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.password_reset.PasswordResetUtils;
 import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -29,12 +30,7 @@ import org.bson.conversions.Bson;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
 
@@ -69,6 +65,14 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             RBAC rbac = userToRBAC.get(userObj.getInt("id"));
             String status = (rbac == null || rbac.getRole() == null) ? Role.MEMBER.getName() : rbac.getRole();
             userObj.append("role", status);
+
+            // Add product scopes to the user object
+            if (rbac != null && rbac.getProductScopes() != null) {
+                userObj.append("productScopes", rbac.getProductScopes());
+            } else {
+                userObj.append("productScopes", java.util.Arrays.asList("API"));
+            }
+
             try {
                 String login = userObj.getString(User.LOGIN);
                 if (login != null) {
@@ -186,14 +190,31 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                         if(isValidUpdateRole && shouldChangeRole){
                             /*
                              * We do only want to update the role, if it exists.
+                             * Also update productScopes if provided, otherwise default to ["API"]
                              */
+                            List<String> scopesToSet = this.productScopes != null && !this.productScopes.isEmpty()
+                                ? this.productScopes
+                                : new ArrayList<>(Arrays.asList("API"));
+
                             RBACDao.instance.updateOneNoUpsert(
                                 filterRbac,
-                                // Saving the custom role here.
-                                Updates.set(RBAC.ROLE, reqUserRole));
+                                Updates.combine(
+                                    Updates.set(RBAC.ROLE, reqUserRole),
+                                    Updates.set(RBAC.PRODUCT_SCOPES, scopesToSet)
+                                ));
 
                                 RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
                                 UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
+                                // Clear context collections cache for all scopes
+                                if (this.productScopes != null) {
+                                    for (String scope : this.productScopes) {
+                                        try {
+                                            UsersCollectionsList.deleteContextCollectionsForUser(accId, CONTEXT_SOURCE.valueOf(scope));
+                                        } catch (Exception e) {
+                                            loggerMaker.errorAndAddToDb(e, "Error clearing cache for scope: " + scope);
+                                        }
+                                    }
+                                }
                             return Action.SUCCESS.toUpperCase();
                         }else{
                             addActionError("User doesn't have access to modify this role.");
@@ -203,7 +224,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                         addActionError("User role doesn't exist.");
                         return Action.ERROR.toUpperCase();
                     }
-                    
+
                 } else {
                     addActionError("User doesn't exist");
                     return Action.ERROR.toUpperCase();
@@ -222,9 +243,18 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
     }
 
     private String userRole;
+    private List<String> productScopes;  // Product scopes for the role (e.g., ["API", "MCP", "AGENTIC"])
 
     public String makeAdmin(){
         return performAction(ActionType.UPDATE_USER_ROLE, this.userRole.toUpperCase());
+    }
+
+    public void setProductScopes(List<String> productScopes) {
+        this.productScopes = productScopes;
+    }
+
+    public List<String> getProductScopes() {
+        return this.productScopes;
     }
 
     private Role[] userRoleHierarchy;

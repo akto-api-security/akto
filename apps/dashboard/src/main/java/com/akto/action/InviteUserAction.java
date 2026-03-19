@@ -113,6 +113,7 @@ public class InviteUserAction extends UserAction{
 
     private String finalInviteCode;
     private String inviteeRole;
+    private List<String> productScopes;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InviteUserAction.class, LoggerMaker.LogDb.DASHBOARD);
 
@@ -206,6 +207,10 @@ public class InviteUserAction extends UserAction{
              * There should only be one invite code per user per account.
              * So if we update with upsert:true per account-inviteeEmail
              */
+            List<String> scopesToStore = this.productScopes != null && !this.productScopes.isEmpty()
+                    ? this.productScopes
+                    : new ArrayList<>(Arrays.asList("API"));
+
             PendingInviteCodesDao.instance.updateOne(
                     Filters.and(
                         Filters.eq(PendingInviteCode.ACCOUNT_ID, Context.accountId.get()),
@@ -213,6 +218,7 @@ public class InviteUserAction extends UserAction{
                     ),
                     Updates.combine(
                         Updates.set(PendingInviteCode.INVITEE_ROLE, this.inviteeRole),
+                        Updates.set(PendingInviteCode.PRODUCT_SCOPES, scopesToStore),
                         Updates.set(PendingInviteCode.INVITE_CODE, inviteCode),
                         Updates.set(PendingInviteCode._EXPIRY, jws.getBody().getExpiration().getTime()),
                         Updates.set(PendingInviteCode._ISSUER, user_id)
@@ -300,5 +306,13 @@ public class InviteUserAction extends UserAction{
 
     public void setInviteeRole(String inviteeRole) {
         this.inviteeRole = inviteeRole;
+    }
+
+    public List<String> getProductScopes() {
+        return productScopes;
+    }
+
+    public void setProductScopes(List<String> productScopes) {
+        this.productScopes = productScopes;
     }
 }

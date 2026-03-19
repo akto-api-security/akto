@@ -1,9 +1,16 @@
-import { Modal, Text, TextField } from "@shopify/polaris"
+import { Modal, Text, TextField, Box, Checkbox } from "@shopify/polaris"
 import { useState, useRef, useCallback, useEffect } from "react"
 import func from "@/util/func"
 import Store from "../../../store"
 import settingRequests from "../api"
 import Dropdown from "../../../components/layouts/Dropdown"
+
+const PRODUCT_SCOPES = [
+    { label: 'API Security', value: 'API' },
+    { label: 'Akto ARGUS', value: 'AGENTIC' },
+    { label: 'Akto ATLAS', value: 'ENDPOINT' },
+    { label: 'DAST', value: 'DAST' },
+];
 
 const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, roleHierarchy, rolesOptions, defaultInviteRole}) => {
 
@@ -11,9 +18,11 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
     const ref = useRef(null)
     const [inviteEmail, setInviteEmail] = useState()
     const [inviteRole, setInviteRole] = useState(defaultInviteRole)
+    const [selectedProductScopes, setSelectedProductScopes] = useState(["API"])
 
     useEffect(() => {
         setInviteRole(defaultInviteRole)
+        setSelectedProductScopes(["API"])
     }, [defaultInviteRole])
 
     const handleRoleSelectChange = useCallback(
@@ -22,6 +31,15 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
         },
         [],
     );
+
+    const handleProductScopeToggle = (scope) => {
+        setSelectedProductScopes(prevScopes => {
+            const newScopes = prevScopes.includes(scope)
+                ? prevScopes.filter(s => s !== scope)
+                : [...prevScopes, scope]
+            return newScopes.length > 0 ? newScopes : ["API"]
+        })
+    }
 
     const handleSendInvitation = async () => {
         setInviteUser(previousState => ({
@@ -36,6 +54,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
             inviteeEmail: inviteEmail?.toLowerCase(),
             websiteHostName: window.location.origin,
             inviteeRole: inviteRole,
+            productScopes: selectedProductScopes
         }
 
         const inviteUsersResponse = await settingRequests.inviteUsers(spec)
@@ -55,6 +74,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
 
         setInviteEmail("")
         setInviteRole(defaultInviteRole)
+        setSelectedProductScopes(["API"])
     }
 
     const handleCopyInvitation = () => {
@@ -101,8 +121,26 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
                     <Dropdown
                         id={"inviteRoleSelection"}
                         selected={handleRoleSelectChange}
-                        menuItems={filteredRoleOptions} 
+                        menuItems={filteredRoleOptions}
                         initial={inviteRole} />
+
+                    <Text variant="bodyMd" color="subdued" as="p" style={{ marginTop: "20px" }}>
+                        Product Scopes
+                    </Text>
+                    <Box padding="400">
+                        {PRODUCT_SCOPES.map((scope) => (
+                            <Box key={scope.value} padding="200">
+                                <Checkbox
+                                    label={scope.label}
+                                    checked={selectedProductScopes.includes(scope.value)}
+                                    onChange={() => handleProductScopeToggle(scope.value)}
+                                />
+                            </Box>
+                        ))}
+                    </Box>
+                    <Text variant="bodySm" color="subdued">
+                        Select which product scopes this user should have access to. If none selected, defaults to API Security.
+                    </Text>
 
                 </Modal.Section>
             </Modal>

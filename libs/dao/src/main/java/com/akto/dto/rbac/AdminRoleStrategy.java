@@ -11,7 +11,7 @@ import com.akto.dto.RBAC.Role;
 public class AdminRoleStrategy implements RoleStrategy {
     @Override
     public Role[] getRoleHierarchy() {
-        return new Role[]{Role.ADMIN, Role.MEMBER, Role.DEVELOPER, Role.GUEST};
+        return new Role[]{Role.ADMIN, Role.MEMBER, Role.DEVELOPER, Role.GUEST, Role.THREAT_ENGINEER, Role.THREAT_VIEWER};
     }
 
     @Override

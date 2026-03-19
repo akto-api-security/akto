@@ -10,6 +10,13 @@ import ResourceListModal from "../../../components/shared/ResourceListModal";
 import observeApi from "../../observe/api";
 import { usersCollectionRenderItem } from "../rbac/utils";
 
+const PRODUCT_SCOPES = [
+    { label: 'API Security', value: 'API' },
+    { label: 'Akto ARGUS', value: 'AGENTIC' },
+    { label: 'Akto ATLAS', value: 'ENDPOINT' },
+    { label: 'DAST', value: 'DAST' },
+];
+
 const Users = () => {
     const username = window.USER_NAME
     const userRole = window.USER_ROLE
@@ -41,6 +48,13 @@ const Users = () => {
     }
 
     const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
+    const [productScopePopup, setProductScopePopup] = useState({})
+
+    const [productScopeSelection, setProductScopeSelection] = useState({
+        selectedRole: "",
+        selectedEmail: "",
+        selectedScopes: ["API"]
+    })
 
     const [passwordResetState, setPasswordResetState] = useState({
         passwordResetLogin: "",
@@ -86,6 +100,14 @@ const Users = () => {
         {
             content: 'Guest',
             role: 'GUEST',
+        },
+        {
+            content: 'Threat Engineer',
+            role: 'THREAT_ENGINEER',
+        },
+        {
+            content: 'Threat Viewer',
+            role: 'THREAT_VIEWER',
         }, ...customRoles
     ] : []
 
@@ -182,18 +204,21 @@ const Users = () => {
             return
         }
 
-        // Call Update Role API
-        await updateUserRole(login, newRole).then((res) => {
-            try {
-                setUsers(users.map(user => user.login === login ? { ...user, role: newRole } : user))
-                setRoleSelectionPopup(prevState => ({ ...prevState, [login]: false }))
-                toggleRoleSelectionPopup(id)
-                func.setToast(true, false, "Updated user role successfully")
-            } catch (error) {
-            }
-        })
-        
-        await getTeamData();
+        // Update role only, keep existing product scopes
+        const user = users.find(u => u.login === login)
+        const currentScopes = user?.productScopes && user.productScopes.length > 0 ? user.productScopes : ["API"]
+
+        try {
+            await updateUserRole(login, newRole, currentScopes).then(() => {
+                setUsers(users.map(u => u.login === login ? { ...u, role: newRole } : u))
+                func.setToast(true, false, "Role updated successfully")
+            })
+            await getTeamData()
+        } catch (error) {
+            func.setToast(false, true, "Failed to update role")
+        }
+
+        toggleRoleSelectionPopup(id)
     }
 
     const toggleRoleSelectionPopup = (id) => {
@@ -201,6 +226,16 @@ const Users = () => {
             ...prevState,
             [id]: !prevState[id]
         }));
+    }
+
+    const toggleProductScopePopup = (id, reset = false) => {
+        setProductScopePopup(prevState => ({
+            ...prevState,
+            [id]: !prevState[id]
+        }));
+        if (reset) {
+            setProductScopeSelection({ selectedRole: "", selectedEmail: "", selectedScopes: ["API"] })
+        }
     }
 
     const getRolesOptionsWithTick = (currentRole) => {
@@ -223,6 +258,18 @@ const Users = () => {
             }
         }
         return role;
+    }
+
+    const getProductScopeOptionsWithTick = (selectedScopes) => {
+        return [{
+            items: PRODUCT_SCOPES.map(scope => ({
+                content: scope.label,
+                value: scope.value,
+                prefix: selectedScopes.includes(scope.value) ?
+                    <Box><Icon source={TickMinor}/></Box> :
+                    <div style={{padding: "10px"}}/>
+            }))
+        }];
     }
 
     const getTeamData = async () => {
@@ -252,9 +299,53 @@ const Users = () => {
         func.setToast(true, false, "User removed successfully")
     }
 
-    const updateUserRole = async (login,roleVal) => {
-        await settingRequests.makeAdmin(login, roleVal)
+    const updateUserRole = async (login, roleVal, productScopes) => {
+        await settingRequests.makeAdmin(login, roleVal, productScopes)
         func.setToast(true, false, "Role updated for " + login + " successfully")
+    }
+
+    const handleProductScopeToggle = async (scope) => {
+        setProductScopeSelection(prevState => {
+            const newScopes = prevState.selectedScopes.includes(scope)
+                ? prevState.selectedScopes.filter(s => s !== scope)
+                : [...prevState.selectedScopes, scope]
+            const finalScopes = newScopes.length > 0 ? newScopes : ["API"]
+
+            // save to backend
+            try {
+                updateUserRole(prevState.selectedEmail, prevState.selectedRole, finalScopes).then(() => {
+                    setUsers(users.map(user => user.login === prevState.selectedEmail ? { ...user, productScopes: finalScopes } : user))
+                })
+            } catch (error) {
+                func.setToast(false, true, "Failed to update product scopes")
+            }
+
+            return {
+                ...prevState,
+                selectedScopes: finalScopes
+            }
+        })
+    }
+
+
+    const handleEditProductScopes = (id, login, role, currentScopes) => {
+        setProductScopeSelection({
+            selectedRole: role,
+            selectedEmail: login,
+            selectedScopes: currentScopes && currentScopes.length > 0 ? currentScopes : ["API"]
+        })
+        toggleProductScopePopup(id)
+    }
+
+    const getScopeLabel = (scopes) => {
+        if(!scopes || scopes.length === 0) {
+            return "API"
+        }
+        if(scopes.length === 1) {
+            const scope = PRODUCT_SCOPES.find(s => s.value === scopes[0])
+            return scope ? scope.label : scopes[0]
+        }
+        return `${scopes.length} scopes`
     }
     
     const getUserApiCollectionIds = (userId) => {
@@ -367,6 +458,29 @@ const Users = () => {
                                                             items: section.items.map(item => ({
                                                                 ...item,
                                                                 onAction: () => handleRoleSelectChange(id, item.role, login)
+                                                            }))
+                                                        }))}
+                                                    />
+                                                </Popover>
+
+                                                <Popover
+                                                    active={productScopePopup[id]}
+                                                    onClose={() => toggleProductScopePopup(id, true)}
+                                                    activator={
+                                                        <Button
+                                                            disclosure
+                                                            onClick={() => handleEditProductScopes(id, login, role, item?.productScopes)}
+                                                        >
+                                                            {getScopeLabel(item?.productScopes)}
+                                                        </Button>
+                                                    }
+                                                >
+                                                    <ActionList
+                                                        sections={getProductScopeOptionsWithTick(productScopeSelection.selectedScopes).map(section => ({
+                                                            ...section,
+                                                            items: section.items.map(item => ({
+                                                                ...item,
+                                                                onAction: () => handleProductScopeToggle(item.value)
                                                             }))
                                                         }))}
                                                     />
