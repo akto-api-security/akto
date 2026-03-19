@@ -787,7 +787,6 @@ public class Executor {
                     varMap.put("wordList_url_webhook", callbackUrls);
                     String firstCallbackUrl = callbackUrls.get(0);
                     varMap.put("url_webhook", firstCallbackUrl);
-                    varMap.put("url", firstCallbackUrl);
                     return new ExecutorSingleOperationResp(true, "");
                 } else {
 
