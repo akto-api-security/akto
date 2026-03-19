@@ -71,7 +71,25 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
     }
 
     private Bson getLatestTestingRunResultProjections() {
-        Bson projections = Projections.include(
+        // For specific account, exclude message to improve performance
+        if (Context.accountId.get() == 1710118493) {
+            return Projections.include(
+                    TestingRunResult.TEST_RUN_ID,
+                    TestingRunResult.API_INFO_KEY,
+                    TestingRunResult.TEST_SUPER_TYPE,
+                    TestingRunResult.TEST_SUB_TYPE,
+                    TestingRunResult.VULNERABLE,
+                    TestingRunResult.CONFIDENCE_PERCENTAGE,
+                    TestingRunResult.START_TIMESTAMP,
+                    TestingRunResult.END_TIMESTAMP,
+                    TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
+                    TestingRunResult.TEST_RESULTS + "." + GenericTestResult._CONFIDENCE,
+                    TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS
+            );
+        }
+
+        // For all other accounts, include message
+        return Projections.include(
                 TestingRunResult.TEST_RUN_ID,
                 TestingRunResult.API_INFO_KEY,
                 TestingRunResult.TEST_SUPER_TYPE,
@@ -85,13 +103,6 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS,
                 TestingRunResult.TEST_RESULTS + "." + TestResult._MESSAGE
         );
-
-        // Exclude message for specific account to improve performance
-        if (Context.accountId.get() == 1710118493) {
-            projections = Projections.exclude(TestingRunResult.TEST_RESULTS + "." + TestResult._MESSAGE);
-        }
-
-        return projections;
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit) {
