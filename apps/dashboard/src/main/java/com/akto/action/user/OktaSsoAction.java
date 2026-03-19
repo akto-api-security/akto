@@ -34,7 +34,6 @@ public class OktaSsoAction extends UserAction {
     private String redirectUri;
     /** Optional: Okta API token (SSWS) to read user group membership when groups are not in the access token. */
     private String managementApiToken;
-    private boolean clearManagementApiToken;
     /** True when a non-empty Management API token (SSWS) is stored. */
     private boolean managementApiTokenStatus;
     private Map<String, String> oktaGroupToAktoUserRoleMap;
@@ -126,15 +125,12 @@ public class OktaSsoAction extends UserAction {
         bsonUpdates.add(Updates.set("oktaGroupToAktoUserRoleMap", activeMapping));
         bsonUpdates.add(Updates.unset("groupRoleMapping"));
         bsonUpdates.add(Updates.unset("oktaRoleMapping"));
-        if (clearManagementApiToken) {
-            bsonUpdates.add(Updates.unset("apiToken"));
-        } else if (managementApiToken != null && !managementApiToken.trim().isEmpty()) {
-            String tok = managementApiToken.trim();
-            if (tok.length() < 20) {
-                addActionError("API token is too short. Paste the full SSWS token from Okta (Security → API → Tokens).");
-                return ERROR.toUpperCase();
+        if (managementApiToken != null) {
+            if (managementApiToken.trim().isEmpty()) {
+                bsonUpdates.add(Updates.unset("apiToken"));
+            } else {
+                bsonUpdates.add(Updates.set("apiToken", managementApiToken.trim()));
             }
-            bsonUpdates.add(Updates.set("apiToken", tok));
         }
         ConfigsDao.instance.updateOne(
             Filters.eq(Constants.ID, OktaConfig.getOktaId(accountId)),
@@ -226,10 +222,6 @@ public class OktaSsoAction extends UserAction {
 
     public void setManagementApiToken(String managementApiToken) {
         this.managementApiToken = managementApiToken;
-    }
-
-    public void setClearManagementApiToken(boolean clearManagementApiToken) {
-        this.clearManagementApiToken = clearManagementApiToken;
     }
 
     public boolean isManagementApiTokenStatus() {

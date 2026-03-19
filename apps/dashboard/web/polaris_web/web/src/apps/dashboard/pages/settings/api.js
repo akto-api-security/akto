@@ -382,10 +382,12 @@ const settingRequests = {
     },
 
     saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, opts = {}) {
-        const { managementApiToken, clearManagementApiToken } = opts
         const data = { oktaGroupToAktoUserRoleMap }
-        if (managementApiToken) data.managementApiToken = managementApiToken
-        if (clearManagementApiToken) data.clearManagementApiToken = true
+        if (Object.prototype.hasOwnProperty.call(opts, 'managementApiToken')) {
+            const t = opts.managementApiToken
+            // Struts cannot distinguish JSON null from omitted String fields; send "" to mean "clear stored token".
+            data.managementApiToken = t == null || String(t).trim() === '' ? '' : t
+        }
         return request({
             url: '/api/saveOktaGroupRoleMapping',
             method: 'post',

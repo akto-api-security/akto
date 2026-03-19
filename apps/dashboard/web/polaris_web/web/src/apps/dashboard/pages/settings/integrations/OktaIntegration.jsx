@@ -195,21 +195,19 @@ function OktaIntegration() {
             let resp
             if (!hasSavedManagementToken) {
                 const t = editApiToken.trim()
-                resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, t ? { managementApiToken: t } : {})
+                resp = await settingRequests.saveOktaGroupRoleMapping(
+                    oktaGroupToAktoUserRoleMap,
+                    t ? { managementApiToken: t } : {}
+                )
                 if (t) toastMsg = 'Group mappings and API token saved.'
             } else {
                 const v = editApiToken
                 if (v === TOKEN_EDIT_MASK) {
                     resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, {})
                 } else if (!v.trim()) {
-                    resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, { clearManagementApiToken: true })
+                    resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, { managementApiToken: null })
                     toastMsg = 'Group mappings saved. Management API token removed.'
                 } else {
-                    if (v.trim().length < 20) {
-                        func.setToast(true, true, 'Paste the full SSWS token from Okta, or delete all characters to remove the saved token.')
-                        setSavingSettings(false)
-                        return
-                    }
                     resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, { managementApiToken: v.trim() })
                     toastMsg = 'Group mappings and API token updated.'
                 }
