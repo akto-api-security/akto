@@ -1796,7 +1796,7 @@ const quickStartFunc = {
 
         // Manual
         const manual = [
-            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj, impervaImportObj, dataDogConnectorObj, microsoftDefenderObj
+            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj, impervaImportObj, dataDogConnectorObj
         ];
 
         // Crawler
@@ -1843,6 +1843,11 @@ const quickStartFunc = {
             cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj
         ]
 
+        // Endpoint Management
+        const endpointManagement = [
+            microsoftDefenderObj
+        ]
+
        if(func.checkLocal() || func.isLimitedAccount()){
            return {
                "Manual": manual
@@ -1870,6 +1875,7 @@ const quickStartFunc = {
 
             connectors = {
                 "Endpoint Agents": endpointAgents,
+                "Endpoint Management": endpointManagement,
                 "Agentic Proxies": agenticProxies,
                 "Browser Extension": browserExtensions,
                 "Secure Web Networks": secureWebNetworks,
