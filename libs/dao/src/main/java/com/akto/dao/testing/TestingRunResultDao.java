@@ -71,7 +71,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
     }
 
     private Bson getLatestTestingRunResultProjections() {
-        return Projections.include(
+        Bson projections = Projections.include(
                 TestingRunResult.TEST_RUN_ID,
                 TestingRunResult.API_INFO_KEY,
                 TestingRunResult.TEST_SUPER_TYPE,
@@ -85,6 +85,13 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS,
                 TestingRunResult.TEST_RESULTS + "." + TestResult._MESSAGE
         );
+
+        // Exclude message for specific account to improve performance
+        if (Context.accountId.get() == 1710118493) {
+            projections = Projections.exclude(TestingRunResult.TEST_RESULTS + "." + TestResult._MESSAGE);
+        }
+
+        return projections;
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit) {
