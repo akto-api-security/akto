@@ -171,33 +171,38 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
 
                         try {
                             testResult.setConfidence(Confidence.valueOf(confidence));
-                            String fullMessage = genericTestResult.getString(TestResult._MESSAGE, null);
                             String lightweightMessage = null;
-                            if (fullMessage != null && fullMessage.length() <= 10240) {  // 10KB
-                                try {
-                                    long startTime = System.currentTimeMillis();
-                                    long timeoutMs = 100;  // 100ms timeout for parsing
 
-                                    Document msgDoc = Document.parse(fullMessage);
+                            // Skip message processing for specific account to improve performance
+                            int accountId = Context.accountId.get();
+                            if (accountId != 1710118493) {
+                                String fullMessage = genericTestResult.getString(TestResult._MESSAGE, null);
+                                if (fullMessage != null && fullMessage.length() <= 10240) {  // 10KB
+                                    try {
+                                        long startTime = System.currentTimeMillis();
+                                        long timeoutMs = 100;  // 100ms timeout for parsing
 
-                                    // Check if parsing took too long
-                                    if (System.currentTimeMillis() - startTime > timeoutMs) {
-                                        lightweightMessage = null;  // Timeout, skip extraction
-                                    } else {
-                                        Document response = (Document) msgDoc.get("response");
-                                        if (response != null) {
-                                            Object statusCode = response.get("statusCode");
-                                            String body = response.getString("body");
-                                            String bodyPreview = (body != null && body.length() > 50)
-                                                    ? body.substring(0, 50) : body;
-                                            Document lightDoc = new Document("response",
-                                                    new Document("statusCode", statusCode).append("body", bodyPreview));
-                                            lightweightMessage = lightDoc.toJson();
+                                        Document msgDoc = Document.parse(fullMessage);
+
+                                        // Check if parsing took too long
+                                        if (System.currentTimeMillis() - startTime > timeoutMs) {
+                                            lightweightMessage = null;  // Timeout, skip extraction
+                                        } else {
+                                            Document response = (Document) msgDoc.get("response");
+                                            if (response != null) {
+                                                Object statusCode = response.get("statusCode");
+                                                String body = response.getString("body");
+                                                String bodyPreview = (body != null && body.length() > 50)
+                                                        ? body.substring(0, 50) : body;
+                                                Document lightDoc = new Document("response",
+                                                        new Document("statusCode", statusCode).append("body", bodyPreview));
+                                                lightweightMessage = lightDoc.toJson();
+                                            }
                                         }
+                                    } catch (Exception parseException) {
+                                        // Parsing failed or timed out; null is fine — frontend handles gracefully
+                                        lightweightMessage = null;
                                     }
-                                } catch (Exception parseException) {
-                                    // Parsing failed or timed out; null is fine — frontend handles gracefully
-                                    lightweightMessage = null;
                                 }
                             }
                             testResult.setMessage(lightweightMessage);
