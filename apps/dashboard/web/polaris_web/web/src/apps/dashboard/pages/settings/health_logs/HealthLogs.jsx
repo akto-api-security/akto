@@ -8,6 +8,7 @@ const HealthLogs = () => {
         <Page
             title="Logs"
             divider
+            fullWidth
         >
             <Logs />
         </Page>
