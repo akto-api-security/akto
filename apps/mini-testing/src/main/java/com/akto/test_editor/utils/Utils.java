@@ -775,7 +775,7 @@ public class Utils {
         String result = "";
         if (keyValue.contains(key)) {
             result = keyValue.split(key)[1].split("[,}]")[0];
-            result = result.replaceAll("\\$", "");
+            result = result.replaceAll("\\}$", "");
             result = result.trim();
         }
         return result;
