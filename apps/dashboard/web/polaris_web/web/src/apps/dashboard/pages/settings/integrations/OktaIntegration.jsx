@@ -9,30 +9,18 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import StepsComponent from './components/StepsComponent';
 import Details from './components/Details';
 import DeleteModal from './components/DeleteModal';
+import { BASE_ROLE_OPTIONS, getBaseRoleDisplayName } from '../roles/baseRoleOptions';
 
 function dashboardActionError(err, fallback) {
     const list = err?.response?.data?.actionErrors
     return (list && list[0]) || fallback
 }
 
-/** Editable mask when a token exists; user selects all + Delete to clear, or paste to replace. */
-const TOKEN_EDIT_MASK = '**********'
-/** Shown in details list when a token is stored (value is never returned from API). */
-const MANAGEMENT_API_TOKEN_CONFIGURED_DISPLAY = '*****'
-
-function managementTokenConfiguredFromResponse(resp) {
-    return resp?.managementApiTokenStatus === true
-}
-
-const AKTO_ROLE_OPTIONS = [
-    { label: 'Admin', value: 'ADMIN' },
-    { label: 'Security Engineer', value: 'MEMBER' },
-    { label: 'Developer', value: 'DEVELOPER' },
-    { label: 'Guest', value: 'GUEST' },
-]
-
-function getAktoRoleOptionLabel(value) {
-    return AKTO_ROLE_OPTIONS.find((r) => r.value === value)?.label || value
+/** Masked value from API (e.g. Constants.ASTERISK); null if not configured. */
+function managementApiTokenMaskedFromResponse(resp) {
+    const t = resp?.managementApiToken
+    if (t == null || String(t).trim() === '') return null
+    return String(t)
 }
 
 function OktaIntegration() {
@@ -43,11 +31,11 @@ function OktaIntegration() {
     const [clientId, setClientId] = useState('')
     const [clientSecret, setClientSecret] = useState('')
     const [setupApiToken, setSetupApiToken] = useState('')
-    /** From server: whether a non-empty Management API token is stored. */
-    const [managementApiTokenConfigured, setManagementApiTokenConfigured] = useState(false)
-    const hasSavedManagementToken = managementApiTokenConfigured
+    /** Masked Management API token string from server; null when not set. */
+    const [managementApiTokenMasked, setManagementApiTokenMasked] = useState(null)
+    const hasSavedManagementToken = Boolean(managementApiTokenMasked)
     const managementApiTokenDisplay = hasSavedManagementToken
-        ? MANAGEMENT_API_TOKEN_CONFIGURED_DISPLAY
+        ? managementApiTokenMasked
         : 'Not set (optional)'
     const [editApiToken, setEditApiToken] = useState('')
     const [savingSettings, setSavingSettings] = useState(false)
@@ -94,7 +82,7 @@ function OktaIntegration() {
             func.setToast(true, true, "Fill all required fields")
             return
         }
-        await settingRequests.addOktaSso(
+        const addResp = await settingRequests.addOktaSso(
             clientId,
             clientSecret,
             authorizationServerId,
@@ -103,7 +91,7 @@ function OktaIntegration() {
             setupApiToken.trim() || undefined
         )
         func.setToast(true, false, "Okta SSO saved successfully!")
-        setManagementApiTokenConfigured(Boolean(setupApiToken.trim()))
+        setManagementApiTokenMasked(managementApiTokenMaskedFromResponse(addResp))
         setSetupApiToken('')
         setComponentType(2)
     }
@@ -143,7 +131,7 @@ function OktaIntegration() {
                 setClientId(resp.clientId)
                 setAuthorizationServerId(resp.authorisationServerId)
                 setOktaDomain(resp.oktaDomain)
-                setManagementApiTokenConfigured(managementTokenConfiguredFromResponse(resp))
+                setManagementApiTokenMasked(managementApiTokenMaskedFromResponse(resp))
                 const grpMap = resp.oktaGroupToAktoUserRoleMap || {}
                 setOktaGroupToAktoUserRoleMap(grpMap)
                 setSavedOktaGroupToAktoUserRoleMap(grpMap)
@@ -201,18 +189,19 @@ function OktaIntegration() {
                 )
                 if (t) toastMsg = 'Group mappings and API token saved.'
             } else {
-                const v = editApiToken
-                if (v === TOKEN_EDIT_MASK) {
-                    resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, {})
-                } else if (!v.trim()) {
+                const trimmed = editApiToken.trim()
+                if (trimmed === '') {
                     resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, { managementApiToken: null })
                     toastMsg = 'Group mappings saved. Management API token removed.'
                 } else {
-                    resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, { managementApiToken: v.trim() })
-                    toastMsg = 'Group mappings and API token updated.'
+                    resp = await settingRequests.saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, { managementApiToken: trimmed })
+                    const unchangedMask = managementApiTokenMasked != null && trimmed === String(managementApiTokenMasked).trim()
+                    toastMsg = unchangedMask
+                        ? 'Group mappings saved successfully!'
+                        : 'Group mappings and API token updated.'
                 }
             }
-            setManagementApiTokenConfigured(managementTokenConfiguredFromResponse(resp))
+            setManagementApiTokenMasked(managementApiTokenMaskedFromResponse(resp))
             setSavedOktaGroupToAktoUserRoleMap({ ...oktaGroupToAktoUserRoleMap })
             setEditMode(false)
             resetMappingDraft()
@@ -236,7 +225,7 @@ function OktaIntegration() {
     const handleEditClick = async () => {
         setEditMode(true)
         setSavedOktaGroupToAktoUserRoleMap({ ...oktaGroupToAktoUserRoleMap })
-        setEditApiToken(hasSavedManagementToken ? TOKEN_EDIT_MASK : '')
+        setEditApiToken(hasSavedManagementToken ? (managementApiTokenMasked || '') : '')
         setOktaGroupNames([])
         setNewGroupName('')
         setNewAktoRole('')
@@ -259,6 +248,7 @@ function OktaIntegration() {
         await settingRequests.deleteOktaSso()
         func.setToast(true, false, "Okta SSO credentials deleted successfully.")
         setShowDeleteModal(false)
+        setManagementApiTokenMasked(null)
         setComponentType(0)
     }
 
@@ -282,7 +272,7 @@ function OktaIntegration() {
                         <Text variant="bodyMd" fontWeight="medium">{name}</Text>
                     </Box>
                     <HorizontalStack gap="3" blockAlign="center">
-                        <Badge>{getAktoRoleOptionLabel(role)}</Badge>
+                        <Badge>{getBaseRoleDisplayName(role)}</Badge>
                         {editMode && (
                             <Button plain destructive icon={DeleteMinor} onClick={() => handleRemoveGroupMapping(name)} accessibilityLabel="Remove mapping" />
                         )}
@@ -328,7 +318,7 @@ function OktaIntegration() {
     )
 
     const usedRolesForAdd = Object.values(oktaGroupToAktoUserRoleMap)
-    const availableRoleOptions = AKTO_ROLE_OPTIONS.filter((r) => !usedRolesForAdd.includes(r.value))
+    const availableRoleOptions = BASE_ROLE_OPTIONS.filter((r) => !usedRolesForAdd.includes(r.value))
     const roleAutocompleteQuery = (aktoRoleText || '').trim().toLowerCase()
     const roleAutocompleteOptions = availableRoleOptions
         .filter((r) => !roleAutocompleteQuery || r.label.toLowerCase().includes(roleAutocompleteQuery) || r.value.toLowerCase().includes(roleAutocompleteQuery))
@@ -393,7 +383,7 @@ function OktaIntegration() {
                         onSelect={(selected) => {
                             const v = selected.length > 0 ? selected[0] : ''
                             setNewAktoRole(v)
-                            setAktoRoleText(v ? getAktoRoleOptionLabel(v) : '')
+                            setAktoRoleText(v ? getBaseRoleDisplayName(v) : '')
                         }}
                         textField={
                             <Autocomplete.TextField

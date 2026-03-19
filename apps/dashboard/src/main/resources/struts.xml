@@ -790,6 +790,9 @@
          <action name="api/fetchOktaSso" class="com.akto.action.user.OktaSsoAction">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AKTO_SSO</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ</param>
@@ -811,6 +814,9 @@
         <action name="api/fetchOktaGroups" class="com.akto.action.user.OktaSsoAction" method="fetchOktaGroups">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AKTO_SSO</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ</param>
@@ -832,6 +838,9 @@
         <action name="api/saveOktaGroupRoleMapping" class="com.akto.action.user.OktaSsoAction" method="saveOktaGroupRoleMapping">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AKTO_SSO</param>
+            </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>

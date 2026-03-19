@@ -11,7 +11,6 @@ import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
-import org.bson.codecs.pojo.annotations.BsonProperty;
 
 import com.akto.dao.ConfigsDao;
 import com.mongodb.client.model.Filters;
@@ -388,7 +387,10 @@ public abstract class Config {
         private String organizationDomain;
         public static final String ACCOUNT_ID = "accountId";
         private int accountId;
-        private String apiToken;
+        /** BSON key for the Okta Management API (SSWS) token. */
+        public static final String MANAGEMENT_API_TOKEN = "managementApiToken";
+        /** SSWS token; persisted in Mongo under {@link #MANAGEMENT_API_TOKEN}. */
+        private String managementApiToken;
         /** Okta group name → Akto user role. Stored in Mongo as {@code oktaGroupToAktoUserRoleMap}. */
         private Map<String, String> oktaGroupToAktoUserRoleMap;
 
@@ -466,11 +468,12 @@ public abstract class Config {
             this.accountId = accountId;
         }
 
-        public String getApiToken() {
-            return apiToken;
+        public String getManagementApiToken() {
+            return managementApiToken;
         }
-        public void setApiToken(String apiToken) {
-            this.apiToken = apiToken;
+
+        public void setManagementApiToken(String managementApiToken) {
+            this.managementApiToken = managementApiToken;
         }
 
         public Map<String, String> getOktaGroupToAktoUserRoleMap() {

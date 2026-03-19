@@ -513,16 +513,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl + "/token", params);
             String accessToken = tokenData.get("access_token").toString();
-            Map<String, Object> userInfo = getUserInfoFromAccessToken(accessToken);
-            if (userInfo == null) {
-                userInfo = CustomHttpRequest.getRequest(domainUrl + "/userinfo", "Bearer " + accessToken, false);
-            }
+            Map<String, Object> userInfo = CustomHttpRequest.getRequest(domainUrl + "/userinfo", "Bearer " + accessToken, false);
             String email = userInfo.get("email").toString();
             String username = userInfo.get("preferred_username").toString();
             logger.infoAndAddToDb("Trying to login with okta sso for email: " + email + ", accountId: " + accountId);
-
             String oktaUserId = userInfo.get("sub") != null ? userInfo.get("sub").toString() : null;
-
             if (!StringUtils.isEmpty(oktaConfig.getOrganizationDomain())) {
                 String userDomain = email.contains("@") ? email.substring(email.indexOf('@') + 1) : null;
                 if (userDomain == null || !oktaConfig.getOrganizationDomain().equalsIgnoreCase(userDomain)) {
@@ -578,52 +573,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     private static String normalizeGroupForConvention(String group) {
         if (group == null) return "";
         return group.toLowerCase().replace(' ', '_').trim();
-    }
-
-    /** Decode Okta access_token JWT payload. Returns null on parse error. */
-    private static BasicDBObject getPayloadFromAccessToken(String accessToken) {
-        if (accessToken == null || accessToken.isEmpty()) return null;
-        String[] parts = accessToken.split("\\.");
-        if (parts.length != 3) return null;
-        try {
-            byte[] decoded = java.util.Base64.getUrlDecoder().decode(parts[1]);
-            String json = new String(decoded, StandardCharsets.UTF_8);
-            return BasicDBObject.parse(json);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    /** Extract userinfo-equivalent claims (sub, email, preferred_username) from access_token JWT. Returns null if email or sub missing. */
-    private static Map<String, Object> getUserInfoFromAccessToken(String accessToken) {
-        BasicDBObject payload = getPayloadFromAccessToken(accessToken);
-        if (payload == null) return null;
-        Object sub = payload.get("sub");
-        Object email = payload.get("email");
-        if (sub == null || sub.toString().isEmpty() || email == null || email.toString().isEmpty()) return null;
-        Map<String, Object> out = new HashMap<>();
-        out.put("sub", sub.toString());
-        out.put("email", email.toString());
-        Object preferredUsername = payload.get("preferred_username");
-        Object name = payload.get("name");
-        out.put("preferred_username", preferredUsername != null && !preferredUsername.toString().isEmpty()
-                ? preferredUsername.toString() : (name != null && !name.toString().isEmpty() ? name.toString() : email.toString()));
-        return out;
-    }
-
-    /** Extract groups claim from Okta access_token JWT payload. Returns empty list if missing or on parse error. */
-    private static List<String> getGroupsFromAccessToken(String accessToken) {
-        BasicDBObject payload = getPayloadFromAccessToken(accessToken);
-        if (payload == null) return Collections.emptyList();
-        Object g = payload.get("groups");
-        if (g instanceof List) {
-            List<String> result = new ArrayList<>();
-            for (Object o : (List<?>) g) {
-                if (o != null) result.add(o.toString());
-            }
-            return result;
-        }
-        return Collections.emptyList();
     }
 
     /**
@@ -696,18 +645,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
      * Uses JWT {@code groups} first; if empty and an API token is configured, loads groups from Okta Management API.
      */
     private String fetchOktaRole(Config.OktaConfig oktaConfig, String oktaUserId, String accessToken) {
-        List<String> groupsFromToken = getGroupsFromAccessToken(accessToken);
         Map<String, String> oktaGroupToAktoUserRoleMap = oktaConfig.getOktaGroupToAktoUserRoleMap();
 
-        if (!groupsFromToken.isEmpty()) {
-            return resolveAktoRoleFromOktaGroupNames(groupsFromToken, oktaGroupToAktoUserRoleMap);
-        }
-
-        if (StringUtils.isEmpty(oktaConfig.getApiToken()) || oktaUserId == null) {
+        if (StringUtils.isEmpty(oktaConfig.getManagementApiToken()) || oktaUserId == null) {
             return RBAC.Role.MEMBER.name();
         }
         List<String> groupsFromApi = fetchOktaGroupsFromManagementApi(
-                oktaConfig.getManagementBaseUrl(), oktaConfig.getApiToken(), oktaUserId);
+                oktaConfig.getManagementBaseUrl(), oktaConfig.getManagementApiToken(), oktaUserId);
         return resolveAktoRoleFromOktaGroupNames(groupsFromApi, oktaGroupToAktoUserRoleMap);
     }
 

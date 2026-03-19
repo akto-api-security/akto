@@ -32,18 +32,21 @@ public class OktaSsoAction extends UserAction {
     private String authorisationServerId;
     private String oktaDomain;
     private String redirectUri;
-    /** Optional: Okta API token (SSWS) to read user group membership when groups are not in the access token. */
     private String managementApiToken;
-    /** True when a non-empty Management API token (SSWS) is stored. */
-    private boolean managementApiTokenStatus;
     private Map<String, String> oktaGroupToAktoUserRoleMap;
-    /** Fetched from Okta Management API (for autosuggest in dashboard). */
     private List<String> oktaGroupNames;
 
-    private static boolean managementApiTokenStatusFrom(OktaConfig c) {
+    private static boolean hasStoredOktaApiToken(OktaConfig c) {
         if (c == null) return false;
-        String t = c.getApiToken();
+        String t = c.getManagementApiToken();
         return t != null && !t.isEmpty();
+    }
+
+    /** Client must not persist the dashboard mask string as the real token. */
+    private static boolean isMaskedTokenSubmission(String s) {
+        if (s == null) return false;
+        String t = s.trim();
+        return Constants.ASTERISK.equals(t) || t.contains("***");
     }
 
     public String addOktaSso() {
@@ -53,6 +56,7 @@ public class OktaSsoAction extends UserAction {
         }
 
         int accountId = Context.accountId.get();
+        String incomingToken = this.managementApiToken;
 
         Config.OktaConfig oktaConfig = new Config.OktaConfig(accountId);
         oktaConfig.setClientId(clientId);
@@ -61,13 +65,15 @@ public class OktaSsoAction extends UserAction {
         oktaConfig.setOktaDomainUrl(oktaDomain);
         oktaConfig.setRedirectUri(redirectUri);
         oktaConfig.setAccountId(Context.accountId.get());
-        if (managementApiToken != null && !managementApiToken.trim().isEmpty()) {
-            oktaConfig.setApiToken(managementApiToken.trim());
+        if (incomingToken != null && !incomingToken.trim().isEmpty() && !isMaskedTokenSubmission(incomingToken)) {
+            oktaConfig.setManagementApiToken(incomingToken.trim());
         }
         String userLogin = getSUser().getLogin();
         String domain = userLogin.split("@")[1];
         oktaConfig.setOrganizationDomain(domain);
         ConfigsDao.instance.insertOne(oktaConfig);
+
+        this.managementApiToken = hasStoredOktaApiToken(oktaConfig) ? Constants.ASTERISK : null;
 
         return SUCCESS.toUpperCase();
     }
@@ -99,12 +105,12 @@ public class OktaSsoAction extends UserAction {
             addActionError("Okta SSO is not configured.");
             return ERROR.toUpperCase();
         }
-        if (oktaConfig.getApiToken() == null || oktaConfig.getApiToken().isEmpty()) {
+        if (oktaConfig.getManagementApiToken() == null || oktaConfig.getManagementApiToken().isEmpty()) {
             addActionError("Management API token is not configured. Configure it in Edit to fetch Okta groups.");
             return ERROR.toUpperCase();
         }
         this.oktaGroupNames = SignupAction.fetchAllOktaGroupNamesFromManagementApi(
-                oktaConfig.getManagementBaseUrl(), oktaConfig.getApiToken());
+                oktaConfig.getManagementBaseUrl(), oktaConfig.getManagementApiToken());
         return SUCCESS.toUpperCase();
     }
 
@@ -115,6 +121,7 @@ public class OktaSsoAction extends UserAction {
             addActionError("Okta SSO is not configured.");
             return ERROR.toUpperCase();
         }
+        String incomingToken = this.managementApiToken;
         Map<String, String> activeMapping = oktaGroupToAktoUserRoleMap != null ? oktaGroupToAktoUserRoleMap : Collections.<String, String>emptyMap();
         String validationError = validateRoleMappingValues(activeMapping);
         if (validationError != null) {
@@ -125,11 +132,11 @@ public class OktaSsoAction extends UserAction {
         bsonUpdates.add(Updates.set("oktaGroupToAktoUserRoleMap", activeMapping));
         bsonUpdates.add(Updates.unset("groupRoleMapping"));
         bsonUpdates.add(Updates.unset("oktaRoleMapping"));
-        if (managementApiToken != null) {
-            if (managementApiToken.trim().isEmpty()) {
-                bsonUpdates.add(Updates.unset("apiToken"));
-            } else {
-                bsonUpdates.add(Updates.set("apiToken", managementApiToken.trim()));
+        if (incomingToken != null) {
+            if (incomingToken.trim().isEmpty()) {
+                bsonUpdates.add(Updates.unset(OktaConfig.MANAGEMENT_API_TOKEN));
+            } else if (!isMaskedTokenSubmission(incomingToken)) {
+                bsonUpdates.add(Updates.set(OktaConfig.MANAGEMENT_API_TOKEN, incomingToken.trim()));
             }
         }
         ConfigsDao.instance.updateOne(
@@ -137,7 +144,7 @@ public class OktaSsoAction extends UserAction {
             Updates.combine(bsonUpdates.toArray(new Bson[0]))
         );
         OktaConfig refreshed = (OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(accountId));
-        this.managementApiTokenStatus = managementApiTokenStatusFrom(refreshed);
+        this.managementApiToken = hasStoredOktaApiToken(refreshed) ? Constants.ASTERISK : null;
         return SUCCESS.toUpperCase();
     }
 
@@ -174,7 +181,9 @@ public class OktaSsoAction extends UserAction {
             this.authorisationServerId = oktaConfig.getAuthorisationServerId();
             this.redirectUri = oktaConfig.getRedirectUri();
             this.oktaGroupToAktoUserRoleMap = oktaConfig.getOktaGroupToAktoUserRoleMap();
-            this.managementApiTokenStatus = managementApiTokenStatusFrom(oktaConfig);
+            this.managementApiToken = hasStoredOktaApiToken(oktaConfig) ? Constants.ASTERISK : null;
+        } else {
+            this.managementApiToken = null;
         }
 
         return SUCCESS.toUpperCase();
@@ -224,8 +233,8 @@ public class OktaSsoAction extends UserAction {
         this.managementApiToken = managementApiToken;
     }
 
-    public boolean isManagementApiTokenStatus() {
-        return managementApiTokenStatus;
+    public String getManagementApiToken() {
+        return managementApiToken;
     }
 
     public List<String> getOktaGroupNames() {

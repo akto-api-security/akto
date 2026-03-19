@@ -358,10 +358,12 @@ const settingRequests = {
     },
 
     addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri, managementApiToken) {
+        const data = { clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri }
+        if (managementApiToken) data.managementApiToken = managementApiToken
         return request({
             url: '/api/addOktaSso',
             method: 'post',
-            data: {clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri, managementApiToken}
+            data
         })
     },
 
