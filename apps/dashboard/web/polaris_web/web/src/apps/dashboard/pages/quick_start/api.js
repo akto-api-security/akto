@@ -293,6 +293,31 @@ const api = {
         })
     },
 
+    fetchDefenderDevices() {
+        return request({
+            url: '/api/fetchDefenderDevices',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    uploadDefenderScript(scriptContent, scriptName) {
+        return request({
+            url: '/api/uploadDefenderScript',
+            method: 'post',
+            data: { scriptContent, scriptName }
+        })
+    },
+
+    runDefenderLiveResponse(deviceIds, scriptName) {
+        return request({
+            url: '/api/runDefenderLiveResponse',
+            method: 'post',
+            data: { deviceIds, scriptName },
+            timeout: 360000
+        })
+    },
+
 }
 
 export default api
