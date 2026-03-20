@@ -8,6 +8,8 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.LoginFlowResponse;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRun.State;
@@ -25,6 +27,11 @@ public class TestingRunPlayground {
     public static final String CREATED_AT = "createdAt";
     public static final String TESTING_RUN_RESULT = "testingRunResult";
     public static final String TESTING_RUN_CONFIG = "testingRunConfig";
+    public static final String LOGIN_FLOW_RESPONSE = "loginFlowResponse";
+    public static final String LOGIN_FLOW_AUTH_MECHANISM = "loginFlowAuthMechanism";
+    public static final String LOGIN_FLOW_NODE_ID = "loginFlowNodeId";
+    public static final String LOGIN_FLOW_USER_ID = "loginFlowUserId";
+    public static final String LOGIN_FLOW_SINGLE_STEP_ONLY = "loginFlowSingleStepOnly";
 
     private ObjectId id;
     private String testTemplate;
@@ -43,6 +50,12 @@ public class TestingRunPlayground {
     private String hexId;
     private TestingRunPlaygroundType testingRunPlaygroundType;
 
+    private AuthMechanism loginFlowAuthMechanism;
+    private String loginFlowNodeId;
+    private int loginFlowUserId;
+    private boolean loginFlowSingleStepOnly;
+    private LoginFlowResponse loginFlowResponse;
+
     public TestingRunPlaygroundType getTestingRunPlaygroundType() {
         if (testingRunPlaygroundType == null) {
             return TestingRunPlaygroundType.TEST_EDITOR_PLAYGROUND;
@@ -56,7 +69,8 @@ public class TestingRunPlayground {
 
     public enum TestingRunPlaygroundType {
         TEST_EDITOR_PLAYGROUND,
-        POSTMAN_IMPORTS
+        POSTMAN_IMPORTS,
+        LOGIN_FLOW_TEST
     }
 
     public TestingRunPlayground(String testTemplate, State state, List<String> samples, ApiInfoKey apiInfoKey, int createdAt) {
@@ -113,7 +127,7 @@ public class TestingRunPlayground {
         if (hexId == null) {
             return this.id.toHexString();
         }
-        return this.hexId;
+        return hexId;
     }
     public TestingRunResult getTestingRunResult() {
         return testingRunResult;
@@ -144,5 +158,45 @@ public class TestingRunPlayground {
 
     public void setOriginalHttpResponse(OriginalHttpResponse originalHttpResponse) {
         this.originalHttpResponse = originalHttpResponse;
+    }
+
+    public AuthMechanism getLoginFlowAuthMechanism() {
+        return loginFlowAuthMechanism;
+    }
+
+    public void setLoginFlowAuthMechanism(AuthMechanism loginFlowAuthMechanism) {
+        this.loginFlowAuthMechanism = loginFlowAuthMechanism;
+    }
+
+    public String getLoginFlowNodeId() {
+        return loginFlowNodeId;
+    }
+
+    public void setLoginFlowNodeId(String loginFlowNodeId) {
+        this.loginFlowNodeId = loginFlowNodeId;
+    }
+
+    public int getLoginFlowUserId() {
+        return loginFlowUserId;
+    }
+
+    public void setLoginFlowUserId(int loginFlowUserId) {
+        this.loginFlowUserId = loginFlowUserId;
+    }
+
+    public boolean isLoginFlowSingleStepOnly() {
+        return loginFlowSingleStepOnly;
+    }
+
+    public void setLoginFlowSingleStepOnly(boolean loginFlowSingleStepOnly) {
+        this.loginFlowSingleStepOnly = loginFlowSingleStepOnly;
+    }
+
+    public LoginFlowResponse getLoginFlowResponse() {
+        return loginFlowResponse;
+    }
+
+    public void setLoginFlowResponse(LoginFlowResponse loginFlowResponse) {
+        this.loginFlowResponse = loginFlowResponse;
     }
 }

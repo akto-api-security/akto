@@ -112,7 +112,9 @@ public class Main {
                             break;
                         case POSTMAN_IMPORTS:
                             handlePostmanImports(testingRunPlayground);
-                            break;
+                        case LOGIN_FLOW_TEST:
+                            handleLoginFlowTestPlayground(testingRunPlayground);
+                        break;
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in running playground tests: " + e.getMessage());
@@ -190,6 +192,25 @@ public class Main {
             testingRunResult.setMultiExecTestResults(list);
         }
         return testingRunResult;
+    }
+
+    private static void handleLoginFlowTestPlayground(TestingRunPlayground testingRunPlayground) {
+        LoginFlowParams params = null;
+        if (testingRunPlayground.isLoginFlowSingleStepOnly()) {
+            params = new LoginFlowParams(testingRunPlayground.getLoginFlowUserId(), true, testingRunPlayground.getLoginFlowNodeId());
+        }
+        LoginFlowResponse loginFlowResponse;
+        try {
+            loginFlowResponse = TestExecutor.executeLoginFlow(
+                    testingRunPlayground.getLoginFlowAuthMechanism(), params);
+        } catch (Exception e) {
+            loginFlowResponse = new LoginFlowResponse(null, e.getMessage(), false);
+        }
+        if (loginFlowResponse == null) {
+            loginFlowResponse = new LoginFlowResponse(null, "Login flow returned no response", false);
+        }
+        testingRunPlayground.setLoginFlowResponse(loginFlowResponse);
+        dataActor.updateTestingRunPlayground(testingRunPlayground);
     }
 
     private static void handlePostmanImports(TestingRunPlayground testingRunPlayground) {
