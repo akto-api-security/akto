@@ -1,5 +1,6 @@
 
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Icon, Avatar, Spinner } from '@shopify/polaris';
 import ReactFlow, { Background, Handle, Position, getBezierPath } from 'react-flow-renderer';
 import TooltipText from '../../../components/shared/TooltipText';
@@ -13,63 +14,157 @@ import {
   buildVSCodeGraph,
 } from './agentGraphUtils';
 
+// MCP hover tooltip rendered as a floating panel
+const McpHoverPanel = ({ metadata }) => {
+  const tools = metadata?.toolsList || [];
+  const lastTool = metadata?.lastToolInvoked;
+  const endpointUrl = metadata?.endpointUrl;
+  const responseData = metadata?.edgeParam?.data;
+
+  const MAX_TOOLS = 10;
+  const visibleTools = tools.slice(0, MAX_TOOLS);
+  const overflow = tools.length - MAX_TOOLS;
+
+  return (
+
+    <Card>
+      <Box maxWidth='500px'>
+        <VerticalStack gap="3">
+          {endpointUrl && (
+            <HorizontalStack gap="2">
+              <Text variant="bodySm" fontWeight="semibold" color="subdued">Endpoint URL:</Text>
+              <Text variant="bodySm" breakWord>{endpointUrl}</Text>
+            </HorizontalStack>
+          )}
+          {lastTool && (
+            <HorizontalStack gap="2">
+              <Text variant="bodySm" fontWeight="semibold" color="subdued">Last Tool Invoked:</Text>
+              <Text variant='bodySm' color="success">{lastTool}</Text>
+            </HorizontalStack>
+          )}
+          {responseData && (
+            <HorizontalStack gap="1">
+              <Text variant="bodySm" fontWeight="semibold" color="subdued">Response From server:</Text>
+              <Box background="bg-subdued" padding="1" borderRadius='1'> 
+                <Text variant="bodySm">{responseData}</Text>
+              </Box>
+            </HorizontalStack>
+          )}
+          {tools.length > 0 && (
+            <VerticalStack gap="1">
+              <Text variant="bodySm" fontWeight="semibold" color="subdued">
+                Tools List({tools.length}):
+              </Text>
+              <HorizontalStack gap="1">
+                {visibleTools.map((tool) => (
+                  <Text key={tool} variant="bodySm">{tool}, </Text>
+                ))}
+                {overflow > 0 && (
+                  <Text variant="bodySm" color="subdued">+{overflow} more</Text>
+                )}
+              </HorizontalStack>
+            </VerticalStack>
+          )}
+        </VerticalStack>
+      </Box>
+    </Card>
+  );
+};
+
 // Custom Node Component following ApiDependencyNode pattern - memoized to prevent re-renders
 const AgentNode = memo(function AgentNode({ data }) {
   const { component, onNodeClick } = data;
+  const [panelPos, setPanelPos] = useState(null);
+  const nodeRef = useRef(null);
 
   const colors = getComponentColors(component.category);
   const IconComponent = getComponentIcon(component.category);
   const isArcadeMcp = component.category === 'arcade-mcp';
+  const isMcp = component.category === 'mcp' && component.metadata;
+
+  const handleMouseEnter = useCallback(() => {
+    if (!isMcp || !nodeRef.current) return;
+    const rect = nodeRef.current.getBoundingClientRect();
+    setPanelPos({ top: rect.top + window.scrollY, left: rect.right + 8 + window.scrollX });
+  }, [isMcp]);
+
+  const handleMouseLeave = useCallback(() => {
+    setPanelPos(null);
+  }, []);
 
   return (
     <>
       <Handle type="target" position={Position.Left} />
       <Handle type="target" position={Position.Top} id="top" />
-      <div onClick={() => onNodeClick && onNodeClick(component)} style={{ cursor: "pointer" }}>
-        <VerticalStack gap={2}>
-          <Card padding={0}>
-            <div style={{
-              border: `1px solid ${colors.borderColor}`,
-              borderRadius: '8px',
-              backgroundColor: colors.backgroundColor
-            }}>
-              <Box padding={3}>
-                <VerticalStack gap={1}>
-                  <Box width='140px'>
-                    <TooltipText
-                      tooltip={component.description}
-                      text={component.type}
-                      textProps={{ color: "subdued", variant: "bodySm" }}
-                    />
-                  </Box>
-                  <HorizontalStack gap={1} align="center">
-                    {typeof IconComponent === 'string' ?
-                    <Avatar source={IconComponent} size={"extraSmall"} /> :
-                    <Icon source={IconComponent} />}
-                    <Box width={component.category === "ai-model" ? "160px" : "110px"}>
-                      <Text variant="bodySm" color="base">
-                        {component.label}
-                      </Text>
-                    </Box>
-                  </HorizontalStack>
-                  {isArcadeMcp && component.mcpServers && component.mcpServers.length > 0 && (
-                    <Box paddingBlockStart="1" width="140px">
-                      <ShowListInBadge
-                        itemsArr={component.mcpServers}
-                        maxItems={2}
-                        status="info"
-                        maxWidth="140px"
-                        itemWidth="35px"
-                        useTooltip={true}
-                        wrap
+      <div style={{ position: 'relative' }}>
+        <div
+          onClick={() => onNodeClick && onNodeClick(component)}
+          style={{ cursor: "pointer" }}
+        >
+          <VerticalStack gap={2}>
+            <Card padding={0}>
+              <div
+                ref={nodeRef}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+                style={{
+                  border: `1px solid ${colors.borderColor}`,
+                  borderRadius: '8px',
+                  backgroundColor: colors.backgroundColor,
+                  pointerEvents: 'all',
+                }}
+              >
+                <Box padding={3}>
+                  <VerticalStack gap={1}>
+                    <Box width='140px'>
+                      <TooltipText
+                        tooltip={component.description}
+                        text={component.type}
+                        textProps={{ color: "subdued", variant: "bodySm" }}
                       />
                     </Box>
-                  )}
-                </VerticalStack>
-              </Box>
-            </div>
-          </Card>
-        </VerticalStack>
+                    <HorizontalStack gap={1} align="center">
+                      {typeof IconComponent === 'string' ?
+                      <Avatar source={IconComponent} size={"extraSmall"} /> :
+                      <Icon source={IconComponent} />}
+                      <Box width={component.category === "ai-model" ? "160px" : "110px"}>
+                        <Text variant="bodySm" color="base">
+                          {component.label}
+                        </Text>
+                      </Box>
+                    </HorizontalStack>
+                    {isArcadeMcp && component.mcpServers && component.mcpServers.length > 0 && (
+                      <Box paddingBlockStart="1" width="140px">
+                        <ShowListInBadge
+                          itemsArr={component.mcpServers}
+                          maxItems={2}
+                          status="info"
+                          maxWidth="140px"
+                          itemWidth="35px"
+                          useTooltip={true}
+                          wrap
+                        />
+                      </Box>
+                    )}
+                  </VerticalStack>
+                </Box>
+              </div>
+            </Card>
+          </VerticalStack>
+        </div>
+
+        {isMcp && panelPos && createPortal(
+          <div
+            style={{
+              position: 'absolute',
+              top: panelPos.top,
+              left: panelPos.left,
+            }}
+          >
+            <McpHoverPanel metadata={component.metadata} />
+          </div>,
+          document.body
+        )}
       </div>
       <Handle type="source" position={Position.Right} id="b" />
       <Handle type="source" position={Position.Bottom} id="bottom" />
@@ -80,6 +175,11 @@ const AgentNode = memo(function AgentNode({ data }) {
 // Custom Edge Component following ApiDependencyEdge pattern - memoized to prevent re-renders
 const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
   const { edgeParam } = data || {};
+  let displayData = edgeParam;
+  
+  if(edgeParam instanceof Object) {
+    displayData = edgeParam?.type 
+  }
 
   // getBezierPath in react-flow-renderer v9 returns a plain string path
   const edgePath = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
@@ -112,11 +212,11 @@ const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targe
         d={pathD}
         markerEnd={`url(#arrow-${id})`}
       />
-      {edgeParam && (
+      {displayData && (
         <foreignObject x={midX - 95} y={midY - 12} width={190} height={28}>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <Badge size="small" status="new">
-              <TooltipText tooltip={edgeParam} text={edgeParam} />
+              <TooltipText tooltip={displayData} text={displayData} />
             </Badge>
           </div>
         </foreignObject>
@@ -204,7 +304,6 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             setVSCodeGraphData(null);
           } else {
             const tagsList = apiCollection?.tagsList || [];
-            const hasAiAgent = tagsList.some(tag => tag.keyName === 'ai-agent');
             const hasMcpServer = tagsList.some(tag => tag.keyName === 'mcp-server');
             const hasBrowserLlm = tagsList.some(tag => tag.keyName === 'browser-llm');
             const hasGenAiOrAiAgent = tagsList.some(tag => tag.keyName === 'gen-ai' || tag.keyName === 'ai-agent');
@@ -294,7 +393,8 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             displayName: key,
             isKey: true,
             requestCount: edgeInfo.requestCount,
-            lastSeen: edgeInfo.lastSeenTimestamp
+            lastSeen: edgeInfo.lastSeenTimestamp,
+            metadata: edgeInfo?.metadata,
           };
         }
       });
@@ -406,6 +506,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
                 showBoundary: isAgent,
                 boundaryColor: '#7c3aed',
                 boundaryBg: 'rgba(124, 58, 237, 0.05)',
+                metadata: info.metadata,
               },
               onNodeClick: handleNodeClick
             },
@@ -448,7 +549,8 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             data: {
               connectionType: edgeInfo?.metadata?.type || 'default',
               edgeParam: edgeInfo?.metadata?.edgeParam,
-              requestCount: edgeInfo.requestCount
+              requestCount: edgeInfo.requestCount,
+              metadata: edgeInfo?.metadata
             }
           });
           edgeIndex++;
