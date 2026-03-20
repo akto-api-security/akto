@@ -73,6 +73,11 @@ public class MicrosoftDefenderIntegrationAction extends UserAction {
     private List<Map<String, Object>> devices;
     private List<Map<String, Object>> libraryScripts;
 
+    // KQL query fields
+    private String kqlQuery;
+    private Integer kqlTimeRangeDays;
+    private List<Map<String, Object>> kqlResults;
+
     private MicrosoftDefenderIntegration microsoftDefenderIntegration;
 
     public String fetchMicrosoftDefenderIntegration() {
@@ -516,6 +521,68 @@ public class MicrosoftDefenderIntegrationAction extends UserAction {
         timeout.put("status", "TimedOut");
         timeout.put("actionId", actionId);
         return timeout;
+    }
+
+    public String runDefenderKqlQuery() {
+        if (kqlQuery == null || kqlQuery.trim().isEmpty()) {
+            addActionError("Please provide a KQL query.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        MicrosoftDefenderIntegration integration = MicrosoftDefenderIntegrationDao.instance.findOne(new BasicDBObject());
+        if (integration == null) {
+            addActionError("Microsoft Defender integration not configured.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        try {
+            String accessToken = fetchAccessToken(integration.getTenantId(), integration.getClientId(), integration.getClientSecret());
+
+            int days = (kqlTimeRangeDays != null && kqlTimeRangeDays > 0 && kqlTimeRangeDays <= 30) ? kqlTimeRangeDays : 1;
+            String timeFilter = "| where Timestamp > ago(" + days + "d)";
+            String finalQuery = kqlQuery.trim().contains("ago(") ? kqlQuery.trim() : kqlQuery.trim() + "\n" + timeFilter;
+
+            Map<String, String> body = new HashMap<>();
+            body.put("Query", finalQuery);
+
+            RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                .build();
+
+            try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
+                HttpPost post = new HttpPost("https://api.securitycenter.microsoft.com/api/advancedqueries/run");
+                post.setHeader("Authorization", "Bearer " + accessToken);
+                post.setHeader("Content-Type", "application/json");
+                post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
+
+                try (CloseableHttpResponse response = httpClient.execute(post)) {
+                    int statusCode = response.getStatusLine().getStatusCode();
+                    String responseBody = EntityUtils.toString(response.getEntity());
+
+                    if (statusCode != 200) {
+                        loggerMaker.error("KQL query failed: HTTP " + statusCode + " - " + responseBody, LogDb.DASHBOARD);
+                        addActionError("Query is invalid or could not be executed. Please check your KQL syntax and try again.");
+                        return Action.ERROR.toUpperCase();
+                    }
+
+                    JsonNode json = OBJECT_MAPPER.readTree(responseBody);
+                    JsonNode results = json.path("Results");
+                    kqlResults = new ArrayList<>();
+                    if (results.isArray()) {
+                        for (JsonNode row : results) {
+                            kqlResults.add(OBJECT_MAPPER.convertValue(row, Map.class));
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            loggerMaker.error("Error running KQL query: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Query is invalid or could not be executed. Please check your KQL syntax and try again.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
     }
 
     public String listDefenderLibraryScripts() {
