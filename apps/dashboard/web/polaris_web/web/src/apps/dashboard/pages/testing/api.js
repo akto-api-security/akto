@@ -190,11 +190,11 @@ export default {
         }).then((resp) => {
             return resp
         })},
-    triggerSingleStep(type, nodeId, requestData) {
+    triggerSingleStep(type, nodeId, requestData, miniTestingServiceName) {
         return request({
             url: 'api/triggerSingleLoginFlow',
             method: 'post',
-            data: {type, nodeId, requestData}
+            data: { type, nodeId, requestData, miniTestingServiceName }
         }).then((resp) => {
             return resp
         })

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Button,
@@ -42,6 +42,10 @@ const AuthComponent = ({
   setOpenAuth,
   advancedHeaderSettingsOpen,
   setAdvancedHeaderSettingsOpen,
+  hybridTestingEnabled = false,
+  miniTestingServiceNameOptions = [],
+  selectedMiniTestingServiceName = '',
+  setSelectedMiniTestingServiceName,
 }) => {
 
 
@@ -70,6 +74,15 @@ const AuthComponent = ({
     { label: "Login Step Builder", value: "LOGIN_STEP_BUILDER" },
     { label: "JSON Recording", value: "RECORDED_FLOW" },
   ];
+
+  const runLoginFlowOnMenuItems = useMemo(
+    () => [
+      { label: "Default (dashboard)", value: "" },
+      ...miniTestingServiceNameOptions,
+    ],
+    [miniTestingServiceNameOptions]
+  );
+
 
   const setTlsInfo = (obj) => {
     setTlsAuthInfo(prev => ({
@@ -332,6 +345,27 @@ const AuthComponent = ({
             transition={{ duration: "500ms", timingFunction: "ease-in-out" }}
             expandOnPrint
           >
+            {hybridTestingEnabled ? (
+              <>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "max-content max-content",
+                    gap: "10px",
+                    alignItems: "center",
+                  }}
+                >
+                  <Text>Run login flow on:</Text>
+                  <Dropdown
+                    id="mini-testing-login-flow-target"
+                    selected={(v) => setSelectedMiniTestingServiceName(v ?? "")}
+                    menuItems={runLoginFlowOnMenuItems}
+                    initial={selectedMiniTestingServiceName ?? ""}
+                  />
+                </div>
+                <br />
+              </>
+            ) : null}
             <div
               style={{
                 display: "grid",
@@ -354,6 +388,7 @@ const AuthComponent = ({
                 extractInformation={true}
                 showOnlyApi={true}
                 setStoreData={handleLoginInfo}
+                miniTestingServiceName={selectedMiniTestingServiceName}
               />
             )}
             {automationType === "RECORDED_FLOW" && (
