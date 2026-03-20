@@ -2384,14 +2384,25 @@ public class DbLayer {
         );
     }
     public static void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
-        TestingRunPlaygroundDao.instance.updateOne(
-                Filters.eq(Constants.ID, testingRunPlayground.getId()),
-                Updates.combine(
-                        Updates.set(TestingRunPlayground.STATE, State.COMPLETED),
-                        Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, testingRunPlayground.getTestingRunResult()
+        Bson stateUpdate = Updates.set(TestingRunPlayground.STATE, State.COMPLETED);
+        if (testingRunPlayground.getTestingRunPlaygroundType()
+                == TestingRunPlayground.TestingRunPlaygroundType.LOGIN_FLOW_TEST) {
+            TestingRunPlaygroundDao.instance.updateOne(
+                    Filters.eq(Constants.ID, testingRunPlayground.getId()),
+                    Updates.combine(
+                            stateUpdate,
+                            Updates.set(TestingRunPlayground.LOGIN_FLOW_RESPONSE,
+                                    testingRunPlayground.getLoginFlowResponse())));
+        } else {
+            TestingRunPlaygroundDao.instance.updateOne(
+                    Filters.eq(Constants.ID, testingRunPlayground.getId()),
+                    Updates.combine(
+                            stateUpdate,
+                            Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, testingRunPlayground.getTestingRunResult()
+                            )
                     )
-                )
             );
+        }
     }
 
     public static void updateTestingRunPlayground(ObjectId id, TestingRunResult testingRunResult) {
