@@ -14,12 +14,14 @@ import {
   buildVSCodeGraph,
 } from './agentGraphUtils';
 
-// MCP hover tooltip rendered as a floating panel
+// Hover panel for MCP and Agent Tool nodes
 const McpHoverPanel = ({ metadata }) => {
   const tools = metadata?.toolsList || [];
   const lastTool = metadata?.lastToolInvoked;
   const endpointUrl = metadata?.endpointUrl;
   const responseData = metadata?.edgeParam?.data;
+  const toolName = metadata?.toolName;
+  const description = metadata?.description;
 
   const MAX_TOOLS = 10;
   const visibleTools = tools.slice(0, MAX_TOOLS);
@@ -28,12 +30,24 @@ const McpHoverPanel = ({ metadata }) => {
   return (
 
     <Card>
-      <Box maxWidth='500px'>
+      <Box maxWidth='400px'>
         <VerticalStack gap="3">
           {endpointUrl && (
             <HorizontalStack gap="2">
               <Text variant="bodySm" fontWeight="semibold" color="subdued">Endpoint URL:</Text>
               <Text variant="bodySm" breakWord>{endpointUrl}</Text>
+            </HorizontalStack>
+          )}
+          {toolName && (
+            <HorizontalStack gap="2">
+              <Text variant="bodySm" fontWeight="semibold" color="subdued">Tool Name:</Text>
+              <Text variant="bodySm" color="success">{toolName}</Text>
+            </HorizontalStack>
+          )}
+          {description && (
+            <HorizontalStack gap="2">
+              <Text variant="bodySm" fontWeight="semibold" color="subdued">Description:</Text>
+              <Text variant="bodySm">{description}</Text>
             </HorizontalStack>
           )}
           {lastTool && (
@@ -80,7 +94,7 @@ const AgentNode = memo(function AgentNode({ data }) {
   const colors = getComponentColors(component.category);
   const IconComponent = getComponentIcon(component.category);
   const isArcadeMcp = component.category === 'arcade-mcp';
-  const isMcp = component.category === 'mcp' && component.metadata;
+  const isMcp = (component.category === 'mcp' || component.category === 'ai-tool') && component.metadata;
 
   const handleMouseEnter = useCallback(() => {
     if (!isMcp || !nodeRef.current) return;
@@ -414,7 +428,8 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             displayName: key,
             isKey: true,
             requestCount: edgeInfo.requestCount,
-            lastSeen: edgeInfo.lastSeenTimestamp
+            lastSeen: edgeInfo.lastSeenTimestamp,
+            metadata: edgeInfo?.metadata,
           };
         }
       });
