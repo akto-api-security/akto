@@ -20,6 +20,7 @@ public class Constants {
     public static final int TWO_HOURS_TIMESTAMP = ( 60 * 60 * 2 );
 
     public static final String AKTO_IGNORE_FLAG = "x-akto-ignore";
+    public static final String AKTO_COVERAGE_FLAG = "x-akto-coverage-check";
     public static final String AKTO_ATTACH_FILE = "x-akto-attach-file";
     public static final String AKTO_TOKEN_KEY = "x-akto-key";
     public static final String AKTO_NODE_ID = "x-akto-node";
@@ -69,6 +70,8 @@ public class Constants {
     public static final String AI_AGENT_SOURCE_DATABRICS = "DATABRICKS";
     public static final String AI_AGENT_SOURCE_VERTEX = "VERTEX_AI";
     public static final String AI_AGENT_SOURCE_SNOWFLAKE = "SNOWFLAKE";
+    public static final String AI_AGENT_SOURCE_ARCADE_DEV = "ARCADE_DEV";
+    public static final String AI_AGENT_SOURCE_MICROSOFT_DEFENDER = "DEFENDER";
     public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
     public static final String AI_AGENT_TAG_SOURCE = "source";
 

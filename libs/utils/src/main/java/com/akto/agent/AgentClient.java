@@ -36,6 +36,12 @@ public class AgentClient {
             .readTimeout(120, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .build();
+    private static final OkHttpClient clientWithLongTimeout = CoreHTTPClient.client.newBuilder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.MINUTES)
+            .callTimeout(5, TimeUnit.MINUTES)
+            .writeTimeout(120, TimeUnit.SECONDS)
+            .build();
     
     private final String agentBaseUrl;
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
@@ -104,9 +110,8 @@ public class AgentClient {
     private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
         Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest);
 
-        Call call = agentHttpClient.newCall(request);
-        call.timeout().timeout(120, TimeUnit.SECONDS);
-        
+        Call call = clientWithLongTimeout.newCall(request);
+
         try (Response response = call.execute()) {
             if (!response.isSuccessful()) {
                 String responseBody = response.body() != null ? response.body().string() : "";

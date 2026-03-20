@@ -350,7 +350,12 @@ public class ApiExecutor {
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
         Map<String, List<String>> headersMap = request.getHeaders();
         if (headersMap == null) headersMap = new HashMap<>();
-        headersMap.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
+
+        // Only add AKTO_IGNORE_FLAG if AKTO_COVERAGE_FLAG is not present
+        if (!headersMap.containsKey(Constants.AKTO_COVERAGE_FLAG)) {
+            headersMap.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
+        }
+
         for (String headerName: headersMap.keySet()) {
             if (forbiddenHeaders.contains(headerName)) continue;
             if (headerName.contains(" ")) continue;
@@ -394,6 +399,10 @@ public class ApiExecutor {
 
         if (url.contains("login_submit")) {
             loggerMaker.infoAndAddToDb("Response Payload " + response.getBody(), LogDb.TESTING);
+        }
+
+        if (executeScript) {
+            response = ApiExecutorUtil.runPostRequestScript(request, response, true, testingRunConfig);
         }
 
         request.setBody(tempPayload);

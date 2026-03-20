@@ -70,6 +70,7 @@ public class ClientActor extends DataActor {
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     public static final String CYBORG_URL = "https://cyborg.akto.io";
     public static final String ULTRON_URL = "https://ultron.akto.io";
+    private static final String PARAM_TEST_SCRIPT_TYPE = "testScriptType";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
         
     /**
@@ -2127,6 +2128,7 @@ public class ClientActor extends DataActor {
                 apiCollection.remove("displayName");
                 apiCollection.remove("urlsCount");
                 apiCollection.remove("envType");
+                apiCollection.remove("conditions");
                 return objectMapper.readValue(apiCollection.toJson(), ApiCollection.class);
             } catch(Exception e) {
                 return null;
@@ -3969,11 +3971,13 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public TestScript fetchTestScript(){
+    public TestScript fetchTestScript(TestScript.Type type){
         TestScript testScript = null;
 
         Map<String, List<String>> headers = buildHeaders();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchTestScript", "", "GET", null, headers, "");
+        BasicDBObject obj = new BasicDBObject();
+        obj.put(PARAM_TEST_SCRIPT_TYPE, type != null ? type.name() : null);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchTestScript", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();

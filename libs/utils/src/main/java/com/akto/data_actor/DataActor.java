@@ -305,7 +305,7 @@ public abstract class DataActor {
 
     public abstract long countTestingRunResultSummaries(Bson filter);
 
-    public abstract TestScript fetchTestScript();
+    public abstract TestScript fetchTestScript(TestScript.Type type);
 
     public abstract List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod);
 

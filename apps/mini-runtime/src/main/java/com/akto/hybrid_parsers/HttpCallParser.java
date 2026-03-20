@@ -321,6 +321,7 @@ public class HttpCallParser {
                     && !source.equals(Constants.AI_AGENT_SOURCE_DATABRICS)
                     && !source.equals(Constants.AI_AGENT_SOURCE_VERTEX)
                     && !source.equals(Constants.AI_AGENT_SOURCE_SNOWFLAKE)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)
                     )) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
@@ -332,6 +333,11 @@ public class HttpCallParser {
                 // No bot name provided, log warning and use base hostname as-is
                 loggerMaker.infoAndAddToDb("AI agent traffic from " + source + " missing bot-name in tags. Using base hostname: " + baseHostname, LogDb.RUNTIME);
                 return baseHostname;
+            }
+
+            // Microsoft Defender traffic: collection name is bot-name.openclaw.defender.com
+            if (source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)) {
+                return botName + ".openclaw.defender.com";
             }
 
             // Reconstruct full hostname: bot-name.base-hostname
@@ -602,6 +608,92 @@ public class HttpCallParser {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing N8N trace: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Checks if the HTTP response is Arcade traffic by examining tags.
+     *
+     * @param httpResponseParam The HTTP response parameters
+     * @return true if this is Arcade traffic, false otherwise
+     */
+    private boolean isArcadeTraffic(HttpResponseParams httpResponseParam) {
+        try {
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) {
+                return false;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return false;
+            }
+
+            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            return Constants.AI_AGENT_SOURCE_ARCADE_DEV.equals(source);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking if traffic is Arcade: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Builds and updates service graph edges for Arcade traffic.
+     * Extracts tool metadata from Arcade-specific request headers.
+     *
+     * @param httpResponseParam The HTTP response containing Arcade headers
+     */
+    @SuppressWarnings("unchecked")
+    private void parseArcadeServiceGraph(HttpResponseParams httpResponseParam) {
+        try {
+            int apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
+            if (apiCollectionId == -1) {
+                loggerMaker.info("Invalid API collection ID for Arcade traffic, skipping service graph update", LogDb.RUNTIME);
+                return;
+            }
+
+            Map<String, List<String>> requestHeaders = httpResponseParam.getRequestParams().getHeaders();
+
+            String userAgent = getHeaderValue(requestHeaders, "user-agent");
+            String toolkit = getHeaderValue(requestHeaders, "x-arcade-toolkit");
+
+            // Fetch existing collection to merge mcp-server-names across calls
+            List<String> mcpServerNames = new ArrayList<>();
+            Map<String, ServiceGraphEdgeInfo> existingEdges = new HashMap<>();
+            ApiCollection existingCollection = dataActor.fetchApiCollectionMeta(apiCollectionId);
+            if (existingCollection != null) {
+                if (existingCollection.getServiceGraphEdges() != null) {
+                    existingEdges.putAll(existingCollection.getServiceGraphEdges());
+                    ServiceGraphEdgeInfo existingEdge = existingEdges.get("ARCADE");
+                    if (existingEdge != null && existingEdge.getMetadata() != null) {
+                        Object existing = existingEdge.getMetadata().get("mcp-server-names");
+                        if (existing instanceof List) {
+                            List<String> existingNames = (List<String>) existing;
+                            mcpServerNames.addAll(existingNames);
+                        }
+                    }
+                }
+            }
+
+            if (toolkit != null && !toolkit.isEmpty() && !mcpServerNames.contains(toolkit)) {
+                mcpServerNames.add(toolkit);
+            }
+
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("type", "mcp");
+            metadata.put("user-agent", userAgent != null ? userAgent : "");
+            metadata.put("mcp-server-names", mcpServerNames);
+
+            // Replace the ARCADE edge with the fully merged one and write directly,
+            // bypassing ServiceGraphBuilder which would discard updates to existing edges.
+            existingEdges.put("ARCADE", new ServiceGraphEdgeInfo("AGENT", "ARCADE", metadata));
+            dataActor.updateServiceGraphEdges(apiCollectionId, existingEdges);
+            loggerMaker.info("Updated service graph for Arcade traffic (collection: " + apiCollectionId + ") with toolkits: " + mcpServerNames, LogDb.RUNTIME);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Arcade service graph: " + e.getMessage());
         }
     }
 
@@ -1330,6 +1422,11 @@ public class HttpCallParser {
             // Parse N8N trace metadata if this is N8N traffic
             if (isN8nTraffic(httpResponseParam)) {
                 parseN8nTrace(httpResponseParam);
+            }
+
+            // Build service graph edges for Arcade traffic
+            if (isArcadeTraffic(httpResponseParam)) {
+                parseArcadeServiceGraph(httpResponseParam);
             }
 
             // Parse LangChain trace data if this is LangChain traffic
