@@ -7471,6 +7471,27 @@
             </result>
         </action>
 
+        <action name="api/fetchRecordedLoginScreenshots" class="com.akto.action.testing.LoginRecorderAction" method="fetchRecordedLoginScreenshots">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">USER_CONFIG</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json" />
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/uploadRecordedFlow" class="com.akto.action.testing.LoginRecorderAction" method="uploadRecordedFlow">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
