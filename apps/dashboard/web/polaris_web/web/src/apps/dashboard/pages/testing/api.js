@@ -199,14 +199,26 @@ export default {
             return resp
         })
     },
-    uploadRecordedLoginFlow(content, tokenFetchCommand) {
+    uploadRecordedLoginFlow(content, tokenFetchCommand, roleName) {
+        const data = { content, tokenFetchCommand }
+        if (roleName) {
+            data.roleName = roleName
+        }
         return request({
             url: '/api/uploadRecordedFlow',
             method: 'post',
-            data: {content, tokenFetchCommand}
+            data
         }).then((resp) => {
             return resp
         })
+    },
+
+    fetchRecordedLoginScreenshots(roleName) {
+        return request({
+            url: '/api/fetchRecordedLoginScreenshots',
+            method: 'post',
+            data: { roleName }
+        }).then((resp) => resp)
     },
 
     fetchRecordedLoginFlow(nodeId) {

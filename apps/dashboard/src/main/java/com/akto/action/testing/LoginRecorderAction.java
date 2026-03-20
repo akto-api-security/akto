@@ -1,7 +1,8 @@
 package com.akto.action.testing;
 
-import java.net.URL;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -12,9 +13,11 @@ import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
 import com.akto.dao.RecordedLoginInputDao;
+import com.akto.dao.RecordedLoginScreenshotDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dto.RecordedLoginFlowInput;
+import com.akto.dto.RecordedLoginFlowScreenshot;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.RecordedLoginFlowUtil;
@@ -36,6 +39,11 @@ public class LoginRecorderAction extends UserAction {
 
     private Boolean tokenFetchInProgress;
 
+    private String roleName;
+
+    private List<String> screenshotsBase64;
+
+    private int screenshotsUpdatedAt;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -51,13 +59,16 @@ public class LoginRecorderAction extends UserAction {
             RecordedLoginInputDao.instance.deleteAll(Filters.eq("userId", userId));
         }
 
+        final String roleNameForFlow = roleName;
+        final int scheduledUserId = userId;
+
         executorService.schedule( new Runnable() {
             public void run() {
                 try {
                     Context.accountId.set(accountId);
                     File tmpOutputFile = File.createTempFile("output", ".json");
                     File tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
-                    RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), getSUser().getId());
+                    RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), scheduledUserId, roleNameForFlow);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,"error running recorded flow " + e.toString(), LogDb.DASHBOARD);
                 }
@@ -94,6 +105,23 @@ public class LoginRecorderAction extends UserAction {
         Bson update = Updates.set("valuesMap", valuesMap);
         LoginFlowStepsDao.instance.updateOne(filter, update);
 
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchRecordedLoginScreenshots() {
+        if (roleName == null || roleName.trim().isEmpty()) {
+            addActionError("roleName is required");
+            return ERROR.toUpperCase();
+        }
+        RecordedLoginFlowScreenshot doc = RecordedLoginScreenshotDao.instance.findOne(
+                Filters.and(Filters.eq("roleName", roleName.trim()), Filters.eq("userId", getSUser().getId())));
+        if (doc == null) {
+            screenshotsBase64 = new ArrayList<>();
+            screenshotsUpdatedAt = 0;
+        } else {
+            screenshotsBase64 = doc.getScreenshotsBase64() != null ? doc.getScreenshotsBase64() : new ArrayList<>();
+            screenshotsUpdatedAt = doc.getUpdatedAt();
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -134,5 +162,29 @@ public class LoginRecorderAction extends UserAction {
 
     public void setTokenFetchInProgress(Boolean tokenFetchInProgress) {
         this.tokenFetchInProgress = tokenFetchInProgress;
+    }
+
+    public String getRoleName() {
+        return roleName;
+    }
+
+    public void setRoleName(String roleName) {
+        this.roleName = roleName;
+    }
+
+    public List<String> getScreenshotsBase64() {
+        return screenshotsBase64;
+    }
+
+    public void setScreenshotsBase64(List<String> screenshotsBase64) {
+        this.screenshotsBase64 = screenshotsBase64;
+    }
+
+    public int getScreenshotsUpdatedAt() {
+        return screenshotsUpdatedAt;
+    }
+
+    public void setScreenshotsUpdatedAt(int screenshotsUpdatedAt) {
+        this.screenshotsUpdatedAt = screenshotsUpdatedAt;
     }
 }
