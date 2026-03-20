@@ -1,5 +1,5 @@
-import { Badge, Button, Combobox, DropZone, HorizontalStack, Icon, Listbox, Spinner, Tag, Text, VerticalStack } from '@shopify/polaris'
-import { SearchMinor } from '@shopify/polaris-icons'
+import { Badge, Button, Combobox, DropZone, HorizontalStack, Icon, Listbox, Select, Spinner, Tag, Text, TextField, Tooltip, VerticalStack } from '@shopify/polaris'
+import { InfoMinor, SearchMinor } from '@shopify/polaris-icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import api from '../api'
 import func from '@/util/func'
@@ -15,6 +15,11 @@ function MicrosoftDefenderRunQueriesConnector() {
     const [uploading, setUploading] = useState(false)
     const [running, setRunning] = useState(false)
     const [results, setResults] = useState(null)
+    const [libraryScripts, setLibraryScripts] = useState([])
+    const [loadingLibrary, setLoadingLibrary] = useState(false)
+    const [useLibraryScript, setUseLibraryScript] = useState(false)
+    const [selectedLibraryScript, setSelectedLibraryScript] = useState('')
+    const [scriptParameters, setScriptParameters] = useState('')
 
     useEffect(() => {
         setLoadingDevices(true)
@@ -23,6 +28,11 @@ function MicrosoftDefenderRunQueriesConnector() {
         }).catch(() => {
             func.setToast(true, true, "Failed to fetch devices. Ensure Microsoft Defender integration is configured.")
         }).finally(() => setLoadingDevices(false))
+
+        setLoadingLibrary(true)
+        api.listDefenderLibraryScripts().then((res) => {
+            if (res && res.libraryScripts) setLibraryScripts(res.libraryScripts)
+        }).catch(() => {}).finally(() => setLoadingLibrary(false))
     }, [])
 
     const allOptions = useMemo(() =>
@@ -70,10 +80,13 @@ function MicrosoftDefenderRunQueriesConnector() {
         }).finally(() => setUploading(false))
     }
 
+    const activeScriptName = useLibraryScript ? selectedLibraryScript : scriptName
+    const canRun = selectedDeviceIds.length > 0 && !!activeScriptName && (useLibraryScript || scriptUploaded) && !running
+
     const handleRun = async () => {
         setRunning(true)
         setResults(null)
-        api.runDefenderLiveResponse(selectedDeviceIds, scriptName).then((res) => {
+        api.runDefenderLiveResponse(selectedDeviceIds, activeScriptName, scriptParameters || null).then((res) => {
             setResults(res.liveResponseResults || [])
             func.setToast(true, false, "Live response completed.")
         }).catch(() => {
@@ -98,10 +111,15 @@ function MicrosoftDefenderRunQueriesConnector() {
         return 'info'
     }
 
+    const libraryOptions = [
+        { label: 'Select a script from library...', value: '' },
+        ...libraryScripts.map((s) => ({ label: s.fileName, value: s.fileName }))
+    ]
+
     return (
         <div className='card-items'>
             <Text variant='bodyMd'>
-                Select devices, upload a script to the Defender Live Response library, then run it sequentially on each selected device.
+                Select devices, choose or upload a script, then run it sequentially on each selected device.
             </Text>
             <VerticalStack gap="4">
 
@@ -153,32 +171,87 @@ function MicrosoftDefenderRunQueriesConnector() {
                     )}
                 </VerticalStack>
 
-                {/* Script upload */}
+                {/* Script selection */}
                 <VerticalStack gap="2">
-                    <Text variant='headingSm'>Upload Script to Defender Library</Text>
-                    <DropZone onDrop={handleDropZoneDrop} accept=".ps1,.sh,.bat" type="file">
-                        {scriptName ? (
-                            <div style={{ padding: '8px 12px' }}>
-                                <HorizontalStack gap="2" blockAlign="center">
-                                    <Text>{scriptName}</Text>
-                                    {scriptUploaded && <Badge status="success">Uploaded</Badge>}
-                                </HorizontalStack>
-                            </div>
+                    <Text variant='headingSm'>Script</Text>
+                    <HorizontalStack gap="2">
+                        <Button
+                            pressed={!useLibraryScript}
+                            onClick={() => setUseLibraryScript(false)}
+                        >
+                            Upload new script
+                        </Button>
+                        <Button
+                            pressed={useLibraryScript}
+                            onClick={() => setUseLibraryScript(true)}
+                        >
+                            Use existing library script
+                        </Button>
+                    </HorizontalStack>
+
+                    {useLibraryScript ? (
+                        loadingLibrary ? (
+                            <HorizontalStack gap="2">
+                                <Spinner size="small" />
+                                <Text>Loading library scripts...</Text>
+                            </HorizontalStack>
                         ) : (
-                            <DropZone.FileUpload actionTitle="Upload script" actionHint="Accepts .ps1, .sh, .bat" />
-                        )}
-                    </DropZone>
-                    {scriptName && (
-                        <HorizontalStack gap="2">
-                            <Button plain onClick={() => { setScriptContent(''); setScriptName(''); setScriptUploaded(false) }}>
-                                Remove
-                            </Button>
-                            <Button onClick={handleUploadScript} loading={uploading} disabled={scriptUploaded || uploading}>
-                                {scriptUploaded ? 'Uploaded' : 'Upload to Library'}
-                            </Button>
-                        </HorizontalStack>
+                            <Select
+                                label="Library script"
+                                labelHidden
+                                options={libraryOptions}
+                                value={selectedLibraryScript}
+                                onChange={setSelectedLibraryScript}
+                            />
+                        )
+                    ) : (
+                        <VerticalStack gap="2">
+                            <Text variant='bodySm' color="subdued">Note: .sh scripts are for macOS/Linux; .ps1 scripts are for Windows.</Text>
+                            <DropZone onDrop={handleDropZoneDrop} accept=".ps1,.sh,.bat" type="file">
+                                {scriptName ? (
+                                    <div style={{ padding: '8px 12px' }}>
+                                        <HorizontalStack gap="2" blockAlign="center">
+                                            <Text>{scriptName}</Text>
+                                            {scriptUploaded && <Badge status="success">Uploaded</Badge>}
+                                        </HorizontalStack>
+                                    </div>
+                                ) : (
+                                    <DropZone.FileUpload actionTitle="Upload script" actionHint="Accepts .ps1 (Windows), .sh (macOS/Linux), .bat" />
+                                )}
+                            </DropZone>
+                            {scriptName && (
+                                <HorizontalStack gap="2">
+                                    <Button plain onClick={() => { setScriptContent(''); setScriptName(''); setScriptUploaded(false) }}>
+                                        Remove
+                                    </Button>
+                                    <Button onClick={handleUploadScript} loading={uploading} disabled={scriptUploaded || uploading}>
+                                        {scriptUploaded ? 'Uploaded' : 'Upload to Library'}
+                                    </Button>
+                                </HorizontalStack>
+                            )}
+                        </VerticalStack>
                     )}
                 </VerticalStack>
+
+                {/* Script parameters */}
+                <TextField
+                    label={
+                        <HorizontalStack gap="1">
+                            <Text>Script Parameters (optional)</Text>
+                            <Tooltip
+                                content={`Passed as -parameters on Windows (.ps1) or as environment args on Linux/macOS (.sh). Example: run update_openclaw_simple.ps1 -parameters "AKTO_PROXY_URL=https://example.ngrok-free.dev/v1 OPENAI_API_KEY=sk-... MODEL_ID=claude-sonnet-4-6"`}
+                                dismissOnMouseOut
+                                width="wide"
+                            >
+                                <Icon source={InfoMinor} color="subdued" />
+                            </Tooltip>
+                        </HorizontalStack>
+                    }
+                    value={scriptParameters}
+                    onChange={setScriptParameters}
+                    placeholder="e.g. AKTO_PROXY_URL=https://example.ngrok-free.dev/v1 OPENAI_API_KEY=sk-... MODEL_ID=claude-sonnet-4-6"
+                    autoComplete="off"
+                />
 
                 {/* Results */}
                 {running && (
@@ -209,7 +282,7 @@ function MicrosoftDefenderRunQueriesConnector() {
                         primary
                         onClick={handleRun}
                         loading={running}
-                        disabled={selectedDeviceIds.length === 0 || !scriptUploaded || running}
+                        disabled={!canRun}
                     >
                         Run on Selected Devices
                     </Button>

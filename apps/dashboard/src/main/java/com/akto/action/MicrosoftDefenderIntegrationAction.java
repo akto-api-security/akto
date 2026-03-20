@@ -68,8 +68,10 @@ public class MicrosoftDefenderIntegrationAction extends UserAction {
     private List<String> deviceIds;
     private String scriptContent;
     private String scriptName;
+    private String scriptParameters;
     private List<Map<String, Object>> liveResponseResults;
     private List<Map<String, Object>> devices;
+    private List<Map<String, Object>> libraryScripts;
 
     private MicrosoftDefenderIntegration microsoftDefenderIntegration;
 
@@ -342,7 +344,7 @@ public class MicrosoftDefenderIntegrationAction extends UserAction {
                 result.put("deviceId", deviceId);
 
                 try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
-                    String actionId = submitLiveResponseAction(httpClient, accessToken, deviceId);
+                    String actionId = submitLiveResponseAction(httpClient, accessToken, deviceId, scriptParameters);
                     if (actionId == null) {
                         // ActiveRequestAlreadyExists — try to cancel and retry once
                         String existingActionId = getActiveActionId(httpClient, accessToken, deviceId);
@@ -351,7 +353,7 @@ public class MicrosoftDefenderIntegrationAction extends UserAction {
                             cancelLiveResponseAction(httpClient, accessToken, existingActionId);
                             try { Thread.sleep(CANCEL_RETRY_WAIT_MS); } catch (InterruptedException ignored) {}
                         }
-                        actionId = submitLiveResponseAction(httpClient, accessToken, deviceId);
+                        actionId = submitLiveResponseAction(httpClient, accessToken, deviceId, scriptParameters);
                     }
 
                     if (actionId == null) {
@@ -389,14 +391,23 @@ public class MicrosoftDefenderIntegrationAction extends UserAction {
     }
 
     // Submits the RunScript live response action. Returns actionId on success, null if ActiveRequestAlreadyExists.
-    private String submitLiveResponseAction(CloseableHttpClient httpClient, String accessToken, String deviceId) throws IOException {
+    private String submitLiveResponseAction(CloseableHttpClient httpClient, String accessToken, String deviceId, String params) throws IOException {
         Map<String, Object> scriptNameParam = new HashMap<>();
         scriptNameParam.put("key", "ScriptName");
         scriptNameParam.put("value", scriptName);
 
+        List<Object> cmdParams = new ArrayList<>();
+        cmdParams.add(scriptNameParam);
+        if (params != null && !params.isEmpty()) {
+            Map<String, Object> scriptArgsParam = new HashMap<>();
+            scriptArgsParam.put("key", "Args");
+            scriptArgsParam.put("value", params);
+            cmdParams.add(scriptArgsParam);
+        }
+
         Map<String, Object> runScriptCommand = new HashMap<>();
         runScriptCommand.put("type", "RunScript");
-        runScriptCommand.put("params", new Object[]{ scriptNameParam });
+        runScriptCommand.put("params", cmdParams);
 
         Map<String, Object> body = new HashMap<>();
         body.put("Commands", new Object[]{ runScriptCommand });
@@ -505,6 +516,58 @@ public class MicrosoftDefenderIntegrationAction extends UserAction {
         timeout.put("status", "TimedOut");
         timeout.put("actionId", actionId);
         return timeout;
+    }
+
+    public String listDefenderLibraryScripts() {
+        MicrosoftDefenderIntegration integration = MicrosoftDefenderIntegrationDao.instance.findOne(new BasicDBObject());
+        if (integration == null) {
+            addActionError("Microsoft Defender integration not configured.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        try {
+            String accessToken = fetchAccessToken(integration.getTenantId(), integration.getClientId(), integration.getClientSecret());
+
+            RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                .build();
+
+            try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
+                HttpGet get = new HttpGet("https://api.securitycenter.microsoft.com/api/libraryfiles");
+                get.setHeader("Authorization", "Bearer " + accessToken);
+
+                try (CloseableHttpResponse response = httpClient.execute(get)) {
+                    int statusCode = response.getStatusLine().getStatusCode();
+                    String responseBody = EntityUtils.toString(response.getEntity());
+
+                    if (statusCode != 200) {
+                        loggerMaker.error("Failed to list Defender library scripts: HTTP " + statusCode + " - " + responseBody, LogDb.DASHBOARD);
+                        addActionError("Failed to list library scripts: HTTP " + statusCode);
+                        return Action.ERROR.toUpperCase();
+                    }
+
+                    JsonNode json = OBJECT_MAPPER.readTree(responseBody);
+                    JsonNode value = json.path("value");
+                    libraryScripts = new ArrayList<>();
+                    if (value.isArray()) {
+                        for (JsonNode item : value) {
+                            Map<String, Object> entry = new HashMap<>();
+                            entry.put("fileName", item.path("fileName").asText(""));
+                            entry.put("description", item.path("description").asText(""));
+                            entry.put("creationTime", item.path("creationTime").asText(""));
+                            libraryScripts.add(entry);
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            loggerMaker.error("Error listing Defender library scripts: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Error listing library scripts: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
     }
 
     private String fetchAccessToken(String tenantId, String clientId, String clientSecret) throws IOException {

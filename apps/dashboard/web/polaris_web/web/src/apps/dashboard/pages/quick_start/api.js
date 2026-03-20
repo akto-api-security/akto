@@ -309,11 +309,19 @@ const api = {
         })
     },
 
-    runDefenderLiveResponse(deviceIds, scriptName) {
+    listDefenderLibraryScripts() {
+        return request({
+            url: '/api/listDefenderLibraryScripts',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    runDefenderLiveResponse(deviceIds, scriptName, scriptParameters) {
         return request({
             url: '/api/runDefenderLiveResponse',
             method: 'post',
-            data: { deviceIds, scriptName },
+            data: { deviceIds, scriptName, scriptParameters },
             timeout: 360000
         })
     },
