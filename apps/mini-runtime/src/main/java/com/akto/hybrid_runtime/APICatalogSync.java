@@ -149,11 +149,18 @@ public class APICatalogSync {
         }
 
         requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp);
+
+        // Skip sample data if x-akto-skip-sample-update header is present
+        Map<String, List<String>> reqHeaders = requestParams.getHeaders();
+        boolean skipSampleData = reqHeaders != null && reqHeaders.get("x-akto-skip-sample-update") != null;
+
         BasicDBObject requestPayload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
-        if (requestPayload != null) {
+        if (requestPayload != null && !skipSampleData) {
             deletedInfo.addAll(requestTemplate.process2(requestPayload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
         }
-        requestTemplate.recordMessage(responseParams.getOrig());
+        if (!skipSampleData) {
+            requestTemplate.recordMessage(responseParams.getOrig());
+        }
 
         Map<Integer, RequestTemplate> responseTemplates = requestTemplate.getResponseTemplates();
         
@@ -182,7 +189,10 @@ public class APICatalogSync {
                 payload = BasicDBObject.parse("{}");
             }
 
-            deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
+            // Skip sample data if x-akto-skip-sample-update header is present
+            if (!skipSampleData) {
+                deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
+            }
             responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp);
             if (!responseParams.getIsPending()) {
                 responseTemplate.processTraffic(responseParams.getTime());
