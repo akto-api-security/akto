@@ -24,6 +24,8 @@ import com.akto.util.RecordedLoginFlowUtil;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
+import lombok.Getter;
+import lombok.Setter;
 
 public class LoginRecorderAction extends UserAction {
 
@@ -41,8 +43,12 @@ public class LoginRecorderAction extends UserAction {
 
     private String roleName;
 
+    @Getter
+    @Setter
     private List<String> screenshotsBase64;
 
+    @Getter
+    @Setter
     private int screenshotsUpdatedAt;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
@@ -59,16 +65,13 @@ public class LoginRecorderAction extends UserAction {
             RecordedLoginInputDao.instance.deleteAll(Filters.eq("userId", userId));
         }
 
-        final String roleNameForFlow = roleName;
-        final int scheduledUserId = userId;
-
         executorService.schedule( new Runnable() {
             public void run() {
                 try {
                     Context.accountId.set(accountId);
                     File tmpOutputFile = File.createTempFile("output", ".json");
                     File tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
-                    RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), scheduledUserId, roleNameForFlow);
+                    RecordedLoginFlowUtil.triggerFlow(tokenFetchCommand, payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), userId, roleName);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,"error running recorded flow " + e.toString(), LogDb.DASHBOARD);
                 }
@@ -170,21 +173,5 @@ public class LoginRecorderAction extends UserAction {
 
     public void setRoleName(String roleName) {
         this.roleName = roleName;
-    }
-
-    public List<String> getScreenshotsBase64() {
-        return screenshotsBase64;
-    }
-
-    public void setScreenshotsBase64(List<String> screenshotsBase64) {
-        this.screenshotsBase64 = screenshotsBase64;
-    }
-
-    public int getScreenshotsUpdatedAt() {
-        return screenshotsUpdatedAt;
-    }
-
-    public void setScreenshotsUpdatedAt(int screenshotsUpdatedAt) {
-        this.screenshotsUpdatedAt = screenshotsUpdatedAt;
     }
 }

@@ -5,6 +5,12 @@ import api from "../api"
 import Store from "../../../store"
 import AuthParams from "./AuthParams"
 
+async function fetchRecordedLoginScreenshotsList(trimmedRole) {
+    const resp = await api.fetchRecordedLoginScreenshots(trimmedRole)
+    const raw = resp?.screenshotsBase64
+    return Array.isArray(raw) ? raw : []
+}
+
 function ReplayScreenshotImg({ b64, stepIndex }) {
     const [fmt, setFmt] = useState('jpeg')
     return (
@@ -59,19 +65,21 @@ function JsonRecording({extractInformation, showOnlyApi, setStoreData, roleName}
             return
         }
         let cancelled = false
-        ;(async () => {
+
+        async function syncHasScreenshotsFromServer() {
             try {
-                const resp = await api.fetchRecordedLoginScreenshots(trimmed)
-                const list = resp?.screenshotsBase64 || []
+                const list = await fetchRecordedLoginScreenshotsList(trimmed)
                 if (!cancelled) {
-                    setHasScreenshots(Array.isArray(list) && list.length > 0)
+                    setHasScreenshots(list.length > 0)
                 }
             } catch {
                 if (!cancelled) {
                     setHasScreenshots(false)
                 }
             }
-        })()
+        }
+
+        syncHasScreenshotsFromServer()
         return () => {
             cancelled = true
         }
@@ -100,9 +108,8 @@ function JsonRecording({extractInformation, showOnlyApi, setStoreData, roleName}
         async function refreshScreenshotsWhileActive() {
             if (!trimmedRole) return
             try {
-                const sResp = await api.fetchRecordedLoginScreenshots(trimmedRole)
-                const list = sResp?.screenshotsBase64 || []
-                setHasScreenshots(Array.isArray(list) && list.length > 0)
+                const list = await fetchRecordedLoginScreenshotsList(trimmedRole)
+                setHasScreenshots(list.length > 0)
             } catch {
                 /* ignore */
             }
@@ -147,10 +154,9 @@ function JsonRecording({extractInformation, showOnlyApi, setStoreData, roleName}
         setModalLoading(true)
         setModalScreenshots([])
         try {
-            const resp = await api.fetchRecordedLoginScreenshots(roleName.trim())
-            const list = resp?.screenshotsBase64 || []
+            const list = await fetchRecordedLoginScreenshotsList(roleName.trim())
             setModalScreenshots(list)
-            setHasScreenshots(Array.isArray(list) && list.length > 0)
+            setHasScreenshots(list.length > 0)
         } catch (err) {
             setToastConfig({ isActive: true, isError: true, message: `Could not load screenshots: ${err}` })
         } finally {
@@ -281,9 +287,9 @@ function JsonRecording({extractInformation, showOnlyApi, setStoreData, roleName}
             >
                 <Modal.Section>
                     {modalLoading ? (
-                        <div style={{ width: "100%", minHeight: "120px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Box width="100%" minHeight="120px" display="flex" alignItems="center" justifyContent="center">
                             <Spinner size="small" />
-                        </div>
+                        </Box>
                     ) : modalScreenshots.length === 0 ? (
                         <Text as="p">No screenshots stored for this role yet. Upload a JSON recording to capture replay steps.</Text>
                     ) : (
