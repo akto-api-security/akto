@@ -4146,18 +4146,9 @@ public class ClientActor extends DataActor {
 
     public void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
         Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("testingRunPlaygroundId", testingRunPlayground.getHexId());
-        obj.put("testingRunPlaygroundType", testingRunPlayground.getTestingRunPlaygroundType());
-        switch (testingRunPlayground.getTestingRunPlaygroundType()) {
-            case TEST_EDITOR_PLAYGROUND:
-                obj.put("testingRunResult", testingRunPlayground.getTestingRunResult());
-                break;
-            case POSTMAN_IMPORTS:
-                obj.put("originalHttpResponse", testingRunPlayground.getOriginalHttpResponse());
-                break;
-        }
-        String jsonString = gson.toJson(obj);
+        Map<String, Object> body = new HashMap<>();
+        body.put("testingRunPlayground", testingRunPlayground);
+        String jsonString = gson.toJson(body);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRunPlaygroundStateAndResult", "", "POST",  jsonString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
