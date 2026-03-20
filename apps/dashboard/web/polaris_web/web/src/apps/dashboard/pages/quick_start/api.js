@@ -293,6 +293,47 @@ const api = {
         })
     },
 
+    fetchDefenderDevices() {
+        return request({
+            url: '/api/fetchDefenderDevices',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    uploadDefenderScript(scriptContent, scriptName) {
+        return request({
+            url: '/api/uploadDefenderScript',
+            method: 'post',
+            data: { scriptContent, scriptName }
+        })
+    },
+
+    runDefenderKqlQuery(kqlQuery, kqlTimeRangeDays) {
+        return request({
+            url: '/api/runDefenderKqlQuery',
+            method: 'post',
+            data: { kqlQuery, kqlTimeRangeDays }
+        })
+    },
+
+    listDefenderLibraryScripts() {
+        return request({
+            url: '/api/listDefenderLibraryScripts',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    runDefenderLiveResponse(deviceIds, scriptName, scriptParameters) {
+        return request({
+            url: '/api/runDefenderLiveResponse',
+            method: 'post',
+            data: { deviceIds, scriptName, scriptParameters },
+            timeout: 360000
+        })
+    },
+
 }
 
 export default api
