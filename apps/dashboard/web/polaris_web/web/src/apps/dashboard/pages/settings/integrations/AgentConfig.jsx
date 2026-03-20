@@ -9,7 +9,8 @@ const MODEL_TYPES = {
   ANTHROPIC: "ANTHROPIC",
   OPENAI: "OPENAI",
   AZURE_OPENAI: "AZURE_OPENAI",
-  OLLAMA: "OLLAMA"
+  OLLAMA: "OLLAMA",
+  DATABRICKS: "DATABRICKS"
 }
 
 const OPENAI_MODELS = [
@@ -29,6 +30,11 @@ const OLLAMA_MODELS = [
   { label: "Qwen small-qwen2.5:0.5b", value: "qwen2.5:0.5b" },
   { label: "Qwen latest-qwen3:8b", value: "qwen3:8b" },
   { label: "Qwen 3 latest-qwen3:latest", value: "qwen3:latest" }
+]
+
+// TODO: there are example models, replace with actual model list
+const DATABRICKS_MODELS = [
+  {label: "Databricks GPT 5 Nano", value: "databricks-gpt-5-nano"},
 ]
 
 function getModelSections(type, data, setData, isEdit=false) {
@@ -52,6 +58,14 @@ function getModelSections(type, data, setData, isEdit=false) {
   switch (type) {
     case MODEL_TYPES.ANTHROPIC:
     case MODEL_TYPES.OPENAI:
+      break;
+    case MODEL_TYPES.DATABRICKS:
+      sections.push({
+        title: "Databricks Workspace Endpoint",
+        type: "text",
+        id: "databricksEndpoint",
+        placeholder: "https://<workspace>.cloud.databricks.com",
+      })
       break;
     case MODEL_TYPES.AZURE_OPENAI:
       sections.push({
@@ -96,6 +110,8 @@ function getModelSections(type, data, setData, isEdit=false) {
         items = ANTHROPIC_MODELS
       } else if (type === MODEL_TYPES.OLLAMA) {
         items = OLLAMA_MODELS
+      } else if (type === MODEL_TYPES.DATABRICKS) {
+        items = DATABRICKS_MODELS
       }
       section.component = (
         <VerticalStack gap="1">
@@ -230,6 +246,10 @@ function AgentConfig() {
             {
               label: 'OLLAMA',
               value: MODEL_TYPES.OLLAMA
+            },
+            {
+              label: 'Databricks',
+              value: MODEL_TYPES.DATABRICKS
             }
             ]}
             initial={modelType}
