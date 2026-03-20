@@ -112,9 +112,113 @@ const agenticCategoryMapping = {
   ]
 }
 
+const MCP_URL = "https://owasp.org/www-project-mcp-top-10/"
+
+const mcpCategoryMapping = {
+  'MCP_AUTH': [
+    { label: "OWASP MCP: MCP07 - Insufficient Authentication & Authorization", url: MCP_URL },
+    { label: "OWASP MCP: MCP01 - Token Mismanagement & Secret Exposure", url: MCP_URL }
+  ],
+  'MCP_INPUT_VALIDATION': [
+    { label: "OWASP MCP: MCP05 - Command Injection & Execution", url: MCP_URL }
+  ],
+  'MCP_DOS': [
+    { label: "OWASP MCP: MCP07 - Insufficient Authentication & Authorization", url: MCP_URL }
+  ],
+  'MCP_SENSITIVE_DATA_LEAKAGE': [
+    { label: "OWASP MCP: MCP01 - Token Mismanagement & Secret Exposure", url: MCP_URL },
+    { label: "OWASP MCP: MCP10 - Context Injection & Over-Sharing", url: MCP_URL }
+  ],
+  'MCP': [
+    { label: "OWASP MCP: MCP06 - Intent Flow Subversion", url: MCP_URL },
+    { label: "OWASP MCP: MCP05 - Command Injection & Execution", url: MCP_URL },
+    { label: "OWASP MCP: MCP09 - Shadow MCP Servers", url: MCP_URL }
+  ],
+  'MCP_TOOL_POISONING': [
+    { label: "OWASP MCP: MCP03 - Tool Poisoning", url: MCP_URL }
+  ],
+  'MCP_PROMPT_INJECTION': [
+    { label: "OWASP MCP: MCP06 - Intent Flow Subversion", url: MCP_URL }
+  ],
+  'MCP_PRIVILEGE_ABUSE': [
+    { label: "OWASP MCP: MCP02 - Privilege Escalation via Scope Creep", url: MCP_URL }
+  ],
+  'MCP_INDIRECT_PROMPT_INJECTION': [
+    { label: "OWASP MCP: MCP06 - Intent Flow Subversion", url: MCP_URL }
+  ],
+  'MCP_MALICIOUS_CODE_EXECUTION': [
+    { label: "OWASP MCP: MCP05 - Command Injection & Execution", url: MCP_URL }
+  ],
+  'MCP_FUNCTION_MANIPULATION': [
+    { label: "OWASP MCP: MCP03 - Tool Poisoning", url: MCP_URL },
+    { label: "OWASP MCP: MCP05 - Command Injection & Execution", url: MCP_URL }
+  ],
+  'MCP_SECURITY': [
+    { label: "OWASP MCP: MCP01 - Token Mismanagement & Secret Exposure", url: MCP_URL },
+    { label: "OWASP MCP: MCP02 - Privilege Escalation via Scope Creep", url: MCP_URL },
+    { label: "OWASP MCP: MCP03 - Tool Poisoning", url: MCP_URL },
+    { label: "OWASP MCP: MCP04 - Software Supply Chain Attacks & Dependency Tampering", url: MCP_URL },
+    { label: "OWASP MCP: MCP05 - Command Injection & Execution", url: MCP_URL },
+    { label: "OWASP MCP: MCP06 - Intent Flow Subversion", url: MCP_URL },
+    { label: "OWASP MCP: MCP07 - Insufficient Authentication & Authorization", url: MCP_URL },
+    { label: "OWASP MCP: MCP08 - Lack of Audit and Telemetry", url: MCP_URL },
+    { label: "OWASP MCP: MCP09 - Shadow MCP Servers", url: MCP_URL },
+    { label: "OWASP MCP: MCP10 - Context Injection & Over-Sharing", url: MCP_URL }
+  ]
+};
+
+const LLM_URL = "https://owasp.org/www-project-llm-security-top-10/"
+
+const llmCategoryMapping = {
+  'LLM': [
+    { label: "OWASP LLM: LLM05 - Improper Output Handling", url: LLM_URL },
+    { label: "OWASP LLM: LLM09 - Misinformation", url: LLM_URL },
+    { label: "OWASP LLM: LLM01 - Prompt Injection", url: LLM_URL }
+  ],
+  'PROMPT_INJECTION': [
+    { label: "OWASP LLM: LLM01 - Prompt Injection", url: LLM_URL }
+  ],
+  'SENSITIVE_INFORMATION_DISCLOSURE': [
+    { label: "OWASP LLM: LLM06 - Sensitive Information Disclosure", url: LLM_URL }
+  ],
+  'SUPPLY_CHAIN': [
+    { label: "OWASP LLM: LLM03 - Supply Chain", url: LLM_URL }
+  ],
+  'DATA_AND_MODEL_POISONING': [
+    { label: "OWASP LLM: LLM04 - Data and Model Poisoning", url: LLM_URL }
+  ],
+  'IMPROPER_OUTPUT_HANDLING': [
+    { label: "OWASP LLM: LLM05 - Improper Output Handling", url: LLM_URL }
+  ],
+  'EXCESSIVE_AGENCY': [
+    { label: "OWASP LLM: LLM08 - Excessive Agency", url: LLM_URL }
+  ],
+  'SYSTEM_PROMPT_LEAKAGE': [
+    { label: "OWASP LLM: LLM07 - System Prompt Leakage", url: LLM_URL }
+  ],
+  'VECTOR_AND_EMBEDDING_WEAKNESSES': [
+    { label: "OWASP LLM: LLM02 - Vector and Embedding Weaknesses", url: LLM_URL }
+  ],
+  'MISINFORMATION': [
+    { label: "OWASP LLM: LLM09 - Misinformation", url: LLM_URL }
+  ],
+  'UNBOUNDED_CONSUMPTION': [
+    { label: "OWASP LLM: LLM10 - Unbounded Consumption", url: LLM_URL }
+  ]
+};
+
 const func = {
   categoryMapping: categoryMapping,
   agenticCategoryMapping: agenticCategoryMapping,
+  mcpCategoryMapping: mcpCategoryMapping,
+  llmCategoryMapping: llmCategoryMapping,
+  getMCPCategoriesForCategory(categoryName) {
+    return mcpCategoryMapping[categoryName] || []
+  },
+
+  getLLMCategoriesForCategory(categoryName) {
+    return llmCategoryMapping[categoryName] || []
+  },
   setToast (isActive, isError, message) {
     Store.getState().setToastConfig({
           isActive: isActive,
