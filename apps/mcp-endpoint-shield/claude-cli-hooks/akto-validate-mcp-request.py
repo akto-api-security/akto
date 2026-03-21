@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
+
 import json
 import logging
 import os
 import ssl
 import sys
-import urllib.request
-from typing import Any, Dict, Union
 import time
-
+import urllib.request
+from typing import Any, Dict, Tuple, Union
 
 from akto_machine_id import get_machine_id, get_username
 
@@ -16,23 +16,18 @@ LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 
-# Create log directory if it doesn't exist
 os.makedirs(LOG_DIR, exist_ok=True)
 
-# Setup logging with both file and console handlers
 logger = logging.getLogger(__name__)
 logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
-# File handler
-file_handler = logging.FileHandler(os.path.join(LOG_DIR, "validate-response.log"))
+file_handler = logging.FileHandler(os.path.join(LOG_DIR, "validate-mcp-request.log"))
 file_handler.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
-file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-file_handler.setFormatter(file_formatter)
+file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 logger.addHandler(file_handler)
 
-# Console handler
 console_handler = logging.StreamHandler(sys.stderr)
-console_handler.setLevel(logging.ERROR)  # Only show errors in console
+console_handler.setLevel(logging.ERROR)
 logger.addHandler(console_handler)
 
 MODE = os.getenv("MODE", "argus").lower()
@@ -42,11 +37,9 @@ AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 
-# SSL Configuration
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 
-# Configure CLAUDE_API_URL based on mode
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
     CLAUDE_API_URL = f"https://{device_id}.ai-agent.claudecli" if device_id else "https://api.anthropic.com"
@@ -76,6 +69,7 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
+
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -90,7 +84,6 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
             duration_ms = int((time.time() - start_time) * 1000)
             status_code = response.getcode()
             raw = response.read().decode("utf-8")
-
             logger.info(f"API RESPONSE: Status {status_code}, Duration: {duration_ms}ms, Size: {len(raw)} bytes")
 
             if LOG_PAYLOADS:
@@ -106,34 +99,34 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         raise
 
 
-def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, Any]:
-    tags = {"gen-ai": "Gen AI"}
+def extract_mcp_server_name(tool_name: str) -> str:
+    if not tool_name.startswith("mcp__"):
+        return "claude-built-in"
+    parts = tool_name.split("__")
+    if len(parts) >= 3 and parts[1]:
+        return parts[1]
+    return "claude-built-in"
+
+
+def build_validation_request(tool_name: str, tool_input: Any, mcp_server_name: str) -> Dict[str, Any]:
+    tags = {"gen-ai": "Gen AI", "mcp_server_name": mcp_server_name}
     if MODE == "atlas":
         tags["ai-agent"] = "claudecli"
         tags["source"] = CONTEXT_SOURCE
 
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
-
     host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
 
-    request_headers = json.dumps({
-        "host": host,
-        "x-claude-hook": "Stop",
-        "content-type": "application/json"
-    })
-
-    response_headers = json.dumps({
-        "x-claude-hook": "Stop",
-        "content-type": "application/json"
-    })
-
-    request_payload = json.dumps({
-        "body": user_prompt
-    })
-
-    response_payload = json.dumps({
-        "body": response_text
-    })
+    request_headers = json.dumps(
+        {
+            "host": host,
+            "x-claude-hook": "PreToolUse",
+            "content-type": "application/json",
+        }
+    )
+    response_headers = json.dumps({"x-claude-hook": "PreToolUse"})
+    request_payload = json.dumps({"body": tool_input, "toolName": tool_name})
+    response_payload = json.dumps({})
 
     return {
         "path": "/v1/messages",
@@ -159,108 +152,101 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
         "enabled_graph": None,
         "tag": json.dumps(tags),
         "metadata": json.dumps(tags),
-        "contextSource": CONTEXT_SOURCE
+        "contextSource": CONTEXT_SOURCE,
     }
 
 
-def extract_text_from_entry(entry: Dict[str, Any]) -> str:
-    content = entry.get("message", {}).get("content", "")
-    if isinstance(content, str):
-        return content.strip()
-    if isinstance(content, list):
-        parts = []
-        for block in content:
-            if isinstance(block, dict) and block.get("type") == "text":
-                text = block.get("text", "")
-                if isinstance(text, str) and text:
-                    parts.append(text)
-        return "".join(parts).strip()
-    return ""
+def call_guardrails(tool_name: str, tool_input: Any, mcp_server_name: str) -> Tuple[bool, str]:
+    if not tool_input:
+        return True, ""
 
-
-def get_last_user_prompt(transcript_path: str) -> str:
-    if not os.path.exists(transcript_path):
-        return ""
-
-    try:
-        last_user = ""
-        with open(transcript_path, "r") as f:
-            for line in f:
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if entry.get("type") == "user":
-                    text = extract_text_from_entry(entry)
-                    if text:
-                        last_user = text
-        return last_user
-    except Exception as e:
-        logger.error(f"Error reading transcript: {e}")
-        return ""
-
-
-def send_ingestion_data(user_prompt: str, response_text: str):
     if not AKTO_DATA_INGESTION_URL:
-        logger.info("AKTO_DATA_INGESTION_URL not set, skipping ingestion")
-        return
+        logger.warning("AKTO_DATA_INGESTION_URL not set, allowing request (fail-open)")
+        return True, ""
 
-    if not user_prompt.strip() or not response_text.strip():
-        return
-
-    logger.info("Ingesting conversation data")
+    logger.info(f"Validating MCP request for tool: {tool_name} (server: {mcp_server_name})")
     if LOG_PAYLOADS:
-        logger.debug(f"Prompt: {user_prompt[:200]}...")
-        logger.debug(f"Response: {response_text[:200]}...")
-    else:
-        logger.info(f"Prompt preview: {user_prompt[:100]}...")
-        logger.info(f"Response preview: {response_text[:100]}...")
+        logger.debug(f"Tool input payload: {json.dumps(tool_input)[:500]}...")
 
     try:
-        request_body = build_ingestion_payload(user_prompt, response_text)
-        post_payload_json(
-            build_http_proxy_url(
-                guardrails=not AKTO_SYNC_MODE,
-                ingest_data=True,
-            ),
+        request_body = build_validation_request(tool_name, tool_input, mcp_server_name)
+        result = post_payload_json(
+            build_http_proxy_url(guardrails=True, ingest_data=False),
             request_body,
         )
-        logger.info("Conversation ingestion successful")
 
+        data = result.get("data", {}) if isinstance(result, dict) else {}
+        guardrails_result = data.get("guardrailsResult", {})
+        allowed = guardrails_result.get("Allowed", True)
+        reason = guardrails_result.get("Reason", "")
+
+        if allowed:
+            logger.info(f"Request ALLOWED for {tool_name}")
+        else:
+            logger.warning(f"Request DENIED for {tool_name}: {reason}")
+
+        return allowed, reason
+    except Exception as e:
+        logger.error(f"Guardrails validation error: {e}")
+        return True, ""
+
+
+def ingest_blocked_request(tool_name: str, tool_input: Any, mcp_server_name: str, reason: str):
+    if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
+        return
+
+    try:
+        request_body = build_validation_request(tool_name, tool_input, mcp_server_name)
+        request_body["responseHeaders"] = json.dumps(
+            {
+                "x-claude-hook": "PreToolUse",
+                "x-blocked-by": "Akto Proxy",
+                "content-type": "application/json",
+            }
+        )
+        request_body["responsePayload"] = json.dumps(
+            {"body": {"x-blocked-by": "Akto Proxy", "reason": reason or "Policy violation"}}
+        )
+        request_body["statusCode"] = "403"
+        request_body["status"] = "403"
+        post_payload_json(
+            build_http_proxy_url(guardrails=False, ingest_data=True),
+            request_body,
+        )
+        logger.info("Blocked MCP request ingestion successful")
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
 
 
 def main():
-    logger.info(f"=== Hook execution started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
+    logger.info(f"=== PreToolUse MCP hook started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
 
     try:
         input_data = json.load(sys.stdin)
-        transcript_path = input_data.get("transcript_path")
-
-        if not transcript_path:
-            logger.info("No transcript path provided")
-            sys.exit(0)
-
-        transcript_path = os.path.expanduser(transcript_path)
-        logger.info(f"Reading transcript from: {transcript_path}")
-
-        response_text = input_data.get("last_assistant_message", "").strip()
-
-        user_prompt = get_last_user_prompt(transcript_path)
-
-        if not user_prompt or not response_text:
-            logger.info("No complete interaction found in transcript")
-            sys.exit(0)
-
-        logger.info(f"Extracted interaction - Prompt: {len(user_prompt)} chars, Response: {len(response_text)} chars")
-        send_ingestion_data(user_prompt, response_text)
-
-    except Exception as e:
-        logger.error(f"Main error: {e}")
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON input: {e}")
         sys.exit(0)
 
-    logger.info("Hook execution completed")
+    tool_name = str(input_data.get("tool_name") or "")
+    tool_input = input_data.get("tool_input") or {}
+    mcp_server_name = extract_mcp_server_name(tool_name)
+
+    logger.info(f"Processing MCP tool request: {tool_name} (server: {mcp_server_name})")
+
+    if AKTO_SYNC_MODE:
+        allowed, reason = call_guardrails(tool_name, tool_input, mcp_server_name)
+        if not allowed:
+            block_reason = reason or "Policy violation"
+            output = {
+                "decision": "block",
+                "reason": f"Blocked by Akto Guardrails: {block_reason}",
+            }
+            logger.warning(f"BLOCKING MCP request - Tool: {tool_name}, Reason: {block_reason}")
+            print(json.dumps(output))
+            ingest_blocked_request(tool_name, tool_input, mcp_server_name, block_reason)
+            sys.exit(0)
+
+    logger.info(f"MCP request allowed for {tool_name}")
     sys.exit(0)
 
 
