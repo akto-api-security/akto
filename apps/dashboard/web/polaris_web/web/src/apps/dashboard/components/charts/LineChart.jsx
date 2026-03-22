@@ -99,19 +99,6 @@ function LineChart(props) {
                     enabled: isSinglePointSeries,
                     radius: isSinglePointSeries ? 5 : undefined,
                 },
-                dataLabels: {
-                    enabled: isSinglePointSeries,
-                    formatter: function () {
-                        const v = this.y;
-                        if (v === null || v === undefined) {
-                            return '';
-                        }
-                        return typeof v === 'number' ? v.toLocaleString() : String(v);
-                    },
-                    style: {
-                        fontWeight: '600',
-                    },
-                },
                 yAxis: singleYAxis ? 0 : (i===1 ? 1 : 0),
                 lineWidth: singleYAxis ? 2 : (i===1 ? 1: 3)
 
