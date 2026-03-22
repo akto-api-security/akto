@@ -63,6 +63,7 @@ function About() {
     const [blockLogs, setBlockLogs] = useState(false)
     const [filterLogPolicy, setFilterLogPolicy] = useState([])
     const [filterLogPolicyText, setFilterLogPolicyText] = useState('')
+    const [enableWeeklySecurityReport, setEnableWeeklySecurityReport] = useState(false)
 
     const setupOptions = settingFunctions.getSetupOptions()
 
@@ -101,6 +102,7 @@ function About() {
         const policyList = resp.filterLogPolicy || []
         setFilterLogPolicy(policyList)
         setFilterLogPolicyText(policyList.join('\n'))
+        setEnableWeeklySecurityReport(!!resp.enableWeeklySecurityReport)
     }
 
     useEffect(()=>{
@@ -232,6 +234,17 @@ function About() {
     const handleRedactPayload = async(val) => {
         setRedactPayload(val);
         await settingRequests.toggleRedactFeature(val);
+    }
+
+    const handleWeeklySecurityReport = async (val) => {
+        setEnableWeeklySecurityReport(val)
+        try {
+            await settingRequests.toggleWeeklySecurityReport(val)
+            func.setToast(true, false, val ? 'Weekly report sent to your email' : 'Weekly security report emails disabled')
+        } catch (e) {
+            setEnableWeeklySecurityReport(!val)
+            func.setToast(true, true, 'Could not update weekly report preference')
+        }
     }
 
     const handleNewMerging = async(val) => {
@@ -724,6 +737,7 @@ function About() {
                                   <ToggleComponent text={"Redact sample data"} initial={redactPayload} onToggle={handleRedactPayload} />
                                   <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
+                                  <ToggleComponent text={"Email me a weekly security report"} initial={enableWeeklySecurityReport} onToggle={handleWeeklySecurityReport} disabled={window.USER_ROLE !== "ADMIN"} />
                                   {redundantUrlComp}
                                   {compulsoryDescriptionComponent}
                                   {logSettingsComponent}
@@ -751,6 +765,7 @@ function About() {
                     {redundantUrlComp}
                     {compulsoryDescriptionComponent}
                     {logSettingsComponent}
+                    <ToggleComponent text={"Email me a weekly security report"} initial={enableWeeklySecurityReport} onToggle={handleWeeklySecurityReport} disabled={window.USER_ROLE !== "ADMIN"} />
                     </VerticalStack>
                   </LegacyCard.Section>
               }

@@ -18,6 +18,8 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.notifications.email.SendgridEmail;
+import com.akto.util.weekly.WeeklySecurityReportService;
 import com.akto.runtime.Main;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.util.Constants;
@@ -33,6 +35,7 @@ import com.opensymphony.xwork2.Action;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -102,6 +105,48 @@ public class AdminSettingsAction extends UserAction {
     @Setter
     @Getter
     private List<String> filterLogPolicy;
+
+    @Setter
+    private Boolean enableWeeklySecurityReport;
+
+    @Getter
+    private Map<String, Object> weeklySecurityReportLastPayload;
+
+    public String toggleWeeklySecurityReport() {
+        User user = getSUser();
+        if (user == null) {
+            addActionError("User not found");
+            return ERROR.toUpperCase();
+        }
+
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.ENABLE_WEEKLY_SECURITY_REPORT, Boolean.TRUE.equals(enableWeeklySecurityReport)),
+                new UpdateOptions().upsert(true)
+        );
+
+        weeklySecurityReportLastPayload = null;
+        if (Boolean.TRUE.equals(enableWeeklySecurityReport)) {
+            try {
+                weeklySecurityReportLastPayload = WeeklySecurityReportService.buildReportPayload(Context.now());
+                String html = WeeklySecurityReportService.buildHtmlEmailBody(weeklySecurityReportLastPayload);
+                String subject = "Your weekly Akto security report";
+                SendgridEmail.getInstance().send(
+                        SendgridEmail.getInstance().buildWeeklySecurityReportEmail(
+                                user.getLogin(),
+                                user.getName(),
+                                subject,
+                                html
+                        )
+                );
+            } catch (IOException e) {
+                logger.errorAndAddToDb("Weekly security report email failed: " + e.getMessage(), LogDb.DASHBOARD);
+                addActionError("Preference saved but email could not be sent.");
+                return ERROR.toUpperCase();
+            }
+        }
+        return SUCCESS.toUpperCase();
+    }
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(

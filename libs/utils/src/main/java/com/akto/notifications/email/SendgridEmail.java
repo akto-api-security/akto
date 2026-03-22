@@ -233,6 +233,30 @@ public class SendgridEmail {
         return mail;
     }
 
+    /**
+     * Plain HTML weekly digest (no SendGrid dynamic template). Same transport as invitation emails.
+     */
+    public Mail buildWeeklySecurityReportEmail(String recipientEmail, String recipientName, String subject, String htmlBody) {
+        System.out.println("Building weekly security report email with subject: " + subject + " for recipient: " + recipientEmail);
+        Mail mail = new Mail();
+        Email fromEmail = new Email();
+        fromEmail.setName("Akto Team");
+        fromEmail.setEmail("kural@akto.io");
+        mail.setFrom(fromEmail);
+        mail.setSubject(subject);
+
+        Personalization personalization = new Personalization();
+        Email to = new Email();
+        to.setEmail(recipientEmail);
+        if (StringUtils.isNotBlank(recipientName)) {
+            to.setName(recipientName);
+        }
+        personalization.addTo(to);
+        mail.addPersonalization(personalization);
+        mail.addContent(new Content("text/html", htmlBody));
+        return mail;
+    }
+
     private Object extractOrgName(String inviteFrom) {
         if (inviteFrom.indexOf('@')<0){
             return ("akto.io");
@@ -244,7 +268,7 @@ public class SendgridEmail {
     public void send(final Mail mail) throws IOException {
         String secretKey = Constants.getSendgridConfig().getSendgridSecretKey();
         if (secretKey == null || secretKey.isEmpty()) {
-            logger.info("No sendgrid config found. Skipping sending email");
+            logger.warn("SendGrid API key is missing; email not sent. Configure SendgridConfig in DB or env.");
             return;
         }
         final SendGrid sg = new SendGrid(Constants.getSendgridConfig().getSendgridSecretKey());

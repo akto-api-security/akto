@@ -163,6 +163,11 @@ public class AccountSettings {
     private List<String> filterLogPolicy;
     public static final String FILTER_LOG_POLICY = "filterLogPolicy";
 
+    public static final String ENABLE_WEEKLY_SECURITY_REPORT = "enableWeeklySecurityReport";
+    @Getter
+    @Setter
+    private boolean enableWeeklySecurityReport;
+
     public AccountSettings() {
     }
 

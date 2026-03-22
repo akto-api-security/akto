@@ -430,6 +430,13 @@ const settingRequests = {
             }
         })
     },
+    toggleWeeklySecurityReport(enableWeeklySecurityReport) {
+        return request({
+            url: '/api/toggleWeeklySecurityReport',
+            method: 'post',
+            data: { enableWeeklySecurityReport }
+        })
+    },
     toggleNewMergingEnabled(newMergingEnabled) {
         return request({
             url: '/api/toggleNewMergingEnabled',
