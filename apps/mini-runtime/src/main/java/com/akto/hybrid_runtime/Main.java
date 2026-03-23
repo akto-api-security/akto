@@ -979,7 +979,7 @@ public class Main {
                         loggerMaker.infoAndAddToDb("Found debug url in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
                     }
                     if(Utils.printDebugHostLog(accWiseResponseEntry) != null){
-                        loggerMaker.infoAndAddToDb("Found debug host in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
+                        Utils.printDebugHostLog(" in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
                     }
                 }
                 accWiseResponse = accWiseResponseFiltered;
