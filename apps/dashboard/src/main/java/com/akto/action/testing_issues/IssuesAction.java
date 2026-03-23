@@ -326,6 +326,28 @@ public class IssuesAction extends UserAction {
             Map<String, Info> infoMap = subCategoryIds.isEmpty() ? new HashMap<>()
                     : YamlTemplateDao.instance.fetchTestInfoMap(Filters.in("_id", new ArrayList<>(subCategoryIds)));
 
+            // Batch fetch TestingRunResult IDs (needed for the correct issue URL)
+            List<ObjectId> summaryIds = rawIssues.stream()
+                    .filter(i -> i.getLatestTestingRunSummaryId() != null)
+                    .map(TestingRunIssues::getLatestTestingRunSummaryId)
+                    .distinct()
+                    .collect(Collectors.toList());
+            Map<String, String> resultHexIdMap = new HashMap<>();
+            if (!summaryIds.isEmpty()) {
+                List<TestingRunResult> resultRefs = VulnerableTestingRunResultDao.instance.findAll(
+                        Filters.in(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryIds),
+                        Projections.include(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
+                                TestingRunResult.TEST_SUB_TYPE, TestingRunResult.API_INFO_KEY));
+                for (TestingRunResult r : resultRefs) {
+                    if (r.getTestRunResultSummaryId() != null && r.getApiInfoKey() != null && r.getId() != null) {
+                        String key = r.getTestRunResultSummaryId().toHexString() + "|" + r.getTestSubType()
+                                + "|" + r.getApiInfoKey().getUrl() + "|" + r.getApiInfoKey().getMethod()
+                                + "|" + r.getApiInfoKey().getApiCollectionId();
+                        resultHexIdMap.put(key, r.getId().toHexString());
+                    }
+                }
+            }
+
             // Build enriched issueDetails
             String base = (siteUrl != null && !siteUrl.isEmpty()) ? siteUrl : "https://app.akto.io";
             issueDetails = new ArrayList<>();
@@ -343,8 +365,17 @@ public class IssuesAction extends UserAction {
                 obj.put("severity", issue.getSeverity() != null ? issue.getSeverity().name() : null);
                 obj.put("creationTime", issue.getCreationTime());
                 obj.put("lastSeen", issue.getLastSeen());
-                if (issue.getLatestTestingRunSummaryId() != null) {
-                    obj.put("issueUrl", base + "/dashboard/reports/issues?result=" + issue.getLatestTestingRunSummaryId().toHexString());
+                if (issue.getLatestTestingRunSummaryId() != null && id.getApiInfoKey() != null) {
+                    String subType = id.getTestSubCategory().startsWith("http")
+                            ? id.getTestCategoryFromSourceConfig()
+                            : id.getTestSubCategory();
+                    String key = issue.getLatestTestingRunSummaryId().toHexString() + "|" + subType
+                            + "|" + id.getApiInfoKey().getUrl() + "|" + id.getApiInfoKey().getMethod()
+                            + "|" + id.getApiInfoKey().getApiCollectionId();
+                    String resultHexId = resultHexIdMap.get(key);
+                    if (resultHexId != null) {
+                        obj.put("issueUrl", base + "/dashboard/reports/issues?result=" + resultHexId);
+                    }
                 }
 
                 Info info = infoMap.get(id.getTestSubCategory());
