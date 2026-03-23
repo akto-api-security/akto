@@ -38,7 +38,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
     private static final String KQL_QUERY =
         "DeviceProcessEvents" +
         "| where ProcessCommandLine has_any (\"openclaw\", \"clawdbot\", \"moltbot\", \"gateway\")" +
-        "| project Timestamp, DeviceName, AccountName, AccountDomain, FileName, ProcessCommandLine, InitiatingProcessFileName" +
+        "| project Timestamp, DeviceId, DeviceName, AccountName, AccountDomain, FileName, ProcessCommandLine, InitiatingProcessFileName" +
         "| order by Timestamp desc";
 
     private MicrosoftDefenderExecutor() {}
@@ -63,7 +63,10 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         Object cursorVal = jobConfig.get(CURSOR_KEY);
         String lastQueriedAt = cursorVal != null ? cursorVal.toString() : null;
 
-        List<Map<String, Object>> results = runHuntingQuery(accessToken, buildKqlQuery(lastQueriedAt));
+        String kqlQuery = buildKqlQuery(lastQueriedAt);
+        logger.debug("Microsoft Defender KQL query for jobId={}: {}", job.getId(), kqlQuery);
+
+        List<Map<String, Object>> results = runHuntingQuery(accessToken, kqlQuery);
         logger.info("Microsoft Defender query returned {} results for jobId={}", results.size(), job.getId());
 
         if (!results.isEmpty()) {
@@ -132,7 +135,8 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         Map<String, Object> record = new HashMap<>();
 
         String deviceName = getStringOrDefault(row, "DeviceName", "unknown-device");
-        record.put("path", "/defender/process-events/" + deviceName);
+        String deviceId = getStringOrDefault(row, "DeviceId", deviceName);
+        record.put("path", "/defender/process-events/" + deviceId);
         record.put("method", "GET");
         record.put("statusCode", "200");
         record.put("type", "HTTP/1.1");
@@ -142,7 +146,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         record.put("responsePayload", OBJECT_MAPPER.writeValueAsString(row));
 
         Map<String, String> requestHeaders = new HashMap<>();
-        requestHeaders.put("host", "api.securitycenter.microsoft.com");
+        requestHeaders.put("host", deviceId + ".openclaw.defender.microsoft.com");
         requestHeaders.put("content-type", "application/json");
         record.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(requestHeaders));
 
@@ -169,7 +173,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         tagMap.put("gen-ai", "Gen AI");
         tagMap.put("source", "ENDPOINT");
         tagMap.put("connector", "MICROSOFT_DEFENDER");
-        tagMap.put("bot-name", deviceName);
+        tagMap.put("bot-name", deviceId);
         tagMap.put("ai-agent", "openclaw");
         record.put("tag", OBJECT_MAPPER.writeValueAsString(tagMap));
 
@@ -181,7 +185,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
             return "DeviceProcessEvents" +
                 "| where Timestamp > datetime(" + lastQueriedAt + ")" +
                 "| where ProcessCommandLine has_any (\"openclaw\", \"clawdbot\", \"moltbot\", \"gateway\")" +
-                "| project Timestamp, DeviceName, AccountName, AccountDomain, FileName, ProcessCommandLine, InitiatingProcessFileName" +
+                "| project Timestamp, DeviceId, DeviceName, AccountName, AccountDomain, FileName, ProcessCommandLine, InitiatingProcessFileName" +
                 "| order by Timestamp desc";
         }
         return KQL_QUERY;
