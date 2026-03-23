@@ -433,6 +433,7 @@ function TestRunResultFlyout(props) {
     const owaspData = func.categoryMapping[categoryKey] || {};
     const owaspMapping = owaspData.label || "";
     const owaspUrl = owaspData.url || "";
+    const asiCategories = func.getASICategoriesForAgenticCategory(selectedTestRunResult?.superCategoryName || "");
 
     function ActionsComp() {
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
@@ -527,6 +528,15 @@ function TestRunResultFlyout(props) {
                                     <Link onClick={() => owaspUrl && window.open(owaspUrl, '_blank')}>
                                         <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
                                     </Link>
+                                ) : null}
+                                {asiCategories.length > 0 ? (
+                                    <HorizontalStack gap="1" wrap>
+                                        {asiCategories.map((asi, index) => (
+                                            <Link key={index} onClick={() => window.open(asi.url, '_blank')}>
+                                                <Badge size="small">{asi.label}</Badge>
+                                            </Link>
+                                        ))}
+                                    </HorizontalStack>
                                 ) : null}
                             </VerticalStack>
                         </div>

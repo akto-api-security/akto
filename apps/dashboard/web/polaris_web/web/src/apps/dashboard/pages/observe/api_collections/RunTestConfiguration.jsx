@@ -220,19 +220,24 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             )}
             {
                 miniTestingServiceNames?.length > 0 ?
-                <Dropdown
-                    label="Select Testing Module"
-                    menuItems={miniTestingServiceNames}
-                    initial={testRun?.miniTestingServiceName || miniTestingServiceNames?.[0]?.value}
-                    selected={(requests) => {
-                        const miniTestingServiceNameOption = getLabel(miniTestingServiceNames, requests)
+                <DropdownSearch
+                    label="Select Testing Module(s)"
+                    optionsList={miniTestingServiceNames}
+                    placeholder="Select one or more testing modules"
+                    setSelected={(selected) => {
                         setTestRun(prev => ({
                             ...prev,
-                            miniTestingServiceName: miniTestingServiceNameOption.value
+                            miniTestingServiceNames: selected
                         }))
                     }}
+                    allowMultiple={true}
+                    showSelectAllMinOptions={1}
+                    value={testRun?.miniTestingServiceNames?.length > 0 
+                        ? `${testRun.miniTestingServiceNames.length} module(s) selected` 
+                        : "Any module"}
+                    preSelected={testRun?.miniTestingServiceNames || []}
                 /> : <></>
-            }
+            } 
 
             <HorizontalStack gap={4}>
             <Checkbox

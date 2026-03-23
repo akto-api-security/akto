@@ -104,7 +104,7 @@ public class SyslogMessageProcessor {
                 logger.debugAndAddToDb("Processing batch item with path: " + dbObject.get("path"), LoggerMaker.LogDb.DATA_INGESTION);
 
                 IngestDataBatch batch = parseIngestDataBatch(dbObject);
-                KafkaUtils.insertData(batch);
+                KafkaUtils.insertData(batch, false);
                 successCount++;
 
             } catch (Exception e) {

@@ -84,4 +84,12 @@ public class UningestedApiOverageDao extends AccountsContextDao<UningestedApiOve
         
         return countMap;
     }
+
+    public long deleteByApiCollectionIds(List<Integer> apiCollectionIds) {
+        if (apiCollectionIds == null || apiCollectionIds.isEmpty()) {
+            return 0;
+        }
+        Bson filter = Filters.in(UningestedApiOverage.API_COLLECTION_ID, apiCollectionIds);
+        return getMCollection().deleteMany(filter).getDeletedCount();
+    }
 } 

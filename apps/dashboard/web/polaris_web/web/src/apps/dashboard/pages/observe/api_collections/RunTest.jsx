@@ -54,7 +54,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         cleanUpTestingResources: false,
         doNotMarkIssuesAsFixed: false,
         autoTicketingDetails: initialAutoTicketingDetails,
-        miniTestingServiceName: "",
+        miniTestingServiceNames: [],
         slackChannel: ""
     }
     const navigate = useNavigate()
@@ -92,6 +92,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([])
     const [slackChannels, setSlackChannels] = useState([])
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
+
+    // Set all modules as default selection when modules are loaded (for new tests only)
+    useEffect(() => {
+        if (miniTestingServiceNames && miniTestingServiceNames.length > 0 && !testIdConfig) {
+            setTestRun(prev => ({
+                ...prev,
+                miniTestingServiceNames: miniTestingServiceNames.map(m => m.value)
+            }));
+        }
+    }, [miniTestingServiceNames, testIdConfig]);
 
     const localCategoryMap = LocalStore.getState().categoryMap
     const dashboardCategory = getDashboardCategory();
@@ -301,7 +311,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
                     scheduleTimestamp: testIdConfig?.scheduleTimestamp,
                     startTimestamp: testIdConfig?.scheduleTimestamp,
                     runTypeParentLabel: testRunType,
-                    miniTestingServiceName: testIdConfig?.miniTestingServiceName || "",
+                    miniTestingServiceNames: testIdConfig?.allowedMiniTestingServiceNames || [],
                     slackChannel: testIdConfig?.selectedSlackChannelId || 0,
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
@@ -591,7 +601,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, maxAgentTokens, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceName, slackChannel, doNotMarkIssuesAsFixed } = testRun
+        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, maxAgentTokens, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceNames, slackChannel, doNotMarkIssuesAsFixed } = testRun
         let {testName} = testRun;
         const autoTicketingDetails = jiraProjectMap ? testRun.autoTicketingDetails : null;
         const collectionId = parseInt(apiCollectionId)
@@ -640,11 +650,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value) ,autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value) ,autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens)
         } else if (isMultiCollection) {
-            await observeApi.scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed)
+            await observeApi.scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens)
         }
 
         setActive(false)

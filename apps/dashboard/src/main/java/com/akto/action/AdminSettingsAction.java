@@ -77,7 +77,12 @@ public class AdminSettingsAction extends UserAction {
     }
 
     public AccountSettings.SetupType setupType;
-    public Boolean newMergingEnabled;
+    @Setter
+    @Getter
+    public boolean newMergingEnabled;
+    @Setter
+    @Getter
+    public boolean doBodyMatch;
     private Set<String> privateCidrList;
 
     public Boolean enableTelemetry;
@@ -103,6 +108,10 @@ public class AdminSettingsAction extends UserAction {
     private List<String> filterLogPolicy;
 
     public String updateSetupType() {
+        if (this.setupType == null) {
+            addActionError("setupType is required");
+            return ERROR.toUpperCase();
+        }
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.SETUP_TYPE, this.setupType),
@@ -124,6 +133,16 @@ public class AdminSettingsAction extends UserAction {
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.URL_REGEX_MATCHING_ENABLED, this.newMergingEnabled),
+                new UpdateOptions().upsert(true)
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String toggleDoBodyMatch() {
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.BODY_MATCH_ENABLED, this.doBodyMatch),
                 new UpdateOptions().upsert(true)
         );
 
@@ -583,14 +602,6 @@ public class AdminSettingsAction extends UserAction {
 
     public void setSetupType(AccountSettings.SetupType setupType) {
         this.setupType = setupType;
-    }
-
-    public Boolean getNewMergingEnabled() {
-        return newMergingEnabled;
-    }
-
-    public void setNewMergingEnabled(Boolean newMergingEnabled) {
-        this.newMergingEnabled = newMergingEnabled;
     }
 
     public void setEnableDebugLogs(boolean enableDebugLogs) {

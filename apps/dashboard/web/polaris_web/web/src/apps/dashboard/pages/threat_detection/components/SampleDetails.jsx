@@ -15,7 +15,9 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
 import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN } from "../constants/guardrailDescriptions";
+import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import OwaspTag from "../../guardrails/components/OwaspTag";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
@@ -69,10 +71,19 @@ function SampleDetails(props) {
         }
         
     }
+    const owaspThreats = useGuardrailDescription
+        ? getOwaspThreatsForRule(moreInfoData?.ruleViolated)
+        : [];
+
     const overviewComp = useGuardrailDescription ? (
         // Structured view for Argus/Atlas guardrails - show all 7 sections with hierarchy
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
+                {owaspThreats.length > 0 && (
+                    <VerticalStack gap={"2"}>
+                        <OwaspTag threats={owaspThreats} />
+                    </VerticalStack>
+                )}
                 {currentTemplateObj?.guardrailSections?.map((section, sectionIdx) => (
                     <div key={sectionIdx}>
                         <VerticalStack gap={"3"}>

@@ -9,6 +9,7 @@ import time
 import urllib.request
 from typing import Any, Dict, Union
 from akto_machine_id import get_machine_id, get_username
+from akto_heartbeat import send_heartbeat
 
 # Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -28,7 +29,7 @@ def detect_connector(input_data: dict) -> str:
     """Detect connector from hook payload. hookEventName is present in all VSCode payloads."""
     if "hookEventName" in input_data:
         return "vscode"
-    return os.getenv("AKTO_CONNECTOR", "github_copilot_cli")
+    return os.getenv("AKTO_CONNECTOR", "vscode")
 
 
 def get_connector_config(connector: str) -> dict:
@@ -229,6 +230,7 @@ def main():
 
     log_dir = os.path.expanduser(os.getenv("LOG_DIR", cfg["log_dir_default"]))
     logger = setup_logging(log_dir)
+    send_heartbeat(log_dir, logger)
 
     logger.info(f"=== Post-Tool Use Hook - Connector: {connector}, Mode: {MODE} ===")
 
@@ -247,8 +249,8 @@ def main():
         result_type = "unknown"
         status_code = "200"
     else:
-        tool_name = input_data.get("toolName", "unknown")
-        tool_args = input_data.get("toolArgs", "")
+        tool_name = input_data.get("toolName") or input_data.get("tool_name", "unknown")
+        tool_args = input_data.get("toolArgs") or json.dumps(input_data.get("tool_input", {}))
         tool_result = input_data.get("toolResult", {})
         result_text = tool_result.get("textResultForLlm", "")
         result_type = tool_result.get("resultType", "unknown")

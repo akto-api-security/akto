@@ -56,7 +56,6 @@ public class AccountConfigurationCache {
     public AccountConfig getConfig(DataActor dataActor) {
         long currentTime = System.currentTimeMillis();
         if(Context.accountId.get() == 1758787662){
-            logger.infoAndAddToDb("Returning default account config");
             return getDefaultConfig();
         }
 
