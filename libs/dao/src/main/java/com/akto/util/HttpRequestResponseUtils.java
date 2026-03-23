@@ -56,6 +56,151 @@ public class HttpRequestResponseUtils {
     public static final String APPLICATION_JSON = "application/json";
     public static final String MULTIPART_FORM_DATA_CONTENT_TYPE = "multipart/form-data";
 
+    /**
+     * Response content-type prefixes that indicate non-API traffic.
+     * These responses (images, fonts, stylesheets, scripts, HTML pages)
+     * are not useful for API discovery and can be skipped early
+     * to avoid expensive JSON parsing of large payloads.
+     */
+    private static final String[] NON_API_CONTENT_TYPES = {
+        "text/html",
+        "text/css",
+        "text/javascript",
+        "image/",
+        "font/",
+        "application/javascript",
+        "application/x-javascript",
+        "application/octet-stream",
+        "application/pdf",
+        "application/x-font",
+        "audio/",
+        "video/",
+    };
+
+    /**
+     * Lightweight check on the raw Kafka message string to detect non-API
+     * response content-types WITHOUT doing a full JSON parse.
+     *
+     * The raw message format has responseHeaders as an escaped JSON string:
+     *   "responseHeaders":"{\"Content-Type\":\"image/png\",...}"
+     *
+     * We search for the Content-Type value within that escaped structure.
+     *
+     * @param rawMessage the raw Kafka message string
+     * @return true if the response content-type is a non-API type that should be skipped
+     */
+    public static boolean isNonApiContentType(String rawMessage) {
+        if (rawMessage == null || rawMessage.isEmpty()) {
+            return false;
+        }
+
+        /*
+         * Find Content-Type value in responseHeaders.
+         * In the raw message, responseHeaders is a JSON string with escaped quotes,
+         * so the pattern looks like: Content-Type\":\"image/png\"
+         * We search for this pattern to extract the content-type value.
+         */
+        String marker = "responseHeaders";
+        int rhStart = rawMessage.indexOf(marker);
+        if (rhStart == -1) {
+            return false;
+        }
+
+        /*
+         * Limit search to responseHeaders section only.
+         * responseHeaders value is a JSON string ending with }"
+         * Find closing boundary to avoid scanning into responsePayload (which can be 700KB+).
+         */
+        int searchStart = rhStart + marker.length();
+        int searchEnd = rawMessage.indexOf("responsePayload", searchStart);
+        if (searchEnd == -1) {
+            searchEnd = Math.min(searchStart + 2048, rawMessage.length());
+        }
+        String headerSection = rawMessage.substring(rhStart, searchEnd);
+
+        // Look for Content-Type in the escaped JSON: Content-Type\":\"<value>
+        // Handle both cases: Content-Type and content-type
+        String ctValue = extractContentTypeFromHeaderSection(headerSection);
+        if (ctValue == null || ctValue.isEmpty()) {
+            return false;
+        }
+
+        String ctLower = ctValue.toLowerCase();
+        for (String nonApiType : NON_API_CONTENT_TYPES) {
+            if (ctLower.startsWith(nonApiType)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Extracts the Content-Type value from an escaped JSON header section string.
+     * Handles the pattern: Content-Type\":\"value\" (escaped quotes in JSON string)
+     * Also handles: Content-Type":"value" (unescaped, if headers are a raw JSON object)
+     */
+    private static String extractContentTypeFromHeaderSection(String section) {
+        // Look for Content-Type key (case-insensitive) then extract the value.
+        // Real Kafka formats seen:
+        //   "Content-Type\": \"image/png\"      (escaped quotes with space after colon)
+        //   "Content-Type\":\"image/png\"        (escaped quotes, no space)
+        //   "Content-Type": "image/png"          (plain JSON)
+        String[] keys = {
+            "Content-Type",
+            "content-type",
+        };
+
+        for (String key : keys) {
+            int idx = section.indexOf(key);
+            if (idx == -1) continue;
+
+            // Move past the key
+            int pos = idx + key.length();
+            if (pos >= section.length()) continue;
+
+            // Skip past separator chars: \, ", :, space — in any order
+            // We need to get from the key to the start of the value
+            // e.g. from `Content-Type` past `\": \"` or `\":\"` or `": "` to `image/png`
+            int limit = Math.min(pos + 10, section.length()); // separator is at most a few chars
+            while (pos < limit) {
+                char c = section.charAt(pos);
+                if (c == '\\' || c == '"' || c == ':' || c == ' ') {
+                    pos++;
+                } else {
+                    break;
+                }
+            }
+
+            if (pos >= section.length()) continue;
+
+            // Now extract the value until we hit a quote, escaped quote, or end
+            int valueStart = pos;
+            int valueEnd = -1;
+            for (int i = valueStart; i < section.length(); i++) {
+                char c = section.charAt(i);
+                if (c == '\\' && i + 1 < section.length() && section.charAt(i + 1) == '"') {
+                    valueEnd = i;
+                    break;
+                }
+                if (c == '"') {
+                    valueEnd = i;
+                    break;
+                }
+            }
+            if (valueEnd > valueStart) {
+                String value = section.substring(valueStart, valueEnd);
+                int semicolon = value.indexOf(';');
+                if (semicolon > 0) {
+                    value = value.substring(0, semicolon).trim();
+                }
+                if (value.contains("/")) { // basic sanity: must look like a mime type
+                    return value;
+                }
+            }
+        }
+        return null;
+    }
+
     public static Map<String, Set<Object>> extractValuesFromPayload(String body) {
         if (body == null) return new HashMap<>();
         if (body.startsWith("[")) body = "{\"json\": "+body+"}";
