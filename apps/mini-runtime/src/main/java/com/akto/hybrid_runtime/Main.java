@@ -775,7 +775,9 @@ public class Main {
                 if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) {
                     continue;
                 }
-
+                if(Utils.printDebugHostLog(httpResponseParams) != null){
+                    Utils.printDebugHostLog("Post processing sample message from kafka: " + httpResponseParams.getOrig());
+                }
                 if (Context.getActualAccountId() == 1759692400) {
                     String debugHeader = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "x-debug-trace");
                     if (debugHeader != null && !debugHeader.isEmpty()) {
@@ -785,15 +787,6 @@ public class Main {
                                 + " statusCode: " + httpResponseParams.getStatusCode());
                     }
                 }
-                
-                HttpRequestParams requestParams = httpResponseParams.getRequestParams();
-                String debugHost = Utils.printDebugHostLog(httpResponseParams);
-                // if (debugHost != null) {
-                //     loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
-                // }
-                // if (Utils.printDebugUrlLog(requestParams.getURL())) {
-                //     loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
-                // }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message: " + r.value() + e);
                 continue;
@@ -984,6 +977,9 @@ public class Main {
 
                     if (Utils.printDebugUrlLog(accWiseResponseEntry.getRequestParams().getURL())) {
                         loggerMaker.infoAndAddToDb("Found debug url in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
+                    }
+                    if(Utils.printDebugHostLog(accWiseResponseEntry) != null){
+                        loggerMaker.infoAndAddToDb("Found debug host in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
                     }
                 }
                 accWiseResponse = accWiseResponseFiltered;
