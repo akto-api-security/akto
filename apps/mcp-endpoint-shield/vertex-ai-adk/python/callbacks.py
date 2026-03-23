@@ -64,19 +64,28 @@ logger.info(f"Akto Guardrails ADK callbacks initialized | sync_mode={SYNC_MODE}"
 # ---------------------------------------------------------------------------
 
 def _get_vertex_endpoint_info() -> tuple:
-    """Derive host and path from Vertex AI Agent Engine env vars.
+    """Derive host and path based on deployment environment.
 
-    Deployed: uses GOOGLE_CLOUD_PROJECT, GOOGLE_CLOUD_LOCATION, GOOGLE_CLOUD_AGENT_ENGINE_ID.
-    Local:    falls back to defaults.
+    Agent Engine: GOOGLE_CLOUD_AGENT_ENGINE_ID is set (auto-injected).
+    Cloud Run:    K_SERVICE is set (auto-injected); host from CLOUD_RUN_SERVICE_URL.
+    Local:        falls back to Gemini API defaults.
     """
     project = os.getenv("GOOGLE_CLOUD_PROJECT")
     location = os.getenv("GOOGLE_CLOUD_LOCATION")
     engine_id = os.getenv("GOOGLE_CLOUD_AGENT_ENGINE_ID")
 
-    if project and location and engine_id:
+    if engine_id and project and location:
+        # Agent Engine mode
         host = f"{location}-aiplatform.googleapis.com"
         path = f"/v1/projects/{project}/locations/{location}/reasoningEngines/{engine_id}:query"
         return host, path
+
+    k_service = os.getenv("K_SERVICE")
+    if k_service:
+        # Cloud Run mode
+        service_url = os.getenv("CLOUD_RUN_SERVICE_URL", "")
+        host = service_url.replace("https://", "").replace("http://", "").rstrip("/") or "run.googleapis.com"
+        return host, "/"
 
     # Local dev fallback
     return "generativelanguage.googleapis.com", "/v1/chat/completions"
@@ -152,8 +161,8 @@ def _build_payload(
 ) -> dict:
     agent_name = callback_context.agent_name or "unknown-agent"
     invocation_id = str(getattr(callback_context, "invocation_id", ""))
-    engine_id = os.getenv("GOOGLE_CLOUD_AGENT_ENGINE_ID")
-    host, path = _get_vertex_endpoint_info()
+    engine_id = os.getenv("GOOGLE_CLOUD_AGENT_ENGINE_ID") or os.getenv("K_SERVICE")
+    host, path = _get_vertex_endpoint_info()  # K_SERVICE resolved to Cloud Run host/path
     timestamp = str(int(time.time() * 1000))
     status_str = str(status_code)
 
