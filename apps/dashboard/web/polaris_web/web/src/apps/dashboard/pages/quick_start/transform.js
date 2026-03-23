@@ -553,7 +553,7 @@ const microsoftDefenderObj = {
 const microsoftDefenderRunQueriesObj = {
     icon: '/public/microsoft_defender.svg',
     label: "Microsoft Defender Run Queries",
-    text: "Select devices from your Microsoft Defender inventory and run a shell script on them via Live Response.",
+    text: "Select devices from your Microsoft Defender inventory and run live responses and KQL queries",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
     key: "MICROSOFT_DEFENDER_RUN_QUERIES",
     component: <MicrosoftDefenderRunQueriesConnector/>
@@ -1826,8 +1826,7 @@ const quickStartFunc = {
         const aiAgentConnectors = [
             awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, snowflakeObj,
-            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, salesforceImportObj,
-            microsoftDefenderObj, microsoftDefenderRunQueriesObj
+            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, salesforceImportObj
         ]
 
         // MCP Scan
@@ -1855,7 +1854,9 @@ const quickStartFunc = {
         ]
 
         // Endpoint Management
-        const endpointManagement = []
+        const endpointManagement = [
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj
+        ]
 
        if(func.checkLocal() || func.isLimitedAccount()){
            return {
