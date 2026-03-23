@@ -1248,6 +1248,10 @@ public class HttpCallParser {
                     loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams invalid response code "
                             + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
                 }
+                if(Utils.printDebugHostLog(httpResponseParam) != null){
+                    loggerMaker.infoAndAddToDb("Found debug host in filterHttpResponseParams invalid response code "
+                            + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
+                }
                 continue;
             }
 
@@ -1255,6 +1259,10 @@ public class HttpCallParser {
             if (ignoreAktoFlag != null){
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
                     loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams ignoreAktoFlag "
+                            + httpResponseParam.getRequestParams().getURL());
+                }
+                if(Utils.printDebugHostLog(httpResponseParam) != null){
+                    loggerMaker.infoAndAddToDb("Found debug host in filterHttpResponseParams ignoreAktoFlag "
                             + httpResponseParam.getRequestParams().getURL());
                 }
                 continue;
@@ -1271,6 +1279,10 @@ public class HttpCallParser {
                         loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams isRedundantEndpoint "
                                 + httpResponseParam.getRequestParams().getURL() + " pattern " + regexPattern.toString());
                     }
+                    if(Utils.printDebugHostLog(httpResponseParam) != null){
+                        loggerMaker.infoAndAddToDb("Found debug host in filterHttpResponseParams isRedundantEndpoint "
+                                + httpResponseParam.getRequestParams().getURL() + " pattern " + regexPattern.toString());
+                    }
                     continue;
                 }
                 List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
@@ -1281,6 +1293,10 @@ public class HttpCallParser {
                 if(isInvalidContentType(contentType)){
                     if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
                         loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams isInvalidContentType "
+                                + httpResponseParam.getRequestParams().getURL() + " contentType " + contentType);
+                    }
+                    if(Utils.printDebugHostLog(httpResponseParam) != null){
+                        loggerMaker.infoAndAddToDb("Found debug host in filterHttpResponseParams isInvalidContentType "
                                 + httpResponseParam.getRequestParams().getURL() + " contentType " + contentType);
                     }
                     continue;
@@ -1327,6 +1343,11 @@ public class HttpCallParser {
                                         + httpResponseParam.getRequestParams().getURL() + " filterType "
                                         + temp.getSecond());
                     }
+                    if(Utils.printDebugHostLog(httpResponseParam) != null){
+                        loggerMaker.infoAndAddToDb("Found debug host in filterHttpResponseParams advanced filters, skipping "
+                                + httpResponseParam.getRequestParams().getURL() + " filterType "
+                                + temp.getSecond());
+                    }
                 }
                 continue;
             }else{
@@ -1335,7 +1356,10 @@ public class HttpCallParser {
                     loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams advanced filters, adding "
                             + httpResponseParam.getRequestParams().getURL() + " filterType " + temp.getSecond());
                 }
-
+                if(Utils.printDebugHostLog(httpResponseParam) != null){
+                    loggerMaker.infoAndAddToDb("Found debug host in filterHttpResponseParams advanced filters, adding "
+                            + httpResponseParam.getRequestParams().getURL() + " filterType " + temp.getSecond());
+                }
             }
 
             int apiCollectionId = createApiCollectionId(httpResponseParam);
