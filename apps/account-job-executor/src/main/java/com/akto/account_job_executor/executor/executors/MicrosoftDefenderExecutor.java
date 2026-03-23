@@ -135,8 +135,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         Map<String, Object> record = new HashMap<>();
 
         String deviceName = getStringOrDefault(row, "DeviceName", "unknown-device");
-        String deviceId = getStringOrDefault(row, "DeviceId", deviceName);
-        record.put("path", "/defender/process-events/" + deviceId);
+        record.put("path", "/defender/process-events/" + deviceName);
         record.put("method", "GET");
         record.put("statusCode", "200");
         record.put("type", "HTTP/1.1");
@@ -146,7 +145,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         record.put("responsePayload", OBJECT_MAPPER.writeValueAsString(row));
 
         Map<String, String> requestHeaders = new HashMap<>();
-        requestHeaders.put("host", deviceId + ".openclaw.defender.microsoft.com");
+        requestHeaders.put("host", deviceName + ".openclaw.defender.microsoft.com");
         requestHeaders.put("content-type", "application/json");
         record.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(requestHeaders));
 
@@ -173,7 +172,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         tagMap.put("gen-ai", "Gen AI");
         tagMap.put("source", "ENDPOINT");
         tagMap.put("connector", "MICROSOFT_DEFENDER");
-        tagMap.put("bot-name", deviceId);
+        tagMap.put("bot-name", deviceName);
         tagMap.put("ai-agent", "openclaw");
         record.put("tag", OBJECT_MAPPER.writeValueAsString(tagMap));
 
