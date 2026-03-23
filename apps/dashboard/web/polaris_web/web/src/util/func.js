@@ -69,47 +69,16 @@ const categoryMapping = {
 const AGENTIC_ASI_URL = "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/"
 
 const agenticCategoryMapping = {
-  'AGENTIC_BUSINESS_ALIGNMENT': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI09 - Human-Agent Trust Exploitation', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI10 - Rogue Agents', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI02 - Tool Misuse and Exploitation', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI06 - Memory and Context Poisoning', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI08 - Cascading Failures', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_SAFETY': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI10 - Rogue Agents', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_SECURITY_AGENT_EXPLOITATION': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI02 - Tool Misuse and Exploitation', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI03 - Identity and Privilege Abuse', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI08 - Cascading Failures', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_SECURITY_CODE_EXECUTION': [
-    { label: 'OWASP Agentic ASI05 - Unexpected Code Execution', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_SECURITY_DATA_EXPOSURE': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI02 - Tool Misuse and Exploitation', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI04 - Agentic Supply Chain Vulnerabilities', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI06 - Memory and Context Poisoning', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_SECURITY_INFRASTRUCTURE': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI03 - Identity and Privilege Abuse', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI04 - Agentic Supply Chain Vulnerabilities', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI07 - Insecure Inter-Agent Communication', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI08 - Cascading Failures', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_SECURITY_PROMPT_INJECTION': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI06 - Memory and Context Poisoning', url: AGENTIC_ASI_URL }
-  ]
+  AGENT_GOAL_HIJACK: { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
+  TOOL_MISUSE_AND_EXPLOITATION: { label: 'OWASP Agentic ASI02 - Tool Misuse and Exploitation', url: AGENTIC_ASI_URL },
+  IDENTITY_AND_PRIVILEGE_ABUSE: { label: 'OWASP Agentic ASI03 - Identity and Privilege Abuse', url: AGENTIC_ASI_URL },
+  AGENTIC_SUPPLY_CHAIN: { label: 'OWASP Agentic ASI04 - Agentic Supply Chain Vulnerabilities', url: AGENTIC_ASI_URL },
+  UNEXPECTED_CODE_EXECUTION: { label: 'OWASP Agentic ASI05 - Unexpected Code Execution', url: AGENTIC_ASI_URL },
+  MEMORY_AND_CONTEXT_POISONING: { label: 'OWASP Agentic ASI06 - Memory and Context Poisoning', url: AGENTIC_ASI_URL },
+  INSECURE_INTER_AGENT_COMMUNICATION: { label: 'OWASP Agentic ASI07 - Insecure Inter-Agent Communication', url: AGENTIC_ASI_URL },
+  CASCADING_FAILURES: { label: 'OWASP Agentic ASI08 - Cascading Failures', url: AGENTIC_ASI_URL },
+  HUMAN_AGENT_TRUST_EXPLOITATION: { label: 'OWASP Agentic ASI09 - Human-Agent Trust Exploitation', url: AGENTIC_ASI_URL },
+  ROGUE_AGENTS: { label: 'OWASP Agentic ASI10 - Rogue Agents', url: AGENTIC_ASI_URL },
 }
 
 const func = {

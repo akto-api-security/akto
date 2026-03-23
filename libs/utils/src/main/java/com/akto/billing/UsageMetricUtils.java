@@ -425,6 +425,27 @@ public class UsageMetricUtils {
         return featureAccess;
     }
 
+    /**
+     * Akto Argus (Agentic Security) dashboard is available when the org has MCP and/or GenAI (AI) asset entitlements.
+     */
+    public static boolean hasAgenticDashboardAccess(int accountId) {
+        try {
+            if (!DashboardMode.isMetered()) {
+                return false;
+            }
+            Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
+            if (organization == null) {
+                return false;
+            }
+            FeatureAccess mcpAccess = getFeatureAccess(organization, MetricTypes.MCP_ASSET_COUNT);
+            FeatureAccess aiAccess = getFeatureAccess(organization, MetricTypes.AI_ASSET_COUNT);
+            return mcpAccess.getIsGranted() || aiAccess.getIsGranted();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking Agentic Argus dashboard access for account: " + accountId, LogDb.DASHBOARD);
+            return false;
+        }
+    }
+
     public static void raiseUsageMixpanelEvent(Organization organization, int accountId, String eventName, JSONObject additionalProps){
         try {
             if (organization == null) {
