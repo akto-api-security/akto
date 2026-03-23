@@ -77,6 +77,7 @@ public class MicrosoftDefenderIntegrationAction extends UserAction {
     private String kqlQuery;
     private Integer kqlTimeRangeDays;
     private List<Map<String, Object>> kqlResults;
+    private String agentName;
 
     private MicrosoftDefenderIntegration microsoftDefenderIntegration;
 
@@ -585,6 +586,122 @@ public class MicrosoftDefenderIntegrationAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String ingestDefenderKqlResults() {
+        if (kqlResults == null || kqlResults.isEmpty()) {
+            addActionError("No KQL results to ingest.");
+            return Action.ERROR.toUpperCase();
+        }
+        if (agentName == null || agentName.trim().isEmpty()) {
+            addActionError("Please provide an agent name.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        MicrosoftDefenderIntegration integration = MicrosoftDefenderIntegrationDao.instance.findOne(new BasicDBObject());
+        if (integration == null) {
+            addActionError("Microsoft Defender integration not configured.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        String dataIngestionUrl = integration.getDataIngestionUrl();
+        if (dataIngestionUrl == null || dataIngestionUrl.trim().isEmpty()) {
+            addActionError("Data ingestion URL is not configured.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        String normalizedUrl = dataIngestionUrl.endsWith("/")
+            ? dataIngestionUrl.substring(0, dataIngestionUrl.length() - 1)
+            : dataIngestionUrl;
+
+        try {
+            List<Map<String, Object>> batch = new ArrayList<>();
+            for (Map<String, Object> row : kqlResults) {
+                batch.add(toKqlIngestionRecord(row, agentName.trim()));
+            }
+
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("batchData", batch);
+            String jsonPayload = OBJECT_MAPPER.writeValueAsString(payload);
+
+            RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                .build();
+
+            try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
+                HttpPost post = new HttpPost(normalizedUrl + "/api/ingestData");
+                post.setHeader("Content-Type", "application/json");
+                post.setEntity(new StringEntity(jsonPayload, ContentType.APPLICATION_JSON));
+
+                try (CloseableHttpResponse response = httpClient.execute(post)) {
+                    int statusCode = response.getStatusLine().getStatusCode();
+                    EntityUtils.consumeQuietly(response.getEntity());
+                    if (statusCode != 200) {
+                        addActionError("Ingestion service returned HTTP " + statusCode);
+                        return Action.ERROR.toUpperCase();
+                    }
+                }
+            }
+        } catch (IOException e) {
+            loggerMaker.error("Error ingesting KQL results: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Failed to ingest KQL results: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+
+        loggerMaker.infoAndAddToDb("Ingested " + kqlResults.size() + " KQL result(s) for agent: " + agentName, LogDb.DASHBOARD);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    private Map<String, Object> toKqlIngestionRecord(Map<String, Object> row, String agent) throws IOException {
+        Map<String, Object> record = new HashMap<>();
+
+        String deviceId = getStringOrDefault(row, "DeviceId", null);
+        String deviceName = getStringOrDefault(row, "DeviceName", null);
+        String botName = deviceId != null ? deviceId : (deviceName != null ? deviceName : "unknown-device");
+        String pathSegment = deviceName != null ? deviceName : (deviceId != null ? deviceId : "unknown-device");
+        record.put("path", "/defender/kql-events/" + pathSegment);
+        record.put("method", "GET");
+        record.put("statusCode", "200");
+        record.put("type", "HTTP/1.1");
+        record.put("status", "OK");
+
+        record.put("requestPayload", "");
+        record.put("responsePayload", OBJECT_MAPPER.writeValueAsString(row));
+
+        Map<String, String> requestHeaders = new HashMap<>();
+        requestHeaders.put("host", "api.securitycenter.microsoft.com");
+        requestHeaders.put("content-type", "application/json");
+        record.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(requestHeaders));
+
+        Map<String, String> responseHeaders = new HashMap<>();
+        responseHeaders.put("content-type", "application/json");
+        record.put("responseHeaders", OBJECT_MAPPER.writeValueAsString(responseHeaders));
+
+        Object tsVal = row.get("Timestamp");
+        record.put("time", tsVal != null ? tsVal.toString() : String.valueOf(System.currentTimeMillis()));
+
+        record.put("source", "MIRRORING");
+        record.put("akto_account_id", String.valueOf(Context.accountId.get()));
+        record.put("akto_vxlan_id", "");
+        record.put("is_pending", "false");
+        record.put("ip", "");
+        record.put("destIp", "");
+        record.put("direction", "");
+        record.put("process_id", "");
+        record.put("socket_id", "");
+        record.put("daemonset_id", "");
+        record.put("enabled_graph", "false");
+
+        Map<String, String> tagMap = new HashMap<>();
+        tagMap.put("gen-ai", "Gen AI");
+        tagMap.put("source", "ENDPOINT");
+        tagMap.put("connector", "MICROSOFT_DEFENDER");
+        tagMap.put("ai-agent", agent);
+        tagMap.put("bot-name", botName);
+        record.put("tag", OBJECT_MAPPER.writeValueAsString(tagMap));
+
+        return record;
+    }
+
     public String listDefenderLibraryScripts() {
         MicrosoftDefenderIntegration integration = MicrosoftDefenderIntegrationDao.instance.findOne(new BasicDBObject());
         if (integration == null) {
@@ -671,6 +788,11 @@ public class MicrosoftDefenderIntegrationAction extends UserAction {
                 return tokenNode.asText();
             }
         }
+    }
+
+    private String getStringOrDefault(Map<String, Object> map, String key, String defaultValue) {
+        Object val = map.get(key);
+        return val != null ? val.toString() : defaultValue;
     }
 
     private String encode(String value) {

@@ -334,6 +334,14 @@ const api = {
         })
     },
 
+    ingestDefenderKqlResults(kqlResults, agentName) {
+        return request({
+            url: '/api/ingestDefenderKqlResults',
+            method: 'post',
+            data: { kqlResults, agentName }
+        })
+    },
+
 }
 
 export default api

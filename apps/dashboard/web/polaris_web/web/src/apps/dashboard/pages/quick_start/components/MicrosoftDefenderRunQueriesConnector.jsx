@@ -1,5 +1,5 @@
 import { Badge, Button, Combobox, DropZone, HorizontalStack, Icon, Listbox, Select, Spinner, Tag, Text, TextField, Tooltip, VerticalStack } from '@shopify/polaris'
-import { ClipboardMinor, InfoMinor, SearchMinor } from '@shopify/polaris-icons'
+import { ClipboardMinor, CollectionsMajor, InfoMinor, SearchMinor } from '@shopify/polaris-icons'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import api from '../api'
 import func from '@/util/func'
@@ -25,6 +25,8 @@ function MicrosoftDefenderRunQueriesConnector() {
     const [kqlTimeRangeDays, setKqlTimeRangeDays] = useState('1')
     const [kqlRunning, setKqlRunning] = useState(false)
     const [kqlResults, setKqlResults] = useState(null)
+    const [agentName, setAgentName] = useState('')
+    const [savingCollections, setSavingCollections] = useState(false)
 
     useEffect(() => {
         setLoadingDevices(true)
@@ -109,6 +111,16 @@ function MicrosoftDefenderRunQueriesConnector() {
         }).catch((err) => {
             func.setToast(true, true, err?.response?.data?.actionErrors?.[0] || "Query is invalid or could not be executed. Please check your KQL syntax and try again.")
         }).finally(() => setKqlRunning(false))
+    }
+
+    const handleSaveAsCollections = () => {
+        if (!kqlResults || kqlResults.length === 0 || !agentName.trim()) return
+        setSavingCollections(true)
+        api.ingestDefenderKqlResults(kqlResults, agentName.trim()).then(() => {
+            func.setToast(true, false, `Ingested result(s) as collections grouped by device.`)
+        }).catch(() => {
+            func.setToast(true, true, "Failed to ingest KQL results.")
+        }).finally(() => setSavingCollections(false))
     }
 
     const copyToClipboard = (text) => {
@@ -385,6 +397,20 @@ function MicrosoftDefenderRunQueriesConnector() {
                                         Copy JSON
                                     </Button>
                                 </HorizontalStack>
+                                <VerticalStack gap="3">
+                                    <TextField
+                                        label="Agent name (ai-agent tag)"
+                                        value={agentName}
+                                        onChange={setAgentName}
+                                        placeholder="e.g. openclaw"
+                                        autoComplete="off"
+                                    />
+                                    <HorizontalStack align="end">
+                                        <Button primary icon={CollectionsMajor} onClick={handleSaveAsCollections} loading={savingCollections} disabled={!agentName.trim() || savingCollections}>
+                                            Save as Collections
+                                        </Button>
+                                    </HorizontalStack>
+                                </VerticalStack>
                                 <div style={{ overflowX: 'auto' }}>
                                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                                         <thead>
