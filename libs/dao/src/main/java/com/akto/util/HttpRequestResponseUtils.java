@@ -19,8 +19,6 @@ import java.util.*;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
@@ -134,71 +132,39 @@ public class HttpRequestResponseUtils {
         return false;
     }
 
-    /**
-     * Extracts the Content-Type value from an escaped JSON header section string.
-     * Handles the pattern: Content-Type\":\"value\" (escaped quotes in JSON string)
-     * Also handles: Content-Type":"value" (unescaped, if headers are a raw JSON object)
-     */
     private static String extractContentTypeFromHeaderSection(String section) {
-        // Look for Content-Type key (case-insensitive) then extract the value.
-        // Real Kafka formats seen:
-        //   "Content-Type\": \"image/png\"      (escaped quotes with space after colon)
-        //   "Content-Type\":\"image/png\"        (escaped quotes, no space)
-        //   "Content-Type": "image/png"          (plain JSON)
-        String[] keys = {
-            "Content-Type",
-            "content-type",
-        };
+        String lower = section.toLowerCase();
+        int idx = lower.indexOf("content-type");
+        if (idx == -1) return null;
 
-        for (String key : keys) {
-            int idx = section.indexOf(key);
-            if (idx == -1) continue;
+        int pos = idx + "content-type".length();
 
-            // Move past the key
-            int pos = idx + key.length();
-            if (pos >= section.length()) continue;
-
-            // Skip past separator chars: \, ", :, space — in any order
-            // We need to get from the key to the start of the value
-            // e.g. from `Content-Type` past `\": \"` or `\":\"` or `": "` to `image/png`
-            int limit = Math.min(pos + 10, section.length()); // separator is at most a few chars
-            while (pos < limit) {
-                char c = section.charAt(pos);
-                if (c == '\\' || c == '"' || c == ':' || c == ' ') {
-                    pos++;
-                } else {
-                    break;
-                }
-            }
-
-            if (pos >= section.length()) continue;
-
-            // Now extract the value until we hit a quote, escaped quote, or end
-            int valueStart = pos;
-            int valueEnd = -1;
-            for (int i = valueStart; i < section.length(); i++) {
-                char c = section.charAt(i);
-                if (c == '\\' && i + 1 < section.length() && section.charAt(i + 1) == '"') {
-                    valueEnd = i;
-                    break;
-                }
-                if (c == '"') {
-                    valueEnd = i;
-                    break;
-                }
-            }
-            if (valueEnd > valueStart) {
-                String value = section.substring(valueStart, valueEnd);
-                int semicolon = value.indexOf(';');
-                if (semicolon > 0) {
-                    value = value.substring(0, semicolon).trim();
-                }
-                if (value.contains("/")) { // basic sanity: must look like a mime type
-                    return value;
-                }
+        // Skip separators
+        while (pos < section.length()) {
+            char c = section.charAt(pos);
+            if (c == ':' || c == '"' || c == '\\' || c == ' ') {
+                pos++;
+            } else {
+                break;
             }
         }
-        return null;
+
+        if (pos >= section.length()) return null;
+
+        int start = pos;
+
+        // Read value
+        while (pos < section.length()) {
+            char c = section.charAt(pos);
+            if (c == '"' || c == '\\' || c == ';') break;
+            pos++;
+        }
+
+        if (pos <= start) return null;
+
+        String value = section.substring(start, pos).trim();
+
+        return value.contains("/") ? value : null;
     }
 
     public static Map<String, Set<Object>> extractValuesFromPayload(String body) {
