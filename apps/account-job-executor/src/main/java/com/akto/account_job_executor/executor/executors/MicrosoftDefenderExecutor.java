@@ -167,9 +167,10 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
 
         Map<String, String> tagMap = new HashMap<>();
         tagMap.put("gen-ai", "Gen AI");
-        tagMap.put("source", "DEFENDER");
+        tagMap.put("source", "ENDPOINT");
+        tagMap.put("connector", "MICROSOFT_DEFENDER");
         tagMap.put("bot-name", deviceName);
-        tagMap.put("agent-name", "openclaw");
+        tagMap.put("ai-agent", "openclaw");
         record.put("tag", OBJECT_MAPPER.writeValueAsString(tagMap));
 
         return record;
