@@ -321,6 +321,7 @@ public class HttpCallParser {
                     && !source.equals(Constants.AI_AGENT_SOURCE_VERTEX)
                     && !source.equals(Constants.AI_AGENT_SOURCE_SNOWFLAKE)
                     && !source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)
                     )) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
@@ -334,9 +335,17 @@ public class HttpCallParser {
                 return baseHostname;
             }
 
-            // Microsoft Defender traffic: collection name is bot-name.openclaw.defender.com
+            // Microsoft Defender traffic: collection name is bot-name.openclaw.defender.microsoft.com
             if (source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)) {
-                return botName + ".openclaw.defender.com";
+                return botName + ".openclaw.defender.microsoft.com";
+            }
+
+            // ENDPOINT source with MICROSOFT_DEFENDER connector: collection name is bot-name.openclaw.defender.microsoft.com
+            if (source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)) {
+                String connector = tagsMap.get(Constants.AI_AGENT_TAG_CONNECTOR);
+                if (Constants.AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER.equals(connector)) {
+                    return botName + ".openclaw.defender.microsoft.com";
+                }
             }
 
             // Reconstruct full hostname: bot-name.base-hostname
