@@ -57,12 +57,12 @@ const McpHoverPanel = ({ metadata }) => {
             </HorizontalStack>
           )}
           {responseData && (
-            <HorizontalStack gap="1">
+            <VerticalStack gap="1">
               <Text variant="bodySm" fontWeight="semibold" color="subdued">Response From server:</Text>
-              <Box background="bg-subdued" padding="1" borderRadius='1'> 
-                <Text variant="bodySm">{responseData}</Text>
+              <Box background="bg-subdued" padding="1" borderRadius='1' overflowY="scroll" maxHeight="10rem">
+                <Text variant="bodySm" breakWord>{responseData}</Text>
               </Box>
-            </HorizontalStack>
+            </VerticalStack>
           )}
           {tools.length > 0 && (
             <VerticalStack gap="1">
@@ -99,7 +99,27 @@ const AgentNode = memo(function AgentNode({ data }) {
   const handleMouseEnter = useCallback(() => {
     if (!isMcp || !nodeRef.current) return;
     const rect = nodeRef.current.getBoundingClientRect();
-    setPanelPos({ top: rect.top + window.scrollY, left: rect.right + 8 + window.scrollX });
+    const panelWidth = 420;
+    const panelHeight = 300;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Use viewport-relative coords (position: fixed)
+    let left = rect.right + 8;
+    let top = rect.top;
+
+    // Clamp horizontally: if panel would overflow right edge, show to the left of node
+    if (left + panelWidth > viewportWidth) {
+      left = rect.left - panelWidth - 8;
+    }
+    // Clamp left edge
+    if (left < 8) left = 8;
+    // Clamp vertically
+    if (top + panelHeight > viewportHeight) {
+      top = Math.max(8, viewportHeight - panelHeight);
+    }
+
+    setPanelPos({ top, left });
   }, [isMcp]);
 
   const handleMouseLeave = useCallback(() => {
@@ -113,7 +133,7 @@ const AgentNode = memo(function AgentNode({ data }) {
       <div style={{ position: 'relative' }}>
         <div
           onClick={() => onNodeClick && onNodeClick(component)}
-          style={{ cursor: "pointer" }}
+          style={{ cursor: isMcp ? "pointer" : "default" }}
         >
           <VerticalStack gap={2}>
             <Card padding={0}>
@@ -141,8 +161,8 @@ const AgentNode = memo(function AgentNode({ data }) {
                       {typeof IconComponent === 'string' ?
                       <Avatar source={IconComponent} size={"extraSmall"} /> :
                       <Icon source={IconComponent} />}
-                      <Box width={component.category === "ai-model" ? "160px" : "110px"}>
-                        <Text variant="bodySm" color="base">
+                      <Box width="140px">
+                        <Text variant="bodySm" color="base" breakWord>
                           {component.label}
                         </Text>
                       </Box>
@@ -170,9 +190,11 @@ const AgentNode = memo(function AgentNode({ data }) {
         {isMcp && panelPos && createPortal(
           <div
             style={{
-              position: 'absolute',
+              position: 'fixed',
               top: panelPos.top,
               left: panelPos.left,
+              zIndex: 9999,
+              maxWidth: '420px',
             }}
           >
             <McpHoverPanel metadata={component.metadata} />
@@ -491,7 +513,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
       });
 
       // Layout configuration
-      const COLUMN_WIDTH = 250;
+      const COLUMN_WIDTH = 350;
       const NODE_HEIGHT = 140;
       const VERTICAL_SPACING = 40;
 
@@ -502,7 +524,6 @@ function AgentDiscoverGraph({ apiCollectionId }) {
           const nodeId = isAgent ? 'agent-0' : `node-${nodeIndex++}`;
           serviceToNodeId[serviceName] = nodeId;
 
-          const label = displayName.length > 30 ? displayName.substring(0, 27) + '...' : displayName;
           const yPosition = startY + (index * (NODE_HEIGHT + VERTICAL_SPACING));
 
           nodes.push({
@@ -511,7 +532,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             data: {
               component: {
                 id: nodeId,
-                label: label,
+                label: displayName,
                 type: isAgent ? 'AI Agent' : info.type,
                 category: isAgent ? 'agent' : info.category,
                 description: isAgent ? 'Central AI agent processing requests' : info.description,
@@ -666,9 +687,9 @@ function AgentDiscoverGraph({ apiCollectionId }) {
                     key={`boundary-${n.id}`}
                     style={{
                       position: 'absolute',
-                      left: `${n.position.x - 16}px`,
-                      top: `${Math.max(16, n.position.y - 16)}px`,
-                      width: '200px',
+                      left: `${n.position.x - 20}px`,
+                      top: `${Math.max(20, n.position.y - 20)}px`,
+                      width: '250px',
                       height: '130px',
                       border: `2px dashed ${n.data.component.boundaryColor || '#7c3aed'}`,
                       borderRadius: '12px',
