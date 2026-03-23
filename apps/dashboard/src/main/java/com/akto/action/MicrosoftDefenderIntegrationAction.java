@@ -75,7 +75,6 @@ public class MicrosoftDefenderIntegrationAction extends UserAction {
 
     // KQL query fields
     private String kqlQuery;
-    private Integer kqlTimeRangeDays;
     private List<Map<String, Object>> kqlResults;
     private String agentName;
 
@@ -539,9 +538,7 @@ public class MicrosoftDefenderIntegrationAction extends UserAction {
         try {
             String accessToken = fetchAccessToken(integration.getTenantId(), integration.getClientId(), integration.getClientSecret());
 
-            int days = (kqlTimeRangeDays != null && kqlTimeRangeDays > 0 && kqlTimeRangeDays <= 30) ? kqlTimeRangeDays : 1;
-            String timeFilter = "| where Timestamp > ago(" + days + "d)";
-            String finalQuery = kqlQuery.trim().contains("ago(") ? kqlQuery.trim() : kqlQuery.trim() + "\n" + timeFilter;
+            String finalQuery = kqlQuery.trim();
 
             Map<String, String> body = new HashMap<>();
             body.put("Query", finalQuery);

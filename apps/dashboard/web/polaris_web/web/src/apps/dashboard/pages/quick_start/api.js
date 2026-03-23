@@ -309,11 +309,11 @@ const api = {
         })
     },
 
-    runDefenderKqlQuery(kqlQuery, kqlTimeRangeDays) {
+    runDefenderKqlQuery(kqlQuery) {
         return request({
             url: '/api/runDefenderKqlQuery',
             method: 'post',
-            data: { kqlQuery, kqlTimeRangeDays }
+            data: { kqlQuery }
         })
     },
 

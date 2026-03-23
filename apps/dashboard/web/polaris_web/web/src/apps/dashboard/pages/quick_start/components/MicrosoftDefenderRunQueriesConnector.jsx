@@ -22,7 +22,6 @@ function MicrosoftDefenderRunQueriesConnector() {
     const [selectedLibraryScript, setSelectedLibraryScript] = useState('')
     const [scriptParameters, setScriptParameters] = useState('')
     const [kqlQuery, setKqlQuery] = useState('')
-    const [kqlTimeRangeDays, setKqlTimeRangeDays] = useState('1')
     const [kqlRunning, setKqlRunning] = useState(false)
     const [kqlResults, setKqlResults] = useState(null)
     const [agentName, setAgentName] = useState('')
@@ -105,7 +104,7 @@ function MicrosoftDefenderRunQueriesConnector() {
     const handleKqlRun = () => {
         setKqlRunning(true)
         setKqlResults(null)
-        api.runDefenderKqlQuery(kqlQuery, parseInt(kqlTimeRangeDays)).then((res) => {
+        api.runDefenderKqlQuery(kqlQuery).then((res) => {
             setKqlResults(res.kqlResults || [])
             func.setToast(true, false, `Query returned ${(res.kqlResults || []).length} result(s).`)
         }).catch((err) => {
@@ -148,14 +147,6 @@ function MicrosoftDefenderRunQueriesConnector() {
     const libraryOptions = [
         { label: 'Select a script from library...', value: '' },
         ...libraryScripts.map((s) => ({ label: s.fileName, value: s.fileName }))
-    ]
-
-    const timeRangeOptions = [
-        { label: 'Last 1 day', value: '1' },
-        { label: 'Last 3 days', value: '3' },
-        { label: 'Last 7 days', value: '7' },
-        { label: 'Last 14 days', value: '14' },
-        { label: 'Last 30 days', value: '30' },
     ]
 
     const kqlColumns = kqlResults && kqlResults.length > 0 ? Object.keys(kqlResults[0]) : []
@@ -352,15 +343,8 @@ function MicrosoftDefenderRunQueriesConnector() {
                 {activeTab === 'kql' && (
                     <VerticalStack gap="4">
                         <Text variant='bodyMd' color="subdued">
-                            Run custom KQL queries against Microsoft Defender Advanced Hunting. A time filter is appended automatically unless your query already uses <code>ago(</code>.
+                            Run custom KQL queries against Microsoft Defender Advanced Hunting.
                         </Text>
-
-                        <Select
-                            label="Time range"
-                            options={timeRangeOptions}
-                            value={kqlTimeRangeDays}
-                            onChange={setKqlTimeRangeDays}
-                        />
 
                         <TextField
                             label="KQL Query"
