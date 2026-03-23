@@ -332,6 +332,12 @@ public class Main {
         int accountId = aSettings.getId();
         Context.setActualAccountId(accountId);
         loggerMaker.infoAndAddToDb("Fetched account settings for account " + Context.getActualAccountId());
+        try {
+            Organization organization = OrgUtils.getOrganizationCached(accountId);
+            isNonApiContentTypeFilterEnabled = organization != null && NON_API_FILTER_ORG_ID.equals(organization.getId());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error initializing isNonApiContentTypeFilterEnabled: " + e.getMessage());
+        }
 
         if (Context.getActualAccountId() == 1759692400) {
             maxPollRecordsConfigTemp = 5000;
@@ -895,7 +901,6 @@ public class Main {
                 // Save raw agent traffic logs to MongoDB for future training (boolean feature flag)
                 try {
                     Organization organization = OrgUtils.getOrganizationCached(Context.getActualAccountId());
-                    isNonApiContentTypeFilterEnabled = organization != null && NON_API_FILTER_ORG_ID.equals(organization.getId());
                     if (organization != null && organization.getFeatureWiseAllowed() != null) {
                         FeatureAccess featureAccess = organization.getFeatureWiseAllowed().get("AGENT_TRAFFIC_LOGS");
                         if (featureAccess != null && featureAccess.getIsGranted()) {
