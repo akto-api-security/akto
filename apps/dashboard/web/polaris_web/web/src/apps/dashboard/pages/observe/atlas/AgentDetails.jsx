@@ -258,6 +258,14 @@ function AgentDetails({
     const humanizeTopicKey = (key) =>
         key.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 
+    const showComingSoon = true;
+
+    const titleComp = <TitleWithInfo
+                titleText="Queries Flagged"
+                textProps={{ variant: "headingMd" }}
+                tooltipContent="Queries identified as potentially harmful or policy-violating."
+            />
+
     const UserAnalysisTab = {
         id: 'user-analysis',
         content: 'User Analysis',
@@ -305,13 +313,23 @@ function AgentDetails({
                                 </Box>
                             </VerticalStack>
                         </HorizontalStack>
-                        {userAnalysis.harmfulTopics && Object.keys(userAnalysis.harmfulTopics).length > 0 && (
+                        {userAnalysis.dominantTopics && userAnalysis.dominantTopics.length > 0 && (
                             <VerticalStack gap="2">
                                 <TitleWithInfo
-                                    titleText="Queries Flagged"
+                                    titleText="Dominant Topics"
                                     textProps={{ variant: "headingMd" }}
-                                    tooltipContent="Queries identified as potentially harmful or policy-violating."
+                                    tooltipContent="The topics that the user mostly queries."
                                 />
+                                <List type="bullet" gap="extraTight">
+                                    {userAnalysis.dominantTopics.map((topic) => (
+                                        <List.Item key={topic}>{topic}</List.Item>
+                                    ))}
+                                </List>
+                            </VerticalStack>
+                        )}
+                        {userAnalysis.harmfulTopics && Object.keys(userAnalysis.harmfulTopics).length > 0 && !showComingSoon && (
+                            <VerticalStack gap="2">
+                                {titleComp}
                                 <List type="bullet" gap="extraTight">
                                     {Object.entries(userAnalysis.harmfulTopics).map(([topic, data]) => (
                                         <List.Item key={topic}>
@@ -340,6 +358,12 @@ function AgentDetails({
                                     ))}
                                 </List>
                             </VerticalStack>
+                        )}
+                        {showComingSoon && (
+                            <HorizontalStack gap="2">
+                                {titleComp}
+                                <Badge status="info">Coming soon</Badge>
+                            </HorizontalStack>
                         )}
                     </VerticalStack>
                 )}
@@ -410,7 +434,7 @@ function AgentDetails({
                 </HorizontalStack>,
                 <LayoutWithTabs
                     key="tabs"
-                    tabs={[UserAnalysisTab, McpServersTab, AgentLogsTab]}
+                    tabs={func.isDemoAccount() ? [UserAnalysisTab, McpServersTab, AgentLogsTab] : [McpServersTab, AgentLogsTab]}
                 />
             ]}
         />

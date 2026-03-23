@@ -269,6 +269,30 @@ const api = {
         })
     },
 
+    fetchMicrosoftDefenderIntegration() {
+        return request({
+            url: '/api/fetchMicrosoftDefenderIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addMicrosoftDefenderIntegration(tenantId, clientId, clientSecret, dataIngestionUrl, recurringIntervalSeconds) {
+        return request({
+            url: '/api/addMicrosoftDefenderIntegration',
+            method: 'post',
+            data: {tenantId, clientId, clientSecret, dataIngestionUrl, recurringIntervalSeconds}
+        })
+    },
+
+    removeMicrosoftDefenderIntegration() {
+        return request({
+            url: '/api/removeMicrosoftDefenderIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
 }
 
 export default api

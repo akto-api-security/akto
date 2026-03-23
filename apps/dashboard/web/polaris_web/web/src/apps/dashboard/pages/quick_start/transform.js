@@ -1832,7 +1832,7 @@ const quickStartFunc = {
 
         // Manual
         const manual = [
-            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj, impervaImportObj, dataDogConnectorObj, microsoftDefenderObj
+            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj, impervaImportObj, dataDogConnectorObj
         ];
 
         // Crawler
@@ -1852,7 +1852,8 @@ const quickStartFunc = {
         const aiAgentConnectors = [
             awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, snowflakeObj,
-            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, salesforceImportObj
+            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, salesforceImportObj,
+            microsoftDefenderObj
         ]
 
         // MCP Scan
@@ -1878,6 +1879,9 @@ const quickStartFunc = {
         const endpointAgents = [
             cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj
         ]
+
+        // Endpoint Management
+        const endpointManagement = []
 
        if(func.checkLocal() || func.isLimitedAccount()){
            return {
@@ -1906,6 +1910,7 @@ const quickStartFunc = {
 
             connectors = {
                 "Endpoint Agents": endpointAgents,
+                "Endpoint Management": endpointManagement,
                 "Agentic Proxies": agenticProxies,
                 "Browser Extension": browserExtensions,
                 "Secure Web Networks": secureWebNetworks,
@@ -1960,7 +1965,8 @@ const quickStartFunc = {
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
                 awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
                 n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
-                apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
+                apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
+                microsoftDefenderObj
             ])
         }
 

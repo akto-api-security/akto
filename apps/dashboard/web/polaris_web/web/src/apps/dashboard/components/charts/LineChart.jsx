@@ -88,14 +88,16 @@ function LineChart(props) {
         // Check if using single yAxis mode
         const singleYAxis = defaultChartOptions?.yAxis && !Array.isArray(defaultChartOptions.yAxis);
 
-        return  data.map((x, i) => {
+        return data.map((x, i) => {
+            const isSinglePointSeries = Array.isArray(x.data) && x.data.length === 1;
             return {
                 data: x.data,
                 color: x.color,
                 name: x.name,
                 fillColor: areaFillHex ? fillColor : {},
                 marker: {
-                    enabled: false
+                    enabled: isSinglePointSeries,
+                    radius: isSinglePointSeries ? 5 : undefined,
                 },
                 yAxis: singleYAxis ? 0 : (i===1 ? 1 : 0),
                 lineWidth: singleYAxis ? 2 : (i===1 ? 1: 3)
