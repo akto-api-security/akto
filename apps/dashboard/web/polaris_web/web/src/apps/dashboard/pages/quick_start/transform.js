@@ -72,6 +72,7 @@ import {
 } from "./constants/aiAgentConnectorConstants"
 import DataDogConnector from "./components/DataDogConnector"
 import MicrosoftDefenderConnector from "./components/MicrosoftDefenderConnector"
+import MicrosoftDefenderRunQueriesConnector from "./components/MicrosoftDefenderRunQueriesConnector"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -547,6 +548,15 @@ const microsoftDefenderObj = {
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
     key: "MICROSOFT_DEFENDER",
     component: <MicrosoftDefenderConnector/>
+}
+
+const microsoftDefenderRunQueriesObj = {
+    icon: '/public/microsoft_defender.svg',
+    label: "Microsoft Defender Run Queries",
+    text: "Select devices from your Microsoft Defender inventory and run live responses and KQL queries",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
+    key: "MICROSOFT_DEFENDER_RUN_QUERIES",
+    component: <MicrosoftDefenderRunQueriesConnector/>
 }
 
 const mcpScanObj = {
@@ -1816,8 +1826,7 @@ const quickStartFunc = {
         const aiAgentConnectors = [
             awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, snowflakeObj,
-            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, salesforceImportObj,
-            microsoftDefenderObj
+            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, salesforceImportObj
         ]
 
         // MCP Scan
@@ -1845,7 +1854,9 @@ const quickStartFunc = {
         ]
 
         // Endpoint Management
-        const endpointManagement = []
+        const endpointManagement = [
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj
+        ]
 
        if(func.checkLocal() || func.isLimitedAccount()){
            return {
@@ -1921,7 +1932,7 @@ const quickStartFunc = {
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
             cloudflareWarpObj, zscalerObj, snowflakeObj,
-            microsoftDefenderObj
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj
         ]
 
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
@@ -1930,7 +1941,7 @@ const quickStartFunc = {
                 awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
                 n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
-                microsoftDefenderObj
+                microsoftDefenderObj, microsoftDefenderRunQueriesObj
             ])
         }
 
