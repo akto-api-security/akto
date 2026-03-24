@@ -1,6 +1,6 @@
 import { ActionList, Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text, Modal, TextField, Checkbox, VerticalStack } from "@shopify/polaris"
 import { DeleteMajor, TickMinor, PasskeyMajor } from "@shopify/polaris-icons"
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
@@ -11,14 +11,44 @@ import ResourceListModal from "../../../components/shared/ResourceListModal";
 import observeApi from "../../observe/api";
 import { usersCollectionRenderItem } from "../rbac/utils";
 
-const PRODUCT_SCOPES = [
-    { label: 'API Security', value: 'API' },
-    { label: 'Akto ARGUS', value: 'AGENTIC' },
-    { label: 'Akto ATLAS', value: 'ENDPOINT' },
-    { label: 'DAST', value: 'DAST' },
-];
+/**
+ * Gets available product scopes based on user's feature access.
+ * Maps feature flags to product scopes:
+ * - API Security: always available (default)
+ * - Akto ARGUS: requires SECURITY_TYPE_AGENTIC feature
+ * - Akto ATLAS: requires ENDPOINT_SECURITY feature
+ * - DAST: requires AKTO_DAST feature
+ */
+const getAvailableProductScopes = () => {
+    const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
+    const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false
+    const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
+    const endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted
+    const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true
+
+    const scopes = [
+        { label: 'API Security', value: 'API' } // Always available
+    ]
+
+    // Add scopes based on feature access
+    if (agenticSecurityGranted) {
+        scopes.push({ label: 'Akto ARGUS', value: 'AGENTIC' })
+    }
+
+    if (endpointSecurityGranted) {
+        scopes.push({ label: 'Akto ATLAS', value: 'ENDPOINT' })
+    }
+
+    if (dastGranted) {
+        scopes.push({ label: 'DAST', value: 'DAST' })
+    }
+
+    return scopes
+}
 
 const Users = () => {
+    // Get available scopes based on user's feature access
+    const PRODUCT_SCOPES = useMemo(() => getAvailableProductScopes(), [])
     const username = window.USER_NAME
     const userRole = window.USER_ROLE
 

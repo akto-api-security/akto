@@ -113,7 +113,6 @@ public class InviteUserAction extends UserAction{
 
     private String finalInviteCode;
     private String inviteeRole;
-    private List<String> productScopes;
     private Map<String, String> scopeRoleMapping;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InviteUserAction.class, LoggerMaker.LogDb.DASHBOARD);
@@ -221,14 +220,9 @@ public class InviteUserAction extends UserAction{
                 return ERROR.toUpperCase();
             }
 
-            // Convert old format to new format
-            List<String> scopesToStore = this.productScopes != null && !this.productScopes.isEmpty()
-                    ? this.productScopes
-                    : new ArrayList<>(Arrays.asList("API"));
+            // If any any case only invitee role is present and no scope then map it to "API"
+                scopeRoleToSave.put("API", this.inviteeRole);
 
-            for (String scope : scopesToStore) {
-                scopeRoleToSave.put(scope, this.inviteeRole);
-            }
         } else {
             addActionError("Either scopeRoleMapping or inviteeRole must be provided");
             return ERROR.toUpperCase();
@@ -357,14 +351,6 @@ public class InviteUserAction extends UserAction{
 
     public void setInviteeRole(String inviteeRole) {
         this.inviteeRole = inviteeRole;
-    }
-
-    public List<String> getProductScopes() {
-        return productScopes;
-    }
-
-    public void setProductScopes(List<String> productScopes) {
-        this.productScopes = productScopes;
     }
 
     public Map<String, String> getScopeRoleMapping() {

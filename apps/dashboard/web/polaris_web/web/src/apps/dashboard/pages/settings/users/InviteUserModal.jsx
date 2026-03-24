@@ -1,18 +1,49 @@
 import { Modal, Text, TextField, Box, Checkbox } from "@shopify/polaris"
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import func from "@/util/func"
 import Store from "../../../store"
 import settingRequests from "../api"
 import Dropdown from "../../../components/layouts/Dropdown"
 
-const PRODUCT_SCOPES = [
-    { label: 'API Security', value: 'API' },
-    { label: 'Akto ARGUS', value: 'AGENTIC' },
-    { label: 'Akto ATLAS', value: 'ENDPOINT' },
-    { label: 'DAST', value: 'DAST' },
-];
+/**
+ * Gets available product scopes based on user's feature access.
+ * Maps feature flags to product scopes:
+ * - API Security: always available (default)
+ * - Akto ARGUS: requires SECURITY_TYPE_AGENTIC feature
+ * - Akto ATLAS: requires ENDPOINT_SECURITY feature
+ * - DAST: requires AKTO_DAST feature
+ */
+const getAvailableProductScopes = () => {
+    const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
+    const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false
+    const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
+    const endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted
+    const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true
+
+    const scopes = [
+        { label: 'API Security', value: 'API' } // Always available
+    ]
+
+    // Add scopes based on feature access
+    if (agenticSecurityGranted) {
+        scopes.push({ label: 'Akto ARGUS', value: 'AGENTIC' })
+    }
+
+    if (endpointSecurityGranted) {
+        scopes.push({ label: 'Akto ATLAS', value: 'ENDPOINT' })
+    }
+
+    if (dastGranted) {
+        scopes.push({ label: 'DAST', value: 'DAST' })
+    }
+
+    return scopes
+}
 
 const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, roleHierarchy, rolesOptions, defaultInviteRole}) => {
+
+    // Get available scopes based on user's feature access
+    const availableScopes = useMemo(() => getAvailableProductScopes(), [])
 
     const setToastConfig = Store(state => state.setToastConfig)
     const ref = useRef(null)
@@ -175,7 +206,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
                         Select product scopes and assign a role for each. Different roles can be assigned to different scopes.
                     </Text>
                     <Box padding="400">
-                        {PRODUCT_SCOPES.map((scope) => (
+                        {availableScopes.map((scope) => (
                             <Box key={scope.value} padding="200" style={{
                                 display: "flex",
                                 alignItems: "center",
