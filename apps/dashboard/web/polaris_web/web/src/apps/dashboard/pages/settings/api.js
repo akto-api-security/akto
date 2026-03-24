@@ -9,8 +9,7 @@ const settingRequests = {
                 inviteeName: apiSpec.inviteeName,
                 inviteeEmail: apiSpec.inviteeEmail,
                 websiteHostName: apiSpec.websiteHostName,
-                inviteeRole: apiSpec.inviteeRole,
-                productScopes: apiSpec.productScopes || ["API"]
+                scopeRoleMapping: apiSpec.scopeRoleMapping
             }
         })
     },
@@ -42,7 +41,18 @@ const settingRequests = {
         })
     },
 
-    
+    updateUserScopeRoleMapping(email, scopeRoleMapping) {
+        return request({
+            url: '/api/updateUserScopeRoleMapping',
+            method: 'post',
+            data: {
+                email: email,
+                scopeRoleMapping: scopeRoleMapping
+            }
+        })
+    },
+
+
     fetchApiTokens() {
         return request({
             url: '/api/fetchApiTokens',

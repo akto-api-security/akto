@@ -2,6 +2,7 @@ package com.akto.dto;
 
 import org.bson.types.ObjectId;
 import java.util.List;
+import java.util.Map;
 
 public class PendingInviteCode {
 
@@ -18,8 +19,8 @@ public class PendingInviteCode {
     public static final String ACCOUNT_ID = "accountId";
     private String inviteeRole;
     public static final String INVITEE_ROLE = "inviteeRole";
-    private List<String> productScopes;
-    public static final String PRODUCT_SCOPES = "productScopes";
+    private Map<String, String> scopeRoleMapping;
+    public static final String SCOPE_ROLE_MAPPING = "scopeRoleMapping";
 
     public PendingInviteCode() {
     }
@@ -97,11 +98,11 @@ public class PendingInviteCode {
         this.inviteeRole = inviteeRole;
     }
 
-    public List<String> getProductScopes() {
-        return productScopes;
+    public Map<String, String> getScopeRoleMapping() {
+        return scopeRoleMapping;
     }
 
-    public void setProductScopes(List<String> productScopes) {
-        this.productScopes = productScopes;
+    public void setScopeRoleMapping(Map<String, String> scopeRoleMapping) {
+        this.scopeRoleMapping = scopeRoleMapping;
     }
 }

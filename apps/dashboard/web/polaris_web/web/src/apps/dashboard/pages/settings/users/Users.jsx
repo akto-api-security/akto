@@ -1,9 +1,10 @@
-import { ActionList, Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text, Modal, TextField } from "@shopify/polaris"
+import { ActionList, Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text, Modal, TextField, Checkbox, VerticalStack } from "@shopify/polaris"
 import { DeleteMajor, TickMinor, PasskeyMajor } from "@shopify/polaris-icons"
 import { useEffect, useState, useRef } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
+import Dropdown from "../../../components/layouts/Dropdown";
 import PersistStore from "../../../../main/PersistStore";
 import SearchableResourceList from "../../../components/shared/SearchableResourceList";
 import ResourceListModal from "../../../components/shared/ResourceListModal";
@@ -62,13 +63,24 @@ const Users = () => {
         passwordResetLinkActive: false,
         passwordResetLink: ""
     })
-      
+
     const setPasswordResetStateHelper = (field, value) => {
         setPasswordResetState(prevState => ({
             ...prevState,
             [field]: value
         }))
     }
+
+    const [editScopeRoleModal, setEditScopeRoleModal] = useState({
+        isActive: false,
+        userId: null,
+        email: "",
+        name: "",
+        currentRole: "",
+        currentScopeRoleMapping: {},
+        editingScopeRoleMapping: {},
+        isSimpleRole: false // true if user only has simple role, false if has scopeRoleMapping
+    })
 
     const ref = useRef(null)
 
@@ -347,6 +359,135 @@ const Users = () => {
         }
         return `${scopes.length} scopes`
     }
+
+    const getScopeRoleMappingLabel = (scopeRoleMapping) => {
+        if (!scopeRoleMapping || Object.keys(scopeRoleMapping).length === 0) {
+            return "API: Member"
+        }
+        const mappings = Object.entries(scopeRoleMapping).map(([scope, role]) => {
+            const scopeLabel = PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
+            return `${scopeLabel}: ${getRoleDisplayName(role)}`
+        })
+        if (mappings.length === 1) {
+            return mappings[0]
+        }
+        return mappings
+    }
+
+    const openEditScopeRoleModal = (userId, email, name, currentRole, currentScopeRoleMapping) => {
+        const isSimpleRole = !currentScopeRoleMapping || Object.keys(currentScopeRoleMapping).length === 0
+        setEditScopeRoleModal({
+            isActive: true,
+            userId,
+            email,
+            name,
+            currentRole,
+            currentScopeRoleMapping: currentScopeRoleMapping || {},
+            editingScopeRoleMapping: currentScopeRoleMapping ? { ...currentScopeRoleMapping } : {},
+            isSimpleRole
+        })
+    }
+
+    const closeEditScopeRoleModal = () => {
+        setEditScopeRoleModal({
+            isActive: false,
+            userId: null,
+            email: "",
+            name: "",
+            currentRole: "",
+            currentScopeRoleMapping: {},
+            editingScopeRoleMapping: {},
+            isSimpleRole: false
+        })
+    }
+
+    const handleScopesToggleInModal = (scope) => {
+        setEditScopeRoleModal(prev => {
+            const newMapping = { ...prev.editingScopeRoleMapping }
+            if (newMapping[scope]) {
+                delete newMapping[scope]
+            } else {
+                // Add scope with current role or default role
+                newMapping[scope] = prev.currentRole || "MEMBER"
+            }
+            return { ...prev, editingScopeRoleMapping: newMapping }
+        })
+    }
+
+    const handleScopeRoleChangeInModal = (scope, role) => {
+        setEditScopeRoleModal(prev => ({
+            ...prev,
+            editingScopeRoleMapping: {
+                ...prev.editingScopeRoleMapping,
+                [scope]: role
+            }
+        }))
+    }
+
+    const saveEditedScopeRoleMapping = async () => {
+        const { email, editingScopeRoleMapping } = editScopeRoleModal
+
+        try {
+            // Call backend to update scope-role mapping
+            await settingRequests.updateUserScopeRoleMapping(email, editingScopeRoleMapping)
+
+            // Update UI
+            const scopes = Object.keys(editingScopeRoleMapping)
+            setUsers(users.map(user =>
+                user.login === email
+                    ? { ...user, scopeRoleMapping: editingScopeRoleMapping, productScopes: scopes }
+                    : user
+            ))
+            func.setToast(true, false, "User access updated successfully")
+            closeEditScopeRoleModal()
+        } catch (error) {
+            func.setToast(true, true, "Failed to update user access")
+            console.error(error)
+        }
+    }
+
+    const renderScopeAccessSummary = (item) => {
+        // Display scope-role mappings (n:n mapping)
+        const scopeRoleMapping = item?.scopeRoleMapping
+
+        if (!scopeRoleMapping || Object.keys(scopeRoleMapping).length === 0) {
+            // Fallback to old behavior
+            const scopes = item?.productScopes || ["API"]
+            const scopeLabels = scopes.map(scope =>
+                PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
+            )
+
+            if (scopeLabels.length === 1) {
+                return scopeLabels[0]
+            }
+
+            return (
+                <Box display="flex" flexDirection="row" gap="200">
+                    {scopeLabels.map((label, idx) => (
+                        <Text key={idx} variant="bodySm">{label}</Text>
+                    ))}
+                </Box>
+            )
+        }
+
+        // Display with n:n mapping: "ROLE for Scope"
+        const mappingPairs = Object.entries(scopeRoleMapping).map(([scope, role]) => {
+            const scopeLabel = PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
+            return `${role} for ${scopeLabel}`
+        })
+
+        if (mappingPairs.length === 1) {
+            return mappingPairs[0]
+        }
+
+        return (
+            <Box display="flex" flexDirection="column" gap="100">
+                {mappingPairs.map((pair, idx) => (
+                    <Text key={idx} variant="bodySm">{pair}</Text>
+                ))}
+            </Box>
+        )
+    }
     
     const getUserApiCollectionIds = (userId) => {
         return usersCollection[userId] || [];
@@ -446,45 +587,11 @@ const Users = () => {
                                                     />
                                                 }
 
-                                                <Popover
-                                                    active={roleSelectionPopup[id]}
-                                                    onClose={() => toggleRoleSelectionPopup(id)}
-                                                    activator={<Button disclosure onClick={() => toggleRoleSelectionPopup(id)}>{getRoleDisplayName(role)}</Button>}
+                                                <Button
+                                                    onClick={() => openEditScopeRoleModal(id, login, name, role, item?.scopeRoleMapping)}
                                                 >
-                                                    <ActionList
-                                                        actionRole="menuitem"
-                                                        sections={getRolesOptionsWithTick(role).map(section => ({
-                                                            ...section,
-                                                            items: section.items.map(item => ({
-                                                                ...item,
-                                                                onAction: () => handleRoleSelectChange(id, item.role, login)
-                                                            }))
-                                                        }))}
-                                                    />
-                                                </Popover>
-
-                                                <Popover
-                                                    active={productScopePopup[id]}
-                                                    onClose={() => toggleProductScopePopup(id, true)}
-                                                    activator={
-                                                        <Button
-                                                            disclosure
-                                                            onClick={() => handleEditProductScopes(id, login, role, item?.productScopes)}
-                                                        >
-                                                            {getScopeLabel(item?.productScopes)}
-                                                        </Button>
-                                                    }
-                                                >
-                                                    <ActionList
-                                                        sections={getProductScopeOptionsWithTick(productScopeSelection.selectedScopes).map(section => ({
-                                                            ...section,
-                                                            items: section.items.map(item => ({
-                                                                ...item,
-                                                                onAction: () => handleProductScopeToggle(item.value)
-                                                            }))
-                                                        }))}
-                                                    />
-                                                </Popover>
+                                                    Edit Access
+                                                </Button>
                                             </HorizontalStack>
                                         )
                                     }
@@ -504,6 +611,29 @@ const Users = () => {
                                     }
                                 ]
 
+                            // Display current configuration
+                            const currentConfigDisplay = item?.scopeRoleMapping && Object.keys(item.scopeRoleMapping).length > 0
+                                ? (
+                                    <Box>
+                                        <Text variant="bodySm" color="subdued">Scope-based access:</Text>
+                                        <Box paddingBlockStart="100">
+                                            {Object.entries(item.scopeRoleMapping).map(([scope, role]) => {
+                                                const scopeLabel = PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
+                                                return (
+                                                    <Text key={scope} variant="bodySm">
+                                                        {getRoleDisplayName(role)} for {scopeLabel}
+                                                    </Text>
+                                                )
+                                            })}
+                                        </Box>
+                                    </Box>
+                                )
+                                : (
+                                    <Text variant="bodySm" color="subdued">
+                                        Role: {getRoleDisplayName(role)}
+                                    </Text>
+                                )
+
                             return (
                                 <ResourceItem
                                     id={id}
@@ -517,6 +647,9 @@ const Users = () => {
                                     <Text variant="bodyMd">
                                         {login}
                                     </Text>
+                                    <Box paddingBlockStart="100">
+                                        {currentConfigDisplay}
+                                    </Box>
                                 </ResourceItem>
                             );
                         }}
@@ -526,13 +659,107 @@ const Users = () => {
                     />
                 </LegacyCard>
                 <InviteUserModal
-                    inviteUser={inviteUser} 
+                    inviteUser={inviteUser}
                     setInviteUser={setInviteUser}
                     toggleInviteUserModal={toggleInviteUserModal}
                     roleHierarchy={roleHierarchy}
                     rolesOptions={rolesOptions}
                     defaultInviteRole={defaultInviteRole}
                 />
+
+                {/* Edit Scope-Role Mapping Modal */}
+                <Modal
+                    open={editScopeRoleModal.isActive}
+                    onClose={closeEditScopeRoleModal}
+                    title={`Edit access for ${editScopeRoleModal.name}`}
+                    primaryAction={{
+                        loading: false,
+                        content: 'Save',
+                        onAction: saveEditedScopeRoleMapping,
+                    }}
+                    secondaryActions={[
+                        {
+                            content: 'Cancel',
+                            onAction: closeEditScopeRoleModal,
+                        },
+                    ]}
+                >
+                    <Modal.Section>
+                        {/* Current Configuration Display */}
+                        <Box paddingBlockEnd="400" borderBottomWidth="1" borderColor="border">
+                            <Text variant="headingSm" as="h3">Current Configuration</Text>
+                            <Box paddingBlockStart="200">
+                                {editScopeRoleModal.isSimpleRole
+                                    ? <Text variant="bodySm">{getRoleDisplayName(editScopeRoleModal.currentRole)}</Text>
+                                    : Object.entries(editScopeRoleModal.currentScopeRoleMapping).length > 0
+                                    ? (
+                                        Object.entries(editScopeRoleModal.currentScopeRoleMapping).map(([scope, role]) => {
+                                            const scopeLabel = PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
+                                            return (
+                                                <Text key={scope} variant="bodySm">
+                                                    {getRoleDisplayName(role)} for {scopeLabel}
+                                                </Text>
+                                            )
+                                        })
+                                    )
+                                    : <Text variant="bodySm">No access configured</Text>
+                                }
+                            </Box>
+                        </Box>
+
+                        {/* Edit Configuration */}
+                        <Box paddingBlockStart="400">
+                            <Text variant="headingSm" as="h3">Configure Access by Scope</Text>
+                            <Text variant="bodySm" color="subdued" as="p" style={{ marginBottom: "20px", marginTop: "10px" }}>
+                                Select scopes and assign a role for each. Unselected scopes will have no access.
+                            </Text>
+
+                            <Box padding="400">
+                                {PRODUCT_SCOPES.map((scope) => {
+                                    const isSelected = scope.value in editScopeRoleModal.editingScopeRoleMapping
+                                    const selectedRole = editScopeRoleModal.editingScopeRoleMapping[scope.value]
+
+                                    return (
+                                        <Box
+                                            key={scope.value}
+                                            padding="200"
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "12px",
+                                                marginBottom: "12px",
+                                                borderBottom: "1px solid #e5e5e5",
+                                                paddingBottom: "12px"
+                                            }}
+                                        >
+                                            <Checkbox
+                                                label=""
+                                                checked={isSelected}
+                                                onChange={() => handleScopesToggleInModal(scope.value)}
+                                            />
+                                            <Text variant="bodyMd" style={{ minWidth: "120px" }}>
+                                                {scope.label}
+                                            </Text>
+                                            {isSelected && (
+                                                <Dropdown
+                                                    id={`edit-role-${scope.value}`}
+                                                    selected={(value) => handleScopeRoleChangeInModal(scope.value, value)}
+                                                    menuItems={rolesOptions[0]?.items?.map((role) => ({
+                                                        label: role.content,
+                                                        value: role.role
+                                                    })) || []}
+                                                    initial={selectedRole || "MEMBER"}
+                                                    style={{ minWidth: "200px" }}
+                                                />
+                                            )}
+                                        </Box>
+                                    )
+                                })}
+                            </Box>
+                        </Box>
+                    </Modal.Section>
+                </Modal>
+
                 <Modal
                     small
                     open={passwordResetState.confirmPasswordResetActive}

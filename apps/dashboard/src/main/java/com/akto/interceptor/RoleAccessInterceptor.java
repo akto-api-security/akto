@@ -101,7 +101,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
     /**
      * Get the list of product scopes that the user has access to.
-     * If user doesn't have product scopes set or list is empty, default to ["API"]
+     * Extracts keys from scopeRoleMapping if available, otherwise defaults to API scope.
      * @param userId the user ID
      * @param accountId the account ID
      * @return list of product scopes (e.g., ["API", "MCP", "AGENTIC"])
@@ -113,7 +113,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                     Filters.eq(RBAC.USER_ID, userId),
                     Filters.eq(RBAC.ACCOUNT_ID, accountId)
                 ),
-                Projections.include(RBAC.PRODUCT_SCOPES)
+                Projections.include(RBAC.SCOPE_ROLE_MAPPING)
             );
 
             if (rbac == null) {
@@ -122,10 +122,18 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 return new ArrayList<>(java.util.Arrays.asList("API"));
             }
 
-            List<String> productScopes = rbac.getProductScopes();
-            if (productScopes == null || productScopes.isEmpty()) {
-                loggerMaker.debug("No product scopes set for userId: " + userId + ". Defaulting to API scope.");
-                return new ArrayList<>(java.util.Arrays.asList("API"));
+            List<String> productScopes = new ArrayList<>();
+
+            // Get scopes from scopeRoleMapping (n:n mapping)
+            Map<String, String> scopeRoleMapping = rbac.getScopeRoleMapping();
+            if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
+                productScopes.addAll(scopeRoleMapping.keySet());
+                loggerMaker.debug("User " + userId + " has scope-role mapping: " + scopeRoleMapping);
+            } else {
+                // No scope-role mapping set, use single role for all scopes (backward compatibility)
+                // getRoleForScope will fall back to single role if no mapping exists
+                loggerMaker.debug("No scope-role mapping for userId: " + userId + ". Using single role for all scopes.");
+                productScopes.add("API");
             }
 
             return productScopes;
@@ -180,14 +188,6 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             logger.debug("Found user in interceptor: " + user.getLogin());
             int userId = user.getId();
 
-            Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, sessionAccId);
-            logger.debug("Found user role in: " + (Context.now() - timeNow));
-            String userRole = userRoleRecord != null ? userRoleRecord.getName().toUpperCase() : "";
-
-            if(userRole == null || userRole.isEmpty()) {
-                throw new Exception("User role not found");
-            }
-
             // ===== PRODUCT SCOPE VALIDATION =====
             // Check if user has access to the current product scope (context source)
             CONTEXT_SOURCE contextSource = Context.contextSource.get();
@@ -197,24 +197,41 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 contextSource = CONTEXT_SOURCE.API;  // Default to API
             }
 
-            // ADMIN role has universal access across all product scopes
-            if (!userRole.equals(Role.ADMIN.name())) {
+            // Get RBAC entry to retrieve scope-specific role using new n:n mapping
+            RBAC rbac = RBACDao.instance.findOne(
+                Filters.and(
+                    Filters.eq(RBAC.USER_ID, userId),
+                    Filters.eq(RBAC.ACCOUNT_ID, sessionAccId)
+                )
+            );
+
+            if (rbac == null) {
+                throw new Exception("User RBAC entry not found for userId: " + userId + ", accountId: " + sessionAccId);
+            }
+
+            // Get the role for the specific product scope (new n:n mapping approach)
+            Role userRoleRecord = rbac.getRoleForScope(contextSource);
+            logger.debug("Found user role in: " + (Context.now() - timeNow));
+
+            // If getRoleForScope returns null, user doesn't have access to this scope
+            if (userRoleRecord == null) {
+                // User doesn't have access to this product scope
+                String scopeDisplayName = getContextSourceDisplayName(contextSource);
+                String errorMessage = "You don't have access to " + scopeDisplayName
+                        + ". Please contact your admin to grant access or navigate to an accessible product scope.";
+                ((ActionSupport) invocation.getAction()).addActionError(errorMessage);
+
                 List<String> userProductScopes = getUserProductScopes(userId, sessionAccId);
                 String contextSourceStr = contextSource.toString();
-                logger.debug("DEBUG RoleAccessInterceptor: Checking contextSourceStr=" + contextSourceStr + " against userProductScopes=" + userProductScopes);
+                logger.debug("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr);
+                loggerMaker.infoAndAddToDb("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr + " (" + scopeDisplayName + "). User scopes: " + userProductScopes);
+                // Block the request - return FORBIDDEN instead of invoking
+                return FORBIDDEN;
+            }
 
-                if (!userProductScopes.contains(contextSourceStr)) {
-                    // User doesn't have access to this product scope
-                    String scopeDisplayName = getContextSourceDisplayName(contextSource);
-                    String errorMessage = "You don't have access to " + scopeDisplayName
-                            + ". Please contact your admin to grant access or navigate to an accessible product scope.";
-                    ((ActionSupport) invocation.getAction()).addActionError(errorMessage);
-
-                    logger.debug("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr);
-                    loggerMaker.infoAndAddToDb("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr + " (" + scopeDisplayName + "). User scopes: " + userProductScopes);
-                    // Block the request - return FORBIDDEN instead of invoking
-                    return FORBIDDEN;
-                }
+            String userRole = userRoleRecord.getName().toUpperCase();
+            if(userRole == null || userRole.isEmpty()) {
+                throw new Exception("User role not found for scope: " + contextSource);
             }
             // ===== END PRODUCT SCOPE VALIDATION =====
 

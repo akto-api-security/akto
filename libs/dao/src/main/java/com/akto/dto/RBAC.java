@@ -3,6 +3,7 @@ package com.akto.dto;
 
 import org.bson.types.ObjectId;
 
+import com.akto.dao.CustomRoleDao;
 import com.akto.dto.rbac.*;
 
 import com.akto.dto.rbac.RbacEnums.Feature;
@@ -13,7 +14,10 @@ import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 public class RBAC {
 
@@ -34,10 +38,10 @@ public class RBAC {
     @Setter
     private List<String> allowedFeaturesForUser;
 
-    public static final String PRODUCT_SCOPES = "productScopes";
+    public static final String SCOPE_ROLE_MAPPING = "scopeRoleMapping";
     @Getter
     @Setter
-    private List<String> productScopes;
+    private Map<String, String> scopeRoleMapping;
 
     // special features for RBAC, we can add more features here when needed
     public static final List<String> SPECIAL_FEATURES_FOR_RBAC = Arrays.asList(
@@ -85,7 +89,6 @@ public class RBAC {
         this.userId = userId;
         this.role = role;
         this.apiCollectionsId = new ArrayList<>();
-        this.productScopes = new ArrayList<>();
     }
 
     public RBAC(int userId, String role, int accountId) {
@@ -94,7 +97,6 @@ public class RBAC {
         this.accountId = accountId;
         this.apiCollectionsId = new ArrayList<>();
         this.allowedFeaturesForUser = new ArrayList<>();
-        this.productScopes = new ArrayList<>();
     }
 
     public RBAC() {
@@ -139,5 +141,77 @@ public class RBAC {
 
     public void setApiCollectionsId(List<Integer> apiCollectionsId) {
         this.apiCollectionsId = apiCollectionsId;
+    }
+
+    /**
+     * Get the role for a specific product scope
+     * @param scope the product scope (e.g., ENDPOINT, AGENTIC, API)
+     * @return the role for that scope, or null if no mapping exists (NO ACCESS to this scope)
+     */
+    public Role getRoleForScope(CONTEXT_SOURCE scope) {
+        if (scope == null) {
+            return null;
+        }
+
+        String scopeStr = scope.toString();
+
+        // If scopeRoleMapping exists and is NOT empty, use ONLY that mapping (explicit model)
+        // Do NOT fall back to single role - this ensures strict access control
+        if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
+            if (this.scopeRoleMapping.containsKey(scopeStr)) {
+                String roleStr = this.scopeRoleMapping.get(scopeStr);
+                return resolveRoleString(roleStr);
+            }
+            // User has scopeRoleMapping but this scope is NOT in it - NO ACCESS
+            return null;
+        }
+
+        // Fall back to old role field ONLY if scopeRoleMapping is null/empty (backward compatibility)
+        if (this.role != null) {
+            return resolveRoleString(this.role);
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolves a role string to a Role enum value.
+     * Handles both standard roles and custom roles by looking up the base role.
+     * Custom roles are stored by some name and resolved to their baseRole
+     * at access time using CustomRoleDao lookup.
+     *
+     * Fallback: If custom role is not found, defaults to GUEST for safety.
+     */
+    private Role resolveRoleString(String roleStr) {
+        if (roleStr == null) {
+            return null;
+        }
+
+        // Try standard role first (ADMIN, MEMBER, DEVELOPER, GUEST, etc.)
+        try {
+            return Role.valueOf(roleStr);
+        } catch (IllegalArgumentException e) {
+            // Not a standard role, try custom role
+        }
+
+        // Try to resolve as custom role by looking up in CustomRoleDao
+        try {
+            CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
+            if (customRole != null && customRole.getBaseRole() != null) {
+                try {
+                    return Role.valueOf(customRole.getBaseRole());
+                } catch (IllegalArgumentException e) {
+                    // BaseRole value is invalid, fallback to GUEST
+                    return Role.GUEST;
+                }
+            }
+        } catch (Exception e) {
+            // CustomRoleDao lookup failed (e.g., DB error, timeout)
+            // Fallback to GUEST for safety - don't block user access completely
+        }
+
+        // Default to GUEST if custom role not found or resolution fails
+        // This ensures user always has minimum access (read-only)
+        return Role.GUEST;
     }
 }

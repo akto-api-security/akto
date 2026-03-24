@@ -283,10 +283,14 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             if (pendingInviteCode != null && pendingInviteCode.getInviteeEmailId().equals(email)) {
                 PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
 
-                // Extract product scopes from invitation
-                this.inviteeProductScopes = pendingInviteCode.getProductScopes();
-                if (this.inviteeProductScopes == null || this.inviteeProductScopes.isEmpty()) {
-                    this.inviteeProductScopes = new ArrayList<>(Arrays.asList("API"));
+                // Extract scope-role mapping from invitation
+                this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
+
+                // Default to API + GUEST if scopeRoleMapping is empty or null
+                if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
+                    logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping is empty/null, defaulting to API + GUEST");
+                    this.scopeRoleMapping = new HashMap<>();
+                    this.scopeRoleMapping.put("API", RBAC.Role.GUEST.name());
                 }
 
                 if(user != null){
@@ -322,7 +326,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     String password;
     String email;
     String invitationCode;
-    List<String> inviteeProductScopes;
+    Map<String, String> scopeRoleMapping;
 
     public String registerViaEmail() {
         code = "";
@@ -335,7 +339,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         }
         int invitedToAccountId = 0;
         String inviteeRole = null;
-        this.inviteeProductScopes = null;
+        this.scopeRoleMapping = null;
         if (!invitationCode.isEmpty()) {
             Jws<Claims> jws;
             try {
@@ -363,9 +367,15 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
             invitedToAccountId = pendingInviteCode.getAccountId();
             inviteeRole = pendingInviteCode.getInviteeRole();
-            this.inviteeProductScopes = pendingInviteCode.getProductScopes();
-            if (this.inviteeProductScopes == null || this.inviteeProductScopes.isEmpty()) {
-                this.inviteeProductScopes = new ArrayList<>(Arrays.asList("API"));
+
+            // Extract scope-role mapping if available (new n:n mapping approach)
+            this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
+
+            // Default to API + GUEST if scopeRoleMapping is empty or null
+            if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
+                logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping is empty/null, defaulting to API + GUEST");
+                this.scopeRoleMapping = new HashMap<>();
+                this.scopeRoleMapping.put("API", RBAC.Role.GUEST.name());
             }
 
         } else {
@@ -715,12 +725,16 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     accountId = pendingInviteCode.getAccountId();
                     logger.info("Updated accountId from invite: " + accountId);
 
-                    // Extract product scopes from invitation
-                    this.inviteeProductScopes = pendingInviteCode.getProductScopes();
-                    if (this.inviteeProductScopes == null || this.inviteeProductScopes.isEmpty()) {
-                        this.inviteeProductScopes = new ArrayList<>(Arrays.asList("API"));
+                    // Extract scope-role mapping if available (new n:n mapping approach)
+                    this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
+                    logger.info("Extracted scope-role mapping from invite: " + this.scopeRoleMapping);
+
+                    // Default to API + GUEST if scopeRoleMapping is empty or null
+                    if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
+                        logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping is empty/null, defaulting to API + GUEST");
+                        this.scopeRoleMapping = new HashMap<>();
+                        this.scopeRoleMapping.put("API", RBAC.Role.GUEST.name());
                     }
-                    logger.info("Extracted product scopes from invite: " + this.inviteeProductScopes);
                 } else {
                     logger.info("Invite code does not match or invitee email mismatch");
                 }
@@ -1071,10 +1085,14 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
                     invitedToAccountId = pendingInviteCode.getAccountId();
 
-                    // Extract product scopes from invitation
-                    this.inviteeProductScopes = pendingInviteCode.getProductScopes();
-                    if (this.inviteeProductScopes == null || this.inviteeProductScopes.isEmpty()) {
-                        this.inviteeProductScopes = new ArrayList<>(Arrays.asList("API"));
+                    // Extract scope-role mapping if available (new n:n mapping approach)
+                    this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
+
+                    // Default to API + GUEST if scopeRoleMapping is empty or null
+                    if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
+                        logger.infoAndAddToDb("[registerViaAzureSamlSso] scopeRoleMapping is empty/null, defaulting to API + GUEST");
+                        this.scopeRoleMapping = new HashMap<>();
+                        this.scopeRoleMapping.put("API", RBAC.Role.GUEST.name());
                     }
                 }
             }
@@ -1435,11 +1453,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     if(!exists){
                         logger.info("[createUserAndRedirect] Adding new account to existing user with role: " + invitedRole);
                         RBAC rbacEntry = new RBAC(user.getId(), invitedRole, accountId);
-                        // Set product scopes from invitation if available
-                        if (this.inviteeProductScopes != null && !this.inviteeProductScopes.isEmpty()) {
-                            rbacEntry.setProductScopes(this.inviteeProductScopes);
-                        } else {
-                            rbacEntry.setProductScopes(new ArrayList<>(Arrays.asList("API")));
+
+                        // Set scope-role mapping if available (new n:n mapping approach)
+                        if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
+                            rbacEntry.setScopeRoleMapping(this.scopeRoleMapping);
+                            logger.info("[createUserAndRedirect] Set scope-role mapping for existing user: " + this.scopeRoleMapping);
                         }
                         RBACDao.instance.insertOne(rbacEntry);
                         String accountName = account != null ? account.getName() : "My account";
@@ -1470,19 +1488,19 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
             logger.infoAndAddToDb("[createUserAndRedirect] Account initialized successfully for accountId: " + accountId);
 
-            // Set product scopes for newly initialized user if available from invitation
-            if (this.inviteeProductScopes != null && !this.inviteeProductScopes.isEmpty()) {
+            // Set scope-role mapping for newly initialized user if available from invitation
+            if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
                 try {
                     RBACDao.instance.getMCollection().updateOne(
                         Filters.and(
                             Filters.eq(RBAC.USER_ID, user.getId()),
                             Filters.eq(RBAC.ACCOUNT_ID, accountId)
                         ),
-                        Updates.set(RBAC.PRODUCT_SCOPES, this.inviteeProductScopes)
+                        Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping)
                     );
-                    logger.info("[createUserAndRedirect] Set product scopes for new user: " + this.inviteeProductScopes);
+                    logger.info("[createUserAndRedirect] Set scope-role mapping for new user: " + this.scopeRoleMapping);
                 } catch (Exception e) {
-                    logger.errorAndAddToDb(e, "[createUserAndRedirect] Error setting product scopes for new user: " + e.getMessage());
+                    logger.errorAndAddToDb(e, "[createUserAndRedirect] Error setting scope-role mapping for new user: " + e.getMessage());
                 }
             }
 
