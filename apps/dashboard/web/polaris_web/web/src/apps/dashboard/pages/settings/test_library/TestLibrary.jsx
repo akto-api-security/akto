@@ -56,6 +56,12 @@ function TestLibrary() {
         fetchData();
     }
 
+    async function handleSyncAllDefaultTestLibraries() {
+        await api.syncAllDefaultTestLibraries()
+        func.setToast(true, false, "All default test libraries will be synced in the background. " + commonMessage)
+        fetchData();
+    }
+
     const [addTestLibraryModalActive, setAddTestLibraryModalActive] = useState(false)
 
     function showAddTestLibraryModal() {
@@ -190,6 +196,9 @@ function TestLibrary() {
                 </Text>
             }
             primaryAction={<Button primary onClick={showAddTestLibraryModal}>Add new test library</Button>}
+            secondaryActions={window.USER_ROLE === 'ADMIN' ? (
+                <Button onClick={handleSyncAllDefaultTestLibraries}>Sync all default libraries</Button>
+            ) : null}
             isFirstPage={true}
             divider={true}
         />

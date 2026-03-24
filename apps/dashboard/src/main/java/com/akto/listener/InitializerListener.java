@@ -2831,6 +2831,49 @@ public class InitializerListener implements ServletContextListener {
         return repos;
     }
 
+    /**
+     * Pulls GitHub zip for a default Akto tests-library ref (e.g. {@code akto-api-security/tests-library:standard})
+     * and imports YAMLs — same as the test-editor scheduler branch for {@link #getAktoTestLibraryReposForZipFetch()}.
+     */
+    public static void syncAktoDefaultTestLibraryZip(String repoAndBranchKey) {
+        if (StringUtils.isBlank(repoAndBranchKey) || !repoAndBranchKey.startsWith("akto-api-security/tests-library")) {
+            logger.warnAndAddToDb("syncAktoDefaultTestLibraryZip skipped invalid key: " + repoAndBranchKey, LogDb.DASHBOARD);
+            return;
+        }
+        byte[] zip = TestTemplateUtils.getZipFromRepoAndBranch(repoAndBranchKey);
+        if (zip == null) {
+            logger.warnAndAddToDb(
+                    "syncAktoDefaultTestLibraryZip: no zip for " + repoAndBranchKey
+                            + " (requires metered mode and GitHub access, or local fallback where applicable)",
+                    LogDb.DASHBOARD);
+        }
+        processTemplateFilesZip(zip, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+    }
+
+    /**
+     * Syncs default refs from {@link #getAktoDefaultTestLibs(int)} plus any Akto {@code akto-api-security/tests-library:…}
+     * entries in account settings (so e.g. agentic-pro syncs when present in DB even if Stigg has no
+     * {@code SECURITY_TYPE_AGENTIC}).
+     */
+    public static void syncAllAktoDefaultTestLibrariesForAccount(int accountId) {
+        Set<String> toSync = new LinkedHashSet<>(getAktoDefaultTestLibs(accountId));
+        AccountSettings as = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(accountId));
+        if (as != null && as.getTestLibraries() != null) {
+            for (TestLibrary tl : as.getTestLibraries()) {
+                if (!Constants._AKTO.equals(tl.getAuthor())) {
+                    continue;
+                }
+                String url = tl.getRepositoryUrl();
+                if (url != null && url.startsWith("akto-api-security/tests-library:")) {
+                    toSync.add(url);
+                }
+            }
+        }
+        for (String repoKey : toSync) {
+            syncAktoDefaultTestLibraryZip(repoKey);
+        }
+    }
+
     public static Set<String> getAktoDefaultThreatPolicies() {
         return new HashSet<>(Arrays.asList("akto-api-security/tests-library:threat_policies_pro"));
     }

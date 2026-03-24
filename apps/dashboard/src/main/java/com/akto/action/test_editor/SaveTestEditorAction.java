@@ -650,6 +650,19 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User synced all default Akto test libraries from GitHub", resource = Resource.TEST_EDITOR, operation = Operation.UPDATE)
+    public String syncAllDefaultTestLibraries() {
+        final int accountId = Context.accountId.get();
+        executorService.schedule(() -> {
+            Context.accountId.set(accountId);
+            try {
+                InitializerListener.syncAllAktoDefaultTestLibrariesForAccount(accountId);
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "syncAllDefaultTestLibraries failed for account " + accountId, LogDb.DASHBOARD);
+            }
+        }, 0, TimeUnit.SECONDS);
+        return SUCCESS.toUpperCase();
+    }
 
     public String addTestLibrary(){
 
