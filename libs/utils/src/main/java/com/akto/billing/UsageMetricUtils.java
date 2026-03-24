@@ -398,6 +398,19 @@ public class UsageMetricUtils {
         return featureAccess;
     }
 
+    /**
+     * Stigg / billing feature key for Agentic (Argus) security type; matches UI {@code SECURITY_TYPE_AGENTIC}.
+     */
+    public static final String FEATURE_SECURITY_TYPE_AGENTIC = "SECURITY_TYPE_AGENTIC";
+
+    /** True when the org’s feature map grants {@link #FEATURE_SECURITY_TYPE_AGENTIC} (same signal as Polaris Stigg). */
+    public static boolean isSecurityTypeAgenticGranted(int accountId) {
+        if (accountId <= 0) {
+            return false;
+        }
+        return getFeatureAccessSaas(accountId, FEATURE_SECURITY_TYPE_AGENTIC).getIsGranted();
+    }
+
     public static FeatureAccess getFeatureAccess(Organization organization, MetricTypes metricType) {
         FeatureAccess featureAccess = FeatureAccess.fullAccess;
         try {
@@ -423,27 +436,6 @@ public class UsageMetricUtils {
             loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric org: " + orgId, LogDb.DASHBOARD);
         }
         return featureAccess;
-    }
-
-    /**
-     * Akto Argus (Agentic Security) dashboard is available when the org has MCP and/or GenAI (AI) asset entitlements.
-     */
-    public static boolean hasAgenticDashboardAccess(int accountId) {
-        try {
-            if (!DashboardMode.isMetered()) {
-                return false;
-            }
-            Organization organization = OrganizationsDao.instance.findOneByAccountId(accountId);
-            if (organization == null) {
-                return false;
-            }
-            FeatureAccess mcpAccess = getFeatureAccess(organization, MetricTypes.MCP_ASSET_COUNT);
-            FeatureAccess aiAccess = getFeatureAccess(organization, MetricTypes.AI_ASSET_COUNT);
-            return mcpAccess.getIsGranted() || aiAccess.getIsGranted();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error checking Agentic Argus dashboard access for account: " + accountId, LogDb.DASHBOARD);
-            return false;
-        }
     }
 
     public static void raiseUsageMixpanelEvent(Organization organization, int accountId, String eventName, JSONObject additionalProps){

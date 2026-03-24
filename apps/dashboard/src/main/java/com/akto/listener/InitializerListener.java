@@ -2795,12 +2795,12 @@ public class InitializerListener implements ServletContextListener {
         return new HashSet<>(Arrays.asList("akto-api-security/tests-library:standard", "akto-api-security/tests-library:pro"));
     }
 
+    /** Agentic test library zip when Stigg {@link UsageMetricUtils#FEATURE_SECURITY_TYPE_AGENTIC} is granted for the org. */
     private static boolean includeAgenticTestLibForAccount(int accountId) {
-        return accountId > 0 && DashboardMode.isMetered()
-                && UsageMetricUtils.hasAgenticDashboardAccess(accountId);
+        return UsageMetricUtils.isSecurityTypeAgenticGranted(accountId);
     }
 
-    /** Standard + pro, and agentic when metered and the account has Argus (MCP/AI) dashboard access. */
+    /** Standard + pro, and agentic when {@link #includeAgenticTestLibForAccount} is true. */
     public static Set<String> getAktoDefaultTestLibs(int accountId) {
         Set<String> libs = getAktoDefaultTestLibs();
         if (includeAgenticTestLibForAccount(accountId)) {

@@ -2,12 +2,14 @@ package com.akto.action;
 
 import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.SignupDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.DefaultTestSuitesDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.Config;
 import com.akto.dto.SignupInfo;
@@ -255,6 +257,8 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                                     int accountId = Integer.parseInt(accountIdStr);
                                     Context.accountId.set(accountId);
                                     DefaultTestSuitesDao.insertDefaultTestSuites(accountToIsFirstTimeMap.getOrDefault(accountId, false));
+                                    AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                                    InitializerListener.insertStateInAccountSettings(accountSettings);
                                 }
                             } catch (Exception e) {
                                 e.printStackTrace();
