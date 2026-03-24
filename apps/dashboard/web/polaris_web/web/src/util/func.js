@@ -224,10 +224,10 @@ prettifyEpoch(epoch) {
     if (diffMonths > 2) {
       return this.toDateStr(new Date(epoch * 1000), true)
     } else if (diffWeeks > 4) {
-      count = Math.round(diffMonths + 0.5)
+      count = Math.max(1, Math.floor(diffDays / 30))
       unit = 'month'
     } else if (diffDays > 11) {
-      count = Math.round(diffWeeks + 0.5)
+      count = Math.max(1, Math.floor(diffWeeks))
       unit = 'week'
     } else if (diffDays === 1) {
       return sign > 0 ? 'tomorrow' : 'yesterday'
@@ -2433,14 +2433,6 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
 
   isLimitedAccount(){
     return window?.ACTIVE_ACCOUNT === 1753372418
-  },
-
-  isModuleRestrictedOrg(){
-    const restrictedOrgIds = [
-      '11ea8bfd-0997-4bf9-9c4c-76f9640af7a2'
-    ];
-    const orgId = window?.STIGG_CUSTOMER_ID || '';
-    return restrictedOrgIds.includes(orgId);
   },
   /**
    * Validates if a string is a valid URL with http or https protocol

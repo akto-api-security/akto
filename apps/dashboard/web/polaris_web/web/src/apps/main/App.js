@@ -112,7 +112,7 @@ import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebh
 import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 import AuditData from "../dashboard/pages/observe/AuditData";
-import EndpointShieldMetadata from "../dashboard/pages/observe/EndpointShieldMetadata";
+import EndpointShieldMetadata from "../dashboard/pages/observe/atlas/EndpointShieldMetadata";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";

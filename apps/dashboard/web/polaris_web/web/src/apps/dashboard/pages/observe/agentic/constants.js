@@ -21,7 +21,7 @@ export const getHeaders = () => {
     return [
         { title: "", text: "", value: "iconComp", isText: CellType.TEXT, boxWidth: '24px' },
         { title: "Agentic asset", text: "Agentic asset", value: "groupName", filterKey: "groupName", textValue: "groupName", showFilter: true, sortActive: true },
-        { title: "Type", text: "Type", value: "clientType", filterKey: "clientType", textValue: "clientType", showFilter: true, sortActive: true, boxWidth: "120px" },
+        { title: "Type", text: "Type", value: "clientType", filterKey: "clientType", textValue: "clientType", boxWidth: "120px" },
         { 
             title: "Endpoints", 
             text: "Endpoints", 

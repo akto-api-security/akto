@@ -1,10 +1,12 @@
 package com.akto.action;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
@@ -15,6 +17,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
+import com.akto.utils.Utils;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
@@ -124,10 +127,15 @@ public class InviteUserAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
+        Integer accountId = Context.accountId.get();
+        if (Utils.allowNewUserInviteViaDashboard(accountId, getSUser())) {
+            addActionError("Inviting new users is not allowed for this account.");
+            return ERROR.toUpperCase();
+        }
+
         int user_id = getSUser().getId();
         loggerMaker.debugAndAddToDb(user_id + " inviting " + inviteeEmail);
 
-        Integer accountId = Context.accountId.get();
         User user = UsersDao.instance.findOne(Filters.and(
                 Filters.eq(User.LOGIN, inviteeEmail),
                 Filters.eq(User.ACCOUNTS+"."+accountId+".accountId", accountId)

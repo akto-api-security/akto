@@ -4,12 +4,13 @@ import json
 import logging
 import os
 import re
+import ssl
 import sys
 import tempfile
 import time
 import urllib.request
 from typing import Any, Dict, Optional, Union
-from akto_machine_id import get_machine_id
+from akto_machine_id import get_machine_id, get_username
 
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.gemini/akto/chat-logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -38,6 +39,10 @@ AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 MODE = os.getenv("MODE", "argus").lower()
 AKTO_CONNECTOR = "gemini_cli"
 
+# SSL Configuration
+SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
+SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
+
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
     GEMINI_API_URL = f"https://{device_id}.ai-agent.gemini" if device_id else GEMINI_API_URL
@@ -48,10 +53,13 @@ else:
 AKTO_CHUNKS_DIR = os.path.join(tempfile.gettempdir(), "akto_gemini_cli_chunks")
 
 
-def build_model_inference_path(model: Optional[str] = None, streaming: Optional[bool] = None) -> str:
-    use_streaming = True if streaming is None else streaming
-    suffix = "streamGenerateContent" if use_streaming else "generateContent"
-    return f"/v1/models/{model}:{suffix}"
+def create_ssl_context():
+    return ssl._create_unverified_context()
+
+
+def uuid_to_ipv6_simple(uuid_str):
+    hex_str = uuid_str.replace("-", "").lower()
+    return ":".join(hex_str[i:i+4] for i in range(0, 32, 4))
 
 
 def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
@@ -64,7 +72,7 @@ def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
     return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
 
 
-def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
+def post_to_akto(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
     logger.info(f"API CALL: POST {url}")
     if LOG_PAYLOADS:
         logger.debug(f"Request payload: {json.dumps(payload, default=str)[:1000]}...")
@@ -79,7 +87,8 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 
     start_time = time.time()
     try:
-        with urllib.request.urlopen(request, timeout=AKTO_TIMEOUT) as response:
+        ssl_context = create_ssl_context()
+        with urllib.request.urlopen(request, context=ssl_context, timeout=AKTO_TIMEOUT) as response:
             duration_ms = int((time.time() - start_time) * 1000)
             status_code = response.getcode()
             raw = response.read().decode("utf-8")
@@ -164,11 +173,11 @@ def read_accumulated_text_and_clear_file(session_id: str) -> str:
         pass
     return text
 
-def build_ingestion_payload(
+
+def build_akto_request(
     user_prompt: str,
     full_response_text: str,
     model: Optional[str] = None,
-    streaming: Optional[bool] = None,
     session_metadata: Optional[Dict[str, Any]] = None,
     usage_metadata: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
@@ -177,44 +186,64 @@ def build_ingestion_payload(
         tags["ai-agent"] = "geminicli"
         tags["source"] = "ENDPOINT"
 
-    request_metadata = {
-        "model": model or "",
-        "tag": tags,
-    }
-    if MODE == "atlas":
-        request_metadata["machine_id"] = os.getenv("DEVICE_ID") or get_machine_id()
-        request_metadata["log_storage"] = {"type": "local_file", "path": LOG_DIR}
-    if session_metadata:
-        request_metadata["gemini_cli_session"] = session_metadata
+    device_id = os.getenv("DEVICE_ID") or get_machine_id()
+    host = GEMINI_API_URL.replace("https://", "").replace("http://", "")
 
-    llm_response: Dict[str, Any] = {
-        "candidates": [
-            {
-                "content": {"role": "model", "parts": [full_response_text]},
-            }
-        ]
-    }
+    request_headers = json.dumps({
+        "host": host,
+        "x-gemini-hook": "AfterModel",
+        "content-type": "application/json"
+    })
+
+    response_headers = json.dumps({
+        "x-gemini-hook": "AfterModel",
+        "content-type": "application/json"
+    })
+
+    request_payload = json.dumps({
+        "body": user_prompt
+    })
+
+    response_body: Dict[str, Any] = {"result": full_response_text}
     if usage_metadata:
-        llm_response["usageMetadata"] = usage_metadata
+        response_body["usageMetadata"] = usage_metadata
+
+    response_payload = json.dumps({
+        "body": json.dumps(response_body)
+    })
+
+    metadata: Dict[str, Any] = {"model": model or ""}
+    if MODE == "atlas":
+        metadata["machine_id"] = device_id
+        metadata["log_storage"] = {"type": "local_file", "path": LOG_DIR}
+    if session_metadata:
+        metadata["gemini_cli_session"] = session_metadata
 
     return {
-        "url": GEMINI_API_URL,
-        "path": build_model_inference_path(model=model, streaming=streaming),
-        "request": {
-            "method": "POST",
-            "headers": {"content-type": "application/json"},
-            "body": {
-                "messages": [{"role": "user", "content": user_prompt}]
-            },
-            "queryParams": {},
-            "metadata": request_metadata
-        },
-        "response": {
-            "body": llm_response,
-            "headers": {"content-type": "application/json"},
-            "statusCode": 200,
-            "status": "OK"
-        }
+        "path": "/gemini/chat",
+        "requestHeaders": request_headers,
+        "responseHeaders": response_headers,
+        "method": "POST",
+        "requestPayload": request_payload,
+        "responsePayload": response_payload,
+        "ip": get_username(),
+        "destIp": "127.0.0.1",
+        "time": str(int(time.time() * 1000)),
+        "statusCode": "200",
+        "type": "HTTP/1.1",
+        "status": "200",
+        "akto_account_id": "1000000",
+        "akto_vxlan_id": device_id,
+        "is_pending": "false",
+        "source": "MIRRORING",
+        "direction": None,
+        "process_id": None,
+        "socket_id": None,
+        "daemonset_id": None,
+        "enabled_graph": None,
+        "tag": json.dumps(tags),
+        "metadata": json.dumps(metadata),
+        "contextSource": "ENDPOINT"
     }
 
 
@@ -235,15 +264,14 @@ def send_ingestion_data(
         logger.debug(f"Response preview: {full_response_text[:500]}...")
 
     try:
-        request_body = build_ingestion_payload(
+        request_body = build_akto_request(
             user_prompt,
             full_response_text,
             model=model,
-            streaming=streaming,
             session_metadata=session_metadata,
             usage_metadata=usage_metadata,
         )
-        post_payload_json(
+        post_to_akto(
             build_http_proxy_url(
                 guardrails=not AKTO_SYNC_MODE,
                 ingest_data=True,
@@ -321,3 +349,7 @@ def main():
 
     sys.stdout.write(json.dumps({}))
     sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

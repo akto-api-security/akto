@@ -35,14 +35,16 @@ const rolesOptions = [
         value: 'THREAT_VIEWER',
     }]
 
-const getRoleDisplayName = (role) => {
-    for (let item of rolesOptions) {
+function getRoleDisplayName(role) {
+    for (const item of rolesOptions) {
         if (item.value === role) {
-            return item.label;
+            return item.label
         }
     }
-    return role;
+    return role
 }
+
+export { rolesOptions, getRoleDisplayName }
 
 const Roles = () => {
 

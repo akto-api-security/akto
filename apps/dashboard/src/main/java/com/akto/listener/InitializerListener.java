@@ -2974,7 +2974,7 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
 
-            logger.debugAndAddToDb("Fetching org metadata",LogDb.DASHBOARD);
+            logger.debugAndAddToDb("Fetching org metadata");
 
             BasicDBObject metaData = OrganizationUtils.fetchOrgMetaData(organizationId, organization.getAdminEmail());
             gracePeriod = OrganizationUtils.fetchOrgGracePeriodFromMetaData(metaData);
@@ -2985,7 +2985,7 @@ public class InitializerListener implements ServletContextListener {
                 String userDomain = organization.getAdminEmail().split("@")[1].toLowerCase();
                 OrganizationInfo orgInfo = domainToOrgInfoCache.get(userDomain);
                 if(orgInfo == null){
-                       logger.debugAndAddToDb("Domain " +userDomain + "not found in cache",LogDb.DASHBOARD);
+                       logger.debugAndAddToDb("Domain " +userDomain + " not found in cache");
                         // Fetch all organizations with matching admin email domain
                         try {
                             List<Organization> orgsWithSameDomain = OrganizationsDao.instance.findAll(

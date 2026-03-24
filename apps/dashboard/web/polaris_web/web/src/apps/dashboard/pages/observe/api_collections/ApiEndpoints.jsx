@@ -924,7 +924,7 @@ function ApiEndpoints(props) {
     function exportCsv(selectedResources = []) {
         const selectedResourcesSet = new Set(selectedResources)
         if (!loading) {
-            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.type === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0].length > 0));
+            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.type === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0] && x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
             const allEndpoints = endpointData['all']
@@ -1772,6 +1772,7 @@ function ApiEndpoints(props) {
                     endpointsList={loading ? [] : endpointData["all"]}
                 />
             ] : showEmptyScreen && !(showSequencesFlow || showSwaggerDependenciesFlow || showSchemaView) ? [
+                <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
                 <EmptyScreensLayout key={"emptyScreen"}
                     iconSrc={"/public/file_plus.svg"}
                     headingText={getEmptyScreenText(collectionsObj).headingText}
@@ -1780,7 +1781,7 @@ function ApiEndpoints(props) {
                     redirectUrl={"/dashboard/observe/inventory"}
                     learnText={"inventory"}
                     docsUrl={ENDPOINTS_PAGE_DOCS_URL}
-                />, <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />] : showSequencesFlow ? [
+                />] : showSequencesFlow ? [
                 <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
             ] : showSwaggerDependenciesFlow ? [
                 <SwaggerDependenciesFlow key="swagger-dependencies-flow" apiCollectionId={apiCollectionId}  />

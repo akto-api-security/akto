@@ -7,14 +7,12 @@ import com.akto.dao.SignupDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.Config;
 import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
-import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
@@ -22,7 +20,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.password_reset.PasswordResetUtils;
-import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
 import com.akto.utils.Token;
@@ -77,6 +74,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     }
 
     BasicDBObject loginResult = new BasicDBObject();
+
     @Override
     public String execute() throws IOException {
         logger.debug("LoginAction Hit");
@@ -88,7 +86,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         User user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, username));
 
         if (user != null && user.getSignupInfoMap()!=null && user.getSignupInfoMap().containsKey(Config.ConfigType.PASSWORD + Config.CONFIG_SALT)){
-            SignupInfo.PasswordHashInfo signupInfo = (SignupInfo.PasswordHashInfo) user.getSignupInfoMap().get(Config.ConfigType.PASSWORD + "-ankush");
+            SignupInfo.PasswordHashInfo signupInfo = (SignupInfo.PasswordHashInfo) user.getSignupInfoMap().get(Config.ConfigType.PASSWORD + Config.CONFIG_SALT);
             String salt = signupInfo.getSalt();
             String passHash = Integer.toString((salt + password).hashCode());
             if (!passHash.equals(signupInfo.getPasshash())) {
@@ -101,7 +99,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
             if (signupUserInfo != null) {
                 SignupInfo.PasswordHashInfo passInfo =
-                        (SignupInfo.PasswordHashInfo) signupUserInfo.getUser().getSignupInfoMap().get(Config.ConfigType.PASSWORD + "-ankush");
+                        (SignupInfo.PasswordHashInfo) signupUserInfo.getUser().getSignupInfoMap().get(Config.ConfigType.PASSWORD + Config.CONFIG_SALT);
 
                 String passHash = Integer.toString((passInfo.getSalt() + password).hashCode());
 
