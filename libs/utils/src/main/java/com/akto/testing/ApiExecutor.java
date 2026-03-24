@@ -662,8 +662,7 @@ public class ApiExecutor {
                 fileUrl = attachHeaderVal.substring(sepIdx + 2);
             }
             RequestBody requestBody = getFileRequestBody(fileUrl);
-        
-            builder.post(requestBody);
+            builder.method(request.getMethod(), requestBody);
             builder.removeHeader(Constants.AKTO_ATTACH_FILE);
             Request updatedRequest = builder.build();
 
