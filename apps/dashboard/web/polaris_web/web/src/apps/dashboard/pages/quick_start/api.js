@@ -342,6 +342,119 @@ const api = {
         })
     },
 
+    fetchSentinelOneIntegration() {
+        return request({
+            url: '/api/fetchSentinelOneIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addSentinelOneIntegration(apiToken, consoleUrl, dataIngestionUrl, recurringIntervalSeconds) {
+        return request({
+            url: '/api/addSentinelOneIntegration',
+            method: 'post',
+            data: { apiToken, consoleUrl, dataIngestionUrl, recurringIntervalSeconds }
+        })
+    },
+
+    removeSentinelOneIntegration() {
+        return request({
+            url: '/api/removeSentinelOneIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    generateSentinelOneApiToken() {
+        return request({
+            url: '/api/generateSentinelOneApiToken',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchSentinelOneAgents() {
+        return request({
+            url: '/api/fetchSentinelOneAgents',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchSentinelOneAgentApplications(agentIds) {
+        return request({
+            url: '/api/fetchSentinelOneAgentApplications',
+            method: 'post',
+            data: { agentIds: agentIds || [] }
+        })
+    },
+
+    listSentinelOneRemoteScripts() {
+        return request({
+            url: '/api/listSentinelOneRemoteScripts',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    uploadSentinelOneRemoteScript(scriptName, scriptContent, osTypes) {
+        return request({
+            url: '/api/uploadSentinelOneRemoteScript',
+            method: 'post',
+            data: { scriptName, scriptContent, osTypes }
+        })
+    },
+
+    getSentinelOneRemoteScriptContent(scriptId) {
+        return request({
+            url: '/api/getSentinelOneRemoteScriptContent',
+            method: 'post',
+            data: { scriptId }
+        })
+    },
+
+    runSentinelOneSdlQuery(searchTerms, sdlLookbackHours) {
+        return request({
+            url: '/api/runSentinelOneSdlQuery',
+            method: 'post',
+            data: { searchTerms, sdlLookbackHours: sdlLookbackHours || 24 },
+            timeout: 120000
+        })
+    },
+
+    executeSentinelOneRemoteScript(scriptId, executeAgentIds, executeTaskDescription, executeInputParams) {
+        return request({
+            url: '/api/executeSentinelOneRemoteScript',
+            method: 'post',
+            data: { scriptId, executeAgentIds, executeTaskDescription, executeInputParams }
+        })
+    },
+
+    getSentinelOneScriptTaskStatus(parentTaskId) {
+        return request({
+            url: '/api/getSentinelOneScriptTaskStatus',
+            method: 'post',
+            data: { parentTaskId }
+        })
+    },
+
+    ingestSentinelOneAgentApplications(agentApplications, agentName) {
+        return request({
+            url: '/api/ingestSentinelOneAgentApplications',
+            method: 'post',
+            data: { agentApplications, agentName }
+        })
+    },
+
+    ingestSentinelOneSdlEvents(sdlResults, agentName) {
+        return request({
+            url: '/api/ingestSentinelOneSdlEvents',
+            method: 'post',
+            data: { sdlResults, agentName }
+        })
+    },
+
 }
 
 export default api
