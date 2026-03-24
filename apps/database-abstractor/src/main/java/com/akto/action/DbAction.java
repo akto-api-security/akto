@@ -3819,6 +3819,10 @@ public class DbAction extends ActionSupport {
         }
     }
 
+    public String insertAwsAccountId() {
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
