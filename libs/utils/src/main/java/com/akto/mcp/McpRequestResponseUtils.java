@@ -361,6 +361,9 @@ public final class McpRequestResponseUtils {
     }
 
     private static String getPayloadSubstring(String payload) {
+        if (StringUtils.isBlank(payload) || payload.length() <= 100) {
+            return payload;
+        }
         return StringUtils.substring(payload, 0, 100) + "...";
     }
 }
