@@ -429,17 +429,6 @@ public class McpToolsSyncJobExecutor {
             "HTTP/1.1"
         );
     }
-
-    // private OriginalHttpRequest createRequest(String host, String mcpMethod, String mcpMethodRequestJson) {
-    //     return new OriginalHttpRequest("",
-    //         null,
-    //         HttpMethod.POST.name(),
-    //         mcpMethodRequestJson,
-    //         OriginalHttpRequest.buildHeadersMap(buildHeaders(host)),
-    //         "HTTP/1.1"
-    //     );
-    // }
-
     
     private String buildHeaders(String host) {
         Map<String, String> headers = new HashMap<>();
@@ -460,17 +449,6 @@ public class McpToolsSyncJobExecutor {
 
         return JSONUtils.getString(headers);
     }
-
-    // private String sendRequest(OriginalHttpRequest request) throws Exception {
-    //     try {
-    //         OriginalHttpResponse response = ApiExecutor.sendRequestWithSse(request, true, null, false,
-    //             new ArrayList<>(), false, true);
-    //         return response.getBody();
-    //     } catch (Exception e) {
-    //         logger.error("Error while making request to MCP server.", e);
-    //         throw e;
-    //     }
-    // }
 
     private String sendRequest(OriginalHttpRequest request, ApiCollection apiCollection) throws Exception {
         try {
