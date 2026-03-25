@@ -601,13 +601,11 @@ public class McpToolsSyncJobExecutor {
                 new ArrayList<>(), false, true);
 
             // If SSE works, update the collection
-            // ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_SSE);
             logger.infoAndAddToDb("Detected SSE transport for MCP server: " + apiCollection.getHostName());
             transportType = TRANSPORT_SSE;
         } catch (Exception sseException) {
             logger.infoAndAddToDb("SSE transport failed, falling back to HTTP transport: " + sseException.getMessage());
             // Fall back to HTTP - no need to test, just store it
-            // ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_HTTP);
             if (callbackWasEmpty) {
                 apiCollection.setSseCallbackUrl(DEFAULT_HTTP_CALLBACK_URL);
                 request.setUrl(DEFAULT_HTTP_CALLBACK_URL);
