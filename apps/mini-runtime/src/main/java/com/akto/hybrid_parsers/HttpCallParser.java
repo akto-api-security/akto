@@ -352,7 +352,7 @@ public class HttpCallParser {
                 String connector = tagsMap.get(Constants.AI_AGENT_TAG_CONNECTOR);
                 String appName = tagsMap.get(Constants.AI_AGENT_APP_NAME);
                 if(Constants.AI_AGENT_CONNECTOR_SENTINEL.equals(connector)) {
-                    return botName + appName + ".sentinelone.com";
+                    return botName + "." + appName + ".sentinelone.com";
                 }
             }
             // Reconstruct full hostname: bot-name.base-hostname
