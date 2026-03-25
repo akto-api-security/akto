@@ -68,17 +68,38 @@ const categoryMapping = {
 
 const AGENTIC_ASI_URL = "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/"
 
+const ASI01 = { label: "OWASP Agentic ASI01 - Agent Goal Hijack", url: AGENTIC_ASI_URL }
+const ASI02 = { label: "OWASP Agentic ASI02 - Tool Misuse and Exploitation", url: AGENTIC_ASI_URL }
+const ASI03 = { label: "OWASP Agentic ASI03 - Identity and Privilege Abuse", url: AGENTIC_ASI_URL }
+const ASI04 = { label: "OWASP Agentic ASI04 - Agentic Supply Chain Vulnerabilities", url: AGENTIC_ASI_URL }
+const ASI05 = { label: "OWASP Agentic ASI05 - Unexpected Code Execution", url: AGENTIC_ASI_URL }
+const ASI06 = { label: "OWASP Agentic ASI06 - Memory and Context Poisoning", url: AGENTIC_ASI_URL }
+const ASI07 = { label: "OWASP Agentic ASI07 - Insecure Inter-Agent Communication", url: AGENTIC_ASI_URL }
+const ASI08 = { label: "OWASP Agentic ASI08 - Cascading Failures", url: AGENTIC_ASI_URL }
+const ASI09 = { label: "OWASP Agentic ASI09 - Human-Agent Trust Exploitation", url: AGENTIC_ASI_URL }
+const ASI10 = { label: "OWASP Agentic ASI10 - Rogue Agents", url: AGENTIC_ASI_URL }
+
+/** Keys are {@code TestCategory} / YAML {@code info.category} names; aliases cover legacy Agent Security-* categories. */
 const agenticCategoryMapping = {
-  AGENT_GOAL_HIJACK: { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-  TOOL_MISUSE_AND_EXPLOITATION: { label: 'OWASP Agentic ASI02 - Tool Misuse and Exploitation', url: AGENTIC_ASI_URL },
-  IDENTITY_AND_PRIVILEGE_ABUSE: { label: 'OWASP Agentic ASI03 - Identity and Privilege Abuse', url: AGENTIC_ASI_URL },
-  AGENTIC_SUPPLY_CHAIN: { label: 'OWASP Agentic ASI04 - Agentic Supply Chain Vulnerabilities', url: AGENTIC_ASI_URL },
-  UNEXPECTED_CODE_EXECUTION: { label: 'OWASP Agentic ASI05 - Unexpected Code Execution', url: AGENTIC_ASI_URL },
-  MEMORY_AND_CONTEXT_POISONING: { label: 'OWASP Agentic ASI06 - Memory and Context Poisoning', url: AGENTIC_ASI_URL },
-  INSECURE_INTER_AGENT_COMMUNICATION: { label: 'OWASP Agentic ASI07 - Insecure Inter-Agent Communication', url: AGENTIC_ASI_URL },
-  CASCADING_FAILURES: { label: 'OWASP Agentic ASI08 - Cascading Failures', url: AGENTIC_ASI_URL },
-  HUMAN_AGENT_TRUST_EXPLOITATION: { label: 'OWASP Agentic ASI09 - Human-Agent Trust Exploitation', url: AGENTIC_ASI_URL },
-  ROGUE_AGENTS: { label: 'OWASP Agentic ASI10 - Rogue Agents', url: AGENTIC_ASI_URL },
+  "AGENT_GOAL_HIJACK": ASI01,
+  "AGENTIC_SECURITY_PROMPT_INJECTION": ASI01,
+  "AGENTIC_SECURITY": ASI01,
+  "TOOL_MISUSE_AND_EXPLOITATION": ASI02,
+  "AGENTIC_SECURITY_AGENT_EXPLOITATION": ASI02,
+  "IDENTITY_AND_PRIVILEGE_ABUSE": ASI03,
+  "AGENTIC_SUPPLY_CHAIN": ASI04,
+  "AGENTIC_SECURITY_INFRASTRUCTURE": ASI04,
+  "UNEXPECTED_CODE_EXECUTION": ASI05,
+  "AGENTIC_SECURITY_CODE_EXECUTION": ASI05,
+  "MEMORY_AND_CONTEXT_POISONING": ASI06,
+  "AGENTIC_SECURITY_DATA_EXPOSURE": ASI06,
+  "INSECURE_INTER_AGENT_COMMUNICATION": ASI07,
+  "CASCADING_FAILURES": ASI08,
+  "HUMAN_AGENT_TRUST_EXPLOITATION": ASI09,
+  "AGENTIC_BUSINESS_ALIGNMENT": ASI09,
+  "AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS": ASI09,
+  "AGENTIC_SAFETY": ASI09,
+  "ROGUE_AGENTS": ASI10,
 }
 
 const func = {
@@ -2489,10 +2510,6 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return { error: "Invalid email format" };
     }
   },
-
-  getASICategoriesForAgenticCategory(agenticCategory) {
-    return agenticCategoryMapping[agenticCategory] || []
-  }
 }
 
 export default func
