@@ -379,7 +379,7 @@ public class InventoryAction extends UserAction {
     public String fetchApiInfosFromSTIs(){
         ApiCollection collection = ApiCollectionsDao.instance.findOne(
                 Filters.in(Constants.ID, apiCollectionId),
-                Projections.include(ApiCollection.HOST_NAME)
+                Projections.include(ApiCollection.HOST_NAME, ApiCollection._TYPE)
         );
         if(collection == null){
             addActionError("No such collection exists");
