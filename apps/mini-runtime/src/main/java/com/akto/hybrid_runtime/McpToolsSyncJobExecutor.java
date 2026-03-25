@@ -452,6 +452,12 @@ public class McpToolsSyncJobExecutor {
             headers.put("mcp-session-id", mcpSessionId);
         }
 
+        if (TRANSPORT_HTTP.equalsIgnoreCase(mcpTransportType)) {
+            headers.put(HttpRequestResponseUtils.HEADER_ACCEPT,
+                HttpRequestResponseUtils.APPLICATION_JSON + ","
+                    + HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE);
+        }
+
         return JSONUtils.getString(headers);
     }
 
@@ -505,7 +511,7 @@ public class McpToolsSyncJobExecutor {
             } else {
                 // Use SSE transport
                 logger.infoAndAddToDb("Using SSE transport for MCP server: " + apiCollection.getHostName());
-                McpSseEndpointHelper.addSseEndpointHeader(request, apiCollection);
+                McpSseEndpointHelper.addSseEndpointHeader(request, apiCollection.getId());
                 response = ApiExecutor.sendRequestWithSse(request, true, null, false,
                     new ArrayList<>(), false, true);
             }
@@ -612,7 +618,7 @@ public class McpToolsSyncJobExecutor {
 
             // Clone request for SSE detection to avoid modifying original
             OriginalHttpRequest sseTestRequest = request.copy();
-            McpSseEndpointHelper.addSseEndpointHeader(sseTestRequest, apiCollection);
+            McpSseEndpointHelper.addSseEndpointHeader(sseTestRequest, apiCollection.getId());
             ApiExecutor.sendRequestWithSse(sseTestRequest, true, null, false,
                 new ArrayList<>(), false, true);
 
