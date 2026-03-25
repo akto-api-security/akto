@@ -11,9 +11,11 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.type.URLMethods;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.mcp.McpSchema;
 import com.akto.mcp.McpSchema.CallToolRequest;
 import com.akto.mcp.McpSchema.ClientCapabilities;
@@ -31,11 +33,15 @@ import com.akto.mcp.McpSchema.ServerCapabilities;
 import com.akto.mcp.McpSchema.Tool;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
+import com.akto.util.HttpRequestResponseUtils;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
+import com.akto.util.McpSseEndpointHelper;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.mongodb.BasicDBObject;
 import io.swagger.oas.inflector.examples.ExampleBuilder;
 import io.swagger.oas.inflector.examples.models.Example;
 import io.swagger.oas.inflector.processors.JsonNodeExampleSerializer;
@@ -64,6 +70,14 @@ public class McpToolsSyncJobExecutor {
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_RESOURCES_LIST + "\", \"params\": {}}";
     public static final String LOCAL_IP = "127.0.0.1";
     private ServerCapabilities mcpServerCapabilities = null;
+
+    public static final String TRANSPORT_SSE = "SSE";
+    public static final String TRANSPORT_HTTP = "HTTP";
+
+    public static final String DEFAULT_SSE_CALLBACK_URL = "/sse";
+    public static final String DEFAULT_HTTP_CALLBACK_URL = "/mcp";
+
+    public static String mcpSessionId = null;
 
     public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
 
@@ -318,7 +332,7 @@ public class McpToolsSyncJobExecutor {
     public Pair<JSONRPCResponse, HttpResponseParams> getMcpMethodResponse(String host, String mcpMethod,
         String mcpMethodRequestJson, ApiCollection apiCollection) throws Exception {
         OriginalHttpRequest mcpRequest = createRequest(host, mcpMethod, mcpMethodRequestJson);
-        String jsonrpcResponse = sendRequest(mcpRequest);
+        String jsonrpcResponse = sendRequest(mcpRequest, apiCollection);
 
         JSONRPCResponse rpcResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(mapper, jsonrpcResponse);
 
@@ -355,13 +369,64 @@ public class McpToolsSyncJobExecutor {
         return "{\"Content-Type\":\"application/json\",\"Accept\":\"*/*\",\"host\":\"" + host + "\"}";
     }
 
-    private String sendRequest(OriginalHttpRequest request) throws Exception {
+    // private String sendRequest(OriginalHttpRequest request) throws Exception {
+    //     try {
+    //         OriginalHttpResponse response = ApiExecutor.sendRequestWithSse(request, true, null, false,
+    //             new ArrayList<>(), false, true);
+    //         return response.getBody();
+    //     } catch (Exception e) {
+    //         logger.error("Error while making request to MCP server.", e);
+    //         throw e;
+    //     }
+    // }
+
+    private String sendRequest(OriginalHttpRequest request, ApiCollection apiCollection) throws Exception {
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequestWithSse(request, true, null, false,
-                new ArrayList<>(), false, true);
+            String transportType = detectAndSetTransportType(request, apiCollection);
+
+            OriginalHttpResponse response;
+            if (TRANSPORT_HTTP.equals(transportType)) {
+                // Use standard HTTP POST for streamable responses
+                // Use sendRequestSkipSse to prevent ApiExecutor from trying SSE
+                logger.infoAndAddToDb("Using HTTP transport for MCP server: " + apiCollection.getHostName());
+
+                // Add Accept header for HTTP transport to support both JSON and event-stream responses
+                Map<String, List<String>> headers = request.getHeaders();
+                if (headers == null) {
+                    headers = new HashMap<>();
+                    request.setHeaders(headers);
+                }
+                headers.put(HttpRequestResponseUtils.HEADER_ACCEPT, Collections.singletonList(
+                    HttpRequestResponseUtils.APPLICATION_JSON + ","
+                        + HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE));
+
+                response = ApiExecutor.sendRequestSkipSse(request, true, null, false, new ArrayList<>(), false);
+                // Extract session ID from response headers if present
+                String sessionId = HttpRequestResponseUtils.getHeaderValue(response.getHeaders(), "mcp-session-id");
+                if (StringUtils.isNotBlank(sessionId)) {
+                    mcpSessionId = sessionId;
+                    logger.info("Extracted mcp-session-id from response");
+                } else {
+                    logger.info("No mcp sessionId found. skipping adding mcp session id in subsequent requests");
+                }
+
+                // Check if response is text/event-stream and extract JSON-RPC from it
+                String contentType = HttpRequestResponseUtils.getHeaderValue(response.getHeaders(), HttpRequestResponseUtils.CONTENT_TYPE);
+                if (contentType != null && contentType.toLowerCase().contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE)) {
+                    logger.info("Received text/event-stream response, extracting JSON-RPC message");
+                    String parsedResponse = McpRequestResponseUtils.parseResponse(contentType, response.getBody());
+                    return extractFirstDataFromParsedSse(parsedResponse);
+                }
+            } else {
+                // Use SSE transport
+                logger.info("Using SSE transport for MCP server: {}", apiCollection.getHostName());
+                McpSseEndpointHelper.addSseEndpointHeader(request, apiCollection);
+                response = ApiExecutor.sendRequestWithSse(request, true, null, false,
+                    new ArrayList<>(), false, true);
+            }
             return response.getBody();
         } catch (Exception e) {
-            logger.error("Error while making request to MCP server.", e);
+            logger.error("Error while making request to MCP server: {}", e.getMessage(), e);
             throw e;
         }
     }
@@ -420,6 +485,63 @@ public class McpToolsSyncJobExecutor {
                 }
             });
         return result;
+    }
+
+    private String extractFirstDataFromParsedSse(String parsedSseJson) {
+        try {
+            // The McpRequestResponseUtils.parseResponse returns: {"events": [{"data": "..."}, ...]}
+            // We need to extract the first event's data field
+            BasicDBObject parsed = BasicDBObject.parse(parsedSseJson);
+            List<BasicDBObject> events = (List<BasicDBObject>) parsed.get("events");
+
+            if (events == null || events.isEmpty()) {
+                logger.warn("No events found in parsed SSE response");
+                return "{}";
+            }
+
+            String firstData = events.get(0).getString("data");
+            if (firstData == null || firstData.isEmpty()) {
+                logger.warn("First event has no data");
+                return "{}";
+            }
+
+            logger.debug("Extracted first data from {} SSE events", events.size());
+            return firstData;
+        } catch (Exception e) {
+            logger.error("Error extracting data from parsed SSE: {}", e.getMessage(), e);
+            return "{}";
+        }
+    }
+
+    private String detectAndSetTransportType(OriginalHttpRequest request, ApiCollection apiCollection) throws Exception {
+        // Try SSE first; if sseCallbackUrl was blank, use DEFAULT_SSE_CALLBACK_URL for the probe
+        boolean callbackWasEmpty = StringUtils.isBlank(apiCollection.getSseCallbackUrl());
+        if (callbackWasEmpty) {
+            apiCollection.setSseCallbackUrl(DEFAULT_SSE_CALLBACK_URL);
+        }
+
+        try {
+            logger.info("Attempting to detect transport type for MCP server: {}", apiCollection.getHostName());
+
+            // Clone request for SSE detection to avoid modifying original
+            OriginalHttpRequest sseTestRequest = request.copy();
+            McpSseEndpointHelper.addSseEndpointHeader(sseTestRequest, apiCollection);
+            ApiExecutor.sendRequestWithSse(sseTestRequest, true, null, false,
+                new ArrayList<>(), false, true);
+
+            // If SSE works, update the collection
+            // ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_SSE);
+            logger.info("Detected SSE transport for MCP server: {}", apiCollection.getHostName());
+            return TRANSPORT_SSE;
+        } catch (Exception sseException) {
+            logger.info("SSE transport failed, falling back to HTTP transport: {}", sseException.getMessage());
+            // Fall back to HTTP - no need to test, just store it
+            // ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_HTTP);
+            if (callbackWasEmpty) {
+                apiCollection.setSseCallbackUrl(DEFAULT_HTTP_CALLBACK_URL);
+            }
+            return TRANSPORT_HTTP;
+        }
     }
 }
 

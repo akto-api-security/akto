@@ -21,12 +21,14 @@ import com.akto.mcp.McpSchema.JSONRPCResponse;
 import com.akto.mcp.McpSchema.JsonSchema;
 import com.akto.mcp.McpSchema.ListToolsResult;
 import com.akto.mcp.McpSchema.Tool;
+import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.mongodb.BasicDBObject;
 import io.swagger.oas.inflector.examples.ExampleBuilder;
 import io.swagger.oas.inflector.examples.models.Example;
 import io.swagger.oas.inflector.processors.JsonNodeExampleSerializer;
@@ -365,5 +367,95 @@ public final class McpRequestResponseUtils {
             return payload;
         }
         return StringUtils.substring(payload, 0, 100) + "...";
+    }
+
+    public static String parseResponse(String contentType, String body) {
+        if (body == null || body.trim().isEmpty()) {
+            return "{\"error\":true,\"message\":\"Empty response\"}";
+        }
+
+        String trimmed = body.trim();
+
+        try {
+            if (contentType != null && contentType.toLowerCase().contains("event-stream")
+                    || trimmed.startsWith("data:") || trimmed.contains("event:")) {
+                return extractSseJson(trimmed);
+            }
+            if (trimmed.startsWith("{") && trimmed.endsWith("}")
+                    || trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                return trimmed; // Already valid JSON
+            }
+            if (trimmed.toLowerCase().contains("<html") || trimmed.toLowerCase().contains("<!doctype")) {
+                return "{\"error\":true,\"message\":\"HTML response\"}";
+            }
+            return "{\"error\":true,\"message\":\"error message: " + TestingUtilsSingleton.escapeJsonString(trimmed) + "\"}";
+
+        } catch (Exception e) {
+            return "{\"error\":true,\"message\":\"error message: " + TestingUtilsSingleton.escapeJsonString(e.getMessage()) + "\"}";
+        }
+    }
+
+    private static String extractSseJson(String sse) {
+        String[] lines = sse.split("\\r?\\n");
+
+        String currentEvent = null;
+        String currentId = null;
+        Integer currentRetry = null;
+        StringBuilder currentData = new StringBuilder();
+        List<BasicDBObject> events = new ArrayList<>();
+
+        for (String line : lines) {
+            line = line.trim();
+            if (line.isEmpty()) {
+                // Blank line signifies the end of the current event, push it to the events list
+                if (currentData.length() > 0 || currentEvent != null || currentId != null || currentRetry != null) {
+                    BasicDBObject eventJson = new BasicDBObject();
+                    eventJson.append("data", currentData.toString().trim());
+                    events.add(eventJson);
+                }
+                // Reset for next event
+                currentEvent = null;
+                currentId = null;
+                currentRetry = null;
+                currentData.setLength(0); // clear the current data
+            } else if (line.startsWith(":")) {
+                // Comment line, ignore
+                continue;
+            } else {
+                // Parse the fields
+                int idx = line.indexOf(":");
+                if (idx != -1) {
+                    String field = line.substring(0, idx).trim();
+                    String value = line.substring(idx + 1).trim();
+
+                    switch (field) {
+                        case "event":
+                            currentEvent = value;
+                            break;
+                        case "id":
+                            currentId = value;
+                            break;
+                        case "retry":
+                            try {
+                                currentRetry = Integer.parseInt(value);
+                            } catch (NumberFormatException ignore) {
+                            }
+                            break;
+                        default:
+                            currentData.append(value).append("\n");
+                            break;
+                    }
+                }
+            }
+        }
+
+        // Final flush for the last event if there was no blank line
+        if (currentData.length() > 0 || currentEvent != null || currentId != null || currentRetry != null) {
+            BasicDBObject eventJson = new BasicDBObject();
+            eventJson.append("data", currentData.toString().trim());
+            events.add(eventJson);
+        }
+
+        return new BasicDBObject().append("events", events).toJson();
     }
 }
