@@ -13302,32 +13302,6 @@
             </result>
         </action>
 
-        <action name="api/generateSentinelOneApiToken" class="com.akto.action.SentinelOneIntegrationAction" method="generateSentinelOneApiToken" >
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User regenerated SentinelOne API token</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="UNAUTHORIZED" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
         <action name="api/fetchSentinelOneAgents" class="com.akto.action.SentinelOneIntegrationAction" method="fetchSentinelOneAgents" >
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -13352,72 +13326,6 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
-        </action>
-
-        <action name="api/runSentinelOneSdlQuery" class="com.akto.action.SentinelOneIntegrationAction" method="runSentinelOneSdlQuery" >
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User ran a SentinelOne SDL query</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="UNAUTHORIZED" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/fetchSentinelOneAgentApplications" class="com.akto.action.SentinelOneIntegrationAction" method="fetchSentinelOneAgentApplications" >
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User fetched SentinelOne agent applications</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="UNAUTHORIZED" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/listSentinelOneRemoteScripts" class="com.akto.action.SentinelOneIntegrationAction" method="listSentinelOneRemoteScripts" >
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User listed SentinelOne remote scripts</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json"><param name="statusCode">422</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
-            <result name="UNAUTHORIZED" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
         </action>
 
         <action name="api/uploadSentinelOneRemoteScript" class="com.akto.action.SentinelOneIntegrationAction" method="uploadSentinelOneRemoteScript" >
@@ -13469,34 +13377,6 @@
                 <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User executed a SentinelOne remote script</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json"><param name="statusCode">422</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
-            <result name="UNAUTHORIZED" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
-        </action>
-
-        <action name="api/ingestSentinelOneAgentApplications" class="com.akto.action.SentinelOneIntegrationAction" method="ingestSentinelOneAgentApplications" >
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User ingested SentinelOne application results</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json"><param name="statusCode">422</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
-            <result name="UNAUTHORIZED" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
-        </action>
-
-        <action name="api/ingestSentinelOneSdlEvents" class="com.akto.action.SentinelOneIntegrationAction" method="ingestSentinelOneSdlEvents" >
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User ingested SentinelOne SDL event results</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json"><param name="statusCode">403</param><param name="ignoreHierarchy">false</param><param name="includeProperties">^actionErrors.*</param></result>
             <result name="SUCCESS" type="json"/>

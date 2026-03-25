@@ -366,33 +366,9 @@ const api = {
         })
     },
 
-    generateSentinelOneApiToken() {
-        return request({
-            url: '/api/generateSentinelOneApiToken',
-            method: 'post',
-            data: {}
-        })
-    },
-
     fetchSentinelOneAgents() {
         return request({
             url: '/api/fetchSentinelOneAgents',
-            method: 'post',
-            data: {}
-        })
-    },
-
-    fetchSentinelOneAgentApplications(agentIds) {
-        return request({
-            url: '/api/fetchSentinelOneAgentApplications',
-            method: 'post',
-            data: { agentIds: agentIds || [] }
-        })
-    },
-
-    listSentinelOneRemoteScripts() {
-        return request({
-            url: '/api/listSentinelOneRemoteScripts',
             method: 'post',
             data: {}
         })
@@ -414,15 +390,6 @@ const api = {
         })
     },
 
-    runSentinelOneSdlQuery(searchTerms, sdlLookbackHours) {
-        return request({
-            url: '/api/runSentinelOneSdlQuery',
-            method: 'post',
-            data: { searchTerms, sdlLookbackHours: sdlLookbackHours || 24 },
-            timeout: 120000
-        })
-    },
-
     executeSentinelOneRemoteScript(scriptId, executeAgentIds, executeTaskDescription, executeInputParams) {
         return request({
             url: '/api/executeSentinelOneRemoteScript',
@@ -436,22 +403,6 @@ const api = {
             url: '/api/getSentinelOneScriptTaskStatus',
             method: 'post',
             data: { parentTaskId }
-        })
-    },
-
-    ingestSentinelOneAgentApplications(agentApplications, agentName) {
-        return request({
-            url: '/api/ingestSentinelOneAgentApplications',
-            method: 'post',
-            data: { agentApplications, agentName }
-        })
-    },
-
-    ingestSentinelOneSdlEvents(sdlResults, agentName) {
-        return request({
-            url: '/api/ingestSentinelOneSdlEvents',
-            method: 'post',
-            data: { sdlResults, agentName }
         })
     },
 

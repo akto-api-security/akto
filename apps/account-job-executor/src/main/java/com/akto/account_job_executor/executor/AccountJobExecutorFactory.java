@@ -3,6 +3,7 @@ package com.akto.account_job_executor.executor;
 import com.akto.account_job_executor.executor.executors.AIAgentConnectorExecutor;
 import com.akto.account_job_executor.executor.executors.BigQueryExecutor;
 import com.akto.account_job_executor.executor.executors.MicrosoftDefenderExecutor;
+import com.akto.account_job_executor.executor.executors.SentinelOneExecutor;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ public class AccountJobExecutorFactory {
         map.put("AI_AGENT_CONNECTOR", AIAgentConnectorExecutor.INSTANCE);
         map.put("VERTEX_AI_CUSTOM_DEPLOYED_MODEL_CONNECTOR", BigQueryExecutor.INSTANCE);
         map.put("MICROSOFT_DEFENDER_AH", MicrosoftDefenderExecutor.INSTANCE);
+        map.put("SENTINELONE_AH", SentinelOneExecutor.INSTANCE);
 
         registry = Collections.unmodifiableMap(map);
     }
