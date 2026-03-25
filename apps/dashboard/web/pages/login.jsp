@@ -116,6 +116,7 @@
                     window.PROTECTIONTRIAL_MSG = '${requestScope.protectionTrialMsg}'
 
                     window.AGENTTRIAL_MSG = '${requestScope.agentTrialMsg}'
+                    window.INVITE_DISABLED_FOR_SSO = '${requestScope.inviteDisabledForSSO}' === 'true';
 
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production

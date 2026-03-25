@@ -738,7 +738,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
         if(jiraIntegration != null){
-            jiraIntegration.setApiToken("****************************");
+            jiraIntegration.setApiToken(Constants.ASTERISK);
             // Also set jiraType for frontend
             if (jiraIntegration.getJiraType() == null) {
                 jiraIntegration.setJiraType(JiraIntegration.JiraType.CLOUD); // Default

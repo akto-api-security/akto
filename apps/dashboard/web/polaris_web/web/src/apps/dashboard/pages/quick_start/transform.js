@@ -71,6 +71,8 @@ import {
     SALESFORCE_FIELDS
 } from "./constants/aiAgentConnectorConstants"
 import DataDogConnector from "./components/DataDogConnector"
+import MicrosoftDefenderConnector from "./components/MicrosoftDefenderConnector"
+import MicrosoftDefenderRunQueriesConnector from "./components/MicrosoftDefenderRunQueriesConnector"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -537,6 +539,24 @@ const agenticShieldObj = {
     docsUrl: 'https://docs.akto.io/agentic-shield',
     key: "AGENTIC_SHIELD",
     component: <AgenticShield/>
+}
+
+const microsoftDefenderObj = {
+    icon: '/public/microsoft_defender.svg',
+    label: "Microsoft Defender for Endpoint",
+    text: "Connect your Microsoft Defender for Endpoint account to Akto for enhanced security insights.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
+    key: "MICROSOFT_DEFENDER",
+    component: <MicrosoftDefenderConnector/>
+}
+
+const microsoftDefenderRunQueriesObj = {
+    icon: '/public/microsoft_defender.svg',
+    label: "Microsoft Defender Run Queries",
+    text: "Select devices from your Microsoft Defender inventory and run live responses and KQL queries",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
+    key: "MICROSOFT_DEFENDER_RUN_QUERIES",
+    component: <MicrosoftDefenderRunQueriesConnector/>
 }
 
 const mcpScanObj = {
@@ -1116,6 +1136,42 @@ const githubCopilotHookObj = {
     component: <BannerComponent
         content="Import your GitHub Copilot CLI proxy traffic, seamlessly into AKTO."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/github-copilot-cli-hooks'
+    />
+}
+
+const codexHookObj = {
+    icon: '/public/openai.svg',
+    label: "Codex CLI Hook",
+    text: "Monitor and secure OpenAI Codex CLI interactions with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/codex-cli-hooks',
+    key: "CODEX_CLI_HOOK",
+    component: <BannerComponent
+        content="Monitor and secure OpenAI Codex CLI interactions with Akto guardrails."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/codex-cli-hooks'
+    />
+}
+
+const intellijHookObj = {
+    icon: '/public/intellij.svg',
+    label: "IntelliJ/JetBrains Hook",
+    text: "IDE-level protection monitoring AI-powered code completions in JetBrains IDEs.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/intellij-hooks',
+    key: "INTELLIJ_HOOK",
+    component: <BannerComponent
+        content="IDE-level protection monitoring AI-powered code completions in JetBrains IDEs."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/intellij-hooks'
+    />
+}
+
+const antigravityObj = {
+    icon: '/public/antigravity.svg',
+    label: "Antigravity Hook",
+    text: "Secure your Antigravity AI agent interactions with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/antigravity-hooks',
+    key: "ANTIGRAVITY_HOOK",
+    component: <BannerComponent
+        content="Secure your Antigravity AI agent interactions with Akto guardrails."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/antigravity-hooks'
     />
 }
 
@@ -1830,7 +1886,12 @@ const quickStartFunc = {
 
         // Endpoint Agents
         const endpointAgents = [
-            cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj
+            cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj
+        ]
+
+        // Endpoint Management
+        const endpointManagement = [
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj
         ]
 
        if(func.checkLocal() || func.isLimitedAccount()){
@@ -1860,6 +1921,7 @@ const quickStartFunc = {
 
             connectors = {
                 "Endpoint Agents": endpointAgents,
+                "Endpoint Management": endpointManagement,
                 "Agentic Proxies": agenticProxies,
                 "Browser Extension": browserExtensions,
                 "Secure Web Networks": secureWebNetworks,
@@ -1895,25 +1957,27 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, databricksImportObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
-            cloudflareWarpObj, zscalerObj, snowflakeObj
+            cloudflareWarpObj, zscalerObj, snowflakeObj,
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj
         ]
 
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
                 awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
-                apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
+                apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
+                microsoftDefenderObj, microsoftDefenderRunQueriesObj
             ])
         }
 

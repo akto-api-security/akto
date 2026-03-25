@@ -1,5 +1,6 @@
 
-import { useState, useEffect, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Icon, Avatar, Spinner } from '@shopify/polaris';
 import ReactFlow, { Background, Handle, Position, getBezierPath } from 'react-flow-renderer';
 import TooltipText from '../../../components/shared/TooltipText';
@@ -13,63 +14,193 @@ import {
   buildVSCodeGraph,
 } from './agentGraphUtils';
 
+// Hover panel for MCP and Agent Tool nodes
+const McpHoverPanel = ({ metadata }) => {
+  const tools = metadata?.toolsList || [];
+  const lastTool = metadata?.lastToolInvoked;
+  const endpointUrl = metadata?.endpointUrl;
+  const responseData = metadata?.edgeParam?.data;
+  const toolName = metadata?.toolName;
+  const description = metadata?.description;
+
+  const MAX_TOOLS = 10;
+  const visibleTools = tools.slice(0, MAX_TOOLS);
+  const overflow = tools.length - MAX_TOOLS;
+
+  return (
+
+    <Card>
+      <Box maxWidth='400px'>
+        <VerticalStack gap="3">
+          {endpointUrl && (
+            <HorizontalStack gap="2">
+              <Text variant="bodySm" fontWeight="semibold" color="subdued">Endpoint URL:</Text>
+              <Text variant="bodySm" breakWord>{endpointUrl}</Text>
+            </HorizontalStack>
+          )}
+          {toolName && (
+            <HorizontalStack gap="2">
+              <Text variant="bodySm" fontWeight="semibold" color="subdued">Tool Name:</Text>
+              <Text variant="bodySm" color="success">{toolName}</Text>
+            </HorizontalStack>
+          )}
+          {description && (
+            <HorizontalStack gap="2">
+              <Text variant="bodySm" fontWeight="semibold" color="subdued">Description:</Text>
+              <Text variant="bodySm">{description}</Text>
+            </HorizontalStack>
+          )}
+          {lastTool && (
+            <HorizontalStack gap="2">
+              <Text variant="bodySm" fontWeight="semibold" color="subdued">Last Tool Invoked:</Text>
+              <Text variant='bodySm' color="success">{lastTool}</Text>
+            </HorizontalStack>
+          )}
+          {responseData && (
+            <VerticalStack gap="1">
+              <Text variant="bodySm" fontWeight="semibold" color="subdued">Response From server:</Text>
+              <Box background="bg-subdued" padding="1" borderRadius='1' overflowY="scroll" maxHeight="10rem">
+                <Text variant="bodySm" breakWord>{responseData}</Text>
+              </Box>
+            </VerticalStack>
+          )}
+          {tools.length > 0 && (
+            <VerticalStack gap="1">
+              <Text variant="bodySm" fontWeight="semibold" color="subdued">
+                Tools List({tools.length}):
+              </Text>
+              <HorizontalStack gap="1">
+                {visibleTools.map((tool) => (
+                  <Text key={tool} variant="bodySm">{tool}, </Text>
+                ))}
+                {overflow > 0 && (
+                  <Text variant="bodySm" color="subdued">+{overflow} more</Text>
+                )}
+              </HorizontalStack>
+            </VerticalStack>
+          )}
+        </VerticalStack>
+      </Box>
+    </Card>
+  );
+};
+
 // Custom Node Component following ApiDependencyNode pattern - memoized to prevent re-renders
 const AgentNode = memo(function AgentNode({ data }) {
   const { component, onNodeClick } = data;
+  const [panelPos, setPanelPos] = useState(null);
+  const nodeRef = useRef(null);
 
   const colors = getComponentColors(component.category);
   const IconComponent = getComponentIcon(component.category);
   const isArcadeMcp = component.category === 'arcade-mcp';
+  const isMcp = (component.category === 'mcp' || component.category === 'ai-tool') && component.metadata;
+
+  const handleMouseEnter = useCallback(() => {
+    if (!isMcp || !nodeRef.current) return;
+    const rect = nodeRef.current.getBoundingClientRect();
+    const panelWidth = 420;
+    const panelHeight = 300;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Use viewport-relative coords (position: fixed)
+    let left = rect.right + 8;
+    let top = rect.top;
+
+    // Clamp horizontally: if panel would overflow right edge, show to the left of node
+    if (left + panelWidth > viewportWidth) {
+      left = rect.left - panelWidth - 8;
+    }
+    // Clamp left edge
+    if (left < 8) left = 8;
+    // Clamp vertically
+    if (top + panelHeight > viewportHeight) {
+      top = Math.max(8, viewportHeight - panelHeight);
+    }
+
+    setPanelPos({ top, left });
+  }, [isMcp]);
+
+  const handleMouseLeave = useCallback(() => {
+    setPanelPos(null);
+  }, []);
 
   return (
     <>
       <Handle type="target" position={Position.Left} />
       <Handle type="target" position={Position.Top} id="top" />
-      <div onClick={() => onNodeClick && onNodeClick(component)} style={{ cursor: "pointer" }}>
-        <VerticalStack gap={2}>
-          <Card padding={0}>
-            <div style={{
-              border: `1px solid ${colors.borderColor}`,
-              borderRadius: '8px',
-              backgroundColor: colors.backgroundColor
-            }}>
-              <Box padding={3}>
-                <VerticalStack gap={1}>
-                  <Box width='140px'>
-                    <TooltipText
-                      tooltip={component.description}
-                      text={component.type}
-                      textProps={{ color: "subdued", variant: "bodySm" }}
-                    />
-                  </Box>
-                  <HorizontalStack gap={1} align="center">
-                    {typeof IconComponent === 'string' ?
-                    <Avatar source={IconComponent} size={"extraSmall"} /> :
-                    <Icon source={IconComponent} />}
-                    <Box width={component.category === "ai-model" ? "160px" : "110px"}>
-                      <Text variant="bodySm" color="base">
-                        {component.label}
-                      </Text>
-                    </Box>
-                  </HorizontalStack>
-                  {isArcadeMcp && component.mcpServers && component.mcpServers.length > 0 && (
-                    <Box paddingBlockStart="1" width="140px">
-                      <ShowListInBadge
-                        itemsArr={component.mcpServers}
-                        maxItems={2}
-                        status="info"
-                        maxWidth="140px"
-                        itemWidth="35px"
-                        useTooltip={true}
-                        wrap
+      <div style={{ position: 'relative' }}>
+        <div
+          onClick={() => onNodeClick && onNodeClick(component)}
+          style={{ cursor: isMcp ? "pointer" : "default" }}
+        >
+          <VerticalStack gap={2}>
+            <Card padding={0}>
+              <div
+                ref={nodeRef}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+                style={{
+                  border: `1px solid ${colors.borderColor}`,
+                  borderRadius: '8px',
+                  backgroundColor: colors.backgroundColor,
+                  pointerEvents: 'all',
+                }}
+              >
+                <Box padding={3}>
+                  <VerticalStack gap={1}>
+                    <Box width='140px'>
+                      <TooltipText
+                        tooltip={component.description}
+                        text={component.type}
+                        textProps={{ color: "subdued", variant: "bodySm" }}
                       />
                     </Box>
-                  )}
-                </VerticalStack>
-              </Box>
-            </div>
-          </Card>
-        </VerticalStack>
+                    <HorizontalStack gap={1} align="center">
+                      {typeof IconComponent === 'string' ?
+                      <Avatar source={IconComponent} size={"extraSmall"} /> :
+                      <Icon source={IconComponent} />}
+                      <Box width="140px">
+                        <Text variant="bodySm" color="base" breakWord>
+                          {component.label}
+                        </Text>
+                      </Box>
+                    </HorizontalStack>
+                    {isArcadeMcp && component.mcpServers && component.mcpServers.length > 0 && (
+                      <Box paddingBlockStart="1" width="140px">
+                        <ShowListInBadge
+                          itemsArr={component.mcpServers}
+                          maxItems={2}
+                          status="info"
+                          maxWidth="140px"
+                          itemWidth="35px"
+                          useTooltip={true}
+                          wrap
+                        />
+                      </Box>
+                    )}
+                  </VerticalStack>
+                </Box>
+              </div>
+            </Card>
+          </VerticalStack>
+        </div>
+
+        {isMcp && panelPos && createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: panelPos.top,
+              left: panelPos.left,
+              zIndex: 9999,
+              maxWidth: '420px',
+            }}
+          >
+            <McpHoverPanel metadata={component.metadata} />
+          </div>,
+          document.body
+        )}
       </div>
       <Handle type="source" position={Position.Right} id="b" />
       <Handle type="source" position={Position.Bottom} id="bottom" />
@@ -80,6 +211,11 @@ const AgentNode = memo(function AgentNode({ data }) {
 // Custom Edge Component following ApiDependencyEdge pattern - memoized to prevent re-renders
 const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
   const { edgeParam } = data || {};
+  let displayData = edgeParam;
+  
+  if(edgeParam instanceof Object) {
+    displayData = edgeParam?.type 
+  }
 
   // getBezierPath in react-flow-renderer v9 returns a plain string path
   const edgePath = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
@@ -112,11 +248,11 @@ const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targe
         d={pathD}
         markerEnd={`url(#arrow-${id})`}
       />
-      {edgeParam && (
+      {displayData && (
         <foreignObject x={midX - 95} y={midY - 12} width={190} height={28}>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <Badge size="small" status="new">
-              <TooltipText tooltip={edgeParam} text={edgeParam} />
+              <TooltipText tooltip={displayData} text={displayData} />
             </Badge>
           </div>
         </foreignObject>
@@ -204,7 +340,6 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             setVSCodeGraphData(null);
           } else {
             const tagsList = apiCollection?.tagsList || [];
-            const hasAiAgent = tagsList.some(tag => tag.keyName === 'ai-agent');
             const hasMcpServer = tagsList.some(tag => tag.keyName === 'mcp-server');
             const hasBrowserLlm = tagsList.some(tag => tag.keyName === 'browser-llm');
             const hasGenAiOrAiAgent = tagsList.some(tag => tag.keyName === 'gen-ai' || tag.keyName === 'ai-agent');
@@ -294,7 +429,8 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             displayName: key,
             isKey: true,
             requestCount: edgeInfo.requestCount,
-            lastSeen: edgeInfo.lastSeenTimestamp
+            lastSeen: edgeInfo.lastSeenTimestamp,
+            metadata: edgeInfo?.metadata,
           };
         }
       });
@@ -314,7 +450,8 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             displayName: key,
             isKey: true,
             requestCount: edgeInfo.requestCount,
-            lastSeen: edgeInfo.lastSeenTimestamp
+            lastSeen: edgeInfo.lastSeenTimestamp,
+            metadata: edgeInfo?.metadata,
           };
         }
       });
@@ -376,7 +513,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
       });
 
       // Layout configuration
-      const COLUMN_WIDTH = 250;
+      const COLUMN_WIDTH = 350;
       const NODE_HEIGHT = 140;
       const VERTICAL_SPACING = 40;
 
@@ -387,7 +524,6 @@ function AgentDiscoverGraph({ apiCollectionId }) {
           const nodeId = isAgent ? 'agent-0' : `node-${nodeIndex++}`;
           serviceToNodeId[serviceName] = nodeId;
 
-          const label = displayName.length > 30 ? displayName.substring(0, 27) + '...' : displayName;
           const yPosition = startY + (index * (NODE_HEIGHT + VERTICAL_SPACING));
 
           nodes.push({
@@ -396,7 +532,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             data: {
               component: {
                 id: nodeId,
-                label: label,
+                label: displayName,
                 type: isAgent ? 'AI Agent' : info.type,
                 category: isAgent ? 'agent' : info.category,
                 description: isAgent ? 'Central AI agent processing requests' : info.description,
@@ -406,6 +542,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
                 showBoundary: isAgent,
                 boundaryColor: '#7c3aed',
                 boundaryBg: 'rgba(124, 58, 237, 0.05)',
+                metadata: info.metadata,
               },
               onNodeClick: handleNodeClick
             },
@@ -448,7 +585,8 @@ function AgentDiscoverGraph({ apiCollectionId }) {
             data: {
               connectionType: edgeInfo?.metadata?.type || 'default',
               edgeParam: edgeInfo?.metadata?.edgeParam,
-              requestCount: edgeInfo.requestCount
+              requestCount: edgeInfo.requestCount,
+              metadata: edgeInfo?.metadata
             }
           });
           edgeIndex++;
@@ -549,9 +687,9 @@ function AgentDiscoverGraph({ apiCollectionId }) {
                     key={`boundary-${n.id}`}
                     style={{
                       position: 'absolute',
-                      left: `${n.position.x - 16}px`,
-                      top: `${Math.max(16, n.position.y - 16)}px`,
-                      width: '200px',
+                      left: `${n.position.x - 20}px`,
+                      top: `${Math.max(20, n.position.y - 20)}px`,
+                      width: '250px',
                       height: '130px',
                       border: `2px dashed ${n.data.component.boundaryColor || '#7c3aed'}`,
                       borderRadius: '12px',

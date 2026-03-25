@@ -269,6 +269,79 @@ const api = {
         })
     },
 
+    fetchMicrosoftDefenderIntegration() {
+        return request({
+            url: '/api/fetchMicrosoftDefenderIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addMicrosoftDefenderIntegration(tenantId, clientId, clientSecret, dataIngestionUrl, recurringIntervalSeconds) {
+        return request({
+            url: '/api/addMicrosoftDefenderIntegration',
+            method: 'post',
+            data: {tenantId, clientId, clientSecret, dataIngestionUrl, recurringIntervalSeconds}
+        })
+    },
+
+    removeMicrosoftDefenderIntegration() {
+        return request({
+            url: '/api/removeMicrosoftDefenderIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchDefenderDevices() {
+        return request({
+            url: '/api/fetchDefenderDevices',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    uploadDefenderScript(scriptContent, scriptName) {
+        return request({
+            url: '/api/uploadDefenderScript',
+            method: 'post',
+            data: { scriptContent, scriptName }
+        })
+    },
+
+    runDefenderKqlQuery(kqlQuery) {
+        return request({
+            url: '/api/runDefenderKqlQuery',
+            method: 'post',
+            data: { kqlQuery }
+        })
+    },
+
+    listDefenderLibraryScripts() {
+        return request({
+            url: '/api/listDefenderLibraryScripts',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    runDefenderLiveResponse(deviceIds, scriptName, scriptParameters) {
+        return request({
+            url: '/api/runDefenderLiveResponse',
+            method: 'post',
+            data: { deviceIds, scriptName, scriptParameters },
+            timeout: 360000
+        })
+    },
+
+    ingestDefenderKqlResults(kqlResults, agentName) {
+        return request({
+            url: '/api/ingestDefenderKqlResults',
+            method: 'post',
+            data: { kqlResults, agentName }
+        })
+    },
+
 }
 
 export default api

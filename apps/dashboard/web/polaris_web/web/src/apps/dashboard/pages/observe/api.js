@@ -208,6 +208,14 @@ export default {
             data: { apiCollections: items }
         })
     },
+
+    async deleteUntrackedCollections(apiCollectionIds) {
+        return await request({
+            url: '/api/deleteUntrackedCollections',
+            method: 'post',
+            data: { apiCollectionIds }
+        })
+    },
     
     async updateUserCollections(userCollectionMap) {
         return await request({

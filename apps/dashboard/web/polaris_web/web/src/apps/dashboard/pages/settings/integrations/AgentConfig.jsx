@@ -9,7 +9,8 @@ const MODEL_TYPES = {
   ANTHROPIC: "ANTHROPIC",
   OPENAI: "OPENAI",
   AZURE_OPENAI: "AZURE_OPENAI",
-  OLLAMA: "OLLAMA"
+  OLLAMA: "OLLAMA",
+  DATABRICKS: "DATABRICKS"
 }
 
 const OPENAI_MODELS = [
@@ -29,6 +30,20 @@ const OLLAMA_MODELS = [
   { label: "Qwen small-qwen2.5:0.5b", value: "qwen2.5:0.5b" },
   { label: "Qwen latest-qwen3:8b", value: "qwen3:8b" },
   { label: "Qwen 3 latest-qwen3:latest", value: "qwen3:latest" }
+]
+
+const DATABRICKS_MODELS = [
+  { label: "Databricks GPT 5.4", value: "databricks-gpt-5-4" },
+  { label: "Databricks GPT 5", value: "databricks-gpt-5" },
+  { label: "Databricks GPT 5 Nano", value: "databricks-gpt-5-nano" },
+  { label: "Databricks Claude Opus 4.6", value: "databricks-claude-opus-4-6" },
+  { label: "Databricks Claude Sonnet 4.6", value: "databricks-claude-sonnet-4-6" },
+  { label: "Databricks Gemini 2.5 Pro", value: "databricks-gemini-2-5-pro" },
+  { label: "Databricks Gemini 2.5 Flash", value: "databricks-gemini-2-5-flash" },
+  { label: "Databricks BGE Large EN", value: "databricks-bge-large-en" },
+  { label: "Databricks Meta Llama 3.1 8B Instruct", value: "databricks-meta-llama-3-1-8b-instruct" },
+  { label: "Databricks Gemma 3 12B", value: "databricks-gemma-3-12b" },
+  { label: "Databricks Qwen3 Next 80B A3B Instruct", value: "databricks-qwen3-next-80b-a3b-instruct" },
 ]
 
 function getModelSections(type, data, setData, isEdit=false) {
@@ -52,6 +67,14 @@ function getModelSections(type, data, setData, isEdit=false) {
   switch (type) {
     case MODEL_TYPES.ANTHROPIC:
     case MODEL_TYPES.OPENAI:
+      break;
+    case MODEL_TYPES.DATABRICKS:
+      sections.push({
+        title: "Databricks Workspace Endpoint",
+        type: "text",
+        id: "databricksEndpoint",
+        placeholder: "https://<workspace>.cloud.databricks.com",
+      })
       break;
     case MODEL_TYPES.AZURE_OPENAI:
       sections.push({
@@ -96,6 +119,8 @@ function getModelSections(type, data, setData, isEdit=false) {
         items = ANTHROPIC_MODELS
       } else if (type === MODEL_TYPES.OLLAMA) {
         items = OLLAMA_MODELS
+      } else if (type === MODEL_TYPES.DATABRICKS) {
+        items = DATABRICKS_MODELS
       }
       section.component = (
         <VerticalStack gap="1">
@@ -230,6 +255,10 @@ function AgentConfig() {
             {
               label: 'OLLAMA',
               value: MODEL_TYPES.OLLAMA
+            },
+            {
+              label: 'Databricks',
+              value: MODEL_TYPES.DATABRICKS
             }
             ]}
             initial={modelType}

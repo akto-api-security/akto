@@ -466,6 +466,25 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String deleteUntrackedCollections() {
+        if (apiCollectionIds == null || apiCollectionIds.isEmpty()) {
+            loggerMaker.debugAndAddToDb("deleteUntrackedCollections: no apiCollectionIds provided", LogDb.DASHBOARD);
+            return SUCCESS.toUpperCase();
+        }
+        loggerMaker.debugAndAddToDb("deleteUntrackedCollections: requested " + apiCollectionIds.size() + " collection(s), ids=" + apiCollectionIds, LogDb.DASHBOARD);
+        List<Integer> accessibleCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        if (accessibleCollectionIds != null) {
+            apiCollectionIds.removeIf(id -> !accessibleCollectionIds.contains(id));
+        }
+        if (apiCollectionIds.isEmpty()) {
+            loggerMaker.debugAndAddToDb("deleteUntrackedCollections: no accessible collections to delete", LogDb.DASHBOARD);
+            return SUCCESS.toUpperCase();
+        }
+        long deletedCount = UningestedApiOverageDao.instance.deleteByApiCollectionIds(apiCollectionIds);
+        loggerMaker.infoAndAddToDb("deleteUntrackedCollections: deleted " + deletedCount + " untracked API record(s) for " + apiCollectionIds.size() + " collection(s), ids=" + apiCollectionIds, LogDb.DASHBOARD);
+        return SUCCESS.toUpperCase();
+    }
+
     public String addApisToCustomCollection(){
 
         if(apiList.isEmpty()){
