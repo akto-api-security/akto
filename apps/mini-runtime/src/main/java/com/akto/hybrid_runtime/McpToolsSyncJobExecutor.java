@@ -191,7 +191,7 @@ public class McpToolsSyncJobExecutor {
                 null
             );
 
-            // no response
+            // no response - just for init purpose so that mcp server doesn't fail the subsequent requests
             getMcpMethodResponse(
                 apiCollection.getHostName(), McpSchema.METHOD_NOTIFICATION_INITIALIZED,
                 JSONUtils.getString(initNotificationsRequest), apiCollection);
