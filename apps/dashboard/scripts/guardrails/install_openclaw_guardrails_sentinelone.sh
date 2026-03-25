@@ -14,7 +14,7 @@ set -e
 # ── Defaults (no $HOME — safe for live response) ──────────────────────────────
 TARGET_USER_HOME="${TARGET_USER_HOME:-}"
 OPENAI_API_KEY="${OPENAI_API_KEY:-}"
-AKTO_PROXY_URL="${AKTO_PROXY_URL:-}"
+AKTO_GUARDRAILS_URL="${AKTO_GUARDRAILS_URL:-}"
 ORIGINAL_PROVIDER="${ORIGINAL_PROVIDER:-}"
 MODEL_API="${MODEL_API:-}"
 MODEL_ID="${MODEL_ID:-}"
@@ -24,7 +24,7 @@ for a in "$@"; do
     case "$a" in
         TARGET_USER_HOME=*)  TARGET_USER_HOME="${a#TARGET_USER_HOME=}" ;;
         OPENAI_API_KEY=*)    OPENAI_API_KEY="${a#OPENAI_API_KEY=}" ;;
-        AKTO_PROXY_URL=*)    AKTO_PROXY_URL="${a#AKTO_PROXY_URL=}" ;;
+        AKTO_GUARDRAILS_URL=*) AKTO_GUARDRAILS_URL="${a#AKTO_GUARDRAILS_URL=}" ;;
         ORIGINAL_PROVIDER=*) ORIGINAL_PROVIDER="${a#ORIGINAL_PROVIDER=}" ;;
         MODEL_API=*)         MODEL_API="${a#MODEL_API=}" ;;
         MODEL_ID=*)          MODEL_ID="${a#MODEL_ID=}" ;;
@@ -121,7 +121,7 @@ backup_config() {
 
 # ── Build and merge both blocks ───────────────────────────────────────────────
 update_config() {
-    local base_url="${AKTO_PROXY_URL%/}"
+    local base_url="${AKTO_GUARDRAILS_URL%/}"
 
     local api_key_value
     if [ -n "$OPENAI_API_KEY" ]; then

@@ -10,7 +10,7 @@
 param(
     [string]$TargetUserHome = "",
     [string]$OpenAIApiKey = "",
-    [string]$AktoProxyUrl = "",
+    [string]$AktoGuardrailsUrl = "",
     [string]$OriginalProvider = "",
     [string]$ModelApi = "",
     [string]$ModelId = ""
@@ -24,7 +24,7 @@ foreach ($arg in $args) {
         switch ($key) {
             "TARGET_USER_HOME"  { $TargetUserHome = $val }
             "OPENAI_API_KEY"    { $OpenAIApiKey = $val }
-            "AKTO_PROXY_URL"    { $AktoProxyUrl = $val }
+            "AKTO_GUARDRAILS_URL" { $AktoGuardrailsUrl = $val }
             "ORIGINAL_PROVIDER" { $OriginalProvider = $val }
             "MODEL_API"         { $ModelApi = $val }
             "MODEL_ID"          { $ModelId = $val }
@@ -128,7 +128,7 @@ function Backup-Config {
 function Update-Config {
     param([string]$ConfigFile)
 
-    $baseUrl = $AktoProxyUrl.TrimEnd('/')
+    $baseUrl = $AktoGuardrailsUrl.TrimEnd('/')
 
     $apiKeyValue = if ($OpenAIApiKey) {
         "$OpenAIApiKey; X-Original-Provider: $OriginalProvider"

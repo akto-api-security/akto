@@ -19,6 +19,9 @@ public class SentinelOneIntegration {
     public static final String DATA_INGESTION_URL = "dataIngestionUrl";
     private String dataIngestionUrl;
 
+    public static final String GUARDRAILS_URL = "guardrailsUrl";
+    private String guardrailsUrl;
+
     public static final String RECURRING_INTERVAL_SECONDS = "recurringIntervalSeconds";
     private int recurringIntervalSeconds = 3600;
 
@@ -50,10 +53,11 @@ public class SentinelOneIntegration {
     public SentinelOneIntegration() {}
 
     public SentinelOneIntegration(String apiToken, String consoleUrl, String dataIngestionUrl,
-                                   int recurringIntervalSeconds, int createdTs, int updatedTs) {
+                                   String guardrailsUrl, int recurringIntervalSeconds, int createdTs, int updatedTs) {
         this.apiToken = apiToken;
         this.consoleUrl = consoleUrl;
         this.dataIngestionUrl = dataIngestionUrl;
+        this.guardrailsUrl = guardrailsUrl;
         this.recurringIntervalSeconds = recurringIntervalSeconds;
         this.createdTs = createdTs;
         this.updatedTs = updatedTs;

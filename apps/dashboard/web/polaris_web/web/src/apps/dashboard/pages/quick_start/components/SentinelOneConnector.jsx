@@ -1,4 +1,4 @@
-import { Box, Button, ChoiceList, Divider, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Checkbox, Divider, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris'
 import { useState, useEffect } from 'react'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
 import api from '../api'
@@ -9,14 +9,19 @@ function SentinelOneConnector() {
     const [apiToken, setApiToken] = useState('')
     const [consoleUrl, setConsoleUrl] = useState('')
     const [dataIngestionUrl, setDataIngestionUrl] = useState('')
+    const [guardrailsUrl, setGuardrailsUrl] = useState('')
     const [recurringIntervalSeconds, setRecurringIntervalSeconds] = useState('3600')
     const [isSaved, setIsSaved] = useState(false)
 
     // Guardrails
-    const [guardrailTypes, setGuardrailTypes] = useState([])
     const [selectedGuardrailTypes, setSelectedGuardrailTypes] = useState([])
-    const [guardrailEnvVars, setGuardrailEnvVars] = useState({})
     const [executingGuardrails, setExecutingGuardrails] = useState(false)
+    
+    // OpenClaw-specific env vars
+    const [openaiApiKey, setOpenaiApiKey] = useState('')
+    const [originalProvider, setOriginalProvider] = useState('')
+    const [modelApi, setModelApi] = useState('')
+    const [modelId, setModelId] = useState('')
 
     useEffect(() => {
         api.fetchSentinelOneIntegration().then((res) => {
@@ -24,27 +29,32 @@ function SentinelOneConnector() {
                 const integration = res.sentinelOneIntegration
                 setConsoleUrl(integration.consoleUrl || '')
                 setDataIngestionUrl(integration.dataIngestionUrl || '')
+                setGuardrailsUrl(integration.guardrailsUrl || '')
                 setRecurringIntervalSeconds(String(integration.recurringIntervalSeconds || 3600))
                 setIsSaved(true)
-                // Fetch guardrail types when integration is configured
-                fetchGuardrailTypes()
+                
+                // Load saved guardrail configuration
+                if (integration.guardrailType && integration.guardrailType.length > 0) {
+                    setSelectedGuardrailTypes(integration.guardrailType)
+                }
+                
+                // Load saved env vars
+                if (integration.guardrailEnvVars) {
+                    const envVars = integration.guardrailEnvVars
+                    setOpenaiApiKey(envVars.OPENAI_API_KEY || '')
+                    setOriginalProvider(envVars.ORIGINAL_PROVIDER || '')
+                    setModelApi(envVars.MODEL_API || '')
+                    setModelId(envVars.MODEL_ID || '')
+                }
             }
         }).catch(() => {})
     }, [])
-
-    const fetchGuardrailTypes = () => {
-        api.getGuardrailTypes().then((res) => {
-            setGuardrailTypes(res.guardrailTypes || [])
-        }).catch(() => {
-            func.setToast(true, true, 'Failed to fetch guardrail types')
-        })
-    }
 
     // ── Config ──────────────────────────────────────────────────────────────
 
     const handleSave = () => {
         api.addSentinelOneIntegration(
-            apiToken || null, consoleUrl, dataIngestionUrl,
+            apiToken || null, consoleUrl, dataIngestionUrl, guardrailsUrl,
             parseInt(recurringIntervalSeconds) || 3600
         ).then(() => {
             setApiToken('')
@@ -55,7 +65,7 @@ function SentinelOneConnector() {
 
     const handleRemove = () => {
         api.removeSentinelOneIntegration().then(() => {
-            setApiToken(''); setConsoleUrl(''); setDataIngestionUrl('')
+            setApiToken(''); setConsoleUrl(''); setDataIngestionUrl(''); setGuardrailsUrl('')
             setRecurringIntervalSeconds('3600'); setIsSaved(false)
             func.setToast(true, false, 'SentinelOne integration removed successfully')
         }).catch(() => func.setToast(true, true, 'Failed to remove SentinelOne integration'))
@@ -63,14 +73,32 @@ function SentinelOneConnector() {
 
     // ── Guardrails ───────────────────────────────────────────────────────────
 
+    const handleGuardrailToggle = (type) => {
+        setSelectedGuardrailTypes(prev => 
+            prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+        )
+    }
+
     const handleSaveGuardrails = () => {
         if (selectedGuardrailTypes.length === 0) {
             func.setToast(true, true, 'Please select at least one guardrail')
             return
         }
 
+        // Build env vars based on selected guardrails
+        const guardrailEnvVars = {}
+        
+        if (selectedGuardrailTypes.includes('openclaw-guardrails')) {
+            guardrailEnvVars['OPENAI_API_KEY'] = openaiApiKey
+            guardrailEnvVars['ORIGINAL_PROVIDER'] = originalProvider
+            guardrailEnvVars['MODEL_API'] = modelApi
+            guardrailEnvVars['MODEL_ID'] = modelId
+        }
+        
+        // AKTO_GUARDRAILS_URL is common for all (used as proxy URL for OpenClaw)
+        guardrailEnvVars['AKTO_GUARDRAILS_URL'] = guardrailsUrl
+
         setExecutingGuardrails(true)
-        // Call API once with all selected guardrail types
         api.saveGuardrailsConfig(selectedGuardrailTypes, guardrailEnvVars, 'all', [])
             .then((result) => {
                 const execution = result.guardrailExecution || {}
@@ -87,7 +115,7 @@ function SentinelOneConnector() {
 
     // ── Derived ──────────────────────────────────────────────────────────────
 
-    const isSaveDisabled = !consoleUrl || !dataIngestionUrl || (!apiToken && !isSaved)
+    const isSaveDisabled = !consoleUrl || !dataIngestionUrl || !guardrailsUrl || (!apiToken && !isSaved)
 
     return (
         <div className='card-items'>
@@ -104,6 +132,9 @@ function SentinelOneConnector() {
                 <PasswordTextField label="API Token" onFunc={true} setField={setApiToken} field={apiToken} requiredIndicator />
                 <TextField label="Data Ingestion Service URL" value={dataIngestionUrl} onChange={setDataIngestionUrl}
                     requiredIndicator autoComplete="off" />
+                <TextField label="Guardrails URL" value={guardrailsUrl} onChange={setGuardrailsUrl}
+                    placeholder="https://your-guardrails-endpoint.akto.io" requiredIndicator autoComplete="off"
+                    helpText="Common URL for all guardrails (AKTO_GUARDRAILS_URL)" />
                 <TextField label="Polling Interval (seconds)" value={recurringIntervalSeconds}
                     onChange={setRecurringIntervalSeconds} type="number" autoComplete="off" />
             </VerticalStack>
@@ -121,60 +152,75 @@ function SentinelOneConnector() {
                     <VerticalStack gap="4">
                         <Text variant="headingMd">Guardrails Installation</Text>
                         <Text variant="bodySm" color="subdued">
-                            Install security guardrails on your SentinelOne managed endpoints
+                            Select and configure security guardrails for your SentinelOne managed endpoints
                         </Text>
 
                         <VerticalStack gap="3">
-                            <Text variant="headingSm">Guardrails</Text>
-                            
-                            {guardrailTypes.map((guardrail) => {
-                                const isSelected = selectedGuardrailTypes.includes(guardrail.type)
+                            {/* Cursor Hooks Guardrail */}
+                            <Box>
+                                <Checkbox
+                                    label="Cursor Hooks"
+                                    checked={selectedGuardrailTypes.includes('cursor-hooks')}
+                                    onChange={() => handleGuardrailToggle('cursor-hooks')}
+                                    helpText="Monitor and secure Cursor AI coding assistant"
+                                />
+                            </Box>
+
+                            {/* OpenClaw Guardrail */}
+                            <VerticalStack gap="2">
+                                <Checkbox
+                                    label="OpenClaw Guardrails"
+                                    checked={selectedGuardrailTypes.includes('openclaw-guardrails')}
+                                    onChange={() => handleGuardrailToggle('openclaw-guardrails')}
+                                    helpText="Secure OpenAI and other LLM integrations"
+                                />
                                 
-                                return (
-                                    <VerticalStack gap="2" key={guardrail.type}>
-                                        <ChoiceList
-                                            choices={[{
-                                                label: guardrail.displayName,
-                                                value: guardrail.type,
-                                                helpText: guardrail.description
-                                            }]}
-                                            selected={isSelected ? [guardrail.type] : []}
-                                            onChange={(selected) => {
-                                                if (selected.length > 0) {
-                                                    // Add to selection
-                                                    if (!selectedGuardrailTypes.includes(guardrail.type)) {
-                                                        setSelectedGuardrailTypes([...selectedGuardrailTypes, guardrail.type])
-                                                    }
-                                                } else {
-                                                    // Remove from selection
-                                                    setSelectedGuardrailTypes(selectedGuardrailTypes.filter(t => t !== guardrail.type))
-                                                }
-                                            }}
-                                        />
-                                        
-                                        {isSelected && guardrail.envVars && guardrail.envVars.length > 0 && (
-                                            <Box paddingInlineStart="6">
-                                                <VerticalStack gap="2">
-                                                    {guardrail.envVars.map((envVar, idx) => (
-                                                        <TextField
-                                                            key={idx}
-                                                            label={envVar.label}
-                                                            placeholder={envVar.placeholder}
-                                                            value={guardrailEnvVars[envVar.name] || ''}
-                                                            onChange={(val) => setGuardrailEnvVars({
-                                                                ...guardrailEnvVars,
-                                                                [envVar.name]: val
-                                                            })}
-                                                            requiredIndicator={envVar.required === 'true'}
-                                                            autoComplete="off"
-                                                        />
-                                                    ))}
-                                                </VerticalStack>
-                                            </Box>
-                                        )}
-                                    </VerticalStack>
-                                )
-                            })}
+                                {selectedGuardrailTypes.includes('openclaw-guardrails') && (
+                                    <Box paddingInlineStart="6">
+                                        <VerticalStack gap="2">
+                                            <Text variant="bodySm" fontWeight="semibold" color="subdued">
+                                                OpenClaw Configuration (uses Guardrails URL as proxy):
+                                            </Text>
+                                            <TextField
+                                                label="OpenAI API Key"
+                                                placeholder="sk-..."
+                                                value={openaiApiKey}
+                                                onChange={setOpenaiApiKey}
+                                                requiredIndicator
+                                                autoComplete="off"
+                                                helpText="OPENAI_API_KEY for OpenClaw"
+                                            />
+                                            <TextField
+                                                label="Original Provider"
+                                                placeholder="openai/gpt-4o-mini"
+                                                value={originalProvider}
+                                                onChange={setOriginalProvider}
+                                                requiredIndicator
+                                                autoComplete="off"
+                                                helpText="ORIGINAL_PROVIDER for OpenClaw"
+                                            />
+                                            <TextField
+                                                label="Model API"
+                                                placeholder="openai-completions"
+                                                value={modelApi}
+                                                onChange={setModelApi}
+                                                requiredIndicator
+                                                autoComplete="off"
+                                                helpText="MODEL_API for OpenClaw"
+                                            />
+                                            <TextField
+                                                label="Model ID"
+                                                placeholder="gpt-4o-mini"
+                                                value={modelId}
+                                                onChange={setModelId}
+                                                requiredIndicator
+                                                autoComplete="off"
+                                                helpText="MODEL_ID for OpenClaw"
+                                            />
+                                        </VerticalStack>
+                                    </Box>
+                                )}
+                            </VerticalStack>
                         </VerticalStack>
 
                         {selectedGuardrailTypes.length > 0 && (

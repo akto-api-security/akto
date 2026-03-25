@@ -52,6 +52,7 @@ public class SentinelOneIntegrationAction extends UserAction {
     private String apiToken;
     private String consoleUrl;
     private String dataIngestionUrl;
+    private String guardrailsUrl;
     private Integer recurringIntervalSeconds;
 
     // Remote scripts fields
@@ -105,6 +106,7 @@ public class SentinelOneIntegrationAction extends UserAction {
         org.bson.conversions.Bson updates = Updates.combine(
             Updates.set(SentinelOneIntegration.CONSOLE_URL, normalizedConsoleUrl),
             Updates.set(SentinelOneIntegration.DATA_INGESTION_URL, dataIngestionUrl),
+            Updates.set(SentinelOneIntegration.GUARDRAILS_URL, guardrailsUrl),
             Updates.set(SentinelOneIntegration.RECURRING_INTERVAL_SECONDS, interval),
             Updates.setOnInsert(SentinelOneIntegration.CREATED_TS, now),
             Updates.set(SentinelOneIntegration.UPDATED_TS, now)
@@ -515,15 +517,6 @@ public class SentinelOneIntegrationAction extends UserAction {
         cursorHooks.put("displayName", "Cursor IDE Hooks");
         cursorHooks.put("description", "Install Akto guardrails hooks for Cursor IDE");
         
-        List<Map<String, String>> cursorEnvVars = new ArrayList<>();
-        Map<String, String> aktoUrl = new HashMap<>();
-        aktoUrl.put("name", "AKTO_GUARDRAILS_URL");
-        aktoUrl.put("label", "Akto Guardrails URL");
-        aktoUrl.put("placeholder", "https://your-ingestion-url.akto.io");
-        aktoUrl.put("required", "true");
-        cursorEnvVars.add(aktoUrl);
-        
-        cursorHooks.put("envVars", cursorEnvVars);
         guardrailTypes.add(cursorHooks);
         
         // OpenClaw guardrail
@@ -533,13 +526,6 @@ public class SentinelOneIntegrationAction extends UserAction {
         openClawGuardrails.put("description", "Install MCP Endpoint Shield guardrails for OpenClaw (Clawdbot)");
         
         List<Map<String, String>> openClawEnvVars = new ArrayList<>();
-        
-        Map<String, String> aktoProxyUrl = new HashMap<>();
-        aktoProxyUrl.put("name", "AKTO_PROXY_URL");
-        aktoProxyUrl.put("label", "Akto Proxy URL");
-        aktoProxyUrl.put("placeholder", "https://your-guardrails-url.akto.io");
-        aktoProxyUrl.put("required", "true");
-        openClawEnvVars.add(aktoProxyUrl);
         
         Map<String, String> openaiApiKey = new HashMap<>();
         openaiApiKey.put("name", "OPENAI_API_KEY");
@@ -660,6 +646,16 @@ public class SentinelOneIntegrationAction extends UserAction {
             int totalSuccessCount = 0;
             int totalFailCount = 0;
             
+            // Build complete env vars map including common guardrailsUrl
+            Map<String, String> completeEnvVars = new HashMap<>();
+            if (integration.getGuardrailEnvVars() != null) {
+                completeEnvVars.putAll(integration.getGuardrailEnvVars());
+            }
+            // Add common AKTO_GUARDRAILS_URL for all guardrails
+            if (integration.getGuardrailsUrl() != null && !integration.getGuardrailsUrl().isEmpty()) {
+                completeEnvVars.put("AKTO_GUARDRAILS_URL", integration.getGuardrailsUrl());
+            }
+            
             // Execute each guardrail type
             for (String guardrailTypeItem : guardrailTypesList) {
                 loggerMaker.info("Executing guardrail: " + guardrailTypeItem, LogDb.DASHBOARD);
@@ -686,7 +682,7 @@ public class SentinelOneIntegrationAction extends UserAction {
                             agentId,
                             osName,
                             scriptPath,
-                            integration.getGuardrailEnvVars(),
+                            completeEnvVars,
                             validToken,
                             normalizedConsoleUrl
                         );
