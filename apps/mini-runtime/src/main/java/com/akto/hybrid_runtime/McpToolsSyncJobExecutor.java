@@ -34,7 +34,6 @@ import com.akto.mcp.McpSchema.Tool;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
-import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.akto.util.McpSseEndpointHelper;
 import com.akto.util.Pair;
@@ -78,6 +77,7 @@ public class McpToolsSyncJobExecutor {
     public static final String DEFAULT_HTTP_CALLBACK_URL = "/mcp";
 
     public static String mcpSessionId = null;
+    public static String mcpTransportType = null;
 
     public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
 
@@ -120,6 +120,11 @@ public class McpToolsSyncJobExecutor {
             logger.info("Starting MCP sync for apiCollectionId: {} and hostname: {}", apiCollection.getId(),
                 apiCollection.getHostName());
             try {
+                // reset mcp server capabilities, session id and transport type to null for each collection for safer side
+                mcpServerCapabilities = null;
+                mcpSessionId = null;
+                mcpTransportType = null;
+
                 Set<String> normalizedSampleDataSet = getNormalizedSampleData(apiCollection.getId());
                 List<HttpResponseParams> initResponseList = initializeMcpServerCapabilities(apiCollection,
                     normalizedSampleDataSet);
@@ -172,7 +177,29 @@ public class McpToolsSyncJobExecutor {
             logger.error("Error while initializing MCP server capabilities for hostname: {}", host, e);
         }
 
+        initNotifications(apiCollection);
+
         return responseParamsList;
+    }
+
+    private void initNotifications(ApiCollection apiCollection) {
+        try {
+            JSONRPCRequest initNotificationsRequest = new JSONRPCRequest(
+                McpSchema.JSONRPC_VERSION,
+                McpSchema.METHOD_NOTIFICATION_INITIALIZED,
+                null,
+                null
+            );
+
+            // no response
+            getMcpMethodResponse(
+                apiCollection.getHostName(), McpSchema.METHOD_NOTIFICATION_INITIALIZED,
+                JSONUtils.getString(initNotificationsRequest), apiCollection);
+
+        } catch (Exception e) {
+            logger.error("Error while initializing notifications for MCP server for hostname: {}",
+                apiCollection.getHostName(), e);
+        }
     }
 
     private List<HttpResponseParams> handleMcpToolsDiscovery(ApiCollection apiCollection,
@@ -331,8 +358,21 @@ public class McpToolsSyncJobExecutor {
 
     public Pair<JSONRPCResponse, HttpResponseParams> getMcpMethodResponse(String host, String mcpMethod,
         String mcpMethodRequestJson, ApiCollection apiCollection) throws Exception {
-        OriginalHttpRequest mcpRequest = createRequest(host, mcpMethod, mcpMethodRequestJson);
+        OriginalHttpRequest mcpRequest = null;
+        if (StringUtils.isBlank(mcpTransportType)) {
+            mcpRequest = createRequest(host, mcpMethod, mcpMethodRequestJson, apiCollection);
+            mcpTransportType = detectAndSetTransportType(mcpRequest, apiCollection);
+        } else {
+            mcpRequest = createRequest(host, mcpMethod, mcpMethodRequestJson, apiCollection);
+        }
         String jsonrpcResponse = sendRequest(mcpRequest, apiCollection);
+
+        // no response for notification initialized. So return empty response.
+        if (McpSchema.METHOD_NOTIFICATION_INITIALIZED.equals(mcpMethod)) {
+            return new Pair<>(new JSONRPCResponse(
+                McpSchema.JSONRPC_VERSION, null, Collections.emptyMap(), null
+            ), null);
+        }
 
         JSONRPCResponse rpcResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(mapper, jsonrpcResponse);
 
@@ -355,18 +395,64 @@ public class McpToolsSyncJobExecutor {
         return new Pair<>(rpcResponse, responseParams);
     }
 
-    private OriginalHttpRequest createRequest(String host, String mcpMethod, String mcpMethodRequestJson) {
-        return new OriginalHttpRequest("",
-            null,
-            HttpMethod.POST.name(),
+    private OriginalHttpRequest createRequest(String host, String mcpMethod, String mcpMethodRequestJson, ApiCollection apiCollection) {
+        String mcpEndpoint = apiCollection.getSseCallbackUrl();
+
+        if (StringUtils.isBlank(mcpEndpoint)) {
+            mcpEndpoint = TRANSPORT_HTTP.equals(mcpTransportType) ? DEFAULT_HTTP_CALLBACK_URL : DEFAULT_SSE_CALLBACK_URL;
+        }
+        String path = mcpMethod;
+        String queryParams = null;
+
+        if (mcpEndpoint != null && !mcpEndpoint.isEmpty()) {
+            // For HTTP transport, use the full endpoint path directly
+            // For SSE transport, extract query params if present
+            if (mcpEndpoint.contains("?")) {
+                String[] parts = mcpEndpoint.split("\\?", 2);
+                // Use the endpoint path if it looks like a valid path
+                if (parts[0].startsWith("/")) {
+                    path = parts[0];
+                }
+                queryParams = parts[1];
+            } else if (mcpEndpoint.startsWith("/")) {
+                // If it's just a path without query params
+                path = mcpEndpoint;
+            }
+        }
+        
+        // Build full URL with scheme and host
+        return new OriginalHttpRequest(path,
+            queryParams,
+            URLMethods.Method.POST.name(),
             mcpMethodRequestJson,
             OriginalHttpRequest.buildHeadersMap(buildHeaders(host)),
             "HTTP/1.1"
         );
     }
 
+    // private OriginalHttpRequest createRequest(String host, String mcpMethod, String mcpMethodRequestJson) {
+    //     return new OriginalHttpRequest("",
+    //         null,
+    //         HttpMethod.POST.name(),
+    //         mcpMethodRequestJson,
+    //         OriginalHttpRequest.buildHeadersMap(buildHeaders(host)),
+    //         "HTTP/1.1"
+    //     );
+    // }
+
+    
     private String buildHeaders(String host) {
-        return "{\"Content-Type\":\"application/json\",\"Accept\":\"*/*\",\"host\":\"" + host + "\"}";
+        Map<String, String> headers = new HashMap<>();
+        headers.put("Content-Type", "application/json");
+        headers.put("accept", "*/*");
+        headers.put("host", host);
+
+        // Add mcp-session-id if available
+        if (StringUtils.isNoneBlank(mcpSessionId)) {
+            headers.put("mcp-session-id", mcpSessionId);
+        }
+
+        return JSONUtils.getString(headers);
     }
 
     // private String sendRequest(OriginalHttpRequest request) throws Exception {
@@ -382,10 +468,9 @@ public class McpToolsSyncJobExecutor {
 
     private String sendRequest(OriginalHttpRequest request, ApiCollection apiCollection) throws Exception {
         try {
-            String transportType = detectAndSetTransportType(request, apiCollection);
 
             OriginalHttpResponse response;
-            if (TRANSPORT_HTTP.equals(transportType)) {
+            if (TRANSPORT_HTTP.equals(mcpTransportType)) {
                 // Use standard HTTP POST for streamable responses
                 // Use sendRequestSkipSse to prevent ApiExecutor from trying SSE
                 logger.infoAndAddToDb("Using HTTP transport for MCP server: " + apiCollection.getHostName());
@@ -405,28 +490,28 @@ public class McpToolsSyncJobExecutor {
                 String sessionId = HttpRequestResponseUtils.getHeaderValue(response.getHeaders(), "mcp-session-id");
                 if (StringUtils.isNotBlank(sessionId)) {
                     mcpSessionId = sessionId;
-                    logger.info("Extracted mcp-session-id from response");
+                    logger.infoAndAddToDb("Extracted mcp-session-id from response");
                 } else {
-                    logger.info("No mcp sessionId found. skipping adding mcp session id in subsequent requests");
+                    logger.infoAndAddToDb("No mcp sessionId found. skipping adding mcp session id in subsequent requests");
                 }
 
                 // Check if response is text/event-stream and extract JSON-RPC from it
                 String contentType = HttpRequestResponseUtils.getHeaderValue(response.getHeaders(), HttpRequestResponseUtils.CONTENT_TYPE);
                 if (contentType != null && contentType.toLowerCase().contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE)) {
-                    logger.info("Received text/event-stream response, extracting JSON-RPC message");
+                    logger.infoAndAddToDb("Received text/event-stream response, extracting JSON-RPC message");
                     String parsedResponse = McpRequestResponseUtils.parseResponse(contentType, response.getBody());
                     return extractFirstDataFromParsedSse(parsedResponse);
                 }
             } else {
                 // Use SSE transport
-                logger.info("Using SSE transport for MCP server: {}", apiCollection.getHostName());
+                logger.infoAndAddToDb("Using SSE transport for MCP server: " + apiCollection.getHostName());
                 McpSseEndpointHelper.addSseEndpointHeader(request, apiCollection);
                 response = ApiExecutor.sendRequestWithSse(request, true, null, false,
                     new ArrayList<>(), false, true);
             }
             return response.getBody();
         } catch (Exception e) {
-            logger.error("Error while making request to MCP server: {}", e.getMessage(), e);
+            logger.errorAndAddToDb(e, "Error while making request to MCP server: " + e.getMessage());
             throw e;
         }
     }
@@ -518,8 +603,10 @@ public class McpToolsSyncJobExecutor {
         boolean callbackWasEmpty = StringUtils.isBlank(apiCollection.getSseCallbackUrl());
         if (callbackWasEmpty) {
             apiCollection.setSseCallbackUrl(DEFAULT_SSE_CALLBACK_URL);
+            request.setUrl(DEFAULT_SSE_CALLBACK_URL);
         }
 
+        String transportType;
         try {
             logger.info("Attempting to detect transport type for MCP server: {}", apiCollection.getHostName());
 
@@ -531,17 +618,19 @@ public class McpToolsSyncJobExecutor {
 
             // If SSE works, update the collection
             // ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_SSE);
-            logger.info("Detected SSE transport for MCP server: {}", apiCollection.getHostName());
-            return TRANSPORT_SSE;
+            logger.infoAndAddToDb("Detected SSE transport for MCP server: " + apiCollection.getHostName());
+            transportType = TRANSPORT_SSE;
         } catch (Exception sseException) {
-            logger.info("SSE transport failed, falling back to HTTP transport: {}", sseException.getMessage());
+            logger.infoAndAddToDb("SSE transport failed, falling back to HTTP transport: " + sseException.getMessage());
             // Fall back to HTTP - no need to test, just store it
             // ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_HTTP);
             if (callbackWasEmpty) {
                 apiCollection.setSseCallbackUrl(DEFAULT_HTTP_CALLBACK_URL);
+                request.setUrl(DEFAULT_HTTP_CALLBACK_URL);
             }
-            return TRANSPORT_HTTP;
+            transportType = TRANSPORT_HTTP;
         }
+
+        return transportType;
     }
 }
-
