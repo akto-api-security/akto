@@ -25,17 +25,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Scheduled executor for SentinelOne data collection.
- * Called by the cron job whenever a SentinelOne integration is configured.
- *
- * Two separate tool lists drive the two collection passes:
- *   APPS_TOOL_LIST – matched against installed-app inventory (app name contains term)
- *   DV_TOOL_LIST   – searched via Deep Visibility process events (processCmd / processName)
- *
- * Per-tool ingestion domain: <tool-lowercase>.sentinel
- *   e.g. Claude → claude.sentinel,  Cursor → cursor.sentinel,  OpenClaw → openclaw.sentinel
- */
 public class SentinelOneExecutor extends AccountJobExecutor {
 
     public static final SentinelOneExecutor INSTANCE = new SentinelOneExecutor();
@@ -47,9 +36,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
     private static final int SOCKET_TIMEOUT_MS   = 60_000;
     private static final int DV_POLL_INTERVAL_MS = 3_000;
     private static final int DV_MAX_WAIT_MS      = 60_000;
-    private static final int DV_LOOKBACK_HOURS   = 24;
-
-    // ── Tool lists ────────────────────────────────────────────────────────────
+    private static final int DV_LOOKBACK_HOURS   = 6;
 
     /**
      * Tools to look up in the installed-app inventory (case-insensitive contains match).
@@ -58,14 +45,13 @@ public class SentinelOneExecutor extends AccountJobExecutor {
     public static final List<String> APPS_TOOL_LIST = Arrays.asList(
         "Claude",
         "Cursor",
-        "openclaw",
         "Copilot",
         "Windsurf",
         "Antigravity"
     );
 
     /**
-     * Tools to query for via Deep Visibility process events.
+     * Tools to query for via Deep Visibility process events. (case sensitive)
      * Matched against processCmd and processName (exact string contains).
      * Add new tools here when they appear as process names.
      */
@@ -76,6 +62,65 @@ public class SentinelOneExecutor extends AccountJobExecutor {
     // ── Executor implementation ───────────────────────────────────────────────
 
     private SentinelOneExecutor() {}
+
+    private static String ensureValidToken(String consoleUrl, String currentToken) throws IOException {
+        String normalizedUrl = normalizeUrl(consoleUrl);
+
+        RequestConfig requestConfig = RequestConfig.custom()
+            .setConnectTimeout(CONNECT_TIMEOUT_MS)
+            .setSocketTimeout(SOCKET_TIMEOUT_MS)
+            .build();
+
+        try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
+            // Test current token with a lightweight API call
+            HttpGet testGet = new HttpGet(normalizedUrl + "/web/api/v2.1/user");
+            testGet.setHeader("Authorization", "ApiToken " + currentToken);
+            testGet.setHeader("Content-Type", "application/json");
+
+            try (CloseableHttpResponse testResponse = httpClient.execute(testGet)) {
+                int statusCode = testResponse.getStatusLine().getStatusCode();
+                
+                // Token is valid
+                if (statusCode == 200) {
+                    loggerMaker.info("SentinelOne API token is valid", LogDb.DASHBOARD);
+                    return currentToken;
+                }
+                
+                // Token is invalid/expired (401/403), generate new token
+                if (statusCode == 401 || statusCode == 403) {
+                    loggerMaker.info("SentinelOne API token expired/invalid, generating new token", LogDb.DASHBOARD);
+                    
+                    HttpGet generateGet = new HttpGet(normalizedUrl + "/web/api/v2.0/users/generate-api-token");
+                    generateGet.setHeader("Authorization", "Bearer " + currentToken);
+                    generateGet.setHeader("Content-Type", "application/json");
+
+                    try (CloseableHttpResponse generateResponse = httpClient.execute(generateGet)) {
+                        int generateStatusCode = generateResponse.getStatusLine().getStatusCode();
+                        String responseBody = EntityUtils.toString(generateResponse.getEntity());
+
+                        if (generateStatusCode != 200) {
+                            loggerMaker.error("Failed to generate new SentinelOne API token: HTTP " + generateStatusCode, LogDb.DASHBOARD);
+                            throw new IOException("Failed to generate new API token: HTTP " + generateStatusCode + " - " + responseBody);
+                        }
+
+                        JsonNode json = OBJECT_MAPPER.readTree(responseBody);
+                        String newToken = json.path("data").path("token").asText(null);
+                        
+                        if (newToken == null || newToken.isEmpty()) {
+                            throw new IOException("No token in SentinelOne response");
+                        }
+
+                        loggerMaker.info("SentinelOne API token refreshed successfully", LogDb.DASHBOARD);
+                        return newToken;
+                    }
+                }
+                
+                // Other error status codes
+                String responseBody = EntityUtils.toString(testResponse.getEntity());
+                throw new IOException("Token validation failed: HTTP " + statusCode + " - " + responseBody);
+            }
+        }
+    }
 
     @Override
     protected void runJob(AccountJob job) throws Exception {
@@ -112,6 +157,14 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         String ingestUrl     = normalizeUrl(integration.getDataIngestionUrl());
         String consoleDomain = extractDomain(integration.getConsoleUrl());
         String apiToken      = integration.getApiToken();
+
+        // Validate token before making any API calls
+        try {
+            apiToken = ensureValidToken(consoleUrl, apiToken);
+        } catch (IOException e) {
+            loggerMaker.error("SentinelOneExecutor: token validation failed — " + e.getMessage(), LogDb.DASHBOARD);
+            return;
+        }
 
         // Fetch agent list once — reused across the apps pass
         List<Map<String, Object>> agentList;

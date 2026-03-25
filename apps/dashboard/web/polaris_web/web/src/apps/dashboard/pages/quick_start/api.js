@@ -374,6 +374,30 @@ const api = {
         })
     },
 
+    getGuardrailTypes() {
+        return request({
+            url: '/api/getGuardrailTypes',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveGuardrailsConfig(guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailAgentIds) {
+        return request({
+            url: '/api/saveGuardrailsConfig',
+            method: 'post',
+            data: { guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailAgentIds }
+        })
+    },
+
+    executeGuardrails() {
+        return request({
+            url: '/api/executeGuardrails',
+            method: 'post',
+            data: {}
+        })
+    },
+
     uploadSentinelOneRemoteScript(scriptName, scriptContent, osTypes) {
         return request({
             url: '/api/uploadSentinelOneRemoteScript',

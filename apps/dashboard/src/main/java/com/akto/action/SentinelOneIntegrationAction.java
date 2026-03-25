@@ -67,6 +67,14 @@ public class SentinelOneIntegrationAction extends UserAction {
     private SentinelOneIntegration sentinelOneIntegration;
     private List<Map<String, Object>> agents;
 
+    // Guardrails fields
+    private List<String> guardrailType;  // Support multiple guardrail types
+    private Map<String, String> guardrailEnvVars;
+    private String guardrailTargetMode;
+    private List<String> guardrailAgentIds;
+    private List<Map<String, Object>> guardrailTypes;
+    private Map<String, Object> guardrailExecution;
+
     public String fetchSentinelOneIntegration() {
         sentinelOneIntegration = SentinelOneIntegrationDao.instance.findOne(
             new BasicDBObject(),
@@ -206,6 +214,9 @@ public class SentinelOneIntegrationAction extends UserAction {
         String normalizedConsoleUrl = normalizeUrl(integration.getConsoleUrl());
 
         try {
+            // Validate and refresh token if needed
+            String validToken = ensureValidToken(normalizedConsoleUrl, integration.getApiToken(), true);
+            
             RequestConfig requestConfig = RequestConfig.custom()
                 .setConnectTimeout(CONNECT_TIMEOUT_MS)
                 .setSocketTimeout(SOCKET_TIMEOUT_MS)
@@ -213,7 +224,7 @@ public class SentinelOneIntegrationAction extends UserAction {
 
             try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
                 HttpGet get = new HttpGet(normalizedConsoleUrl + "/web/api/v2.1/agents?limit=1000");
-                get.setHeader("Authorization", "ApiToken " + integration.getApiToken());
+                get.setHeader("Authorization", "ApiToken " + validToken);
                 get.setHeader("Content-Type", "application/json");
 
                 try (CloseableHttpResponse response = httpClient.execute(get)) {
@@ -291,7 +302,10 @@ public class SentinelOneIntegrationAction extends UserAction {
             .setConnectTimeout(CONNECT_TIMEOUT_MS).setSocketTimeout(SOCKET_TIMEOUT_MS).build();
         try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
 
-            String siteId = fetchSiteIdFromAgents(integration.getApiToken(), normalizedConsoleUrl);
+            // Validate and refresh token if needed
+            String validToken = ensureValidToken(normalizedConsoleUrl, integration.getApiToken(), true);
+            
+            String siteId = fetchSiteIdFromAgents(validToken, normalizedConsoleUrl);
             if (siteId == null || siteId.isEmpty()) {
                 addActionError("Could not determine site ID — ensure at least one agent is enrolled.");
                 return Action.ERROR.toUpperCase();
@@ -316,7 +330,7 @@ public class SentinelOneIntegrationAction extends UserAction {
                 ContentType.TEXT_PLAIN, fileName);
 
             HttpPost post = new HttpPost(normalizedConsoleUrl + "/web/api/v2.1/remote-scripts");
-            post.setHeader("Authorization", "ApiToken " + integration.getApiToken());
+            post.setHeader("Authorization", "ApiToken " + validToken);
             post.setEntity(builder.build());
 
             try (CloseableHttpResponse response = httpClient.execute(post)) {
@@ -408,8 +422,11 @@ public class SentinelOneIntegrationAction extends UserAction {
         RequestConfig requestConfig = RequestConfig.custom()
             .setConnectTimeout(CONNECT_TIMEOUT_MS).setSocketTimeout(SOCKET_TIMEOUT_MS).build();
         try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
+            // Validate and refresh token if needed
+            String validToken = ensureValidToken(normalizedConsoleUrl, integration.getApiToken(), true);
+            
             HttpPost post = new HttpPost(normalizedConsoleUrl + "/web/api/v2.1/remote-scripts/execute");
-            post.setHeader("Authorization", "ApiToken " + integration.getApiToken());
+            post.setHeader("Authorization", "ApiToken " + validToken);
             post.setHeader("Content-Type", "application/json");
             post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
 
@@ -447,8 +464,11 @@ public class SentinelOneIntegrationAction extends UserAction {
         RequestConfig requestConfig = RequestConfig.custom()
             .setConnectTimeout(CONNECT_TIMEOUT_MS).setSocketTimeout(SOCKET_TIMEOUT_MS).build();
         try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
+            // Validate and refresh token if needed
+            String validToken = ensureValidToken(normalizedConsoleUrl, integration.getApiToken(), true);
+            
             HttpGet get = new HttpGet(normalizedConsoleUrl + "/web/api/v2.1/remote-scripts/status?parenttaskid=" + parentTaskId);
-            get.setHeader("Authorization", "ApiToken " + integration.getApiToken());
+            get.setHeader("Authorization", "ApiToken " + validToken);
             try (CloseableHttpResponse response = httpClient.execute(get)) {
                 int statusCode = response.getStatusLine().getStatusCode();
                 String responseBody = EntityUtils.toString(response.getEntity());
@@ -479,7 +499,629 @@ public class SentinelOneIntegrationAction extends UserAction {
         }
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // Guardrails Management
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Returns available guardrail types with their required environment variables
+     */
+    public String fetchGuardrailTypes() {
+        guardrailTypes = new ArrayList<>();
+        
+        // Cursor Hooks guardrail
+        Map<String, Object> cursorHooks = new HashMap<>();
+        cursorHooks.put("type", "cursor-hooks");
+        cursorHooks.put("displayName", "Cursor IDE Hooks");
+        cursorHooks.put("description", "Install Akto guardrails hooks for Cursor IDE");
+        
+        List<Map<String, String>> cursorEnvVars = new ArrayList<>();
+        Map<String, String> aktoUrl = new HashMap<>();
+        aktoUrl.put("name", "AKTO_GUARDRAILS_URL");
+        aktoUrl.put("label", "Akto Guardrails URL");
+        aktoUrl.put("placeholder", "https://your-ingestion-url.akto.io");
+        aktoUrl.put("required", "true");
+        cursorEnvVars.add(aktoUrl);
+        
+        cursorHooks.put("envVars", cursorEnvVars);
+        guardrailTypes.add(cursorHooks);
+        
+        // OpenClaw guardrail
+        Map<String, Object> openClawGuardrails = new HashMap<>();
+        openClawGuardrails.put("type", "openclaw-guardrails");
+        openClawGuardrails.put("displayName", "OpenClaw Guardrails");
+        openClawGuardrails.put("description", "Install MCP Endpoint Shield guardrails for OpenClaw (Clawdbot)");
+        
+        List<Map<String, String>> openClawEnvVars = new ArrayList<>();
+        
+        Map<String, String> aktoProxyUrl = new HashMap<>();
+        aktoProxyUrl.put("name", "AKTO_PROXY_URL");
+        aktoProxyUrl.put("label", "Akto Proxy URL");
+        aktoProxyUrl.put("placeholder", "https://your-guardrails-url.akto.io");
+        aktoProxyUrl.put("required", "true");
+        openClawEnvVars.add(aktoProxyUrl);
+        
+        Map<String, String> openaiApiKey = new HashMap<>();
+        openaiApiKey.put("name", "OPENAI_API_KEY");
+        openaiApiKey.put("label", "OpenAI API Key");
+        openaiApiKey.put("placeholder", "sk-xxxxx");
+        openaiApiKey.put("required", "true");
+        openClawEnvVars.add(openaiApiKey);
+        
+        Map<String, String> originalProvider = new HashMap<>();
+        originalProvider.put("name", "ORIGINAL_PROVIDER");
+        originalProvider.put("label", "Original Provider");
+        originalProvider.put("placeholder", "openai/gpt-4o-mini");
+        originalProvider.put("required", "true");
+        openClawEnvVars.add(originalProvider);
+        
+        Map<String, String> modelId = new HashMap<>();
+        modelId.put("name", "MODEL_ID");
+        modelId.put("label", "Model ID");
+        modelId.put("placeholder", "gpt-4o-mini");
+        modelId.put("required", "true");
+        openClawEnvVars.add(modelId);
+        
+        openClawGuardrails.put("envVars", openClawEnvVars);
+        guardrailTypes.add(openClawGuardrails);
+        
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Saves guardrails configuration and executes multiple guardrail types
+     */
+    public String saveGuardrailsConfig() {
+        if (guardrailType == null || guardrailType.isEmpty()) {
+            addActionError("At least one guardrail type is required");
+            return Action.ERROR.toUpperCase();
+        }
+
+        if (guardrailTargetMode == null || guardrailTargetMode.isEmpty()) {
+            addActionError("Target mode is required (all or select)");
+            return Action.ERROR.toUpperCase();
+        }
+
+        if ("select".equals(guardrailTargetMode) && (guardrailAgentIds == null || guardrailAgentIds.isEmpty())) {
+            addActionError("At least one agent must be selected for 'select' target mode");
+            return Action.ERROR.toUpperCase();
+        }
+
+        int now = Context.now();
+        
+        // Save all selected guardrail types
+        org.bson.conversions.Bson updates = Updates.combine(
+            Updates.set(SentinelOneIntegration.GUARDRAIL_TYPE, guardrailType),  // Now saves array
+            Updates.set(SentinelOneIntegration.GUARDRAIL_ENV_VARS, guardrailEnvVars),
+            Updates.set(SentinelOneIntegration.GUARDRAIL_TARGET_MODE, guardrailTargetMode),
+            Updates.set(SentinelOneIntegration.GUARDRAIL_AGENT_IDS, guardrailAgentIds),
+            Updates.set(SentinelOneIntegration.GUARDRAIL_STATUS, "pending"),
+            Updates.set(SentinelOneIntegration.UPDATED_TS, now)
+        );
+
+        SentinelOneIntegrationDao.instance.updateOne(new BasicDBObject(), updates);
+        
+        loggerMaker.info("Guardrails configuration saved: " + String.join(", ", guardrailType), LogDb.DASHBOARD);
+        
+        // Automatically trigger execution for all types
+        return executeGuardrails();
+    }
+
+    /**
+     * Executes guardrails installation on selected agents
+     */
+    public String executeGuardrails() {
+        SentinelOneIntegration integration = SentinelOneIntegrationDao.instance.findOne(new BasicDBObject());
+        if (integration == null) {
+            addActionError("SentinelOne integration not configured");
+            return Action.ERROR.toUpperCase();
+        }
+
+        List<String> guardrailTypesList = integration.getGuardrailType();
+        if (guardrailTypesList == null || guardrailTypesList.isEmpty()) {
+            addActionError("Guardrail type not configured");
+            return Action.ERROR.toUpperCase();
+        }
+
+        String normalizedConsoleUrl = normalizeUrl(integration.getConsoleUrl());
+        
+        try {
+            // Validate and refresh token if needed
+            String validToken = ensureValidToken(normalizedConsoleUrl, integration.getApiToken(), true);
+            
+            // Update status to running
+            SentinelOneIntegrationDao.instance.updateOne(
+                new BasicDBObject(),
+                Updates.set(SentinelOneIntegration.GUARDRAIL_STATUS, "running")
+            );
+
+            // Get target agents
+            List<String> targetAgentIds;
+            if ("all".equals(integration.getGuardrailTargetMode())) {
+                // Fetch all agents
+                List<Map<String, Object>> allAgents = fetchAllAgents(validToken, normalizedConsoleUrl);
+                targetAgentIds = new ArrayList<>();
+                for (Map<String, Object> agent : allAgents) {
+                    targetAgentIds.add((String) agent.get("id"));
+                }
+            } else {
+                targetAgentIds = integration.getGuardrailAgentIds();
+            }
+
+            if (targetAgentIds == null || targetAgentIds.isEmpty()) {
+                addActionError("No agents available for guardrails installation");
+                SentinelOneIntegrationDao.instance.updateOne(
+                    new BasicDBObject(),
+                    Updates.set(SentinelOneIntegration.GUARDRAIL_STATUS, "failed")
+                );
+                return Action.ERROR.toUpperCase();
+            }
+
+            int totalSuccessCount = 0;
+            int totalFailCount = 0;
+            
+            // Execute each guardrail type
+            for (String guardrailTypeItem : guardrailTypesList) {
+                loggerMaker.info("Executing guardrail: " + guardrailTypeItem, LogDb.DASHBOARD);
+                
+                // Determine script based on guardrail type
+                String scriptPath = getScriptPath(guardrailTypeItem);
+                if (scriptPath == null) {
+                    loggerMaker.error("Unknown guardrail type: " + guardrailTypeItem, LogDb.DASHBOARD);
+                    continue;
+                }
+                
+                // Execute script on each agent
+                int successCount = 0;
+                int failCount = 0;
+                
+                for (String agentId : targetAgentIds) {
+                    try {
+                        // Get agent details to determine OS
+                        Map<String, Object> agentDetails = getAgentDetails(agentId, validToken, normalizedConsoleUrl);
+                        String osName = (String) agentDetails.get("osName");
+                        
+                        // Execute script based on OS
+                        boolean success = executeGuardrailScript(
+                            agentId,
+                            osName,
+                            scriptPath,
+                            integration.getGuardrailEnvVars(),
+                            validToken,
+                            normalizedConsoleUrl
+                        );
+                        
+                        if (success) {
+                            successCount++;
+                        } else {
+                            failCount++;
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.error("Failed to execute guardrail " + guardrailTypeItem + " on agent " + agentId + ": " + e.getMessage(), LogDb.DASHBOARD);
+                        failCount++;
+                    }
+                }
+                
+                loggerMaker.info("Guardrail " + guardrailTypeItem + " execution: " + successCount + " success, " + failCount + " failed", LogDb.DASHBOARD);
+                totalSuccessCount += successCount;
+                totalFailCount += failCount;
+            }
+
+            // Update status
+            String finalStatus = (totalFailCount == 0) ? "completed" : "partial";
+            int now = Context.now();
+            
+            SentinelOneIntegrationDao.instance.updateOne(
+                new BasicDBObject(),
+                Updates.combine(
+                    Updates.set(SentinelOneIntegration.GUARDRAIL_STATUS, finalStatus),
+                    Updates.set(SentinelOneIntegration.GUARDRAIL_LAST_EXECUTION_TS, now)
+                )
+            );
+
+            int totalExecutions = targetAgentIds.size() * guardrailTypesList.size();
+            guardrailExecution = new HashMap<>();
+            guardrailExecution.put("successCount", totalSuccessCount);
+            guardrailExecution.put("failCount", totalFailCount);
+            guardrailExecution.put("totalCount", totalExecutions);
+            guardrailExecution.put("status", finalStatus);
+            
+            loggerMaker.info("All guardrails execution completed: " + totalSuccessCount + " success, " + totalFailCount + " failed out of " + totalExecutions + " total", LogDb.DASHBOARD);
+            
+            return Action.SUCCESS.toUpperCase();
+            
+        } catch (IOException e) {
+            loggerMaker.error("Error executing guardrails: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Error executing guardrails: " + e.getMessage());
+            
+            SentinelOneIntegrationDao.instance.updateOne(
+                new BasicDBObject(),
+                Updates.set(SentinelOneIntegration.GUARDRAIL_STATUS, "failed")
+            );
+            
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    // ── Helper methods for guardrails ─────────────────────────────────────────
+
+    private List<Map<String, Object>> fetchAllAgents(String token, String consoleUrl) throws IOException {
+        RequestConfig requestConfig = RequestConfig.custom()
+            .setConnectTimeout(CONNECT_TIMEOUT_MS)
+            .setSocketTimeout(SOCKET_TIMEOUT_MS)
+            .build();
+
+        try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
+            HttpGet get = new HttpGet(consoleUrl + "/web/api/v2.1/agents?limit=1000");
+            get.setHeader("Authorization", "ApiToken " + token);
+            get.setHeader("Content-Type", "application/json");
+
+            try (CloseableHttpResponse response = httpClient.execute(get)) {
+                int statusCode = response.getStatusLine().getStatusCode();
+                String responseBody = EntityUtils.toString(response.getEntity());
+
+                if (statusCode != 200) {
+                    throw new IOException("Failed to fetch agents: HTTP " + statusCode);
+                }
+
+                JsonNode json = OBJECT_MAPPER.readTree(responseBody);
+                JsonNode dataNode = json.path("data");
+                List<Map<String, Object>> agents = new ArrayList<>();
+                
+                if (dataNode.isArray()) {
+                    for (JsonNode agentNode : dataNode) {
+                        Map<String, Object> entry = new HashMap<>();
+                        entry.put("id", agentNode.path("id").asText(""));
+                        entry.put("computerName", agentNode.path("computerName").asText(""));
+                        entry.put("osName", agentNode.path("osName").asText(""));
+                        agents.add(entry);
+                    }
+                }
+                
+                return agents;
+            }
+        }
+    }
+
+    private Map<String, Object> getAgentDetails(String agentId, String token, String consoleUrl) throws IOException {
+        RequestConfig requestConfig = RequestConfig.custom()
+            .setConnectTimeout(CONNECT_TIMEOUT_MS)
+            .setSocketTimeout(SOCKET_TIMEOUT_MS)
+            .build();
+
+        try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
+            HttpGet get = new HttpGet(consoleUrl + "/web/api/v2.1/agents?ids=" + agentId);
+            get.setHeader("Authorization", "ApiToken " + token);
+            get.setHeader("Content-Type", "application/json");
+
+            try (CloseableHttpResponse response = httpClient.execute(get)) {
+                int statusCode = response.getStatusLine().getStatusCode();
+                String responseBody = EntityUtils.toString(response.getEntity());
+
+                if (statusCode != 200) {
+                    throw new IOException("Failed to fetch agent details: HTTP " + statusCode);
+                }
+
+                JsonNode json = OBJECT_MAPPER.readTree(responseBody);
+                JsonNode dataNode = json.path("data");
+                
+                if (dataNode.isArray() && dataNode.size() > 0) {
+                    JsonNode agentNode = dataNode.get(0);
+                    Map<String, Object> agent = new HashMap<>();
+                    agent.put("id", agentNode.path("id").asText(""));
+                    agent.put("computerName", agentNode.path("computerName").asText(""));
+                    agent.put("osName", agentNode.path("osName").asText(""));
+                    agent.put("osType", agentNode.path("osType").asText(""));
+                    return agent;
+                }
+                
+                throw new IOException("Agent not found: " + agentId);
+            }
+        }
+    }
+
+    private String getScriptPath(String guardrailType) {
+        // Return relative path from dashboard/scripts/guardrails/
+        switch (guardrailType) {
+            case "cursor-hooks":
+                return "install_cursor_hooks_sentinelone";
+            case "openclaw-guardrails":
+                return "install_openclaw_guardrails_sentinelone";
+            default:
+                return null;
+        }
+    }
+
+    private boolean executeGuardrailScript(String agentId, String osName, String scriptBasePath,
+                                           Map<String, String> envVars, String token, String consoleUrl) throws IOException {
+        
+        // Determine script extension based on OS
+        String scriptExt;
+        if (osName != null && osName.toLowerCase().contains("windows")) {
+            scriptExt = ".ps1";
+        } else {
+            scriptExt = ".sh";
+        }
+        
+        String fullScriptPath = "apps/dashboard/scripts/guardrails/" + scriptBasePath + scriptExt;
+        
+        // Read script content from file
+        String scriptContent;
+        try {
+            java.nio.file.Path path = java.nio.file.Paths.get(fullScriptPath);
+            scriptContent = new String(java.nio.file.Files.readAllBytes(path));
+        } catch (Exception e) {
+            loggerMaker.error("Failed to read script file: " + fullScriptPath + " - " + e.getMessage(), LogDb.DASHBOARD);
+            return false;
+        }
+
+        // Upload script
+        String uploadedScriptId = uploadScriptForGuardrails(scriptBasePath + scriptExt, scriptContent, token, consoleUrl);
+        if (uploadedScriptId == null) {
+            return false;
+        }
+
+        // Build input params from env vars
+        StringBuilder inputParams = new StringBuilder();
+        if (envVars != null) {
+            for (Map.Entry<String, String> entry : envVars.entrySet()) {
+                inputParams.append(entry.getKey()).append("=").append(entry.getValue()).append(" ");
+            }
+        }
+
+        // Execute script
+        return executeScriptOnAgent(uploadedScriptId, agentId, inputParams.toString().trim(), token, consoleUrl);
+    }
+
+    private String uploadScriptForGuardrails(String scriptName, String scriptContent, String token, String consoleUrl) {
+        try {
+            RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                .build();
+
+            try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
+                String siteId = fetchSiteIdFromAgents(token, consoleUrl);
+                if (siteId == null || siteId.isEmpty()) {
+                    loggerMaker.error("Could not determine site ID for guardrails", LogDb.DASHBOARD);
+                    return null;
+                }
+
+                String os = "macos";
+                if (scriptName.endsWith(".ps1")) os = "windows";
+                else if (scriptName.endsWith(".py")) os = "linux";
+
+                MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+                builder.addTextBody("scriptName", scriptName);
+                builder.addTextBody("scriptType", "artifactCollection");
+                builder.addTextBody("scopeLevel", "site");
+                builder.addTextBody("scopeId", siteId);
+                builder.addTextBody("inputRequired", "false");
+                builder.addTextBody("osTypes", os);
+                builder.addBinaryBody("file",
+                    scriptContent.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                    ContentType.TEXT_PLAIN, scriptName);
+
+                HttpPost post = new HttpPost(consoleUrl + "/web/api/v2.1/remote-scripts");
+                post.setHeader("Authorization", "ApiToken " + token);
+                post.setEntity(builder.build());
+
+                try (CloseableHttpResponse response = httpClient.execute(post)) {
+                    int statusCode = response.getStatusLine().getStatusCode();
+                    String responseBody = EntityUtils.toString(response.getEntity());
+                    
+                    if (statusCode != 200 && statusCode != 201) {
+                        loggerMaker.error("Upload guardrail script failed: HTTP " + statusCode, LogDb.DASHBOARD);
+                        return null;
+                    }
+                    
+                    JsonNode json = OBJECT_MAPPER.readTree(responseBody);
+                    return json.path("data").path("id").asText(null);
+                }
+            }
+        } catch (IOException e) {
+            loggerMaker.error("Error uploading guardrail script: " + e.getMessage(), LogDb.DASHBOARD);
+            return null;
+        }
+    }
+
+    private boolean executeScriptOnAgent(String scriptId, String agentId, String inputParams, String token, String consoleUrl) {
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("scriptId", scriptId);
+            data.put("outputDestination", "SentinelCloud");
+            data.put("taskDescription", "Akto guardrails installation");
+            if (inputParams != null && !inputParams.isEmpty()) {
+                data.put("inputParams", inputParams);
+            }
+
+            Map<String, Object> filter = new HashMap<>();
+            filter.put("ids", java.util.Arrays.asList(agentId));
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("data", data);
+            body.put("filter", filter);
+
+            RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                .build();
+
+            try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
+                HttpPost post = new HttpPost(consoleUrl + "/web/api/v2.1/remote-scripts/execute");
+                post.setHeader("Authorization", "ApiToken " + token);
+                post.setHeader("Content-Type", "application/json");
+                post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
+
+                try (CloseableHttpResponse response = httpClient.execute(post)) {
+                    int statusCode = response.getStatusLine().getStatusCode();
+                    return statusCode == 200 || statusCode == 201;
+                }
+            }
+        } catch (IOException e) {
+            loggerMaker.error("Error executing script on agent: " + e.getMessage(), LogDb.DASHBOARD);
+            return false;
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Helper Methods
+    // ══════════════════════════════════════════════════════════════════════════
+
+    public static String ensureValidToken(String consoleUrl, String currentToken, boolean updateDb) throws IOException {
+        String normalizedUrl = (consoleUrl != null && consoleUrl.endsWith("/")) 
+            ? consoleUrl.substring(0, consoleUrl.length() - 1) 
+            : consoleUrl;
+
+        RequestConfig requestConfig = RequestConfig.custom()
+            .setConnectTimeout(CONNECT_TIMEOUT_MS)
+            .setSocketTimeout(SOCKET_TIMEOUT_MS)
+            .build();
+
+        try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
+            // Test current token with a lightweight API call
+            HttpGet testGet = new HttpGet(normalizedUrl + "/web/api/v2.1/user");
+            testGet.setHeader("Authorization", "ApiToken " + currentToken);
+            testGet.setHeader("Content-Type", "application/json");
+
+            try (CloseableHttpResponse testResponse = httpClient.execute(testGet)) {
+                int statusCode = testResponse.getStatusLine().getStatusCode();
+                
+                // Token is valid
+                if (statusCode == 200) {
+                    loggerMaker.infoAndAddToDb("SentinelOne API token is valid", LogDb.DASHBOARD);
+                    return currentToken;
+                }
+                
+                // Token is invalid/expired (401/403), generate new token
+                if (statusCode == 401 || statusCode == 403) {
+                    loggerMaker.infoAndAddToDb("SentinelOne API token expired/invalid, generating new token", LogDb.DASHBOARD);
+                    
+                    HttpGet generateGet = new HttpGet(normalizedUrl + "/web/api/v2.0/users/generate-api-token");
+                    generateGet.setHeader("Authorization", "Bearer " + currentToken);
+                    generateGet.setHeader("Content-Type", "application/json");
+
+                    try (CloseableHttpResponse generateResponse = httpClient.execute(generateGet)) {
+                        int generateStatusCode = generateResponse.getStatusLine().getStatusCode();
+                        String responseBody = EntityUtils.toString(generateResponse.getEntity());
+
+                        if (generateStatusCode != 200) {
+                            loggerMaker.errorAndAddToDb("Failed to generate new SentinelOne API token: HTTP " + generateStatusCode, LogDb.DASHBOARD);
+                            throw new IOException("Failed to generate new API token: HTTP " + generateStatusCode + " - " + responseBody);
+                        }
+
+                        JsonNode json = OBJECT_MAPPER.readTree(responseBody);
+                        String newToken = json.path("data").path("token").asText(null);
+                        
+                        if (newToken == null || newToken.isEmpty()) {
+                            throw new IOException("No token in SentinelOne response");
+                        }
+
+                        // Update DB and job config if requested
+                        if (updateDb) {
+                            int now = Context.now();
+                            SentinelOneIntegrationDao.instance.updateOne(
+                                new BasicDBObject(),
+                                Updates.combine(
+                                    Updates.set(SentinelOneIntegration.API_TOKEN, newToken),
+                                    Updates.set(SentinelOneIntegration.UPDATED_TS, now)
+                                )
+                            );
+
+                            AccountJob existingJob = AccountJobDao.instance.findOne(
+                                Filters.and(
+                                    Filters.eq(AccountJob.JOB_TYPE, JOB_TYPE),
+                                    Filters.eq(AccountJob.SUB_TYPE, JOB_SUB_TYPE)
+                                )
+                            );
+                            if (existingJob != null) {
+                                AccountJobDao.instance.updateOneNoUpsert(
+                                    Filters.eq(AccountJob.ID, existingJob.getId()),
+                                    Updates.set("config." + SentinelOneIntegration.API_TOKEN, newToken)
+                                );
+                            }
+                        }
+
+                        loggerMaker.infoAndAddToDb("SentinelOne API token refreshed successfully", LogDb.DASHBOARD);
+                        return newToken;
+                    }
+                }
+                
+                // Other error status codes
+                String responseBody = EntityUtils.toString(testResponse.getEntity());
+                throw new IOException("Token validation failed: HTTP " + statusCode + " - " + responseBody);
+            }
+        }
+    }
+
     private String normalizeUrl(String url) {
         return (url != null && url.endsWith("/")) ? url.substring(0, url.length() - 1) : url;
+    }
+
+    // Getters and Setters
+    // ══════════════════════════════════════════════════════════════════════════
+
+    public SentinelOneIntegration getSentinelOneIntegration() {
+        return sentinelOneIntegration;
+    }
+
+    public void setSentinelOneIntegration(SentinelOneIntegration sentinelOneIntegration) {
+        this.sentinelOneIntegration = sentinelOneIntegration;
+    }
+
+    public List<Map<String, Object>> getAgents() {
+        return agents;
+    }
+
+    public void setAgents(List<Map<String, Object>> agents) {
+        this.agents = agents;
+    }
+
+    public List<Map<String, Object>> getGuardrailTypes() {
+        return guardrailTypes;
+    }
+
+    public void setGuardrailTypes(List<Map<String, Object>> guardrailTypes) {
+        this.guardrailTypes = guardrailTypes;
+    }
+
+    public Map<String, Object> getGuardrailExecution() {
+        return guardrailExecution;
+    }
+
+    public void setGuardrailExecution(Map<String, Object> guardrailExecution) {
+        this.guardrailExecution = guardrailExecution;
+    }
+
+    public List<String> getGuardrailType() {
+        return guardrailType;
+    }
+
+    public void setGuardrailType(List<String> guardrailType) {
+        this.guardrailType = guardrailType;
+    }
+
+    public Map<String, String> getGuardrailEnvVars() {
+        return guardrailEnvVars;
+    }
+
+    public void setGuardrailEnvVars(Map<String, String> guardrailEnvVars) {
+        this.guardrailEnvVars = guardrailEnvVars;
+    }
+
+    public String getGuardrailTargetMode() {
+        return guardrailTargetMode;
+    }
+
+    public void setGuardrailTargetMode(String guardrailTargetMode) {
+        this.guardrailTargetMode = guardrailTargetMode;
+    }
+
+    public List<String> getGuardrailAgentIds() {
+        return guardrailAgentIds;
+    }
+
+    public void setGuardrailAgentIds(List<String> guardrailAgentIds) {
+        this.guardrailAgentIds = guardrailAgentIds;
     }
 }
