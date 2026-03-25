@@ -3,6 +3,8 @@ import { devtools, persist } from "zustand/middleware";
 
 import pako from "pako"; // Gzip Compression
 
+import { getInitialDashboardCategory } from "./labelHelper";
+
 // Factory function to create Custom Storage with Gzip Compression
 export const createGzipStorage = (storage) => ({
     getItem: (name) => {
@@ -77,7 +79,7 @@ const initialState = {
     trafficAlerts: [],
     sendEventOnLogin: false,
     tableSelectedTab: {},
-    dashboardCategory: 'API Security',
+    dashboardCategory: getInitialDashboardCategory() // Keep in memory (not persisted)
 };
 
 let persistStore = (set, get) => ({
@@ -290,7 +292,6 @@ persistStore = persist(persistStore, {
         trafficAlerts: state.trafficAlerts,
         sendEventOnLogin: state.sendEventOnLogin,
         tableSelectedTab: state.tableSelectedTab,
-        dashboardCategory: state.dashboardCategory
     })
 });
 

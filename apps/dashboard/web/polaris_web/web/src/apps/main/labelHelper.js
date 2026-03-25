@@ -19,6 +19,21 @@ export const CATEGORY_AGENTIC_SECURITY = 'Agentic Security';
 export const CATEGORY_DAST = 'DAST';
 export const CATEGORY_ENDPOINT_SECURITY = 'Endpoint Security';
 
+export const validDashboardCategories = [
+  CATEGORY_API_SECURITY,
+  CATEGORY_AGENTIC_SECURITY,
+  CATEGORY_ENDPOINT_SECURITY,
+  CATEGORY_DAST
+]
+
+export const getInitialDashboardCategory = () => {
+  const categoryFromServer = window.DASHBOARD_CATEGORY;
+  if (validDashboardCategories.includes(categoryFromServer)) {
+    return categoryFromServer;
+  }
+  return CATEGORY_API_SECURITY; // default category
+}
+
 export function getDashboardCategory() {
   try {
     const category = PersistStore.getState().dashboardCategory

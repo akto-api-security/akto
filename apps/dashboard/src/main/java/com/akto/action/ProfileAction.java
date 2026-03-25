@@ -24,6 +24,7 @@ import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.cloud.Utils;
 import com.akto.utils.crons.OrganizationCache;
 import com.akto.util.OrganizationInfo;
+import com.akto.util.enums.GlobalEnums.DashboardCategory;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.UserBlockedNoPlanAlert;
 import com.akto.notifications.slack.SlackSender;
@@ -39,7 +40,9 @@ import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ProfileAction extends UserAction {
 
@@ -205,6 +208,15 @@ public class ProfileAction extends UserAction {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));
         }
 
+        List<String> validDashboardCategories = DashboardCategoryAction.getValidDashboardCategories();
+        // Retrieve dashboard category from session
+        String dashboardCategory = null;
+        try {
+            dashboardCategory = (String) request.getSession().getAttribute("dashboardCategory");
+        } catch (Exception e) {
+            // do nothing
+        }
+
         // only external API calls have non-null "utility"
         if (DashboardMode.isMetered() &&  utility == null) {
             if(organization == null){
@@ -250,6 +262,29 @@ public class ProfileAction extends UserAction {
                         .append(FeatureAccess.USAGE, featureAccess.getUsage())
                         .append(FeatureAccess.OVERAGE_FIRST_DETECTED, featureAccess.getOverageFirstDetected())
                         .append(FeatureAccess.IS_OVERAGE_AFTER_GRACE, featureAccess.checkInvalidAccess()));
+            }
+
+            try {
+                if (dashboardCategory == null || !validDashboardCategories.contains(dashboardCategory)) {
+                    // default dashboard category
+                    dashboardCategory = DashboardCategory.API_SECURITY.getDashboardCategory();
+
+                    Map<String, String> featureToDashboardCategoryMap = new LinkedHashMap<>();
+                    featureToDashboardCategoryMap.put(DashboardCategory.SECURITY_TYPE_AGENTIC.toString(), DashboardCategory.SECURITY_TYPE_AGENTIC.getDashboardCategory());
+                    featureToDashboardCategoryMap.put(DashboardCategory.ENDPOINT_SECURITY.toString(), DashboardCategory.ENDPOINT_SECURITY.getDashboardCategory());
+                    featureToDashboardCategoryMap.put(DashboardCategory.AKTO_DAST.toString(), DashboardCategory.AKTO_DAST.getDashboardCategory());
+
+                    for (String featureLabel : featureToDashboardCategoryMap.keySet()) {
+                        if (featureWiseAllowed.get(featureLabel) != null && featureWiseAllowed.get(featureLabel).getIsGranted()) {
+                            dashboardCategory = featureToDashboardCategoryMap.get(featureLabel);
+                            break;
+                        }
+                    }
+
+                    request.getSession().setAttribute("dashboardCategory", dashboardCategory);
+                }
+            } catch (Exception e) {
+                logger.error("Error determining initial dashboard category for org: " + organizationId);
             }
 
             boolean dataIngestionPaused = UsageMetricUtils.checkActiveEndpointOverage(sessionAccId);
@@ -324,6 +359,13 @@ public class ProfileAction extends UserAction {
 
             }
         }
+
+        if (dashboardCategory == null || !validDashboardCategories.contains(dashboardCategory)) {
+            // Set default dashboard category if not set already
+            dashboardCategory = DashboardCategory.API_SECURITY.getDashboardCategory();
+            request.getSession().setAttribute("dashboardCategory", dashboardCategory);
+        }
+        userDetails.append("dashboardCategory", dashboardCategory);
 
         if (versions.length > 2) {
             if (versions[2].contains("akto-release-version")) {

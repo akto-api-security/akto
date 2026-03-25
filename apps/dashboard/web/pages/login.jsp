@@ -82,6 +82,7 @@
                     window.AZURE_AUTH_URL = '${requestScope.azureAuthUrl}'
                     window.GITHUB_AUTH_URL = '${requestScope.githubAuthUrl}'
                     window.ACTIVE_SSO = '${requestScope.activeSso}'
+                    window.DASHBOARD_CATEGORY = '${requestScope.dashboardCategory}';
 
                     window.IS_AWS_WAF_INTEGRATED = '${requestScope.isAwsWafIntegrated}'
                     window.IS_CLOUDFLARE_WAF_INTEGRATED = '${requestScope.isCloudflareWafIntegrated}'

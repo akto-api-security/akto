@@ -97,5 +97,14 @@ export default {
                 newPassword
             }
         })
+    },
+    switchDashboardCategory: function(dashboardCategory) {
+        return request({
+            url: 'api/switchDashboardCategory',
+            method: 'post',
+            data: {
+                dashboardCategory
+            }
+        })
     }
 }
