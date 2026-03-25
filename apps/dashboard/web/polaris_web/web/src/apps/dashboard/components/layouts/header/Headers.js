@@ -203,6 +203,7 @@ export default function Header() {
     }
 
     const handleDashboardChange = async (value) => {
+        func.setToast(true, false, `Switching to ${value} dashboard...`)
         try {
             await api.switchDashboardCategory(value);
         } catch (err) {
