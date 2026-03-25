@@ -389,7 +389,8 @@ public class InventoryAction extends UserAction {
         if((collection.getHostName() == null || collection.getHostName().isEmpty()) && collection.getId() != AllAPIsGroup.ALL_APIS_GROUP_ID){
             Bson filter = Filters.and(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
                             Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
-            if (collection.getType() != null && !collection.getType().equals(ApiCollection.Type.API_GROUP)) {
+            // the previous logic was of this was redundant as only 1 type of ApiCollection.Type exists
+            if (collection.getType() != null && collection.getType().equals(ApiCollection.Type.API_GROUP) && Context.accountId.get() == 1729478227) {
                 filter = Filters.and(SingleTypeInfoDao.filterForHostHeader(0, false), filter);
             }
             list = ApiCollectionsDao.fetchEndpointsInCollection(filter, 0, -1, Utils.DELTA_PERIOD_VALUE);
