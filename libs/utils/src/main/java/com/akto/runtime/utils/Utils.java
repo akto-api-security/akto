@@ -217,7 +217,7 @@ public class Utils {
 
     public static String printDebugHostLog(HttpResponseParams httpResponseParams) {
        
-        if (DEBUG_HOSTS_SET.isEmpty()) return null;
+        if (DEBUG_HOSTS_SET.isEmpty() || httpResponseParams == null || httpResponseParams.getRequestParams() == null) return null;
         String host = RuntimeUtil.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
         return DEBUG_HOSTS_SET.contains(host) ? host : null;
     }
