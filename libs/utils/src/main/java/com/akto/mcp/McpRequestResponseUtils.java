@@ -62,6 +62,8 @@ public final class McpRequestResponseUtils {
             return Arrays.asList(responseParams);
         }
 
+        logger.infoAndAddToDb("Found MCP request: " + mcpRequest.getSecond().getMethod());
+
         handleMcpMethodCall(mcpRequest.getSecond(), requestPayload, responseParams);
 
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
@@ -69,6 +71,7 @@ public final class McpRequestResponseUtils {
         if (McpSchema.METHOD_TOOLS_LIST.equals(mcpRequest.getSecond().getMethod())) {
             List<HttpResponseParams> expanded = handleToolsListForStreamableHttp(responseParams);
             responseParamsList.addAll(expanded);
+            logger.infoAndAddToDb("Expanded MCP request: " + expanded.size() + " tools");
         }
         return responseParamsList;
     }
@@ -192,6 +195,7 @@ public final class McpRequestResponseUtils {
             }
 
             if (StringUtils.isEmpty(extractedData)) {
+                logger.errorAndAddToDb("No extracted data found for tools list response. Response body: " + getPayloadSubstring(responseBody));
                 return Collections.emptyList();
             }
 
@@ -200,10 +204,11 @@ public final class McpRequestResponseUtils {
                 jsonRpcResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(OBJECT_MAPPER,
                     extractedData);
             } catch (Exception e) {
-                logger.error("Error parsing tools list response as JSON-RPC. Skipping adding tools/call samples");
+                logger.errorAndAddToDb(e, "Error parsing tools list response as JSON-RPC. Skipping adding tools/call samples. original payload: " + getPayloadSubstring(responseBody));
                 return Collections.emptyList();
             }
             if (jsonRpcResponse == null || jsonRpcResponse.getResult() == null) {
+                logger.errorAndAddToDb("No result found in tools list response. Skipping adding tools/call samples. original payload: " + getPayloadSubstring(responseBody));
                 return Collections.emptyList();
             }
 
@@ -211,11 +216,12 @@ public final class McpRequestResponseUtils {
             try {
                 toolsResult = JSONUtils.fromJson(jsonRpcResponse.getResult(), ListToolsResult.class);
             } catch (Exception e) {
-                logger.error("Error parsing tools list result from extracted data", e);
+                logger.errorAndAddToDb(e, "Error parsing tools list result from extracted data. original payload: " + getPayloadSubstring(responseBody));
                 return Collections.emptyList();
             }
 
             if (toolsResult == null || CollectionUtils.isEmpty(toolsResult.getTools())) {
+                logger.errorAndAddToDb("No tools found in tools list result. Skipping adding tools/call samples. original payload: " + getPayloadSubstring(responseBody));
                 return Collections.emptyList();
             }
 
@@ -251,7 +257,7 @@ public final class McpRequestResponseUtils {
             }
             return out;
         } catch (Exception e) {
-            logger.error("Error handling tools/list for streamable http", e);
+            logger.errorAndAddToDb(e, "Error handling tools/list for streamable http. message: " + e.getMessage());
         }
 
         return Collections.emptyList();
@@ -352,5 +358,12 @@ public final class McpRequestResponseUtils {
             sb.append(".").append(parts[i]);
         }
         return sb.toString();
+    }
+
+    private static String getPayloadSubstring(String payload) {
+        if (StringUtils.isBlank(payload) || payload.length() <= 100) {
+            return payload;
+        }
+        return StringUtils.substring(payload, 0, 100) + "...";
     }
 }
