@@ -194,9 +194,9 @@ function getScanFrequency(periodInSeconds) {
 const transform = {
 
   tagList: (list, linkType) => {
+    const items = Array.isArray(list) ? list : []
 
-    let ret = list?.map((tag, index) => {
-
+    return items.map((tag, index) => {
       let linkUrl = ""
       let badgeContent = tag
       switch (linkType) {
@@ -220,7 +220,6 @@ const transform = {
         </Link>
       )
     })
-    return ret;
   },
   prepareDataFromSummary: (data, testRunState) => {
     let obj = {};
@@ -546,19 +545,18 @@ const transform = {
             </HorizontalStack>
           )
           break;
-        case "ASI Category":
-          let asiCategories = func.getASICategoriesForAgenticCategory(category?.superCategory?.name)
-          if (asiCategories == null || asiCategories == undefined || asiCategories.length == 0) {
-            return;
+        case "ASI Category": {
+          const agenticOwasp = func.agenticCategoryMapping[category?.superCategory?.name]
+          if (!agenticOwasp?.label) {
+            return
           }
           sectionLocal.content = (
             <HorizontalStack gap="2">
-              {
-                transform.tagList(asiCategories, "ASI")
-              }
+              {transform.tagList([agenticOwasp], "ASI")}
             </HorizontalStack>
           )
-          break;
+          break
+        }
         case "Compliance":
           if (category?.compliance?.mapComplianceToListClauses && Object.keys(category?.compliance?.mapComplianceToListClauses).length > 0) {
             sectionLocal.content = (

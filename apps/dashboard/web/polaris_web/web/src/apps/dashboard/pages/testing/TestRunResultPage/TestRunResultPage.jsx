@@ -358,8 +358,8 @@ function TestRunResultPage(props) {
       setAzureBoardsWorkItemUrl(azureBoardsWorkItemUrlCopy)
       setServiceNowTicketUrl(serviceNowTicketUrlCopy)
       setDevRevWorkUrl(devrevWorkUrlCopy)
-      setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory], moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
-      setRemediation(subCategoryMap[runIssues?.id?.testSubCategory]?.remediation)
+      setInfoState(transform.fillMoreInformation(tmp[runIssues?.id?.testSubCategory], moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
+      setRemediation(tmp[runIssues?.id?.testSubCategory]?.remediation)
       // setJiraIssueUrl(jiraIssueUrl)
       // setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
     } else {
