@@ -12,15 +12,15 @@ set -e
 GITHUB_RAW_BASE="https://raw.githubusercontent.com/akto-api-security/akto/agent-hooks/apps/mcp-endpoint-shield/cursor-hooks"
 
 TARGET_USER_HOME="${TARGET_USER_HOME:-}"
-AKTO_DATA_INGESTION_URL="${AKTO_DATA_INGESTION_URL:-}"
+AKTO_GUARDRAILS_URL="${AKTO_GUARDRAILS_URL:-}"
 for a in "$@"; do
     case "$a" in
         TARGET_USER_HOME=*) TARGET_USER_HOME="${a#TARGET_USER_HOME=}" ;;
-        AKTO_DATA_INGESTION_URL=*) AKTO_DATA_INGESTION_URL="${a#AKTO_DATA_INGESTION_URL=}" ;;
+        AKTO_GUARDRAILS_URL=*) AKTO_GUARDRAILS_URL="${a#AKTO_GUARDRAILS_URL=}" ;;
     esac
 done
 
-[ -n "$AKTO_DATA_INGESTION_URL" ] && export AKTO_DATA_INGESTION_URL
+[ -n "$AKTO_GUARDRAILS_URL" ] && export AKTO_GUARDRAILS_URL
 
 log() {
     echo "[Cursor Hooks] $1"
@@ -57,21 +57,21 @@ check_cursor_installed() {
 }
 
 get_ingestion_url() {
-    if [ -n "${AKTO_DATA_INGESTION_URL:-}" ]; then
-        echo "$AKTO_DATA_INGESTION_URL"
+    if [ -n "${AKTO_GUARDRAILS_URL:-}" ]; then
+        echo "$AKTO_GUARDRAILS_URL"
         return 0
     fi
 
     if [ -f "$CONFIG_FILE" ]; then
         local url
-        url=$(grep "^AKTO_DATA_INGESTION_URL=" "$CONFIG_FILE" 2>/dev/null | cut -d= -f2-)
+        url=$(grep "^AKTO_GUARDRAILS_URL=" "$CONFIG_FILE" 2>/dev/null | cut -d= -f2-)
         if [ -n "$url" ]; then
             echo "$url"
             return 0
         fi
     fi
 
-    echo "https://1726615470-guardrails.akto.io"
+    echo "https://guardrails.akto.io"
 }
 
 generate_device_id() {
@@ -121,28 +121,41 @@ create_wrapper() {
 
     if ! download_file "$template_url" "$wrapper_file.tmp"; then
         log_error "Failed to download wrapper template for $hook_type, creating locally..."
+        log "Creating wrapper with URL: $ingestion_url"
 
         cat > "$wrapper_file" <<EOF
 #!/bin/bash
+# Auto-generated wrapper for Akto guardrails hook
+# Guardrails URL: $ingestion_url
+
 export MODE="atlas"
-export AKTO_DATA_INGESTION_URL="$ingestion_url"
+export AKTO_GUARDRAILS_URL="$ingestion_url"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="$CURSOR_CONNECTOR"
 export CONTEXT_SOURCE="ENDPOINT"
 export DEVICE_ID="$device_id"
+
+# Log configuration for debugging
+echo "[Cursor Hook] Guardrails URL: \$AKTO_GUARDRAILS_URL" >&2
+echo "[Cursor Hook] Device ID: \$DEVICE_ID" >&2
+
 exec python3 "$python_script" "\$@"
 EOF
         chmod +x "$wrapper_file"
         return 0
     fi
 
-    sed -e "s|{{AKTO_DATA_INGESTION_URL}}|$ingestion_url|g" \
+    # Replace both old and new placeholder formats
+    sed -e "s|{{AKTO_GUARDRAILS_URL}}|$ingestion_url|g" \
+        -e "s|{{AKTO_DATA_INGESTION_URL}}|$ingestion_url|g" \
         -e "s|{{DEVICE_ID (optional)}}|$device_id|g" \
         "$wrapper_file.tmp" > "$wrapper_file"
 
     rm -f "$wrapper_file.tmp"
     chmod +x "$wrapper_file"
+    
+    log "Wrapper configured with URL: $ingestion_url"
 }
 
 update_cursor_hooks() {
@@ -213,7 +226,7 @@ main() {
 
     INGESTION_URL=$(get_ingestion_url)
     if [ -z "$INGESTION_URL" ]; then
-        log "Warning: AKTO_DATA_INGESTION_URL not configured"
+        log "Warning: AKTO_GUARDRAILS_URL not configured"
         INGESTION_URL="https://your-ingestion-url.akto.io"
     fi
 

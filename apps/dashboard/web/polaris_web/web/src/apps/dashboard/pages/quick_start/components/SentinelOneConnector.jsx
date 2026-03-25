@@ -14,16 +14,20 @@ function SentinelOneConnector() {
     const [isSaved, setIsSaved] = useState(false)
 
     // Guardrails
+    const [guardrailTypes, setGuardrailTypes] = useState([])
     const [selectedGuardrailTypes, setSelectedGuardrailTypes] = useState([])
     const [executingGuardrails, setExecutingGuardrails] = useState(false)
-    
-    // OpenClaw-specific env vars
-    const [openaiApiKey, setOpenaiApiKey] = useState('')
-    const [originalProvider, setOriginalProvider] = useState('')
-    const [modelApi, setModelApi] = useState('')
-    const [modelId, setModelId] = useState('')
+    const [envVarValues, setEnvVarValues] = useState({})
 
     useEffect(() => {
+        // Fetch available guardrail types from backend
+        api.getGuardrailTypes().then((res) => {
+            if (res && res.guardrailTypes) {
+                setGuardrailTypes(res.guardrailTypes)
+            }
+        }).catch(() => {})
+
+        // Fetch existing integration config
         api.fetchSentinelOneIntegration().then((res) => {
             if (res && res.sentinelOneIntegration) {
                 const integration = res.sentinelOneIntegration
@@ -40,11 +44,7 @@ function SentinelOneConnector() {
                 
                 // Load saved env vars
                 if (integration.guardrailEnvVars) {
-                    const envVars = integration.guardrailEnvVars
-                    setOpenaiApiKey(envVars.OPENAI_API_KEY || '')
-                    setOriginalProvider(envVars.ORIGINAL_PROVIDER || '')
-                    setModelApi(envVars.MODEL_API || '')
-                    setModelId(envVars.MODEL_ID || '')
+                    setEnvVarValues(integration.guardrailEnvVars)
                 }
             }
         }).catch(() => {})
@@ -85,18 +85,11 @@ function SentinelOneConnector() {
             return
         }
 
-        // Build env vars based on selected guardrails
-        const guardrailEnvVars = {}
-        
-        if (selectedGuardrailTypes.includes('openclaw-guardrails')) {
-            guardrailEnvVars['OPENAI_API_KEY'] = openaiApiKey
-            guardrailEnvVars['ORIGINAL_PROVIDER'] = originalProvider
-            guardrailEnvVars['MODEL_API'] = modelApi
-            guardrailEnvVars['MODEL_ID'] = modelId
+        // AKTO_GUARDRAILS_URL is common for all
+        const guardrailEnvVars = {
+            'AKTO_GUARDRAILS_URL': guardrailsUrl,
+            ...envVarValues
         }
-        
-        // AKTO_GUARDRAILS_URL is common for all (used as proxy URL for OpenClaw)
-        guardrailEnvVars['AKTO_GUARDRAILS_URL'] = guardrailsUrl
 
         setExecutingGuardrails(true)
         api.saveGuardrailsConfig(selectedGuardrailTypes, guardrailEnvVars, 'all', [])
@@ -156,71 +149,46 @@ function SentinelOneConnector() {
                         </Text>
 
                         <VerticalStack gap="3">
-                            {/* Cursor Hooks Guardrail */}
-                            <Box>
-                                <Checkbox
-                                    label="Cursor Hooks"
-                                    checked={selectedGuardrailTypes.includes('cursor-hooks')}
-                                    onChange={() => handleGuardrailToggle('cursor-hooks')}
-                                    helpText="Monitor and secure Cursor AI coding assistant"
-                                />
-                            </Box>
-
-                            {/* OpenClaw Guardrail */}
-                            <VerticalStack gap="2">
-                                <Checkbox
-                                    label="OpenClaw Guardrails"
-                                    checked={selectedGuardrailTypes.includes('openclaw-guardrails')}
-                                    onChange={() => handleGuardrailToggle('openclaw-guardrails')}
-                                    helpText="Secure OpenAI and other LLM integrations"
-                                />
+                            {guardrailTypes.map((guardrail) => {
+                                const isSelected = selectedGuardrailTypes.includes(guardrail.type)
+                                const hasEnvVars = guardrail.envVars && guardrail.envVars.length > 0
                                 
-                                {selectedGuardrailTypes.includes('openclaw-guardrails') && (
-                                    <Box paddingInlineStart="6">
-                                        <VerticalStack gap="2">
-                                            <Text variant="bodySm" fontWeight="semibold" color="subdued">
-                                                OpenClaw Configuration (uses Guardrails URL as proxy):
-                                            </Text>
-                                            <TextField
-                                                label="OpenAI API Key"
-                                                placeholder="sk-..."
-                                                value={openaiApiKey}
-                                                onChange={setOpenaiApiKey}
-                                                requiredIndicator
-                                                autoComplete="off"
-                                                helpText="OPENAI_API_KEY for OpenClaw"
-                                            />
-                                            <TextField
-                                                label="Original Provider"
-                                                placeholder="openai/gpt-4o-mini"
-                                                value={originalProvider}
-                                                onChange={setOriginalProvider}
-                                                requiredIndicator
-                                                autoComplete="off"
-                                                helpText="ORIGINAL_PROVIDER for OpenClaw"
-                                            />
-                                            <TextField
-                                                label="Model API"
-                                                placeholder="openai-completions"
-                                                value={modelApi}
-                                                onChange={setModelApi}
-                                                requiredIndicator
-                                                autoComplete="off"
-                                                helpText="MODEL_API for OpenClaw"
-                                            />
-                                            <TextField
-                                                label="Model ID"
-                                                placeholder="gpt-4o-mini"
-                                                value={modelId}
-                                                onChange={setModelId}
-                                                requiredIndicator
-                                                autoComplete="off"
-                                                helpText="MODEL_ID for OpenClaw"
-                                            />
-                                        </VerticalStack>
-                                    </Box>
-                                )}
-                            </VerticalStack>
+                                return (
+                                    <VerticalStack key={guardrail.type} gap="2">
+                                        <Checkbox
+                                            label={guardrail.displayName}
+                                            checked={isSelected}
+                                            onChange={() => handleGuardrailToggle(guardrail.type)}
+                                            helpText={guardrail.description}
+                                        />
+                                        
+                                        {isSelected && hasEnvVars && (
+                                            <Box paddingInlineStart="6">
+                                                <VerticalStack gap="2">
+                                                    <Text variant="bodySm" fontWeight="semibold" color="subdued">
+                                                        {guardrail.displayName} Configuration:
+                                                    </Text>
+                                                    {guardrail.envVars.map((envVar) => (
+                                                        <TextField
+                                                            key={envVar.name}
+                                                            label={envVar.label}
+                                                            placeholder={envVar.placeholder}
+                                                            value={envVarValues[envVar.name] || ''}
+                                                            onChange={(value) => setEnvVarValues(prev => ({
+                                                                ...prev,
+                                                                [envVar.name]: value
+                                                            }))}
+                                                            requiredIndicator={envVar.required === 'true'}
+                                                            autoComplete="off"
+                                                            helpText={`${envVar.name} for ${guardrail.displayName}`}
+                                                        />
+                                                    ))}
+                                                </VerticalStack>
+                                            </Box>
+                                        )}
+                                    </VerticalStack>
+                                )
+                            })}
                         </VerticalStack>
 
                         {selectedGuardrailTypes.length > 0 && (

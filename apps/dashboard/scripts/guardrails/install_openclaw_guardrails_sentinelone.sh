@@ -16,7 +16,7 @@ TARGET_USER_HOME="${TARGET_USER_HOME:-}"
 OPENAI_API_KEY="${OPENAI_API_KEY:-}"
 AKTO_GUARDRAILS_URL="${AKTO_GUARDRAILS_URL:-}"
 ORIGINAL_PROVIDER="${ORIGINAL_PROVIDER:-}"
-MODEL_API="${MODEL_API:-}"
+MODEL_API="${MODEL_API:-openai-completions}"
 MODEL_ID="${MODEL_ID:-}"
 
 # ── Parse KEY=VALUE args ──────────────────────────────────────────────────────
@@ -26,7 +26,6 @@ for a in "$@"; do
         OPENAI_API_KEY=*)    OPENAI_API_KEY="${a#OPENAI_API_KEY=}" ;;
         AKTO_GUARDRAILS_URL=*) AKTO_GUARDRAILS_URL="${a#AKTO_GUARDRAILS_URL=}" ;;
         ORIGINAL_PROVIDER=*) ORIGINAL_PROVIDER="${a#ORIGINAL_PROVIDER=}" ;;
-        MODEL_API=*)         MODEL_API="${a#MODEL_API=}" ;;
         MODEL_ID=*)          MODEL_ID="${a#MODEL_ID=}" ;;
     esac
 done

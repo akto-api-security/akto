@@ -47,13 +47,13 @@ function Get-IngestionUrl {
     $configFile = Join-Path $UserHome ".akto-mcp-endpoint-shield\config\config.env"
     if (Test-Path $configFile) {
         $content = Get-Content $configFile -ErrorAction SilentlyContinue
-        $urlLine = $content | Where-Object { $_ -match "^AKTO_DATA_INGESTION_URL=" }
+        $urlLine = $content | Where-Object { $_ -match "^AKTO_GUARDRAILS_URL=" }
         if ($urlLine) {
             return ($urlLine -split "=", 2)[1].Trim()
         }
     }
     
-    return "https://1726615470-guardrails.akto.io"
+    return "https://guardrails.akto.io"
 }
 
 function Get-DeviceId {
@@ -108,15 +108,24 @@ function New-WrapperScript {
     $tempFile = "$wrapperFile.tmp"
     if (-not (Get-FileFromUrl $templateUrl $tempFile)) {
         Write-LogError "Failed to download wrapper template for $HookType, creating locally..."
+        Write-Log "Creating wrapper with URL: $IngestionUrl"
         
         $wrapperContent = @"
+# Auto-generated wrapper for Akto guardrails hook
+# Guardrails URL: $IngestionUrl
+
 `$env:MODE = "atlas"
-`$env:AKTO_DATA_INGESTION_URL = "$IngestionUrl"
+`$env:AKTO_GUARDRAILS_URL = "$IngestionUrl"
 `$env:AKTO_SYNC_MODE = "true"
 `$env:AKTO_TIMEOUT = "5"
 `$env:AKTO_CONNECTOR = "$Connector"
 `$env:CONTEXT_SOURCE = "ENDPOINT"
 `$env:DEVICE_ID = "$DeviceId"
+
+# Log configuration for debugging
+Write-Host "[Cursor Hook] Guardrails URL: `$env:AKTO_GUARDRAILS_URL" -ForegroundColor Gray
+Write-Host "[Cursor Hook] Device ID: `$env:DEVICE_ID" -ForegroundColor Gray
+
 & python "$pythonScript" `$args
 "@
         Set-Content -Path $wrapperFile -Value $wrapperContent -Encoding UTF8
@@ -124,10 +133,13 @@ function New-WrapperScript {
     }
     
     $content = Get-Content $tempFile -Raw
+    $content = $content -replace '\{\{AKTO_GUARDRAILS_URL\}\}', $IngestionUrl
     $content = $content -replace '\{\{AKTO_DATA_INGESTION_URL\}\}', $IngestionUrl
     $content = $content -replace '\{\{DEVICE_ID \(optional\)\}\}', $DeviceId
     Set-Content -Path $wrapperFile -Value $content -Encoding UTF8
     Remove-Item $tempFile -ErrorAction SilentlyContinue
+    
+    Write-Log "Wrapper configured with URL: $IngestionUrl"
 }
 
 function Update-CursorHooks {
@@ -214,7 +226,7 @@ function Install-ForUser {
         
         $ingestionUrl = Get-IngestionUrl $UserHome $AktoDataIngestionUrl
         if (-not $ingestionUrl) {
-            Write-Log "Warning: AKTO_DATA_INGESTION_URL not configured"
+            Write-Log "Warning: AKTO_GUARDRAILS_URL not configured"
             $ingestionUrl = "https://your-ingestion-url.akto.io"
         }
         

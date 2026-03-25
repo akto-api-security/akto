@@ -216,9 +216,6 @@ public class SentinelOneIntegrationAction extends UserAction {
         String normalizedConsoleUrl = normalizeUrl(integration.getConsoleUrl());
 
         try {
-            // Validate and refresh token if needed
-            String validToken = ensureValidToken(normalizedConsoleUrl, integration.getApiToken(), true);
-            
             RequestConfig requestConfig = RequestConfig.custom()
                 .setConnectTimeout(CONNECT_TIMEOUT_MS)
                 .setSocketTimeout(SOCKET_TIMEOUT_MS)
@@ -226,7 +223,7 @@ public class SentinelOneIntegrationAction extends UserAction {
 
             try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
                 HttpGet get = new HttpGet(normalizedConsoleUrl + "/web/api/v2.1/agents?limit=1000");
-                get.setHeader("Authorization", "ApiToken " + validToken);
+                get.setHeader("Authorization", "ApiToken " + integration.getApiToken());
                 get.setHeader("Content-Type", "application/json");
 
                 try (CloseableHttpResponse response = httpClient.execute(get)) {
@@ -303,11 +300,8 @@ public class SentinelOneIntegrationAction extends UserAction {
         RequestConfig requestConfig = RequestConfig.custom()
             .setConnectTimeout(CONNECT_TIMEOUT_MS).setSocketTimeout(SOCKET_TIMEOUT_MS).build();
         try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
-
-            // Validate and refresh token if needed
-            String validToken = ensureValidToken(normalizedConsoleUrl, integration.getApiToken(), true);
             
-            String siteId = fetchSiteIdFromAgents(validToken, normalizedConsoleUrl);
+            String siteId = fetchSiteIdFromAgents(integration.getApiToken(), normalizedConsoleUrl);
             if (siteId == null || siteId.isEmpty()) {
                 addActionError("Could not determine site ID — ensure at least one agent is enrolled.");
                 return Action.ERROR.toUpperCase();
@@ -332,7 +326,7 @@ public class SentinelOneIntegrationAction extends UserAction {
                 ContentType.TEXT_PLAIN, fileName);
 
             HttpPost post = new HttpPost(normalizedConsoleUrl + "/web/api/v2.1/remote-scripts");
-            post.setHeader("Authorization", "ApiToken " + validToken);
+            post.setHeader("Authorization", "ApiToken " + integration.getApiToken());
             post.setEntity(builder.build());
 
             try (CloseableHttpResponse response = httpClient.execute(post)) {
@@ -424,11 +418,8 @@ public class SentinelOneIntegrationAction extends UserAction {
         RequestConfig requestConfig = RequestConfig.custom()
             .setConnectTimeout(CONNECT_TIMEOUT_MS).setSocketTimeout(SOCKET_TIMEOUT_MS).build();
         try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
-            // Validate and refresh token if needed
-            String validToken = ensureValidToken(normalizedConsoleUrl, integration.getApiToken(), true);
-            
             HttpPost post = new HttpPost(normalizedConsoleUrl + "/web/api/v2.1/remote-scripts/execute");
-            post.setHeader("Authorization", "ApiToken " + validToken);
+            post.setHeader("Authorization", "ApiToken " + integration.getApiToken());
             post.setHeader("Content-Type", "application/json");
             post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
 
@@ -466,11 +457,8 @@ public class SentinelOneIntegrationAction extends UserAction {
         RequestConfig requestConfig = RequestConfig.custom()
             .setConnectTimeout(CONNECT_TIMEOUT_MS).setSocketTimeout(SOCKET_TIMEOUT_MS).build();
         try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
-            // Validate and refresh token if needed
-            String validToken = ensureValidToken(normalizedConsoleUrl, integration.getApiToken(), true);
-            
             HttpGet get = new HttpGet(normalizedConsoleUrl + "/web/api/v2.1/remote-scripts/status?parenttaskid=" + parentTaskId);
-            get.setHeader("Authorization", "ApiToken " + validToken);
+            get.setHeader("Authorization", "ApiToken " + integration.getApiToken());
             try (CloseableHttpResponse response = httpClient.execute(get)) {
                 int statusCode = response.getStatusLine().getStatusCode();
                 String responseBody = EntityUtils.toString(response.getEntity());
@@ -551,6 +539,14 @@ public class SentinelOneIntegrationAction extends UserAction {
         openClawGuardrails.put("envVars", openClawEnvVars);
         guardrailTypes.add(openClawGuardrails);
         
+        // Claude CLI Hooks guardrail
+        Map<String, Object> claudeCliHooks = new HashMap<>();
+        claudeCliHooks.put("type", "claude-cli-hooks");
+        claudeCliHooks.put("displayName", "Claude CLI Hooks");
+        claudeCliHooks.put("description", "Monitor and secure Claude AI CLI assistant");
+        
+        guardrailTypes.add(claudeCliHooks);
+        
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -612,9 +608,6 @@ public class SentinelOneIntegrationAction extends UserAction {
         String normalizedConsoleUrl = normalizeUrl(integration.getConsoleUrl());
         
         try {
-            // Validate and refresh token if needed
-            String validToken = ensureValidToken(normalizedConsoleUrl, integration.getApiToken(), true);
-            
             // Update status to running
             SentinelOneIntegrationDao.instance.updateOne(
                 new BasicDBObject(),
@@ -625,7 +618,7 @@ public class SentinelOneIntegrationAction extends UserAction {
             List<String> targetAgentIds;
             if ("all".equals(integration.getGuardrailTargetMode())) {
                 // Fetch all agents
-                List<Map<String, Object>> allAgents = fetchAllAgents(validToken, normalizedConsoleUrl);
+                List<Map<String, Object>> allAgents = fetchAllAgents(integration.getApiToken(), normalizedConsoleUrl);
                 targetAgentIds = new ArrayList<>();
                 for (Map<String, Object> agent : allAgents) {
                     targetAgentIds.add((String) agent.get("id"));
@@ -674,7 +667,7 @@ public class SentinelOneIntegrationAction extends UserAction {
                 for (String agentId : targetAgentIds) {
                     try {
                         // Get agent details to determine OS
-                        Map<String, Object> agentDetails = getAgentDetails(agentId, validToken, normalizedConsoleUrl);
+                        Map<String, Object> agentDetails = getAgentDetails(agentId, integration.getApiToken(), normalizedConsoleUrl);
                         String osName = (String) agentDetails.get("osName");
                         
                         // Execute script based on OS
@@ -683,7 +676,7 @@ public class SentinelOneIntegrationAction extends UserAction {
                             osName,
                             scriptPath,
                             completeEnvVars,
-                            validToken,
+                            integration.getApiToken(),
                             normalizedConsoleUrl
                         );
                         
@@ -823,6 +816,8 @@ public class SentinelOneIntegrationAction extends UserAction {
                 return "install_cursor_hooks_sentinelone";
             case "openclaw-guardrails":
                 return "install_openclaw_guardrails_sentinelone";
+            case "claude-cli-hooks":
+                return "install_claude_cli_hooks_sentinelone";
             default:
                 return null;
         }
@@ -963,92 +958,6 @@ public class SentinelOneIntegrationAction extends UserAction {
     // ══════════════════════════════════════════════════════════════════════════
     // Helper Methods
     // ══════════════════════════════════════════════════════════════════════════
-
-    public static String ensureValidToken(String consoleUrl, String currentToken, boolean updateDb) throws IOException {
-        String normalizedUrl = (consoleUrl != null && consoleUrl.endsWith("/")) 
-            ? consoleUrl.substring(0, consoleUrl.length() - 1) 
-            : consoleUrl;
-
-        RequestConfig requestConfig = RequestConfig.custom()
-            .setConnectTimeout(CONNECT_TIMEOUT_MS)
-            .setSocketTimeout(SOCKET_TIMEOUT_MS)
-            .build();
-
-        try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
-            // Test current token with a lightweight API call
-            HttpGet testGet = new HttpGet(normalizedUrl + "/web/api/v2.1/user");
-            testGet.setHeader("Authorization", "ApiToken " + currentToken);
-            testGet.setHeader("Content-Type", "application/json");
-
-            try (CloseableHttpResponse testResponse = httpClient.execute(testGet)) {
-                int statusCode = testResponse.getStatusLine().getStatusCode();
-                
-                // Token is valid
-                if (statusCode == 200) {
-                    loggerMaker.infoAndAddToDb("SentinelOne API token is valid", LogDb.DASHBOARD);
-                    return currentToken;
-                }
-                
-                // Token is invalid/expired (401/403), generate new token
-                if (statusCode == 401 || statusCode == 403) {
-                    loggerMaker.infoAndAddToDb("SentinelOne API token expired/invalid, generating new token", LogDb.DASHBOARD);
-                    
-                    HttpGet generateGet = new HttpGet(normalizedUrl + "/web/api/v2.0/users/generate-api-token");
-                    generateGet.setHeader("Authorization", "Bearer " + currentToken);
-                    generateGet.setHeader("Content-Type", "application/json");
-
-                    try (CloseableHttpResponse generateResponse = httpClient.execute(generateGet)) {
-                        int generateStatusCode = generateResponse.getStatusLine().getStatusCode();
-                        String responseBody = EntityUtils.toString(generateResponse.getEntity());
-
-                        if (generateStatusCode != 200) {
-                            loggerMaker.errorAndAddToDb("Failed to generate new SentinelOne API token: HTTP " + generateStatusCode, LogDb.DASHBOARD);
-                            throw new IOException("Failed to generate new API token: HTTP " + generateStatusCode + " - " + responseBody);
-                        }
-
-                        JsonNode json = OBJECT_MAPPER.readTree(responseBody);
-                        String newToken = json.path("data").path("token").asText(null);
-                        
-                        if (newToken == null || newToken.isEmpty()) {
-                            throw new IOException("No token in SentinelOne response");
-                        }
-
-                        // Update DB and job config if requested
-                        if (updateDb) {
-                            int now = Context.now();
-                            SentinelOneIntegrationDao.instance.updateOne(
-                                new BasicDBObject(),
-                                Updates.combine(
-                                    Updates.set(SentinelOneIntegration.API_TOKEN, newToken),
-                                    Updates.set(SentinelOneIntegration.UPDATED_TS, now)
-                                )
-                            );
-
-                            AccountJob existingJob = AccountJobDao.instance.findOne(
-                                Filters.and(
-                                    Filters.eq(AccountJob.JOB_TYPE, JOB_TYPE),
-                                    Filters.eq(AccountJob.SUB_TYPE, JOB_SUB_TYPE)
-                                )
-                            );
-                            if (existingJob != null) {
-                                AccountJobDao.instance.updateOneNoUpsert(
-                                    Filters.eq(AccountJob.ID, existingJob.getId()),
-                                    Updates.set("config." + SentinelOneIntegration.API_TOKEN, newToken)
-                                );
-                            }
-                        }
-
-                        loggerMaker.infoAndAddToDb("SentinelOne API token refreshed successfully", LogDb.DASHBOARD);
-                        return newToken;
-                    }
-                }
-                
-                // Other error status codes
-                String responseBody = EntityUtils.toString(testResponse.getEntity());
-                throw new IOException("Token validation failed: HTTP " + statusCode + " - " + responseBody);
-            }
-        }
-    }
 
     private String normalizeUrl(String url) {
         return (url != null && url.endsWith("/")) ? url.substring(0, url.length() - 1) : url;
