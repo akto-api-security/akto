@@ -12,15 +12,15 @@ set -e
 GITHUB_RAW_BASE="https://raw.githubusercontent.com/akto-api-security/akto/agent-hooks/apps/mcp-endpoint-shield/claude-cli-hooks"
 
 TARGET_USER_HOME="${TARGET_USER_HOME:-}"
-AKTO_GUARDRAILS_URL="${AKTO_GUARDRAILS_URL:-}"
+AKTO_DATA_INGESTION_URL="${AKTO_DATA_INGESTION_URL:-}"
 for a in "$@"; do
     case "$a" in
         TARGET_USER_HOME=*) TARGET_USER_HOME="${a#TARGET_USER_HOME=}" ;;
-        AKTO_GUARDRAILS_URL=*) AKTO_GUARDRAILS_URL="${a#AKTO_GUARDRAILS_URL=}" ;;
+        AKTO_DATA_INGESTION_URL=*) AKTO_DATA_INGESTION_URL="${a#AKTO_DATA_INGESTION_URL=}" ;;
     esac
 done
 
-[ -n "$AKTO_GUARDRAILS_URL" ] && export AKTO_GUARDRAILS_URL
+[ -n "$AKTO_DATA_INGESTION_URL" ] && export AKTO_DATA_INGESTION_URL
 
 log() {
     echo "[Claude CLI Hooks] $1"
@@ -56,14 +56,14 @@ check_claude_installed() {
 }
 
 get_ingestion_url() {
-    if [ -n "${AKTO_GUARDRAILS_URL:-}" ]; then
-        echo "$AKTO_GUARDRAILS_URL"
+    if [ -n "${AKTO_DATA_INGESTION_URL:-}" ]; then
+        echo "$AKTO_DATA_INGESTION_URL"
         return 0
     fi
 
     if [ -f "$CONFIG_FILE" ]; then
         local url
-        url=$(grep "^AKTO_GUARDRAILS_URL=" "$CONFIG_FILE" 2>/dev/null | cut -d= -f2-)
+        url=$(grep "^AKTO_DATA_INGESTION_URL=" "$CONFIG_FILE" 2>/dev/null | cut -d= -f2-)
         if [ -n "$url" ]; then
             echo "$url"
             return 0
@@ -231,8 +231,7 @@ main() {
     log "✓ Claude CLI detected"
 
     INGESTION_URL=$(get_ingestion_url)
-    if [ -z "$INGESTION_URL" ]; then
-        log "⚠ Warning: AKTO_GUARDRAILS_URL not configured"
+    if [ -z "$INGESTION_URL" ]; then\n        log "⚠ Warning: AKTO_DATA_INGESTION_URL not configured"
         INGESTION_URL="https://guardrails.akto.io"
     fi
 

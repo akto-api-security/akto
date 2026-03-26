@@ -47,7 +47,7 @@ function Get-IngestionUrl {
     $configFile = Join-Path $UserHome ".akto-mcp-endpoint-shield\config\config.env"
     if (Test-Path $configFile) {
         $content = Get-Content $configFile -ErrorAction SilentlyContinue
-        $urlLine = $content | Where-Object { $_ -match "^AKTO_GUARDRAILS_URL=" }
+        $urlLine = $content | Where-Object { $_ -match "^AKTO_DATA_INGESTION_URL=" }
         if ($urlLine) {
             return ($urlLine -split "=", 2)[1].Trim()
         }

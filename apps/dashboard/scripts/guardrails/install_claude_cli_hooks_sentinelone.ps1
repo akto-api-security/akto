@@ -17,12 +17,12 @@ $GITHUB_RAW_BASE = "https://raw.githubusercontent.com/akto-api-security/akto/age
 foreach ($arg in $args) {
     switch -Wildcard ($arg) {
         "TARGET_USER_HOME=*" { $TargetUserHome = $arg -replace "TARGET_USER_HOME=", "" }
-        "AKTO_GUARDRAILS_URL=*" { $AktoGuardrailsUrl = $arg -replace "AKTO_GUARDRAILS_URL=", "" }
+        "AKTO_DATA_INGESTION_URL=*" { $AktoDataIngestionUrl = $arg -replace "AKTO_DATA_INGESTION_URL=", "" }
     }
 }
 
-if ($AktoGuardrailsUrl) {
-    $env:AKTO_GUARDRAILS_URL = $AktoGuardrailsUrl
+if ($AktoDataIngestionUrl) {
+    $env:AKTO_DATA_INGESTION_URL = $AktoDataIngestionUrl
 }
 
 function Write-Log {
@@ -63,7 +63,7 @@ function Get-GuardrailsUrl {
     
     if (Test-Path $ConfigFile) {
         $content = Get-Content $ConfigFile -Raw
-        if ($content -match 'AKTO_GUARDRAILS_URL=(.+)') {
+        if ($content -match 'AKTO_DATA_INGESTION_URL=(.+)') {
             return $Matches[1].Trim()
         }
     }
@@ -238,9 +238,9 @@ function Install-ForUser {
     
     Write-Log "✓ Claude CLI detected"
     
-    $GuardrailsUrl = Get-GuardrailsUrl -ConfigFile $ConfigFile -EnvVar $AktoGuardrailsUrl
+    $GuardrailsUrl = Get-GuardrailsUrl -ConfigFile $ConfigFile -EnvVar $AktoDataIngestionUrl
     if (-not $GuardrailsUrl) {
-        Write-Log "⚠ Warning: AKTO_GUARDRAILS_URL not configured"
+        Write-Log "⚠ Warning: AKTO_DATA_INGESTION_URL not configured"
         $GuardrailsUrl = "https://guardrails.akto.io"
     }
     
