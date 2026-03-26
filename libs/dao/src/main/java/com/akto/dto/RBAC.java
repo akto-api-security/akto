@@ -144,6 +144,24 @@ public class RBAC {
     }
 
     /**
+     * Initializes default scope-role mapping if empty.
+     * If scopeRoleMapping is null or empty, creates a new HashMap with API scope mapped to the provided default role.
+     * Otherwise, returns the existing scopeRoleMapping unchanged.
+     *
+     * @param scopeRoleMapping the current scope-role mapping (may be null/empty)
+     * @param defaultRole the default role to use for API scope if mapping is empty
+     * @return the initialized or existing scopeRoleMapping
+     */
+    public static Map<String, String> initializeScopeRoleMapping(Map<String, String> scopeRoleMapping, String defaultRole) {
+        if (scopeRoleMapping == null || scopeRoleMapping.isEmpty()) {
+            Map<String, String> initialized = new HashMap<>();
+            initialized.put("API", defaultRole);
+            return initialized;
+        }
+        return scopeRoleMapping;
+    }
+
+    /**
      * Get the role for a specific product scope
      * @param scope the product scope (e.g., ENDPOINT, AGENTIC, API)
      * @return the role for that scope, or null if no mapping exists (NO ACCESS to this scope)

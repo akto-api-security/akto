@@ -92,12 +92,7 @@ export default function Header() {
 
 
     const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
-    const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
-    const agenticSecurityGranted =(stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false)
-    const mcpSecurityGranted =(stiggFeatures?.MCP_SECURITY?.isGranted || true);
-    const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
-    let endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted;
-    const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true;
+    const { agenticSecurityGranted, endpointSecurityGranted, dastGranted, mcpSecurityGranted } = func.getStiggFeatureGrants();
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];

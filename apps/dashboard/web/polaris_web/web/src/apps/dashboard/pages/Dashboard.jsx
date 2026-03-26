@@ -103,11 +103,7 @@ function Dashboard() {
      * This prevents 403 errors when user logs in but current scope isn't available to them.
      */
     useEffect(() => {
-        const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
-        const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false
-        const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
-        const endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted
-        const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true
+        const { agenticSecurityGranted, endpointSecurityGranted, dastGranted } = func.getStiggFeatureGrants()
 
         // Build list of accessible categories
         const accessibleCategories = ['API Security']; // API always accessible

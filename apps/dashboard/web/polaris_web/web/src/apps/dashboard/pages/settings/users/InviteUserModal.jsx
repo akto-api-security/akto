@@ -1,4 +1,4 @@
-import { Modal, Text, TextField, Box, Checkbox } from "@shopify/polaris"
+import { Modal, Text, TextField, Box, Checkbox, HorizontalStack } from "@shopify/polaris"
 import { useState, useRef, useCallback, useEffect, useMemo } from "react"
 import func from "@/util/func"
 import Store from "../../../store"
@@ -14,11 +14,7 @@ import Dropdown from "../../../components/layouts/Dropdown"
  * - DAST: requires AKTO_DAST feature
  */
 const getAvailableProductScopes = () => {
-    const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
-    const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false
-    const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
-    const endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted
-    const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true
+    const { agenticSecurityGranted, endpointSecurityGranted, dastGranted } = func.getStiggFeatureGrants()
 
     const scopes = [
         { label: 'API Security', value: 'API' } // Always available
@@ -207,10 +203,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
                     </Text>
                     <Box padding="400">
                         {availableScopes.map((scope) => (
-                            <Box key={scope.value} padding="200" style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
+                            <HorizontalStack key={scope.value} gap="200" align="start" style={{
                                 marginBottom: "12px",
                                 borderBottom: "1px solid #e5e5e5",
                                 paddingBottom: "12px"
@@ -232,7 +225,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
                                         style={{ minWidth: "200px" }}
                                     />
                                 )}
-                            </Box>
+                            </HorizontalStack>
                         ))}
                     </Box>
 

@@ -14,8 +14,10 @@ import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.password_reset.PasswordResetUtils;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.utils.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -40,6 +42,63 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
     BasicDBList users;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TeamAction.class, LogDb.DASHBOARD);
+    public static final String INVALID_PRODUCT_SCOPE = "Invalid product scope: user account does not have access to this scope";
+
+    /**
+     * Maps scope values to display labels
+     */
+    private static String getScopeDisplayLabel(String scope) {
+        switch (scope) {
+            case "API":
+                return "API Security";
+            case "AGENTIC":
+                return "Akto ARGUS";
+            case "ENDPOINT":
+                return "Akto ATLAS";
+            case "DAST":
+                return "DAST";
+            default:
+                return scope;
+        }
+    }
+
+    /**
+     * Formats scope-role mapping for display in pending invitations.
+     * Format: "Invitation sent for Developer on API, Security Engineer on Akto ATLAS"
+     */
+    private String formatScopeRoleMapping(Map<String, String> scopeRoleMapping) {
+        if (scopeRoleMapping == null || scopeRoleMapping.isEmpty()) {
+            return "Invitation sent";
+        }
+
+        StringBuilder roleText = new StringBuilder("Invitation sent for ");
+        boolean first = true;
+        for (Map.Entry<String, String> entry : scopeRoleMapping.entrySet()) {
+            if (!first) {
+                roleText.append(", ");
+            }
+            roleText.append(entry.getValue())
+                    .append(" on ")
+                    .append(getScopeDisplayLabel(entry.getKey()));
+            first = false;
+        }
+        return roleText.toString();
+    }
+
+    /**
+     * Validates that a product scope is accessible for the current account.
+     * Based on STIGG feature grants for the account.
+     *
+     * @param scope the scope to validate
+     * @return true if scope is accessible, false otherwise
+     */
+    private boolean isValidProductScope(String scope) {
+        if (scope == null || scope.isEmpty()) {
+            return false;
+        }
+        Set<String> accessibleScopes = UsageMetricCalculator.getAccessibleProductScopes(Context.accountId.get());
+        return accessibleScopes.contains(scope);
+    }
 
     public String fetchTeamData() {
         int accountId = Context.accountId.get();
@@ -90,12 +149,20 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             if (pendingInviteCode.getAccountId() == 0) {//case where account id doesn't exists belonged to older 1_000_000 account
                 pendingInviteCode.setAccountId(1_000_000);
             }
-            String inviteeRole = pendingInviteCode.getInviteeRole();
-            String roleText = "Invitation sent ";
-            if (inviteeRole == null) {
-                roleText += "for Security Engineer";
+
+            // Use new scopeRoleMapping if available, otherwise fall back to old inviteeRole for backward compatibility
+            String roleText;
+            if (pendingInviteCode.getScopeRoleMapping() != null && !pendingInviteCode.getScopeRoleMapping().isEmpty()) {
+                roleText = formatScopeRoleMapping(pendingInviteCode.getScopeRoleMapping());
             } else {
-                roleText += "for " + inviteeRole;
+                // Backward compatibility: use old inviteeRole field
+                String inviteeRole = pendingInviteCode.getInviteeRole();
+                roleText = "Invitation sent ";
+                if (inviteeRole == null) {
+                    roleText += "for Security Engineer";
+                } else {
+                    roleText += "for " + inviteeRole;
+                }
             }
             /*
              * Do not send invitation code, if already a member.
@@ -241,12 +308,26 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             return Action.ERROR.toUpperCase();
         }
 
-        // Default to API + GUEST if scopeRoleMapping is empty
-        Map<String, String> scopeRoleMappingToSave = scopeRoleMapping;
-        if (scopeRoleMapping == null || scopeRoleMapping.isEmpty()) {
-            loggerMaker.debugAndAddToDb("scopeRoleMapping is empty, defaulting to API + GUEST");
-            scopeRoleMappingToSave = new HashMap<>();
-            scopeRoleMappingToSave.put("API", Role.GUEST.name());
+        loggerMaker.debugAndAddToDb("scopeRoleMapping before init: " + scopeRoleMapping);
+        if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
+
+            String defaultRole = RBAC.Role.MEMBER.name();
+            if (UsageMetricCalculator.isRbacFeatureAvailable(Context.accountId.get())) {
+                defaultRole = Utils.fetchDefaultInviteRole(Context.accountId.get(), RBAC.Role.GUEST.name());
+            }
+            this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, defaultRole);
+        }
+        loggerMaker.debugAndAddToDb("scopeRoleMapping after init: " + scopeRoleMapping);
+
+        // Validate that all scopes in scopeRoleMappingToSave are valid product scopes
+        if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
+            for (String scope : scopeRoleMapping.keySet()) {
+                if (!isValidProductScope(scope)) {
+                    addActionError(INVALID_PRODUCT_SCOPE + scope);
+                    loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
+                    return Action.ERROR.toUpperCase();
+                }
+            }
         }
 
         try {
@@ -258,7 +339,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             // Update the scopeRoleMapping in RBAC
             RBACDao.instance.updateOneNoUpsert(
                 filterRbac,
-                Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMappingToSave)
+                Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMapping)
             );
 
             // Clear cache

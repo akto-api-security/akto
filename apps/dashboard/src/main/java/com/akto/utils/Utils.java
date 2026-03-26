@@ -1,18 +1,9 @@
 package com.akto.utils;
 
 import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
-import com.akto.dao.ThirdPartyAccessDao;
-import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AccountsContextDaoWithRbac;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.FilterSampleDataDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.SensitiveParamInfoDao;
-import com.akto.dao.SensitiveSampleDataDao;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.*;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
@@ -989,5 +980,17 @@ public class Utils {
             }
         }
         return new ApiInfoKeyResult(apiInfoKeys.size(), showApiInfo ? apiInfoList : null);
+    }
+
+    public static String fetchDefaultInviteRole(int accountId, String fallbackDefault){
+        try {
+            Context.accountId.set(accountId);
+            CustomRole defaultRole = CustomRoleDao.instance.findOne(CustomRole.DEFAULT_INVITE_ROLE, true);
+            if(defaultRole != null){
+                return defaultRole.getName();
+            }
+        } catch(Exception e){
+        }
+        return fallbackDefault;
     }
 }

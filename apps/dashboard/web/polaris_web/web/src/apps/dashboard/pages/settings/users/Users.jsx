@@ -20,11 +20,7 @@ import { usersCollectionRenderItem } from "../rbac/utils";
  * - DAST: requires AKTO_DAST feature
  */
 const getAvailableProductScopes = () => {
-    const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
-    const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false
-    const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
-    const endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted
-    const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true
+    const { agenticSecurityGranted, endpointSecurityGranted, dastGranted } = func.getStiggFeatureGrants()
 
     const scopes = [
         { label: 'API Security', value: 'API' } // Always available
@@ -165,7 +161,7 @@ const Users = () => {
                 role: 'ADMIN',
             },
             {
-                content: 'Security Engineer',
+                content: 'Member',
                 role: 'MEMBER',
             }, ...paidFeatureRoleOptions]
         },
@@ -492,11 +488,11 @@ const Users = () => {
             }
 
             return (
-                <Box display="flex" flexDirection="row" gap="200">
+                <HorizontalStack gap="200">
                     {scopeLabels.map((label, idx) => (
                         <Text key={idx} variant="bodySm">{label}</Text>
                     ))}
-                </Box>
+                </HorizontalStack>
             )
         }
 
@@ -511,11 +507,11 @@ const Users = () => {
         }
 
         return (
-            <Box display="flex" flexDirection="column" gap="100">
+            <VerticalStack gap="200">
                 {mappingPairs.map((pair, idx) => (
                     <Text key={idx} variant="bodySm">{pair}</Text>
                 ))}
-            </Box>
+            </VerticalStack>
         )
     }
     
@@ -750,13 +746,11 @@ const Users = () => {
                                     const selectedRole = editScopeRoleModal.editingScopeRoleMapping[scope.value]
 
                                     return (
-                                        <Box
+                                        <HorizontalStack
                                             key={scope.value}
-                                            padding="200"
+                                            gap="400"
+                                            align="start"
                                             style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "12px",
                                                 marginBottom: "12px",
                                                 borderBottom: "1px solid #e5e5e5",
                                                 paddingBottom: "12px"
@@ -782,7 +776,7 @@ const Users = () => {
                                                     style={{ minWidth: "200px" }}
                                                 />
                                             )}
-                                        </Box>
+                                        </HorizontalStack>
                                     )
                                 })}
                             </Box>
