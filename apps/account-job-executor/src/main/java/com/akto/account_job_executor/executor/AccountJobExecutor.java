@@ -38,29 +38,32 @@ public abstract class AccountJobExecutor {
         logger.info("Executing job: jobId={}, jobType={}, subType={}",
             jobId, job.getJobType(), job.getSubType());
 
-        AccountJob executedJob;
+        boolean isRetry = false;
         try {
             // Run the job-specific logic
             runJob(job);
 
             // Mark job as completed
-            executedJob = logSuccess(jobId);
+            logSuccess(jobId);
             logger.info("Finished executing job successfully: jobId={}", jobId);
 
         } catch (RetryableJobException rex) {
             // Retryable error - reschedule job for 5 minutes later
-            executedJob = reScheduleJob(job);
+            isRetry = true;
+            reScheduleJob(job);
             logger.error("Retryable error occurred. Re-scheduling job for 5 minutes later: jobId={}",
                 jobId, rex);
 
         } catch (Exception e) {
             // Non-retryable error - mark as failed
-            executedJob = logFailure(jobId, e);
+            logFailure(jobId, e);
             logger.error("Non-retryable error occurred. Job marked as FAILED: jobId={}", jobId, e);
         }
 
-        // Handle recurring jobs
-        handleRecurringJob(job);
+        // Reschedule recurring jobs on success/failure, but not on retry
+        if (!isRetry) {
+            handleRecurringJob(job);
+        }
     }
 
     /**
