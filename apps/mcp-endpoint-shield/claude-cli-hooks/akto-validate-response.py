@@ -5,7 +5,9 @@ import os
 import ssl
 import sys
 import urllib.request
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Union
+import time
+
 
 from akto_machine_id import get_machine_id, get_username
 
@@ -37,7 +39,7 @@ MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-AKTO_CONNECTOR = "claude_code_cli"
+AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 
 # SSL Configuration
@@ -55,18 +57,6 @@ else:
 
 
 def create_ssl_context():
-    """
-    Create SSL context with graceful fallback strategy.
-
-    Attempts in order:
-    1. Custom SSL_CERT_PATH if provided
-    2. System default SSL context
-    3. Python certifi bundle (if available)
-    4. Unverified context (last resort)
-
-    Returns:
-        ssl.SSLContext or None
-    """
     return ssl._create_unverified_context()
 
 
@@ -81,8 +71,6 @@ def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
 
 
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
-    import time
-
     logger.info(f"API CALL: POST {url}")
     if LOG_PAYLOADS:
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
@@ -119,40 +107,30 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 
 
 def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, Any]:
-    """Build the request body for data ingestion."""
-    import time
-
-    # Build tags based on mode
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
         tags["ai-agent"] = "claudecli"
         tags["source"] = CONTEXT_SOURCE
 
-    # Get device ID
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
 
-    # Build host from CLAUDE_API_URL
     host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
 
-    # Build request headers as JSON string
     request_headers = json.dumps({
         "host": host,
-        "x-claude-hook": "PostToolUse",
+        "x-claude-hook": "Stop",
         "content-type": "application/json"
     })
 
-    # Build response headers as JSON string
     response_headers = json.dumps({
-        "x-claude-hook": "PostToolUse",
+        "x-claude-hook": "Stop",
         "content-type": "application/json"
     })
 
-    # Build request payload as JSON string
     request_payload = json.dumps({
         "body": user_prompt
     })
 
-    # Build response payload as JSON string
     response_payload = json.dumps({
         "body": response_text
     })
@@ -168,7 +146,7 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": "200",
-        "type": None,
+        "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
         "akto_vxlan_id": device_id,
@@ -185,41 +163,48 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
     }
 
 
-def get_last_interaction(transcript_path: str) -> tuple[str, str]:
-    if not os.path.exists(transcript_path):
-        return "", ""
+def extract_text_from_entry(entry: Dict[str, Any]) -> str:
+    content = entry.get("message", {}).get("content", "")
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text = block.get("text", "")
+                if isinstance(text, str) and text:
+                    parts.append(text)
+        return "".join(parts).strip()
+    return ""
 
-    user_prompt, assistant_response = "", ""
-    
+
+def get_last_user_prompt(transcript_path: str) -> str:
+    if not os.path.exists(transcript_path):
+        return ""
+
     try:
-        with open(transcript_path, 'r') as f:
+        last_user = ""
+        with open(transcript_path, "r") as f:
             for line in f:
                 try:
                     entry = json.loads(line)
-                    entry_type = entry.get('type')
-                    if entry_type not in ('user', 'assistant'):
-                        continue
-                    
-                    content = entry.get('message', {}).get('content', '')
-                    text = content if isinstance(content, str) else "".join(
-                        block.get('text', '') for block in content if block.get('type') == 'text'
-                    )
-                    
-                    if entry_type == 'user':
-                        user_prompt = text
-                    else:
-                        assistant_response = text
-                        
                 except json.JSONDecodeError:
                     continue
-                    
-        return user_prompt, assistant_response
+                if entry.get("type") == "user":
+                    text = extract_text_from_entry(entry)
+                    if text:
+                        last_user = text
+        return last_user
     except Exception as e:
         logger.error(f"Error reading transcript: {e}")
-        return "", ""
+        return ""
 
 
 def send_ingestion_data(user_prompt: str, response_text: str):
+    if not AKTO_DATA_INGESTION_URL:
+        logger.info("AKTO_DATA_INGESTION_URL not set, skipping ingestion")
+        return
+
     if not user_prompt.strip() or not response_text.strip():
         return
 
@@ -260,7 +245,9 @@ def main():
         transcript_path = os.path.expanduser(transcript_path)
         logger.info(f"Reading transcript from: {transcript_path}")
 
-        user_prompt, response_text = get_last_interaction(transcript_path)
+        response_text = input_data.get("last_assistant_message", "").strip()
+
+        user_prompt = get_last_user_prompt(transcript_path)
 
         if not user_prompt or not response_text:
             logger.info("No complete interaction found in transcript")

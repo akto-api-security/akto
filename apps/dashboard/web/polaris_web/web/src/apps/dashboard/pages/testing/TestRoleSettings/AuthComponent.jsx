@@ -42,6 +42,7 @@ const AuthComponent = ({
   setOpenAuth,
   advancedHeaderSettingsOpen,
   setAdvancedHeaderSettingsOpen,
+  roleName,
   hybridTestingEnabled = false,
   miniTestingServiceNameOptions = [],
   selectedMiniTestingServiceName = '',
@@ -396,6 +397,7 @@ const AuthComponent = ({
                 extractInformation={true}
                 showOnlyApi={true}
                 setStoreData={handleLoginInfo}
+                roleName={roleName}
               />
             )}
           </Collapsible>

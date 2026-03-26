@@ -429,11 +429,16 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
-    const categoryKey = selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] || selectedTestRunResult?.testCategory;
+    const categoryKey =
+      selectedTestRunResult?.superCategoryName ||
+      selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] ||
+      selectedTestRunResult?.testCategory;
     const owaspData = func.categoryMapping[categoryKey] || {};
     const owaspMapping = owaspData.label || "";
     const owaspUrl = owaspData.url || "";
-    const asiCategories = func.getASICategoriesForAgenticCategory(selectedTestRunResult?.superCategoryName || "");
+    const owaspAgenticData = func.agenticCategoryMapping[categoryKey] || {};
+    const owaspAgenticMapping = owaspAgenticData.label || "";
+    const owaspAgenticUrl = owaspAgenticData.url || "";
 
     function ActionsComp() {
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
@@ -529,14 +534,10 @@ function TestRunResultFlyout(props) {
                                         <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
                                     </Link>
                                 ) : null}
-                                {asiCategories.length > 0 ? (
-                                    <HorizontalStack gap="1" wrap>
-                                        {asiCategories.map((asi, index) => (
-                                            <Link key={index} onClick={() => window.open(asi.url, '_blank')}>
-                                                <Badge size="small">{asi.label}</Badge>
-                                            </Link>
-                                        ))}
-                                    </HorizontalStack>
+                                {owaspAgenticMapping.length > 0 ? (
+                                    <Link onClick={() => owaspAgenticUrl && window.open(owaspAgenticUrl, '_blank')}>
+                                        <Badge size="small">{owaspAgenticMapping}</Badge>
+                                    </Link>
                                 ) : null}
                             </VerticalStack>
                         </div>

@@ -320,6 +320,7 @@ function TestRoleSettings() {
       setOpenAuth={setOpenAuth}
       advancedHeaderSettingsOpen={advancedHeaderSettingsOpen}
       setAdvancedHeaderSettingsOpen={setAdvancedHeaderSettingsOpen}
+      roleName={roleName}
       hybridTestingEnabled={hybridTestingEnabled}
       miniTestingServiceNameOptions={miniTestingServiceNameOptions}
       selectedMiniTestingServiceName={selectedMiniTestingServiceName}
