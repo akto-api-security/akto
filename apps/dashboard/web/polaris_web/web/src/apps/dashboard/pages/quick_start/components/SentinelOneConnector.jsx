@@ -1,5 +1,6 @@
-import { Box, Button, Checkbox, Divider, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris'
-import { useState, useEffect } from 'react'
+import { Box, Button, Checkbox, Combobox, Divider, HorizontalStack, Icon, Listbox, Tag, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { SearchMinor } from '@shopify/polaris-icons'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
 import api from '../api'
 import func from '@/util/func'
@@ -18,6 +19,37 @@ function SentinelOneConnector() {
     const [selectedGuardrailTypes, setSelectedGuardrailTypes] = useState([])
     const [executingGuardrails, setExecutingGuardrails] = useState(false)
     const [envVarValues, setEnvVarValues] = useState({})
+
+    // Device selection
+    const [agents, setAgents] = useState([])
+    const [runOnAllDevices, setRunOnAllDevices] = useState(true)
+    const [selectedAgentIds, setSelectedAgentIds] = useState([])
+    const [searchInput, setSearchInput] = useState('')
+
+    const allOptions = useMemo(() =>
+        agents.map((agent) => ({
+            value: agent.id,
+            label: agent.computerName || agent.id,
+            os: agent.osName || 'Unknown OS',
+        })),
+        [agents]
+    )
+
+    const filteredOptions = useMemo(() => {
+        return allOptions.filter((opt) =>
+            opt.label.toLowerCase().includes(searchInput.toLowerCase())
+        )
+    }, [allOptions, searchInput])
+
+    const toggleDevice = useCallback((id) => {
+        setSelectedAgentIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+        )
+    }, [])
+
+    const removeDevice = useCallback((id) => {
+        setSelectedAgentIds((prev) => prev.filter((x) => x !== id))
+    }, [])
 
     useEffect(() => {
         // Fetch available guardrail types from backend
@@ -46,6 +78,21 @@ function SentinelOneConnector() {
                 if (integration.guardrailEnvVars) {
                     setEnvVarValues(integration.guardrailEnvVars)
                 }
+
+                // Load saved target mode and agent IDs
+                if (integration.guardrailTargetMode) {
+                    setRunOnAllDevices(integration.guardrailTargetMode === 'all')
+                }
+                if (integration.guardrailAgentIds && integration.guardrailAgentIds.length > 0) {
+                    setSelectedAgentIds(integration.guardrailAgentIds)
+                }
+
+                // Fetch agents list
+                api.fetchSentinelOneAgents().then((agentsRes) => {
+                    if (agentsRes && agentsRes.agents) {
+                        setAgents(agentsRes.agents)
+                    }
+                }).catch(() => {})
             }
         }).catch(() => {})
     }, [])
@@ -85,14 +132,22 @@ function SentinelOneConnector() {
             return
         }
 
+        if (!runOnAllDevices && selectedAgentIds.length === 0) {
+            func.setToast(true, true, 'Please select at least one device')
+            return
+        }
+
         // AKTO_GUARDRAILS_URL is common for all
         const guardrailEnvVars = {
             'AKTO_GUARDRAILS_URL': guardrailsUrl,
             ...envVarValues
         }
 
+        const targetMode = runOnAllDevices ? 'all' : 'selected'
+        const agentIds = runOnAllDevices ? [] : selectedAgentIds
+
         setExecutingGuardrails(true)
-        api.saveGuardrailsConfig(selectedGuardrailTypes, guardrailEnvVars, 'all', [])
+        api.saveGuardrailsConfig(selectedGuardrailTypes, guardrailEnvVars, targetMode, agentIds)
             .then((result) => {
                 const execution = result.guardrailExecution || {}
                 const totalSuccess = execution.successCount || 0
@@ -192,16 +247,81 @@ function SentinelOneConnector() {
                         </VerticalStack>
 
                         {selectedGuardrailTypes.length > 0 && (
-                            <HorizontalStack align="end">
-                                <Button
-                                    primary
-                                    onClick={handleSaveGuardrails}
-                                    loading={executingGuardrails}
-                                    disabled={executingGuardrails}
-                                >
-                                    Save & Run Guardrails
-                                </Button>
-                            </HorizontalStack>
+                            <VerticalStack gap="3">
+                                <Box paddingBlockStart="2">
+                                    <VerticalStack gap="2">
+                                        <Checkbox
+                                            label="Run on all devices"
+                                            checked={runOnAllDevices}
+                                            onChange={(checked) => {
+                                                setRunOnAllDevices(checked)
+                                            }}
+                                            helpText="Install guardrails on all SentinelOne managed endpoints"
+                                        />
+
+                                        {!runOnAllDevices && (
+                                            <Box paddingInlineStart="6">
+                                                <VerticalStack gap="2">
+                                                    <Combobox
+                                                        allowMultiple
+                                                        activator={
+                                                            <Combobox.TextField
+                                                                prefix={<Icon source={SearchMinor} />}
+                                                                onChange={setSearchInput}
+                                                                label="Search devices"
+                                                                value={searchInput}
+                                                                placeholder="Search and select devices..."
+                                                                autoComplete="off"
+                                                            />
+                                                        }
+                                                    >
+                                                        {filteredOptions.length > 0 ? (
+                                                            <Listbox onSelect={toggleDevice}>
+                                                                {filteredOptions.map((opt) => (
+                                                                    <Listbox.Option
+                                                                        key={opt.value}
+                                                                        value={opt.value}
+                                                                        selected={selectedAgentIds.includes(opt.value)}
+                                                                        accessibilityLabel={opt.label}
+                                                                    >
+                                                                        {`${opt.label} (${opt.os})`}
+                                                                    </Listbox.Option>
+                                                                ))}
+                                                            </Listbox>
+                                                        ) : null}
+                                                    </Combobox>
+                                                    {selectedAgentIds.length > 0 && (
+                                                        <HorizontalStack gap="1" wrap>
+                                                            {selectedAgentIds.map((id) => {
+                                                                const opt = allOptions.find((o) => o.value === id)
+                                                                return (
+                                                                    <Tag key={id} onRemove={() => removeDevice(id)}>
+                                                                        {opt ? `${opt.label} (${opt.os})` : id}
+                                                                    </Tag>
+                                                                )
+                                                            })}
+                                                        </HorizontalStack>
+                                                    )}
+                                                    <Text variant="bodySm" color="subdued">
+                                                        {selectedAgentIds.length} of {agents.length} device(s) selected
+                                                    </Text>
+                                                </VerticalStack>
+                                            </Box>
+                                        )}
+                                    </VerticalStack>
+                                </Box>
+
+                                <HorizontalStack align="end">
+                                    <Button
+                                        primary
+                                        onClick={handleSaveGuardrails}
+                                        loading={executingGuardrails}
+                                        disabled={executingGuardrails || (!runOnAllDevices && selectedAgentIds.length === 0)}
+                                    >
+                                        Save & Run Guardrails
+                                    </Button>
+                                </HorizontalStack>
+                            </VerticalStack>
                         )}
                     </VerticalStack>
                 </VerticalStack>
