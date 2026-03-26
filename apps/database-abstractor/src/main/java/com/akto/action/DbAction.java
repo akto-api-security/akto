@@ -5016,7 +5016,7 @@ public class DbAction extends ActionSupport {
         }
 
         loggerMaker.infoAndAddToDb("Starting import of OpenAPI spec for accountId=" + accountId);
-        loggerMaker.infoAndAddToDb("OpenAPI spec: " + openApiSchema);
+        loggerMaker.infoAndAddToDb("OpenAPI spec: " + openApiSchema, LogDb.CYBORG);
 
         // Submit task to a separate executor with timeout
         new Thread(new Runnable() {
