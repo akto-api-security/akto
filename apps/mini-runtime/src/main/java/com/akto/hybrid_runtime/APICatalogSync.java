@@ -149,9 +149,9 @@ public class APICatalogSync {
         }
 
         requestTemplate.processHeaders(requestParams.getHeaders(), baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp);
-        BasicDBObject requestPayload = RequestTemplate.parseRequestPayload(requestParams, urlWithParams);
-        if (requestPayload != null) {
-            deletedInfo.addAll(requestTemplate.process2(requestPayload, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
+        Map<String, Set<Object>> reqFlattened = RequestTemplate.streamFlattenRequestPayload(requestParams, urlWithParams);
+        if (reqFlattened != null && !reqFlattened.isEmpty()) {
+            deletedInfo.addAll(requestTemplate.process2WithFlattened(reqFlattened, baseURL.getUrl(), methodStr, -1, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
         }
         requestTemplate.recordMessage(responseParams.getOrig());
 
@@ -175,14 +175,7 @@ public class APICatalogSync {
             }
 
 
-            BasicDBObject payload;
-            try {
-                payload = BasicDBObject.parse(respPayload);
-            } catch (Exception e) {
-                payload = BasicDBObject.parse("{}");
-            }
-
-            deletedInfo.addAll(responseTemplate.process2(payload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
+            deletedInfo.addAll(responseTemplate.process2Stream(respPayload, baseURL.getUrl(), methodStr, statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp));
             responseTemplate.processHeaders(responseParams.getHeaders(), baseURL.getUrl(), method.name(), statusCode, userId, requestParams.getApiCollectionId(), responseParams.getOrig(), sensitiveParamInfoBooleanMap, timestamp);
             if (!responseParams.getIsPending()) {
                 responseTemplate.processTraffic(responseParams.getTime());
