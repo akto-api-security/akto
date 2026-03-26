@@ -673,9 +673,9 @@ public class StartTestAction extends UserAction {
         this.testingRunType = TestingRunType.ONE_TIME;
         if (cicdCount > 0) {
             this.testingRunType = TestingRunType.CI_CD;
-        } else if (this.testingRun.getPeriodInSeconds() > 0) {
+        } else if (this.testingRun != null && this.testingRun.getPeriodInSeconds() > 0) {
             this.testingRunType = TestingRunType.RECURRING;
-        } else if (this.testingRun.getPeriodInSeconds() == -1) {
+        } else if (this.testingRun != null && this.testingRun.getPeriodInSeconds() == -1) {
             this.testingRunType = TestingRunType.CONTINUOUS_TESTING;
         }
 
