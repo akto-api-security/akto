@@ -113,6 +113,7 @@ public class InviteUserAction extends UserAction{
 
     private String finalInviteCode;
     private String inviteeRole;
+    private Map<String, String> scopeRoleMapping;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InviteUserAction.class, LoggerMaker.LogDb.DASHBOARD);
 
@@ -158,24 +159,72 @@ public class InviteUserAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
-        Role userRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
-        Role baseRole = null;
+        Role adminUserRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
 
-        CustomRole customRole = CustomRoleDao.instance.findRoleByName(this.inviteeRole);
+        // Validate scopeRoleMapping if provided, otherwise fall back to old fields for backward compatibility
+        Map<String, String> scopeRoleToSave = new HashMap<>();
 
-        try {
-            if (customRole != null) {
-                baseRole = Role.valueOf(customRole.getBaseRole());
-            } else {
-                baseRole = Role.valueOf(this.inviteeRole);
+        if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
+            // New n:n mapping approach
+            for (Map.Entry<String, String> entry : this.scopeRoleMapping.entrySet()) {
+                String roleStr = entry.getValue();
+                Role baseRole = null;
+
+                CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
+
+                try {
+                    if (customRole != null) {
+                        baseRole = Role.valueOf(customRole.getBaseRole());
+                    } else {
+                        baseRole = Role.valueOf(roleStr);
+                    }
+                } catch (Exception e) {
+                    addActionError("Invalid role: " + roleStr);
+                    return ERROR.toUpperCase();
+                }
+
+                if (!Arrays.asList(adminUserRole.getRoleHierarchy()).contains(baseRole)) {
+                    addActionError("User not allowed to invite for role: " + roleStr);
+                    return ERROR.toUpperCase();
+                }
+
+                // Save the role name (custom or standard) to scopeRoleMapping.
+                // Custom roles will be resolved to their baseRole at access time via RBAC.getRoleForScope()
+                // This preserves the custom role assignment for auditing and future enhancements.
+                scopeRoleToSave.put(entry.getKey(), roleStr);
             }
-        } catch (Exception e) {
-            addActionError("Invalid role");
-            return ERROR.toUpperCase();
-        }
 
-        if (!Arrays.asList(userRole.getRoleHierarchy()).contains(baseRole)) {
-            addActionError("User not allowed to invite for this role");
+            if (scopeRoleToSave.isEmpty()) {
+                // Default to API + GUEST if no scopes selected
+                loggerMaker.debugAndAddToDb("scopeRoleMapping is empty, defaulting to API + GUEST");
+                scopeRoleToSave.put("API", Role.GUEST.name());
+            }
+        } else if (this.inviteeRole != null && !this.inviteeRole.isEmpty()) {
+            // Backward compatibility: old single role
+            Role baseRole = null;
+            CustomRole customRole = CustomRoleDao.instance.findRoleByName(this.inviteeRole);
+
+            try {
+                if (customRole != null) {
+                    baseRole = Role.valueOf(customRole.getBaseRole());
+                } else {
+                    baseRole = Role.valueOf(this.inviteeRole);
+                }
+            } catch (Exception e) {
+                addActionError("Invalid role");
+                return ERROR.toUpperCase();
+            }
+
+            if (!Arrays.asList(adminUserRole.getRoleHierarchy()).contains(baseRole)) {
+                addActionError("User not allowed to invite for this role");
+                return ERROR.toUpperCase();
+            }
+
+            // If any any case only invitee role is present and no scope then map it to "API"
+                scopeRoleToSave.put("API", this.inviteeRole);
+
+        } else {
+            addActionError("Either scopeRoleMapping or inviteeRole must be provided");
             return ERROR.toUpperCase();
         }
 
@@ -212,12 +261,14 @@ public class InviteUserAction extends UserAction{
                         Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, inviteeEmail)
                     ),
                     Updates.combine(
-                        Updates.set(PendingInviteCode.INVITEE_ROLE, this.inviteeRole),
+                        Updates.set(PendingInviteCode.SCOPE_ROLE_MAPPING, scopeRoleToSave),
                         Updates.set(PendingInviteCode.INVITE_CODE, inviteCode),
                         Updates.set(PendingInviteCode._EXPIRY, jws.getBody().getExpiration().getTime()),
                         Updates.set(PendingInviteCode._ISSUER, user_id)
                     )
             );
+
+            loggerMaker.infoAndAddToDb("Invitation sent with scopeRoleMapping: " + scopeRoleToSave);
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
             e.printStackTrace();
             return ERROR.toUpperCase();
@@ -300,5 +351,13 @@ public class InviteUserAction extends UserAction{
 
     public void setInviteeRole(String inviteeRole) {
         this.inviteeRole = inviteeRole;
+    }
+
+    public Map<String, String> getScopeRoleMapping() {
+        return scopeRoleMapping;
+    }
+
+    public void setScopeRoleMapping(Map<String, String> scopeRoleMapping) {
+        this.scopeRoleMapping = scopeRoleMapping;
     }
 }

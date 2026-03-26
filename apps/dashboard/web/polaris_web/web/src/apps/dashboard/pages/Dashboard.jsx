@@ -2,7 +2,7 @@ import { Outlet, useLocation, useNavigate} from "react-router-dom"
 import { history } from "@/util/history";
 import Store from "../store";
 import homeFunctions from "./home/module";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Frame, Toast, VerticalStack, Banner, Button, Text } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
@@ -19,6 +19,23 @@ import threatDetectionRequests from "./threat_detection/api";
 import SessionStore from "../../main/SessionStore";
 import { updateThreatFiltersStore } from "./threat_detection/utils/threatFilters";
 
+/**
+ * Maps scope values to dashboard category names
+ */
+const scopeToCategoryMap = {
+    'API': 'API Security',
+    'AGENTIC': 'Agentic Security',
+    'ENDPOINT': 'Endpoint Security',
+    'DAST': 'DAST'
+}
+
+/**
+ * Gets the dashboard category for a given scope
+ */
+const getDashboardCategoryForScope = (scope) => {
+    return scopeToCategoryMap[scope] || 'API Security'
+}
+
 function Dashboard() {
 
     const location = useLocation();
@@ -34,6 +51,9 @@ function Dashboard() {
 
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
+
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
+    const setDashboardCategory = PersistStore((state) => state.setDashboardCategory);
 
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
     const [eventForUser, setEventForUser] = useState({})
@@ -76,6 +96,39 @@ function Dashboard() {
             updateThreatFiltersStore(res?.templates || [])
         })
     }
+
+    /**
+     * Auto-detect user's accessible product scopes based on feature grants.
+     * If the current dashboard category isn't accessible, switch to the first accessible one.
+     * This prevents 403 errors when user logs in but current scope isn't available to them.
+     */
+    useEffect(() => {
+        const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
+        const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false
+        const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
+        const endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted
+        const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true
+
+        // Build list of accessible categories
+        const accessibleCategories = ['API Security']; // API always accessible
+
+        if (agenticSecurityGranted) {
+            accessibleCategories.push('Agentic Security');
+        }
+
+        if (endpointSecurityGranted) {
+            accessibleCategories.push('Endpoint Security');
+        }
+
+        if (dastGranted) {
+            accessibleCategories.push('DAST');
+        }
+
+        // If current dashboard category isn't accessible, switch to first accessible one
+        if (!accessibleCategories.includes(dashboardCategory)) {
+            setDashboardCategory(accessibleCategories[0]);
+        }
+    }, []);
 
     useEffect(() => {
         if(trafficAlerts == null && window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')){
