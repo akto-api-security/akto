@@ -340,19 +340,48 @@ public class McpToolsSyncJobExecutor {
         );
     }
 
+    @SuppressWarnings("rawtypes")
     public static Map<String, Object> generateExampleArguments(JsonSchema inputSchema) {
         if (inputSchema == null) {
             return Collections.emptyMap();
         }
         try {
             String inputSchemaJson = mapper.writeValueAsString(inputSchema);
-            Schema openApiSchema = io.swagger.v3.core.util.Json.mapper().readValue(inputSchemaJson, Schema.class);
-            Example example = ExampleBuilder.fromSchema(openApiSchema, null);
+            Schema<?> openApiSchema = io.swagger.v3.core.util.Json.mapper().readValue(inputSchemaJson, Schema.class);
+            Map<String, Schema> schemaDefinitions = buildSchemaDefinitions(inputSchema);
+            Example example = ExampleBuilder.fromSchema(openApiSchema, schemaDefinitions);
             return JSONUtils.getMap(Json.pretty(example));
 
         } catch (Exception e) {
-            logger.error("Failed to generate example arguments using OpenAPI ExampleBuilder", e);
+            logger.errorAndAddToDb(e, "Failed to generate example arguments using OpenAPI ExampleBuilder. message: " + e.getMessage());
             return Collections.emptyMap();
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static Map<String, Schema> buildSchemaDefinitions(JsonSchema inputSchema) {
+        Map<String, Schema> schemaDefinitions = new HashMap<>();
+        addSchemaDefinitions(schemaDefinitions, inputSchema.getDefs());
+        addSchemaDefinitions(schemaDefinitions, inputSchema.getDefinitions());
+        return schemaDefinitions;
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static void addSchemaDefinitions(Map<String, Schema> schemaDefinitions, Map<String, Object> definitions) {
+        if (definitions == null || definitions.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, Object> entry : definitions.entrySet()) {
+            if (entry.getValue() == null) {
+                continue;
+            }
+            try {
+                String schemaJson = mapper.writeValueAsString(entry.getValue());
+                Schema<?> schema = io.swagger.v3.core.util.Json.mapper().readValue(schemaJson, Schema.class);
+                schemaDefinitions.put(entry.getKey(), schema);
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "Failed to parse schema definition for key: " + entry.getKey() + ". message: " + e.getMessage());
+            }
         }
     }
 
