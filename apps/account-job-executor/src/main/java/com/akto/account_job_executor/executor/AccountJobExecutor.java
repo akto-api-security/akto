@@ -60,7 +60,7 @@ public abstract class AccountJobExecutor {
         }
 
         // Handle recurring jobs
-        handleRecurringJob(executedJob);
+        handleRecurringJob(job);
     }
 
     /**
