@@ -10,7 +10,6 @@ function SentinelOneConnector() {
     const [apiToken, setApiToken] = useState('')
     const [consoleUrl, setConsoleUrl] = useState('')
     const [dataIngestionUrl, setDataIngestionUrl] = useState('')
-    const [guardrailsUrl, setGuardrailsUrl] = useState('')
     const [recurringIntervalSeconds, setRecurringIntervalSeconds] = useState('3600')
     const [isSaved, setIsSaved] = useState(false)
 
@@ -65,7 +64,6 @@ function SentinelOneConnector() {
                 const integration = res.sentinelOneIntegration
                 setConsoleUrl(integration.consoleUrl || '')
                 setDataIngestionUrl(integration.dataIngestionUrl || '')
-                setGuardrailsUrl(integration.guardrailsUrl || '')
                 setRecurringIntervalSeconds(String(integration.recurringIntervalSeconds || 3600))
                 setIsSaved(true)
                 
@@ -101,7 +99,7 @@ function SentinelOneConnector() {
 
     const handleSave = () => {
         api.addSentinelOneIntegration(
-            apiToken || null, consoleUrl, dataIngestionUrl, guardrailsUrl,
+            apiToken || null, consoleUrl, dataIngestionUrl,
             parseInt(recurringIntervalSeconds) || 3600
         ).then(() => {
             setApiToken('')
@@ -112,7 +110,7 @@ function SentinelOneConnector() {
 
     const handleRemove = () => {
         api.removeSentinelOneIntegration().then(() => {
-            setApiToken(''); setConsoleUrl(''); setDataIngestionUrl(''); setGuardrailsUrl('')
+            setApiToken(''); setConsoleUrl(''); setDataIngestionUrl('')
             setRecurringIntervalSeconds('3600'); setIsSaved(false)
             func.setToast(true, false, 'SentinelOne integration removed successfully')
         }).catch(() => func.setToast(true, true, 'Failed to remove SentinelOne integration'))
@@ -137,9 +135,9 @@ function SentinelOneConnector() {
             return
         }
 
-        // AKTO_GUARDRAILS_URL is common for all
+        // AKTO_DATA_INGESTION_URL is common for all
         const guardrailEnvVars = {
-            'AKTO_GUARDRAILS_URL': guardrailsUrl,
+            'AKTO_DATA_INGESTION_URL': dataIngestionUrl,
             ...envVarValues
         }
 
@@ -163,7 +161,7 @@ function SentinelOneConnector() {
 
     // ── Derived ──────────────────────────────────────────────────────────────
 
-    const isSaveDisabled = !consoleUrl || !dataIngestionUrl || !guardrailsUrl || (!apiToken && !isSaved)
+    const isSaveDisabled = !consoleUrl || !dataIngestionUrl || (!apiToken && !isSaved)
 
     return (
         <div className='card-items'>
@@ -179,10 +177,8 @@ function SentinelOneConnector() {
                     placeholder="https://usea1-partners.sentinelone.net" requiredIndicator autoComplete="off" />
                 <PasswordTextField label="API Token" onFunc={true} setField={setApiToken} field={apiToken} requiredIndicator />
                 <TextField label="Data Ingestion Service URL" value={dataIngestionUrl} onChange={setDataIngestionUrl}
-                    requiredIndicator autoComplete="off" />
-                <TextField label="Guardrails URL" value={guardrailsUrl} onChange={setGuardrailsUrl}
-                    placeholder="https://your-guardrails-endpoint.akto.io" requiredIndicator autoComplete="off"
-                    helpText="Common URL for all guardrails (AKTO_GUARDRAILS_URL)" />
+                    requiredIndicator autoComplete="off"
+                    helpText="Common URL for data ingestion and guardrails (AKTO_DATA_INGESTION_URL)" />
                 <TextField label="Polling Interval (seconds)" value={recurringIntervalSeconds}
                     onChange={setRecurringIntervalSeconds} type="number" autoComplete="off" />
             </VerticalStack>

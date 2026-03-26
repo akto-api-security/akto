@@ -106,8 +106,6 @@ public class SentinelOneIntegrationAction extends UserAction {
         org.bson.conversions.Bson updates = Updates.combine(
             Updates.set(SentinelOneIntegration.CONSOLE_URL, normalizedConsoleUrl),
             Updates.set(SentinelOneIntegration.DATA_INGESTION_URL, dataIngestionUrl),
-            Updates.set(SentinelOneIntegration.GUARDRAILS_URL, guardrailsUrl),
-            Updates.set(SentinelOneIntegration.RECURRING_INTERVAL_SECONDS, interval),
             Updates.setOnInsert(SentinelOneIntegration.CREATED_TS, now),
             Updates.set(SentinelOneIntegration.UPDATED_TS, now)
         );
@@ -639,14 +637,14 @@ public class SentinelOneIntegrationAction extends UserAction {
             int totalSuccessCount = 0;
             int totalFailCount = 0;
             
-            // Build complete env vars map including common guardrailsUrl
+            // Build complete env vars map including common dataIngestionUrl
             Map<String, String> completeEnvVars = new HashMap<>();
             if (integration.getGuardrailEnvVars() != null) {
                 completeEnvVars.putAll(integration.getGuardrailEnvVars());
             }
-            // Add common AKTO_GUARDRAILS_URL for all guardrails
-            if (integration.getGuardrailsUrl() != null && !integration.getGuardrailsUrl().isEmpty()) {
-                completeEnvVars.put("AKTO_GUARDRAILS_URL", integration.getGuardrailsUrl());
+            // Add common AKTO_DATA_INGESTION_URL for all guardrails
+            if (integration.getDataIngestionUrl() != null && !integration.getDataIngestionUrl().isEmpty()) {
+                completeEnvVars.put("AKTO_DATA_INGESTION_URL", integration.getDataIngestionUrl());
             }
             
             // Execute each guardrail type

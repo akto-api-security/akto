@@ -350,11 +350,11 @@ const api = {
         })
     },
 
-    addSentinelOneIntegration(apiToken, consoleUrl, dataIngestionUrl, guardrailsUrl, recurringIntervalSeconds) {
+    addSentinelOneIntegration(apiToken, consoleUrl, dataIngestionUrl, recurringIntervalSeconds) {
         return request({
             url: '/api/addSentinelOneIntegration',
             method: 'post',
-            data: { apiToken, consoleUrl, dataIngestionUrl, guardrailsUrl, recurringIntervalSeconds }
+            data: { apiToken, consoleUrl, dataIngestionUrl, recurringIntervalSeconds }
         })
     },
 

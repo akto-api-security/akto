@@ -47,7 +47,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         "Cursor",
         "Copilot",
         "Windsurf",
-        "Antigravity"
+        "Antigravity",
+        "Codex"
     );
 
     /**
@@ -56,7 +57,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
      * Add new tools here when they appear as process names.
      */
     public static final List<String> DV_TOOL_LIST = Arrays.asList(
-    "openclaw"
+    "openclaw",
+    "gemini"
     );
 
     // ── Executor implementation ───────────────────────────────────────────────
@@ -126,18 +128,25 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         }
 
         // ── Pass 2: Deep Visibility (process events) ──────────────────────────
-        for (String tool : DV_TOOL_LIST) {
+        // Make ONE combined query for all DV tools to avoid rate limiting
+        if (!DV_TOOL_LIST.isEmpty()) {
             try {
-                List<Map<String, Object>> events = runDvQuery(tool, apiToken, consoleUrl, DV_LOOKBACK_HOURS);
-                if (events.isEmpty()) {
-                    loggerMaker.info("SentinelOneExecutor: no DV events for tool: " + tool, LogDb.DASHBOARD);
-                    continue;
+                List<Map<String, Object>> allEvents = runDvQueryForAllTools(DV_TOOL_LIST, apiToken, consoleUrl, DV_LOOKBACK_HOURS);
+                if (allEvents.isEmpty()) {
+                    loggerMaker.info("SentinelOneExecutor: no DV events found for any tool", LogDb.DASHBOARD);
+                } else {
+                    // Group and ingest events by detected tool
+                    Map<String, List<Map<String, Object>>> eventsByTool = groupEventsByTool(allEvents, DV_TOOL_LIST);
+                    for (Map.Entry<String, List<Map<String, Object>>> entry : eventsByTool.entrySet()) {
+                        String tool = entry.getKey();
+                        List<Map<String, Object>> events = entry.getValue();
+                        String toolDomain = tool.toLowerCase() + ".sentinel";
+                        ingestDvEvents(events, tool, toolDomain, ingestUrl, consoleDomain);
+                        loggerMaker.info("SentinelOneExecutor: ingested " + events.size() + " DV event(s) for " + tool, LogDb.DASHBOARD);
+                    }
                 }
-                String toolDomain = tool.toLowerCase() + ".sentinel";
-                ingestDvEvents(events, tool, toolDomain, ingestUrl, consoleDomain);
-                loggerMaker.info("SentinelOneExecutor: ingested " + events.size() + " DV event(s) for " + tool, LogDb.DASHBOARD);
             } catch (IOException e) {
-                loggerMaker.error("SentinelOneExecutor: DV error for " + tool + " — " + e.getMessage(), LogDb.DASHBOARD);
+                loggerMaker.error("SentinelOneExecutor: DV query failed — " + e.getMessage(), LogDb.DASHBOARD);
             }
         }
     }
@@ -295,17 +304,33 @@ public class SentinelOneExecutor extends AccountJobExecutor {
 
     // ── Deep Visibility ───────────────────────────────────────────────────────
 
+    /**
+     * Run a SINGLE combined DV query for all tools to avoid rate limiting.
+     * Query format: (processCmd contains "tool1" OR processName contains "tool1") OR 
+     *               (processCmd contains "tool2" OR processName contains "tool2") ...
+     */
     @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> runDvQuery(
-            String tool,
+    private static List<Map<String, Object>> runDvQueryForAllTools(
+            List<String> tools,
             String apiToken,
             String consoleUrl,
             int lookbackHours) throws IOException {
 
-        // Build S1QL query from tool name
-        String query = "processCmd contains \"" + tool + "\" OR processName contains \"" + tool + "\"";
+        // Build combined S1QL query for all tools
+        StringBuilder queryBuilder = new StringBuilder();
+        for (int i = 0; i < tools.size(); i++) {
+            String tool = tools.get(i);
+            if (i > 0) {
+                queryBuilder.append(" OR ");
+            }
+            queryBuilder.append("(processCmd contains \"").append(tool).append("\"");
+            queryBuilder.append(" OR processName contains \"").append(tool).append("\")");
+        }
+        String query = queryBuilder.toString();
         String toDate = java.time.Instant.now().toString();
         String fromDate = java.time.Instant.now().minus(lookbackHours, java.time.temporal.ChronoUnit.HOURS).toString();
+        
+        loggerMaker.info("SentinelOneExecutor: DV query: " + query, LogDb.DASHBOARD);
 
         RequestConfig requestConfig = RequestConfig.custom()
             .setConnectTimeout(CONNECT_TIMEOUT_MS)
@@ -379,10 +404,47 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                 }
             }
 
-            loggerMaker.info("SentinelOneExecutor: DV query returned " + sdlResults.size() + " result(s) for tool: " + tool, LogDb.DASHBOARD);
+            loggerMaker.info("SentinelOneExecutor: DV query returned " + sdlResults.size() + " total event(s)", LogDb.DASHBOARD);
             return sdlResults;
 
         }
+    }
+
+    /**
+     * Group events by which tool was detected in the process command/name.
+     * An event can match multiple tools - we'll assign it to the first match.
+     */
+    private static Map<String, List<Map<String, Object>>> groupEventsByTool(
+            List<Map<String, Object>> events,
+            List<String> tools) {
+        
+        Map<String, List<Map<String, Object>>> result = new HashMap<>();
+        for (String tool : tools) {
+            result.put(tool, new ArrayList<>());
+        }
+        
+        for (Map<String, Object> event : events) {
+            String processCmd = getStringOrDefault(event, "processCmd", "").toLowerCase();
+            String processName = getStringOrDefault(event, "processName", "").toLowerCase();
+            
+            // Assign to first matching tool
+            boolean assigned = false;
+            for (String tool : tools) {
+                String toolLower = tool.toLowerCase();
+                if (processCmd.contains(toolLower) || processName.contains(toolLower)) {
+                    result.get(tool).add(event);
+                    assigned = true;
+                    break;
+                }
+            }
+            
+            // If no tool matched (shouldn't happen), assign to first tool
+            if (!assigned && !tools.isEmpty()) {
+                result.get(tools.get(0)).add(event);
+            }
+        }
+        
+        return result;
     }
 
     private static void ingestDvEvents(

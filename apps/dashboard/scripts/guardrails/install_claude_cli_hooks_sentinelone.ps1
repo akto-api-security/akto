@@ -130,10 +130,10 @@ function New-WrapperScript {
         $wrapperContent = @"
 #!/bin/bash
 # Auto-generated wrapper for Akto guardrails hook
-# Guardrails URL: $IngestionUrl
+# Data Ingestion URL: $IngestionUrl
 
 export MODE="atlas"
-export AKTO_GUARDRAILS_URL="$IngestionUrl"
+export AKTO_DATA_INGESTION_URL="$IngestionUrl"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="claude_code_cli"
@@ -141,7 +141,7 @@ export CONTEXT_SOURCE="ENDPOINT"
 export DEVICE_ID="$DeviceId"
 
 # Log configuration for debugging
-echo "[Claude Hook] Guardrails URL: `$AKTO_GUARDRAILS_URL" >&2
+echo "[Claude Hook] Data Ingestion URL: `$AKTO_DATA_INGESTION_URL" >&2
 echo "[Claude Hook] Device ID: `$DEVICE_ID" >&2
 
 exec python3 "$pythonScript" "`$@"
@@ -151,7 +151,6 @@ exec python3 "$pythonScript" "`$@"
     }
     
     $content = Get-Content $tempFile -Raw
-    $content = $content -replace '\{\{AKTO_GUARDRAILS_URL\}\}', $IngestionUrl
     $content = $content -replace '\{\{AKTO_DATA_INGESTION_URL\}\}', $IngestionUrl
     $content = $content -replace '\{\{DEVICE_ID \(optional\)\}\}', $DeviceId
     Set-Content -Path $wrapperFile -Value $content -NoNewline

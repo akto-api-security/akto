@@ -112,10 +112,10 @@ function New-WrapperScript {
         
         $wrapperContent = @"
 # Auto-generated wrapper for Akto guardrails hook
-# Guardrails URL: $IngestionUrl
+# Data Ingestion URL: $IngestionUrl
 
 `$env:MODE = "atlas"
-`$env:AKTO_GUARDRAILS_URL = "$IngestionUrl"
+`$env:AKTO_DATA_INGESTION_URL = "$IngestionUrl"
 `$env:AKTO_SYNC_MODE = "true"
 `$env:AKTO_TIMEOUT = "5"
 `$env:AKTO_CONNECTOR = "$Connector"
@@ -123,7 +123,7 @@ function New-WrapperScript {
 `$env:DEVICE_ID = "$DeviceId"
 
 # Log configuration for debugging
-Write-Host "[Cursor Hook] Guardrails URL: `$env:AKTO_GUARDRAILS_URL" -ForegroundColor Gray
+Write-Host "[Cursor Hook] Data Ingestion URL: `$env:AKTO_DATA_INGESTION_URL" -ForegroundColor Gray
 Write-Host "[Cursor Hook] Device ID: `$env:DEVICE_ID" -ForegroundColor Gray
 
 & python "$pythonScript" `$args
@@ -133,7 +133,6 @@ Write-Host "[Cursor Hook] Device ID: `$env:DEVICE_ID" -ForegroundColor Gray
     }
     
     $content = Get-Content $tempFile -Raw
-    $content = $content -replace '\{\{AKTO_GUARDRAILS_URL\}\}', $IngestionUrl
     $content = $content -replace '\{\{AKTO_DATA_INGESTION_URL\}\}', $IngestionUrl
     $content = $content -replace '\{\{DEVICE_ID \(optional\)\}\}', $DeviceId
     Set-Content -Path $wrapperFile -Value $content -Encoding UTF8

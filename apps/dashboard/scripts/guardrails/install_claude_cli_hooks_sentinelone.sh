@@ -135,10 +135,10 @@ create_wrapper() {
         cat > "$wrapper_file" <<EOF
 #!/bin/bash
 # Auto-generated wrapper for Akto guardrails hook
-# Guardrails URL: $ingestion_url
+# Data Ingestion URL: $ingestion_url
 
 export MODE="atlas"
-export AKTO_GUARDRAILS_URL="$ingestion_url"
+export AKTO_DATA_INGESTION_URL="$ingestion_url"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="claude_code_cli"
@@ -146,7 +146,7 @@ export CONTEXT_SOURCE="ENDPOINT"
 export DEVICE_ID="$device_id"
 
 # Log configuration for debugging
-echo "[Claude Hook] Guardrails URL: \$AKTO_GUARDRAILS_URL" >&2
+echo "[Claude Hook] Data Ingestion URL: \$AKTO_DATA_INGESTION_URL" >&2
 echo "[Claude Hook] Device ID: \$DEVICE_ID" >&2
 
 exec python3 "$python_script" "\$@"
@@ -155,9 +155,9 @@ EOF
         return 0
     fi
 
-    sed -e "s|{{AKTO_GUARDRAILS_URL}}|$ingestion_url|g" \
-        -e "s|{{AKTO_DATA_INGESTION_URL}}|$ingestion_url|g" \
+    sed -e "s|{{AKTO_DATA_INGESTION_URL}}|$ingestion_url|g" \
         -e "s|{{DEVICE_ID (optional)}}|$device_id|g" \
+        "$wrapper_file.tmp" > "$wrapper_file"
         "$wrapper_file.tmp" > "$wrapper_file"
 
     rm -f "$wrapper_file.tmp"
