@@ -889,6 +889,13 @@ public class ApiExecutor {
         throw new Exception("Timeout waiting for SSE message with id=" + id);
     }
 
+    public static OriginalHttpResponse sendRequestSkipSse(OriginalHttpRequest request,
+            boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug,
+            List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+        return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs,
+                skipSSRFCheck, true);
+    }
+
     public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects,
         TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
         boolean skipSSRFCheck, boolean overrideMessageEndpoint) throws Exception {
