@@ -353,7 +353,7 @@ public class McpToolsSyncJobExecutor {
             return JSONUtils.getMap(Json.pretty(example));
 
         } catch (Exception e) {
-            logger.error("Failed to generate example arguments using OpenAPI ExampleBuilder", e);
+            logger.errorAndAddToDb(e, "Failed to generate example arguments using OpenAPI ExampleBuilder. message: " + e.getMessage());
             return Collections.emptyMap();
         }
     }
@@ -380,7 +380,7 @@ public class McpToolsSyncJobExecutor {
                 Schema<?> schema = io.swagger.v3.core.util.Json.mapper().readValue(schemaJson, Schema.class);
                 schemaDefinitions.put(entry.getKey(), schema);
             } catch (Exception e) {
-                logger.debug("Failed to parse schema definition for key: {}", entry.getKey(), e);
+                logger.errorAndAddToDb(e, "Failed to parse schema definition for key: " + entry.getKey() + ". message: " + e.getMessage());
             }
         }
     }
