@@ -44,8 +44,6 @@ import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
 import com.opensymphony.xwork2.Action;
@@ -267,7 +265,10 @@ public class IssuesAction extends UserAction {
             // Resolve collection names → IDs
             if (filterCollectionNames != null && !filterCollectionNames.isEmpty()) {
                 List<ApiCollection> matched = ApiCollectionsDao.instance.findAll(
-                    Filters.in(ApiCollection.NAME, filterCollectionNames),
+                    Filters.or(
+                        Filters.in(ApiCollection.NAME, filterCollectionNames),
+                        Filters.in(ApiCollection.HOST_NAME, filterCollectionNames)
+                    ),
                     Projections.exclude(ApiCollection._URLS));
                 filterCollectionsId = matched.stream().map(ApiCollection::getId).collect(Collectors.toList());
                 if (filterCollectionsId.isEmpty()) {
