@@ -258,18 +258,20 @@ public class AgentClient {
             return false;
         }
     }
-    public void initializeAgent(String sseUrl, String authorizationToken) {
+    public void initializeAgent(String sseUrl, String authorizationToken, String requestMethod) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("sseUrl", sseUrl);
         requestBody.put("authorization", authorizationToken);
+        requestBody.put("requestMethod", requestMethod != null && !requestMethod.isEmpty() ? requestMethod : "GET");
         initializeAgent(requestBody);
     }
 
-    public void initializeAgent(String sessionUrl, String requestHeaders, String apiRequestBody, String conversationId) {
+    public void initializeAgent(String sessionUrl, String requestHeaders, String apiRequestBody, String requestMethod, String conversationId) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("sessionUrl", sessionUrl);
         requestBody.put("requestHeaders", requestHeaders);
         requestBody.put("requestBody", apiRequestBody);
+        requestBody.put("requestMethod", requestMethod != null && !requestMethod.isEmpty() ? requestMethod : "POST");
         requestBody.put("conversationId", conversationId);
         initializeAgent(requestBody);
     }

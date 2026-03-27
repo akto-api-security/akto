@@ -46,7 +46,8 @@ public class AgenticUtils {
                 String url = request.getFullUrlWithParams();
                 String requestBody = request.getBody();
                 String requestHeaders = request.fetchHeadersJsonString();
-                agentClient.initializeAgent(url, requestHeaders, requestBody, conversationId);
+                String requestMethod = request.getMethod();
+                agentClient.initializeAgent(url, requestHeaders, requestBody, requestMethod, conversationId);
                 return;
             }
             Map<String, String> authPairs = getMcpAuthPairs();
@@ -55,7 +56,11 @@ public class AgenticUtils {
             if (StringUtils.isEmpty(sseUrl) || StringUtils.isEmpty(authorization)) {
                 return;
             }
-            agentClient.initializeAgent(sseUrl, authorization);
+            String requestMethod = "POST";
+            if (rawApi != null && rawApi.getRequest() != null && StringUtils.isNotEmpty(rawApi.getRequest().getMethod())) {
+                requestMethod = rawApi.getRequest().getMethod();
+            }
+            agentClient.initializeAgent(sseUrl, authorization, requestMethod);
         }
     }
 
