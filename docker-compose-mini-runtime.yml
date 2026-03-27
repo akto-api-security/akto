@@ -1,0 +1,164 @@
+version: '2.1'
+
+services:
+  kafka1:
+    image: public.ecr.aws/aktosecurity/confluentinc-cp-kafka:8.2.0-1-ubi9
+    restart: always
+    hostname: kafka1
+    user: "0"
+    ports:
+      - "9092:9092"
+      - "19092:19092"
+      - "29092:29092"
+      - "9999:9999"
+    environment:
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_NODE_ID: "1"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka1:9094"
+      KAFKA_CLUSTER_ID: "c6a1b8e2-4f2a-4b2a-9c3f-1a2b3c4d5e6f"
+      KAFKA_LISTENERS: "CONTROLLER://0.0.0.0:9094,LISTENER_DOCKER_EXTERNAL_DIFFHOST://0.0.0.0:9092,LISTENER_DOCKER_INTERNAL://0.0.0.0:19092,LISTENER_DOCKER_EXTERNAL_LOCALHOST://0.0.0.0:29092"
+      KAFKA_ADVERTISED_LISTENERS: LISTENER_DOCKER_EXTERNAL_DIFFHOST://${AKTO_KAFKA_IP}:9092, LISTENER_DOCKER_INTERNAL://kafka1:19092,LISTENER_DOCKER_EXTERNAL_LOCALHOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,LISTENER_DOCKER_EXTERNAL_DIFFHOST:PLAINTEXT,LISTENER_DOCKER_INTERNAL:PLAINTEXT,LISTENER_DOCKER_EXTERNAL_LOCALHOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: LISTENER_DOCKER_INTERNAL
+      KAFKA_BROKER_ID: "1"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_CREATE_TOPICS: "akto.api.logs:3:3"
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 60000
+      KAFKA_LOG_RETENTION_HOURS: 5
+      KAFKA_LOG_SEGMENT_BYTES: 104857600
+      KAFKA_LOG_CLEANER_ENABLE: "true"
+      KAFKA_CLEANUP_POLICY: "delete"
+      KAFKA_LOG_RETENTION_BYTES: 10737418240
+    volumes:
+      - ./data-kafka-data:/var/lib/kafka/data
+      - ./data-kafka-secrets:/etc/kafka/secrets
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
+
+  # akto-api-security-runtime:
+  #   image: public.ecr.aws/aktosecurity/akto-api-security-mini-runtime:latest
+  #   environment:
+  #     AKTO_CONFIG_NAME: staging
+  #     AKTO_KAFKA_TOPIC_NAME: akto.api.logs
+  #     AKTO_KAFKA_BROKER_URL: kafka1:19092
+  #     AKTO_KAFKA_BROKER_MAL: localhost:29092
+  #     AKTO_KAFKA_GROUP_ID_CONFIG: asdf
+  #     AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG: "100"
+  #     AKTO_ACCOUNT_NAME: Helios
+  #     AKTO_TRAFFIC_BATCH_SIZE: "100"
+  #     AKTO_TRAFFIC_BATCH_TIME_SECS: "10"
+  #     USE_HOSTNAME: "true"
+  #     AKTO_INSTANCE_TYPE: RUNTIME
+  #     DATABASE_ABSTRACTOR_SERVICE_URL: https://cyborg.akto.io
+  #     DATABASE_ABSTRACTOR_SERVICE_TOKEN: "<token>"
+  #     RUNTIME_MODE: hybrid
+  #     AKTO_THREAT_ENABLED: "true"
+  #   mem_limit: 8g    
+  #   restart: always
+  #   depends_on:
+  #     - kafka1
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "100m"
+  #       max-file: "2"
+  
+  # akto-api-security-mirror-api-logging:
+  #   image: public.ecr.aws/aktosecurity/mirror-api-logging:k8s_agent
+  #   environment:
+  #     AKTO_CONFIG_NAME: staging
+  #     AKTO_KAFKA_TOPIC_NAME: akto.api.logs
+  #     AKTO_KAFKA_BROKER_URL: kafka1:19092
+  #     AKTO_KAFKA_BROKER_MAL: localhost:29092
+  #     AKTO_KAFKA_GROUP_ID_CONFIG: asdf
+  #     AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG: "100"
+  #     AKTO_ACCOUNT_NAME: Helios
+  #     AKTO_TRAFFIC_BATCH_SIZE: "100"
+  #     AKTO_TRAFFIC_BATCH_TIME_SECS: "10"
+  #     USE_HOSTNAME: "true"
+  #     AKTO_INSTANCE_TYPE: RUNTIME
+  #     DATABASE_ABSTRACTOR_SERVICE_URL: https://cyborg.akto.io
+  #     DATABASE_ABSTRACTOR_SERVICE_TOKEN: "<token>"
+  #     RUNTIME_MODE: hybrid
+  #     AKTO_THREAT_ENABLED: "true"
+  #   mem_limit: 4g    
+  #   restart: always
+  #   depends_on:
+  #     - kafka1
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "100m"
+  #       max-file: "2"
+  #   network_mode: host
+
+  # akto-hello-world:
+  #   image: public.ecr.aws/aktosecurity/hello-world-server:latest
+  #   restart: always
+  #   ports: 
+  #     - "8000:8000"
+  
+  # redis:
+  #   container_name: redis-threat-detection
+  #   image: public.ecr.aws/aktosecurity/redis:latest
+  #   restart: always
+  #   volumes:
+  #     - ./data-redis-data:/data
+  #   ports:
+  #     - "6379:6379"
+
+  # threat-detection:
+  #   image: public.ecr.aws/aktosecurity/akto-threat-detection:latest
+  #   environment:
+  #     AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER: kafka1:19092
+  #     AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER: kafka1:19092
+  #     AKTO_THREAT_PROTECTION_BACKEND_URL: https://tbs.akto.io
+  #     RUNTIME_MODE: hybrid
+  #     AKTO_THREAT_PROTECTION_BACKEND_TOKEN: "<token>"
+  #     DATABASE_ABSTRACTOR_SERVICE_TOKEN: "<token>"
+  #     AKTO_LOG_LEVEL: DEBUG
+  #     AGGREGATION_RULES_ENABLED: "true"
+  #     AKTO_THREAT_DETECTION_LOCAL_REDIS_URI: redis://redis:6379
+  #   restart: always
+  #   depends_on:
+  #     - kafka1
+  #     - redis
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "100m"
+  #       max-file: "2"
+    
+  # data-ingestion-service:
+  #   image: aktosecurity/data-ingestion-service
+  #   environment:
+  #     AKTO_TRAFFIC_BATCH_SIZE: "100"
+  #     AKTO_TRAFFIC_BATCH_TIME_SECS: "10"
+  #     AKTO_KAFKA_BROKER_URL: kafka1:19092
+  #     AKTO_KAFKA_PRODUCER_BATCH_SIZE: "10"
+  #     AKTO_KAFKA_PRODUCER_LINGER_MS: "10"
+  #     AKTO_KAFKA_TOPIC_NAME: akto.api.logs
+  #     GUARDRAILS_SERVICE_URL: http://guardrails-service-http:8080
+  #   restart: always
+  #   ports:
+  #     - "9091:8080"
+  #     - "5140:5140/tcp"
+  #   depends_on:
+  #     - kafka1
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "100m"
+  #       max-file: "2"
+
+  # watchtower:
+  #   image: containrrr/watchtower
+  #   restart: always
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   env_file: ./watchtower.env
+  #   labels:
+  #     com.centurylinklabs.watchtower.enable: "false"

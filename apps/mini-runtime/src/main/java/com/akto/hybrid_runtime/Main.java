@@ -935,7 +935,7 @@ public class Main {
                 }
             }
         } else {
-            loggerMaker.error("Kafka producer is null");
+            //loggerMaker.error("Kafka producer is null");
         }
     }
 
@@ -1213,11 +1213,10 @@ public class Main {
         }
         
         if (isKafkaAuthenticationEnabled) {
-            if(StringUtils.isEmpty(kafkaPassword) || StringUtils.isEmpty(kafkaUsername)){
+            if (!KafkaConfig.addValidatedAuthenticationProperties(properties, kafkaUsername, kafkaPassword)) {
                 loggerMaker.errorAndAddToDb("Kafka authentication credentials not provided");
                 return null;
             }
-            KafkaConfig.addAuthenticationProperties(properties, kafkaUsername, kafkaPassword);
         }
 
         return properties;
