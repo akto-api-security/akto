@@ -262,7 +262,7 @@ public class DaoInit {
         ClassModel<UsageSync> UsageSyncClassModel = ClassModel.builder(UsageSync.class).enableDiscriminator(true).build();
         ClassModel<Organization> OrganizationClassModel = ClassModel.builder(Organization.class).enableDiscriminator(true).build();
         ClassModel<AccountConfig> AccountConfigClassModel = ClassModel.builder(AccountConfig.class).enableDiscriminator(true).build();
-        ClassModel<AccountConfig.AccountEntry> AccountEntryClassModel = ClassModel.builder(AccountConfig.AccountEntry.class).enableDiscriminator(true).build();
+        ClassModel<AccountConfig.AwsAccountConfig> AwsAccountConfigClassModel = ClassModel.builder(AccountConfig.AwsAccountConfig.class).enableDiscriminator(true).build();
         ClassModel<ReplaceDetail> replaceDetailClassModel = ClassModel.builder(ReplaceDetail.class).enableDiscriminator(true).build();
         ClassModel<ModifyHostDetail> modifyHostDetailClassModel = ClassModel.builder(ModifyHostDetail.class).enableDiscriminator(true).build();
         ClassModel<FileUpload> fileUploadClassModel = ClassModel.builder(FileUpload.class).enableDiscriminator(true).build();
@@ -308,7 +308,7 @@ public class DaoInit {
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel,jiraintegrationClassModel, setupClassModel,
                 cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
                 methodConditionClassModel, regexTestingEndpointsClassModel, allTestingEndpointsClassModel,
-                UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel, AccountConfigClassModel, AccountEntryClassModel,
+                UsageMetricClassModel, UsageMetricInfoClassModel, UsageSyncClassModel, OrganizationClassModel, AccountConfigClassModel, AwsAccountConfigClassModel,
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,

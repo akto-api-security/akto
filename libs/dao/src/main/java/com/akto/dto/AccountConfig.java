@@ -22,13 +22,41 @@ public class AccountConfig {
     private int adminAccountId;
     public static final String ADMIN_ACCOUNT_ID = "adminAccountId";
 
-    private Map<Integer, AccountEntry> accounts;  // aktoAccountId → AccountEntry
+    private Map<Integer, Object> accounts;  // aktoAccountId → account config (type indicates AWS-ACCOUNTS, etc.)
     public static final String ACCOUNTS = "accounts";
+
+    public enum AccountType {
+        AWS_ACCOUNTS("AWS-ACCOUNTS"),
+        GCP_ACCOUNTS("GCP-ACCOUNTS"),
+        AZURE_ACCOUNTS("AZURE-ACCOUNTS");
+
+        private final String value;
+
+        AccountType(String value) {
+            this.value = value;
+        }
+
+        public String getValue() {
+            return value;
+        }
+
+        public static AccountType fromValue(String value) {
+            for (AccountType type : AccountType.values()) {
+                if (type.value.equals(value)) {
+                    return type;
+                }
+            }
+            throw new IllegalArgumentException("Unknown account type: " + value);
+        }
+    }
 
     @Getter
     @Setter
     @NoArgsConstructor
-    public static class AccountEntry {
+    public static class AwsAccountConfig {
+        private String type;                    // "AWS-ACCOUNTS"
+        public static final String TYPE = "type";
+
         private String awsAccountId;
         public static final String AWS_ACCOUNT_ID = "awsAccountId";
 
@@ -38,8 +66,9 @@ public class AccountConfig {
         private long lastUpdatedTimestamp;
         public static final String LAST_UPDATED_TIMESTAMP = "lastUpdatedTimestamp";
 
-        public AccountEntry(String awsAccountId) {
+        public AwsAccountConfig(String awsAccountId) {
             this.awsAccountId = awsAccountId;
+            this.type = AccountType.AWS_ACCOUNTS.getValue();
         }
     }
 }
