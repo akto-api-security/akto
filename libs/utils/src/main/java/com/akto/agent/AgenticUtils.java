@@ -56,11 +56,7 @@ public class AgenticUtils {
             if (StringUtils.isEmpty(sseUrl) || StringUtils.isEmpty(authorization)) {
                 return;
             }
-            String requestMethod = "POST";
-            if (rawApi != null && rawApi.getRequest() != null && StringUtils.isNotEmpty(rawApi.getRequest().getMethod())) {
-                requestMethod = rawApi.getRequest().getMethod();
-            }
-            agentClient.initializeAgent(sseUrl, authorization, requestMethod);
+            agentClient.initializeAgent(sseUrl, authorization);
         }
     }
 
