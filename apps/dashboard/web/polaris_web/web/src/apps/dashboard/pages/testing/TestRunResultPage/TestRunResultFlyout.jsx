@@ -28,6 +28,7 @@ import ForbiddenRole from '../../../components/shared/ForbiddenRole'
 import LegendLabel from './LegendLabel.jsx'
 import TestRunResultChat from './TestRunResultChat.jsx'
 import AskAktoSection from './AskAktoSection.jsx'
+import WhyFlaggedSection from './WhyFlaggedSection.jsx'
 import PersistStore from '../../../../main/PersistStore'
 
 const SKIPPED_TEST_DOCS_URL = "https://docs.akto.io/api-security-testing/concepts/skipped-test-cases";
@@ -38,7 +39,7 @@ function isSkippedTestError(errorText) {
 }
 
 function TestRunResultFlyout(props) {
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, scanFlaggingDecision, validationFallbackFromScan } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -658,15 +659,20 @@ function TestRunResultFlyout(props) {
     // Move state outside to prevent reset on component recreation
     const hasAnalyzedRef = useRef(false);
     const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
+    const [httpExplain, setHttpExplain] = useState(null);
+
+    useEffect(() => {
+        setHttpExplain(null);
+        hasAnalyzedRef.current = false;
+    }, [selectedTestRunResult?.id]);
 
     // Component that handles vulnerability analysis only when mounted
     const ValuesTabContent = React.memo(({ isAgentic = false } = {}) => {
 
         useEffect(() => {
             // Check if vulnerability highlighting is enabled (use existing GPT feature flag)
-            //const isVulnerabilityHighlightingEnabled = window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && 
-            //    window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true;
-            const isVulnerabilityHighlightingEnabled = false;
+            const isVulnerabilityHighlightingEnabled =
+                window.STIGG_FEATURE_WISE_ALLOWED?.AKTO_GPT_AI?.isGranted === true;
 
             if (!hasAnalyzedRef.current && selectedTestRunResult?.vulnerable && selectedTestRunResult?.testResults && isVulnerabilityHighlightingEnabled) {
                 hasAnalyzedRef.current = true;
@@ -718,6 +724,20 @@ function TestRunResultFlyout(props) {
                                 );
 
                                 const analysisData = response.analysisResult || response;
+
+                                if (analysisData?.rationale || (analysisData?.evidencePhrases?.length > 0)) {
+                                    setHttpExplain((prev) => {
+                                        if (prev && prev.rationale) {
+                                            return prev;
+                                        }
+                                        return {
+                                            rationale: analysisData.rationale || '',
+                                            evidencePhrases: Array.isArray(analysisData.evidencePhrases)
+                                                ? analysisData.evidencePhrases
+                                                : []
+                                        };
+                                    });
+                                }
 
                                 if (analysisData?.vulnerableSegments?.length > 0) {
                                     const enhancedSegments = analysisData.vulnerableSegments.map(segment => ({
@@ -940,6 +960,15 @@ function TestRunResultFlyout(props) {
                         <Button plain onClick={() => setFullDescription(!fullDescription)}> {fullDescription ? "Less" : "More"} information</Button>
                     </Box>
                 </VerticalStack>
+                <WhyFlaggedSection
+                    flaggingDecision={scanFlaggingDecision}
+                    validationFallback={validationFallbackFromScan}
+                    hasConversations={(conversations?.length || 0) > 0}
+                    conversations={conversations}
+                    selectedTestRunResult={selectedTestRunResult}
+                    issueDetails={issueDetails}
+                    httpExplain={httpExplain}
+                />
                 <Divider />
                 {testResultDetailsComp}
                 {infoState && typeof infoState === 'object' && infoState.length > 0 ? (
@@ -998,7 +1027,16 @@ function TestRunResultFlyout(props) {
     const remediationTab = (selectedTestRunResult && selectedTestRunResult.vulnerable) && {
         id: "remediation",
         content: "Remediation",
-        component: (<MarkdownViewer markdown={remediationText}></MarkdownViewer>)
+        component: (
+            <Box padding="4">
+                <VerticalStack gap="3">
+                    <Text variant="bodySm" tone="subdued" fontWeight="semibold">
+                        General remediation guidance
+                    </Text>
+                    <MarkdownViewer markdown={remediationText} />
+                </VerticalStack>
+            </Box>
+        )
     }
 
     const errorTab = {

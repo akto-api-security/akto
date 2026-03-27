@@ -1491,6 +1491,8 @@ const transform = {
   prepareConversationsList(agentConversationResults, isGeneric = false) {
     let conversationsListCopy = []
     let extractedRemediationText = ''
+    let aggregatedFlaggingDecision = null
+    let validationFallback = ''
 
     agentConversationResults.forEach(conversation => {
 
@@ -1506,6 +1508,16 @@ const transform = {
         validation:conversation?.validation,
         role: "user"
       })
+
+      const vmRaw = conversation?.validationMessage
+      if (vmRaw && typeof vmRaw === 'string' && vmRaw.trim().length > 0 && vmRaw.toLowerCase() !== 'null') {
+        validationFallback = vmRaw
+      }
+      if (conversation?.flaggingDecision && (conversation.validation === true || conversation.validation === 'true')) {
+        aggregatedFlaggingDecision = conversation.flaggingDecision
+      } else if (conversation?.flaggingDecision && !aggregatedFlaggingDecision) {
+        aggregatedFlaggingDecision = conversation.flaggingDecision
+      }
 
       let systemMessage = conversation.response
       if(!isGeneric) {
@@ -1546,7 +1558,9 @@ const transform = {
 
     return {
       conversations: conversationsListCopy,
-      remediationText: extractedRemediationText
+      remediationText: extractedRemediationText,
+      flaggingDecision: aggregatedFlaggingDecision,
+      validationFallback
     }
   }
 }

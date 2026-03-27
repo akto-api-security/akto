@@ -83,6 +83,8 @@ function TestRunResultPage(props) {
   const [conversations, setConversations] = useState([])
   const [conversationRemediationText, setConversationRemediationText] = useState(null)
   const [validationFailed, setValidationFailed] = useState(false)
+  const [scanFlaggingDecision, setScanFlaggingDecision] = useState(null)
+  const [validationFallbackFromScan, setValidationFallbackFromScan] = useState('')
   const agenticConversationsRef = useRef([])
   const [showForbidden, setShowForbidden] = useState(false)
 
@@ -300,9 +302,20 @@ function TestRunResultPage(props) {
             setConversations(result.conversations);
             setConversationRemediationText(result.remediationText || null)
             setValidationFailed(result.validationFailed)
+            setScanFlaggingDecision(result.flaggingDecision || null)
+            setValidationFallbackFromScan(result.validationFallback || '')
             agenticConversationsRef.current = res;
+          } else {
+            setScanFlaggingDecision(null)
+            setValidationFallbackFromScan('')
           }
+        } else {
+          setScanFlaggingDecision(null)
+          setValidationFallbackFromScan('')
         }
+      } else {
+        setScanFlaggingDecision(null)
+        setValidationFallbackFromScan('')
       }
       setShowDetails(true)
     }
@@ -485,6 +498,8 @@ function TestRunResultPage(props) {
           aiLoading={aiLoading}
           onGenerateAiOverview={handleGenerateAiOverview}
           onSendFollowUp={handleSendFollowUp}
+          scanFlaggingDecision={scanFlaggingDecision}
+          validationFallbackFromScan={validationFallbackFromScan}
         />
       </>
       :
@@ -502,6 +517,8 @@ function TestRunResultPage(props) {
         conversations={conversations}
         conversationRemediationText={conversationRemediationText}
         showForbidden={showForbidden}
+        scanFlaggingDecision={scanFlaggingDecision}
+        validationFallbackFromScan={validationFallbackFromScan}
       />
   )
 }
