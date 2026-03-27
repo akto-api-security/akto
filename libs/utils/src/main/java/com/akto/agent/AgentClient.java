@@ -200,9 +200,11 @@ public class AgentClient {
             }
             String validationMessage = null;
             String remediationMessage = null;
-            if(validation) {
-                validationMessage = jsonNode.get("validationMessage").asText();
-                remediationMessage = jsonNode.get("remediationMessage").asText();
+            if (validation) {
+                validationMessage = jsonNode.has("validationMessage") && !jsonNode.get("validationMessage").isNull()
+                    ? jsonNode.get("validationMessage").asText() : null;
+                remediationMessage = jsonNode.has("remediationMessage") && !jsonNode.get("remediationMessage").isNull()
+                    ? jsonNode.get("remediationMessage").asText() : null;
             }
 
             String finalSentPrompt = null;
@@ -218,8 +220,10 @@ public class AgentClient {
                 loggerMaker.infoAndAddToDb("externalApiTokens field NOT FOUND in response");
             }
 
-            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage, externalApiTokens);
-            
+            AgentConversationResult result = new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage, externalApiTokens);
+            result.setFlaggingDecision(FlaggingDecisionParser.parse(jsonNode));
+            return result;
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error parsing agent response: " + e.getMessage() + ", response body: " + responseBody);
             throw new Exception("Failed to parse agent response: " + e.getMessage(), e);
