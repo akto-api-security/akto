@@ -13,8 +13,14 @@ import java.util.Map;
 public class AccountConfig {
 
     @BsonId
-    private String id;                          // orgId
+    private String id;                          // orgId_type (e.g., "abc123_AWS-ACCOUNTS")
     public static final String ID = "_id";
+
+    private String orgId;
+    public static final String ORG_ID = "orgId";
+
+    private String type;                        // AWS-ACCOUNTS, GCP-ACCOUNTS, AZURE-ACCOUNTS
+    public static final String TYPE_FIELD = "type";
 
     private String adminEmail;
     public static final String ADMIN_EMAIL = "adminEmail";

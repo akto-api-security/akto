@@ -3846,20 +3846,24 @@ public class DbAction extends ActionSupport {
                     .min()
                     .orElse(accountId);
 
-            // Create AWS account config map
+            // Create AWS account config map (without type - type is now on parent doc)
             long currentTime = Context.now();
             Map<String, Object> accountConfigMap = new HashMap<>();
-            accountConfigMap.put(AccountConfig.TYPE, AccountConfig.AccountType.AWS_ACCOUNTS.getValue());
             accountConfigMap.put(AccountConfig.AWS_ACCOUNT_ID, awsAccountId);
             accountConfigMap.put(AccountConfig.CREATED_TIMESTAMP, currentTime);
             accountConfigMap.put(AccountConfig.LAST_UPDATED_TIMESTAMP, currentTime);
 
             // Update org document with account config in the accounts map
-            // _id is just orgId now, one document per org
+            // _id is orgId_type for one document per org per type
+            String accountTypeValue = AccountConfig.AccountType.AWS_ACCOUNTS.getValue();
+            String docId = org.getId() + "_" + accountTypeValue;
+
             AccountConfigDao.instance.updateOne(
-                Filters.eq(AccountConfig.ID, org.getId()),
+                Filters.eq(AccountConfig.ID, docId),
                 Updates.combine(
-                    Updates.setOnInsert(AccountConfig.ID, org.getId()),
+                    Updates.setOnInsert(AccountConfig.ID, docId),
+                    Updates.setOnInsert(AccountConfig.ORG_ID, org.getId()),
+                    Updates.setOnInsert(AccountConfig.TYPE_FIELD, accountTypeValue),
                     Updates.setOnInsert(AccountConfig.ADMIN_EMAIL, org.getAdminEmail()),
                     Updates.setOnInsert(AccountConfig.ADMIN_ACCOUNT_ID, adminAccountId),
                     Updates.set(AccountConfig.ACCOUNTS + "." + String.valueOf(accountId), accountConfigMap)
@@ -3884,8 +3888,9 @@ public class DbAction extends ActionSupport {
                 return Action.ERROR.toUpperCase();
             }
 
-            // Fetch the account config for this org
-            AccountConfig accountConfig = AccountConfigDao.instance.findByOrgId(org.getId());
+            // Fetch the AWS account config for this org
+            String accountTypeValue = AccountConfig.AccountType.AWS_ACCOUNTS.getValue();
+            AccountConfig accountConfig = AccountConfigDao.instance.findByOrgIdAndType(org.getId(), accountTypeValue);
             if (accountConfig == null || accountConfig.getAccounts() == null) {
                 accountMappings = new ArrayList<>();
                 return Action.SUCCESS.toUpperCase();
@@ -3900,13 +3905,12 @@ public class DbAction extends ActionSupport {
                 if (accountConfigObj instanceof Map) {
                     Map<String, Object> configMap = (Map<String, Object>) accountConfigObj;
                     String awsId = (String) configMap.get(AccountConfig.AWS_ACCOUNT_ID);
-                    String type = (String) configMap.get(AccountConfig.TYPE);
 
                     if (awsId != null && !awsId.isEmpty()) {
                         Map<String, Object> mapping = new HashMap<>();
                         mapping.put("aktoAccountId", Integer.parseInt(aktoAccountIdStr));
                         mapping.put("awsAccountId", awsId);
-                        mapping.put("type", type);
+                        mapping.put("type", accountTypeValue);
                         accountMappings.add(mapping);
                     }
                 }
