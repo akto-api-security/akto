@@ -11,7 +11,7 @@ import sys
 import urllib.request
 from typing import Any, Dict, Tuple, Union
 
-from akto_machine_id import get_machine_id, get_username
+from akto_machine_id import get_device_label, get_username
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.cursor/akto/mcp-logs"))
@@ -50,7 +50,7 @@ SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 
 # Configure API_URL based on mode
 if MODE == "atlas":
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
+    device_id = os.getenv("DEVICE_ID") or get_device_label()
     API_URL = f"https://{device_id}.ai-agent.cursor" if device_id else "https://api.anthropic.com"
     logger.info(f"MODE: {MODE}, Device ID: {device_id}, API_URL: {API_URL}")
 else:
@@ -205,7 +205,7 @@ def build_validation_request(tool_input: str, mcp_server_name: str) -> dict:
     tags["mcp_server_name"] = mcp_server_name
 
     # Get device ID
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
+    device_id = os.getenv("DEVICE_ID") or get_device_label()
 
     # Build host from API_URL
     host = API_URL.replace("https://", "").replace("http://", "")

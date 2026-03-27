@@ -9,7 +9,7 @@ from typing import Any, Dict, Union
 import time
 
 
-from akto_machine_id import get_machine_id, get_username
+from akto_machine_id import get_device_label, get_username
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
@@ -48,7 +48,7 @@ SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 
 # Configure CLAUDE_API_URL based on mode
 if MODE == "atlas":
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
+    device_id = os.getenv("DEVICE_ID") or get_device_label()
     CLAUDE_API_URL = f"https://{device_id}.ai-agent.claudecli" if device_id else "https://api.anthropic.com"
     logger.info(f"MODE: {MODE}, Device ID: {device_id}, CLAUDE_API_URL: {CLAUDE_API_URL}")
 else:
@@ -112,7 +112,7 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
         tags["ai-agent"] = "claudecli"
         tags["source"] = CONTEXT_SOURCE
 
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
+    device_id = os.getenv("DEVICE_ID") or get_device_label()
 
     host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
 
