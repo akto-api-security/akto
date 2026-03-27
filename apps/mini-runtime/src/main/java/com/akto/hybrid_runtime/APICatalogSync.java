@@ -1560,7 +1560,6 @@ public class APICatalogSync {
         int from = 0;
         int batch = 10000;
 
-        long start = System.currentTimeMillis();
         if (writesForParams.size() >0) {
 
             do {
@@ -1574,12 +1573,6 @@ public class APICatalogSync {
         }
 
         aktoPolicyNew.syncWithDb();
-
-        loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic");
-        if(writesForTraffic.size() > 0) {
-            dataActor.bulkWriteTrafficInfo(writesForTraffic);
-        }
-
 
         loggerMaker.infoAndAddToDb("adding " + writesForSampleData.size() + " updates for samples");
         if(writesForSampleData.size() > 0) {
