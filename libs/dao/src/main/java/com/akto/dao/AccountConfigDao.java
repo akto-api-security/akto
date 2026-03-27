@@ -2,7 +2,6 @@ package com.akto.dao;
 
 import com.akto.dto.AccountConfig;
 import com.mongodb.client.model.Filters;
-import java.util.List;
 
 public class AccountConfigDao extends CommonContextDao<AccountConfig> {
 
@@ -18,11 +17,7 @@ public class AccountConfigDao extends CommonContextDao<AccountConfig> {
         return AccountConfig.class;
     }
 
-    public List<AccountConfig> findByOrgId(String orgId) {
-        return findAll(Filters.eq(AccountConfig.ORG_ID, orgId));
-    }
-
-    public AccountConfig findByAwsAccountId(String awsAccountId) {
-        return findOne(Filters.eq(AccountConfig.AWS_ACCOUNT_ID, awsAccountId));
+    public AccountConfig findByOrgId(String orgId) {
+        return findOne(Filters.eq(AccountConfig.ID, orgId));
     }
 }

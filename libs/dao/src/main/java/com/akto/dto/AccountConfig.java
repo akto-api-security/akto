@@ -4,6 +4,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonId;
+import java.util.HashMap;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -11,11 +13,8 @@ import org.bson.codecs.pojo.annotations.BsonId;
 public class AccountConfig {
 
     @BsonId
-    private String id;                          // orgId + "_" + aktoAccountId
+    private String id;                          // orgId
     public static final String ID = "_id";
-
-    private String orgId;
-    public static final String ORG_ID = "orgId";
 
     private String adminEmail;
     public static final String ADMIN_EMAIL = "adminEmail";
@@ -23,9 +22,30 @@ public class AccountConfig {
     private int adminAccountId;
     public static final String ADMIN_ACCOUNT_ID = "adminAccountId";
 
-    private int aktoAccountId;
-    public static final String AKTO_ACCOUNT_ID = "aktoAccountId";
+    private Map<Integer, AccountEntry> accounts;  // aktoAccountId → AccountEntry
+    public static final String ACCOUNTS = "accounts";
 
-    private String awsAccountId;
-    public static final String AWS_ACCOUNT_ID = "awsAccountId";
+    private long createdTimestamp;
+    public static final String CREATED_TIMESTAMP = "createdTimestamp";
+
+    private long lastUpdatedTimestamp;
+    public static final String LAST_UPDATED_TIMESTAMP = "lastUpdatedTimestamp";
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class AccountEntry {
+        private String awsAccountId;
+        public static final String AWS_ACCOUNT_ID = "awsAccountId";
+
+        private long createdTimestamp;
+        public static final String CREATED_TIMESTAMP = "createdTimestamp";
+
+        private long lastUpdatedTimestamp;
+        public static final String LAST_UPDATED_TIMESTAMP = "lastUpdatedTimestamp";
+
+        public AccountEntry(String awsAccountId) {
+            this.awsAccountId = awsAccountId;
+        }
+    }
 }

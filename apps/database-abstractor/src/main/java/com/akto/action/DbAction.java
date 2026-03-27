@@ -3842,18 +3842,25 @@ public class DbAction extends ActionSupport {
                     .min()
                     .orElse(accountId);
 
-            // Composite _id ensures idempotency: same call twice → same document updated, no duplicate
-            String docId = org.getId() + "_" + accountId;
+            // Create account entry with aws account id
+            AccountConfig.AccountEntry accountEntry = new AccountConfig.AccountEntry(awsAccountId);
 
+            // Set timestamps for account entry
+            long currentTime = Context.now();
+            accountEntry.setCreatedTimestamp(currentTime);
+            accountEntry.setLastUpdatedTimestamp(currentTime);
+
+            // Update org document with account entry in the accounts map
+            // _id is just orgId now, one document per org
             AccountConfigDao.instance.updateOne(
-                Filters.eq(AccountConfig.ID, docId),
+                Filters.eq(AccountConfig.ID, org.getId()),
                 Updates.combine(
-                    Updates.setOnInsert(AccountConfig.ID, docId),
-                    Updates.setOnInsert(AccountConfig.ORG_ID, org.getId()),
+                    Updates.setOnInsert(AccountConfig.ID, org.getId()),
                     Updates.setOnInsert(AccountConfig.ADMIN_EMAIL, org.getAdminEmail()),
                     Updates.setOnInsert(AccountConfig.ADMIN_ACCOUNT_ID, adminAccountId),
-                    Updates.setOnInsert(AccountConfig.AKTO_ACCOUNT_ID, accountId),
-                    Updates.set(AccountConfig.AWS_ACCOUNT_ID, awsAccountId)
+                    Updates.setOnInsert(AccountConfig.CREATED_TIMESTAMP, currentTime),
+                    Updates.set(AccountConfig.LAST_UPDATED_TIMESTAMP, currentTime),
+                    Updates.set(AccountConfig.ACCOUNTS + "." + accountId, accountEntry)
                 )
             );
 
