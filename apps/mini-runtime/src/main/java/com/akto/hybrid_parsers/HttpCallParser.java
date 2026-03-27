@@ -465,7 +465,7 @@ public class HttpCallParser {
         }
 
         this.sync_count += filteredResponseParams.size();
-        int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
+        int syncThresh = sync_threshold_count;
         executeCatalogSync(syncImmediately, fetchAllSTI, isHarOrPcap, syncThresh);
 
     }
@@ -485,7 +485,6 @@ public class HttpCallParser {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
                 dependencyAnalyser.syncWithDb();
             }
-            syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
 
@@ -1266,7 +1265,7 @@ public class HttpCallParser {
                 }
             } else {
                 filteredResponseParams.addAll(responseParamsList);
-                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory");
+                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + " new graphql endpoints in inventory");
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {

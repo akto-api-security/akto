@@ -5,6 +5,9 @@ import java.util.regex.Pattern;
 public class RegexPredicate extends Predicate{
     private String value;
 
+    /** Lazily compiled; invalidated when {@link #setValue} runs. */
+    private transient volatile Pattern compiledPattern;
+
     public RegexPredicate() {
         super(Type.REGEX);
     }
@@ -14,11 +17,28 @@ public class RegexPredicate extends Predicate{
         this.value = value;
     }
 
+    private Pattern compiledPattern() {
+        Pattern p = compiledPattern;
+        if (p != null) {
+            return p;
+        }
+        if (value == null) {
+            return null;
+        }
+        synchronized (this) {
+            if (compiledPattern == null && value != null) {
+                compiledPattern = Pattern.compile(value);
+            }
+            return compiledPattern;
+        }
+    }
+
     @Override
     public boolean validate(Object obj) {
         if (!(obj instanceof String)) return false;
+        Pattern pattern = compiledPattern();
+        if (pattern == null) return false;
         String str = obj.toString();
-        Pattern pattern = Pattern.compile(this.value);
         return pattern.matcher(str).matches();
     }
 
@@ -28,6 +48,7 @@ public class RegexPredicate extends Predicate{
 
     public void setValue(String value) {
         this.value = value;
+        this.compiledPattern = null;
     }
 
     @Override
