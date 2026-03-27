@@ -10,7 +10,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.upload.SwaggerUploadLog;
+import com.akto.dto.AccountConfig;
 import com.akto.open_api.parser.Parser;
 import com.akto.open_api.parser.ParserResult;
 import com.akto.parsers.HttpCallParser;
@@ -376,6 +378,10 @@ public class DbAction extends ActionSupport {
     @Getter
     @Setter
     private String awsAccountIds;
+
+    @Getter
+    @Setter
+    private String awsAccountId;
 
     public String fetchAwsAccountIdsForApiGatewayLogging() {
 
@@ -3820,6 +3826,41 @@ public class DbAction extends ActionSupport {
     }
 
     public String insertAwsAccountId() {
+        try {
+            int accountId = Context.accountId.get();
+
+            // Find the org this account belongs to
+            Organization org = OrganizationsDao.instance.findOneByAccountId(accountId);
+            if (org == null) {
+                addActionError("Organization not found for accountId: " + accountId);
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Admin account = smallest ID in org.accounts (oldest = admin)
+            int adminAccountId = org.getAccounts().stream()
+                    .mapToInt(Integer::intValue)
+                    .min()
+                    .orElse(accountId);
+
+            // Composite _id ensures idempotency: same call twice → same document updated, no duplicate
+            String docId = org.getId() + "_" + accountId;
+
+            AccountConfigDao.instance.updateOne(
+                Filters.eq(AccountConfig.ID, docId),
+                Updates.combine(
+                    Updates.setOnInsert(AccountConfig.ID, docId),
+                    Updates.setOnInsert(AccountConfig.ORG_ID, org.getId()),
+                    Updates.setOnInsert(AccountConfig.ADMIN_EMAIL, org.getAdminEmail()),
+                    Updates.setOnInsert(AccountConfig.ADMIN_ACCOUNT_ID, adminAccountId),
+                    Updates.setOnInsert(AccountConfig.AKTO_ACCOUNT_ID, accountId),
+                    Updates.set(AccountConfig.AWS_ACCOUNT_ID, awsAccountId)
+                )
+            );
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertAwsAccountId: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
