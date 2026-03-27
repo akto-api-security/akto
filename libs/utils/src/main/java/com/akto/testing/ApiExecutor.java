@@ -81,9 +81,9 @@ public class ApiExecutor {
                 HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol, isHttps) :
                 HTTPClientHandler.instance.getHTTPClient(isHttps, followRedirects, requestProtocol);
 
-        if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
-            throw new IllegalArgumentException("SSRF attack attempt");
-        }
+        // if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
+        //     throw new IllegalArgumentException("SSRF attack attempt");
+        // }
         String requestUrl = request.url().toString();
         boolean isCyborgCall = requestUrl.contains("cyborg.akto.io") || requestUrl.contains("ultron.akto.io");
         long start = System.currentTimeMillis();
@@ -662,7 +662,7 @@ public class ApiExecutor {
                 fileUrl = attachHeaderVal.substring(sepIdx + 2);
             }
             RequestBody requestBody = getFileRequestBody(fileUrl);
-            builder.method(request.getMethod(), requestBody);
+            builder.post(requestBody);
             builder.removeHeader(Constants.AKTO_ATTACH_FILE);
             Request updatedRequest = builder.build();
 
