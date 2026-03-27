@@ -46,7 +46,8 @@ public class AgenticUtils {
                 String url = request.getFullUrlWithParams();
                 String requestBody = request.getBody();
                 String requestHeaders = request.fetchHeadersJsonString();
-                agentClient.initializeAgent(url, requestHeaders, requestBody, conversationId);
+                String requestMethod = request.getMethod();
+                agentClient.initializeAgent(url, requestHeaders, requestBody, requestMethod, conversationId);
                 return;
             }
             Map<String, String> authPairs = getMcpAuthPairs();
