@@ -10,7 +10,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.upload.SwaggerUploadLog;
+import com.akto.dto.AccountConfig;
 import com.akto.open_api.parser.Parser;
 import com.akto.open_api.parser.ParserResult;
 import com.akto.parsers.HttpCallParser;
@@ -376,6 +378,10 @@ public class DbAction extends ActionSupport {
     @Getter
     @Setter
     private String awsAccountIds;
+
+    @Getter
+    @Setter
+    private String awsAccountId;
 
     public String fetchAwsAccountIdsForApiGatewayLogging() {
 
@@ -3820,6 +3826,46 @@ public class DbAction extends ActionSupport {
     }
 
     public String insertAwsAccountId() {
+        try {
+            int accountId = Context.accountId.get();
+
+            // Find the org this account belongs to
+            Organization org = OrganizationsDao.instance.findOneByAccountId(accountId);
+            if (org == null) {
+                addActionError("Organization not found for accountId: " + accountId);
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Admin account = smallest ID in org.accounts (oldest = admin)
+            int adminAccountId = org.getAccounts().stream()
+                    .mapToInt(Integer::intValue)
+                    .min()
+                    .orElse(accountId);
+
+            // Create AWS account config map
+            long currentTime = Context.now();
+            Map<String, Object> accountConfigMap = new HashMap<>();
+            accountConfigMap.put(AccountConfig.TYPE, AccountConfig.AccountType.AWS_ACCOUNTS.getValue());
+            accountConfigMap.put(AccountConfig.AWS_ACCOUNT_ID, awsAccountId);
+            accountConfigMap.put(AccountConfig.CREATED_TIMESTAMP, currentTime);
+            accountConfigMap.put(AccountConfig.LAST_UPDATED_TIMESTAMP, currentTime);
+
+            // Update org document with account config in the accounts map
+            // _id is just orgId now, one document per org
+            AccountConfigDao.instance.updateOne(
+                Filters.eq(AccountConfig.ID, org.getId()),
+                Updates.combine(
+                    Updates.setOnInsert(AccountConfig.ID, org.getId()),
+                    Updates.setOnInsert(AccountConfig.ADMIN_EMAIL, org.getAdminEmail()),
+                    Updates.setOnInsert(AccountConfig.ADMIN_ACCOUNT_ID, adminAccountId),
+                    Updates.set(AccountConfig.ACCOUNTS + "." + accountId, accountConfigMap)
+                )
+            );
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertAwsAccountId: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
