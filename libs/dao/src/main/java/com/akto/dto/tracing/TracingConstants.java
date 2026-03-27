@@ -26,6 +26,7 @@ public final class TracingConstants {
         public static final String TASK = "task";
         public static final String BATCH = "batch";
         public static final String CUSTOM = "custom";
+        public static final String USER = "user";
         public static final String UNKNOWN = "unknown";
         private SpanKind() {}
     }
