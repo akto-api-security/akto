@@ -3858,8 +3858,6 @@ public class DbAction extends ActionSupport {
                     Updates.setOnInsert(AccountConfig.ID, org.getId()),
                     Updates.setOnInsert(AccountConfig.ADMIN_EMAIL, org.getAdminEmail()),
                     Updates.setOnInsert(AccountConfig.ADMIN_ACCOUNT_ID, adminAccountId),
-                    Updates.setOnInsert(AccountConfig.CREATED_TIMESTAMP, currentTime),
-                    Updates.set(AccountConfig.LAST_UPDATED_TIMESTAMP, currentTime),
                     Updates.set(AccountConfig.ACCOUNTS + "." + accountId, accountEntry)
                 )
             );

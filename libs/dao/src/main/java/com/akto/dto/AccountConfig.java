@@ -25,12 +25,6 @@ public class AccountConfig {
     private Map<Integer, AccountEntry> accounts;  // aktoAccountId → AccountEntry
     public static final String ACCOUNTS = "accounts";
 
-    private long createdTimestamp;
-    public static final String CREATED_TIMESTAMP = "createdTimestamp";
-
-    private long lastUpdatedTimestamp;
-    public static final String LAST_UPDATED_TIMESTAMP = "lastUpdatedTimestamp";
-
     @Getter
     @Setter
     @NoArgsConstructor
