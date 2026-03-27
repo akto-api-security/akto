@@ -73,6 +73,7 @@ import {
 import DataDogConnector from "./components/DataDogConnector"
 import MicrosoftDefenderConnector from "./components/MicrosoftDefenderConnector"
 import MicrosoftDefenderRunQueriesConnector from "./components/MicrosoftDefenderRunQueriesConnector"
+import SentinelOneConnector from "./components/SentinelOneConnector"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -539,6 +540,15 @@ const agenticShieldObj = {
     docsUrl: 'https://docs.akto.io/agentic-shield',
     key: "AGENTIC_SHIELD",
     component: <AgenticShield/>
+}
+
+const sentinelOneObj = {
+    icon: '/public/sentinelone.svg',
+    label: "SentinelOne",
+    text: "Connect SentinelOne to Akto to detect AI coding tools (Claude, Cursor) running on managed endpoints.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-sentinelone',
+    key: "SENTINELONE",
+    component: <SentinelOneConnector/>
 }
 
 const microsoftDefenderObj = {
@@ -1891,7 +1901,7 @@ const quickStartFunc = {
 
         // Endpoint Management
         const endpointManagement = [
-            microsoftDefenderObj, microsoftDefenderRunQueriesObj
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
         ]
 
        if(func.checkLocal() || func.isLimitedAccount()){
@@ -1968,7 +1978,7 @@ const quickStartFunc = {
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
             cloudflareWarpObj, zscalerObj, snowflakeObj,
-            microsoftDefenderObj, microsoftDefenderRunQueriesObj
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
         ]
 
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
@@ -1977,7 +1987,7 @@ const quickStartFunc = {
                 awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
                 n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
-                microsoftDefenderObj, microsoftDefenderRunQueriesObj
+                microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
             ])
         }
 
