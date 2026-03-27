@@ -201,7 +201,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 testingRunResult.setHexId(testingRunResult.getId().toHexString());
                 testingRunResults.add(testingRunResult);
             } catch (Exception e) {
-                e.printStackTrace();;
+                e.printStackTrace();
                 continue;
             }
            
