@@ -3842,13 +3842,13 @@ public class DbAction extends ActionSupport {
                     .min()
                     .orElse(accountId);
 
-            // Create AWS account config entry with aws account id
-            AccountConfig.AwsAccountConfig awsAccountConfig = new AccountConfig.AwsAccountConfig(awsAccountId);
-
-            // Set timestamps for account config
+            // Create AWS account config map
             long currentTime = Context.now();
-            awsAccountConfig.setCreatedTimestamp(currentTime);
-            awsAccountConfig.setLastUpdatedTimestamp(currentTime);
+            Map<String, Object> accountConfigMap = new HashMap<>();
+            accountConfigMap.put(AccountConfig.TYPE, AccountConfig.AccountType.AWS_ACCOUNTS.getValue());
+            accountConfigMap.put(AccountConfig.AWS_ACCOUNT_ID, awsAccountId);
+            accountConfigMap.put(AccountConfig.CREATED_TIMESTAMP, currentTime);
+            accountConfigMap.put(AccountConfig.LAST_UPDATED_TIMESTAMP, currentTime);
 
             // Update org document with account config in the accounts map
             // _id is just orgId now, one document per org
@@ -3858,7 +3858,7 @@ public class DbAction extends ActionSupport {
                     Updates.setOnInsert(AccountConfig.ID, org.getId()),
                     Updates.setOnInsert(AccountConfig.ADMIN_EMAIL, org.getAdminEmail()),
                     Updates.setOnInsert(AccountConfig.ADMIN_ACCOUNT_ID, adminAccountId),
-                    Updates.set(AccountConfig.ACCOUNTS + "." + accountId, awsAccountConfig)
+                    Updates.set(AccountConfig.ACCOUNTS + "." + accountId, accountConfigMap)
                 )
             );
 

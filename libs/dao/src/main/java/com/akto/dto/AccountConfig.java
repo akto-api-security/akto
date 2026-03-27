@@ -22,7 +22,7 @@ public class AccountConfig {
     private int adminAccountId;
     public static final String ADMIN_ACCOUNT_ID = "adminAccountId";
 
-    private Map<Integer, Object> accounts;  // aktoAccountId → account config (type indicates AWS-ACCOUNTS, etc.)
+    private Map<Integer, Object> accounts;  // aktoAccountId → account config map
     public static final String ACCOUNTS = "accounts";
 
     public enum AccountType {
@@ -50,25 +50,9 @@ public class AccountConfig {
         }
     }
 
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    public static class AwsAccountConfig {
-        private String type;                    // "AWS-ACCOUNTS"
-        public static final String TYPE = "type";
-
-        private String awsAccountId;
-        public static final String AWS_ACCOUNT_ID = "awsAccountId";
-
-        private long createdTimestamp;
-        public static final String CREATED_TIMESTAMP = "createdTimestamp";
-
-        private long lastUpdatedTimestamp;
-        public static final String LAST_UPDATED_TIMESTAMP = "lastUpdatedTimestamp";
-
-        public AwsAccountConfig(String awsAccountId) {
-            this.awsAccountId = awsAccountId;
-            this.type = AccountType.AWS_ACCOUNTS.getValue();
-        }
-    }
+    // Account field constants
+    public static final String TYPE = "type";
+    public static final String AWS_ACCOUNT_ID = "awsAccountId";
+    public static final String CREATED_TIMESTAMP = "createdTimestamp";
+    public static final String LAST_UPDATED_TIMESTAMP = "lastUpdatedTimestamp";
 }
