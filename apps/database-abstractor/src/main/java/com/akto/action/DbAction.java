@@ -383,6 +383,10 @@ public class DbAction extends ActionSupport {
     @Setter
     private String awsAccountId;
 
+    @Getter
+    @Setter
+    private List<Map<String, Object>> accountMappings;
+
     public String fetchAwsAccountIdsForApiGatewayLogging() {
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
@@ -3858,12 +3862,58 @@ public class DbAction extends ActionSupport {
                     Updates.setOnInsert(AccountConfig.ID, org.getId()),
                     Updates.setOnInsert(AccountConfig.ADMIN_EMAIL, org.getAdminEmail()),
                     Updates.setOnInsert(AccountConfig.ADMIN_ACCOUNT_ID, adminAccountId),
-                    Updates.set(AccountConfig.ACCOUNTS + "." + accountId, accountConfigMap)
+                    Updates.set(AccountConfig.ACCOUNTS + "." + String.valueOf(accountId), accountConfigMap)
                 )
             );
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertAwsAccountId: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchAwsAccountIdMappings() {
+        try {
+            int accountId = Context.accountId.get();
+
+            // Find the org this account belongs to
+            Organization org = OrganizationsDao.instance.findOneByAccountId(accountId);
+            if (org == null) {
+                addActionError("Organization not found for accountId: " + accountId);
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Fetch the account config for this org
+            AccountConfig accountConfig = AccountConfigDao.instance.findByOrgId(org.getId());
+            if (accountConfig == null || accountConfig.getAccounts() == null) {
+                accountMappings = new ArrayList<>();
+                return Action.SUCCESS.toUpperCase();
+            }
+
+            // Build response list from accounts map
+            accountMappings = new ArrayList<>();
+            for (Map.Entry<String, Object> entry : accountConfig.getAccounts().entrySet()) {
+                String aktoAccountIdStr = entry.getKey();
+                Object accountConfigObj = entry.getValue();
+
+                if (accountConfigObj instanceof Map) {
+                    Map<String, Object> configMap = (Map<String, Object>) accountConfigObj;
+                    String awsId = (String) configMap.get(AccountConfig.AWS_ACCOUNT_ID);
+                    String type = (String) configMap.get(AccountConfig.TYPE);
+
+                    if (awsId != null && !awsId.isEmpty()) {
+                        Map<String, Object> mapping = new HashMap<>();
+                        mapping.put("aktoAccountId", Integer.parseInt(aktoAccountIdStr));
+                        mapping.put("awsAccountId", awsId);
+                        mapping.put("type", type);
+                        accountMappings.add(mapping);
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchAwsAccountIdMappings: " + e.getMessage());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();

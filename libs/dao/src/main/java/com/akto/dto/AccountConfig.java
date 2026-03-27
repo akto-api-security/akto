@@ -22,7 +22,7 @@ public class AccountConfig {
     private int adminAccountId;
     public static final String ADMIN_ACCOUNT_ID = "adminAccountId";
 
-    private Map<Integer, Object> accounts;  // aktoAccountId → account config map
+    private Map<String, Object> accounts;  // aktoAccountId (as String) → account config map
     public static final String ACCOUNTS = "accounts";
 
     public enum AccountType {
