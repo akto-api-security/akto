@@ -676,7 +676,8 @@ function CompliancePage() {
             filterSubCategory: filterSubCategory,
             startEpoch: [startTimestamp.toString()],
             endTimeStamp: [endTimestamp.toString()],
-            activeCollections: [activeCollections.toString()]
+            activeCollections: [activeCollections.toString()],
+            complianceStandard: [complianceView]
         }
         setIssuesFilters(obj)
 
