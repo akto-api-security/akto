@@ -202,7 +202,15 @@ export default function Header() {
         })
     }
 
-    const handleDashboardChange = (value) => {
+    const handleDashboardChange = async (value) => {
+        func.setToast(true, false, `Switching to ${value} dashboard...`)
+        try {
+            await api.switchDashboardCategory(value);
+        } catch (err) {
+            func.setToast(true, true, "Failed to switch dashboard category. Please try again.");
+            return;
+        }
+        
         PersistStore.getState().setAllCollections([]);
         PersistStore.getState().setCollectionsMap({});
         PersistStore.getState().setHostNameMap({});

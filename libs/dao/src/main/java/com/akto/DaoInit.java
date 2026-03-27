@@ -435,7 +435,8 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.CONTEXT_SOURCE.class),
                 new EnumCodec<>(ReputationSource.class),
                 new EnumCodec<>(ReputationScore.class),
-                new EnumCodec<>(JiraIntegration.JiraType.class)
+                new EnumCodec<>(JiraIntegration.JiraType.class),
+                new EnumCodec<>(GlobalEnums.DashboardCategory.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
