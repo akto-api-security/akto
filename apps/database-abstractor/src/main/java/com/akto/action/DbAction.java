@@ -3290,7 +3290,10 @@ public class DbAction extends ActionSupport {
 
     public String updateTestingRunPlaygroundStateAndResult(){
         try {
-            switch (this.getTestingRunPlaygroundType()) {
+            TestingRunPlayground.TestingRunPlaygroundType playgroundType = this.testingRunPlayground != null
+                    ? this.testingRunPlayground.getTestingRunPlaygroundType()
+                    : this.getTestingRunPlaygroundType();
+            switch (playgroundType) {
                 case TEST_EDITOR_PLAYGROUND:
                     Map<String, WorkflowNodeDetails> data = new HashMap<>();
                     try {
@@ -3330,6 +3333,12 @@ public class DbAction extends ActionSupport {
                     if (this.getOriginalHttpResponse() != null) {
                         DbLayer.updateTestingRunPlayground(new ObjectId(this.testingRunPlaygroundId), this.getOriginalHttpResponse());
                     }
+                    break;
+                case LOGIN_FLOW_TEST:
+                    if (this.testingRunPlayground != null) {
+                        DbLayer.updateTestingRunPlayground(this.testingRunPlayground);
+                    }
+                    break;
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateTestingRunPlaygroundStateAndResult " + e.toString());
