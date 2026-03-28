@@ -81,7 +81,11 @@ module.exports = {
   },
   resolve: {
     alias: {
-      '@': resolve('/web/src')
+      '@': resolve('/web/src'),
+      // Smart navigation: redirect react-router-dom to our enhanced module
+      // This enables ctrl+click to open links in new tabs automatically
+      'react-router-dom-original': require.resolve('react-router-dom'),
+      'react-router-dom': resolve('/web/src/util/navigation.js'),
     },
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.json', '*']
   },
