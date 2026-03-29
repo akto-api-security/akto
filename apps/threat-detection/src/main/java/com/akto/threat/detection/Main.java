@@ -26,6 +26,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
+import com.akto.threat.detection.config.ThreatDetectionConfig;
 import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
@@ -61,6 +62,9 @@ public class Main {
     logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
     ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
 
+    // Initialize threat detection configuration and Hyperscan matcher
+    ThreatDetectionConfig.initialize();
+
     int accountId = ClientActor.getAccountId();
     Context.accountId.set(accountId);
     String instanceId = ModuleInfoWorker.getModuleName(ModuleInfo.ModuleType.THREAT_DETECTION); 
@@ -79,6 +83,7 @@ public class Main {
     startModuleConfigPoller();
 
     initCustomDataTypeScheduler();
+
     CmsCounterLayer.initialize(localRedis);
     DistributionCalculator distributionCalculator = new DistributionCalculator();
     DistributionDataForwardLayer distributionDataForwardLayer = new DistributionDataForwardLayer(localRedis, distributionCalculator);
