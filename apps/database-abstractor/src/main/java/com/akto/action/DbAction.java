@@ -3846,18 +3846,18 @@ public class DbAction extends ActionSupport {
                     .min()
                     .orElse(accountId);
 
-            // Create AWS account config map (without type - type is now on parent doc)
             long currentTime = Context.now();
-            Map<String, Object> accountConfigMap = new HashMap<>();
-            accountConfigMap.put(AccountConfig.AWS_ACCOUNT_ID, awsAccountId);
-            accountConfigMap.put(AccountConfig.CREATED_TIMESTAMP, currentTime);
-            accountConfigMap.put(AccountConfig.LAST_UPDATED_TIMESTAMP, currentTime);
-
-            // Update org document with account config in the accounts map
-            // _id is orgId_type for one document per org per type
             String accountTypeValue = AccountConfig.AccountType.AWS_ACCOUNTS.getValue();
             String docId = org.getId() + "_" + accountTypeValue;
 
+            String accountKey = String.valueOf(accountId);
+            String awsAccountIdsPath = AccountConfig.ACCOUNTS + "." + accountKey + "." + AccountConfig.AWS_ACCOUNT_IDS;
+            String lastUpdatedPath = AccountConfig.ACCOUNTS + "." + accountKey + "." + AccountConfig.LAST_UPDATED_TIMESTAMP;
+            String createdPath = AccountConfig.ACCOUNTS + "." + accountKey + "." + AccountConfig.CREATED_TIMESTAMP;
+
+            // Use addToSet to append to array instead of overwriting
+            // Prevents duplicates automatically
+            // Note: updateOne() automatically upserts by default
             AccountConfigDao.instance.updateOne(
                 Filters.eq(AccountConfig.ID, docId),
                 Updates.combine(
@@ -3866,7 +3866,9 @@ public class DbAction extends ActionSupport {
                     Updates.setOnInsert(AccountConfig.TYPE_FIELD, accountTypeValue),
                     Updates.setOnInsert(AccountConfig.ADMIN_EMAIL, org.getAdminEmail()),
                     Updates.setOnInsert(AccountConfig.ADMIN_ACCOUNT_ID, adminAccountId),
-                    Updates.set(AccountConfig.ACCOUNTS + "." + String.valueOf(accountId), accountConfigMap)
+                    Updates.setOnInsert(createdPath, currentTime),
+                    Updates.addToSet(awsAccountIdsPath, awsAccountId),  // Append to array, no duplicates
+                    Updates.set(lastUpdatedPath, currentTime)
                 )
             );
 
@@ -3904,14 +3906,22 @@ public class DbAction extends ActionSupport {
 
                 if (accountConfigObj instanceof Map) {
                     Map<String, Object> configMap = (Map<String, Object>) accountConfigObj;
-                    String awsId = (String) configMap.get(AccountConfig.AWS_ACCOUNT_ID);
+                    int aktoId = Integer.parseInt(aktoAccountIdStr);
 
-                    if (awsId != null && !awsId.isEmpty()) {
-                        Map<String, Object> mapping = new HashMap<>();
-                        mapping.put("aktoAccountId", Integer.parseInt(aktoAccountIdStr));
-                        mapping.put("awsAccountId", awsId);
-                        mapping.put("type", accountTypeValue);
-                        accountMappings.add(mapping);
+                    // Read awsAccountIds array
+                    Object awsAccountIdsObj = configMap.get(AccountConfig.AWS_ACCOUNT_IDS);
+                    if (awsAccountIdsObj instanceof java.util.List) {
+                        @SuppressWarnings("unchecked")
+                        java.util.List<String> awsAccountIds = (java.util.List<String>) awsAccountIdsObj;
+                        for (String awsId : awsAccountIds) {
+                            if (awsId != null && !awsId.isEmpty()) {
+                                Map<String, Object> mapping = new HashMap<>();
+                                mapping.put("aktoAccountId", aktoId);
+                                mapping.put("awsAccountId", awsId);
+                                mapping.put("type", accountTypeValue);
+                                accountMappings.add(mapping);
+                            }
+                        }
                     }
                 }
             }
