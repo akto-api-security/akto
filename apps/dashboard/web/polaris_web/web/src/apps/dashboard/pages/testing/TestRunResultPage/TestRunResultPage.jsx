@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { CircleTickMajor, ArchiveMinor, LinkMinor } from '@shopify/polaris-icons';
 import TestingStore from '../testingStore';
 import api from '../api';
@@ -83,6 +83,7 @@ function TestRunResultPage(props) {
   const [conversations, setConversations] = useState([])
   const [conversationRemediationText, setConversationRemediationText] = useState(null)
   const [validationFailed, setValidationFailed] = useState(false)
+  const agenticConversationsRef = useRef([])
   const [showForbidden, setShowForbidden] = useState(false)
 
   // AI Chat state
@@ -140,8 +141,59 @@ function TestRunResultPage(props) {
     return jiraInteg.jiraTicketKey
   }
 
-  async function attachFileToIssue(origReq, testReq, issueId) {
-    let jiraInteg = await api.attachFileToIssue(origReq, testReq, issueId);
+  async function attachFileToIssue(origReq, testReq, issueId, agenticResult = false) {
+    await api.attachFileToIssue(origReq, testReq, issueId, agenticResult);
+  }
+
+  function formatHttpMessage(rawMessage) {
+    try {
+      // The message is stored with literal backslash-escaped quotes ({\"request\":...})
+      // Wrap in quotes so JSON.parse treats it as a JSON string and unescapes it
+      let parsed;
+      try {
+        parsed = JSON.parse(rawMessage);
+      } catch (_) {
+        parsed = JSON.parse('"' + rawMessage + '"');
+      }
+      // Handle double-stringified case
+      if (typeof parsed === 'string') {
+        parsed = JSON.parse(parsed);
+      }
+      const req = parsed.request || {};
+      const res = parsed.response || {};
+
+      let reqHeaders = {};
+      let resHeaders = {};
+      try { reqHeaders = typeof req.headers === 'string' ? JSON.parse(req.headers) : (req.headers || {}); } catch (_) {}
+      try { resHeaders = typeof res.headers === 'string' ? JSON.parse(res.headers) : (res.headers || {}); } catch (_) {}
+
+      let reqBody = req.body || '';
+      let resBody = res.body || '';
+      try { reqBody = JSON.stringify(JSON.parse(reqBody), null, 2); } catch (_) {}
+      try { resBody = JSON.stringify(JSON.parse(resBody), null, 2); } catch (_) {}
+
+      const formatHeaders = (headers) =>
+        Object.entries(headers).map(([k, v]) => `  ${k}: ${v}`).join('\n') || '  (none)';
+
+      return [
+        '=== REQUEST ===',
+        `${req.method || 'GET'} ${req.url || ''}`,
+        req.queryParams ? `Query Params: ${req.queryParams}` : null,
+        '\nHeaders:',
+        formatHeaders(reqHeaders),
+        '\nBody:',
+        reqBody || '(empty)',
+        '',
+        '=== RESPONSE ===',
+        `Status: ${res.statusCode || ''}`,
+        '\nHeaders:',
+        formatHeaders(resHeaders),
+        '\nBody:',
+        resBody || '(empty)',
+      ].filter(line => line !== null).join('\n');
+    } catch (_) {
+      return rawMessage;
+    }
   }
 
   function buildTestResultMetadata() {
@@ -246,9 +298,9 @@ function TestRunResultPage(props) {
           if (res && res.length > 0) {
             const result = transform.prepareConversationsList(res)
             setConversations(result.conversations);
-            // Store remediation text from conversations if available
             setConversationRemediationText(result.remediationText || null)
             setValidationFailed(result.validationFailed)
+            agenticConversationsRef.current = res;
           }
         }
       }
@@ -311,7 +363,29 @@ function TestRunResultPage(props) {
     }
 
     let sampleData = selectedTestRunResult.testResults[0]
-    attachFileToIssue(sampleData.originalMessage, sampleData.message, jiraTicketKey)
+    if (sampleData.resultTypeAgentic) {
+      const agenticConversations = agenticConversationsRef.current;
+      if (agenticConversations && agenticConversations.length > 0) {
+        const separator = "\n\n" + "=".repeat(60) + "\n\n";
+
+        // File 1: Prompt/conversation messages
+        const conversationText = agenticConversations.map((conv, idx) => {
+          let turn = `Turn ${idx + 1}\n\nTested Interaction:\n${conv.finalSentPrompt}\n\nAI Agent:\n${conv.response}`;
+          if (conv.validationMessage && conv.validationMessage !== "null") {
+            turn += `\n\nValidation Message:\n${conv.validationMessage}`;
+          }
+          return turn;
+        }).join(separator);
+        attachFileToIssue(conversationText, null, jiraTicketKey, true);
+
+        // File 2: HTTP request/response from testResults message
+        if (sampleData.message) {
+          attachFileToIssue(formatHttpMessage(sampleData.message), null, jiraTicketKey, true);
+        }
+      }
+    } else {
+      attachFileToIssue(sampleData.originalMessage, sampleData.message, jiraTicketKey)
+    }
 
   }
 

@@ -139,12 +139,12 @@ export default {
             }
         })
     },
-    attachFileToIssue(origReq, testReq, issueId) {
+    attachFileToIssue(origReq, testReq, issueId, agenticResult = false) {
         return request({
             url: '/api/attachFileToIssue',
             method: 'post',
             data: {
-                origReq, testReq, issueId
+                origReq, testReq, issueId, agenticResult
             }
         })
     },
