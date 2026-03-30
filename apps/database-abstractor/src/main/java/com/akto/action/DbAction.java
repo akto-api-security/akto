@@ -96,6 +96,7 @@ import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
 
+import org.apache.struts2.ServletActionContext;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -3854,6 +3855,19 @@ public class DbAction extends ActionSupport {
             String awsAccountIdsPath = AccountConfig.ACCOUNTS + "." + accountKey + "." + AccountConfig.AWS_ACCOUNT_IDS;
             String lastUpdatedPath = AccountConfig.ACCOUNTS + "." + accountKey + "." + AccountConfig.LAST_UPDATED_TIMESTAMP;
             String createdPath = AccountConfig.ACCOUNTS + "." + accountKey + "." + AccountConfig.CREATED_TIMESTAMP;
+            String tokenPath = AccountConfig.ACCOUNTS + "." + accountKey + "." + AccountConfig.DATABASE_ABSTRACTOR_TOKEN;
+
+            // Extract database abstractor token from Authorization header
+            String databaseAbstractorToken = null;
+            try {
+                javax.servlet.http.HttpServletRequest request = ServletActionContext.getRequest();
+                String authHeader = request.getHeader("Authorization");
+                if (authHeader != null && !authHeader.isEmpty()) {
+                    databaseAbstractorToken = authHeader;
+                }
+            } catch (Exception headerEx) {
+                loggerMaker.errorAndAddToDb("Could not extract Authorization header: " + headerEx.getMessage());
+            }
 
             // Use addToSet to append to array instead of overwriting
             // Prevents duplicates automatically
@@ -3868,6 +3882,7 @@ public class DbAction extends ActionSupport {
                     Updates.setOnInsert(AccountConfig.ADMIN_ACCOUNT_ID, adminAccountId),
                     Updates.setOnInsert(createdPath, currentTime),
                     Updates.addToSet(awsAccountIdsPath, awsAccountId),  // Append to array, no duplicates
+                    Updates.set(tokenPath, databaseAbstractorToken),    // Always update token
                     Updates.set(lastUpdatedPath, currentTime)
                 )
             );
@@ -3908,6 +3923,13 @@ public class DbAction extends ActionSupport {
                     Map<String, Object> configMap = (Map<String, Object>) accountConfigObj;
                     int aktoId = Integer.parseInt(aktoAccountIdStr);
 
+                    // Extract database abstractor token for this akto account
+                    String token = null;
+                    Object tokenObj = configMap.get(AccountConfig.DATABASE_ABSTRACTOR_TOKEN);
+                    if (tokenObj instanceof String) {
+                        token = (String) tokenObj;
+                    }
+
                     // Read awsAccountIds array
                     Object awsAccountIdsObj = configMap.get(AccountConfig.AWS_ACCOUNT_IDS);
                     if (awsAccountIdsObj instanceof java.util.List) {
@@ -3919,6 +3941,9 @@ public class DbAction extends ActionSupport {
                                 mapping.put("aktoAccountId", aktoId);
                                 mapping.put("awsAccountId", awsId);
                                 mapping.put("type", accountTypeValue);
+                                if (token != null) {
+                                    mapping.put("databaseAbstractorToken", token);
+                                }
                                 accountMappings.add(mapping);
                             }
                         }
