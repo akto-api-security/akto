@@ -3,15 +3,17 @@ from litellm.proxy.proxy_server import UserAPIKeyAuth
 from fastapi import HTTPException
 from typing import Literal, Tuple, Optional, Any
 import httpx
+import json
 import os
 import logging
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-DATA_INGESTION_URL = os.getenv("DATA_INGESTION_URL")
+DATA_INGESTION_SERVICE_URL = os.getenv("DATA_INGESTION_SERVICE_URL")
 SYNC_MODE = os.getenv("SYNC_MODE", "true").lower() == "true"
 TIMEOUT = float(os.getenv("TIMEOUT", "5"))
-LITELLM_URL = os.getenv("LITELLM_URL")
+LITELLM_URL = os.getenv("LITELLM_URL", "http://localhost:4000")
 AKTO_CONNECTOR_NAME = "litellm"
 HTTP_PROXY_PATH = "/api/http-proxy"
 
@@ -34,7 +36,7 @@ class GuardrailsHandler(CustomLogger):
         return params
 
     async def post_http_proxy(self, *, guardrails: bool, ingest_data: bool, http_proxy_payload: dict) -> httpx.Response:
-        endpoint = f"{DATA_INGESTION_URL}{HTTP_PROXY_PATH}"
+        endpoint = f"{DATA_INGESTION_SERVICE_URL}{HTTP_PROXY_PATH}"
         return await self.client.post(
             endpoint,
             params=self.build_http_proxy_params(guardrails=guardrails, ingest_data=ingest_data),
@@ -54,7 +56,6 @@ class GuardrailsHandler(CustomLogger):
             if kwargs is not None:
                 litellm_params = kwargs.get("litellm_params", {})
 
-                # Method 1: Try to get the path from metadata.user_api_key_request_route (most direct)
                 metadata = litellm_params.get("metadata", {})
                 request_route = metadata.get("user_api_key_request_route")
                 if request_route:
@@ -136,11 +137,11 @@ class GuardrailsHandler(CustomLogger):
             return data
 
     async def async_validate_and_ingest(self, data: dict, call_type: str, response_dict: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> None:
-        if not DATA_INGESTION_URL:
+        if not DATA_INGESTION_SERVICE_URL:
             return
 
         try:
-            http_proxy_payload = self.build_payload(data, call_type, response_dict, user_api_key_dict, wrap_response=True, kwargs=kwargs)
+            http_proxy_payload = self.build_payload(data, call_type, response_dict, user_api_key_dict, status_code=200, kwargs=kwargs)
             response = await self.post_http_proxy(guardrails=True, ingest_data=True, http_proxy_payload=http_proxy_payload)
             if response.status_code == 200:
                 allowed, reason = self.parse_guardrails_result(response.json())
@@ -150,10 +151,10 @@ class GuardrailsHandler(CustomLogger):
             logger.error(f"Guardrails async validation error: {e}")
 
     async def call_guardrails_validation(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> Tuple[bool, str]:
-        if not DATA_INGESTION_URL:
+        if not DATA_INGESTION_SERVICE_URL:
             return True, ""
 
-        http_proxy_payload = self.build_payload(data, call_type, None, user_api_key_dict, wrap_response=True, kwargs=kwargs)
+        http_proxy_payload = self.build_payload(data, call_type, None, user_api_key_dict, kwargs=kwargs)
 
         try:
             response = await self.post_http_proxy(guardrails=True, ingest_data=False, http_proxy_payload=http_proxy_payload)
@@ -180,22 +181,15 @@ class GuardrailsHandler(CustomLogger):
         *,
         log_http_error: bool = False,
     ) -> None:
-        if not DATA_INGESTION_URL:
+        if not DATA_INGESTION_SERVICE_URL:
             return
-
-        response_payload = {
-            "body": response_body,
-            "headers": {"content-type": "application/json"},
-            "statusCode": status_code,
-            "status": "OK" if status_code == 200 else "forbidden",
-        }
 
         http_proxy_payload = self.build_payload(
             data,
             call_type,
-            response_payload,
+            response_body,
             user_api_key_dict,
-            wrap_response=False,
+            status_code=status_code,
             kwargs=kwargs,
         )
 
@@ -218,7 +212,7 @@ class GuardrailsHandler(CustomLogger):
         )
 
     async def ingest_blocked_request(self, data: dict, call_type: str, reason: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> None:
-        if not DATA_INGESTION_URL or not SYNC_MODE:
+        if not DATA_INGESTION_SERVICE_URL or not SYNC_MODE:
             return
 
         await self.ingest_response(
@@ -230,76 +224,85 @@ class GuardrailsHandler(CustomLogger):
             kwargs,
         )
 
-    def build_request_litellm_metadata(self, call_type: str, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None) -> dict:
-        request_metadata = {
-            "call_type": call_type,
-            "model": data.get("model", ""),
-            "tag": {"gen-ai": "Gen AI"}
-        }
-        
+    def build_tags(self, call_type: str, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None) -> dict:
+        tags = {"gen-ai": "Gen AI"}
+        if call_type:
+            tags["call_type"] = call_type
+        model = data.get("model", "")
+        if model:
+            tags["model"] = model
         if user_api_key_dict:
             try:
-                request_metadata["litellm_auth"] = {
-                    "api_key": getattr(user_api_key_dict, "api_key", ""),
-                    "key_alias": getattr(user_api_key_dict, "key_alias", None),
-                    "user_id": getattr(user_api_key_dict, "user_id", None),
-                    "team_id": getattr(user_api_key_dict, "team_id", None),
-                    "org_id": getattr(user_api_key_dict, "org_id", None),
-                    "models": getattr(user_api_key_dict, "models", []),
-                    "blocked_models": getattr(user_api_key_dict, "blocked_models", []),
-                    "permissions": getattr(user_api_key_dict, "permissions", {}),
-                    "limits": {
-                        "rpm_limit": getattr(user_api_key_dict, "rpm_limit", None),
-                        "tpm_limit": getattr(user_api_key_dict, "tpm_limit", None),
-                        "max_tokens": getattr(user_api_key_dict, "max_tokens", None),
-                        "budget_limit": getattr(user_api_key_dict, "max_budget", None),
-                        "budget_duration": getattr(user_api_key_dict, "budget_duration", None)
-                    },
-                    "usage": {
-                        "request_count": getattr(user_api_key_dict, "request_count", 0),
-                        "total_tokens": getattr(user_api_key_dict, "total_tokens", 0),
-                        "spend": getattr(user_api_key_dict, "spend", 0.0),
-                    },
-                }
+                key_alias = getattr(user_api_key_dict, "key_alias", None)
+                team_id = getattr(user_api_key_dict, "team_id", None)
+                user_id = getattr(user_api_key_dict, "user_id", None)
+                if key_alias:
+                    tags["key_alias"] = key_alias
+                if team_id:
+                    tags["team_id"] = team_id
+                if user_id:
+                    tags["user_id"] = user_id
             except Exception as e:
-                logger.error(f"Failed to enrich metadata: {e}")
-        return request_metadata
+                logger.error(f"Failed to enrich tags: {e}")
+        return tags
 
-    def build_payload(self, data: dict, call_type: str, response_obj: Optional[dict], user_api_key_dict: Optional[UserAPIKeyAuth] = None, wrap_response: bool = True, kwargs: Optional[dict] = None) -> dict:
-        model_body_payload = {
+    def build_payload(self, data: dict, call_type: str, response_obj: Optional[dict], user_api_key_dict: Optional[UserAPIKeyAuth] = None, status_code: int = 200, kwargs: Optional[dict] = None) -> dict:
+        request_body = {
             "model": data.get("model", ""),
             "messages": data.get("messages", []),
-            "stream": data.get("stream", False)
+            "stream": data.get("stream", False),
         }
 
-        request_metadata = self.build_request_litellm_metadata(call_type, data, user_api_key_dict)
-
-        if response_obj is None:
-            response_payload = None
-        elif wrap_response:
-            response_payload = {
-                "body": response_obj,
-                "headers": {"content-type": "application/json"},
-                "statusCode": 200,
-                "status": "OK"
-            }
-        else:
-            response_payload = response_obj
-
-        # Dynamically extract the request path from kwargs
         request_path = self.extract_request_path(kwargs)
+        tags = self.build_tags(call_type, data, user_api_key_dict)
+        host = LITELLM_URL.replace("https://", "").replace("http://", "") if LITELLM_URL else "localhost:4000"
+        timestamp = str(int(datetime.now(timezone.utc).timestamp() * 1000))
+
+        request_headers = json.dumps({
+            "host": host,
+            "content-type": "application/json",
+        })
+
+        response_headers = json.dumps({
+            "content-type": "application/json",
+        })
+
+        request_payload = json.dumps({
+            "body": json.dumps(request_body),
+        })
+
+        if response_obj is not None:
+            response_payload = json.dumps({
+                "body": json.dumps(response_obj),
+            })
+        else:
+            response_payload = json.dumps({})
 
         return {
-            "url": LITELLM_URL,
             "path": request_path,
-            "request": {
-                "method": "POST",
-                "headers": {"content-type": "application/json"},
-                "body": model_body_payload,
-                "queryParams": {},
-                "metadata": request_metadata
-            },
-            "response": response_payload
+            "requestHeaders": request_headers,
+            "responseHeaders": response_headers,
+            "method": "POST",
+            "requestPayload": request_payload,
+            "responsePayload": response_payload,
+            "ip": "0.0.0.0",
+            "destIp": "127.0.0.1",
+            "time": timestamp,
+            "statusCode": str(status_code),
+            "type": None,
+            "status": str(status_code),
+            "akto_account_id": "1000000",
+            "akto_vxlan_id": "0",
+            "is_pending": "false",
+            "source": "MIRRORING",
+            "direction": None,
+            "process_id": None,
+            "socket_id": None,
+            "daemonset_id": None,
+            "enabled_graph": None,
+            "tag": json.dumps(tags),
+            "metadata": json.dumps(tags),
+            "contextSource": "ENDPOINT",
         }
 
     async def async_on_shutdown(self) -> None:
