@@ -88,6 +88,8 @@ public class JSONUtils {
     public static Map<String, Set<Object>> streamFlatten(String json) {
         Map<String, Set<Object>> ret = new HashMap<>();
         if (json == null || json.isEmpty()) return ret;
+        char first = json.charAt(0);
+        if (first != '{' && first != '[') return ret;
 
         try (com.fasterxml.jackson.core.JsonParser parser = jsonFactory.createParser(json)) {
             Deque<String> pathStack = new ArrayDeque<>();
