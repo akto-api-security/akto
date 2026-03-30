@@ -170,6 +170,7 @@ public class Main {
 
             kafkaProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
             kafkaProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+            kafkaProps.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
 
             protobufKafkaProducer = new KafkaProducer<>(kafkaProps);
             loggerMaker.info("Connected to protobuf kafka producer @ " + Context.now());
