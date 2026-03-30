@@ -127,8 +127,20 @@ public class RequestTemplate {
 
     public List<SingleTypeInfo> process2(BasicDBObject payload, String url, String method, int responseCode, String userId,
                                          int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap, int timestamp) {
+            Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
+            return process2WithFlattened(flattened, url, method, responseCode, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, timestamp);
+    }
+
+    public List<SingleTypeInfo> process2Stream(String jsonPayload, String url, String method, int responseCode, String userId,
+                                         int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap, int timestamp) {
+            Map<String, Set<Object>> flattened = JSONUtils.streamFlatten(jsonPayload);
+            return process2WithFlattened(flattened, url, method, responseCode, userId, apiCollectionId, rawMessage, sensitiveParamInfoBooleanMap, timestamp);
+    }
+
+    public List<SingleTypeInfo> process2WithFlattened(Map<String, Set<Object>> flattened, String url, String method, int responseCode, String userId,
+                                         int apiCollectionId, String rawMessage, Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap, int timestamp) {
             List<SingleTypeInfo> deleted = new ArrayList<>();
-        
+
             if(userIds.size() < 10) userIds.add(userId);
 
             Trie.Node<String, Pair<KeyTypes, Set<String>>> root = this.keyTrie.getRoot();
@@ -137,12 +149,10 @@ public class RequestTemplate {
             // insert(payload, userId, root, url, method, responseCode, "", apiCollectionId);
             insertTime += (System.currentTimeMillis() - s);
             int now = Context.now();
-
-            Map<String, Set<Object>> flattened = JSONUtils.flatten(payload);
             s = System.currentTimeMillis();
             for(String param: flattened.keySet()) {
                 if (parameters.size() > 1000) {
-                    continue;
+                    break;
                 }
                 KeyTypes keyTypes = parameters.get(param);
                 if (keyTypes == null) {
@@ -675,6 +685,43 @@ public class RequestTemplate {
         payload.putAll(queryParams.toMap());
 
         return payload;
+    }
+
+    /**
+     * Stream-flatten the request payload + query params without building an intermediate
+     * BasicDBObject tree for the body. Query params are small so we flatten them normally
+     * and merge into the result.
+     */
+    public static Map<String, Set<Object>> streamFlattenRequestPayload(HttpRequestParams requestParams, String urlWithParams) {
+        String reqPayload = requestParams.getPayload();
+
+        BasicDBObject queryParams = null;
+        try {
+            queryParams = getQueryJSONWithSuffix(urlWithParams);
+        } catch (Exception e) {
+            queryParams = new BasicDBObject();
+        }
+
+        if (reqPayload == null || reqPayload.isEmpty()) {
+            reqPayload = "{}";
+        }
+
+        if (reqPayload.startsWith("[")) {
+            reqPayload = "{\"json\": " + reqPayload + "}";
+        }
+
+        // Stream-flatten the body (avoids BasicDBObject.parse)
+        Map<String, Set<Object>> flattened = JSONUtils.streamFlatten(reqPayload);
+
+        // Query params are tiny — flatten normally and merge
+        if (queryParams != null && !queryParams.isEmpty()) {
+            Map<String, Set<Object>> queryFlattened = JSONUtils.flatten(queryParams);
+            for (Map.Entry<String, Set<Object>> entry : queryFlattened.entrySet()) {
+                flattened.merge(entry.getKey(), entry.getValue(), (a, b) -> { a.addAll(b); return a; });
+            }
+        }
+
+        return flattened;
     }
 
     private static String[] splitURL(String url) {

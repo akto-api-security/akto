@@ -37,6 +37,11 @@ import java.util.*;
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
 
+    public static final String ENV_MCP_JSONRPC_SSE_ENABLED = "AKTO_MCP_JSONRPC_SSE_ENABLED";
+
+    private static final boolean MCP_JSONRPC_SSE_ENABLED =
+            "true".equalsIgnoreCase(System.getenv().getOrDefault(ENV_MCP_JSONRPC_SSE_ENABLED, "false"));
+
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
     private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -307,7 +312,14 @@ public class ApiExecutor {
     private static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean jsonRpcCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
 
-        if (!jsonRpcCheck && shouldInitiateSSEStream(request)) {
+        String bodySnapshotForJsonRpc = null;
+        JsonNode jsonBodyTreeSnapshot = null;
+        if (MCP_JSONRPC_SSE_ENABLED && !jsonRpcCheck) {
+            bodySnapshotForJsonRpc = request.getBody();
+            jsonBodyTreeSnapshot = tryReadJsonBodyTree(bodySnapshotForJsonRpc);
+        }
+
+        if (!jsonRpcCheck && MCP_JSONRPC_SSE_ENABLED && shouldInitiateSSEStream(request, jsonBodyTreeSnapshot)) {
             return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);
         }
 
@@ -385,7 +397,7 @@ public class ApiExecutor {
             case PATCH:
             case TRACK:
             case TRACE:
-                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, type);
+                response = sendWithRequestBody(request, builder, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, type, bodySnapshotForJsonRpc, jsonBodyTreeSnapshot);
                 break;
             case OTHER:
                 throw new Exception("Invalid method name");
@@ -625,7 +637,7 @@ public class ApiExecutor {
         );
     }
 
-    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol) throws Exception {
+    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol, String bodySnapshotForJsonRpc, JsonNode jsonBodyTreeSnapshot) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
             headers = new HashMap<>();
@@ -778,7 +790,16 @@ public class ApiExecutor {
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
-            if (request.getHeaders().containsKey("charset") || isJsonRpcRequest(request)) {
+            boolean treatAsJsonRpc = false;
+            if (MCP_JSONRPC_SSE_ENABLED) {
+                if (bodySnapshotForJsonRpc != null
+                        && java.util.Objects.equals(bodySnapshotForJsonRpc, request.getBody())) {
+                    treatAsJsonRpc = isJsonRpcNode(jsonBodyTreeSnapshot);
+                } else {
+                    treatAsJsonRpc = isJsonRpcRequestFromBody(request);
+                }
+            }
+            if (request.getHeaders().containsKey("charset") || treatAsJsonRpc) {
                 body = RequestBody.create(payload, null);
                 request.getHeaders().remove("charset");
             } else {
@@ -790,17 +811,24 @@ public class ApiExecutor {
         return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol, request.getTlsAuthParam());
     }
 
-    private static boolean isJsonRpcRequest(OriginalHttpRequest request) {
-        try {
-            String body = request.getBody();
-            if (body == null) {
-                return false;
-            }
-            JsonNode node = objectMapper.readTree(body);
-            return node.has("jsonrpc") && node.has("id") && node.has("method");
-        } catch (Exception e) {
-            return false;
+    private static JsonNode tryReadJsonBodyTree(String body) {
+        if (body == null || body.isEmpty()) {
+            return null;
         }
+        try {
+            return objectMapper.readTree(body);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static boolean isJsonRpcNode(JsonNode node) {
+        return node != null && node.has("jsonrpc") && node.has("id") && node.has("method");
+    }
+
+    /** Parses the current request body (second parse when snapshot does not match after transforms). */
+    private static boolean isJsonRpcRequestFromBody(OriginalHttpRequest request) {
+        return isJsonRpcNode(tryReadJsonBodyTree(request.getBody()));
     }
 
     private static class SseSession {
@@ -883,6 +911,10 @@ public class ApiExecutor {
     public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects,
         TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
         boolean skipSSRFCheck, boolean overrideMessageEndpoint) throws Exception {
+        if (!MCP_JSONRPC_SSE_ENABLED) {
+            throw new IllegalStateException(
+                    ENV_MCP_JSONRPC_SSE_ENABLED + " must be set to true for SSE / MCP JSON-RPC requests");
+        }
         // Always use prepareUrl to get the absolute URL
         String url = prepareUrl(request, testingRunConfig);
         URI uri = new URI(url);
@@ -962,9 +994,10 @@ public class ApiExecutor {
         }
     }
 
-    private static boolean shouldInitiateSSEStream(OriginalHttpRequest request) {
+    /** Only called when the MCP/JSON-RPC/SSE env flag is on; {@code bodyTree} is the upfront parse of the request body. */
+    private static boolean shouldInitiateSSEStream(OriginalHttpRequest request, JsonNode bodyTree) {
 
-        if (!isJsonRpcRequest(request)) {
+        if (!isJsonRpcNode(bodyTree)) {
             return false;
         }
 
