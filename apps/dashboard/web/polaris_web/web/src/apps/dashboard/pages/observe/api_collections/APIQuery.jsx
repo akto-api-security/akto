@@ -1,9 +1,9 @@
-import CollectionComponent from "../../../components/CollectionComponent"
+import CollectionComponent, { AUTH_TYPES } from "../../../components/CollectionComponent"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
 import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon, Popover, ActionList, Checkbox } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
-import React, { useState, useReducer, useCallback, useMemo, useEffect } from 'react'
+import React, { useState, useReducer, useCallback, useMemo, useEffect, useRef } from 'react'
 import { produce } from "immer"
 import ApiEndpoints from "./ApiEndpoints";
 import api from "../api"
@@ -15,6 +15,20 @@ import PersistStore from "../../../../main/PersistStore";
 import collectionsApi from "./api"
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
+
+const AUTH_TYPE_ENUM_VALUES = new Set(AUTH_TYPES.map((t) => t.value))
+
+function parseAuthTypeEnumFromFiltersSearchParam(filtersParam) {
+    if (!filtersParam || filtersParam === '#all') return null
+    const idx = filtersParam.indexOf('__')
+    if (idx === -1) return null
+    const key = filtersParam.slice(0, idx)
+    const value = filtersParam.slice(idx + 2)
+    if (key !== 'auth_type' || !value) return null
+    const authEnum = decodeURIComponent(value).toUpperCase()
+    if (!AUTH_TYPE_ENUM_VALUES.has(authEnum)) return null
+    return authEnum
+}
 
 function APIQuery() {
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
@@ -36,6 +50,9 @@ function APIQuery() {
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
     const collectionId = (searchParams && searchParams.get("collectionId") !== null) ? searchParams.get("collectionId") : -1
+
+    const appliedUrlFilterRef = useRef(false)
+    const pendingExploreFromUrlRef = useRef(false)
 
     const getEmptyCondition = (type) => {
         return { data: {}, operator: "AND", type: type };
@@ -101,6 +118,30 @@ function APIQuery() {
             }
         }
     },[collectionId])
+
+    useEffect(() => {
+        if (appliedUrlFilterRef.current) return
+        if (searchParams.get('collectionId')) {
+            appliedUrlFilterRef.current = true
+            return
+        }
+        const filtersParam = searchParams.get('filters')
+        if (!filtersParam || filtersParam === '#all') {
+            appliedUrlFilterRef.current = true
+            return
+        }
+        const authEnum = parseAuthTypeEnumFromFiltersSearchParam(filtersParam)
+        if (!authEnum) {
+            appliedUrlFilterRef.current = true
+            return
+        }
+        appliedUrlFilterRef.current = true
+        pendingExploreFromUrlRef.current = true
+        dispatchConditions({
+            type: 'add',
+            obj: { type: 'AUTH_TYPE', operator: 'AND', data: { authTypes: [authEnum] } }
+        })
+    }, [searchParams])
 
     const prepareData = useCallback(() => {
         let dt = [];
@@ -176,8 +217,15 @@ function APIQuery() {
         }
     }, [prepareData, skipTagsMismatch]);
 
+    useEffect(() => {
+        if (!pendingExploreFromUrlRef.current) return
+        if (conditions.length === 0) return
+        pendingExploreFromUrlRef.current = false
+        exploreEndpoints()
+    }, [conditions, exploreEndpoints])
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    const modalComponent =
+   const modalComponent =
         <SaveAsCollectionModal
             key="save-as-collection-modal"
             createNewCollection={createNewCollection}

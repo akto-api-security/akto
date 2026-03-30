@@ -69,7 +69,7 @@ function HomeDashboard() {
     ];
 
     const ALL_COLLECTION_INVENTORY_ID = 111111121
-
+    const EXPLORE_MODE_QUERY_PATH = '/dashboard/observe/query_mode'
 
     const allCollections = PersistStore(state => state.allCollections)
     const hostNameMap = PersistStore(state => state.hostNameMap)
@@ -851,6 +851,15 @@ function HomeDashboard() {
         return `${baseUrl}${separator}filters=${baseFilter}__${encodeURIComponent(filterValue)}`
     }, [])
 
+    const buildExploreModeAuthFiltersUrl = useCallback((baseUrl, filterValue, baseFilter) => {
+        if (!baseUrl) return undefined
+        if (!filterValue) {
+            return baseUrl
+        }
+        const separator = baseUrl.includes('?') ? '&' : '?'
+        return `${baseUrl}${separator}filters=${baseFilter}__${encodeURIComponent(filterValue)}`
+    }, [])
+
     function buildAPITypesData(apiStats, missingCount, redundantCount, apiTypeMissing) {
         // Initialize the data with default values for all API types
         const data = [
@@ -1126,13 +1135,13 @@ function HomeDashboard() {
         <InfoCard
             component={
                 <div style={{ marginTop: showTestingComponents ? '0px' : '20px' }}>
-                    <ChartypeComponent data={authMap} navUrl={inventoryAllCollectionBaseUrl} navUrlBuilder={(baseUrl, filterValue) => buildAuthFiltersUrl(baseUrl, filterValue, "auth_type")} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%"/>
+                    <ChartypeComponent data={authMap} navUrl={EXPLORE_MODE_QUERY_PATH} navUrlBuilder={(baseUrl, filterValue) => buildExploreModeAuthFiltersUrl(baseUrl, filterValue, "auth_type")} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%"/>
                 </div>
             }
             title={`${mapLabel("APIs", getDashboardCategory())} by Authentication`}
             titleToolTip={`Breakdown of ${mapLabel("APIs", getDashboardCategory())} by the authentication methods they use, including unauthenticated APIs which may pose security risks.`}
             linkText="Check out"
-            linkUrl={inventoryAllCollectionBaseUrl}
+            linkUrl={EXPLORE_MODE_QUERY_PATH}
         />
 
     const apisByTypeComponent = (!isMCPSecurityCategory()) ? <InfoCard
