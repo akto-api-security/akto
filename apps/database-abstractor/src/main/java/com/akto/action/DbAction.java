@@ -5101,9 +5101,10 @@ public class DbAction extends ActionSupport {
             try {
                 Bson updates = Updates.combine(
                     Updates.setOnInsert("_id", candidateId),
-                    Updates.setOnInsert("hostName", hostName),
-                    Updates.setOnInsert("startTs", Context.now()),
-                    Updates.setOnInsert("urls", new HashSet<>())
+                    Updates.set(ApiCollection.HOST_NAME, hostName),
+                    Updates.set(ApiCollection.NAME, hostName),
+                    Updates.setOnInsert(ApiCollection.START_TS, Context.now()),
+                    Updates.setOnInsert(ApiCollection.URLS_STRING, new HashSet<>())
                 );
                 ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(
                     Filters.eq(ApiCollection.HOST_NAME, hostName), updates, updateOptions);
