@@ -258,6 +258,17 @@ class GuardrailsHandler(CustomLogger):
         parsed = urlparse(LITELLM_URL) if LITELLM_URL else None
         host = parsed.netloc if parsed and parsed.netloc else "localhost:4000"
         timestamp = str(int(datetime.now(timezone.utc).timestamp() * 1000))
+        proxy_server_request = (
+            data.get("proxy_server_request")
+            or (kwargs.get("litellm_params", {}) if kwargs else {}).get("proxy_server_request")
+            or {}
+        )
+        request_headers_raw = proxy_server_request.get("headers", {})
+        client_ip = (
+            request_headers_raw.get("x-forwarded-for", "").split(",")[0].strip()
+            or request_headers_raw.get("x-real-ip", "")
+            or "0.0.0.0"
+        )
 
         request_headers = json.dumps({
             "host": host,
@@ -286,7 +297,7 @@ class GuardrailsHandler(CustomLogger):
             "method": "POST",
             "requestPayload": request_payload,
             "responsePayload": response_payload,
-            "ip": "0.0.0.0",
+            "ip": client_ip,
             "destIp": "127.0.0.1",
             "time": timestamp,
             "statusCode": str(status_code),
@@ -303,7 +314,7 @@ class GuardrailsHandler(CustomLogger):
             "enabled_graph": None,
             "tag": json.dumps(tags),
             "metadata": json.dumps(tags),
-            "contextSource": "ENDPOINT",
+            "contextSource": "AGENTIC",
         }
 
     async def async_on_shutdown(self) -> None:
