@@ -7,6 +7,7 @@ import json
 import os
 import logging
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -246,7 +247,7 @@ class GuardrailsHandler(CustomLogger):
                 logger.error(f"Failed to enrich tags: {e}")
         return tags
 
-    def build_payload(self, data: dict, call_type: str, response_obj: Optional[dict], user_api_key_dict: Optional[UserAPIKeyAuth] = None, status_code: int = 200, kwargs: Optional[dict] = None) -> dict:
+    def build_payload(self, data: dict, call_type: str, response_obj: Optional[Any], user_api_key_dict: Optional[UserAPIKeyAuth] = None, status_code: int = 200, kwargs: Optional[dict] = None) -> dict:
         request_body = {
             "model": data.get("model", ""),
             "messages": data.get("messages", []),
@@ -255,7 +256,8 @@ class GuardrailsHandler(CustomLogger):
 
         request_path = self.extract_request_path(kwargs)
         tags = self.build_tags(call_type, data, user_api_key_dict)
-        host = LITELLM_URL.replace("https://", "").replace("http://", "") if LITELLM_URL else "localhost:4000"
+        parsed = urlparse(LITELLM_URL) if LITELLM_URL else None
+        host = parsed.netloc if parsed and parsed.netloc else "localhost:4000"
         timestamp = str(int(datetime.now(timezone.utc).timestamp() * 1000))
 
         request_headers = json.dumps({
@@ -268,15 +270,15 @@ class GuardrailsHandler(CustomLogger):
         })
 
         request_payload = json.dumps({
-            "body": json.dumps(request_body),
+            "body": request_body,
         })
 
         if response_obj is not None:
             response_payload = json.dumps({
-                "body": json.dumps(response_obj),
+                "body": response_obj,
             })
         else:
-            response_payload = json.dumps({})
+            response_payload = None
 
         return {
             "path": request_path,
