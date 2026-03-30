@@ -931,11 +931,11 @@ public class DbLayer {
                 Updates.setOnInsert("urls", new HashSet<>())
         );
 
-        if (userEnv != null) {
+        if (userEnv != null && Constants.SHOULD_SAVE_TAGS) {
             update = Updates.combine(update, Updates.set(ApiCollection.USER_ENV_TYPE, userEnv));
         }
 
-        if (tags != null && !tags.isEmpty()) {
+        if (tags != null && !tags.isEmpty() && Constants.SHOULD_SAVE_TAGS) {
             // Update the entire tagsList
             update = Updates.combine(update, Updates.set(ApiCollection.TAGS_STRING, getFilteredTags(apiCollection, tags)));
         }
@@ -1003,11 +1003,11 @@ public class DbLayer {
             Updates.setOnInsert("urls", new HashSet<>())
         );
 
-        if (userEnv != null) {
+        if (userEnv != null && Constants.SHOULD_SAVE_TAGS) {
             updates = Updates.combine(updates, Updates.set(ApiCollection.USER_ENV_TYPE, userEnv));
         }
 
-        if(tags != null && !tags.isEmpty()) {
+        if(tags != null && !tags.isEmpty() && Constants.SHOULD_SAVE_TAGS) {
             updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, getFilteredTags(apiCollection, tags)));
         }
 
@@ -1033,7 +1033,7 @@ public class DbLayer {
     // Atomic operation to update tags for service tag collection
     // Uses $set to replace the entire tagsList
     public static void updateServiceTagCollectionTags(int collectionId, List<CollectionTags> tagsList) {
-        if (tagsList == null || tagsList.isEmpty()) {
+        if (tagsList == null || tagsList.isEmpty() || !Constants.SHOULD_SAVE_TAGS) {
             return;
         }
         ApiCollectionsDao.instance.updateOne(
@@ -1059,11 +1059,11 @@ public class DbLayer {
             Updates.setOnInsert(ApiCollection.HOST_NAME, hostName)
         );
 
-        if(tags != null && !tags.isEmpty()) {
+        if(tags != null && !tags.isEmpty() && Constants.SHOULD_SAVE_TAGS) {
             updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, tags));
         }
 
-        if(accessType != null && !accessType.isEmpty()) {
+        if(accessType != null && !accessType.isEmpty() && Constants.SHOULD_SAVE_TAGS) {
             updates = Updates.combine(updates, Updates.set(ApiCollection.ACCESS_TYPE, accessType));
         }
 
