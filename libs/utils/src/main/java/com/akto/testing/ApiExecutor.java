@@ -40,7 +40,7 @@ public class ApiExecutor {
     public static final String ENV_MCP_JSONRPC_SSE_ENABLED = "AKTO_MCP_JSONRPC_SSE_ENABLED";
 
     private static final boolean MCP_JSONRPC_SSE_ENABLED =
-            "true".equalsIgnoreCase(System.getenv(ENV_MCP_JSONRPC_SSE_ENABLED));
+            "true".equalsIgnoreCase(System.getenv().getOrDefault(ENV_MCP_JSONRPC_SSE_ENABLED, "true"));
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
