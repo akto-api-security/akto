@@ -27,6 +27,8 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
 
 import com.akto.IPLookupClient;
 import com.akto.RawApiMetadataFactory;
@@ -236,6 +238,21 @@ public class MaliciousTrafficDetectorTask implements Task {
                 logger.warnAndAddToDb(this.instanceId + ": Subscription: " + kafkaConsumer.subscription());
                 if (kafkaConsumer.assignment().isEmpty()) {
                   logger.warnAndAddToDb(this.instanceId + ": WARNING - No partitions assigned! Consumer may not receive records.");
+                }
+                // Log committed offsets and end offsets (lag) for each assigned partition
+                try {
+                  Set<TopicPartition> assignedPartitions = kafkaConsumer.assignment();
+                  Map<TopicPartition, Long> endOffsets = kafkaConsumer.endOffsets(assignedPartitions);
+                  for (TopicPartition tp : assignedPartitions) {
+                    OffsetAndMetadata committed = kafkaConsumer.committed(tp);
+                    long committedOffset = committed != null ? committed.offset() : -1;
+                    long endOffset = endOffsets.getOrDefault(tp, -1L);
+                    long lag = (committed != null && endOffset >= 0) ? endOffset - committedOffset : -1;
+                    logger.warnAndAddToDb(this.instanceId + ": Partition " + tp + " committedOffset=" + committedOffset +
+                                          " endOffset=" + endOffset + " lag=" + lag);
+                  }
+                } catch (Exception e) {
+                  logger.errorAndAddToDb(e, this.instanceId + ": Error fetching offset info: " + e.getMessage());
                 }
                 recordsReadCount = 0;
                 lastRecordCountLogTime = currentTime;
