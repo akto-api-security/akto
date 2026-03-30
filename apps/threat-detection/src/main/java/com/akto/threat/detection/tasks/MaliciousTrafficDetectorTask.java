@@ -552,16 +552,13 @@ public class MaliciousTrafficDetectorTask implements Task {
     ThreatDetectionMode detectionMode = ThreatDetectionConfig.getDetectionMode();
     boolean skipFilterLoop = false;
 
-    // Run Hyperscan if enabled (HYPERSCAN_ONLY or HYBRID mode)
-    if (detectionMode == ThreatDetectionMode.HYPERSCAN_ONLY || detectionMode == ThreatDetectionMode.HYBRID) {
+    // Run Hyperscan if enabled
+    if (detectionMode == ThreatDetectionMode.HYPERSCAN_ONLY) {
       RedactionType hsRedactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
       hyperscanEventHandler.detectAndPushEvents(
           responseParam, apiInfoKey, actor, metadata,
           successfulExploit, isIgnoredEvent, hsRedactionType);
-
-      if (detectionMode == ThreatDetectionMode.HYPERSCAN_ONLY) {
-        skipFilterLoop = true;
-      }
+      skipFilterLoop = true;
     }
 
     // Only run filter loop if not skipped

@@ -1,31 +1,14 @@
 package com.akto.threat.detection.enums;
 
 /**
- * Enum representing the three threat detection modes.
+ * Enum representing the threat detection modes.
  *
  * - FILTER_YAML_ONLY: Use only filter YAML templates (default)
  * - HYPERSCAN_ONLY: Use only Hyperscan pattern matching
- * - HYBRID: Use both Hyperscan and filter YAML (Hyperscan first for performance, fallback to YAML)
  */
 public enum ThreatDetectionMode {
-    /**
-     * Use only filter YAML templates for threat detection.
-     * This is the default and most comprehensive mode.
-     */
     FILTER_YAML_ONLY("FILTER_YAML_ONLY"),
-
-    /**
-     * Use only Hyperscan for threat detection.
-     * Fast but limited to pattern matching only.
-     */
-    HYPERSCAN_ONLY("HYPERSCAN_ONLY"),
-
-    /**
-     * Use both Hyperscan and filter YAML.
-     * Hyperscan runs first for fast pattern detection,
-     * then filter YAML for complex validation logic.
-     */
-    HYBRID("HYBRID");
+    HYPERSCAN_ONLY("HYPERSCAN_ONLY");
 
     private final String value;
 

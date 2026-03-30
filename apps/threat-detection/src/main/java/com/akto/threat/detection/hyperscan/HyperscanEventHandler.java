@@ -54,6 +54,7 @@ public class HyperscanEventHandler {
 
         HyperscanThreatMatcher matcher = HyperscanThreatMatcher.getInstance();
         if (!matcher.isInitialized()) {
+            logger.errorAndAddToDb("Hyperscan matcher not initialized, skipping detection");
             return false;
         }
 

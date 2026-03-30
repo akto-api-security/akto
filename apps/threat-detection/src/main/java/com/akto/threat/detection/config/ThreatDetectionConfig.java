@@ -15,7 +15,7 @@ public class ThreatDetectionConfig {
 
     /**
      * Environment variable name for threat detection mode.
-     * Valid values: FILTER_YAML_ONLY, HYPERSCAN_ONLY, HYBRID
+     * Valid values: FILTER_YAML_ONLY, HYPERSCAN_ONLY
      * Default: FILTER_YAML_ONLY
      */
     public static final String ENV_THREAT_DETECTION_MODE = "THREAT_DETECTION_MODE";
@@ -43,7 +43,11 @@ public class ThreatDetectionConfig {
 
         // Only initialize Hyperscan when mode requires it
         if (detectionMode != ThreatDetectionMode.FILTER_YAML_ONLY) {
-            initializeHyperscan();
+            boolean hyperscanReady = initializeHyperscan();
+            if (!hyperscanReady) {
+                logger.errorAndAddToDb("Hyperscan failed to initialize, falling back to FILTER_YAML_ONLY mode");
+                detectionMode = ThreatDetectionMode.FILTER_YAML_ONLY;
+            }
         }
 
         initialized = true;
@@ -52,39 +56,21 @@ public class ThreatDetectionConfig {
     /**
      * Initialize Hyperscan threat matcher from pattern file.
      */
-    private static void initializeHyperscan() {
+    private static boolean initializeHyperscan() {
         try {
             HyperscanThreatMatcher matcher = HyperscanThreatMatcher.getInstance();
-            boolean initialized = false;
+            boolean hsInitialized = matcher.initializeFromClasspath("threat-patterns-example.txt");
 
-            // First, try from environment variable (file path)
-            String envPath = System.getenv("HYPERSCAN_PATTERN_FILE");
-            if (envPath != null && !envPath.isEmpty()) {
-                logger.infoAndAddToDb("Using HYPERSCAN_PATTERN_FILE env var: " + envPath);
-                initialized = matcher.initialize(envPath);
-            }
-
-            // Second, try from classpath resources
-            if (!initialized) {
-                logger.infoAndAddToDb("Trying to load pattern file from classpath: threat-patterns-example.txt");
-                initialized = matcher.initializeFromClasspath("threat-patterns-example.txt");
-            }
-
-            // Third, try default file path
-            if (!initialized) {
-                String defaultPath = "apps/threat-detection/src/main/resources/threat-patterns-example.txt";
-                logger.infoAndAddToDb("Trying default pattern file path: " + defaultPath);
-                initialized = matcher.initialize(defaultPath);
-            }
-
-            if (!initialized) {
-                logger.errorAndAddToDb("Failed to initialize Hyperscan matcher from all sources");
+            if (!hsInitialized) {
+                logger.errorAndAddToDb("Failed to initialize Hyperscan matcher from classpath");
             } else {
                 logger.infoAndAddToDb("Hyperscan matcher initialized successfully with " +
                     matcher.getPatternCount() + " patterns across " + matcher.getCategoryCount() + " categories");
             }
+            return hsInitialized;
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error initializing Hyperscan: " + e.getMessage());
+            return false;
         }
     }
 
@@ -101,24 +87,12 @@ public class ThreatDetectionConfig {
         return detectionMode;
     }
 
-    /**
-     * Check if Hyperscan should be used (either HYPERSCAN_ONLY or HYBRID mode).
-     *
-     * @return true if Hyperscan should be enabled
-     */
     public static boolean isHyperscanEnabled() {
-        ThreatDetectionMode mode = getDetectionMode();
-        return mode == ThreatDetectionMode.HYPERSCAN_ONLY || mode == ThreatDetectionMode.HYBRID;
+        return getDetectionMode() == ThreatDetectionMode.HYPERSCAN_ONLY;
     }
 
-    /**
-     * Check if Filter YAML should be used (either FILTER_YAML_ONLY or HYBRID mode).
-     *
-     * @return true if Filter YAML should be enabled
-     */
     public static boolean isFilterYamlEnabled() {
-        ThreatDetectionMode mode = getDetectionMode();
-        return mode == ThreatDetectionMode.FILTER_YAML_ONLY || mode == ThreatDetectionMode.HYBRID;
+        return getDetectionMode() == ThreatDetectionMode.FILTER_YAML_ONLY;
     }
 
     /**
