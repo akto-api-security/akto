@@ -51,8 +51,7 @@ class GuardrailsHandler(CustomLogger):
         return guardrails_result.get("Allowed", True), guardrails_result.get("Reason", "")
 
     def extract_request_path(self, kwargs: Optional[dict] = None) -> str:
-        """Extract the request path from kwargs or fall back to env variable."""
-        fallback = "/v1/chat/completions"
+        fallback = "/chat/completions"
         try:
             if kwargs is not None:
                 litellm_params = kwargs.get("litellm_params", {})
@@ -127,7 +126,7 @@ class GuardrailsHandler(CustomLogger):
                 await self.ingest_blocked_request(data, call_type, reason, user_api_key_dict, kwargs)
                 raise HTTPException(
                     status_code=403,
-                    detail={"error": "Blocked by Akto Guardrails"},
+                    detail=f"Blocked by Akto Guardrails: {reason}" if reason else "Blocked by Akto Guardrails",
                 )
             return data
         except HTTPException as e:
@@ -137,7 +136,7 @@ class GuardrailsHandler(CustomLogger):
             logger.error(f"Guardrails validation error (fail-open): {e}")
             return data
 
-    async def async_validate_and_ingest(self, data: dict, call_type: str, response_dict: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> None:
+    async def async_validate_and_ingest(self, data: dict, call_type: str, response_dict: Optional[dict], user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> None:
         if not DATA_INGESTION_SERVICE_URL:
             return
 
@@ -201,7 +200,7 @@ class GuardrailsHandler(CustomLogger):
         except Exception as e:
             logger.error(f"Ingestion failed: {e}")
 
-    async def ingest_data(self, data: dict, call_type: str, response_dict: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> None:
+    async def ingest_data(self, data: dict, call_type: str, response_dict: Optional[dict], user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> None:
         await self.ingest_response(
             data,
             call_type,
@@ -219,7 +218,7 @@ class GuardrailsHandler(CustomLogger):
         await self.ingest_response(
             data,
             call_type,
-            {"x-blocked-by": "Akto Proxy"},
+            {"x-blocked-by": "Akto Proxy", "reason": reason},
             403,
             user_api_key_dict,
             kwargs,
