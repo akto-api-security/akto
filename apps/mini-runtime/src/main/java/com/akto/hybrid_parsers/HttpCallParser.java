@@ -321,6 +321,7 @@ public class HttpCallParser {
                     && !source.equals(Constants.AI_AGENT_SOURCE_VERTEX)
                     && !source.equals(Constants.AI_AGENT_SOURCE_SNOWFLAKE)
                     && !source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)
                     )) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
@@ -334,9 +335,17 @@ public class HttpCallParser {
                 return baseHostname;
             }
 
-            // Microsoft Defender traffic: collection name is bot-name.openclaw.defender.com
+            // Microsoft Defender traffic: collection name is bot-name.openclaw.defender.microsoft.com
             if (source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)) {
-                return botName + ".openclaw.defender.com";
+                return botName + ".openclaw.defender.microsoft.com";
+            }
+
+            // ENDPOINT source with MICROSOFT_DEFENDER connector: collection name is bot-name.openclaw.defender.microsoft.com
+            if (source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)) {
+                String connector = tagsMap.get(Constants.AI_AGENT_TAG_CONNECTOR);
+                if (Constants.AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER.equals(connector)) {
+                    return botName + ".openclaw.defender.microsoft.com";
+                }
             }
 
             // Reconstruct full hostname: bot-name.base-hostname
@@ -1239,6 +1248,10 @@ public class HttpCallParser {
                     loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams invalid response code "
                             + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
                 }
+                if(Utils.printDebugHostLog(httpResponseParam) != null){
+                    Utils.printDebugHostLog(" in filterHttpResponseParams invalid response code "
+                            + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
+                }
                 continue;
             }
 
@@ -1246,6 +1259,10 @@ public class HttpCallParser {
             if (ignoreAktoFlag != null){
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
                     loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams ignoreAktoFlag "
+                            + httpResponseParam.getRequestParams().getURL());
+                }
+                if(Utils.printDebugHostLog(httpResponseParam) != null){
+                    Utils.printDebugHostLog(" in filterHttpResponseParams ignoreAktoFlag "
                             + httpResponseParam.getRequestParams().getURL());
                 }
                 continue;
@@ -1262,6 +1279,10 @@ public class HttpCallParser {
                         loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams isRedundantEndpoint "
                                 + httpResponseParam.getRequestParams().getURL() + " pattern " + regexPattern.toString());
                     }
+                    if(Utils.printDebugHostLog(httpResponseParam) != null){
+                        Utils.printDebugHostLog(" in filterHttpResponseParams isRedundantEndpoint "
+                                + httpResponseParam.getRequestParams().getURL() + " pattern " + regexPattern.toString());
+                    }
                     continue;
                 }
                 List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
@@ -1272,6 +1293,10 @@ public class HttpCallParser {
                 if(isInvalidContentType(contentType)){
                     if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
                         loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams isInvalidContentType "
+                                + httpResponseParam.getRequestParams().getURL() + " contentType " + contentType);
+                    }
+                    if(Utils.printDebugHostLog(httpResponseParam) != null){
+                        Utils.printDebugHostLog(" in filterHttpResponseParams isInvalidContentType "
                                 + httpResponseParam.getRequestParams().getURL() + " contentType " + contentType);
                     }
                     continue;
@@ -1307,6 +1332,11 @@ public class HttpCallParser {
                         + httpResponseParam.getRequestParams().getURL());
             }
 
+            if(Utils.printDebugHostLog(httpResponseParam) != null){
+                Utils.printDebugHostLog(" in filterHttpResponseParams starting advanced filters "
+                        + httpResponseParam.getRequestParams().getURL());
+            }
+
             Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
             HttpResponseParams param = temp.getFirst();
             if(param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)){
@@ -1318,6 +1348,11 @@ public class HttpCallParser {
                                         + httpResponseParam.getRequestParams().getURL() + " filterType "
                                         + temp.getSecond());
                     }
+                    if(Utils.printDebugHostLog(httpResponseParam) != null){
+                        Utils.printDebugHostLog(" in filterHttpResponseParams advanced filters, skipping "
+                                + httpResponseParam.getRequestParams().getURL() + " filterType "
+                                + temp.getSecond());
+                    }
                 }
                 continue;
             }else{
@@ -1326,7 +1361,10 @@ public class HttpCallParser {
                     loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams advanced filters, adding "
                             + httpResponseParam.getRequestParams().getURL() + " filterType " + temp.getSecond());
                 }
-
+                if(Utils.printDebugHostLog(httpResponseParam) != null){
+                    Utils.printDebugHostLog(" in filterHttpResponseParams advanced filters, adding "
+                            + httpResponseParam.getRequestParams().getURL() + " filterType " + temp.getSecond());
+                }
             }
 
             int apiCollectionId = createApiCollectionId(httpResponseParam);

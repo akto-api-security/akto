@@ -72,8 +72,11 @@ public class Constants {
     public static final String AI_AGENT_SOURCE_SNOWFLAKE = "SNOWFLAKE";
     public static final String AI_AGENT_SOURCE_ARCADE_DEV = "ARCADE_DEV";
     public static final String AI_AGENT_SOURCE_MICROSOFT_DEFENDER = "DEFENDER";
+    public static final String AI_AGENT_SOURCE_ENDPOINT = "ENDPOINT";
     public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
     public static final String AI_AGENT_TAG_SOURCE = "source";
+    public static final String AI_AGENT_TAG_CONNECTOR = "connector";
+    public static final String AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER = "MICROSOFT_DEFENDER";
 
     public static final String STATUS_PENDING = "Pending";
     public static final String STATUS_IN_PROGRESS = "In Progress";
