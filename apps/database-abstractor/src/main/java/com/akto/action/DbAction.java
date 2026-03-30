@@ -5101,6 +5101,7 @@ public class DbAction extends ActionSupport {
             try {
                 Bson updates = Updates.combine(
                     Updates.setOnInsert("_id", candidateId),
+                    Updates.setOnInsert("hostName", hostName),
                     Updates.setOnInsert("startTs", Context.now()),
                     Updates.setOnInsert("urls", new HashSet<>())
                 );
