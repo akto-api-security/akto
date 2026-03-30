@@ -3,6 +3,12 @@ import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringSerializer;
 
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
+import com.mongodb.client.model.Filters;
+import com.akto.DaoInit;
+import com.akto.dao.SampleDataDao;
+import com.akto.dao.context.Context;
+import com.akto.dto.traffic.SampleData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Properties;
@@ -14,7 +20,8 @@ import java.util.Random;
 
 public class KafkaProducerExample {
     // Kafka configuration
-    private static final String BOOTSTRAP_SERVERS = "localhost:9092";
+    // private static final String BOOTSTRAP_SERVERS = "localhost:9092";
+    public static final String BOOTSTRAP_SERVERS= "13.89.142.170:9093";
     private static final String TOPIC = "akto.api.logs";
 
     @lombok.Getter
@@ -164,7 +171,52 @@ public class KafkaProducerExample {
         return records;
     }
 
-    public static void main(String[] args) {
+
+    public static void main(String[] args) throws Exception {
+        System.out.printf("\n\n*******Running KafkaBenchmark******\n\n");
+
+        Properties props = new Properties();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
+
+        int targetRatePerSecond = 30000;
+        int numCycles = 10;
+
+        // Load records once from MongoDB
+        List<ProducerRecord<String, String>> records = buildFromMongo(1758787662, null);
+        int recordCount = records.size();
+
+        // Calculate target cycle time: time to send recordCount messages at targetRate
+        long targetCycleTimeMs = (recordCount * 1000L) / targetRatePerSecond;
+
+        System.out.println(String.format("Target rate: %,d msgs/sec", targetRatePerSecond));
+        System.out.println(String.format("Records per cycle: %,d", recordCount));
+        System.out.println(String.format("Target cycle time: %d ms", targetCycleTimeMs));
+        System.out.println();
+
+        for (int i = 0; i < numCycles; i++) {
+            long startTime = System.currentTimeMillis();
+
+            produceRecords(props, records);
+
+            long elapsed = System.currentTimeMillis() - startTime;
+            long sleepTime = targetCycleTimeMs - elapsed;
+
+            double actualRate = (recordCount * 1000.0) / elapsed;
+            System.out.println(String.format("Cycle %d: sent %,d records in %d ms (%.0f msgs/sec), sleeping %d ms",
+                i + 1, recordCount, elapsed, actualRate, Math.max(0, sleepTime)));
+
+            if (sleepTime > 0) {
+                Thread.sleep(sleepTime);
+            }
+        }
+
+        System.out.println(String.format("\nCompleted: %,d total messages", recordCount * numCycles));
+    }
+
+    public static void main21(String[] args) {
         // Configure Kafka producer properties
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
@@ -189,6 +241,45 @@ public class KafkaProducerExample {
 
     }
 
+    public static List<ProducerRecord<String, String>> buildFromMongo(int accountId, List<Integer> apiCollectionIds) {
+        List<ProducerRecord<String, String>> records = new ArrayList<>();
+
+        // Initialize MongoDB connection
+        String mongoUri = System.getenv("AKTO_MONGO_CONN") != null
+            ? System.getenv("AKTO_MONGO_CONN")
+            : "mongodb://localhost:27017";
+        DaoInit.init(new ConnectionString(mongoUri));
+
+        // Set account context
+        Context.accountId.set(accountId);
+
+        // Fetch sample data filtered by apiCollectionIds (or all if null)
+        List<SampleData> sampleDataList;
+        if (apiCollectionIds == null || apiCollectionIds.isEmpty()) {
+            sampleDataList = SampleDataDao.instance.findAll(Filters.empty());
+        } else {
+            sampleDataList = SampleDataDao.instance.findAll(
+                Filters.in("_id.apiCollectionId", apiCollectionIds)
+            );
+        }
+
+        System.out.println("Found " + sampleDataList.size() + " sample data documents");
+
+        for (SampleData sampleData : sampleDataList) {
+            if (sampleData.getSamples() == null) {
+                continue;
+            }
+            for (String sample : sampleData.getSamples()) {
+                // Samples are already stored in the same JSON format as demoRecordGenerator produces
+                // (same format as IngestDataBatch -> insertData() output)
+                records.add(new ProducerRecord<>(TOPIC, null, sample));
+            }
+        }
+
+        System.out.println("Built " + records.size() + " ProducerRecord records from MongoDB");
+        return records;
+    }
+
     private static void produceRecords(Properties props, List<ProducerRecord<String, String>> records) {
         try (KafkaProducer<String, String> producer = new KafkaProducer<>(props)) {
             for (ProducerRecord<String, String> record : records) {
@@ -196,8 +287,8 @@ public class KafkaProducerExample {
                     if (exception != null) {
                         System.err.println("Error sending record: " + exception.getMessage());
                     } else {
-                        System.out.println("Record sent to partition " + metadata.partition() +
-                                " with offset " + metadata.offset());
+                        // System.out.println("Record sent to partition " + metadata.partition() +
+                        //         " with offset " + metadata.offset());
                     }
                 });
             }
