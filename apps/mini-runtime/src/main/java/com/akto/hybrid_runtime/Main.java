@@ -761,7 +761,7 @@ public class Main {
                     loggerMaker.infoAndAddToDb("Committing offset at position: " + lastSyncOffset);
                 }
 
-                if ((Context.getActualAccountId() != 1759692400 && Context.getActualAccountId() != 1758787662) && tryForCollectionName(r.value())) {
+                if ((Context.getActualAccountId() != 1759692400 && Context.getActualAccountId() != 1758787662 && Context.getActualAccountId() != 1662680463) && tryForCollectionName(r.value())) {
                     continue;
                 }
                 
