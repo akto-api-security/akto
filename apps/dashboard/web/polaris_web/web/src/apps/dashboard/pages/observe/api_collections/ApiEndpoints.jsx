@@ -18,6 +18,7 @@ import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import PersistStore from "../../../../main/PersistStore"
 import { CollectionIcon } from "../../../components/shared/CollectionIcon"
 import transform from "../transform"
+import GuardrailSchemaModal from "./GuardrailSchemaModal"
 import { CellType } from "../../../components/tables/rows/GithubRow"
 import {ApiGroupModal, Operation} from "./ApiGroupModal"
 import TooltipText from "../../../components/shared/TooltipText"
@@ -34,11 +35,13 @@ import IssuesApi from "../../issues/api"
 import SequencesFlow from "./SequencesFlow"
 import SwaggerDependenciesFlow from "./SwaggerDependenciesFlow"
 import SchemaView from "./SchemaView"
-import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper"
+import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel, isEndpointSecurityCategory, isAgenticSecurityCategory } from "../../../../main/labelHelper"
 import McpToolsGraph from "./McpToolsGraph"
 import { findTypeTag, TYPE_TAG_KEYS } from "../agentic/mcpClientHelper"
 import AgentDiscoverGraphWithDummyData from "./AgentDiscoveryGraphWithDummyData"
 import AgentDiscoverGraph from "./AgentDiscoverGraph"
+import { dummyCollections } from "./AgentDiscoveryDummyData"
+import ComponentRiskAnalysisBadges from "../components/ComponentRiskAnalysisBadges"
 
 const headings = [
     {
@@ -60,6 +63,13 @@ const headings = [
         filterKey: 'riskScore',
         showFilter:true
     },
+    // Component Risk Analysis (Endpoint Security / Atlas only)
+    ...(isEndpointSecurityCategory() ? [{
+        text: "Component Risk Analysis",
+        title: "Component Risk Analysis",
+        value: "componentRiskAnalysisComp",
+        textValue: "componentRiskAnalysis",
+    }] : []),
     // Conditionally include Issues column (skip for Endpoint Security)
     ...(!isEndpointSecurityCategory() ? [{
         text:"Issues",
@@ -164,7 +174,8 @@ const headings = [
         title: "Description",
         filterKey: "description",
         tooltipContent: "Description of the API",
-    }
+    },
+    { title: '', type: CellType.ACTION }
 ]
 
 let headers = JSON.parse(JSON.stringify(headings))
@@ -193,8 +204,7 @@ headers.push({
 })
 
 
-// Offset for hidden Issues column in Endpoint Security mode
-const columnOffset = isEndpointSecurityCategory() ? -1 : 0;
+const columnOffset = 0;
 
 const sortOptions = [
     { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore', columnIndex: 2},
@@ -209,7 +219,26 @@ const sortOptions = [
     { label: 'Last tested', value: 'lastTested desc', directionLabel: 'Oldest', sortKey: 'lastTested', columnIndex: 10 + columnOffset },
 ];
 
+/** Build once: resourceName -> componentRiskAnalysis. */
+function buildResourceNameToRiskMap(mcpAuditInfoList) {
+    const map = new Map();
+    if (!Array.isArray(mcpAuditInfoList)) return map;
+    for (const audit of mcpAuditInfoList) {
+        const name = audit?.resourceName;
+        if (!name || typeof name !== 'string' || !audit?.componentRiskAnalysis) continue;
+        map.set(name.trim(), audit.componentRiskAnalysis);
+    }
+    return map;
+}
 
+/** Lookup risk for an endpoint: extract component name from path, then map.get(componentName). */
+function getRiskAnalysisForEndpoint(endpointUrl, resourceNameToRiskMap) {
+    if (!endpointUrl || !resourceNameToRiskMap?.size) {
+        return null;
+    }
+    const componentName = transform.extractMcpComponentNameFromPath(endpointUrl);
+    return componentName != null ? (resourceNameToRiskMap.get(componentName) ?? null) : null;
+}
 
 function ApiEndpoints(props) {
     const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
@@ -236,7 +265,6 @@ function ApiEndpoints(props) {
     const [openAPIfile, setOpenAPIfile] = useState(null)
     const [sourcesBackfilled, setSourcesBackfilled] = useState(false)
     const [collectionIssuesData, setCollectionIssuesData] = useState([])
-
     const [endpointData, setEndpointData] = useState({"all":[], 'sensitive': [], 'new': [], 'high_risk': [], 'no_auth': [], 'shadow': [], 'zombie': []})
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
@@ -258,6 +286,13 @@ function ApiEndpoints(props) {
     const [redacted, setIsRedacted] = useState(false)
     const [showRedactModal, setShowRedactModal] = useState(false)
     const [tableLoading, setTableLoading] = useState(false)
+    const [showBulkGuardrailModal, setShowBulkGuardrailModal] = useState(false)
+    const [bulkGuardrailEnabled, setBulkGuardrailEnabled] = useState(false)
+    const [bulkGuardrailApiIds, setBulkGuardrailApiIds] = useState([])
+    const [updatingGuardrails, setUpdatingGuardrails] = useState(false)
+    const [showGuardrailSchemaModal, setShowGuardrailSchemaModal] = useState(false)
+    const [selectedEndpointForSchema, setSelectedEndpointForSchema] = useState(null)
+    const [savingGuardrailSchema, setSavingGuardrailSchema] = useState(false)
 
     const queryParams = new URLSearchParams(location.search);
     const selectedUrl = queryParams.get('selected_url')
@@ -277,6 +312,7 @@ function ApiEndpoints(props) {
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
+
     async function fetchData() {
         setLoading(true)
         let apiEndpointsInCollection;
@@ -286,6 +322,8 @@ function ApiEndpoints(props) {
         let sourceCodeData = {};
         let apiInfoSeverityMap ;
         let issuesDataResp;
+        let mcpListForRisk = [];
+        let resourceNameToRiskMap = new Map();
         if (isQueryPage) {
             let apiCollectionData = endpointListFromConditions
             if (Object.keys(endpointListFromConditions).length === 0) {
@@ -316,9 +354,10 @@ function ApiEndpoints(props) {
                 api.fetchApiInfosForCollection(apiCollectionId),
                 api.fetchAPIsFromSourceCode(apiCollectionId),
             ];
-
-            // Conditionally add testing-related APIs (skip for Endpoint Security)
-            if (!isEndpointSecurityCategory()) {
+            // MCP audit API only for Endpoint Security (Atlas) – do not call for other collections
+            if (isEndpointSecurityCategory()) {
+                apiPromises.push(api.fetchMcpAuditInfoByCollection(apiCollectionId));
+            } else {
                 apiPromises.push(api.getSeveritiesCountPerCollection(apiCollectionId));
                 apiPromises.push(IssuesApi.fetchIssues(0, 1000, ["OPEN"], [apiCollectionId], null, null, null, null, null, null, true, null));
             }
@@ -328,13 +367,15 @@ function ApiEndpoints(props) {
             let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
             sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
 
-            // Conditionally extract testing-related results (skip for Endpoint Security)
-            if (!isEndpointSecurityCategory()) {
-                apiInfoSeverityMap = results[3].status === 'fulfilled' ? results[3].value : {};
-                issuesDataResp = results[4].status === 'fulfilled' ? results[4].value : {};
-            } else {
+            if (isEndpointSecurityCategory()) {
+                const mcpAuditResult = results[3].status === 'fulfilled' ? (results[3].value || []) : [];
+                mcpListForRisk = mcpAuditResult;
+                resourceNameToRiskMap = buildResourceNameToRiskMap(mcpListForRisk);
                 apiInfoSeverityMap = {};
                 issuesDataResp = {};
+            } else {
+                apiInfoSeverityMap = results[3].status === 'fulfilled' ? results[3].value : {};
+                issuesDataResp = results[4].status === 'fulfilled' ? results[4].value : {};
             }
 
             // Initialize with empty sensitive params for fast UI loading
@@ -455,6 +496,25 @@ function ApiEndpoints(props) {
             }
         })
 
+        // Component Risk Analysis: single map (like sensitiveParamsMap) — build once, apply when building endpoint objects
+        const getComponentRiskCompForEndpoint = (endpointUrl) => {
+            if (!isEndpointSecurityCategory() || !resourceNameToRiskMap.size) return null;
+            return <ComponentRiskAnalysisBadges componentRiskAnalysis={getRiskAnalysisForEndpoint(endpointUrl, resourceNameToRiskMap)} />;
+        };
+
+        const riskCompByEndpoint = new Map();
+        const setRiskCompIfMissing = (item) => {
+            if (item?.endpoint && !riskCompByEndpoint.has(item.endpoint)) {
+                riskCompByEndpoint.set(item.endpoint, getComponentRiskCompForEndpoint(item.endpoint));
+            }
+        };
+        allEndpoints.forEach(setRiskCompIfMissing);
+        shadowApis.forEach(setRiskCompIfMissing);
+        shadowApis = shadowApis.map((s) => ({
+            ...s,
+            componentRiskAnalysisComp: riskCompByEndpoint.get(s.endpoint) ?? null
+        }));
+
         // Step 1: Create lightweight objects for ALL endpoints (for filtering & counting only)
         const allEndpointsLight = allEndpoints.map((obj) => {
             const t = collectionTagsMap[obj.apiCollectionId];
@@ -464,6 +524,7 @@ function ApiEndpoints(props) {
                 tagsString: t?.str || "",
                 isNew: transform.isNewEndpoint(obj.lastSeenTs),
                 open:  obj.auth_type === undefined || obj.auth_type.toLowerCase() === "unauthenticated" || obj.auth_type.toLowerCase() === "no auth type found",
+                componentRiskAnalysisComp: riskCompByEndpoint.get(obj.endpoint) ?? null
             };
         });
 
@@ -542,8 +603,6 @@ function ApiEndpoints(props) {
         // Step 3: Helper function to prettify a page of data with tags applied
         const prettifyPageWithTags = (pageData) => {
             const prettified = transform.prettifyEndpointsData(pageData);
-
-            // Re-apply tags after prettify
             prettified.forEach((obj) => {
                 const t = collectionTagsMap[obj.apiCollectionId];
                 if (t) {
@@ -553,7 +612,6 @@ function ApiEndpoints(props) {
                     obj.tagsString = "";
                 }
             });
-
             return prettified;
         };
 
@@ -563,17 +621,9 @@ function ApiEndpoints(props) {
             // For 'all' tab: mix raw allEndpointsLight + already prettified shadowApis
             data['all'] = [...allEndpointsLight, ...shadowApis];
             data['all']._prettifyPageData = (pageData) => {
-                // Determine which items are shadowApis (already prettified) vs raw data
-                return pageData.map((item) => {
-                    // Check if this item is a shadowApi by checking for codeAnalysisEndpoint flag
-                    if (item.codeAnalysisEndpoint === true) {
-                        // Already prettified, return as-is
-                        return item;
-                    } else {
-                        // Raw data, needs prettification
-                        return prettifyPageWithTags([item])[0];
-                    }
-                });
+                return pageData.map((item) =>
+                    item.codeAnalysisEndpoint === true ? item : prettifyPageWithTags([item])[0]
+                );
             };
 
             data['sensitive'] = sensitiveEndpoints;
@@ -601,7 +651,6 @@ function ApiEndpoints(props) {
         } else {
             // Small collection: render all normally
             const prettifyData = transform.prettifyEndpointsData(allEndpointsLight);
-
             prettifyData.forEach((obj) => {
                 const t = collectionTagsMap[obj.apiCollectionId];
                 if (t) {
@@ -875,7 +924,7 @@ function ApiEndpoints(props) {
     function exportCsv(selectedResources = []) {
         const selectedResourcesSet = new Set(selectedResources)
         if (!loading) {
-            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.type === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0].length > 0));
+            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.type === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0] && x[0].length > 0));
 
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
             const allEndpoints = endpointData['all']
@@ -950,7 +999,7 @@ function ApiEndpoints(props) {
         }
     }
 
-    function uploadOpenFileWithSource(source, file, isAiAgent = false) {
+    function uploadOpenFileWithSource(source, file, isAiAgent = false, skipLiveReplay = false) {
         const reader = new FileReader();
         if (!file) {
             file = openAPIfile
@@ -962,6 +1011,7 @@ function ApiEndpoints(props) {
             formData.append("openAPIString", reader.result)
             formData.append("apiCollectionId", apiCollectionId);
             formData.append("triggeredWithAIAgent", isAiAgent);
+            formData.append("skipLiveReplay", skipLiveReplay);
             if (source) {
                 formData.append("source", source)
             }
@@ -1328,7 +1378,7 @@ function ApiEndpoints(props) {
             <SelectSource
                 show={showSourceDialog}
                 setShow={(val) => setShowSourceDialog(val)}
-                primaryAction={(val) => uploadOpenFileWithSource(val)}
+                primaryAction={(val, skipLiveReplay) => uploadOpenFileWithSource(val, null, false, skipLiveReplay)}
             />
         </HorizontalStack>
     )
@@ -1430,6 +1480,18 @@ function ApiEndpoints(props) {
             onAction: () => handleBulkDeMerge(selectedResources)
         })
 
+        // Add bulk guardrail actions (only for Argus dashboard)
+        if (isAgenticSecurityCategory()) {
+            ret.push({
+                content: 'Enable guardrails',
+                onAction: () => handleBulkGuardrail(selectedResources, true)
+            })
+            ret.push({
+                content: 'Disable guardrails',
+                onAction: () => handleBulkGuardrail(selectedResources, false)
+            })
+        }
+
         if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
             ret.push({
                 content: 'Delete ' + mapLabel('APIs', getDashboardCategory()),
@@ -1438,6 +1500,74 @@ function ApiEndpoints(props) {
         }
 
         return ret;
+    }
+
+    function handleBulkGuardrail(selectedResources, enabled) {
+        // Extract API Info IDs from selected resources
+        const apiInfoIds = selectedResources.map(resourceId => {
+            const endpoint = endpointData["all"].find(e => e.id === resourceId)
+            if (endpoint) {
+                return `${endpoint.apiCollectionId} ${endpoint.endpoint} ${endpoint.method}`
+            }
+            return null
+        }).filter(id => id !== null)
+
+        if (apiInfoIds.length === 0) {
+            func.setToast(true, true, "No valid endpoints selected")
+            return
+        }
+
+        setBulkGuardrailApiIds(apiInfoIds)
+        setBulkGuardrailEnabled(enabled)
+        setShowBulkGuardrailModal(true)
+    }
+
+    async function handleBulkGuardrailConfirm() {
+        setUpdatingGuardrails(true)
+        try {
+            await api.bulkAgentProxyGuardrail(bulkGuardrailApiIds, bulkGuardrailEnabled)
+            func.setToast(true, false, `Successfully ${bulkGuardrailEnabled ? 'enabled' : 'disabled'} guardrails for ${bulkGuardrailApiIds.length} endpoint(s)`)
+            setShowBulkGuardrailModal(false)
+            // Refresh data to show updated guardrail status
+            setTimeout(() => {
+                fetchData()
+            }, 500)
+        } catch (error) {
+            func.setToast(true, true, `Error updating guardrails: ${error.message || 'Unknown error'}`)
+        } finally {
+            setUpdatingGuardrails(false)
+        }
+    }
+
+    async function handleToggleGuardrail(apiInfoId, enabled, event) {
+        event?.stopPropagation() // Prevent row click
+        try {
+            await api.bulkAgentProxyGuardrail([apiInfoId], enabled)
+            func.setToast(true, false, `Guardrails ${enabled ? 'enabled' : 'disabled'} successfully`)
+            // Refresh data to show updated guardrail status
+            setTimeout(() => {
+                fetchData()
+            }, 500)
+        } catch (error) {
+            func.setToast(true, true, `Error updating guardrail: ${error.message || 'Unknown error'}`)
+        }
+    }
+
+    async function handleSaveGuardrailSchema(schemaConfig) {
+        const item = selectedEndpointForSchema
+        const apiInfoId = `${item.apiCollectionId} ${item.endpoint} ${item.method}`
+        setSavingGuardrailSchema(true)
+        try {
+            const payload = schemaConfig === null ? { clearGuardrailSchema: true } : { guardrailSchema: schemaConfig }
+            await api.bulkAgentProxyGuardrail([apiInfoId], item.agentProxyGuardrailEnabled, payload)
+            func.setToast(true, false, schemaConfig === null ? 'Guardrail schema cleared' : 'Guardrail schema updated successfully')
+            setShowGuardrailSchemaModal(false)
+            setTimeout(() => { fetchData() }, 500)
+        } catch (error) {
+            func.setToast(true, true, `Error updating guardrail schema: ${error.message || 'Unknown error'}`)
+        } finally {
+            setSavingGuardrailSchema(false)
+        }
     }
 
     let modal = (
@@ -1507,8 +1637,74 @@ function ApiEndpoints(props) {
         </Modal>
     )
 
+    let bulkGuardrailModal = (
+        <Modal
+            open={showBulkGuardrailModal}
+            onClose={() => setShowBulkGuardrailModal(false)}
+            title={`${bulkGuardrailEnabled ? 'Enable' : 'Disable'} Guardrails`}
+            primaryAction={{
+                content: bulkGuardrailEnabled ? 'Enable' : 'Disable',
+                onAction: handleBulkGuardrailConfirm,
+                loading: updatingGuardrails
+            }}
+            secondaryActions={[
+                {
+                    content: 'Cancel',
+                    onAction: () => setShowBulkGuardrailModal(false)
+                }
+            ]}
+            key="bulk-guardrail-modal"
+        >
+            <Modal.Section>
+                <VerticalStack gap="4">
+                    <Text>Are you sure you want to {bulkGuardrailEnabled ? 'enable' : 'disable'} guardrails for {bulkGuardrailApiIds.length} endpoint(s)?</Text>
+                    <Text variant="bodyMd" color="subdued">
+                        {bulkGuardrailEnabled 
+                            ? 'Guardrails will be applied to these endpoints when traffic passes through the agent proxy.'
+                            : 'Guardrails will no longer be applied to these endpoints.'}
+                    </Text>
+                </VerticalStack>
+            </Modal.Section>
+        </Modal>
+    )
+
     const canShowTags = () => {
         return isApiGroup || isQueryPage;
+    }
+
+    const getActions = (item) => {
+        const apiInfoId = `${item.apiCollectionId} ${item.endpoint} ${item.method}`
+        const guardrailEnabled = item.agentProxyGuardrailEnabled || false
+        
+        const actions = []
+        
+        // Add guardrail actions (only for Argus dashboard)
+        if (isAgenticSecurityCategory()) {
+            if (guardrailEnabled) {
+                actions.push({
+                    content: 'Disable guardrails for this endpoint',
+                    onAction: async () => {
+                        handleToggleGuardrail(apiInfoId, false, null)
+                    }
+                })
+            } else {
+                actions.push({
+                    content: 'Enable guardrails for this endpoint',
+                    onAction: async () => {
+                        handleToggleGuardrail(apiInfoId, true, null)
+                    }
+                })
+            }
+            actions.push({
+                content: 'Configure guardrail schema',
+                onAction: () => {
+                    setSelectedEndpointForSchema(item)
+                    setShowGuardrailSchemaModal(true)
+                }
+            })
+        }
+        
+        return actions.length > 0 ? [{ items: actions }] : []
     }
 
     const apiEndpointTable = [<GithubSimpleTable
@@ -1543,6 +1739,8 @@ function ApiEndpoints(props) {
         tableTabs={tableTabs}
         selectable={true}
         promotedBulkActions={promotedBulkActions}
+        hasRowActions={true}
+        getActions={getActions}
         loading={tableLoading || loading}
         setSelectedResourcesForPrimaryAction={setSelectedResourcesForPrimaryAction}
         calendarFilterKeys={{
@@ -1550,6 +1748,7 @@ function ApiEndpoints(props) {
             "lastSeenTs": "Last Seen",
             "detectedTs": "Discovered timestamp",
         }}
+        onExportCsv={() => exportCsv()}
     />,
     <ApiDetails
         key="api-details"
@@ -1562,6 +1761,7 @@ function ApiEndpoints(props) {
     />,
     ]
 
+    const dummyAgenticGraph = dummyCollections.has(apiCollectionId);
 
     const components = [
         loading ? [<SpinnerCentered key="loading" />] : (
@@ -1572,6 +1772,7 @@ function ApiEndpoints(props) {
                     endpointsList={loading ? [] : endpointData["all"]}
                 />
             ] : showEmptyScreen && !(showSequencesFlow || showSwaggerDependenciesFlow || showSchemaView) ? [
+                <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
                 <EmptyScreensLayout key={"emptyScreen"}
                     iconSrc={"/public/file_plus.svg"}
                     headingText={getEmptyScreenText(collectionsObj).headingText}
@@ -1587,7 +1788,7 @@ function ApiEndpoints(props) {
             ] : showSchemaView ? [
                 <SchemaView key="schema-view" apiCollectionId={apiCollectionId} />
             ] : [
-                func.isDemoAccount() ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
+                dummyAgenticGraph ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
                 (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
                 // Hide "Test your Endpoints" banner for Endpoint Security
                 (!isEndpointSecurityCategory() && (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,
@@ -1610,7 +1811,17 @@ function ApiEndpoints(props) {
                   />,
                   modal,
                   deleteApiModal,
-                  bulkDeMergeModal
+                  bulkDeMergeModal,
+                  bulkGuardrailModal,
+                  <GuardrailSchemaModal
+                      key="guardrail-schema-modal"
+                      open={showGuardrailSchemaModal}
+                      onClose={() => setShowGuardrailSchemaModal(false)}
+                      endpoint={selectedEndpointForSchema ? `${selectedEndpointForSchema.method} ${selectedEndpointForSchema.endpoint}` : ''}
+                      initialData={selectedEndpointForSchema}
+                      onSave={handleSaveGuardrailSchema}
+                      saving={savingGuardrailSchema}
+                  />
             ]
         )
       ]

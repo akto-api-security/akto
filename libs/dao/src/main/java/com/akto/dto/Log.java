@@ -27,6 +27,7 @@ public class Log {
     private String key;
 
     public static final String TIMESTAMP = "timestamp";
+    public static final String KEY = "key";
     private int timestamp;
 
     public Log() {

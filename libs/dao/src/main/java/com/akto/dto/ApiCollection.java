@@ -4,6 +4,7 @@ import com.akto.util.Constants;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -76,12 +77,61 @@ public class ApiCollection {
     int mcpMaliciousnessLastCheck;
     public static final String MCP_MALICIOUSNESS_LAST_CHECK = "mcpMaliciousnessLastCheck";
 
-    private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
-        "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
-        "localhost", "local", "intranet", "lan", "example", "invalid", 
-        "home", "corp", "priv", "localdomain", "localnet", "network", 
-        "int", "private"
-    );
+
+    String accessType;
+    public static final String ACCESS_TYPE = "accessType";
+
+    public enum AccessType {
+        INTERNAL("Internal"),
+        THIRD_PARTY("Third party"),
+        UNKNOWN("Unknown");
+
+        private final String displayName;
+
+        AccessType(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        public static AccessType fromDisplayName(String displayName) {
+            if (displayName == null || displayName.isEmpty()) return null;
+            for (AccessType t : values()) {
+                if (t.displayName.equals(displayName)) return t;
+            }
+            return null;
+        }
+    }
+
+    // Keyword (with dot prefix in hostname) -> env tag value. Order: specific envs first, then STAGING fallback.
+    private static final LinkedHashMap<String, String> ENV_KEYWORD_TO_TAG_WITH_DOT = new LinkedHashMap<>();
+    static {
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("staging", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("qa", ENV_TYPE.QA.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("dev", ENV_TYPE.DEV.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("integ", ENV_TYPE.INTEG.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("uat", ENV_TYPE.UAT.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("preprod", ENV_TYPE.PREPROD.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("demo", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("test", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("svc", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("localhost", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("local", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("intranet", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("lan", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("example", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("invalid", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("home", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("corp", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("priv", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("localdomain", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("localnet", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("network", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("int", ENV_TYPE.STAGING.name());
+        ENV_KEYWORD_TO_TAG_WITH_DOT.put("private", ENV_TYPE.STAGING.name());
+    }
 
     private static final List<String> ENV_KEYWORDS_WITHOUT_DOT = Arrays.asList(
         "kubernetes", "internal"
@@ -93,7 +143,7 @@ public class ApiCollection {
     }
 
     public enum ENV_TYPE {
-        STAGING,PRODUCTION
+        STAGING, PRODUCTION, QA, DEV, INTEG, UAT, PREPROD, INTERNAL
     }
 
     Type type;
@@ -233,30 +283,39 @@ public class ApiCollection {
         this.urls = urls;
     }
 
+    /**
+     * Returns env type from DB only (tagsList). No on-the-fly derivation from hostname.
+     */
     public List<CollectionTags> getEnvType(){
-        if(this.tagsList == null || this.tagsList.isEmpty()){
-            CollectionTags envTypeTag = new CollectionTags();
-            envTypeTag.setKeyName("envType");
-            if (this.hostName != null) {
-                for (String keyword : ENV_KEYWORDS_WITH_DOT) {
-                    if (this.hostName.contains("." + keyword)) {
-                        envTypeTag.setValue("STAGING");
-                    }
-                }
-                for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
-                    if (this.hostName.contains(keyword)) {
-                        envTypeTag.setValue("STAGING");
-                    }
-                }
-
-                if(envTypeTag.getValue() != null) {
-                    return Arrays.asList(envTypeTag);
-                }
-            }
+        if (this.tagsList == null || this.tagsList.isEmpty()) {
             return null;
-        }else{
-            return this.tagsList;
         }
+        return this.tagsList;
+    }
+
+    /**
+     * Computes env type tag from hostname using same rules as before. Used to persist to DB
+     * when a collection has no tags so that env type always comes from DB.
+     * @return envType tag to persist, or null if hostname does not match any rule
+     */
+    public CollectionTags computeEnvTypeFromHostname() {
+        if (this.hostName == null) {
+            return null;
+        }
+        String hostLower = this.hostName.toLowerCase();
+        for (Map.Entry<String, String> e : ENV_KEYWORD_TO_TAG_WITH_DOT.entrySet()) {
+            if (hostLower.contains("." + e.getKey())) {
+                CollectionTags tag = new CollectionTags(Context.now(), "envType", e.getValue(), CollectionTags.TagSource.USER);
+                return tag;
+            }
+        }
+        for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
+            if (hostLower.contains(keyword)) {
+                CollectionTags tag = new CollectionTags(Context.now(), "envType", ENV_TYPE.INTERNAL.name(), CollectionTags.TagSource.USER);
+                return tag;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -521,6 +580,14 @@ public class ApiCollection {
 
     public void setSseCallbackUrl(String sseCallbackUrl) {
         this.sseCallbackUrl = sseCallbackUrl;
+    }
+
+     public String getAccessType() {
+        return accessType;
+    }
+
+    public void setAccessType(String accessType) {
+        this.accessType = accessType;
     }
 
     public String getMcpTransportType() {

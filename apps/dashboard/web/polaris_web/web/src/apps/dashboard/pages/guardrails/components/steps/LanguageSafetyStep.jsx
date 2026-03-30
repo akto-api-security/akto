@@ -1,5 +1,6 @@
 import { VerticalStack, Text, Checkbox, HorizontalStack, Button, TextField, Box, DataTable, RangeSlider } from "@shopify/polaris";
 import { DeleteMajor } from '@shopify/polaris-icons';
+import OwaspTag from "../OwaspTag";
 
 export const LanguageSafetyConfig = {
     number: 3,
@@ -38,10 +39,10 @@ const LanguageSafetyStep = ({
 }) => {
     return (
         <VerticalStack gap="4">
-            <Text variant="headingMd">Language Safety & Abuse Guardrails</Text>
             <Text variant="bodyMd" tone="subdued">
                 Configure language safety filters to detect gibberish, inappropriate sentiment, profanity, and custom blocked words.
             </Text>
+            <OwaspTag stepNumber={3} />
 
             <VerticalStack gap="4">
                 {/* Gibberish Detection */}

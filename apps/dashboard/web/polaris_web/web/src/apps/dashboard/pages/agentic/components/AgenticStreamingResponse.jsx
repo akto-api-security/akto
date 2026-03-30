@@ -29,10 +29,8 @@ function AgenticStreamingResponse({ content, timeTaken, onStreamingComplete, ski
 
         const streamInterval = setInterval(() => {
             if (currentIndex < words.length) {
-                setDisplayedContent(prev => {
-                    const newContent = prev + (prev ? ' ' : '') + words[currentIndex];
-                    return newContent;
-                });
+                const indexToUse = currentIndex;
+                setDisplayedContent(prev => prev + (prev ? ' ' : '') + words[indexToUse]);
                 currentIndex++;
             } else {
                 clearInterval(streamInterval);

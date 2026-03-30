@@ -17,6 +17,7 @@ import com.akto.dao.test_editor.info.InfoParser;
 import com.akto.dao.testing.AgentConversationResultDao;
 import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
@@ -39,6 +40,7 @@ import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.TestingRunWebhook;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.listener.InitializerListener;
@@ -52,10 +54,11 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
+
+import static com.akto.test_editor.Utils.sendRequestToWebhookService;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
-import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
 import com.akto.utils.TrafficFilterUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -104,8 +107,12 @@ public class SaveTestEditorAction extends UserAction {
     private HashMap<String, Integer> testCountMap;
     private String testingRunPlaygroundHexId;
     private State testingRunPlaygroundStatus;
+    private List<String> callbackUuids;
+    private boolean callbackHit;
     @Getter @Setter
-    private String testRoleId;
+    private String miniTestingName;
+    @Getter @Setter
+    private Map<String, Object> testingRunConfig;
 
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
@@ -341,6 +348,13 @@ public class SaveTestEditorAction extends UserAction {
                     testingRunPlayground.setSamples(sampleDataList.get(0).getSamples());
                     testingRunPlayground.setApiInfoKey(infoKey);
                     testingRunPlayground.setCreatedAt(Context.now());
+                    if (StringUtils.isNotBlank(miniTestingName)) {
+                        testingRunPlayground.setMiniTestingName(miniTestingName);
+                    }
+                    TestingRunConfig testingRunConfig = buildTestingRunConfigFromRequest(this.testingRunConfig);
+                    if (testingRunConfig != null) {
+                        testingRunPlayground.setTestingRunConfig(testingRunConfig);
+                    }
 
                     InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(testingRunPlayground);
                     if (insertOne.wasAcknowledged()) {
@@ -392,8 +406,10 @@ public class SaveTestEditorAction extends UserAction {
         List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
         int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         
-        TestingRunConfig testingRunConfig = new TestingRunConfig();
-        testingRunConfig.setTestRoleId(testRoleId);
+        TestingRunConfig testingRunConfig = buildTestingRunConfigFromRequest(this.testingRunConfig);
+        if (testingRunConfig == null) {
+            testingRunConfig = new TestingRunConfig();
+        }
         List<String> samples = testingUtil.getSampleMessages().get(infoKey);
         TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(null, infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
         if(testingRunResult == null){
@@ -418,6 +434,10 @@ public class SaveTestEditorAction extends UserAction {
                     false,null,0,Context.now(),
                     Context.now(), new ObjectId(), null, testLogs
             );
+        }
+        // capture callback UUIDs (if any) for editor polling
+        if (testingRunResult != null && testingRunResult.getCallbackUuids() != null && !testingRunResult.getCallbackUuids().isEmpty()) {
+            this.callbackUuids = testingRunResult.getCallbackUuids();
         }
         generateTestingRunResultAndIssue(testConfig, infoKey, testingRunResult);
 
@@ -468,12 +488,60 @@ public class SaveTestEditorAction extends UserAction {
         }else {
             if(testingRunPlayGround.getTestingRunResult() != null) {
                 this.testingRunResult = testingRunPlayGround.getTestingRunResult();
+                if (this.testingRunResult.getCallbackUuids() != null && !this.testingRunResult.getCallbackUuids().isEmpty()) {
+                    this.callbackUuids = this.testingRunResult.getCallbackUuids();
+                }
                 generateTestingRunResultAndIssue(testConfig, infoKey, testingRunResult);
             } else {
                 this.testingRunResult = failedResult;
             }
         }
         return SUCCESS.toUpperCase();
+    }
+
+    public String fetchCallbackStatusForTestEditor() {
+        if (callbackUuids == null || callbackUuids.isEmpty()) {
+            addActionError("callbackUuids cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        boolean hit = false;
+        for (String uuid : callbackUuids) {
+            if (uuid == null || uuid.isEmpty()) {
+                continue;
+            }
+            try {
+                TestingRunWebhook mapping = TestingRunWebhookDao.instance.findByUuid(uuid);
+                if (mapping != null && mapping.isUrlHit()) {
+                    hit = true;
+                    break;
+                }
+                if (sendRequestToWebhookService(uuid)) {
+                    hit = true;
+                    TestingRunWebhookDao.instance.markUrlHit(uuid);
+                    break;
+                }
+            } catch (Exception e) {
+                logger.errorAndAddToDb("Error while checking callback status for uuid " + uuid + ": " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }
+
+        this.callbackHit = hit;
+        return SUCCESS.toUpperCase();
+    }
+
+    private TestingRunConfig buildTestingRunConfigFromRequest(Map<String, Object> config) {
+        if (config == null || config.isEmpty()) return null;
+        TestingRunConfig runConfig = new TestingRunConfig();
+        Object overridden = config.get(TestingRunConfig.OVERRIDDEN_TEST_APP_URL);
+        if (overridden != null && StringUtils.isNotBlank(overridden.toString())) {
+            runConfig.setOverriddenTestAppUrl(overridden.toString());
+        }
+        Object roleId = config.get(TestingRunConfig.TEST_ROLE_ID);
+        if (roleId != null && StringUtils.isNotBlank(roleId.toString())) {
+            runConfig.setTestRoleId(roleId.toString());
+        }
+        return runConfig;
     }
 
     public void generateTestingRunResultAndIssue(TestConfig testConfig, ApiInfo.ApiInfoKey infoKey, TestingRunResult testingRunResult) {
@@ -582,6 +650,19 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User synced all default Akto test libraries from GitHub", resource = Resource.TEST_EDITOR, operation = Operation.UPDATE)
+    public String syncAllDefaultTestLibraries() {
+        final int accountId = Context.accountId.get();
+        executorService.schedule(() -> {
+            Context.accountId.set(accountId);
+            try {
+                InitializerListener.syncAllAktoDefaultTestLibrariesForAccount(accountId);
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "syncAllDefaultTestLibraries failed for account " + accountId, LogDb.DASHBOARD);
+            }
+        }, 0, TimeUnit.SECONDS);
+        return SUCCESS.toUpperCase();
+    }
 
     public String addTestLibrary(){
 
@@ -830,6 +911,22 @@ public class SaveTestEditorAction extends UserAction {
 
     public String getTestingRunPlaygroundHexId() {
         return testingRunPlaygroundHexId;
+    }
+
+    public List<String> getCallbackUuids() {
+        return callbackUuids;
+    }
+
+    public void setCallbackUuids(List<String> callbackUuids) {
+        this.callbackUuids = callbackUuids;
+    }
+
+    public boolean isCallbackHit() {
+        return callbackHit;
+    }
+
+    public void setCallbackHit(boolean callbackHit) {
+        this.callbackHit = callbackHit;
     }
 
 }

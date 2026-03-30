@@ -1,6 +1,7 @@
 package com.akto.data_actor;
 
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.metrics.MetricData;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -74,15 +75,20 @@ public class ClientActor extends DataActor {
         return dbAbsHost + "/api";
     }
 
-    public static int getAccountId() throws Exception {
-        String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
-        DecodedJWT jwt = JWT.decode(token);
-        String payload = jwt.getPayload();
-        byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
-        String decodedPayload = new String(decodedBytes);
-        BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
-        int accId = (int) basicDBObject.getInt("accountId");
-        return accId;
+    public static int getAccountId() {
+        try {
+            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+            DecodedJWT jwt = JWT.decode(token);
+            String payload = jwt.getPayload();
+            byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
+            String decodedPayload = new String(decodedBytes);
+            BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
+            int accId = (int) basicDBObject.getInt("accountId");
+            return accId;
+        } catch (Exception e) {
+            return 1000000;
+        }
+        
     }
 
     public static boolean checkAccount() {
@@ -1140,6 +1146,28 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void insertAgenticTestingLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("key", log.getKey());
+        logObj.put("log", log.getLog());
+        logObj.put("timestamp", log.getTimestamp());
+        obj.put("log", logObj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertAgenticTestingLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                System.out.println("non 2xx response in insertAgenticTestingLog");
+                return;
+            }
+        } catch (Exception e) {
+            System.out.println("error in insertAgenticTestingLog " + e);
+            return;
+        }
+    }
+
     public void modifyHybridSaasSetting(boolean isHybridSaas) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
@@ -1556,5 +1584,24 @@ public class ClientActor extends DataActor {
         loggerMaker.infoAndAddToDb("fetchAllApiCollections api called size " + apiCollections.size(), LoggerMaker.LogDb.RUNTIME);
         return apiCollections;
     }
+
+    @Override
+    public void ingestMetricData(List<MetricData> metricData){
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("metricData", metricData);
+        String objString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/ingestMetricsData", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in updateUsage", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in ingestMetricData " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return;
+    };
 
 }

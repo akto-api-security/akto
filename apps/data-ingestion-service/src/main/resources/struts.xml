@@ -39,6 +39,18 @@
             </result>
         </action>
 
+        <action name="api/auth-check" class="com.akto.action.IngestionAction" method="authCheck">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^success</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/http-proxy" class="com.akto.action.HttpProxyAction" method="httpProxy">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -48,11 +60,32 @@
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
+                <param name="includeProperties">^success,^message,^data.*</param>
             </result>
         </action>
 
-        <action name="api/http-proxy/truefoundry" class="com.akto.action.HttpProxyAction" method="truefoundryProxy">
+        <!-- Arcade Webhook Endpoints -->
+        <action name="pre" class="com.akto.action.ArcadeWebhookAction" method="arcade">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^code,^error_message</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="includeProperties">^code,^error_message</param>
+            </result>
+        </action>
+
+        <action name="post" class="com.akto.action.ArcadeWebhookAction" method="arcade">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^code,^error_message</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="includeProperties">^code,^error_message</param>
+            </result>
+        </action>
+
+        <action name="api/http-proxy/truefoundry" class="com.akto.action.TrueFoundryProxyAction" method="truefoundry">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
@@ -69,6 +102,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
+
 
     </package>
 

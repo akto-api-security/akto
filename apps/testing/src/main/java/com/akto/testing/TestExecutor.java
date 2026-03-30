@@ -303,19 +303,19 @@ public class TestExecutor {
         int currentTime = Context.now();
         Map<String, String> hostAndContentType = new HashMap<>();
         try {
-            loggerMaker.info("Starting findAllHosts at: " + currentTime, LogDb.TESTING);
+            loggerMaker.info("Starting findAllHosts at: " + currentTime);
             hostAndContentType = StatusCodeAnalyser.findAllHosts(sampleMessageStore, sampleDataMapForStatusCodeAnalyser);
             loggerMaker.info("Completing findAllHosts in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
         } catch (Exception e){
-            loggerMaker.errorAndAddToDb("Error while running findAllHosts " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb(e, "Error while running findAllHosts " + e.getMessage());
         }
         try {
             currentTime = Context.now();
-            loggerMaker.debugAndAddToDb("Starting HostValidator at: " + currentTime, LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("Starting HostValidator at: " + currentTime);
             HostValidator.compute(hostAndContentType,testingRun.getTestingRunConfig());
-            loggerMaker.debugAndAddToDb("Completing HostValidator in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("Completing HostValidator in: " + (Context.now() -  currentTime) + " at: " + Context.now());
         } catch (Exception e){
-            loggerMaker.errorAndAddToDb("Error while running HostValidator " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb(e, "Error while running HostValidator " + e.getMessage());
         }
         try {
             currentTime = Context.now();
@@ -323,14 +323,14 @@ public class TestExecutor {
             StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig(), hostAndContentType);
             loggerMaker.infoAndAddToDb("Completing StatusCodeAnalyser in: " + (Context.now() -  currentTime) + " at: " + Context.now());
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.errorAndAddToDb(e, "Error while running status code analyser " + e.getMessage());
         }
-        loggerMaker.debugAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result +  " defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
+        loggerMaker.debugAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result +  " defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap);
 
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
 
-        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed());
+        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getMaxAgentTokens());
         TestingUtilsSingleton.init();
 
         // Pre-fetch auth token before inserting records in Kafka
@@ -518,12 +518,17 @@ public class TestExecutor {
             for (String testSubCategory: testingRunSubCategories) {
                 if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
                     loggerMaker.debugAndAddToDb("Trying to run test for category: " + testSubCategory + " with summary state: " + GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId) );
-                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)){
+                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId, true)
+                            && !TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
                         insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit,
                                 apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun,
                                 isApiInfoTested, new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
                     }else{
-                        loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+                        if(TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
+                            loggerMaker.infoAndAddToDb("Agent token limit reached, stopping further tests for run: " + testingRun.getHexId(), LogDb.TESTING);
+                        } else {
+                            loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+                        }
                         break;
                     }
                 }
@@ -638,6 +643,14 @@ public class TestExecutor {
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap),
                         Updates.set(TestingRunResultSummary.STATE, updatedState)),
                 options);
+
+        if (TestingConfigurations.getInstance().isAgentTokenLimitExceeded()) {
+            TestingRunResultSummariesDao.instance.updateOne(
+                    Filters.eq(Constants.ID, summaryId),
+                    Updates.set(TestingRunResultSummary.METADATA_STRING + ".tokenRateLimited",
+                            TestResult.TestError.TOKEN_RATE_LIMITED.getMessage())
+            );
+        }
 
         if (TestingConfigurations.getInstance().getRerunTestingRunResultSummary() != null) {
             TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummary.ID,
@@ -907,12 +920,32 @@ public class TestExecutor {
                     VulnerableTestingRunResultDao.instance.insertMany(vulTestResults);
                 }
 
+                // Calculate total external API tokens from all test results
+                int totalExternalApiTokens = 0;
+                for (TestingRunResult runResult : testingRunResults) {
+                    if (runResult != null && runResult.getTestResults() != null) {
+                        for (GenericTestResult testResult : runResult.getTestResults()) {
+                            if (testResult instanceof TestResult) {
+                                int tokens = ((TestResult) testResult).getExternalApiTokens();
+                                loggerMaker.infoAndAddToDb("📊 TestExecutor reading tokens from TestResult: " + tokens, LogDb.TESTING);
+                                totalExternalApiTokens += tokens;
+                            }
+                        }
+                    }
+                }
+                loggerMaker.infoAndAddToDb("TestExecutor TOTAL tokens to add to summary: " + totalExternalApiTokens, LogDb.TESTING);
+                TestingConfigurations.getInstance().addAgentTokens(totalExternalApiTokens);
+
+                // Update summary with test count and cumulative external API tokens
                 TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
                     Filters.eq(Constants.ID, testRunResultSummaryId),
-                    Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize)
+                    Updates.combine(
+                        Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, resultSize),
+                        Updates.inc(TestingRunResultSummary.TOTAL_EXTERNAL_API_TOKENS, totalExternalApiTokens)
+                    )
                 );
 
-                loggerMaker.debugAndAddToDb("Updated count in summary", LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Updated TestingRunResultSummary with " + totalExternalApiTokens + " tokens", LogDb.TESTING);
 
                 TestingIssuesHandler handler = new TestingIssuesHandler();
                 boolean triggeredByTestEditor = false;
@@ -1130,6 +1163,14 @@ public class TestExecutor {
         Map<String, Object> varMap = new HashMap<>();
         String severity = testConfig.getInfo().getSeverity();
 
+        // Add test context to varMap for SSRF UUID mapping (batch runs and test editor)
+        varMap.put("accountId", Context.accountId.get());
+        varMap.put("apiInfoKey", apiInfoKey.toString());
+        varMap.put("testSubType", testSubType);
+        if (testRunId != null && testRunResultSummaryId != null) {
+            varMap.put("testRunId", testRunId.toHexString());
+            varMap.put("testRunResultSummaryId", testRunResultSummaryId.toHexString());
+        }
         for (String key: wordListsMap.keySet()) {
             varMap.put("wordList_" + key, wordListsMap.get(key));
         }
@@ -1234,6 +1275,18 @@ public class TestExecutor {
             testRunId, apiInfoKey, testSuperType, testSubType ,testResults.getTestResults(),
             vulnerable,singleTypeInfos,confidencePercentage,startTime,
             endTime, testRunResultSummaryId, testResults.getWorkflowTest(), testLogs);  
+
+        // Attach any callback UUIDs captured during execution for editor polling
+        Object callbackUuidsObj = varMap.get("random_uuid");
+        if (callbackUuidsObj instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> callbackUuids = (List<String>) callbackUuidsObj;
+            ret.setCallbackUuids(callbackUuids);
+            // Validate block ran immediately; callback hit may arrive later. Mark result as pending so UI can poll.
+            if (!vulnerable && !callbackUuids.isEmpty()) {
+                ret.setCallbackCheckPending(true);
+            }
+        }
 
         if (testingRunConfig!=null && testingRunConfig.getCleanUp()) {
             try {
@@ -1454,7 +1507,18 @@ public class TestExecutor {
     private boolean prefetchAuthWithRetry(TestRoles testRole, RawApi rawApi, int maxAttempts) {
         AuthMechanism authMechanism = testRole.findMatchingAuthMechanism(rawApi);
         
-        if (authMechanism == null || !LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanism.getType())) {
+        if (authMechanism == null) {
+            return true; // No auth mechanism, no prefetch needed
+        }
+        
+        String authType = authMechanism.getType();
+        
+        // Handle digest authentication
+        if (LoginFlowEnums.AuthMechanismTypes.DIGEST_AUTH.toString().equalsIgnoreCase(authType)) {
+            return true; // Digest auth doesn't require prefetch - works directly via DigestAuthParam.addAuthTokens()
+        }
+        
+        if (!LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authType)) {
             return true; // Not a login request type, no prefetch needed
         }
         
@@ -1487,5 +1551,5 @@ public class TestExecutor {
         
         return false;
     }
-    
+
 }

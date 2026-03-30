@@ -1,7 +1,9 @@
 package com.akto.dto.testing;
 
+import java.util.List;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 public class TestingRun {
 
@@ -24,6 +26,8 @@ public class TestingRun {
     private int testRunTime;
     public static final String MAX_CONCURRENT_REQUEST = "maxConcurrentRequests";
     private int maxConcurrentRequests;
+    public static final String MAX_AGENT_TOKENS = "maxAgentTokens";
+    private int maxAgentTokens = -1;
     private String triggeredBy;
     public static final String TRIGGERED_BY = "triggeredBy";
 
@@ -44,8 +48,10 @@ public class TestingRun {
     private String name;
 
     public static final String MINI_TESTING_SERVICE_NAME = "miniTestingServiceName";
+    public static final String ALLOWED_MINI_TESTING_SERVICE_NAMES = "allowedMiniTestingServiceNames";
     public static final String SELECTED_SLACK_CHANNEL_ID = "selectedSlackChannelId";
     private String miniTestingServiceName;
+    private List<String> allowedMiniTestingServiceNames;
     private int selectedSlackChannelId;
 
     public enum TestingRunType{
@@ -61,6 +67,9 @@ public class TestingRun {
     private int sendPendingTestsWebhookTimestamp;
     public static final String DO_NOT_MARK_ISSUES_AS_FIXED = "doNotMarkIssuesAsFixed";
     private boolean doNotMarkIssuesAsFixed = false;
+
+    public static final String DASHBOARD_CONTEXT = "dashboardContext";
+    private CONTEXT_SOURCE dashboardContext;
 
     public TestingRun() { }
 
@@ -82,12 +91,18 @@ public class TestingRun {
     }
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests, boolean sendSlackAlert, String miniTestingServiceName, int selectedSlackChannelId) {
-        this(scheduleTimestamp, userEmail,testingEndpoints,testIdConfig, state, periodInSeconds, name, testRunTime, maxConcurrentRequests, sendSlackAlert, false, miniTestingServiceName, selectedSlackChannelId);
+        this(scheduleTimestamp, userEmail,testingEndpoints,testIdConfig, state, periodInSeconds, name, testRunTime, maxConcurrentRequests, sendSlackAlert, false, miniTestingServiceName, selectedSlackChannelId, null);
     }
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig,
         State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests,
         boolean sendSlackAlert, boolean sendMsTeamsAlert, String miniTestingServiceName, int selectedSlackChannelId) {
+        this(scheduleTimestamp, userEmail, testingEndpoints, testIdConfig, state, periodInSeconds, name, testRunTime, maxConcurrentRequests, sendSlackAlert, sendMsTeamsAlert, miniTestingServiceName, selectedSlackChannelId, null);
+    }
+
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig,
+        State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests,
+        boolean sendSlackAlert, boolean sendMsTeamsAlert, String miniTestingServiceName, int selectedSlackChannelId, CONTEXT_SOURCE dashboardContext) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.testRunTime = testRunTime;
         this.maxConcurrentRequests = maxConcurrentRequests;
@@ -104,6 +119,7 @@ public class TestingRun {
         this.isNewTestRun = true;
         this.sendMsTeamsAlert = sendMsTeamsAlert;
         this.selectedSlackChannelId = selectedSlackChannelId;
+        this.dashboardContext = dashboardContext;
     }
 
     public TestingRunConfig getTestingRunConfig() {
@@ -128,6 +144,14 @@ public class TestingRun {
 
     public void setMaxConcurrentRequests(int maxConcurrentRequests) {
         this.maxConcurrentRequests = maxConcurrentRequests;
+    }
+
+    public int getMaxAgentTokens() {
+        return maxAgentTokens;
+    }
+
+    public void setMaxAgentTokens(int maxAgentTokens) {
+        this.maxAgentTokens = maxAgentTokens;
     }
 
     // if u r adding anything here make sure to add to stopAllTests() method too
@@ -255,6 +279,14 @@ public class TestingRun {
         this.miniTestingServiceName = miniTestingServiceName;
     }
 
+    public List<String> getAllowedMiniTestingServiceNames() {
+        return allowedMiniTestingServiceNames;
+    }
+
+    public void setAllowedMiniTestingServiceNames(List<String> allowedMiniTestingServiceNames) {
+        this.allowedMiniTestingServiceNames = allowedMiniTestingServiceNames;
+    }
+
     public int getSelectedSlackChannelId() {
         return selectedSlackChannelId;
     }
@@ -277,6 +309,14 @@ public class TestingRun {
 
     public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+    }
+
+    public CONTEXT_SOURCE getDashboardContext() {
+        return dashboardContext;
+    }
+
+    public void setDashboardContext(CONTEXT_SOURCE dashboardContext) {
+        this.dashboardContext = dashboardContext;
     }
 
     @Override

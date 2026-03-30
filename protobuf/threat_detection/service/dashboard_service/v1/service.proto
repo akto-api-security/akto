@@ -71,7 +71,9 @@ message ListMaliciousRequestsRequest {
     Filter filter = 4;
 }
 
-message FetchAlertFiltersRequest {}
+message FetchAlertFiltersRequest {
+  optional TimeRangeFilter detected_at_time_range = 1;
+}
 
 message FetchAlertFiltersResponse {
   repeated string actors = 1;
@@ -283,7 +285,16 @@ message ModifyThreatActorStatusRequest {
   uint64 updated_ts = 3;
 }
 
-message ModifyThreatActorStatusResponse {  
+message ModifyThreatActorStatusResponse {
+}
+
+message BulkModifyThreatActorStatusRequest {
+  repeated string ips = 1;
+  string status = 2;
+  uint64 updated_ts = 3;
+}
+
+message BulkModifyThreatActorStatusResponse {
 }
 
 message UpdateMaliciousEventStatusRequest {

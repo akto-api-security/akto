@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { LegacyCard, Text, Divider, VerticalStack } from "@shopify/polaris";
 import ParamsCard from "./ParamsCard";
 import DeleteModal from "./DeleteModal";
-import { HARDCODED, LOGIN_REQUEST, SAMPLE_DATA, TLS_AUTH } from "./TestRoleConstants";
+import { HARDCODED, LOGIN_REQUEST, SAMPLE_DATA, TLS_AUTH, DIGEST_AUTH } from "./TestRoleConstants";
 
 
 const SavedParamComponent = ({
@@ -37,6 +37,8 @@ const SavedParamComponent = ({
       setOpenAuth(TLS_AUTH)
   } else if (authObj?.authMechanism?.type === "SAMPLE_DATA") {
       setOpenAuth(SAMPLE_DATA)
+  } else if (authObj?.authMechanism?.type === "DIGEST_AUTH") {
+      setOpenAuth(DIGEST_AUTH)
   }
     setEditableDocs(index);
   };

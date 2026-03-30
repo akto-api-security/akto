@@ -103,6 +103,8 @@ public class InventoryAction extends UserAction {
     long newCount = 0;
     long oldCount = 0;
     public String fetchEndpointsCount() {
+        long startTime = System.currentTimeMillis();
+
         if (endTimestamp == 0) endTimestamp = Context.now();
 
         Set<Integer> demoCollections = new HashSet<>();
@@ -113,8 +115,17 @@ public class InventoryAction extends UserAction {
         ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
         if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
 
+        long beforeNewCount = System.currentTimeMillis();
         newCount = SingleTypeInfoDao.instance.fetchEndpointsCount(0, endTimestamp, demoCollections);
+        long newCountTime = System.currentTimeMillis() - beforeNewCount;
+
+        long beforeOldCount = System.currentTimeMillis();
         oldCount = SingleTypeInfoDao.instance.fetchEndpointsCount(0, startTimestamp, demoCollections);
+        long oldCountTime = System.currentTimeMillis() - beforeOldCount;
+
+        long totalTime = System.currentTimeMillis() - startTime;
+        loggerMaker.warnAndAddToDb("fetchEndpointsCount: totalTime=" + totalTime + "ms (newCount=" + newCountTime + "ms, oldCount=" + oldCountTime + "ms), results: newCount=" + newCount + ", oldCount=" + oldCount, LogDb.DASHBOARD);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -368,7 +379,7 @@ public class InventoryAction extends UserAction {
     public String fetchApiInfosFromSTIs(){
         ApiCollection collection = ApiCollectionsDao.instance.findOne(
                 Filters.in(Constants.ID, apiCollectionId),
-                Projections.include(ApiCollection.HOST_NAME)
+                Projections.include(ApiCollection.HOST_NAME, ApiCollection._TYPE)
         );
         if(collection == null){
             addActionError("No such collection exists");
@@ -378,7 +389,8 @@ public class InventoryAction extends UserAction {
         if((collection.getHostName() == null || collection.getHostName().isEmpty()) && collection.getId() != AllAPIsGroup.ALL_APIS_GROUP_ID){
             Bson filter = Filters.and(Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
                             Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
-            if (collection.getType() != null && !collection.getType().equals(ApiCollection.Type.API_GROUP)) {
+            // the previous logic was of this was redundant as only 1 type of ApiCollection.Type exists
+            if (collection.getType() != null && collection.getType().equals(ApiCollection.Type.API_GROUP) && Context.accountId.get() == 1729478227) {
                 filter = Filters.and(SingleTypeInfoDao.filterForHostHeader(0, false), filter);
             }
             list = ApiCollectionsDao.fetchEndpointsInCollection(filter, 0, -1, Utils.DELTA_PERIOD_VALUE);
@@ -435,7 +447,7 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String getAccessTypes() {
+    public String fetchAccessTypes() {
         response = new BasicDBObject();
         if (urls == null || urls.size() == 0 ){
             return Action.SUCCESS.toUpperCase();
@@ -446,7 +458,7 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String getSummaryInfoForChanges(){
+    public String fetchSummaryInfoForChanges(){
         long countEndpoints = SingleTypeInfoDao.instance.fetchEndpointsCount(startTimestamp, endTimestamp, deactivatedCollections);
         int countSensitiveApis = SingleTypeInfoDao.instance.getSensitiveApisCount(new ArrayList<>(), false, (
                 Filters.and(
@@ -538,7 +550,7 @@ public class InventoryAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private void getResponseForTrendApis(List<Bson> pipeline){
+    private void fetchResponseForTrendApis(List<Bson> pipeline){
         MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
         List<BasicDBObject> endpoints = new ArrayList<>();
@@ -567,7 +579,7 @@ public class InventoryAction extends UserAction {
         } catch(Exception e){
         }
         pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
-        getResponseForTrendApis(pipeline);
+        fetchResponseForTrendApis(pipeline);
 
         return SUCCESS.toUpperCase();
     }
@@ -599,7 +611,7 @@ public class InventoryAction extends UserAction {
 
         pipeline.add(Aggregates.group(_id, Accumulators.last(SingleTypeInfo._TIMESTAMP, "$" + SingleTypeInfo._TIMESTAMP)));
         pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
-        getResponseForTrendApis(pipeline);
+        fetchResponseForTrendApis(pipeline);
         return SUCCESS.toUpperCase();
     }
 
@@ -619,7 +631,7 @@ public class InventoryAction extends UserAction {
         pipeline.add(Aggregates.limit(100_000));
         pipeline.addAll(SingleTypeInfoDao.instance.buildPipelineForTrend(InitializerListener.isNotKubernetes()));
 
-        getResponseForTrendApis(pipeline);
+        fetchResponseForTrendApis(pipeline);
 
         return Action.SUCCESS.toUpperCase();
 
@@ -868,7 +880,7 @@ public class InventoryAction extends UserAction {
     }
 
     private String searchString;
-    private List<SingleTypeInfo> getMongoResults(String searchKey) {
+    private List<SingleTypeInfo> fetchMongoResults(String searchKey) {
 
         List<String> sortFields = new ArrayList<>();
         sortFields.add(sortKey);
@@ -890,17 +902,17 @@ public class InventoryAction extends UserAction {
         return list;
     }
 
-    private long getTotalParams(String searchKey) {
+    private long fetchTotalParams(String searchKey) {
         return SingleTypeInfoDao.instance.getMCollection().countDocuments(Filters.and(prepareFilters("STI"), getSearchFilters(searchKey)));
     }
 
     public String fetchChanges() {
         response = new BasicDBObject();
 
-        long totalParams = getTotalParams(SingleTypeInfo._URL);
+        long totalParams = fetchTotalParams(SingleTypeInfo._URL);
         loggerMaker.debugAndAddToDb("Total params: " + totalParams, LogDb.DASHBOARD);
 
-        List<SingleTypeInfo> singleTypeInfos = getMongoResults(SingleTypeInfo._URL);
+        List<SingleTypeInfo> singleTypeInfos = fetchMongoResults(SingleTypeInfo._URL);
         loggerMaker.debugAndAddToDb("STI count: " + singleTypeInfos.size(), LogDb.DASHBOARD);
 
         response.put("data", new BasicDBObject("endpoints", singleTypeInfos ).append("total", totalParams));
@@ -1122,7 +1134,7 @@ public class InventoryAction extends UserAction {
 
     Map<ApiInfoKey, Map<String, Integer>> severityMapForCollection;
 
-    public String getSeveritiesCountPerCollection(){
+    public String fetchSeveritiesCountPerCollection(){
         if(apiCollectionId == -1){
             return ERROR.toUpperCase();
         }
@@ -1153,7 +1165,7 @@ public class InventoryAction extends UserAction {
     }
 
     private Set<MergedUrls> mergedUrls;
-    public String getDeMergedApis() {
+    public String fetchDeMergedApis() {
         mergedUrls = MergedUrlsDao.instance.getMergedUrls();
         return SUCCESS.toUpperCase();
     }

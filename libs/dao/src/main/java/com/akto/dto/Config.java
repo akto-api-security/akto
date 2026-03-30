@@ -1,8 +1,11 @@
 package com.akto.dto;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import lombok.Getter;
@@ -374,6 +377,7 @@ public abstract class Config {
 
     @BsonDiscriminator
     public static class OktaConfig extends Config {
+
         private String clientId;
         private String clientSecret;
         private String oktaDomainUrl;
@@ -383,6 +387,12 @@ public abstract class Config {
         private String organizationDomain;
         public static final String ACCOUNT_ID = "accountId";
         private int accountId;
+        /** BSON key for the Okta Management API (SSWS) token. */
+        public static final String MANAGEMENT_API_TOKEN = "managementApiToken";
+        /** SSWS token; persisted in Mongo under {@link #MANAGEMENT_API_TOKEN}. */
+        private String managementApiToken;
+        /** Okta group name → Akto user role. Stored in Mongo as {@code oktaGroupToAktoUserRoleMap}. */
+        private Map<String, String> oktaGroupToAktoUserRoleMap;
 
         public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
 
@@ -427,6 +437,15 @@ public abstract class Config {
             this.authorisationServerId = authorisationServerId;
         }
 
+        public String getOAuthDomainUrl() {
+            String base = "https://" + oktaDomainUrl + "/oauth2/";
+            return base + (authorisationServerId == null || authorisationServerId.isEmpty() ? "/v1" : authorisationServerId + "/v1");
+        }
+
+        public String getManagementBaseUrl() {
+            return "https://" + oktaDomainUrl;
+        }
+
         public String getRedirectUri() {
             return redirectUri;
         }
@@ -447,6 +466,21 @@ public abstract class Config {
         }
         public void setAccountId(int accountId) {
             this.accountId = accountId;
+        }
+
+        public String getManagementApiToken() {
+            return managementApiToken;
+        }
+
+        public void setManagementApiToken(String managementApiToken) {
+            this.managementApiToken = managementApiToken;
+        }
+
+        public Map<String, String> getOktaGroupToAktoUserRoleMap() {
+            return oktaGroupToAktoUserRoleMap;
+        }
+        public void setOktaGroupToAktoUserRoleMap(Map<String, String> oktaGroupToAktoUserRoleMap) {
+            this.oktaGroupToAktoUserRoleMap = oktaGroupToAktoUserRoleMap;
         }
     }
 
@@ -770,6 +804,15 @@ public abstract class Config {
         private int accountId;
         private List<String> severityLevels;
         public static final String SEVERITY_LEVELS = "severityLevels";
+        private List<String> threatPolicies;
+        public static final String THREAT_POLICIES = "threatPolicies";
+
+        public static final String LIST_IDS = "listIds";
+        private List<String> listIds;
+        public static final String RULE_ID = "ruleId";
+        private String ruleId;
+        public static final String ZONE_ID = "zoneId";
+        private String zoneId;
 
         public static final String _CONFIG_ID = "configId";
         public static final String CONFIG_ID = ConfigType.CLOUDFLARE_WAF.name();
@@ -787,6 +830,18 @@ public abstract class Config {
             this.accountId = accountId;
             this.id = accountId + "_" + CONFIG_ID;
             this.severityLevels = severityLevels;
+            this.threatPolicies = new ArrayList<>();
+        }
+
+        public CloudflareWafConfig(String apiKey, String email, String integrationType, String accountOrZoneId, int accountId, List<String> severityLevels, List<String> threatPolicies) {
+            this.apiKey = apiKey;
+            this.email = email;
+            this.integrationType = integrationType;
+            this.accountOrZoneId = accountOrZoneId;
+            this.accountId = accountId;
+            this.id = accountId + "_" + CONFIG_ID;
+            this.severityLevels = severityLevels;
+            this.threatPolicies = threatPolicies != null ? threatPolicies : new ArrayList<>();
         }
 
         public String getApiKey() {
@@ -840,6 +895,38 @@ public abstract class Config {
         public void setSeverityLevels(List<String> severityLevels) {
             this.severityLevels = severityLevels;
         }
+
+        public List<String> getListIds() {
+            return listIds;
+        }
+
+        public void setListIds(List<String> listIds) {
+            this.listIds = listIds;
+        }
+
+        public String getRuleId() {
+            return ruleId;
+        }
+
+        public void setRuleId(String ruleId) {
+            this.ruleId = ruleId;
+        }
+
+        public String getZoneId() {
+            return zoneId;
+        }
+
+        public void setZoneId(String zoneId) {
+            this.zoneId = zoneId;
+        }
+
+        public List<String> getThreatPolicies() {
+            return threatPolicies;
+        }
+
+        public void setThreatPolicies(List<String> threatPolicies) {
+            this.threatPolicies = threatPolicies;
+        }
     }
 
     @BsonDiscriminator
@@ -851,8 +938,10 @@ public abstract class Config {
         private String ruleSetName;
         private int accountId;
         private List<String> severityLevels;
+        private List<String> threatPolicies;
 
         public static final String CONFIG_ID = ConfigType.AWS_WAF.name();
+        public static final String THREAT_POLICIES = "threatPolicies";
 
         public AwsWafConfig() {
             this.configType = ConfigType.AWS_WAF;
@@ -868,6 +957,21 @@ public abstract class Config {
             this.ruleSetName = ruleSetName;
             this.accountId = accountId;
             this.id = accountId + "_" + CONFIG_ID;
+            this.severityLevels = severityLevels;
+            this.threatPolicies = new ArrayList<>();
+        }
+
+        public AwsWafConfig(String awsAccessKey, String awsSecretKey, String region, String ruleSetId,
+                String ruleSetName, int accountId, List<String> severityLevels, List<String> threatPolicies) {
+            this.awsAccessKey = awsAccessKey;
+            this.awsSecretKey = awsSecretKey;
+            this.region = region;
+            this.ruleSetId = ruleSetId;
+            this.ruleSetName = ruleSetName;
+            this.accountId = accountId;
+            this.id = accountId + "_" + CONFIG_ID;
+            this.severityLevels = severityLevels;
+            this.threatPolicies = threatPolicies != null ? threatPolicies : new ArrayList<>();
         }
 
         public String getAwsAccessKey() {
@@ -929,7 +1033,15 @@ public abstract class Config {
         public void setSeverityLevels(List<String> severityLevels) {
             this.severityLevels = severityLevels;
         }
-       
+
+        public List<String> getThreatPolicies() {
+            return threatPolicies;
+        }
+
+        public void setThreatPolicies(List<String> threatPolicies) {
+            this.threatPolicies = threatPolicies;
+        }
+
     }
 
     @BsonDiscriminator

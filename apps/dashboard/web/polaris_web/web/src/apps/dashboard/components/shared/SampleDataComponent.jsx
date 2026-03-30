@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react'
 import {
-    ClipboardMinor,ArrowDownMinor, ArrowUpMinor
+    ClipboardMinor,ArrowDownMinor, ArrowUpMinor, MaximizeMajor
 } from '@shopify/polaris-icons';
 import {
     HorizontalStack, Box, LegacyCard,
-    Button, Popover, ActionList, Icon, Text, Tooltip
+    Button, Popover, ActionList, Icon, Text, Tooltip, Modal
 } from '@shopify/polaris';
 import SampleData from './SampleData';
 import func from "@/util/func";
@@ -13,17 +13,29 @@ import transform from './customDiffEditor';
 
 function SampleDataComponent(props) {
 
-    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true } = props;
+    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true, simpleJson = false } = props;
     const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [popoverActive, setPopoverActive] = useState({});
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
     const [currentIndex, setCurrentIndex] = useState({request: 0, response: 0})
     const [responseTime, setResponseTime] = useState(undefined)
     const [ipObj, setIpObj] = useState({sourceIP: "", destIP: ""})
+    const [expanded, setExpanded] = useState(false)
+    const [editorContent, setEditorContent] = useState("")
 
     const ref = useRef(null)
 
     useEffect(()=>{
+        if (simpleJson) {
+            setSampleJsonData((prev) => ({
+                ...prev,
+                [type]: {
+                    message: sampleData?.message || "",
+                    originalMessage: sampleData?.originalMessage,
+                }
+            }))
+            return
+        }
 
         // Metadata parsing: JSON only
         let parsed;
@@ -117,11 +129,25 @@ function SampleDataComponent(props) {
                 response: showResponse ? { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, ...(segmentsFromMetadata ? {} : {vulnerabilitySegments}) } : {},
             })
         }
-      }, [sampleData, metadata])
+    }, [sampleData, metadata, isNewDiff, showResponse, simpleJson, type])
 
-    const copyContent = async(type,completeData) => {
+    const copyContent = async(type, completeData, isSimpleJson = false) => {
         let copyString = "";
         let snackBarMessage = ""
+        
+        // For simple JSON mode, just copy the raw content
+        if (isSimpleJson) {
+            try {
+                // Try to parse and pretty-print, or use raw content
+                const parsed = JSON.parse(completeData);
+                copyString = JSON.stringify(parsed, null, 2);
+            } catch {
+                copyString = completeData;
+            }
+            snackBarMessage = "Content copied to clipboard";
+            return {copyString, snackBarMessage};
+        }
+        
         completeData = JSON.parse(completeData);
         if (type=="RESPONSE") {
             let responsePayload = {}
@@ -164,7 +190,7 @@ function SampleDataComponent(props) {
     }
 
     async function copyRequest(reqType, type, completeData) {
-        let { copyString, snackBarMessage } = await copyContent(type, completeData)
+        let { copyString, snackBarMessage } = await copyContent(type, completeData, simpleJson)
         if (copyString) {
             func.copyToClipboard(copyString, ref, snackBarMessage)
             setPopoverActive({ [reqType]: !popoverActive[reqType] })
@@ -173,16 +199,27 @@ function SampleDataComponent(props) {
 
     function getItems(type, data) {
         let items = []
+        // Use editor content if available, otherwise fall back to message
+        const contentToUse = data.editorContent ? data.editorContent : data.message
+        if (simpleJson) {
+            if (contentToUse) {
+                items.push({
+                    content: 'Copy',
+                    onAction: () => { copyRequest(type, "RESPONSE", contentToUse) },
+                })
+            }
+            return items;
+        }
 
         if (type == "request") {
-            if (data.message) {
+            if (contentToUse) {
                 items.push({
                     content: 'Copy request as curl',
-                    onAction: () => { copyRequest(type, "CURL", data.message) },
+                    onAction: () => { copyRequest(type, "CURL", contentToUse) },
                 },
                     {
                         content: 'Copy request as burp',
-                        onAction: () => { copyRequest(type, "BURP", data.message) },
+                        onAction: () => { copyRequest(type, "BURP", contentToUse) },
                     })
             }
             if (data.originalMessage) {
@@ -190,6 +227,7 @@ function SampleDataComponent(props) {
                     items[0].content = "Copy attempt request as curl"
                     items[1].content = "Copy attempt request as burp"
                 }
+                if(data?.originalMessage !== data?.message){
                 items.push({
                     content: 'Copy original request as curl',
                     onAction: () => { copyRequest(type, "CURL", data.originalMessage) },
@@ -198,22 +236,25 @@ function SampleDataComponent(props) {
                         content: 'Copy original request as burp',
                         onAction: () => { copyRequest(type, "BURP", data.originalMessage) },
                     })
+                }
             }
         } else {
-            if (data.message) {
+            if (contentToUse) {
                 items.push({
                     content: 'Copy response',
-                    onAction: () => { copyRequest(type, "RESPONSE", data.message) },
+                    onAction: () => { copyRequest(type, "RESPONSE", contentToUse) },
                 })
             }
             if (data.originalMessage) {
                 if(items.length==1){
                     items[0].content = "Copy attempt response"
                 }
+                if(data?.originalMessage != data?.message){
                 items.push({
                     content: 'Copy original response',
                     onAction: () => { copyRequest(type, "RESPONSE", data.originalMessage) },
                 })
+                }
             }
         }
 
@@ -247,19 +288,28 @@ function SampleDataComponent(props) {
     }
 
     let currentLineActive = lineNumbers && lineNumbers[type].length > 0 ? lineNumbers[type][currentIndex[type]] : 1
-    return (
+    const currentMessage = sampleJsonData?.[type]?.message
+    
+    const handleEditorData = (data) => {
+        setEditorContent(data)
+        getEditorData(data)
+    }
 
+    return (
         <Box id='sample-data-editor-container'>
             <LegacyCard.Section flush>
                 <Box padding={"2"}>
                     <HorizontalStack padding="2" align='space-between'>
-                        {func.toSentenceCase(type)} 
-                        { type==="response" && responseTime ? (` (${responseTime} ms)`) : "" }
-                        { type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ? 
-                            (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`) 
-                            : "" }
+                        <Text variant="bodyMd" fontWeight="semibold">
+                            {/* Hide the word 'response' if simpleJson is true */}
+                            {!simpleJson && func.toSentenceCase(type)}
+                            {!simpleJson && type==="response" && responseTime ? (` (${responseTime} ms)`) : ""}
+                            {!simpleJson && type==="request" && (ipObj?.sourceIP.length>0 || ipObj?.destIP.length>0) ?
+                                (` (${ipObj?.sourceIP ? `Src: ${ipObj.sourceIP}` : ""}${ipObj?.sourceIP && ipObj?.destIP ? " & " : ""}${ipObj?.destIP ? `Dest: ${ipObj.destIP}` : ""})`)
+                                : ""}
+                        </Text>
                         <HorizontalStack gap={2}>
-                        {isNewDiff ? <HorizontalStack gap="2">
+                        {isNewDiff && lineNumbers[type]?.length > 0 ? <HorizontalStack gap="2">
                                 <Box borderInlineEndWidth='1' borderColor="border-subdued" padding="1">
                                     <Text variant="bodyMd" color="subdued">{ lineNumbers[type].length } changes</Text>
                                 </Box>
@@ -277,7 +327,14 @@ function SampleDataComponent(props) {
                                 </HorizontalStack>
                             </HorizontalStack> 
                             : null}
-                            <Tooltip content={`Copy ${type}`}>
+                            <Button
+                                plain
+                                icon={MaximizeMajor}
+                                onClick={() => setExpanded(true)}
+                                accessibilityLabel={`Expand ${type}`}
+                                disabled={!currentMessage}
+                            />
+                            <Tooltip content={simpleJson ? "Copy" : `Copy ${type}`}>
                             <Popover
                                 zIndexOverride={"600"}
                                 active={popoverActive[type]}
@@ -288,7 +345,7 @@ function SampleDataComponent(props) {
                                 <div ref={ref}/>
                                 <ActionList
                                     actionRole="menuitem"
-                                    items={getItems(type, sampleData)}
+                                    items={getItems(type, {...sampleData, editorContent})}
                                 />
                             </Popover>
                             </Tooltip>
@@ -297,8 +354,21 @@ function SampleDataComponent(props) {
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={getEditorData}/> : null}
+                {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage={simpleJson ? "json" : "custom_http"} currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={handleEditorData}/> : null}
             </LegacyCard.Section>
+
+            <Modal open={expanded} onClose={() => setExpanded(false)} title={simpleJson ? " " : func.toSentenceCase(type)} large>
+                <Modal.Section>
+                    {sampleJsonData[type] ? <SampleData
+                        data={sampleJsonData[type]}
+                        readOnly={readOnly}
+                        showDiff={showDiff}
+                        editorLanguage={simpleJson ? "json" : "custom_http"}
+                        minHeight="600px"
+                        getLineNumbers={getLineNumbers}
+                    /> : null}
+                </Modal.Section>
+            </Modal>
         </Box>
     )
 

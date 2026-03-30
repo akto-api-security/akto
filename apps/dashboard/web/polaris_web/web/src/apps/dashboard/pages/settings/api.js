@@ -1,4 +1,5 @@
 import request from "@/util/request"
+import { ALL_STORED_LOG_KEYS } from "./health_logs/logKeysConstants"
 
 const settingRequests = {
     inviteUsers(apiSpec) {
@@ -105,14 +106,16 @@ const settingRequests = {
             }
         })
     },
-    fetchLogsFromDb(startTime, endTime, logDb) {
+    fetchLogsFromDb(startTime, endTime, logDb, logKeys) {
+        const sendKeys = Array.isArray(logKeys) && logKeys.length > 0 && logKeys.length < ALL_STORED_LOG_KEYS.length
         return request({
             url: '/api/fetchLogsFromDb',
             method: 'post',
             data: {
                 startTime,
                 endTime,
-                logDb
+                logDb,
+                ...(sendKeys ? { logKeys } : {}),
             }
         })
     },
@@ -154,6 +157,19 @@ const settingRequests = {
     fetchMetrics(startTimestamp, endTimestamp, metricIdPrefix, instanceId) {
         const data = {startTime:startTimestamp, endTime:endTimestamp}
         if (metricIdPrefix) data.metricIdPrefix = metricIdPrefix
+        if (instanceId) data.instanceId = instanceId
+        return request({
+            url: '/api/metrics',
+            method: 'post',
+            data
+        })
+    },
+    fetchMetricsByModule(startTimestamp, endTimestamp, moduleType, instanceId) {
+        const data = {
+            startTime: startTimestamp,
+            endTime: endTimestamp,
+            moduleType: moduleType
+        }
         if (instanceId) data.instanceId = instanceId
         return request({
             url: '/api/metrics',
@@ -344,11 +360,13 @@ const settingRequests = {
         })
     },
 
-    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
+    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri, managementApiToken) {
+        const data = { clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri }
+        if (managementApiToken) data.managementApiToken = managementApiToken
         return request({
             url: '/api/addOktaSso',
             method: 'post',
-            data: {clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri}
+            data
         })
     },
 
@@ -357,6 +375,28 @@ const settingRequests = {
             url: '/api/deleteOktaSso',
             method: 'post',
             data: {}
+        })
+    },
+
+    fetchOktaGroups() {
+        return request({
+            url: '/api/fetchOktaGroups',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, opts = {}) {
+        const data = { oktaGroupToAktoUserRoleMap }
+        if (Object.prototype.hasOwnProperty.call(opts, 'managementApiToken')) {
+            const t = opts.managementApiToken
+            // Struts cannot distinguish JSON null from omitted String fields; send "" to mean "clear stored token".
+            data.managementApiToken = t == null || String(t).trim() === '' ? '' : t
+        }
+        return request({
+            url: '/api/saveOktaGroupRoleMapping',
+            method: 'post',
+            data
         })
     },
 
@@ -423,6 +463,15 @@ const settingRequests = {
             method: 'post',
             data: {
                 newMergingEnabled
+            }
+        });
+    },
+    toggleDoBodyMatch(doBodyMatch) {
+        return request({
+            url: '/api/toggleDoBodyMatch',
+            method: 'post',
+            data: {
+                doBodyMatch
             }
         });
     },
@@ -599,11 +648,11 @@ const settingRequests = {
             data: {roleName}
         })
     },
-    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName,severityLevels) {
+    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies) {
         return request({
             url: '/api/addAwsWafIntegration',
             method: 'post',
-            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName,severityLevels}
+            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies}
         })
     },
     fetchAwsWafIntegration() {
@@ -776,11 +825,11 @@ const settingRequests = {
             data: {}
         })
     },
-    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType,severityLevels) {
+    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels, threatPolicies) {
         return await request({
             url: '/api/addCloudflareWafIntegration',
             method: 'post',
-            data: {accountOrZoneId, apiKey, email, integrationType,severityLevels}
+            data: {accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels, threatPolicies}
         })
     },
     async getDeMergedApis() {
@@ -807,6 +856,13 @@ const settingRequests = {
     async deleteAllMaliciousEvents() {
         return await request({
             url: '/api/deleteAllMaliciousEvents',
+            method: 'post',
+            data: {}
+        })
+    },
+    async resetCollectionAccessTypes() {
+        return await request({
+            url: '/api/resetCollectionAccessTypes',
             method: 'post',
             data: {}
         })
@@ -855,6 +911,16 @@ const settingRequests = {
             }
         })
     },
+    getUserAnalysis(agentId, deviceId) {
+        return request({
+            url: '/api/getUserAnalysis',
+            method: 'post',
+            data: {
+                agentId,
+                deviceId
+            }
+        })
+    },
     addMcpRegistryIntegration(registries) {
         return request({
             url: '/api/addMcpRegistryIntegration',
@@ -888,6 +954,13 @@ const settingRequests = {
             url: '/api/updateModuleEnvAndReboot',
             method: 'post',
             data: {moduleId, moduleName, envData}
+        })
+    },
+    fetchFilterYamlTemplate() {
+        return request({
+            url: '/api/fetchFilterYamlTemplate',
+            method: 'post',
+            data: {}
         })
     }
 }

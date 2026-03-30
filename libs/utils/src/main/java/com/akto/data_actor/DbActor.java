@@ -4,6 +4,7 @@ import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.metrics.MetricData;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
@@ -213,6 +214,12 @@ public class DbActor extends DataActor {
     public void insertProtectionLog(Log log) {
         DbLayer.insertProtectionLog(log);
     }
+
+    @Override
+    public void insertAgenticTestingLog(Log log) {
+        DbLayer.insertAgenticTestingLog(log);
+    }
+
     @Override
     public List<CodeAnalysisRepo> findReposToRun() {
         return Collections.emptyList();
@@ -258,5 +265,9 @@ public class DbActor extends DataActor {
         return DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName);
     }
 
+    @Override
+    public void ingestMetricData(List<MetricData> metricData) {
+        DbLayer.ingestMetric(metricData);
+    }
 
 }

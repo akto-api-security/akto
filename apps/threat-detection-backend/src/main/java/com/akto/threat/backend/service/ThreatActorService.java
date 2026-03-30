@@ -10,6 +10,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.BulkModifyThreatActorStatusRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.BulkModifyThreatActorStatusResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ParamEnumerationConfig;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.RatelimitConfig;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
@@ -36,6 +38,9 @@ import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1145,6 +1150,34 @@ public class ThreatActorService {
 
         return ModifyThreatActorStatusResponse.newBuilder().build();
       }
+
+  public BulkModifyThreatActorStatusResponse bulkModifyThreatActorStatus(
+      String accountId, BulkModifyThreatActorStatusRequest request) {
+
+    if (request.getIpsList().isEmpty()) {
+      return BulkModifyThreatActorStatusResponse.newBuilder().build();
+    }
+
+    MongoCollection<Document> coll = this.mongoClient
+        .getDatabase(accountId)
+        .getCollection(MongoDBCollection.ThreatDetection.ACTOR_INFO, Document.class);
+
+    List<WriteModel<Document>> bulkOps = new ArrayList<>();
+    for (String ip : request.getIpsList()) {
+      bulkOps.add(new UpdateOneModel<>(
+          Filters.eq("actorId", ip),
+          Updates.combine(
+              Updates.set("updatedTs", request.getUpdatedTs()),
+              Updates.set("status", request.getStatus()),
+              Updates.setOnInsert("actorId", ip)
+          ),
+          new UpdateOptions().upsert(true)
+      ));
+    }
+
+    coll.bulkWrite(bulkOps);
+    return BulkModifyThreatActorStatusResponse.newBuilder().build();
+  }
 
   public FetchThreatsForActorResponse fetchThreatsForActor(
       String accountId, FetchThreatsForActorRequest request, String contextSource) {

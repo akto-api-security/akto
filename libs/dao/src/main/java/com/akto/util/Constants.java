@@ -83,8 +83,10 @@ public class Constants {
     public static final String AKTO_MCP_PROMPT = "PROMPT";
     public static final String AKTO_MCP_SERVER = "SERVER";
     public static final String STATUS_PENDING = "Pending";
+    /** Masked secret placeholder in dashboard JSON (e.g. Jira/Okta integration fetch) and similar UI. */
     public static final String ASTERISK = "**********************";
     public static final String AKTO_MCP_SERVER_URL = StringUtils.isNotBlank(System.getenv("AKTO_MCP_SERVER_URL")) ? System.getenv("AKTO_MCP_SERVER_URL") : "http://localhost:5500";
+    public static final String HOST_HEADER = "Host";
     public static final String AKTO_ENDPOINT_SOURCE_TAG = "source";
     public static final String AKTO_ENDPOINT_SOURCE_VALUE = "ENDPOINT";
     public static final String FAVICON_SOURCE_URL ="https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=https://";

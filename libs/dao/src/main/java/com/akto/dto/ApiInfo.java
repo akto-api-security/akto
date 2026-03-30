@@ -79,6 +79,54 @@ public class ApiInfo {
     private float threatScore;
     public static final String THREAT_SCORE = "threatScore";
 
+    public static final String AGENT_PROXY_GUARDRAIL_ENABLED = "agentProxyGuardrailEnabled";
+    private boolean agentProxyGuardrailEnabled;
+
+    public static class MessageFieldEntry {
+        private String fieldPath;
+        private String description;
+
+        public MessageFieldEntry() {}
+
+        public MessageFieldEntry(String fieldPath, String description) {
+            this.fieldPath = fieldPath;
+            this.description = description;
+        }
+
+        public String getFieldPath() { return fieldPath; }
+        public void setFieldPath(String fieldPath) { this.fieldPath = fieldPath; }
+        public String getDescription() { return description; }
+        public void setDescription(String description) { this.description = description; }
+    }
+
+    public static class GuardrailSchema {
+        private List<MessageFieldEntry> requestMessageFields;
+        private List<MessageFieldEntry> responseMessageFields;
+        private Integer blockedResponseCode;
+        private String blockedResponseBody;
+        private String blockedResponseContentType;
+
+        public GuardrailSchema() {}
+
+        public List<MessageFieldEntry> getRequestMessageFields() { return requestMessageFields; }
+        public void setRequestMessageFields(List<MessageFieldEntry> requestMessageFields) { this.requestMessageFields = requestMessageFields; }
+
+        public List<MessageFieldEntry> getResponseMessageFields() { return responseMessageFields; }
+        public void setResponseMessageFields(List<MessageFieldEntry> responseMessageFields) { this.responseMessageFields = responseMessageFields; }
+
+        public Integer getBlockedResponseCode() { return blockedResponseCode; }
+        public void setBlockedResponseCode(Integer blockedResponseCode) { this.blockedResponseCode = blockedResponseCode; }
+
+        public String getBlockedResponseBody() { return blockedResponseBody; }
+        public void setBlockedResponseBody(String blockedResponseBody) { this.blockedResponseBody = blockedResponseBody; }
+
+        public String getBlockedResponseContentType() { return blockedResponseContentType; }
+        public void setBlockedResponseContentType(String blockedResponseContentType) { this.blockedResponseContentType = blockedResponseContentType; }
+    }
+
+    public static final String GUARDRAIL_SCHEMA = "guardrailSchema";
+    private GuardrailSchema guardrailSchema;
+
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP
     }
@@ -226,6 +274,7 @@ public class ApiInfo {
         this.severityScore = 0;
         this.riskScore = 0 ;
         this.lastCalculatedTime = 0;
+        this.agentProxyGuardrailEnabled = false;
         if(apiInfoKey != null){
             this.collectionIds = Arrays.asList(apiInfoKey.getApiCollectionId());
         }
@@ -650,4 +699,15 @@ public class ApiInfo {
     public float getThreatScore() {
         return threatScore;
     }
+
+    public boolean isAgentProxyGuardrailEnabled() {
+        return agentProxyGuardrailEnabled;
+    }
+
+    public void setAgentProxyGuardrailEnabled(boolean agentProxyGuardrailEnabled) {
+        this.agentProxyGuardrailEnabled = agentProxyGuardrailEnabled;
+    }
+
+    public GuardrailSchema getGuardrailSchema() { return guardrailSchema; }
+    public void setGuardrailSchema(GuardrailSchema guardrailSchema) { this.guardrailSchema = guardrailSchema; }
 }

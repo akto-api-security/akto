@@ -12,6 +12,10 @@ import {
     FormLayout
 } from "@shopify/polaris";
 import { PlusMinor, EditMinor, DeleteMinor } from "@shopify/polaris-icons";
+import OwaspTag from "../OwaspTag";
+import RuleLabelWithTag from "../RuleLabelWithTag";
+import { RULE_OWASP_THREATS } from "../owaspConfig";
+import func from "@/util/func";
 
 export const ContentPolicyConfig = {
     number: 2,
@@ -21,9 +25,10 @@ export const ContentPolicyConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ enablePromptAttacks, enableDeniedTopics, deniedTopics, enableHarmfulCategories, enableBasePromptRule }) => {
+    getSummary: ({ enablePromptAttacks, enableContextPoisoning, enableDeniedTopics, deniedTopics, enableHarmfulCategories, enableBasePromptRule }) => {
         const filters = [];
         if (enablePromptAttacks) filters.push('Prompt attacks');
+        if (func.isDemoAccount() && enableContextPoisoning) filters.push('Context poisoning');
         if (enableDeniedTopics && deniedTopics?.length > 0) filters.push(`${deniedTopics.length} denied topic${deniedTopics.length !== 1 ? 's' : ''}`);
         if (enableHarmfulCategories) filters.push('Harmful categories');
         if (enableBasePromptRule) filters.push('Intent verification');
@@ -37,6 +42,9 @@ const ContentPolicyStep = ({
     setEnablePromptAttacks,
     promptAttackLevel,
     setPromptAttackLevel,
+    // Context poisoning (demo only)
+    enableContextPoisoning,
+    setEnableContextPoisoning,
     // Denied topics
     enableDeniedTopics,
     setEnableDeniedTopics,
@@ -246,16 +254,16 @@ const ContentPolicyStep = ({
 
     return (
         <VerticalStack gap="4">
-            <Text variant="headingMd">Content & Policy Guardrails</Text>
             <Text variant="bodyMd" tone="subdued">
                 Configure content filtering and policy guardrails to protect against harmful content and policy violations.
             </Text>
+            <OwaspTag stepNumber={2} />
 
             <VerticalStack gap="4">
                 {/* Prompt Injection Attacks */}
                 <Box>
                     <Checkbox
-                        label="Enable prompt injection attacks filter"
+                        label={<RuleLabelWithTag name="Enable prompt injection attacks filter" threats={RULE_OWASP_THREATS.promptInjection} />}
                         checked={enablePromptAttacks}
                         onChange={setEnablePromptAttacks}
                         helpText="Detect and block user inputs attempting to override system instructions."
@@ -280,6 +288,18 @@ const ContentPolicyStep = ({
                         </Box>
                     )}
                 </Box>
+
+                {/* Context poisoning (demo only) */}
+                {func.isDemoAccount() && (
+                    <Box>
+                        <Checkbox
+                            label={<RuleLabelWithTag name="Enable context poisoning attacks" threats={RULE_OWASP_THREATS.contextPoisoning} />}
+                            checked={enableContextPoisoning ?? false}
+                            onChange={setEnableContextPoisoning}
+                            helpText="Detect and block attempts to poison agent memory or context."
+                        />
+                    </Box>
+                )}
 
                 {/* Denied Topics */}
                 <Box>
@@ -361,7 +381,7 @@ const ContentPolicyStep = ({
                 {/* Intent Based Guardrails (Base Prompt) */}
                 <Box>
                     <Checkbox
-                        label="Enable agent intent verification"
+                        label={<RuleLabelWithTag name="Enable agent intent verification" threats={RULE_OWASP_THREATS.intentVerification} />}
                         checked={enableBasePromptRule}
                         onChange={setEnableBasePromptRule}
                         helpText="Verify if agent requests match the intent of the base prompt. The base prompt is automatically detected from traffic, and user inputs filling placeholders like {var} or {} are checked against this intent."
