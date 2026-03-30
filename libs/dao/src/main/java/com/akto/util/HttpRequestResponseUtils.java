@@ -19,8 +19,6 @@ import java.util.*;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.transform.OutputKeys;
-import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
@@ -55,6 +53,119 @@ public class HttpRequestResponseUtils {
     public static final String HEADER_ACCEPT = "accept";
     public static final String APPLICATION_JSON = "application/json";
     public static final String MULTIPART_FORM_DATA_CONTENT_TYPE = "multipart/form-data";
+
+    /**
+     * Response content-type prefixes that indicate non-API traffic.
+     * These responses (images, fonts, stylesheets, scripts, HTML pages)
+     * are not useful for API discovery and can be skipped early
+     * to avoid expensive JSON parsing of large payloads.
+     */
+    private static final String[] NON_API_CONTENT_TYPES = {
+        "text/html",
+        "text/css",
+        "text/javascript",
+        "image/",
+        "font/",
+        "application/javascript",
+        "application/x-javascript",
+        "application/octet-stream",
+        "application/pdf",
+        "application/x-font",
+        "audio/",
+        "video/",
+    };
+
+    /**
+     * Lightweight check on the raw Kafka message string to detect non-API
+     * response content-types WITHOUT doing a full JSON parse.
+     *
+     * The raw message format has responseHeaders as an escaped JSON string:
+     *   "responseHeaders":"{\"Content-Type\":\"image/png\",...}"
+     *
+     * We search for the Content-Type value within that escaped structure.
+     *
+     * @param rawMessage the raw Kafka message string
+     * @return true if the response content-type is a non-API type that should be skipped
+     */
+    public static boolean isNonApiContentType(String rawMessage) {
+        if (rawMessage == null || rawMessage.isEmpty()) {
+            return false;
+        }
+
+        /*
+         * Find Content-Type value in responseHeaders.
+         * In the raw message, responseHeaders is a JSON string with escaped quotes,
+         * so the pattern looks like: Content-Type\":\"image/png\"
+         * We search for this pattern to extract the content-type value.
+         */
+        String marker = "responseHeaders";
+        int rhStart = rawMessage.indexOf(marker);
+        if (rhStart == -1) {
+            return false;
+        }
+
+        /*
+         * Limit search to responseHeaders section only.
+         * responseHeaders value is a JSON string ending with }"
+         * Find closing boundary to avoid scanning into responsePayload (which can be 700KB+).
+         */
+        int searchStart = rhStart + marker.length();
+        int searchEnd = rawMessage.indexOf("responsePayload", searchStart);
+        if (searchEnd == -1) {
+            searchEnd = Math.min(searchStart + 2048, rawMessage.length());
+        }
+        String headerSection = rawMessage.substring(rhStart, searchEnd);
+
+        // Look for Content-Type in the escaped JSON: Content-Type\":\"<value>
+        // Handle both cases: Content-Type and content-type
+        String ctValue = extractContentTypeFromHeaderSection(headerSection);
+        if (ctValue == null || ctValue.isEmpty()) {
+            return false;
+        }
+
+        String ctLower = ctValue.toLowerCase();
+        for (String nonApiType : NON_API_CONTENT_TYPES) {
+            if (ctLower.startsWith(nonApiType)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String extractContentTypeFromHeaderSection(String section) {
+        String lower = section.toLowerCase();
+        int idx = lower.indexOf("content-type");
+        if (idx == -1) return null;
+
+        int pos = idx + "content-type".length();
+
+        // Skip separators
+        while (pos < section.length()) {
+            char c = section.charAt(pos);
+            if (c == ':' || c == '"' || c == '\\' || c == ' ') {
+                pos++;
+            } else {
+                break;
+            }
+        }
+
+        if (pos >= section.length()) return null;
+
+        int start = pos;
+
+        // Read value
+        while (pos < section.length()) {
+            char c = section.charAt(pos);
+            if (c == '"' || c == '\\' || c == ';') break;
+            pos++;
+        }
+
+        if (pos <= start) return null;
+
+        String value = section.substring(start, pos).trim();
+
+        return value.contains("/") ? value : null;
+    }
 
     public static Map<String, Set<Object>> extractValuesFromPayload(String body) {
         if (body == null) return new HashMap<>();

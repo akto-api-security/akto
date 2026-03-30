@@ -35,6 +35,7 @@ import com.akto.runtime.utils.Utils;
 import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.usage.OrgUtils;
 import com.akto.util.DashboardMode;
+import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
 
 import org.apache.commons.lang3.StringUtils;
@@ -68,7 +69,7 @@ public class Main {
     public static final String kafkaPassword = KafkaConfig.getKafkaPassword();
     public static final boolean isSendToThreatEnabled = System.getenv("SEND_TO_THREAT_ENABLED") != null && System.getenv("SEND_TO_THREAT_ENABLED").equalsIgnoreCase("true");
 
-    private static int debugPrintCounter = 500;
+    private static int debugPrintCounter = 20;
     private static void printL(Object o) {
         if (debugPrintCounter > 0) {
             debugPrintCounter--;
@@ -80,6 +81,8 @@ public class Main {
     static long lastLogSyncOffsetMRS;
     static boolean syncImmediately = false;
     static boolean fetchAllSTI = true;
+    private static final String NON_API_FILTER_ORG_ID = "2651c8f0-cf6b-416a-a304-b8d8adc573d7";
+    static boolean isNonApiContentTypeFilterEnabled = false;
     static Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
 
     static boolean isDashboardInstance = false;
@@ -329,6 +332,12 @@ public class Main {
         int accountId = aSettings.getId();
         Context.setActualAccountId(accountId);
         loggerMaker.infoAndAddToDb("Fetched account settings for account " + Context.getActualAccountId());
+        try {
+            Organization organization = OrgUtils.getOrganizationCached(accountId);
+            isNonApiContentTypeFilterEnabled = organization != null && NON_API_FILTER_ORG_ID.equals(organization.getId());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error initializing isNonApiContentTypeFilterEnabled: " + e.getMessage());
+        }
 
         if (Context.getActualAccountId() == 1759692400) {
             maxPollRecordsConfigTemp = 5000;
@@ -734,7 +743,7 @@ public class Main {
         }
     }
 
-    private static int LOG_DEBUG_RECORDS = 100; 
+    private static int LOG_DEBUG_RECORDS = 10; 
     private static long bulkParseTrafficToResponseParams(long lastSyncOffset, ConsumerRecords<String, String> records,
             Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
         for (ConsumerRecord<String,String> r: records) {
@@ -765,7 +774,11 @@ public class Main {
                 if (Context.getActualAccountId() != 1759692400 && tryForCollectionName(r.value())) {
                     continue;
                 }
-                
+
+                if (isNonApiContentTypeFilterEnabled && HttpRequestResponseUtils.isNonApiContentType(r.value())) {
+                    continue;
+                }
+
                 httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                 if (httpResponseParams == null) {
                     loggerMaker.error("HttpResponse params was skipped due to invalid json requestBody");
@@ -775,7 +788,9 @@ public class Main {
                 if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) {
                     continue;
                 }
-
+                if(Utils.printDebugHostLog(httpResponseParams) != null){
+                    Utils.printDebugHostLog("Post processing sample message from kafka: " + httpResponseParams.getOrig());
+                }
                 if (Context.getActualAccountId() == 1759692400) {
                     String debugHeader = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "x-debug-trace");
                     if (debugHeader != null && !debugHeader.isEmpty()) {
@@ -785,15 +800,6 @@ public class Main {
                                 + " statusCode: " + httpResponseParams.getStatusCode());
                     }
                 }
-                
-                HttpRequestParams requestParams = httpResponseParams.getRequestParams();
-                String debugHost = Utils.printDebugHostLog(httpResponseParams);
-                // if (debugHost != null) {
-                //     loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
-                // }
-                // if (Utils.printDebugUrlLog(requestParams.getURL())) {
-                //     loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
-                // }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message: " + r.value() + e);
                 continue;
@@ -984,6 +990,9 @@ public class Main {
 
                     if (Utils.printDebugUrlLog(accWiseResponseEntry.getRequestParams().getURL())) {
                         loggerMaker.infoAndAddToDb("Found debug url in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
+                    }
+                    if(Utils.printDebugHostLog(accWiseResponseEntry) != null){
+                        Utils.printDebugHostLog(" in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
                     }
                 }
                 accWiseResponse = accWiseResponseFiltered;
