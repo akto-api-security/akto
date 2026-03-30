@@ -10,7 +10,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.upload.SwaggerUploadLog;
+import com.akto.dto.AccountConfig;
 import com.akto.open_api.parser.Parser;
 import com.akto.open_api.parser.ParserResult;
 import com.akto.parsers.HttpCallParser;
@@ -377,6 +379,14 @@ public class DbAction extends ActionSupport {
     @Setter
     private String awsAccountIds;
 
+    @Getter
+    @Setter
+    private String awsAccountId;
+
+    @Getter
+    @Setter
+    private List<Map<String, Object>> accountMappings;
+
     public String fetchAwsAccountIdsForApiGatewayLogging() {
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
@@ -722,9 +732,9 @@ public class DbAction extends ActionSupport {
                         }
 
                         // Filter out ignored headers
-                        // if (isHeader && param != null && com.akto.util.filter.HeaderFilter.shouldIgnoreHeader(param)) {
-                        //     ignore = true;
-                        // }
+                        if (isHeader && param != null && com.akto.util.filter.HeaderFilter.shouldIgnoreHeader(param)) {
+                            ignore = true;
+                        }
 
                         // Filter for account 1759386565: ignore template URLs
                         if (accId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID && url != null && APICatalog.isStringTemplateUrl(url)) {
@@ -3828,6 +3838,110 @@ public class DbAction extends ActionSupport {
         }
     }
 
+    public String insertAwsAccountId() {
+        try {
+            int accountId = Context.accountId.get();
+
+            // Find the org this account belongs to
+            Organization org = OrganizationsDao.instance.findOneByAccountId(accountId);
+            if (org == null) {
+                addActionError("Organization not found for accountId: " + accountId);
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Admin account = smallest ID in org.accounts (oldest = admin)
+            int adminAccountId = org.getAccounts().stream()
+                    .mapToInt(Integer::intValue)
+                    .min()
+                    .orElse(accountId);
+
+            long currentTime = Context.now();
+            String accountTypeValue = AccountConfig.AccountType.AWS_ACCOUNTS.getValue();
+            String docId = org.getId() + "_" + accountTypeValue;
+
+            String accountKey = String.valueOf(accountId);
+            String awsAccountIdsPath = AccountConfig.ACCOUNTS + "." + accountKey + "." + AccountConfig.AWS_ACCOUNT_IDS;
+            String lastUpdatedPath = AccountConfig.ACCOUNTS + "." + accountKey + "." + AccountConfig.LAST_UPDATED_TIMESTAMP;
+            String createdPath = AccountConfig.ACCOUNTS + "." + accountKey + "." + AccountConfig.CREATED_TIMESTAMP;
+
+            // Use addToSet to append to array instead of overwriting
+            // Prevents duplicates automatically
+            // Note: updateOne() automatically upserts by default
+            AccountConfigDao.instance.updateOne(
+                Filters.eq(AccountConfig.ID, docId),
+                Updates.combine(
+                    Updates.setOnInsert(AccountConfig.ID, docId),
+                    Updates.setOnInsert(AccountConfig.ORG_ID, org.getId()),
+                    Updates.setOnInsert(AccountConfig.TYPE_FIELD, accountTypeValue),
+                    Updates.setOnInsert(AccountConfig.ADMIN_EMAIL, org.getAdminEmail()),
+                    Updates.setOnInsert(AccountConfig.ADMIN_ACCOUNT_ID, adminAccountId),
+                    Updates.setOnInsert(createdPath, currentTime),
+                    Updates.addToSet(awsAccountIdsPath, awsAccountId),  // Append to array, no duplicates
+                    Updates.set(lastUpdatedPath, currentTime)
+                )
+            );
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertAwsAccountId: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchAwsAccountIdMappings() {
+        try {
+            int accountId = Context.accountId.get();
+
+            // Find the org this account belongs to
+            Organization org = OrganizationsDao.instance.findOneByAccountId(accountId);
+            if (org == null) {
+                addActionError("Organization not found for accountId: " + accountId);
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Fetch the AWS account config for this org
+            String accountTypeValue = AccountConfig.AccountType.AWS_ACCOUNTS.getValue();
+            AccountConfig accountConfig = AccountConfigDao.instance.findByOrgIdAndType(org.getId(), accountTypeValue);
+            if (accountConfig == null || accountConfig.getAccounts() == null) {
+                accountMappings = new ArrayList<>();
+                return Action.SUCCESS.toUpperCase();
+            }
+
+            // Build response list from accounts map
+            accountMappings = new ArrayList<>();
+            for (Map.Entry<String, Object> entry : accountConfig.getAccounts().entrySet()) {
+                String aktoAccountIdStr = entry.getKey();
+                Object accountConfigObj = entry.getValue();
+
+                if (accountConfigObj instanceof Map) {
+                    Map<String, Object> configMap = (Map<String, Object>) accountConfigObj;
+                    int aktoId = Integer.parseInt(aktoAccountIdStr);
+
+                    // Read awsAccountIds array
+                    Object awsAccountIdsObj = configMap.get(AccountConfig.AWS_ACCOUNT_IDS);
+                    if (awsAccountIdsObj instanceof java.util.List) {
+                        @SuppressWarnings("unchecked")
+                        java.util.List<String> awsAccountIds = (java.util.List<String>) awsAccountIdsObj;
+                        for (String awsId : awsAccountIds) {
+                            if (awsId != null && !awsId.isEmpty()) {
+                                Map<String, Object> mapping = new HashMap<>();
+                                mapping.put("aktoAccountId", aktoId);
+                                mapping.put("awsAccountId", awsId);
+                                mapping.put("type", accountTypeValue);
+                                accountMappings.add(mapping);
+                            }
+                        }
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchAwsAccountIdMappings: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -5021,7 +5135,7 @@ public class DbAction extends ActionSupport {
         }
 
         loggerMaker.infoAndAddToDb("Starting import of OpenAPI spec for accountId=" + accountId);
-        loggerMaker.infoAndAddToDb("OpenAPI spec: " + openApiSchema);
+        loggerMaker.infoAndAddToDb("OpenAPI spec: " + openApiSchema, LogDb.CYBORG);
 
         // Submit task to a separate executor with timeout
         new Thread(new Runnable() {
