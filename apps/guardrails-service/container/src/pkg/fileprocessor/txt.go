@@ -12,8 +12,18 @@ type TxtProcessor struct{}
 
 func (TxtProcessor) SupportedExtensions() []string {
 	return []string{
-		".txt", ".md", ".csv", ".tsv", ".json",
-		".xml", ".yaml", ".yml", ".log", ".cfg", ".ini",
+		// Plain text & config
+		".txt", ".md", ".csv", ".tsv", ".log", ".cfg", ".ini", ".env", ".toml", ".properties",
+		// Data formats
+		".json", ".xml", ".yaml", ".yml", ".jsonl", ".ndjson",
+		// Source code
+		".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rb", ".php",
+		".c", ".cpp", ".h", ".hpp", ".cs", ".rs", ".swift", ".kt", ".scala",
+		".sh", ".bash", ".zsh", ".ps1", ".bat", ".cmd",
+		// Web
+		".css", ".scss", ".less", ".graphql", ".gql", ".sql",
+		// Misc
+		".r", ".m", ".tex", ".rst", ".diff", ".patch",
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
 	"github.com/gin-gonic/gin"
@@ -382,7 +383,10 @@ func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload, cont
 				return &chunkResult{Err: ctx.Err()}
 			}
 		}
-		result, err := h.validatorService.ValidateRequest(ctx, payload, contextSource, "", "")
+		result, err := h.validatorService.ValidateRequest(ctx, &models.ValidateRequestParams{
+			RequestPayload: payload,
+			ContextSource:  contextSource,
+		}, "", "")
 		if err != nil {
 			lastErr = err
 			continue
