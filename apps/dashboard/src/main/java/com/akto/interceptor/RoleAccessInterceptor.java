@@ -102,19 +102,15 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
     /**
      * Get the list of product scopes that the user has access to.
      * Extracts keys from scopeRoleMapping if available, otherwise defaults to API scope.
+     * Uses cached RBAC entry for performance.
      * @param userId the user ID
      * @param accountId the account ID
      * @return list of product scopes (e.g., ["API", "MCP", "AGENTIC"])
      */
     private List<String> getUserProductScopes(int userId, int accountId) {
         try {
-            RBAC rbac = RBACDao.instance.findOne(
-                Filters.and(
-                    Filters.eq(RBAC.USER_ID, userId),
-                    Filters.eq(RBAC.ACCOUNT_ID, accountId)
-                ),
-                Projections.include(RBAC.SCOPE_ROLE_MAPPING)
-            );
+            // Use cached RBAC entry for performance (15-minute cache)
+            RBAC rbac = RBACDao.getCurrentRBACForUser(userId, accountId);
 
             if (rbac == null) {
                 loggerMaker.debug("RBAC entry not found for userId: " + userId + ", accountId: " + accountId
@@ -192,21 +188,19 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             // Check if user has access to the current product scope (context source)
             CONTEXT_SOURCE contextSource = Context.contextSource.get();
             logger.debug("DEBUG RoleAccessInterceptor: Context.contextSource.get() returned: " + contextSource);
-            if (contextSource == null) {
-                logger.debug("DEBUG RoleAccessInterceptor: contextSource is null, defaulting to API");
-                contextSource = CONTEXT_SOURCE.API;  // Default to API
-            }
 
-            // Get RBAC entry to retrieve scope-specific role using new n:n mapping
-            RBAC rbac = RBACDao.instance.findOne(
-                Filters.and(
-                    Filters.eq(RBAC.USER_ID, userId),
-                    Filters.eq(RBAC.ACCOUNT_ID, sessionAccId)
-                )
-            );
+            // Get RBAC entry using cache to support scope-specific role retrieval (n:n mapping)
+            // This uses RBACDao.getCurrentRBACForUser() which caches the RBAC entry with 15-minute expiry
+            RBAC rbac = RBACDao.getCurrentRBACForUser(userId, sessionAccId);
 
             if (rbac == null) {
                 throw new Exception("User RBAC entry not found for userId: " + userId + ", accountId: " + sessionAccId);
+            }
+
+            // If no context source is set, default to API
+            if (contextSource == null) {
+                contextSource = CONTEXT_SOURCE.API;
+                logger.debug("DEBUG RoleAccessInterceptor: contextSource was null, defaulting to API");
             }
 
             // Get the role for the specific product scope (new n:n mapping approach)
