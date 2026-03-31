@@ -6,11 +6,15 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 
 public class Gateway {
 
     private static final Logger logger = LogManager.getLogger(Gateway.class);
+    private static final ExecutorService guardrailsExecutor = Executors.newFixedThreadPool(20);
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
@@ -49,23 +53,40 @@ public class Gateway {
             String guardrails = getStringField(requestData, "guardrails");
             if ("true".equalsIgnoreCase(guardrails)) {
                 long guardrailsStart = System.currentTimeMillis();
-                logger.info("Calling guardrails /validate/request, contextSource: {}", validateParams.get("contextSource"));
-                Map<String, Object> guardrailsResult = guardrailsClient.callValidateRequest(validateParams);
-                logger.info("Guardrails request validation completed - path: {}, allowed: {}, latencyMs: {}",
-                    requestData.get("path"), guardrailsResult != null ? guardrailsResult.get("allowed") : "null",
-                    System.currentTimeMillis() - guardrailsStart);
-                result.put("guardrailsResult", guardrailsResult);
+                String contextSource = (String) validateParams.get("contextSource");
+
+                CompletableFuture<Map<String, Object>> requestFuture = CompletableFuture
+                    .supplyAsync(() -> guardrailsClient.callValidateRequest(validateParams), guardrailsExecutor)
+                    .exceptionally(e -> {
+                        logger.error("validate/request failed - path: {}, error: {}", requestData.get("path"), e.getMessage(), e);
+                        return buildErrorResult(e.getMessage());
+                    });
 
                 String responsePayload = getStringField(requestData, "responsePayload");
+                CompletableFuture<Map<String, Object>> responseFuture = null;
                 if (responsePayload != null && !responsePayload.isEmpty()) {
-                    long guardrailsResponseStart = System.currentTimeMillis();
-                    logger.info("Calling guardrails /validate/response, contextSource: {}", validateParams.get("contextSource"));
-                    Map<String, Object> guardrailsResponseResult = guardrailsClient.callValidateResponse(validateParams);
-                    logger.info("Guardrails response validation completed - path: {}, allowed: {}, latencyMs: {}",
-                        requestData.get("path"), guardrailsResponseResult != null ? guardrailsResponseResult.get("allowed") : "null",
-                        System.currentTimeMillis() - guardrailsResponseStart);
-                    result.put("guardrailsResponseResult", guardrailsResponseResult);
+                    responseFuture = CompletableFuture
+                        .supplyAsync(() -> guardrailsClient.callValidateResponse(validateParams), guardrailsExecutor)
+                        .exceptionally(e -> {
+                            logger.error("validate/response failed - path: {}, error: {}", requestData.get("path"), e.getMessage(), e);
+                            return buildErrorResult(e.getMessage());
+                        });
                 }
+
+                if (responseFuture != null) {
+                    CompletableFuture.allOf(requestFuture, responseFuture).join();
+                    result.put("guardrailsResponseResult", responseFuture.join());
+                } else {
+                    requestFuture.join();
+                }
+
+                Map<String, Object> guardrailsResult = requestFuture.join();
+                logger.info("Guardrails validation completed - path: {}, contextSource: {}, requestAllowed: {}, responseAllowed: {}, latencyMs: {}",
+                    requestData.get("path"), contextSource,
+                    guardrailsResult != null ? guardrailsResult.get("allowed") : "null",
+                    responseFuture != null ? result.get("guardrailsResponseResult") != null ? ((Map<?, ?>) result.get("guardrailsResponseResult")).get("allowed") : "null" : "skipped",
+                    System.currentTimeMillis() - guardrailsStart);
+                result.put("guardrailsResult", guardrailsResult);
             }
 
             String ingestData = getStringField(requestData, "ingest_data");
@@ -91,6 +112,14 @@ public class Gateway {
             error.put("error", e.getMessage());
             return error;
         }
+    }
+
+    private Map<String, Object> buildErrorResult(String errorMessage) {
+        Map<String, Object> error = new HashMap<>();
+        error.put("allowed", false);
+        error.put("modified", false);
+        error.put("reason", "Guardrails validation failed: " + errorMessage);
+        return error;
     }
 
     private Map<String, Object> buildValidateParams(Map<String, Object> requestData) {
