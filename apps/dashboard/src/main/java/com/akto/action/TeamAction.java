@@ -313,19 +313,39 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
 
             String defaultRole = RBAC.Role.MEMBER.name();
             if (UsageMetricCalculator.isRbacFeatureAvailable(Context.accountId.get())) {
-                defaultRole = Utils.fetchDefaultInviteRole(Context.accountId.get(), RBAC.Role.GUEST.name());
+                defaultRole = Utils.fetchDefaultInviteRole(Context.accountId.get(), Role.NO_ACCESS.name());
             }
             this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, defaultRole);
         }
         loggerMaker.debugAndAddToDb("scopeRoleMapping after init: " + scopeRoleMapping);
 
         // Validate that all scopes in scopeRoleMappingToSave are valid product scopes
+        // Allow NO_ACCESS assignments for any scope (NO_ACCESS is explicit deny, not a privilege)
         if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
-            for (String scope : scopeRoleMapping.keySet()) {
-                if (!isValidProductScope(scope)) {
-                    addActionError(INVALID_PRODUCT_SCOPE + scope);
-                    loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
-                    return Action.ERROR.toUpperCase();
+            for (Map.Entry<String, String> entry : scopeRoleMapping.entrySet()) {
+                String scope = entry.getKey();
+                String roleStr = entry.getValue();
+
+                // Allow NO_ACCESS assignments for any scope (NO_ACCESS is explicit deny, not a privilege)
+                // Only validate scope accessibility for actual role assignments (non-NO_ACCESS)
+                try {
+                    Role baseRole = RBAC.Role.valueOf(roleStr);
+                    if (!baseRole.equals(RBAC.Role.NO_ACCESS) && !isValidProductScope(scope)) {
+                        addActionError(INVALID_PRODUCT_SCOPE + scope);
+                        loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
+                        return Action.ERROR.toUpperCase();
+                    }
+                } catch (IllegalArgumentException e) {
+                    // roleStr is not a standard role, check if it's a custom role
+                    CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
+                    if (customRole != null) {
+                        Role baseRole = RBAC.Role.valueOf(customRole.getBaseRole());
+                        if (!baseRole.equals(RBAC.Role.NO_ACCESS) && !isValidProductScope(scope)) {
+                            addActionError(INVALID_PRODUCT_SCOPE + scope);
+                            loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
+                            return Action.ERROR.toUpperCase();
+                        }
+                    }
                 }
             }
         }

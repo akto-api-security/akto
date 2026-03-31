@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import org.apache.struts2.ServletActionContext;
 
 public class RoleAccessInterceptor extends AbstractInterceptor {
@@ -253,6 +254,8 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             }
 
             if(!hasRequiredAccess && userRole.equals("NO ACCESS")){
+                HttpServletResponse response = (HttpServletResponse) ServletActionContext.getResponse();
+                response.setHeader("X-No-Access-Error", "true");
                 ((ActionSupport) invocation.getAction()).addActionError("You do not have access to this product. Please ask Admin to grant access or navigate to accessible product");
                 return FORBIDDEN;
             }

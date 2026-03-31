@@ -163,7 +163,11 @@ const Users = () => {
             {
                 content: 'Member',
                 role: 'MEMBER',
-            }, ...paidFeatureRoleOptions]
+            }, ...paidFeatureRoleOptions,
+            {
+                content: 'No Access',
+                role: 'NO_ACCESS',
+            }]
         },
         {
             items: [

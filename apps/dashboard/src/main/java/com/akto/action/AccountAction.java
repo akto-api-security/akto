@@ -53,6 +53,7 @@ import com.opensymphony.xwork2.Action;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -288,6 +289,33 @@ public class AccountAction extends UserAction {
         getSession().put("user", user);
         getSession().put("accountId", newAccountId);
         return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Overloaded version that accepts scopeRoleMapping instead of a single role.
+     * Used when creating new users without explicit invitation (signup flow).
+     * This ensures only scopeRoleMapping is set, not the old role field.
+     */
+    public static User initializeAccount(String email, int newAccountId, String newAccountName, boolean isNew, Map<String, String> scopeRoleMapping) {
+        User user = UsersDao.addAccount(email, newAccountId, newAccountName);
+        RBAC rbacEntry = new RBAC(user.getId(), null, newAccountId);  // Don't set old role field
+        if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
+            // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
+            scopeRoleMapping = RBAC.ensureCompleteScopeRoleMapping(scopeRoleMapping);
+            rbacEntry.setScopeRoleMapping(scopeRoleMapping);
+        }
+        RBACDao.instance.insertOne(rbacEntry);
+        Context.accountId.set(newAccountId);
+        try {
+            loggerMaker.debugAndAddToDb("Updated dashboard version");
+            AccountSettingsDao.instance.updateVersion(DASHBOARD_VERSION);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e,"Error while updating account version", LogDb.DASHBOARD);
+        }
+
+        loggerMaker.debugAndAddToDb("isNew " + isNew);
+        if (isNew) intializeCollectionsForTheAccount(newAccountId);
+        return user;
     }
 
     public static User initializeAccount(String email, int newAccountId, String newAccountName, boolean isNew, String role) {

@@ -215,16 +215,17 @@ public class InviteUserAction extends UserAction{
                 String scope = entry.getKey();
                 String roleStr = entry.getValue();
 
-                // Validate product scope is one of the allowed values
-                if (!isValidProductScope(scope)) {
-                    addActionError(INVALID_PRODUCT_SCOPE + scope);
-                    loggerMaker.errorAndAddToDb("Invalid product scope attempted: " + scope + " for user invitation");
-                    return ERROR.toUpperCase();
-                }
-
                 Role baseRole = validateAndGetBaseRole(roleStr);
 
                 if (baseRole == null) {
+                    return ERROR.toUpperCase();
+                }
+
+                // Allow NO_ACCESS assignments for any scope (NO_ACCESS is explicit deny, not a privilege)
+                // Only validate scope accessibility for actual role assignments (non-NO_ACCESS)
+                if (!baseRole.equals(Role.NO_ACCESS) && !isValidProductScope(scope)) {
+                    addActionError(INVALID_PRODUCT_SCOPE + scope);
+                    loggerMaker.errorAndAddToDb("Invalid product scope attempted: " + scope + " for user invitation");
                     return ERROR.toUpperCase();
                 }
 

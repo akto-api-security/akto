@@ -57,7 +57,9 @@ function Dashboard() {
 
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
     const [eventForUser, setEventForUser] = useState({})
-    
+    const [showNoAccessAlert, setShowNoAccessAlert] = useState(false)
+    const [noAccessMessage, setNoAccessMessage] = useState("")
+
     const sendEventOnLogin = LocalStore(state => state.sendEventOnLogin)
     const setSendEventOnLogin = LocalStore(state => state.setSendEventOnLogin)
     const fetchAllCollections = async () => {
@@ -96,6 +98,18 @@ function Dashboard() {
             updateThreatFiltersStore(res?.templates || [])
         })
     }
+
+    // Monitor NO_ACCESS alert flag
+    useEffect(() => {
+        const checkInterval = setInterval(() => {
+            if (window.SHOW_NO_ACCESS_ALERT) {
+                setShowNoAccessAlert(true);
+                setNoAccessMessage(window.NO_ACCESS_ALERT_MESSAGE || "");
+            }
+        }, 100);
+
+        return () => clearInterval(checkInterval);
+    }, []);
 
     /**
      * Auto-detect user's accessible product scopes based on RBAC scope-role mapping.
@@ -250,6 +264,43 @@ function Dashboard() {
 
     return (
         <div className={`dashboard ${isAskAiRoute ? 'ask-ai-route' : ''}`}>
+        {showNoAccessAlert && (
+            <div style={{
+                position: "fixed",
+                top: "120px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                backgroundColor: "#FED7D7",
+                border: "1px solid #FC8181",
+                borderRadius: "4px",
+                padding: "10px 16px",
+                paddingRight: "40px",
+                zIndex: 1000,
+                maxWidth: "600px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
+            }}>
+                <button onClick={() => {
+                    setShowNoAccessAlert(false);
+                    window.SHOW_NO_ACCESS_ALERT = false;
+                }} style={{
+                    position: "absolute",
+                    top: "8px",
+                    right: "8px",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "20px",
+                    color: "#AE191C",
+                    padding: "0",
+                    width: "24px",
+                    height: "24px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                }}>×</button>
+                <Text variant="bodyMd" color="critical">{noAccessMessage}</Text>
+            </div>
+        )}
         <Frame>
             <Outlet />
             {shouldShowWelcomeBackModal && <WelcomeBackDetailsModal isAdmin={window.USER_ROLE === 'ADMIN'} />}
