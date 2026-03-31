@@ -122,6 +122,16 @@ public class TestTemplateUtils {
             TestCategory.AGENTIC_SECURITY_INFRASTRUCTURE,
             TestCategory.AGENTIC_SECURITY_DATA_EXPOSURE,
             TestCategory.AGENTIC_SECURITY_CODE_EXECUTION,
+            TestCategory.AGENT_GOAL_HIJACK,
+            TestCategory.TOOL_MISUSE_AND_EXPLOITATION,
+            TestCategory.IDENTITY_AND_PRIVILEGE_ABUSE,
+            TestCategory.AGENTIC_SUPPLY_CHAIN,
+            TestCategory.UNEXPECTED_CODE_EXECUTION,
+            TestCategory.MEMORY_AND_CONTEXT_POISONING,
+            TestCategory.INSECURE_INTER_AGENT_COMMUNICATION,
+            TestCategory.CASCADING_FAILURES,
+            TestCategory.HUMAN_AGENT_TRUST_EXPLOITATION,
+            TestCategory.ROGUE_AGENTS,
         };
 
         switch (contextSource) {
