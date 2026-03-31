@@ -66,6 +66,8 @@ public class LoggerMaker  {
 
     protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
 
+    private static final boolean shouldNotSendLogs = System.getenv("BLOCK_LOGS") != null && System.getenv("BLOCK_LOGS").equals("true");
+
     static {
         scheduler.scheduleAtFixedRate(new Runnable() {
 
@@ -266,6 +268,11 @@ public class LoggerMaker  {
     }
     
     private void insert(String info, String key, LogDb db) {
+        
+        if(shouldNotSendLogs || (accountSettings != null && accountSettings.isBlockLogs())) {
+            return;
+        }
+
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
         if(checkUpdate() && db!=null){
