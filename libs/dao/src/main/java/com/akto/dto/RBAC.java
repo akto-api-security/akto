@@ -55,7 +55,8 @@ public class RBAC {
         DEVELOPER("DEVELOPER", new DeveloperRoleStrategy()),
         GUEST("GUEST", new GuestRoleStrategy()),
         THREAT_ENGINEER("THREAT ENGINEER", new ThreatEngineerRoleStrategy()),
-        THREAT_VIEWER("THREAT VIEWER", new ThreatViewerRoleStrategy());
+        THREAT_VIEWER("THREAT VIEWER", new ThreatViewerRoleStrategy()),
+        NO_ACCESS("NO ACCESS", new NoAccessRoleStrategy());
 
         private final RoleStrategy roleStrategy;
         private String name;
@@ -141,6 +142,57 @@ public class RBAC {
 
     public void setApiCollectionsId(List<Integer> apiCollectionsId) {
         this.apiCollectionsId = apiCollectionsId;
+    }
+
+    /**
+     * Initializes default scope-role mapping if empty.
+     * If scopeRoleMapping is null or empty, creates a new HashMap with API scope mapped to the provided default role.
+     * Otherwise, returns the existing scopeRoleMapping unchanged.
+     *
+     * @param scopeRoleMapping the current scope-role mapping (may be null/empty)
+     * @param defaultRole the default role to use for API scope if mapping is empty
+     * @return the initialized or existing scopeRoleMapping
+     */
+    public static Map<String, String> initializeScopeRoleMapping(Map<String, String> scopeRoleMapping, String defaultRole) {
+        if (scopeRoleMapping == null || scopeRoleMapping.isEmpty()) {
+            Map<String, String> initialized = new HashMap<>();
+            initialized.put("API", defaultRole);
+            return initialized;
+        }
+        return scopeRoleMapping;
+    }
+
+    /**
+     * Ensures all product scopes are present in the mapping with NO_ACCESS as default.
+     * For any scope not explicitly mapped, assigns NO_ACCESS role.
+     * This enforces strict access control - users only get access to explicitly assigned scopes.
+     *
+     * Valid scopes: API, MCP (future), AGENTIC, ENDPOINT, DAST
+     *
+     * @param scopeRoleMapping the current partial or complete scope-role mapping
+     * @return the complete scope-role mapping with all scopes included (unmapped = NO_ACCESS)
+     */
+    public static Map<String, String> ensureCompleteScopeRoleMapping(Map<String, String> scopeRoleMapping) {
+        Map<String, String> completedMapping = new HashMap<>();
+
+        // Define all valid product scopes
+        List<String> allScopes = Arrays.asList("API", "AGENTIC", "ENDPOINT", "DAST");
+
+        if (scopeRoleMapping == null) {
+            scopeRoleMapping = new HashMap<>();
+        }
+
+        // Add all provided scopes
+        completedMapping.putAll(scopeRoleMapping);
+
+        // Fill in missing scopes with NO_ACCESS
+        for (String scope : allScopes) {
+            if (!completedMapping.containsKey(scope)) {
+                completedMapping.put(scope, Role.NO_ACCESS.name());
+            }
+        }
+
+        return completedMapping;
     }
 
     /**

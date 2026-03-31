@@ -6,15 +6,11 @@ import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.Config;
-import com.akto.dto.CustomRole;
-import com.akto.dto.PendingInviteCode;
+import com.akto.dto.*;
 import com.akto.dto.RBAC.Role;
-import com.akto.dto.SignupInfo;
-import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
 import com.akto.utils.Utils;
@@ -46,11 +42,60 @@ public class InviteUserAction extends UserAction{
     public static final String DIFFERENT_ORG_EMAIL_ERROR = "Email must belong to same organisation";
     public static final String NOT_ALLOWED_TO_INVITE = "you're not authorised to invite for this role";
     public static final String AKTO_DOMAIN = "akto.io";
+    public static final String INVALID_PRODUCT_SCOPE = "Invalid product scope: user account does not have access to this scope";
 
     public static Map<String, String> commonOrganisationsMap = new HashMap<>();
     private static final ExecutorService executor = Executors.newFixedThreadPool(1);
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+
+    /**
+     * Validates that a product scope is accessible for the current account.
+     * Based on STIGG feature grants for the account.
+     *
+     * @param scope the scope to validate
+     * @return true if scope is accessible, false otherwise
+     */
+    private boolean isValidProductScope(String scope) {
+        if (scope == null || scope.isEmpty()) {
+            return false;
+        }
+        Set<String> accessibleScopes = UsageMetricCalculator.getAccessibleProductScopes(Context.accountId.get());
+        return accessibleScopes.contains(scope);
+    }
+
+    /**
+     * Validates a role string and returns its base role.
+     * Handles both standard roles (ADMIN, MEMBER) and custom roles.
+     *
+     * @param roleStr the role string to validate
+     * @return the base Role if valid, null if invalid
+     */
+    private Role validateAndGetBaseRole(String roleStr) {
+        Role baseRole = null;
+        CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
+
+        try {
+            if (customRole != null) {
+                baseRole = Role.valueOf(customRole.getBaseRole());
+            } else {
+                baseRole = Role.valueOf(roleStr);
+            }
+        } catch (Exception e) {
+            addActionError("Invalid role: " + roleStr);
+            return null;
+        }
+
+        // Get current user's role for hierarchy validation
+        Role currentUserRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
+
+        if (!Arrays.asList(currentUserRole.getRoleHierarchy()).contains(baseRole)) {
+            addActionError("User not allowed to invite for role: " + roleStr);
+            return null;
+        }
+
+        return baseRole;
+    }
 
     static {
         commonOrganisationsMap.put("blinkhealth.com", "blinkhealth.com");
@@ -159,7 +204,7 @@ public class InviteUserAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
-        Role adminUserRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
+        Role userRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
 
         // Validate scopeRoleMapping if provided, otherwise fall back to old fields for backward compatibility
         Map<String, String> scopeRoleToSave = new HashMap<>();
@@ -167,61 +212,49 @@ public class InviteUserAction extends UserAction{
         if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
             // New n:n mapping approach
             for (Map.Entry<String, String> entry : this.scopeRoleMapping.entrySet()) {
+                String scope = entry.getKey();
                 String roleStr = entry.getValue();
-                Role baseRole = null;
 
-                CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
-
-                try {
-                    if (customRole != null) {
-                        baseRole = Role.valueOf(customRole.getBaseRole());
-                    } else {
-                        baseRole = Role.valueOf(roleStr);
-                    }
-                } catch (Exception e) {
-                    addActionError("Invalid role: " + roleStr);
+                // Validate product scope is one of the allowed values
+                if (!isValidProductScope(scope)) {
+                    addActionError(INVALID_PRODUCT_SCOPE + scope);
+                    loggerMaker.errorAndAddToDb("Invalid product scope attempted: " + scope + " for user invitation");
                     return ERROR.toUpperCase();
                 }
 
-                if (!Arrays.asList(adminUserRole.getRoleHierarchy()).contains(baseRole)) {
-                    addActionError("User not allowed to invite for role: " + roleStr);
+                Role baseRole = validateAndGetBaseRole(roleStr);
+
+                if (baseRole == null) {
                     return ERROR.toUpperCase();
                 }
 
                 // Save the role name (custom or standard) to scopeRoleMapping.
                 // Custom roles will be resolved to their baseRole at access time via RBAC.getRoleForScope()
                 // This preserves the custom role assignment for auditing and future enhancements.
-                scopeRoleToSave.put(entry.getKey(), roleStr);
+                scopeRoleToSave.put(scope, roleStr);
             }
 
             if (scopeRoleToSave.isEmpty()) {
-                // Default to API + GUEST if no scopes selected
-                loggerMaker.debugAndAddToDb("scopeRoleMapping is empty, defaulting to API + GUEST");
-                scopeRoleToSave.put("API", Role.GUEST.name());
+                // Default to API + NO_ACCESS if no scopes selected
+                loggerMaker.debugAndAddToDb("scopeRoleMapping is empty, defaulting to API + NO_ACCESS");
+                scopeRoleToSave.put("API", RBAC.Role.NO_ACCESS.name());
             }
+
+            // Ensure all scopes are present - fill missing scopes with NO_ACCESS
+            scopeRoleToSave = RBAC.ensureCompleteScopeRoleMapping(scopeRoleToSave);
+            loggerMaker.debugAndAddToDb("After ensuring complete mapping: " + scopeRoleToSave);
         } else if (this.inviteeRole != null && !this.inviteeRole.isEmpty()) {
             // Backward compatibility: old single role
-            Role baseRole = null;
-            CustomRole customRole = CustomRoleDao.instance.findRoleByName(this.inviteeRole);
-
-            try {
-                if (customRole != null) {
-                    baseRole = Role.valueOf(customRole.getBaseRole());
-                } else {
-                    baseRole = Role.valueOf(this.inviteeRole);
-                }
-            } catch (Exception e) {
-                addActionError("Invalid role");
+            Role baseRole = validateAndGetBaseRole(this.inviteeRole);
+            if (baseRole == null) {
                 return ERROR.toUpperCase();
             }
 
-            if (!Arrays.asList(adminUserRole.getRoleHierarchy()).contains(baseRole)) {
-                addActionError("User not allowed to invite for this role");
-                return ERROR.toUpperCase();
-            }
+            // If any case only invitee role is present and no scope then map it to "API"
+            scopeRoleToSave.put("API", this.inviteeRole);
 
-            // If any any case only invitee role is present and no scope then map it to "API"
-                scopeRoleToSave.put("API", this.inviteeRole);
+            // Ensure all scopes are present - fill missing scopes with NO_ACCESS
+            scopeRoleToSave = RBAC.ensureCompleteScopeRoleMapping(scopeRoleToSave);
 
         } else {
             addActionError("Either scopeRoleMapping or inviteeRole must be provided");

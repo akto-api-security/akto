@@ -2523,7 +2523,26 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
 
   getASICategoriesForAgenticCategory(agenticCategory) {
     return agenticCategoryMapping[agenticCategory] || []
-  }
+  },
+
+   getStiggFeatureGrants() {
+      const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
+      const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false
+      const mcpSecurityGranted = stiggFeatures?.MCP_SECURITY?.isGranted || true
+      const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
+      const endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted
+      const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true
+
+      return {
+        agenticSecurityGranted,
+        endpointSecurityGranted,
+        dastGranted,
+        mcpSecurityGranted,
+        stiggFeatures
+      }
+    }
 }
+
+
 
 export default func

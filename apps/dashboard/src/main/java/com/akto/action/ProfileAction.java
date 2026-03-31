@@ -18,6 +18,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.utils.Intercom;
 import com.akto.utils.AlertUtils;
 import com.akto.utils.billing.OrganizationUtils;
@@ -27,8 +28,12 @@ import com.akto.util.OrganizationInfo;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.UserBlockedNoPlanAlert;
 import com.akto.notifications.slack.SlackSender;
+
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
+
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -36,10 +41,6 @@ import com.mongodb.client.model.Projections;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
 
 public class ProfileAction extends UserAction {
 
@@ -116,6 +117,13 @@ public class ProfileAction extends UserAction {
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
         RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+
+        // Get full RBAC entry to extract scope-role mapping for frontend
+        RBAC rbac = RBACDao.getCurrentRBACForUser(user.getId(), Context.accountId.get());
+        Map<String, String> scopeRoleMapping = new HashMap<>();
+        if (rbac != null && rbac.getScopeRoleMapping() != null) {
+            scopeRoleMapping = rbac.getScopeRoleMapping();
+        }
 
         boolean jiraIntegrated = false;
         try {
@@ -196,6 +204,7 @@ public class ProfileAction extends UserAction {
                 .append("servicenowIntegrated", servicenowIntegrated)
                 .append("devrevIntegrated", devrevIntegrated)
                 .append("userRole", userRole.toString().toUpperCase())
+                .append("scopeRoleMapping", new BasicDBObject(scopeRoleMapping))
                 .append("currentTimeZone", timeZone)
                 .append("organizationName", orgName)
                 .append("isAwsWafIntegrated", awsWafCount != 0)
@@ -206,6 +215,26 @@ public class ProfileAction extends UserAction {
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));
+        }
+
+        List<String> validDashboardCategories = Arrays.stream(GlobalEnums.DashboardCategory.values())
+                .map(GlobalEnums.DashboardCategory::getDashboardCategory)
+                .collect(Collectors.toList());
+
+        // Derive dashboard category from scopeRoleMapping only if it's populated (for new users with scope-based access)
+        // For backward compatibility with old users who only have a single role, skip this derivation if scopeRoleMapping is empty
+        String dashboardCategory = null;
+        if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
+            dashboardCategory = deriveDashboardCategoryFromScopeRoleMapping(scopeRoleMapping);
+        }
+
+        // Fallback to session attribute if not derived from scopeRoleMapping
+        if (dashboardCategory == null) {
+            try {
+                dashboardCategory = (String) request.getSession().getAttribute("dashboardCategory");
+            } catch (Exception e) {
+                // do nothing
+            }
         }
 
         // only external API calls have non-null "utility"
@@ -328,6 +357,13 @@ public class ProfileAction extends UserAction {
             }
         }
 
+        if (dashboardCategory == null || !validDashboardCategories.contains(dashboardCategory)) {
+            // Set default dashboard category if not set already
+            dashboardCategory = GlobalEnums.DashboardCategory.API_SECURITY.getDashboardCategory();
+            request.getSession().setAttribute("dashboardCategory", dashboardCategory);
+        }
+        userDetails.append("dashboardCategory", dashboardCategory);
+
         if (versions.length > 2) {
             if (versions[2].contains("akto-release-version")) {
                 userDetails.append("releaseVersion", "akto-release-version");
@@ -400,6 +436,42 @@ public class ProfileAction extends UserAction {
 
     public BasicDBList getUsers() {
         return users;
+    }
+
+    /**
+     * Derives dashboard category from scopeRoleMapping.
+     * Returns the first scope that is NOT NO_ACCESS, converted to its dashboard category.
+     * Scopes are checked in order: API, AGENTIC, ENDPOINT, DAST
+     *
+     * @param scopeRoleMapping Map of scope to role (e.g., {"API": "ADMIN", "AGENTIC": "NO_ACCESS"})
+     * @return Dashboard category name (e.g., "API Security"), or null if no accessible scope found
+     */
+    private static String deriveDashboardCategoryFromScopeRoleMapping(Map<String, String> scopeRoleMapping) {
+        if (scopeRoleMapping == null || scopeRoleMapping.isEmpty()) {
+            return null;
+        }
+
+        // Check scopes in order of priority
+        String[] scopesInOrder = {"API", "AGENTIC", "ENDPOINT", "DAST"};
+
+        for (String scope : scopesInOrder) {
+            String role = scopeRoleMapping.get(scope);
+            if (role != null && !role.equals("NO_ACCESS")) {
+                // Found an accessible scope, convert to dashboard category
+                switch (scope) {
+                    case "API":
+                        return GlobalEnums.DashboardCategory.API_SECURITY.getDashboardCategory();
+                    case "AGENTIC":
+                        return GlobalEnums.DashboardCategory.SECURITY_TYPE_AGENTIC.getDashboardCategory();
+                    case "ENDPOINT":
+                        return GlobalEnums.DashboardCategory.ENDPOINT_SECURITY.getDashboardCategory();
+                    case "DAST":
+                        return GlobalEnums.DashboardCategory.AKTO_DAST.getDashboardCategory();
+                }
+            }
+        }
+
+        return null;
     }
 
     private BasicDBObject subscription;

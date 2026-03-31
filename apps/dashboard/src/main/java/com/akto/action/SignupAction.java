@@ -289,12 +289,16 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 // Extract scope-role mapping from invitation
                 this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
 
-                // Default to API + GUEST if scopeRoleMapping is empty or null
+                // Ensure complete mapping with NO_ACCESS for unassigned scopes
+                logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping before init: " + this.scopeRoleMapping);
                 if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
-                    logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping is empty/null, defaulting to API + GUEST");
-                    this.scopeRoleMapping = new HashMap<>();
-                    this.scopeRoleMapping.put("API", RBAC.Role.GUEST.name());
+
+                    this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.NO_ACCESS.getName());
+                    logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after init: " + this.scopeRoleMapping);
                 }
+                // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
+                this.scopeRoleMapping = RBAC.ensureCompleteScopeRoleMapping(this.scopeRoleMapping);
+                logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after ensuring complete: " + this.scopeRoleMapping);
 
                 if(user != null){
                     AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId(), pendingInviteCode.getInviteeRole());
@@ -312,6 +316,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 return ERROR.toUpperCase();
             }
 
+        }else {
+            this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name());
         }
         createUserAndRedirect(email, name, auth0SignupInfo, 0, Config.ConfigType.AUTH0.toString());
         code = "";
@@ -374,12 +380,16 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             // Extract scope-role mapping if available (new n:n mapping approach)
             this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
 
-            // Default to API + GUEST if scopeRoleMapping is empty or null
+            // Ensure complete mapping with NO_ACCESS for unassigned scopes
+            logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping before init: " + this.scopeRoleMapping);
             if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
-                logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping is empty/null, defaulting to API + GUEST");
-                this.scopeRoleMapping = new HashMap<>();
-                this.scopeRoleMapping.put("API", RBAC.Role.GUEST.name());
+
+                this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.NO_ACCESS.getName());
+                logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping after init: " + this.scopeRoleMapping);
             }
+            // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
+            this.scopeRoleMapping = RBAC.ensureCompleteScopeRoleMapping(this.scopeRoleMapping);
+            logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping after ensuring complete: " + this.scopeRoleMapping);
 
         } else {
             if (!InitializerListener.isSaas) {
@@ -570,12 +580,16 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
                     logger.info("Extracted scope-role mapping from invite: " + this.scopeRoleMapping);
 
-                    // Default to API + GUEST if scopeRoleMapping is empty or null
+                    // Ensure complete mapping with NO_ACCESS for unassigned scopes
+                    logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping before init: " + this.scopeRoleMapping);
                     if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
-                        logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping is empty/null, defaulting to API + GUEST");
-                        this.scopeRoleMapping = new HashMap<>();
-                        this.scopeRoleMapping.put("API", RBAC.Role.GUEST.name());
+
+                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.NO_ACCESS.getName());
+                        logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping after init: " + this.scopeRoleMapping);
                     }
+                    // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
+                    this.scopeRoleMapping = RBAC.ensureCompleteScopeRoleMapping(this.scopeRoleMapping);
+                    logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping after ensuring complete: " + this.scopeRoleMapping);
                 } else {
                     logger.info("Invite code does not match or invitee email mismatch");
                 }
@@ -1042,11 +1056,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     // Extract scope-role mapping if available (new n:n mapping approach)
                     this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
 
-                    // Default to API + GUEST if scopeRoleMapping is empty or null
+                    // Default to API + No access if scopeRoleMapping is empty or null
+                    logger.infoAndAddToDb("[registerViaAzureSamlSso] scopeRoleMapping before init: " + this.scopeRoleMapping);
                     if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
-                        logger.infoAndAddToDb("[registerViaAzureSamlSso] scopeRoleMapping is empty/null, defaulting to API + GUEST");
-                        this.scopeRoleMapping = new HashMap<>();
-                        this.scopeRoleMapping.put("API", RBAC.Role.GUEST.name());
+
+                        this.scopeRoleMapping = RBAC.ensureCompleteScopeRoleMapping(this.scopeRoleMapping);
+                        logger.infoAndAddToDb("[registerViaAzureSamlSso] scopeRoleMapping after init: " + this.scopeRoleMapping);
                     }
                 }
             }
@@ -1422,8 +1437,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         // Set scope-role mapping if available (new n:n mapping approach)
                         if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
                             rbacEntry.setScopeRoleMapping(this.scopeRoleMapping);
-                            logger.info("[createUserAndRedirect] Set scope-role mapping for existing user: " + this.scopeRoleMapping);
+                        }else {   //if no product access  while creating user then map that role to API as this is the case of new sign up without invitation
+                            RBAC.ensureCompleteScopeRoleMapping(this.scopeRoleMapping);
+                            rbacEntry.setScopeRoleMapping(this.scopeRoleMapping);
                         }
+                        logger.info("[createUserAndRedirect] Set scope-role mapping for existing user: " + this.scopeRoleMapping);
                         RBACDao.instance.insertOne(rbacEntry);
                         String accountName = account != null ? account.getName() : "My account";
                         user = UsersDao.addAccount(user.getLogin(), accountId, accountName);

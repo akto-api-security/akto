@@ -169,4 +169,22 @@ public class GlobalEnums {
     }
 
     /* ********************************************************************** */
+
+    public enum DashboardCategory {
+        // FeatureLabel(DashboardCategory)
+        API_SECURITY("API Security"),
+        SECURITY_TYPE_AGENTIC("Agentic Security"),
+        ENDPOINT_SECURITY("Endpoint Security"),
+        AKTO_DAST("DAST");
+
+        private final String dashboardCategory;
+
+        DashboardCategory(String dashboardCategory) {
+            this.dashboardCategory = dashboardCategory;
+        }
+
+        public String getDashboardCategory() {
+            return dashboardCategory;
+        }
+    }
 }

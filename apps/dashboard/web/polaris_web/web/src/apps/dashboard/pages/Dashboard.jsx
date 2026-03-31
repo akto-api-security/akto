@@ -98,34 +98,53 @@ function Dashboard() {
     }
 
     /**
-     * Auto-detect user's accessible product scopes based on feature grants.
+     * Auto-detect user's accessible product scopes based on RBAC scope-role mapping.
      * If the current dashboard category isn't accessible, switch to the first accessible one.
      * This prevents 403 errors when user logs in but current scope isn't available to them.
+     * Uses window.scopeRoleMapping from ProfileAction if available, falls back to STIGG feature grants.
      */
     useEffect(() => {
-        const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
-        const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false
-        const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
-        const endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted
-        const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true
+        let accessibleCategories = ['API Security']; // Default fallback
 
-        // Build list of accessible categories
-        const accessibleCategories = ['API Security']; // API always accessible
+        // Prefer RBAC scope-role mapping if available
+        const scopeRoleMapping = window?.scopeRoleMapping;
+        if (scopeRoleMapping && typeof scopeRoleMapping === 'object') {
+            accessibleCategories = [];
+            const noAccessRole = 'NO_ACCESS';
 
-        if (agenticSecurityGranted) {
-            accessibleCategories.push('Agentic Security');
-        }
+            // Check each scope in the mapping
+            for (const [scope, role] of Object.entries(scopeRoleMapping)) {
+                if (role !== noAccessRole) {
+                    const category = getDashboardCategoryForScope(scope);
+                    if (category && !accessibleCategories.includes(category)) {
+                        accessibleCategories.push(category);
+                    }
+                }
+            }
 
-        if (endpointSecurityGranted) {
-            accessibleCategories.push('Endpoint Security');
-        }
+            // If no accessible scopes found in mapping, fall back to empty array
+            if (accessibleCategories.length === 0) {
+                accessibleCategories = [];
+            }
+        } else {
+            // Fallback to feature grants when scopeRoleMapping isn't available
+            const { agenticSecurityGranted, endpointSecurityGranted, dastGranted } = func.getStiggFeatureGrants();
 
-        if (dastGranted) {
-            accessibleCategories.push('DAST');
+            if (agenticSecurityGranted) {
+                accessibleCategories.push('Agentic Security');
+            }
+
+            if (endpointSecurityGranted) {
+                accessibleCategories.push('Endpoint Security');
+            }
+
+            if (dastGranted) {
+                accessibleCategories.push('DAST');
+            }
         }
 
         // If current dashboard category isn't accessible, switch to first accessible one
-        if (!accessibleCategories.includes(dashboardCategory)) {
+        if (accessibleCategories.length > 0 && !accessibleCategories.includes(dashboardCategory)) {
             setDashboardCategory(accessibleCategories[0]);
         }
     }, []);

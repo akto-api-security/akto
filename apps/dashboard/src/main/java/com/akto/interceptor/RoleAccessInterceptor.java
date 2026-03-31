@@ -213,7 +213,18 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             Role userRoleRecord = rbac.getRoleForScope(contextSource);
             logger.debug("Found user role in: " + (Context.now() - timeNow));
 
-            // If getRoleForScope returns null, user doesn't have access to this scope
+            // For backward compatibility: if getRoleForScope returns null but user has old single role field,
+            // fall back to that role. This ensures old users can still access all scopes.
+            if (userRoleRecord == null && rbac.getRole() != null) {
+                try {
+                    userRoleRecord = RBAC.Role.valueOf(rbac.getRole());
+                    logger.debug("Using fallback single role for user " + user.getLogin() + " due to backward compatibility");
+                } catch (IllegalArgumentException e) {
+                    logger.debug("Failed to parse fallback role: " + rbac.getRole() + " for user " + user.getLogin());
+                }
+            }
+
+            // If getRoleForScope returns null and no fallback role, user doesn't have access to this scope
             if (userRoleRecord == null) {
                 // User doesn't have access to this product scope
                 String scopeDisplayName = getContextSourceDisplayName(contextSource);
@@ -245,6 +256,11 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             }
             if(featureLabel.equals(Feature.ADMIN_ACTIONS.name())){
                 hasRequiredAccess = userRole.equals(Role.ADMIN.name());
+            }
+
+            if(!hasRequiredAccess && userRole.equals("NO ACCESS")){
+                ((ActionSupport) invocation.getAction()).addActionError("You do not have access to this product. Please ask Admin to grant access or navigate to accessible product");
+                return FORBIDDEN;
             }
 
             if(!hasRequiredAccess) {

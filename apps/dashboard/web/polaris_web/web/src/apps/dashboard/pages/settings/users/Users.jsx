@@ -645,13 +645,17 @@ const Users = () => {
                             const currentConfigDisplay = item?.scopeRoleMapping && Object.keys(item.scopeRoleMapping).length > 0
                                 ? (
                                     <Box>
-                                        <Text variant="bodySm" color="subdued">Scope-based access:</Text>
+                                        <Text variant="bodySm" color="subdued">
+                                            {item?.isInvitation ? "Invitation sent for " : "Scope-based access:"}
+                                        </Text>
                                         <Box paddingBlockStart="100">
-                                            {Object.entries(item.scopeRoleMapping).map(([scope, role]) => {
+                                            {Object.entries(item.scopeRoleMapping).map(([scope, roleValue]) => {
                                                 const scopeLabel = PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
+                                                // Skip NO_ACCESS roles for display purposes
+                                                if (roleValue === 'NO_ACCESS') return null;
                                                 return (
                                                     <Text key={scope} variant="bodySm">
-                                                        {getRoleDisplayName(role)} for {scopeLabel}
+                                                        {getRoleDisplayName(roleValue)} ({scopeLabel}){item?.isInvitation && Object.entries(item.scopeRoleMapping).filter(([,r]) => r !== 'NO_ACCESS').length > 1 ? ',' : ''}
                                                     </Text>
                                                 )
                                             })}
