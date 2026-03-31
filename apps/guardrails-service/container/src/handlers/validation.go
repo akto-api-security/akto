@@ -119,6 +119,17 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		return
 	}
 
+	if req.RequestPayload == "" {
+		h.logger.Error("ValidateRequest - missing requestPayload",
+			zap.Int64("latencyMs", time.Since(start).Milliseconds()))
+		alertMsg := "[guardrails] /validate/request - missing requestPayload"
+		slack.SendAlert(h.logger, alertMsg)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "requestPayload is required",
+		})
+		return
+	}
+
 	// Extract session and request IDs from headers
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
 
@@ -181,10 +192,10 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 // ValidateRequestWithPolicy validates a single request payload with a provided policy (for playground testing)
 func (h *ValidationHandler) ValidateRequestWithPolicy(c *gin.Context) {
 	var req struct {
-		Payload       string                 `json:"payload" binding:"required"`
-		ContextSource string                 `json:"contextSource,omitempty"` // Optional context source
-		SkipThreat    *bool                  `json:"skipThreat,omitempty"`    // Optional: skip threat reporting to TBS (default: false)
-		Policy        *mcp.GuardrailsPolicy  `json:"policy" binding:"required"` // Required: policy for playground testing
+		Payload       string                `json:"payload" binding:"required"`
+		ContextSource string                `json:"contextSource,omitempty"`   // Optional context source
+		SkipThreat    *bool                 `json:"skipThreat,omitempty"`      // Optional: skip threat reporting to TBS (default: false)
+		Policy        *mcp.GuardrailsPolicy `json:"policy" binding:"required"` // Required: policy for playground testing
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -225,15 +236,33 @@ func (h *ValidationHandler) ValidateRequestWithPolicy(c *gin.Context) {
 
 // ValidateResponse validates a single response payload
 func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
-	var req struct {
-		Payload       string `json:"payload" binding:"required"`
-		ContextSource string `json:"contextSource,omitempty"` // Optional context source
-		SkipThreat    *bool  `json:"skipThreat,omitempty"`    // Optional: skip threat reporting to TBS (default: false)
-	}
+	start := time.Now()
+	var req models.ValidateRequestParams
 
 	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Error("ValidateResponse - invalid request format",
+			zap.Error(err),
+			zap.Int64("latencyMs", time.Since(start).Milliseconds()))
+		alertMsg := fmt.Sprintf("[guardrails] /validate/response - invalid request format: %s", err.Error())
+		slack.SendAlert(h.logger, alertMsg)
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid request format",
+		})
+		return
+	}
+
+	// Response body: prefer responsePayload; legacy field "payload" still supported (see models.ValidateRequestParams.LegacyPayload).
+	responseBody := req.ResponsePayload
+	if responseBody == "" {
+		responseBody = req.LegacyPayload
+	}
+	if responseBody == "" {
+		h.logger.Error("ValidateResponse - missing response body",
+			zap.Int64("latencyMs", time.Since(start).Milliseconds()))
+		alertMsg := "[guardrails] /validate/response - missing responsePayload or payload"
+		slack.SendAlert(h.logger, alertMsg)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "responsePayload or payload is required",
 		})
 		return
 	}
@@ -241,24 +270,58 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 	// Extract session and request IDs from headers
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
 
-	// Default skipThreat to false if not provided
-	skipThreat := false
-	if req.SkipThreat != nil {
-		skipThreat = *req.SkipThreat
-	}
+	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/response - responsePayload: %s", responseBody))
 
-	h.logger.Debug("ValidateResponse - received contextSource from request",
+	h.logger.Info("ValidateResponse - received request",
+		zap.String("path", req.Path),
+		zap.String("method", req.Method),
+		zap.String("account", req.AktoAccountID),
 		zap.String("contextSource", req.ContextSource),
 		zap.String("sessionID", sessionID),
-		zap.String("requestID", requestID))
+		zap.String("requestID", requestID),
+		zap.String("ip", req.IP),
+		zap.String("destIp", req.DestIP),
+		zap.String("statusCode", req.StatusCode),
+		zap.String("source", req.Source),
+		zap.String("direction", req.Direction),
+		zap.String("tag", req.Tag),
+		zap.String("aktoVxlanId", req.AktoVxlanID),
+		zap.Bool("hasRequestHeaders", req.RequestHeaders != ""),
+		zap.Bool("hasResponseHeaders", req.ResponseHeaders != ""),
+		zap.Bool("hasRequestPayload", req.RequestPayload != ""),
+		zap.Bool("hasMetadata", req.Metadata != ""),
+		zap.Bool("skipThreat", req.EffectiveSkipThreat()))
 
-	result, err := h.validatorService.ValidateResponse(c.Request.Context(), req.Payload, req.ContextSource, sessionID, requestID, skipThreat)
+	result, err := h.validatorService.ValidateResponse(c.Request.Context(), &req, responseBody, sessionID, requestID)
 	if err != nil {
-		h.logger.Error("Failed to validate response", zap.Error(err))
+		h.logger.Error("ValidateResponse failed",
+			zap.String("path", req.Path),
+			zap.String("method", req.Method),
+			zap.String("account", req.AktoAccountID),
+			zap.String("contextSource", req.ContextSource),
+			zap.String("sessionID", sessionID),
+			zap.Int64("latencyMs", time.Since(start).Milliseconds()),
+			zap.Error(err))
+		alertMsg := fmt.Sprintf("[guardrails] /validate/response failed - path: %s, method: %s, account: %s, contextSource: %s, sessionID: %s, error: %s",
+			req.Path, req.Method, req.AktoAccountID, req.ContextSource, sessionID, err.Error())
+		slack.SendAlert(h.logger, alertMsg)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Validation failed",
 		})
 		return
+	}
+
+	h.logger.Info("ValidateResponse - completed",
+		zap.String("path", req.Path),
+		zap.String("method", req.Method),
+		zap.String("account", req.AktoAccountID),
+		zap.String("sessionID", sessionID),
+		zap.Bool("allowed", result.Allowed),
+		zap.Bool("modified", result.Modified),
+		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
+
+	if resultJSON, err := json.Marshal(result); err == nil {
+		go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/response - result: %s", string(resultJSON)))
 	}
 
 	c.JSON(http.StatusOK, result)
