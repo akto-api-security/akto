@@ -4,15 +4,16 @@ import com.akto.dao.AccountsContextDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Indexes;
 import org.bson.conversions.Bson;
-import com.mongodb.client.model.Filters;
-
-import java.util.List;
 
 public class UningestedApiOverageDao extends AccountsContextDao<UningestedApiOverage> {
 
     public static final UningestedApiOverageDao instance = new UningestedApiOverageDao();
+    
+    // Maximum number of documents to keep in the collection
+    public static final int MAX_DOCUMENTS = 5000;
 
     private UningestedApiOverageDao() {}
 
@@ -48,4 +49,13 @@ public class UningestedApiOverageDao extends AccountsContextDao<UningestedApiOve
         );
         return findOne(filter) != null;
     }
-} 
+
+    /**
+     * Check if the collection has reached the maximum document limit
+     * @return true if the collection has reached or exceeded MAX_DOCUMENTS
+     */
+    public boolean hasReachedLimit() {
+        long currentCount = getMCollection().countDocuments();
+        return currentCount >= MAX_DOCUMENTS;
+    }
+}
