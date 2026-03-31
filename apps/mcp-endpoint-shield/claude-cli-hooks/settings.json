@@ -43,6 +43,17 @@
           }
         ]
       }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-validate-file-wrapper.sh",
+            "timeout": 15
+          }
+        ]
+      }
     ]
   }
 }
