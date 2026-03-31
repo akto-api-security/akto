@@ -58,6 +58,8 @@ public class LoggerMaker  {
 
     protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
 
+    private static final boolean shouldNotSendLogs = System.getenv("BLOCK_LOGS") != null && System.getenv("BLOCK_LOGS").equals("true");
+
     // Flag to send logs to infra only (no console output) - lazy initialized from env var
     private static Boolean SEND_TO_INFRA_ONLY = null;
 
@@ -278,6 +280,11 @@ public class LoggerMaker  {
     }
     
     private void insert(String info, String key, LogDb db) {
+        
+        if(shouldNotSendLogs || (accountSettings != null && accountSettings.isBlockLogs())) {
+            return;
+        }
+
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
         if(checkUpdate() && db!=null){
