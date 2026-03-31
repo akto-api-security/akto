@@ -44,14 +44,28 @@ public class Gateway {
             }
 
             Map<String, Object> result = new HashMap<>();
+            Map<String, Object> validateParams = buildValidateParams(requestData);
 
             String guardrails = getStringField(requestData, "guardrails");
             if ("true".equalsIgnoreCase(guardrails)) {
                 long guardrailsStart = System.currentTimeMillis();
-                Map<String, Object> guardrailsResponse = callGuardrails(requestData);
-                logger.info("Guardrails call completed - path: {}, latencyMs: {}",
-                    requestData.get("path"), System.currentTimeMillis() - guardrailsStart);
-                result.put("guardrailsResult", guardrailsResponse);
+                logger.info("Calling guardrails /validate/request, contextSource: {}", validateParams.get("contextSource"));
+                Map<String, Object> guardrailsResult = guardrailsClient.callValidateRequest(validateParams);
+                logger.info("Guardrails request validation completed - path: {}, allowed: {}, latencyMs: {}",
+                    requestData.get("path"), guardrailsResult != null ? guardrailsResult.get("allowed") : "null",
+                    System.currentTimeMillis() - guardrailsStart);
+                result.put("guardrailsResult", guardrailsResult);
+
+                String responsePayload = getStringField(requestData, "responsePayload");
+                if (responsePayload != null && !responsePayload.isEmpty()) {
+                    long guardrailsResponseStart = System.currentTimeMillis();
+                    logger.info("Calling guardrails /validate/response, contextSource: {}", validateParams.get("contextSource"));
+                    Map<String, Object> guardrailsResponseResult = guardrailsClient.callValidateResponse(validateParams);
+                    logger.info("Guardrails response validation completed - path: {}, allowed: {}, latencyMs: {}",
+                        requestData.get("path"), guardrailsResponseResult != null ? guardrailsResponseResult.get("allowed") : "null",
+                        System.currentTimeMillis() - guardrailsResponseStart);
+                    result.put("guardrailsResponseResult", guardrailsResponseResult);
+                }
             }
 
             String ingestData = getStringField(requestData, "ingest_data");
@@ -79,39 +93,31 @@ public class Gateway {
         }
     }
 
-    private Map<String, Object> callGuardrails(Map<String, Object> requestData) {
-        Map<String, Object> validateRequest = new HashMap<>();
-        validateRequest.put("requestPayload", requestData.get("requestPayload"));
-        validateRequest.put("contextSource", requestData.get("contextSource"));
+    private Map<String, Object> buildValidateParams(Map<String, Object> requestData) {
+        Map<String, Object> validateParams = new HashMap<>();
+        validateParams.put("requestPayload", requestData.get("requestPayload"));
+        validateParams.put("responsePayload", requestData.get("responsePayload"));
+        validateParams.put("contextSource", requestData.get("contextSource"));
 
-        putIfNotNull(validateRequest, requestData, "path");
-        putIfNotNull(validateRequest, requestData, "requestHeaders");
-        putIfNotNull(validateRequest, requestData, "responseHeaders");
-        putIfNotNull(validateRequest, requestData, "method");
-        putIfNotNull(validateRequest, requestData, "responsePayload");
-        putIfNotNull(validateRequest, requestData, "ip");
-        putIfNotNull(validateRequest, requestData, "destIp");
-        putIfNotNull(validateRequest, requestData, "time");
-        putIfNotNull(validateRequest, requestData, "statusCode");
-        putIfNotNull(validateRequest, requestData, "type");
-        putIfNotNull(validateRequest, requestData, "status");
-        putIfNotNull(validateRequest, requestData, "akto_account_id");
-        putIfNotNull(validateRequest, requestData, "akto_vxlan_id");
-        putIfNotNull(validateRequest, requestData, "is_pending");
-        putIfNotNull(validateRequest, requestData, "source");
-        putIfNotNull(validateRequest, requestData, "direction");
-        putIfNotNull(validateRequest, requestData, "tag");
-        putIfNotNull(validateRequest, requestData, "metadata");
+        putIfNotNull(validateParams, requestData, "path");
+        putIfNotNull(validateParams, requestData, "requestHeaders");
+        putIfNotNull(validateParams, requestData, "responseHeaders");
+        putIfNotNull(validateParams, requestData, "method");
+        putIfNotNull(validateParams, requestData, "ip");
+        putIfNotNull(validateParams, requestData, "destIp");
+        putIfNotNull(validateParams, requestData, "time");
+        putIfNotNull(validateParams, requestData, "statusCode");
+        putIfNotNull(validateParams, requestData, "type");
+        putIfNotNull(validateParams, requestData, "status");
+        putIfNotNull(validateParams, requestData, "akto_account_id");
+        putIfNotNull(validateParams, requestData, "akto_vxlan_id");
+        putIfNotNull(validateParams, requestData, "is_pending");
+        putIfNotNull(validateParams, requestData, "source");
+        putIfNotNull(validateParams, requestData, "direction");
+        putIfNotNull(validateParams, requestData, "tag");
+        putIfNotNull(validateParams, requestData, "metadata");
 
-        String contextSource = getStringField(requestData, "contextSource");
-        logger.info("Calling guardrails /validate/request, contextSource: {}", contextSource);
-
-        Map<String, Object> guardrailsResponse = guardrailsClient.callValidateRequest(validateRequest);
-
-        logger.info("Guardrails response - allowed: {}",
-            guardrailsResponse != null ? guardrailsResponse.get("Allowed") : "null");
-
-        return guardrailsResponse;
+        return validateParams;
     }
 
     private void ingestData(Map<String, Object> requestData) {
