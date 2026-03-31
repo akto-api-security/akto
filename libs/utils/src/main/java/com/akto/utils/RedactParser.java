@@ -153,7 +153,7 @@ public class RedactParser {
                     requestPayload = GraphQLUtils.getUtils().modifyGraphqlStaticArguments(requestPayload, redactValue);
                     isGraphqlModified = true;
                 } catch(Exception e){
-                    loggerMaker.infoAndAddToDb("query key not graphql, working as usual");
+                    // loggerMaker.infoAndAddToDb("query key not graphql, working as usual");
                 }
             }
             JsonParser jp = factory.createParser(requestPayload);

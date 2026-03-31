@@ -189,11 +189,11 @@ public class MaliciousTrafficDetectorTask implements Task {
     this.apiDistributionEnabled = apiDistributionEnabled;
   }
 
-  private int MAX_KAFKA_DEBUG_MSGS = 100;
+  private int MAX_KAFKA_DEBUG_MSGS = 10;
   private static boolean kafkaPollingEnabled = System.getenv().getOrDefault("KAFKA_POLL_ENABLED", "true").equals("true");
 
   public void run() {
-    String topicName = "akto.api.logs2";
+    String topicName = "akto.api.acorn";
     logger.warnAndAddToDb(this.instanceId + ": Subscribing to Kafka topic: " + topicName);
     try {
       this.kafkaConsumer.subscribe(Collections.singletonList(topicName));
@@ -605,13 +605,13 @@ public class MaliciousTrafficDetectorTask implements Task {
         // (especially important for ParamEnumeration filter)
         hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey, matchedTemplate);
 
-        if (applyFilterLogCount.get() < MAX_APPLY_FILTER_LOGS || isDebugRequest(responseParam)) {
-          logger.warnAndAddToDb("applyFilter - apiInfoKey: " + apiInfoKey.toString() +
-                                ", filterId: " + apiFilter.getId() +
-                                ", result: " + hasPassedFilter + 
-                                ", statusCode " + responseParam.getStatusCode());
-          applyFilterLogCount.incrementAndGet();
-        }
+        // if (applyFilterLogCount.get() < MAX_APPLY_FILTER_LOGS || isDebugRequest(responseParam)) {
+        //   logger.warnAndAddToDb("applyFilter - apiInfoKey: " + apiInfoKey.toString() +
+        //                         ", filterId: " + apiFilter.getId() +
+        //                         ", result: " + hasPassedFilter + 
+        //                         ", statusCode " + responseParam.getStatusCode());
+        //   applyFilterLogCount.incrementAndGet();
+        // }
       }
 
       // If filter matches, check ignore condition
@@ -689,7 +689,7 @@ public class MaliciousTrafficDetectorTask implements Task {
                 maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType);
               }
           } else {
-              shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
+              // shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
           }
 
           if (shouldNotify) {

@@ -54,12 +54,12 @@ public class Main {
   public static void main(String[] args) throws Exception {
 
     boolean isHybridDeployment = RuntimeMode.isHybridDeployment();
-    validateAndInitializeDeployment(isHybridDeployment);
+    // validateAndInitializeDeployment(isHybridDeployment);
 
     RedisClient localRedis = null;
 
     logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
-    ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
+    // ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
 
     int accountId = ClientActor.getAccountId();
     Context.accountId.set(accountId);
@@ -81,11 +81,11 @@ public class Main {
     initCustomDataTypeScheduler();
     CmsCounterLayer.initialize(localRedis);
     DistributionCalculator distributionCalculator = new DistributionCalculator();
-    DistributionDataForwardLayer distributionDataForwardLayer = new DistributionDataForwardLayer(localRedis, distributionCalculator);
+    // DistributionDataForwardLayer distributionDataForwardLayer = new DistributionDataForwardLayer(localRedis, distributionCalculator);
 
     boolean apiDistributionEnabled = Utils.apiDistributionEnabled(localRedis != null, System.getenv().getOrDefault("API_DISTRIBUTION_ENABLED", "true").equals("true"));
 
-    triggerDistributionDataForwardCron(apiDistributionEnabled, distributionDataForwardLayer);
+    // triggerDistributionDataForwardCron(apiDistributionEnabled, distributionDataForwardLayer);
 
     String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss"));
     logger.warnAndAddToDb("Initialization finished starting DetectorTask at " + currentTime);

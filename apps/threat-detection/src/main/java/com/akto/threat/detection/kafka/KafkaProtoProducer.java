@@ -5,6 +5,8 @@ import com.akto.kafka.Serializer;
 import com.google.protobuf.Message;
 import java.time.Duration;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+
 import org.apache.kafka.clients.producer.*;
 
 public class KafkaProtoProducer {
@@ -25,7 +27,15 @@ public class KafkaProtoProducer {
 
   public void send(String topic, Message message) {
     byte[] messageBytes = message.toByteArray();
-    this.producer.send(new ProducerRecord<>(topic, messageBytes));
+    // try {
+		this.producer.send(new ProducerRecord<>(topic, messageBytes));
+	// } catch (InterruptedException e) {
+	// 	// TODO Auto-generated catch block
+	// 	e.printStackTrace();
+	// } catch (ExecutionException e) {
+	// 	// TODO Auto-generated catch block
+	// 	e.printStackTrace();
+	// }
   }
 
   public void close() {

@@ -241,6 +241,12 @@
             <artifactId>netty-codec</artifactId>
             <version>4.1.118.Final</version>
         </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-resolver-dns-native-macos</artifactId>
+            <version>4.1.118.Final</version>
+            <classifier>osx-aarch_64</classifier>
+        </dependency>
 
         <dependency>
             <groupId>com.clearspring.analytics</groupId>
