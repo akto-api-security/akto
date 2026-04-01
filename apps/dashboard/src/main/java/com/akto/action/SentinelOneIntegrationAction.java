@@ -733,7 +733,7 @@ public class SentinelOneIntegrationAction extends UserAction {
             scriptExt = ".sh";
         }
         
-        String fullScriptPath = "apps/dashboard/scripts/guardrails/" + scriptBasePath + scriptExt;
+        String fullScriptPath = "apps/mcp-endpoint-shield/sentinelone" + scriptBasePath + scriptExt;
         
         // Read script content from file
         String scriptContent;
