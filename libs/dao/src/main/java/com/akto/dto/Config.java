@@ -41,7 +41,7 @@ public abstract class Config {
 
     public enum ConfigType {
         SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF, RSA_KP, MCP_REGISTRY,
-        SLACK_ALERT_INTERNAL, ABUSEIPDB, DATA_DOG, BLOCK_ACCESS_WEBHOOK;
+        SLACK_ALERT_INTERNAL, ABUSEIPDB, DATA_DOG, BLOCK_ACCESS_WEBHOOK, DATADOG_FORWARDER;
     }
 
     public ConfigType configType;
@@ -371,6 +371,30 @@ public abstract class Config {
 
         public DataDogConfig(int accountId) {
             this.configType = ConfigType.DATA_DOG;
+            this.id = CONFIG_ID + "_" + accountId;
+        }
+    }
+
+    @BsonDiscriminator
+    @Getter
+    @Setter
+    public static class DatadogForwarderConfig extends Config {
+        public static final String API_KEY = "apiKey";
+        public static final String DATADOG_SITE = "datadogSite";
+        public static final String ENABLED = "enabled";
+
+        private String apiKey;
+        private String datadogSite;
+        private boolean enabled;
+
+        public static final String CONFIG_ID = ConfigType.DATADOG_FORWARDER.name() + CONFIG_SALT;
+
+        public DatadogForwarderConfig() {
+            this.configType = ConfigType.DATADOG_FORWARDER;
+        }
+
+        public DatadogForwarderConfig(int accountId) {
+            this.configType = ConfigType.DATADOG_FORWARDER;
             this.id = CONFIG_ID + "_" + accountId;
         }
     }

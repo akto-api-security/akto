@@ -149,6 +149,12 @@ function Integrations() {
       source: '/public/splunk.svg'
     }
 
+    let datadogObj = {
+      id: 'datadog',
+      name: 'Datadog',
+      source: '/public/datadog.svg'
+    }
+
     let agentConfigObj ={
       id: 'agents',
       name:'Agents',
@@ -243,7 +249,7 @@ function Integrations() {
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
-    const siemItems = [splunkObj];
+    const siemItems = [splunkObj, datadogObj];
     switch (tabId) {
       case 'traffic':
         return trafficItems;
