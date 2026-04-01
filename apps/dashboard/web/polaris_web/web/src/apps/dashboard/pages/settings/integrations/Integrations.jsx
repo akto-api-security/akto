@@ -152,7 +152,7 @@ function Integrations() {
     let datadogObj = {
       id: 'datadog',
       name: 'Datadog',
-      source: '/public/datadog.svg'
+      source: '/public/datadog-1.svg'
     }
 
     let agentConfigObj ={

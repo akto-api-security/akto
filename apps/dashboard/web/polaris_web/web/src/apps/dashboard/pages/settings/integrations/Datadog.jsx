@@ -82,7 +82,7 @@ function Datadog() {
         </LegacyCard>
     )
 
-    const cardContent = "Forward all HTTP requests and responses processed by mini-runtime to Datadog as log entries for observability and tracing."
+    const cardContent = "Forward all HTTP requests and responses captured by Akto to Datadog as log entries for observability and tracing."
 
     return (
         <IntegrationsLayout title="Datadog" cardContent={cardContent} component={DatadogCard} docsUrl="" />

@@ -78,7 +78,7 @@ public class DatadogAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        String testPayload = "[{\"ddsource\":\"akto\",\"service\":\"akto-mini-runtime\",\"ddtags\":\"env:test\",\"message\":\"Akto Datadog integration test\"}]";
+        String testPayload = "[{\"ddsource\":\"akto\",\"service\":\"akto-datadog-traffic-processor\",\"ddtags\":\"env:test\",\"hostname\":\"akto-datadog-traffic-processor\",\"message\":\"Akto Datadog integration test\"}]";
         String endpointUrl = "https://http-intake.logs." + datadogSite.trim() + "/v1/input";
 
         try {
