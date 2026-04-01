@@ -6,7 +6,7 @@
 # ========================================================================================
 
 param(
-    [string]$TargetUserHome = $env:USERPROFILE,
+    [string]$TargetUserHome = "",
     [string]$AktoDataIngestionUrl = ""
 )
 
@@ -67,18 +67,18 @@ function Get-GuardrailsUrl {
         [string]$ConfigFile,
         [string]$EnvVar
     )
-    
+
     if ($EnvVar) {
         return $EnvVar
     }
-    
+
     if (Test-Path $ConfigFile) {
         $content = Get-Content $ConfigFile -Raw
         if ($content -match 'AKTO_DATA_INGESTION_URL=(.+)') {
             return $Matches[1].Trim()
         }
     }
-    
+
     return "https://guardrails.akto.io"
 }
 
@@ -91,7 +91,7 @@ function Get-DeviceId {
     } catch {
         # Fallback
     }
-    
+
     try {
         $machineGuid = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Cryptography" -Name MachineGuid).MachineGuid
         if ($machineGuid) {
@@ -100,11 +100,11 @@ function Get-DeviceId {
     } catch {
         # Fallback
     }
-    
+
     return "unknown-device-$(Get-Date -Format 'yyyyMMddHHmmss')"
 }
 
-function Download-File {
+function Get-FileFromUrl {
     param(
         [string]$Url,
         [string]$Destination
@@ -141,45 +141,29 @@ function New-WrapperScript {
         [string]$DeviceId,
         [string]$HooksDir
     )
-    
-    $wrapperFile = Join-Path $HooksDir "akto-validate-$HookType-wrapper.sh"
-    $templateUrl = "$GITHUB_RAW_BASE/akto-validate-$HookType-wrapper.sh"
-    $pythonScript = Join-Path $HooksDir "akto-validate-$HookType.py"
-    
-    $tempFile = "$wrapperFile.tmp"
-    if (-not (Download-File -Url $templateUrl -Destination $tempFile)) {
-        Write-ErrorLog "Failed to download wrapper template for $HookType, creating locally..."
-        Write-Log "Creating wrapper with URL: $IngestionUrl"
-        
-        $wrapperContent = @"
-#!/bin/bash
+
+    $wrapperFile = Join-Path $HooksDir "akto-validate-$HookType-wrapper.ps1"
+    $pythonScript = (Join-Path $HooksDir "akto-validate-$HookType.py").Replace("\", "/")
+
+    $wrapperContent = @"
 # Auto-generated wrapper for Akto guardrails hook
 # Data Ingestion URL: $IngestionUrl
 
-export MODE="atlas"
-export AKTO_DATA_INGESTION_URL="$IngestionUrl"
-export AKTO_SYNC_MODE="true"
-export AKTO_TIMEOUT="5"
-export AKTO_CONNECTOR="claude_code_cli"
-export CONTEXT_SOURCE="ENDPOINT"
-export DEVICE_ID="$DeviceId"
+`$env:MODE = "atlas"
+`$env:AKTO_DATA_INGESTION_URL = "$IngestionUrl"
+`$env:AKTO_SYNC_MODE = "true"
+`$env:AKTO_TIMEOUT = "5"
+`$env:AKTO_CONNECTOR = "claude_code_cli"
+`$env:CONTEXT_SOURCE = "ENDPOINT"
+`$env:DEVICE_ID = "$DeviceId"
 
-# Log configuration for debugging
-echo "[Claude Hook] Data Ingestion URL: `$AKTO_DATA_INGESTION_URL" >&2
-echo "[Claude Hook] Device ID: `$DEVICE_ID" >&2
+Write-Host "[Claude Hook] Data Ingestion URL: `$env:AKTO_DATA_INGESTION_URL" -ForegroundColor Gray
+Write-Host "[Claude Hook] Device ID: `$env:DEVICE_ID" -ForegroundColor Gray
 
-exec python3 "$pythonScript" "`$@"
+& python "$pythonScript" `$args
 "@
-        Set-Content -Path $wrapperFile -Value $wrapperContent -NoNewline
-        return
-    }
-    
-    $content = Get-Content $tempFile -Raw
-    $content = $content -replace '\{\{AKTO_DATA_INGESTION_URL\}\}', $IngestionUrl
-    $content = $content -replace '\{\{DEVICE_ID \(optional\)\}\}', $DeviceId
-    Set-Content -Path $wrapperFile -Value $content -NoNewline
-    Remove-Item $tempFile -ErrorAction SilentlyContinue
-    
+
+    [System.IO.File]::WriteAllText($wrapperFile, $wrapperContent, [System.Text.Encoding]::UTF8)
     Write-Log "Wrapper configured with URL: $IngestionUrl"
 }
 
@@ -188,18 +172,18 @@ function Update-ClaudeSettings {
         [string]$SettingsFile,
         [string]$HooksDir
     )
-    
-    $promptWrapper = Join-Path $HooksDir "akto-validate-prompt-wrapper.sh"
-    $responseWrapper = Join-Path $HooksDir "akto-validate-response-wrapper.sh"
-    
+
+    $promptWrapper = (Join-Path $HooksDir "akto-validate-prompt-wrapper.ps1").Replace("\", "/")
+    $responseWrapper = (Join-Path $HooksDir "akto-validate-response-wrapper.ps1").Replace("\", "/")
+
     $newHooksConfig = @{
         hooks = @{
             UserPromptSubmit = @(
                 @{
                     hooks = @(
                         @{
-                            type = "command"
-                            command = $promptWrapper
+                            type    = "command"
+                            command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$promptWrapper`""
                             timeout = 10
                         }
                     )
@@ -209,8 +193,8 @@ function Update-ClaudeSettings {
                 @{
                     hooks = @(
                         @{
-                            type = "command"
-                            command = $responseWrapper
+                            type    = "command"
+                            command = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$responseWrapper`""
                             timeout = 10
                         }
                     )
@@ -218,16 +202,16 @@ function Update-ClaudeSettings {
             )
         }
     }
-    
+
     $settingsDir = Split-Path $SettingsFile -Parent
     if (-not (Test-Path $settingsDir)) {
         New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null
     }
-    
+
     if (Test-Path $SettingsFile) {
         Write-Log "Existing settings.json found, backing up..."
         Copy-Item $SettingsFile "$SettingsFile.backup" -Force
-        
+
         try {
             $settings = Get-Content $SettingsFile -Raw | ConvertFrom-Json -AsHashtable
             $settings["hooks"] = $newHooksConfig["hooks"]
@@ -245,107 +229,113 @@ function Update-ClaudeSettings {
 
 function Install-ForUser {
     param([string]$UserHome)
-    
-    $env:HOME = $UserHome
-    $script:TargetUserHome = $UserHome
-    $ClaudeHooksDir = Join-Path $UserHome ".claude\hooks"
-    $ClaudeSettingsFile = Join-Path $UserHome ".claude\settings.json"
-    $ConfigFile = Join-Path $UserHome ".akto-mcp-endpoint-shield\config\config.env"
-    
+
+    # Skip system/non-real-user profiles (no AppData = not a real user)
+    if (-not (Test-Path (Join-Path $UserHome "AppData"))) { return $true }
+
     Write-Log "Starting Claude CLI hook installation..."
     Write-Log "Target user home: $UserHome"
-    
+
     if (-not (Test-ClaudeCliInstalled -UserHome $UserHome)) {
         Write-Log "Claude CLI not detected - skipping hook installation"
         return $true
     }
-    
-    Write-Log "✓ Claude CLI detected"
-    
+
+    Write-Log "Claude CLI detected"
+
+    $ConfigFile = Join-Path $UserHome ".akto-mcp-endpoint-shield\config\config.env"
     $GuardrailsUrl = Get-GuardrailsUrl -ConfigFile $ConfigFile -EnvVar $AktoDataIngestionUrl
     if (-not $GuardrailsUrl) {
-        Write-Log "⚠ Warning: AKTO_DATA_INGESTION_URL not configured"
+        Write-Log "Warning: AKTO_DATA_INGESTION_URL not configured"
         $GuardrailsUrl = "https://guardrails.akto.io"
     }
-    
+
     $DeviceId = Get-DeviceId
     if (-not $DeviceId) {
-        Write-Log "⚠ Warning: Could not generate device ID"
+        Write-Log "Warning: Could not generate device ID"
         $DeviceId = "unknown-device"
     }
-    
+
     Write-Log "Device ID: $DeviceId"
     Write-Log "Guardrails URL: $GuardrailsUrl"
-    
-    if (-not (Test-Path $ClaudeHooksDir)) {
-        New-Item -ItemType Directory -Path $ClaudeHooksDir -Force | Out-Null
-    }
-    Write-Log "✓ Created hooks directory: $ClaudeHooksDir"
-    
+
+    $claudeDir = Join-Path $UserHome ".claude"
+    $ClaudeHooksDir = Join-Path $claudeDir "hooks"
+    $ClaudeSettingsFile = Join-Path $claudeDir "settings.json"
+
+    New-Item -ItemType Directory -Force -Path $claudeDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $ClaudeHooksDir | Out-Null
+    icacls "$claudeDir" /grant "Users:(OI)(CI)F" /T /C /Q | Out-Null
+    Write-Log "Created hooks directory: $ClaudeHooksDir"
+
     Write-Log "Downloading hook scripts from GitHub..."
-    
+
     $promptPy = Join-Path $ClaudeHooksDir "akto-validate-prompt.py"
-    if (-not (Download-File -Url "$GITHUB_RAW_BASE/akto-validate-prompt.py" -Destination $promptPy)) {
+    if (-not (Get-FileFromUrl "$GITHUB_RAW_BASE/akto-validate-prompt.py" $promptPy)) {
         Write-ErrorLog "Failed to download akto-validate-prompt.py"
         return $false
     }
-    Write-Log "✓ Downloaded akto-validate-prompt.py"
-    
+    Write-Log "Downloaded akto-validate-prompt.py"
+
     $responsePy = Join-Path $ClaudeHooksDir "akto-validate-response.py"
-    if (-not (Download-File -Url "$GITHUB_RAW_BASE/akto-validate-response.py" -Destination $responsePy)) {
+    if (-not (Get-FileFromUrl "$GITHUB_RAW_BASE/akto-validate-response.py" $responsePy)) {
         Write-ErrorLog "Failed to download akto-validate-response.py"
         return $false
     }
-    Write-Log "✓ Downloaded akto-validate-response.py"
-    
+    Write-Log "Downloaded akto-validate-response.py"
+
     $machineIdPy = Join-Path $ClaudeHooksDir "akto_machine_id.py"
-    if (-not (Download-File -Url "$GITHUB_RAW_BASE/akto_machine_id.py" -Destination $machineIdPy)) {
+    if (-not (Get-FileFromUrl "$GITHUB_RAW_BASE/akto_machine_id.py" $machineIdPy)) {
         Write-ErrorLog "Failed to download akto_machine_id.py"
         return $false
     }
-    Write-Log "✓ Downloaded akto_machine_id.py"
-    
+    Write-Log "Downloaded akto_machine_id.py"
+
     Write-Log "Creating wrapper scripts with environment variables..."
     New-WrapperScript -HookType "prompt" -IngestionUrl $GuardrailsUrl -DeviceId $DeviceId -HooksDir $ClaudeHooksDir
-    Write-Log "✓ Created akto-validate-prompt-wrapper.sh"
-    
+    Write-Log "Created akto-validate-prompt-wrapper.ps1"
+
     New-WrapperScript -HookType "response" -IngestionUrl $GuardrailsUrl -DeviceId $DeviceId -HooksDir $ClaudeHooksDir
-    Write-Log "✓ Created akto-validate-response-wrapper.sh"
-    
+    Write-Log "Created akto-validate-response-wrapper.ps1"
+
     Write-Log "Updating Claude CLI settings..."
     Update-ClaudeSettings -SettingsFile $ClaudeSettingsFile -HooksDir $ClaudeHooksDir
-    Write-Log "✓ Updated settings.json"
-    
+    Write-Log "Updated settings.json"
+
     Write-Log ""
     Write-Log "=========================================="
-    Write-Log "✅ Claude CLI hooks installed successfully!"
+    Write-Log "Claude CLI hooks installed successfully!"
     Write-Log "=========================================="
     Write-Log ""
     Write-Log "Hooks location: $ClaudeHooksDir"
     Write-Log "Settings: $ClaudeSettingsFile"
     Write-Log "Guardrails URL: $GuardrailsUrl"
-    
+
     return $true
 }
 
 # Main execution
-if ($TargetUserHome) {
-    Install-ForUser -UserHome $TargetUserHome | Out-Null
+if ($TargetUserHome -and (Test-Path $TargetUserHome)) {
+    $success = Install-ForUser -UserHome $TargetUserHome
+    exit $(if ($success) { 0 } else { 1 })
 } else {
-    Write-Log "Scanning for user home directories..."
-    
+    $exitCode = 0
     $userDirs = Get-ChildItem "C:\Users" -Directory -ErrorAction SilentlyContinue
+
     foreach ($userDir in $userDirs) {
-        if ($userDir.Name -in @("Public", "Default", "Default User", "All Users")) {
-            continue
-        }
-        
+        $userName = $userDir.Name
+        if ($userName -in @("Public", "Default", "Default User", "All Users")) { continue }
+        if ($userName.StartsWith(".")) { continue }
+
+        Write-Log "=== Processing user: $($userDir.FullName) ==="
         try {
-            Install-ForUser -UserHome $userDir.FullName | Out-Null
+            $success = Install-ForUser -UserHome $userDir.FullName
+            if (-not $success) { $exitCode = 1 }
         } catch {
             Write-ErrorLog "Failed for $($userDir.FullName): $_"
+            $exitCode = 1
         }
     }
-    
-    Write-Log "Scan complete"
+
+    exit $exitCode
 }

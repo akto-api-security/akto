@@ -142,7 +142,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                         List<Map<String, Object>> events = entry.getValue();
                         String toolDomain = tool.toLowerCase() + ".sentinel";
                         ingestDvEvents(events, tool, toolDomain, ingestUrl, consoleDomain);
-                        loggerMaker.info("SentinelOneExecutor: ingested " + events.size() + " DV event(s) for " + tool, LogDb.DASHBOARD);
                     }
                 }
             } catch (IOException e) {
@@ -461,7 +460,12 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             if (objType != null && !"process".equalsIgnoreCase(objType.toString())) continue;
             batch.add(toDvIngestionRecord(event, tool, toolDomain, consoleDomain));
         }
-        if (!batch.isEmpty()) sendBatch(batch, ingestUrl);
+        if (!batch.isEmpty()) {
+            sendBatch(batch, ingestUrl);
+            loggerMaker.info("SentinelOneExecutor: ingested " + batch.size() + " DV event(s) for " + tool, LogDb.DASHBOARD);
+        } else {
+            loggerMaker.info("SentinelOneExecutor: no process events to ingest for " + tool + " (filtered out " + events.size() + " non-process events)", LogDb.DASHBOARD);
+        }
     }
 
     private static Map<String, Object> toDvIngestionRecord(
@@ -537,16 +541,20 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             .build();
 
         try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-            HttpPost post = new HttpPost(ingestUrl + "/api/ingestData");
+            String endpoint = ingestUrl + "/api/ingestData";
+            HttpPost post = new HttpPost(endpoint);
             post.setHeader("Content-Type", "application/json");
             post.setEntity(new StringEntity(json, ContentType.APPLICATION_JSON));
 
+            loggerMaker.info("SentinelOneExecutor: sending batch of " + batch.size() + " record(s) to " + endpoint, LogDb.DASHBOARD);
             try (CloseableHttpResponse resp = client.execute(post)) {
                 int status = resp.getStatusLine().getStatusCode();
-                EntityUtils.consumeQuietly(resp.getEntity());
+                String responseBody = EntityUtils.toString(resp.getEntity());
                 if (status != 200) {
-                    throw new IOException("Ingestion service returned HTTP " + status);
+                    loggerMaker.error("SentinelOneExecutor: ingestion failed with HTTP " + status + ": " + responseBody, LogDb.DASHBOARD);
+                    throw new IOException("Ingestion service returned HTTP " + status + ": " + responseBody);
                 }
+                loggerMaker.info("SentinelOneExecutor: batch sent successfully, HTTP " + status, LogDb.DASHBOARD);
             }
         }
     }
