@@ -192,7 +192,7 @@ public class LLMProviderClient {
         return content;
     }
 
-    // --- Env var fallback (preserves exact current AzureOpenAIPromptHandler behavior) ---
+    // --- Env var fallback (preserves older AzureOpenAIPromptHandler behavior) ---
 
     static String callAzureOpenAIFromEnv(String prompt, OkHttpClient client) throws IOException, org.json.JSONException {
         String host = System.getenv("AZURE_OPENAI_HOST");
