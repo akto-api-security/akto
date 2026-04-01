@@ -52,6 +52,8 @@ public abstract class DataActor {
 
     public abstract AccountSettings fetchAccountSettings();
 
+    public abstract Config.DatadogForwarderConfig fetchDatadogForwarderConfig();
+
     public abstract long fetchEstimatedDocCount();
 
     public abstract void updateCidrList(List<String> cidrList);
