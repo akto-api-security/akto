@@ -75,7 +75,10 @@ public class RBACDao extends CommonContextDao<RBAC> {
             } else {
                 currentRole = Role.MEMBER.name();
             }
-            
+
+            if(currentRole == null){
+                return null;
+            }
             CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
             if (customRole != null) {
                 actualRole = Role.valueOf(customRole.getBaseRole());

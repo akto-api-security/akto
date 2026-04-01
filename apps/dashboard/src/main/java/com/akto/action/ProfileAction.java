@@ -203,7 +203,7 @@ public class ProfileAction extends UserAction {
                 .append("azureBoardsIntegrated", azureBoardsIntegrated)
                 .append("servicenowIntegrated", servicenowIntegrated)
                 .append("devrevIntegrated", devrevIntegrated)
-                .append("userRole", userRole.toString().toUpperCase())
+                .append("userRole", userRole!=null ?userRole.toString().toUpperCase(): "")
                 .append("scopeRoleMapping", new BasicDBObject(scopeRoleMapping))
                 .append("currentTimeZone", timeZone)
                 .append("organizationName", orgName)
