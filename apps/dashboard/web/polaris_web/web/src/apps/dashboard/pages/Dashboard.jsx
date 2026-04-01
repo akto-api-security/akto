@@ -100,7 +100,12 @@ function Dashboard() {
     }
 
     // Monitor NO_ACCESS alert flag
+    // Skip alert monitoring during onboarding since APIs may return 403 during setup
     useEffect(() => {
+        if (location.pathname.includes('/onboarding')) {
+            return;
+        }
+
         const checkInterval = setInterval(() => {
             if (window.SHOW_NO_ACCESS_ALERT) {
                 setShowNoAccessAlert(true);
@@ -109,15 +114,22 @@ function Dashboard() {
         }, 100);
 
         return () => clearInterval(checkInterval);
-    }, []);
+    }, [location.pathname]);
 
     /**
      * Auto-detect user's accessible product scopes based on RBAC scope-role mapping.
      * If the current dashboard category isn't accessible, switch to the first accessible one.
      * This prevents 403 errors when user logs in but current scope isn't available to them.
      * Uses window.scopeRoleMapping from ProfileAction if available, falls back to STIGG feature grants.
+     *
+     * Skip this logic during onboarding since new users may have NO_ACCESS initially.
      */
     useEffect(() => {
+        // Skip auto-redirect logic during onboarding
+        if (location.pathname.includes('/onboarding')) {
+            return;
+        }
+
         let accessibleCategories = ['API Security']; // Default fallback
 
         // Prefer RBAC scope-role mapping if available
@@ -161,7 +173,7 @@ function Dashboard() {
         if (accessibleCategories.length > 0 && !accessibleCategories.includes(dashboardCategory)) {
             setDashboardCategory(accessibleCategories[0]);
         }
-    }, []);
+    }, [location.pathname]);
 
     useEffect(() => {
         if(trafficAlerts == null && window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')){
@@ -219,6 +231,11 @@ function Dashboard() {
 
     useEffect(() => {
         selectItems([])
+        // Clear NO_ACCESS alert when leaving onboarding
+        if (!location.pathname.includes('/onboarding')) {
+            window.SHOW_NO_ACCESS_ALERT = false;
+            setShowNoAccessAlert(false);
+        }
     },[location.pathname])
 
     const toastConfig = Store(state => state.toastConfig)
@@ -261,10 +278,11 @@ function Dashboard() {
     const shouldShowWelcomeBackModal = window.IS_SAAS === "true" && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
 
     const isAskAiRoute = location.pathname.includes('/ask-ai')
+    const isOnboardingRoute = location.pathname.includes('/onboarding')
 
     return (
         <div className={`dashboard ${isAskAiRoute ? 'ask-ai-route' : ''}`}>
-        {showNoAccessAlert && (
+        {showNoAccessAlert && !isOnboardingRoute && (
             <div style={{
                 position: "fixed",
                 top: "120px",

@@ -204,6 +204,11 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 logger.debug("DEBUG RoleAccessInterceptor: contextSource was null, defaulting to API");
             }
 
+            // Skip product scope validation for onboarding routes
+            // Onboarding is a special setup flow where users may not have access to all scopes yet
+            String requestUri = request.getRequestURI();
+            boolean isOnboardingRequest = requestUri != null && requestUri.contains("/onboarding");
+
             // Get the role for the specific product scope (new n:n mapping approach)
             Role userRoleRecord = rbac.getRoleForScope(contextSource);
             logger.debug("Found user role in: " + (Context.now() - timeNow));
@@ -219,13 +224,20 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 }
             }
 
-            // If getRoleForScope returns null and no fallback role, user doesn't have access to this scope
-            if (userRoleRecord == null) {
+            String userRole = null;
+            if (userRoleRecord != null) {
+                userRole = userRoleRecord.getName().toUpperCase();
+            }
+
+            // If getRoleForScope returns null or returns NO_ACCESS and no fallback role, user doesn't have access to this scope
+            // Skip this check for onboarding routes
+            if (!isOnboardingRequest && (userRoleRecord == null || userRoleRecord.equals(Role.NO_ACCESS))) {
                 // User doesn't have access to this product scope
                 String scopeDisplayName = getContextSourceDisplayName(contextSource);
-                String errorMessage = "You don't have access to " + scopeDisplayName
-                        + ". Please contact your admin to grant access or navigate to an accessible product scope.";
-                ((ActionSupport) invocation.getAction()).addActionError(errorMessage);
+                HttpServletResponse response = (HttpServletResponse) ServletActionContext.getResponse();
+                response.setHeader("X-No-Access-Error", "true");
+                ((ActionSupport) invocation.getAction()).addActionError("You do not have access to this product. Please ask Admin to grant access or navigate to accessible product");
+
 
                 List<String> userProductScopes = getUserProductScopes(userId, sessionAccId);
                 String contextSourceStr = contextSource.toString();
@@ -235,9 +247,15 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 return FORBIDDEN;
             }
 
-            String userRole = userRoleRecord.getName().toUpperCase();
-            if(userRole == null || userRole.isEmpty()) {
+            if(!isOnboardingRequest && (userRole == null || userRole.isEmpty())) {
                 throw new Exception("User role not found for scope: " + contextSource);
+            }
+
+            if (isOnboardingRequest) {
+                logger.debug("Skipping all access validation for onboarding request from user " + user.getLogin());
+                // Allow onboarding requests to proceed without access checks
+                // This is a special flow where users may not have full access yet
+                return invocation.invoke();
             }
             // ===== END PRODUCT SCOPE VALIDATION =====
 

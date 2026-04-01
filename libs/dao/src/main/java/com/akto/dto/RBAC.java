@@ -215,7 +215,7 @@ public class RBAC {
                 return resolveRoleString(roleStr);
             }
             // User has scopeRoleMapping but this scope is NOT in it - NO ACCESS
-            return null;
+            return Role.NO_ACCESS;
         }
 
         // Fall back to old role field ONLY if scopeRoleMapping is null/empty (backward compatibility)
