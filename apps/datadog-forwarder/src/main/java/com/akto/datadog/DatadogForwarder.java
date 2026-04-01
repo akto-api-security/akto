@@ -1,9 +1,10 @@
 package com.akto.datadog;
 
 import com.akto.dto.Config;
-import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
-import com.akto.runtime.parser.SampleParser;
+
+import java.util.Arrays;
+import java.util.HashSet;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -22,7 +23,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -31,6 +31,13 @@ public class DatadogForwarder {
     private static final LoggerMaker loggerMaker = new LoggerMaker(DatadogForwarder.class, LoggerMaker.LogDb.RUNTIME);
     private static final int MAX_BATCH_SIZE = 500;
     private static final int MAX_BATCH_BYTES = 4 * 1024 * 1024; // 4MB (Datadog limit is 5MB)
+    private static final HashSet<String> ALLOWED_FIELDS = new HashSet<>(Arrays.asList(
+        "path", "requestHeaders", "responseHeaders", "method", "requestPayload", "responsePayload",
+        "ip", "time", "statusCode", "status", "tag", "contextSource"
+    ));
+    private static final HashSet<String> JSON_STRING_FIELDS = new HashSet<>(Arrays.asList(
+        "requestHeaders", "responseHeaders", "requestPayload", "responsePayload", "tag"
+    ));
 
     private final String kafkaBrokerUrl;
     private final String kafkaTopic;
@@ -81,10 +88,9 @@ public class DatadogForwarder {
 
                 for (ConsumerRecord<String, String> record : records) {
                     try {
-                        HttpResponseParams params = SampleParser.parseSampleMessage(record.value());
-                        if (params == null) continue;
+                        if (record.value() == null || record.value().isEmpty()) continue;
 
-                        JSONObject logEntry = buildLogEntry(params);
+                        JSONObject logEntry = buildLogEntry(record.value());
                         String entryStr = logEntry.toString();
                         int entryBytes = entryStr.getBytes(StandardCharsets.UTF_8).length;
 
@@ -114,34 +120,34 @@ public class DatadogForwarder {
         }
     }
 
-    private JSONObject buildLogEntry(HttpResponseParams params) {
-        JSONObject message = new JSONObject();
-        try {
-            if (params.getRequestParams() != null) {
-                message.put("url", params.getRequestParams().getURL());
-                message.put("method", params.getRequestParams().getMethod());
-                message.put("requestBody", params.getRequestParams().getPayload());
-                Map<String, List<String>> reqHeaders = params.getRequestParams().getHeaders();
-                if (reqHeaders != null) {
-                    message.put("requestHeaders", new JSONObject(reqHeaders));
+    private JSONObject buildLogEntry(String rawMessage) {
+        JSONObject source = new JSONObject(rawMessage);
+        JSONObject entry = new JSONObject();
+
+        for (String key : source.keySet()) {
+            if (!ALLOWED_FIELDS.contains(key)) continue;
+            Object value = source.get(key);
+            if (value == null || value == JSONObject.NULL) continue;
+
+            if (JSON_STRING_FIELDS.contains(key) && value instanceof String) {
+                try {
+                    entry.put(key, new JSONObject((String) value));
+                } catch (Exception e) {
+                    try {
+                        entry.put(key, new JSONArray((String) value));
+                    } catch (Exception e2) {
+                        entry.put(key, value);
+                    }
                 }
+            } else {
+                entry.put(key, value);
             }
-            message.put("statusCode", params.getStatusCode());
-            message.put("responseBody", params.getPayload());
-            Map<String, List<String>> respHeaders = params.getHeaders();
-            if (respHeaders != null) {
-                message.put("responseHeaders", new JSONObject(respHeaders));
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error building Datadog log entry: " + e, LoggerMaker.LogDb.RUNTIME);
         }
 
-        JSONObject entry = new JSONObject();
         entry.put("ddsource", "akto");
         entry.put("service", "akto-mini-runtime");
         entry.put("ddtags", "env:prod");
         entry.put("hostname", hostname);
-        entry.put("message", message.toString());
         return entry;
     }
 
