@@ -270,7 +270,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         record.put("statusCode", "200");
         record.put("type", "HTTP/1.1");
         record.put("status", "OK");
-        record.put("requestPayload", "");
+        record.put("requestPayload", "{}");
         record.put("responsePayload", OBJECT_MAPPER.writeValueAsString(app));
 
         Map<String, String> reqH = new HashMap<>();
@@ -489,7 +489,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         record.put("statusCode", "200");
         record.put("type", "HTTP/1.1");
         record.put("status", "OK");
-        record.put("requestPayload", "");
+        record.put("requestPayload", "{}");
         record.put("responsePayload", OBJECT_MAPPER.writeValueAsString(event));
 
         Map<String, String> reqH = new HashMap<>();
