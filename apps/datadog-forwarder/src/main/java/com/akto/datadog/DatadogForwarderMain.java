@@ -39,7 +39,7 @@ public class DatadogForwarderMain {
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error polling DatadogForwarderConfig: " + e, LoggerMaker.LogDb.RUNTIME);
             }
-        }, 60, 60, TimeUnit.SECONDS);
+        }, 5, 5, TimeUnit.MINUTES);
 
         DatadogForwarder forwarder = new DatadogForwarder(kafkaBrokerUrl, kafkaTopic, configRef);
         forwarder.run();
