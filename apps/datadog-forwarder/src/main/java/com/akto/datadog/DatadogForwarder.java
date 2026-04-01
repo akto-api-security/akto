@@ -16,7 +16,6 @@ import org.json.JSONObject;
 
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.InetAddress;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -42,20 +41,12 @@ public class DatadogForwarder {
     private final String kafkaBrokerUrl;
     private final String kafkaTopic;
     private final AtomicReference<Config.DatadogForwarderConfig> configRef;
-    private final String hostname;
 
     public DatadogForwarder(String kafkaBrokerUrl, String kafkaTopic,
                             AtomicReference<Config.DatadogForwarderConfig> configRef) {
         this.kafkaBrokerUrl = kafkaBrokerUrl;
         this.kafkaTopic = kafkaTopic;
         this.configRef = configRef;
-        String h;
-        try {
-            h = InetAddress.getLocalHost().getHostName();
-        } catch (Exception e) {
-            h = "akto-mini-runtime";
-        }
-        this.hostname = h;
     }
 
     public void run() {
@@ -145,9 +136,21 @@ public class DatadogForwarder {
         }
 
         entry.put("ddsource", "akto");
-        entry.put("service", "akto-mini-runtime");
+        entry.put("service", "akto-datadog-traffic-processor");
         entry.put("ddtags", "env:prod");
+
+        String hostname = "hostname_not_found";
+        try {
+            JSONObject reqHeaders = entry.optJSONObject("requestHeaders");
+            if (reqHeaders != null) {
+                String host = reqHeaders.optString("host", null);
+                if (host != null && !host.isEmpty()) {
+                    hostname = host;
+                }
+            }
+        } catch (Exception ignored) {}
         entry.put("hostname", hostname);
+
         return entry;
     }
 
