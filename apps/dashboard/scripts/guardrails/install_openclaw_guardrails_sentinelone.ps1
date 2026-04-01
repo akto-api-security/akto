@@ -1,275 +1,134 @@
 # ========================================================================================
-# MCP Endpoint Shield - OpenClaw (Clawdbot) Config Updater (PowerShell)
-# ========================================================================================
-# Updates openclaw.json:
-#   1. Adds models.providers.secure-local block
-#   2. Updates agents.defaults.model.primary and agents.defaults.models
-#   3. Generates/reads .env file at %USERPROFILE%\.openclaw\akto.env
+# MCP Endpoint Shield - OpenClaw (Clawdbot) Config Updater (Hardened for S1)
 # ========================================================================================
 
 param(
-    [string]$TargetUserHome = $env:USERPROFILE,
+    [string]$TargetUserHome = "",
     [string]$OpenAIApiKey = "",
-    [string]$AktoGuardrailsUrl = "",
-    [string]$OriginalProvider = "",
-    [string]$ModelApi = "",
-    [string]$ModelId = ""
+    [string]$AktoGuardrailsUrl = "https://guardrails.akto.io",
+    [string]$OriginalProvider = "openai/gpt-4o-mini",
+    [string]$ModelApi = "openai",
+    [string]$ModelId = "gpt-4o-mini"
 )
 
-# ── Parse KEY=VALUE args from remaining parameters ───────────────────────────
+# ── Parse KEY=VALUE args ──────────────────────────────────────────────────────
 foreach ($arg in $args) {
     if ($arg -match '^([^=]+)=(.*)$') {
-        $key = $matches[1]
-        $val = $matches[2]
+        $key = $matches[1]; $val = $matches[2]
         switch ($key) {
-            "TARGET_USER_HOME"  { $TargetUserHome = $val }
-            "OPENAI_API_KEY"    { $OpenAIApiKey = $val }
+            "TARGET_USER_HOME"    { $TargetUserHome = $val }
+            "OPENAI_API_KEY"      { $OpenAIApiKey = $val }
             "AKTO_GUARDRAILS_URL" { $AktoGuardrailsUrl = $val }
-            "ORIGINAL_PROVIDER" { $OriginalProvider = $val }
-            "MODEL_API"         { $ModelApi = $val }
-            "MODEL_ID"          { $ModelId = $val }
+            "ORIGINAL_PROVIDER"   { $OriginalProvider = $val }
+            "MODEL_API"           { $ModelApi = $val }
+            "MODEL_ID"            { $ModelId = $val }
         }
     }
 }
 
-function Write-Log {
-    param([string]$Message)
-    Write-Host "[OpenClaw Config] $Message"
-}
+function Write-Log { param([string]$Message) Write-Host "[OpenClaw Config] $Message" -ForegroundColor Green }
+function Write-LogError { param([string]$Message) Write-Host "[OpenClaw Config] ERROR: $Message" -ForegroundColor Red }
 
-function Write-LogError {
-    param([string]$Message)
-    Write-Host "[OpenClaw Config] ERROR: $Message" -ForegroundColor Red
-}
-
-# ── Load .env if it exists, then apply arg overrides on top ──────────────────
-function Load-Env {
-    param([string]$EnvFile)
-
-    if (Test-Path $EnvFile) {
-        Write-Log "Loading env from: $EnvFile"
-        Get-Content $EnvFile | ForEach-Object {
-            $line = $_.Trim()
-            if ($line -and !$line.StartsWith('#')) {
-                if ($line -match '^([^=]+)=(.*)$') {
-                    $key = $matches[1]
-                    $val = $matches[2]
-                    
-                    switch ($key) {
-                        "AKTO_PROXY_URL"    { if (!$script:AktoProxyUrl) { $script:AktoProxyUrl = $val } }
-                        "OPENAI_API_KEY"    { if (!$script:OpenAIApiKey) { $script:OpenAIApiKey = $val } }
-                        "ORIGINAL_PROVIDER" { if (!$script:OriginalProvider) { $script:OriginalProvider = $val } }
-                        "MODEL_API"         { if (!$script:ModelApi) { $script:ModelApi = $val } }
-                        "MODEL_ID"          { if (!$script:ModelId) { $script:ModelId = $val } }
-                    }
-                }
-            }
-        }
-        Write-Log "✓ Env file loaded"
-    } else {
-        Write-Log "No existing env file found — will create one at: $EnvFile"
+# ── Helper: Ensure Nested PSObject Properties Exist ───────────────────────────
+function Ensure-Property {
+    param($Object, $PropertyName)
+    if ($null -eq $Object.$PropertyName) {
+        $Object | Add-Member -MemberType NoteProperty -Name $PropertyName -Value (New-Object PSObject)
     }
+    return $Object.$PropertyName
+}
 
-    # Apply fallbacks
-    if (!$script:AktoProxyUrl) { $script:AktoProxyUrl = "http://localhost:8080" }
-    if (!$script:OriginalProvider) { $script:OriginalProvider = "openai/gpt-4o-mini" }
+# ── Update openclaw.json Logic ────────────────────────────────────────────────
+function Update-Config {
+    param([string]$ConfigFile)
+
+    $baseUrl = $AktoGuardrailsUrl.TrimEnd('/')
+    $apiKeyValue = if ($OpenAIApiKey) { "$OpenAIApiKey; X-Original-Provider: $OriginalProvider" } else { "`${OPENAI_API_KEY}; X-Original-Provider: $OriginalProvider" }
+    $providerKey = "secure-local/$ModelId"
+
+    # 1. Load JSON (No -AsHashtable to keep it PS 5.1 compatible)
+    $config = Get-Content $ConfigFile -Raw | ConvertFrom-Json
+    if ($null -eq $config) { $config = New-Object PSObject }
+
+    # 2. Build Models Hierarchy
+    $models = Ensure-Property $config "models"
+    $providers = Ensure-Property $models "providers"
+
+    # 3. Inject secure-local provider
+    $secureLocalBlock = @{
+        api     = $ModelApi
+        apiKey  = $apiKeyValue
+        baseUrl = $baseUrl
+        models  = @(@{ id = $ModelId; name = $ModelId })
+    }
+    $providers | Add-Member -MemberType NoteProperty -Name "secure-local" -Value $secureLocalBlock -Force
+
+    # 4. Build Agents Hierarchy
+    $agents = Ensure-Property $config "agents"
+    $defaults = Ensure-Property $agents "defaults"
+    $modelDefaults = Ensure-Property $defaults "model"
+    $modelsList = Ensure-Property $defaults "models"
+
+    # 5. Set Primary Model
+    $modelDefaults | Add-Member -MemberType NoteProperty -Name "primary" -Value $providerKey -Force
+    $modelsList | Add-Member -MemberType NoteProperty -Name $providerKey -Value @{} -Force
+
+    # 6. Convert back to JSON with DEPTH 20 (Prevents truncation)
+    $json = $config | ConvertTo-Json -Depth 20
+    
+    # 7. Write UTF-8 (No BOM)
+    [System.IO.File]::WriteAllText($ConfigFile, $json, [System.Text.Encoding]::UTF8)
+    Write-Log "Successfully updated $ConfigFile"
 }
 
 # ── Write .env file ───────────────────────────────────────────────────────────
 function Write-Env {
     param([string]$EnvFile)
-
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $content = @"
-# Akto MCP Endpoint Shield - OpenClaw config
-# Auto-generated by install_openclaw_guardrails_sentinelone.ps1 — $timestamp
-
-AKTO_PROXY_URL=$AktoProxyUrl
+AKTO_PROXY_URL=$AktoGuardrailsUrl
 OPENAI_API_KEY=$OpenAIApiKey
 ORIGINAL_PROVIDER=$OriginalProvider
 MODEL_API=$ModelApi
 MODEL_ID=$ModelId
 "@
-
     [System.IO.File]::WriteAllText($EnvFile, $content, [System.Text.Encoding]::UTF8)
-    Write-Log "✓ Env file written: $EnvFile"
 }
 
-# ── OpenClaw installation detection ──────────────────────────────────────────
-function Test-OpenClawInstalled {
-    param([string]$UserHome)
-
-    # .openclaw dir exists after first run
-    if (Test-Path (Join-Path $UserHome ".openclaw")) {
-        return $true
-    }
-
-    # npm global install paths (SYSTEM account has no %APPDATA%, derive from UserHome)
-    $npmPaths = @(
-        (Join-Path $UserHome "AppData\Roaming\npm\openclaw"),
-        (Join-Path $UserHome "AppData\Roaming\npm\openclaw.cmd"),
-        (Join-Path $UserHome "AppData\Local\npm\openclaw"),
-        (Join-Path $UserHome "AppData\Local\npm\openclaw.cmd")
-    )
-    foreach ($p in $npmPaths) {
-        if (Test-Path $p) { return $true }
-    }
-
-    # Last resort: Get-Command works if run interactively (non-SYSTEM)
-    if (Get-Command openclaw -ErrorAction SilentlyContinue) {
-        return $true
-    }
-
-    return $false
-}
-
-# ── Preflight checks ──────────────────────────────────────────────────────────
-function Test-Requirements {
-    param([string]$ConfigFile)
-
-    if (!(Test-Path $ConfigFile)) {
-        Write-Log "Skipping $TargetUserHome — openclaw.json not found at: $ConfigFile"
-        return $false
-    }
-
-    try {
-        $null = Get-Content $ConfigFile -Raw | ConvertFrom-Json
-    } catch {
-        Write-LogError "openclaw.json is not valid JSON. Aborting."
-        exit 1
-    }
-
-    return $true
-}
-
-# ── Backup ────────────────────────────────────────────────────────────────────
-function Backup-Config {
-    param([string]$ConfigFile)
-
-    $timestamp = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-    $backup = "$ConfigFile.backup.$timestamp"
-    Copy-Item $ConfigFile $backup
-    Write-Log "✓ Backup saved: $backup"
-}
-
-# ── Build and merge both blocks ───────────────────────────────────────────────
-function Update-Config {
-    param([string]$ConfigFile)
-
-    $baseUrl = $AktoGuardrailsUrl.TrimEnd('/')
-
-    $apiKeyValue = if ($OpenAIApiKey) {
-        "$OpenAIApiKey; X-Original-Provider: $OriginalProvider"
-    } else {
-        "`${OPENAI_API_KEY}; X-Original-Provider: $OriginalProvider"
-    }
-
-    $providerKey = "secure-local/$ModelId"
-
-    # Load existing config
-    $config = Get-Content $ConfigFile -Raw | ConvertFrom-Json
-
-    # Create secure-local provider
-    if (!$config.models) { $config | Add-Member -NotePropertyName models -NotePropertyValue @{} }
-    if (!$config.models.providers) { $config.models | Add-Member -NotePropertyName providers -NotePropertyValue @{} }
-    
-    $secureLocal = @{
-        api = $ModelApi
-        apiKey = $apiKeyValue
-        baseUrl = $baseUrl
-        models = @(
-            @{
-                id = $ModelId
-                name = $ModelId
-            }
-        )
-    }
-    
-    $config.models.providers | Add-Member -NotePropertyName "secure-local" -NotePropertyValue $secureLocal -Force
-
-    # Update agents defaults
-    if (!$config.agents) { $config | Add-Member -NotePropertyName agents -NotePropertyValue @{} }
-    if (!$config.agents.defaults) { $config.agents | Add-Member -NotePropertyName defaults -NotePropertyValue @{} }
-    if (!$config.agents.defaults.model) { $config.agents.defaults | Add-Member -NotePropertyName model -NotePropertyValue @{} }
-    
-    $config.agents.defaults.model | Add-Member -NotePropertyName primary -NotePropertyValue $providerKey -Force
-    
-    if (!$config.agents.defaults.models) { 
-        $config.agents.defaults | Add-Member -NotePropertyName models -NotePropertyValue @{} 
-    }
-    $config.agents.defaults.models | Add-Member -NotePropertyName $providerKey -NotePropertyValue @{} -Force
-
-    # Write back
-    $json = $config | ConvertTo-Json -Depth 10
-    [System.IO.File]::WriteAllText($ConfigFile, $json, [System.Text.Encoding]::UTF8)
-}
-
-# ── Per-user install ──────────────────────────────────────────────────────────
+# ── Per-user installation ─────────────────────────────────────────────────────
 function Install-ForUser {
     param([string]$UserHome)
 
-    $script:TargetUserHome = $UserHome
-    $ConfigFile = Join-Path $UserHome ".openclaw\openclaw.json"
-    $EnvFile = Join-Path $UserHome ".openclaw\akto.env"
+    if (-not (Test-Path (Join-Path $UserHome "AppData"))) { return }
 
-    Write-Log ""
-    Write-Log "=== Processing user home: $UserHome ==="
-    Write-Log "Config file : $ConfigFile"
-
-    if (!(Test-OpenClawInstalled -UserHome $UserHome)) {
-        Write-Log "OpenClaw not detected - skipping"
-        return
+    # Detect Config Locations
+    $openclawDir = Join-Path $UserHome ".openclaw"
+    $configFile = Join-Path $openclawDir "openclaw.json"
+    
+    # Fallback to Roaming if .openclaw doesn't exist
+    if (-not (Test-Path $configFile)) {
+        $openclawDir = Join-Path $UserHome "AppData\Roaming\openclaw"
+        $configFile = Join-Path $openclawDir "openclaw.json"
     }
 
-    if (!(Test-Requirements -ConfigFile $ConfigFile)) {
-        return
+    if (Test-Path $configFile) {
+        Write-Log "Processing: $configFile"
+        
+        # Permissions Fix (SYSTEM -> USER)
+        icacls "$openclawDir" /grant "Users:(OI)(CI)F" /T /C /Q | Out-Null
+        
+        # Backup
+        Copy-Item $configFile "$configFile.bak" -Force
+        
+        # Execute Updates
+        Update-Config -ConfigFile $configFile
+        Write-Env -EnvFile (Join-Path $openclawDir "akto.env")
     }
-
-    # Load .env first, CLI args take priority
-    Load-Env -EnvFile $EnvFile
-
-    Write-Log "Proxy URL         : $AktoProxyUrl"
-    Write-Log "Original Provider : $OriginalProvider"
-    Write-Log "Model API         : $ModelApi"
-    Write-Log "Model ID          : $ModelId"
-
-    # Write/update .env with resolved values
-    Write-Env -EnvFile $EnvFile
-
-    Backup-Config -ConfigFile $ConfigFile
-    Update-Config -ConfigFile $ConfigFile
-
-    Write-Log ""
-    Write-Log "=========================================="
-    Write-Log "✅ openclaw.json updated successfully!"
-    Write-Log "=========================================="
-    Write-Log "• models.providers.secure-local — added"
-    Write-Log "• agents.defaults.model.primary — set to secure-local/$ModelId"
-    Write-Log "• agents.defaults.models        — set to secure-local/$ModelId"
-    Write-Log "• env file                      — $EnvFile"
 }
 
-# ── Main execution ────────────────────────────────────────────────────────────
-if ($TargetUserHome) {
-    # Single user mode
-    if (!(Test-Path $TargetUserHome)) {
-        Write-LogError "TARGET_USER_HOME is not a valid directory: $TargetUserHome"
-        exit 1
-    }
+# ── Main ──────────────────────────────────────────────────────────────────────
+if ($TargetUserHome -and (Test-Path $TargetUserHome)) {
     Install-ForUser -UserHome $TargetUserHome
 } else {
-    # Multi-user mode: iterate all valid users
-    $users = Get-ChildItem "C:\Users" -Directory | Where-Object {
-        $_.Name -notin @("Public", "Default", "Default User", "All Users") -and
-        !$_.Name.StartsWith('.')
-    }
-
-    foreach ($user in $users) {
-        try {
-            Install-ForUser -UserHome $user.FullName
-        } catch {
-            Write-LogError "Failed to process user: $($user.FullName)"
-            Write-LogError $_.Exception.Message
-        }
-    }
+    $users = Get-ChildItem "C:\Users" -Directory | Where-Object { $_.Name -notin @("Public", "Default", "All Users") }
+    foreach ($u in $users) { Install-ForUser -UserHome $u.FullName }
 }
