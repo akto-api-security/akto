@@ -398,22 +398,6 @@ const api = {
         })
     },
 
-    uploadSentinelOneRemoteScript(scriptName, scriptContent, osTypes) {
-        return request({
-            url: '/api/uploadSentinelOneRemoteScript',
-            method: 'post',
-            data: { scriptName, scriptContent, osTypes }
-        })
-    },
-
-    getSentinelOneRemoteScriptContent(scriptId) {
-        return request({
-            url: '/api/getSentinelOneRemoteScriptContent',
-            method: 'post',
-            data: { scriptId }
-        })
-    },
-
     executeSentinelOneRemoteScript(scriptId, executeAgentIds, executeTaskDescription, executeInputParams) {
         return request({
             url: '/api/executeSentinelOneRemoteScript',

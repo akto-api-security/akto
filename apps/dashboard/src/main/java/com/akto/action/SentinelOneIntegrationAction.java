@@ -282,105 +282,6 @@ public class SentinelOneIntegrationAction extends UserAction {
         return null;
     }
 
-    /** Upload a script to the SentinelOne remote scripts library. */
-    public String uploadSentinelOneRemoteScript() {
-        if (scriptName == null || scriptName.trim().isEmpty() || scriptContent == null || scriptContent.trim().isEmpty()) {
-            addActionError("scriptName and scriptContent are required.");
-            return Action.ERROR.toUpperCase();
-        }
-        SentinelOneIntegration integration = SentinelOneIntegrationDao.instance.findOne(new BasicDBObject());
-        if (integration == null) {
-            addActionError("SentinelOne integration not configured.");
-            return Action.ERROR.toUpperCase();
-        }
-        String normalizedConsoleUrl = normalizeUrl(integration.getConsoleUrl());
-
-        RequestConfig requestConfig = RequestConfig.custom()
-            .setConnectTimeout(CONNECT_TIMEOUT_MS).setSocketTimeout(SOCKET_TIMEOUT_MS).build();
-        try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
-            
-            String siteId = fetchSiteIdFromAgents(integration.getApiToken(), normalizedConsoleUrl);
-            if (siteId == null || siteId.isEmpty()) {
-                addActionError("Could not determine site ID — ensure at least one agent is enrolled.");
-                return Action.ERROR.toUpperCase();
-            }
-
-            // Detect OS from file extension when not provided
-            String os = "macos";
-            if (scriptName.endsWith(".ps1")) os = "windows";
-            else if (scriptName.endsWith(".py")) os = "linux";
-
-            String fileName = scriptName.endsWith(".sh") || scriptName.endsWith(".ps1") || scriptName.endsWith(".py")
-                ? scriptName : scriptName + ".sh";
-            MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-            builder.addTextBody("scriptName", scriptName);
-            builder.addTextBody("scriptType", "artifactCollection");
-            builder.addTextBody("scopeLevel", "site");
-            builder.addTextBody("scopeId", siteId);
-            builder.addTextBody("inputRequired", "false");
-            builder.addTextBody("osTypes", os);
-            builder.addBinaryBody("file",
-                scriptContent.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-                ContentType.TEXT_PLAIN, fileName);
-
-            HttpPost post = new HttpPost(normalizedConsoleUrl + "/web/api/v2.1/remote-scripts");
-            post.setHeader("Authorization", "ApiToken " + integration.getApiToken());
-            post.setEntity(builder.build());
-
-            try (CloseableHttpResponse response = httpClient.execute(post)) {
-                int statusCode = response.getStatusLine().getStatusCode();
-                String responseBody = EntityUtils.toString(response.getEntity());
-                if (statusCode != 200 && statusCode != 201) {
-                    loggerMaker.error("Upload remote script failed: HTTP " + statusCode + " - " + responseBody, LogDb.DASHBOARD);
-                    addActionError("Upload failed: " + responseBody);
-                    return Action.ERROR.toUpperCase();
-                }
-                JsonNode json = OBJECT_MAPPER.readTree(responseBody);
-                scriptId = json.path("data").path("id").asText(null);
-            }
-            return Action.SUCCESS.toUpperCase();
-        } catch (IOException e) {
-            loggerMaker.error("Error uploading remote script: " + e.getMessage(), LogDb.DASHBOARD);
-            addActionError("Error uploading remote script: " + e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
-    }
-
-    /** Fetch the content of a remote script by ID. */
-    public String getSentinelOneRemoteScriptContent() {
-        if (scriptId == null || scriptId.trim().isEmpty()) {
-            addActionError("scriptId is required.");
-            return Action.ERROR.toUpperCase();
-        }
-        SentinelOneIntegration integration = SentinelOneIntegrationDao.instance.findOne(new BasicDBObject());
-        if (integration == null) {
-            addActionError("SentinelOne integration not configured.");
-            return Action.ERROR.toUpperCase();
-        }
-        String normalizedConsoleUrl = normalizeUrl(integration.getConsoleUrl());
-        RequestConfig requestConfig = RequestConfig.custom()
-            .setConnectTimeout(CONNECT_TIMEOUT_MS).setSocketTimeout(SOCKET_TIMEOUT_MS).build();
-        try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
-            HttpGet get = new HttpGet(normalizedConsoleUrl + "/web/api/v2.1/remote-scripts/script-content?scriptId=" + scriptId);
-            get.setHeader("Authorization", "ApiToken " + integration.getApiToken());
-            try (CloseableHttpResponse response = httpClient.execute(get)) {
-                int statusCode = response.getStatusLine().getStatusCode();
-                String responseBody = EntityUtils.toString(response.getEntity());
-                if (statusCode != 200) {
-                    addActionError("Failed to fetch script content: HTTP " + statusCode);
-                    return Action.ERROR.toUpperCase();
-                }
-                JsonNode json = OBJECT_MAPPER.readTree(responseBody);
-                scriptContent = json.path("data").path("scriptContent").asText(responseBody);
-            }
-            return Action.SUCCESS.toUpperCase();
-        } catch (IOException e) {
-            loggerMaker.error("Error fetching script content: " + e.getMessage(), LogDb.DASHBOARD);
-            addActionError("Error fetching script content: " + e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
-    }
-
     /** Execute a remote script on selected agents. */
     public String executeSentinelOneRemoteScript() {
         if (scriptId == null || scriptId.trim().isEmpty()) {
@@ -876,17 +777,22 @@ public class SentinelOneIntegrationAction extends UserAction {
                     return null;
                 }
 
-                String os = "macos";
-                if (scriptName.endsWith(".ps1")) os = "windows";
-                else if (scriptName.endsWith(".py")) os = "linux";
+                String osTypesValue;
+                if (scriptName.endsWith(".ps1")) {
+                    osTypesValue = "windows";
+                } else if (scriptName.endsWith(".py")) {
+                    osTypesValue = "linux,macos,windows";
+                } else {
+                    osTypesValue = "linux,macos";
+                }
 
                 MultipartEntityBuilder builder = MultipartEntityBuilder.create();
                 builder.addTextBody("scriptName", scriptName);
-                builder.addTextBody("scriptType", "artifactCollection");
+                builder.addTextBody("scriptType", "action");
                 builder.addTextBody("scopeLevel", "site");
                 builder.addTextBody("scopeId", siteId);
                 builder.addTextBody("inputRequired", "false");
-                builder.addTextBody("osTypes", os);
+                builder.addTextBody("osTypes", osTypesValue);
                 builder.addBinaryBody("file",
                     scriptContent.getBytes(java.nio.charset.StandardCharsets.UTF_8),
                     ContentType.TEXT_PLAIN, scriptName);

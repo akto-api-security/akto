@@ -5,11 +5,25 @@
 # ========================================================================================
 # Automatically installs Akto guardrails hooks for Cursor IDE if detected
 # Downloads latest hooks from GitHub and configures Cursor hooks.json
+# Compatible with macOS and Linux
 # ========================================================================================
+
+# Ensure common binary paths are available (SentinelOne remote execution uses minimal PATH)
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 set -e
 
 GITHUB_RAW_BASE="https://raw.githubusercontent.com/akto-api-security/akto/agent-hooks/apps/mcp-endpoint-shield/cursor-hooks"
+
+# Detect OS
+OS_TYPE="$(uname -s)"
+IS_MACOS=false
+IS_LINUX=false
+
+case "$OS_TYPE" in
+    Darwin) IS_MACOS=true ;;
+    Linux) IS_LINUX=true ;;
+esac
 
 TARGET_USER_HOME="${TARGET_USER_HOME:-}"
 AKTO_DATA_INGESTION_URL="${AKTO_DATA_INGESTION_URL:-}"
@@ -49,11 +63,41 @@ install_for_user() {
 }
 
 check_cursor_installed() {
-    if [ -d "$TARGET_USER_HOME/.cursor" ] || [ -d "/Applications/Cursor.app" ]; then
+    # Check Cursor config directory (works on both macOS and Linux)
+    if [ -d "$TARGET_USER_HOME/.cursor" ]; then
         return 0
-    else
-        return 1
     fi
+
+    # macOS app bundle check
+    if [ "$IS_MACOS" = true ] && [ -d "/Applications/Cursor.app" ]; then
+        return 0
+    fi
+
+    # Linux package installations
+    if [ "$IS_LINUX" = true ]; then
+        # ~/.config/Cursor/ is created on first run — most reliable Linux indicator
+        if [ -d "$TARGET_USER_HOME/.config/Cursor" ]; then
+            return 0
+        fi
+        # .deb package paths (note: capital C in some packages)
+        if [ -d "/opt/cursor" ] || [ -d "/opt/Cursor" ] || \
+           [ -d "/usr/share/cursor" ] || [ -d "/usr/share/Cursor" ] || \
+           [ -f "/usr/bin/cursor" ] || \
+           [ -f "$TARGET_USER_HOME/.local/bin/cursor" ] || \
+           [ -d "$TARGET_USER_HOME/.local/share/cursor" ]; then
+            return 0
+        fi
+        # Snap installations
+        if [ -d "/snap/cursor" ]; then
+            return 0
+        fi
+        # command -v may fail under sudo (different PATH), try it last
+        if command -v cursor >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+
+    return 1
 }
 
 get_ingestion_url() {
@@ -75,7 +119,8 @@ get_ingestion_url() {
 }
 
 generate_device_id() {
-    if command -v ioreg >/dev/null 2>&1; then
+    # macOS: Try ioreg first
+    if [ "$IS_MACOS" = true ] && command -v ioreg >/dev/null 2>&1; then
         UUID=$(ioreg -rd1 -c IOPlatformExpertDevice 2>/dev/null | grep IOPlatformUUID | awk -F'"' '{print $4}')
         if [ -n "$UUID" ]; then
             echo "$UUID" | tr -d '-' | tr '[:upper:]' '[:lower:]'
@@ -83,8 +128,29 @@ generate_device_id() {
         fi
     fi
 
+    # Linux: Try machine-id
+    if [ "$IS_LINUX" = true ] && [ -f "/etc/machine-id" ]; then
+        cat "/etc/machine-id" | tr '[:upper:]' '[:lower:]'
+        return 0
+    fi
+
+    # Fallback: Get MAC address (macOS: en0, Linux: eth0 or ens0)
     if command -v ifconfig >/dev/null 2>&1; then
-        MAC=$(ifconfig en0 2>/dev/null | grep ether | awk '{print $2}' | tr -d ':')
+        if [ "$IS_MACOS" = true ]; then
+            MAC=$(ifconfig en0 2>/dev/null | grep ether | awk '{print $2}' | tr -d ':')
+        else
+            MAC=$(ifconfig eth0 2>/dev/null | awk '/ether/{print $2}' | tr -d ':')
+            [ -z "$MAC" ] && MAC=$(ifconfig ens0 2>/dev/null | awk '/ether/{print $2}' | tr -d ':')
+        fi
+        if [ -n "$MAC" ]; then
+            echo "$MAC" | tr '[:upper:]' '[:lower:]'
+            return 0
+        fi
+    fi
+
+    # Last resort: ip command (Linux only) — no grep -oP, use awk instead
+    if [ "$IS_LINUX" = true ] && command -v ip >/dev/null 2>&1; then
+        MAC=$(ip link show | awk '/link\/ether/{print $2}' | head -1 | tr -d ':')
         if [ -n "$MAC" ]; then
             echo "$MAC" | tr '[:upper:]' '[:lower:]'
             return 0
@@ -99,10 +165,10 @@ download_file() {
     local dest="$2"
 
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "$url" -o "$dest" 2>/dev/null
+        curl -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "$url" -o "$dest"
         return $?
     elif command -v wget >/dev/null 2>&1; then
-        wget -q --no-cache "$url" -O "$dest" 2>/dev/null
+        wget -q --no-cache "$url" -O "$dest"
         return $?
     else
         log_error "Neither curl nor wget available"
@@ -196,8 +262,14 @@ EOF
             local merged_config
             merged_config=$(echo "$existing_config" | jq --argjson newhooks "$new_hooks_config" '
                 .version = $newhooks.version |
-                .hooks.beforeSubmitPrompt = ((.hooks.beforeSubmitPrompt // []) + $newhooks.hooks.beforeSubmitPrompt) |
-                .hooks.afterAgentResponse = ((.hooks.afterAgentResponse // []) + $newhooks.hooks.afterAgentResponse)
+                .hooks.beforeSubmitPrompt = (
+                    [(.hooks.beforeSubmitPrompt // [])[] | select(.command | contains("/akto/") | not)] +
+                    $newhooks.hooks.beforeSubmitPrompt
+                ) |
+                .hooks.afterAgentResponse = (
+                    [(.hooks.afterAgentResponse // [])[] | select(.command | contains("/akto/") | not)] +
+                    $newhooks.hooks.afterAgentResponse
+                )
             ')
 
             echo "$merged_config" > "$CURSOR_HOOKS_FILE"
@@ -240,7 +312,14 @@ main() {
     mkdir -p "$CURSOR_HOOKS_DIR"
     log "Created hooks directory: $CURSOR_HOOKS_DIR"
 
-    REAL_USER="$(stat -f '%Su' "$TARGET_USER_HOME" 2>/dev/null || echo "")"
+    # Get real user (works on both macOS and Linux)
+    REAL_USER=""
+    if [ "$IS_MACOS" = true ]; then
+        REAL_USER="$(stat -f '%Su' "$TARGET_USER_HOME" 2>/dev/null || echo "")"
+    else
+        REAL_USER="$(stat -c '%U' "$TARGET_USER_HOME" 2>/dev/null || echo "")"
+    fi
+
     if [ -n "$REAL_USER" ] && [ "$REAL_USER" != "root" ]; then
         chown -R "$REAL_USER" "$TARGET_USER_HOME/.cursor" 2>/dev/null || true
         log "Set ownership to $REAL_USER"
@@ -306,12 +385,20 @@ if [ -n "$TARGET_USER_HOME" ]; then
     exit $?
 else
     EXIT_CODE=0
-    for u in /Users/*/; do
+
+    # Determine user home directories based on OS
+    if [ "$IS_MACOS" = true ]; then
+        USER_DIRS="/Users/*"
+    else
+        USER_DIRS="/home/*"
+    fi
+
+    for u in $USER_DIRS; do
         u="${u%/}"
         base="$(basename "$u")"
         [ "$base" = "Shared" ] && continue
         [ "$base" = "Guest" ] && continue
-        [[ "$base" == .* ]] && continue
+        case "$base" in .*) continue ;; esac
         [ -d "$u" ] || continue
 
         log "=== Processing user: $u ==="
