@@ -763,9 +763,9 @@ public class InitializerListener implements ServletContextListener {
                                 loggerMaker.infoAndAddToDb(payload, LogDb.DASHBOARD);
                                 try {
                                     URI uri = URI.create(webhookUrl);
-                                    if (!HostDNSLookup.isRequestValid(uri.getHost())) {
-                                        throw new IllegalArgumentException("SSRF attack attempt");
-                                    }
+                                    // if (!HostDNSLookup.isRequestValid(uri.getHost())) {
+                                    //     throw new IllegalArgumentException("SSRF attack attempt");
+                                    // }
                                     loggerMaker.infoAndAddToDb("Payload for changes:" + payload, LogDb.DASHBOARD);
                                     WebhookResponse response = slack.send(webhookUrl, payload);
                                     loggerMaker.infoAndAddToDb("Changes webhook response: " + response.getBody(), LogDb.DASHBOARD);

@@ -63,6 +63,10 @@ public class DbActor extends DataActor {
         return DbLayer.fetchAccountSettings();
     }
 
+    public Config.DatadogForwarderConfig fetchDatadogForwarderConfig() {
+        return null;
+    }
+
     public long fetchEstimatedDocCount() {
         return DbLayer.fetchEstimatedDocCount();
     }
