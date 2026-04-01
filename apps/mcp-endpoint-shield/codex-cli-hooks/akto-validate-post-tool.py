@@ -111,7 +111,7 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 
 
 def build_ingestion_payload(
-    tool_name: str, tool_input: str, tool_response: str
+    tool_name: str, tool_input: Dict[str, Any], tool_response: Dict[str, Any]
 ) -> Dict[str, Any]:
     tags = {
         "gen-ai": "Gen AI",
@@ -166,7 +166,7 @@ def build_ingestion_payload(
     }
 
 
-def send_ingestion_data(tool_name: str, tool_input: Any, tool_response: Any):
+def send_ingestion_data(tool_name: str, tool_input: Dict[str, Any], tool_response: Dict[str, Any]):
     if not AKTO_DATA_INGESTION_URL:
         logger.info("AKTO_DATA_INGESTION_URL not set, skipping ingestion")
         return

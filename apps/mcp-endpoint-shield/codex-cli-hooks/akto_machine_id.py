@@ -5,7 +5,10 @@ Mimics the Go implementation for generating unique device identifiers.
 """
 import os
 import platform
-import pwd
+try:
+    import pwd
+except ImportError:
+    pwd = None  # type: ignore[assignment]
 import subprocess
 import uuid
 
