@@ -5,6 +5,7 @@ import com.akto.dto.RawApi;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.type.URLTemplate;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
 import com.akto.threat.detection.utils.ThreatDetector;
 
 import java.util.List;
@@ -41,7 +42,7 @@ public class FilterYamlDetectionStrategy implements ThreatDetectionStrategy {
     }
 
     @Override
-    public List<com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError> getThreatPositions(
+    public List<SchemaConformanceError> getThreatPositions(
             String filterId,
             HttpResponseParams httpResponseParams) {
 

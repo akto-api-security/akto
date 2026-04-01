@@ -14,7 +14,7 @@ public enum RuntimeMode {
 
     public static boolean isHybridDeployment(){
         RuntimeMode runtimeMode = RuntimeMode.getRuntimeMode();
-        return true;//runtimeMode.equals(HYBRID);
+        return runtimeMode.equals(HYBRID);
     }
 
 }
