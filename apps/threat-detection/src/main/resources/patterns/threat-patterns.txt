@@ -1,0 +1,138 @@
+# Threat Detection Patterns for Hyperscan
+# Format: <prefix>::<regex_pattern>
+#
+# Categories:
+#   - sqli: SQL Injection
+#   - xss: Cross-Site Scripting
+#   - lfi: Local File Inclusion
+#   - rfi: Remote File Inclusion
+#   - cmd: Command Injection
+#   - ssrf: Server-Side Request Forgery
+#   - xxe: XML External Entity
+#   - path: Path Traversal
+
+# ==========================================
+# SQL Injection (SQLI)
+# ==========================================
+regex_sqli_01::(?i)(union\s+select|select\s+.*\s+from|insert\s+into)
+regex_sqli_02::(?i)(drop\s+table|delete\s+from|update\s+.*\s+set)
+regex_sqli_03::(?i)(\bor\b\s+['"]?\d+['"]?\s*=\s*['"]?\d+)
+regex_sqli_04::(?i)(\band\b\s+['"]?\d+['"]?\s*=\s*['"]?\d+)
+regex_sqli_05::(?i)(exec\s*\(|execute\s*\(|sp_executesql)
+regex_sqli_06::(?i)(information_schema|sys\.tables|sys\.columns)
+regex_sqli_07::(?i)(concat\s*\(|char\s*\(|ascii\s*\()
+regex_sqli_08::(?i)(benchmark\s*\(|sleep\s*\(|waitfor\s+delay)
+regex_sqli_09::(?i)(load_file\s*\(|into\s+outfile|into\s+dumpfile)
+regex_sqli_10::(?i)(0x[0-9a-f]+|char\(0x)
+regex_sqli_high_accuracy_11::(?i)('.*--|\\".*--|'.*#)
+regex_sqli_high_accuracy_12::(?i)(;.*drop|;.*alter|;.*create)
+
+# ==========================================
+# Cross-Site Scripting (XSS)
+# ==========================================
+xss_html_tags_high_accuracy_d0d4::<\s*script[^>]*>.*?<\s*/\s*script\s*>
+xss_html_tags_01::<\s*script[^>]*>
+xss_html_tags_02::<\s*iframe[^>]*\s+src\s*=
+xss_html_tags_03::<\s*img[^>]*\s+src\s*=
+xss_html_tags_04::<\s*embed[^>]*\s+src\s*=
+xss_html_tags_05::<\s*object[^>]*\s+data\s*=
+xss_javascript_protocol_01::(?i)javascript\s*:
+xss_javascript_protocol_02::(?i)data\s*:\s*text/html
+xss_event_handler_01::(?i)\bonload\s*=\s*["']
+xss_event_handler_02::(?i)\bonerror\s*=\s*["']
+xss_event_handler_03::(?i)\bon\w+\s*=\s*["']
+xss_eval_01::(?i)\beval\s*\(
+xss_document_01::(?i)document\s*\.\s*cookie
+xss_document_02::(?i)document\s*\.\s*write
+
+# ==========================================
+# Local File Inclusion (LFI)
+# ==========================================
+lfi_dotdot_01::\.\.\/|\.\.\\
+lfi_etc_passwd_02::\/etc\/passwd
+lfi_etc_shadow_03::\/etc\/shadow
+lfi_windows_01::(?i)c:\\windows\\system32
+lfi_windows_02::(?i)c:\\boot\.ini
+lfi_proc_01::\/proc\/self\/
+lfi_var_log_01::\/var\/log\/
+lfi_php_filter_01::php:\/\/filter
+lfi_php_input_01::php:\/\/input
+lfi_data_protocol_01::data:\/\/text\/plain
+
+# ==========================================
+# Command Injection (CMD)
+# ==========================================
+cmd_injection_01::(?i)[;&|]\s*(cat|ls|wget|curl|nc|bash|sh)\s+
+cmd_injection_pipe_02::(?i)\|\s*(cat|tee|grep|awk|sed)
+cmd_injection_backtick_03::`[^`]*`
+cmd_injection_dollar_04::\$\([^)]*\)
+cmd_injection_redirect_05::(?i)>\s*/dev/null
+cmd_injection_redirect_06::(?i)>\s*/tmp/
+cmd_injection_base64_01::(?i)base64\s+-d
+cmd_injection_netcat_01::(?i)nc\s+-[lpe]
+cmd_injection_python_01::(?i)python\s+-c
+cmd_injection_perl_01::(?i)perl\s+-e
+
+# ==========================================
+# Server-Side Request Forgery (SSRF)
+# ==========================================
+ssrf_localhost_01::(?i)(localhost|127\.0\.0\.1|0\.0\.0\.0|::1)
+ssrf_internal_ip_01::(10\.\d{1,3}\.\d{1,3}\.\d{1,3})
+ssrf_internal_ip_02::(172\.(1[6-9]|2[0-9]|3[01])\.\d{1,3}\.\d{1,3})
+ssrf_internal_ip_03::(192\.168\.\d{1,3}\.\d{1,3})
+ssrf_cloud_metadata_01::169\.254\.169\.254
+ssrf_cloud_metadata_02::(?i)metadata\.google\.internal
+ssrf_cloud_metadata_03::(?i)instance-data\.ec2\.internal
+ssrf_file_protocol_01::file:\/\/\/
+ssrf_gopher_01::gopher:\/\/
+ssrf_dict_01::dict:\/\/
+
+# ==========================================
+# Path Traversal
+# ==========================================
+path_traversal_01::\.\.\/\.\.\/
+path_traversal_02::\.\.\\\.\.\\
+path_traversal_03::%2e%2e%2f
+path_traversal_04::%2e%2e%5c
+path_traversal_encoded_01::\.\.%252f
+path_traversal_encoded_02::\.\.%255c
+
+# ==========================================
+# XML External Entity (XXE)
+# ==========================================
+xxe_entity_01::<!ENTITY
+xxe_system_01::SYSTEM\s+["']
+xxe_public_01::PUBLIC\s+["']
+xxe_doctype_01::<!DOCTYPE
+
+# ==========================================
+# LDAP Injection
+# ==========================================
+ldap_injection_01::\*\)\(
+ldap_injection_02::\)\(cn=
+ldap_injection_03::\(\|\(
+
+# ==========================================
+# NoSQL Injection
+# ==========================================
+nosql_injection_01::(?i)(\$ne|\$gt|\$gte|\$lt|\$lte)
+nosql_injection_02::(?i)\$where
+nosql_injection_03::(?i)\$regex
+
+# ==========================================
+# Template Injection
+# ==========================================
+template_injection_01::\{\{.*\}\}
+template_injection_02::\{%.*%\}
+template_injection_03::\$\{.*\}
+
+# ==========================================
+# Sensitive Data Exposure
+# ==========================================
+sensitive_aws_key_01::(?i)AKIA[0-9A-Z]{16}
+sensitive_private_key_01::-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----
+sensitive_jwt_01::eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+
+
+# ==========================================
+# Additional Patterns (Add more as needed)
+# ==========================================

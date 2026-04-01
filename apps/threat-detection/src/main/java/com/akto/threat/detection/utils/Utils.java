@@ -13,6 +13,7 @@ import com.akto.dto.RawApiMetadata;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
+import com.akto.threat.detection.hyperscan.ThreatCategory;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
@@ -103,68 +104,17 @@ public class Utils {
     /**
      * Build a synthetic FilterConfig for a Hyperscan-detected threat category.
      * This allows Hyperscan results to flow through the same event pipeline as YAML filters.
+     * Uses ThreatCategory enum as single source of truth for filter ID, category, and severity.
      */
-    public static FilterConfig buildHyperscanFilterConfig(String category, String severity) {
-        Category yamlCategory = mapCategoryToYamlCategory(category);
-        String filterId = yamlCategory.getName();
-        FilterConfig filter = new FilterConfig(filterId, null, null, null);
+    public static FilterConfig buildHyperscanFilterConfig(ThreatCategory tc) {
+        FilterConfig filter = new FilterConfig(tc.getFilterId(), null, null, null);
         Info info = new Info();
-        info.setName(filterId);
-        info.setCategory(yamlCategory);
-        info.setSubCategory(category);
-        info.setSeverity(severity != null ? severity : mapCategoryToSeverity(category));
+        info.setName(tc.getFilterId());
+        info.setCategory(tc.toYamlCategory());
+        info.setSubCategory(tc.getCategoryName());
+        info.setSeverity(tc.getSeverity());
         filter.setInfo(info);
         return filter;
-    }
-
-    /**
-     * Map Hyperscan top-level category to the Category used by YAML filters,
-     * so events show up consistently in the dashboard.
-     */
-    private static Category mapCategoryToYamlCategory(String category) {
-        if (category == null) return new Category("SM", "Security Misconfiguration", "Security Misconfiguration (SM)");
-        switch (category.toLowerCase()) {
-            case "sqli":
-                return new Category("SQL_INJECTION", "SQL Injection", "SQL Injection");
-            case "nosql":
-                return new Category("NOSQL_INJECTION", "NoSQL Injection", "NoSQL Injection");
-            case "xss":
-                return new Category("XSS", "XSS", "Cross-site scripting (XSS)");
-            case "os_cmd":
-                return new Category("OS_COMMAND_INJECTION", "OS Command Injection", "OS Command Injection");
-            case "windows":
-                return new Category("COMMAND_INJECTION", "Command Injection", "Command Injection");
-            case "ssrf":
-                return new Category("SSRF", "Server Side Request Forgery", "Server Side Request Forgery (SSRF)");
-            case "lfi":
-                return new Category("LFI_RFI", "Local File Inclusion", "Local File Inclusion / Remote File Inclusion (LFI/RFI)");
-            case "xxe":
-                return new Category("COMMAND_INJECTION", "Command Injection", "Command Injection");
-            case "ldap":
-                return new Category("COMMAND_INJECTION", "Command Injection", "Command Injection");
-            case "ssti":
-                return new Category("SSTI", "Server Side Template Injection", "Server Side Template Injection (SSTI)");
-            case "debug":
-            case "version":
-                return new Category("SecurityMisconfig", "Security Misconfiguration", "Security Misconfiguration");
-            case "stack_trace":
-                return new Category("SecurityMisconfig", "Security Misconfiguration", "Security Misconfiguration");
-            default:
-                return new Category("SecurityMisconfig", "Security Misconfiguration", "Security Misconfiguration");
-        }
-    }
-
-    private static String mapCategoryToSeverity(String category) {
-        if (category == null) return "MEDIUM";
-        switch (category.toLowerCase()) {
-            case "sqli": case "os_cmd": case "xxe": case "nosql": case "windows":
-            case "xss": case "ssrf": case "lfi": case "ssti": case "ldap":
-                return "HIGH";
-            case "debug": case "version": case "stack_trace":
-                return "LOW";
-            default:
-                return "MEDIUM";
-        }
     }
 
     public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors, boolean successfulExploit, boolean ignoredEvent, RedactionType redactionType) {
@@ -185,22 +135,25 @@ public class Utils {
                 // If redaction fails, fall back to original message
             }
         }
-            SampleMaliciousRequest.Builder maliciousReqBuilder = SampleMaliciousRequest.newBuilder()
-                    .setUrl(responseParam.getRequestParams().getURL())
-                    .setMethod(responseParam.getRequestParams().getMethod())
-                    .setPayload(redactedPayload)
-                    .setIp(actor) // For now using actor as IP
-                    .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
-                    .setTimestamp(responseParam.getTime())
-                    .setFilterId(apiFilter.getId())
-                    .setSuccessfulExploit(successfulExploit)
-                    .setStatus(status);
+        SampleMaliciousRequest.Builder maliciousReqBuilder = SampleMaliciousRequest.newBuilder()
+                .setUrl(responseParam.getRequestParams().getURL())
+                .setMethod(responseParam.getRequestParams().getMethod())
+                .setPayload(redactedPayload)
+                .setIp(actor) // For now using actor as IP
+                .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
+                .setTimestamp(responseParam.getTime())
+                .setFilterId(apiFilter.getId())
+                .setSuccessfulExploit(successfulExploit)
+                .setStatus(status);
 
+        
+        if (metadata != null) {
             metadataBuilder.setCountryCode(metadata.getCountryCode());
             metadataBuilder.setDestCountryCode(metadata.getDestCountryCode() != null ? metadata.getDestCountryCode() : "");
             maliciousReqBuilder.setMetadata(metadataBuilder.build());
-            return maliciousReqBuilder.build();
         }
+        return maliciousReqBuilder.build();
+    }
 
     public static boolean apiDistributionEnabled(boolean redisEnabled, boolean apiDistributionEnabled) {
         if (!redisEnabled) {

@@ -36,6 +36,7 @@ public class HyperscanThreatMatcher {
     private Map<String, List<Integer>> categoryToPatternIds;
     private boolean initialized = false;
     private ThreadLocal<com.gliwka.hyperscan.wrapper.Scanner> scannerThreadLocal;
+    private Set<ScanLocation> activeLocations = EnumSet.noneOf(ScanLocation.class);
 
     public enum ScanLocation {
         REQUEST_URL, REQUEST_HEADERS, REQUEST_BODY,
@@ -160,6 +161,7 @@ public class HyperscanThreatMatcher {
         try {
             patternMap = new ConcurrentHashMap<>();
             categoryToPatternIds = new ConcurrentHashMap<>();
+            activeLocations = EnumSet.noneOf(ScanLocation.class);
 
             List<Expression> expressions = parsePatternLines(lines);
             if (expressions.isEmpty()) {
@@ -200,8 +202,10 @@ public class HyperscanThreatMatcher {
                         patternId));
 
                 String groupName = extractGroupName(originalPattern);
-                PatternInfo info = new PatternInfo(prefix, patternId, groupName, parseLocations(locationsStr));
+                Set<ScanLocation> locs = parseLocations(locationsStr);
+                PatternInfo info = new PatternInfo(prefix, patternId, groupName, locs);
                 patternMap.put(patternId, info);
+                activeLocations.addAll(locs);
                 categoryToPatternIds.computeIfAbsent(info.category, k -> new ArrayList<>()).add(patternId);
                 patternId++;
             } catch (Exception e) {
@@ -232,11 +236,20 @@ public class HyperscanThreatMatcher {
 
     // --- Scanning ---
 
+    /**
+     * Check if any pattern targets this location — if not, skip the entire Hyperscan scan.
+     */
+    private boolean hasAnyPatternForLocation(ScanLocation loc) {
+        return activeLocations.contains(ScanLocation.ALL) || activeLocations.contains(loc);
+    }
+
     public List<MatchResult> scan(String text, String location) {
         if (!initialized || text == null || text.isEmpty()) return Collections.emptyList();
 
-        List<MatchResult> matches = new ArrayList<>();
         ScanLocation scanLoc = toScanLocation(location);
+        if (!hasAnyPatternForLocation(scanLoc)) return Collections.emptyList();
+
+        List<MatchResult> matches = new ArrayList<>();
 
         try {
             com.gliwka.hyperscan.wrapper.Scanner scanner = scannerThreadLocal.get();
@@ -247,8 +260,6 @@ public class HyperscanThreatMatcher {
                 if (info != null && isLocationAllowed(info.locations, scanLoc)) {
                     int s = (int) Math.min(from, text.length());
                     int e = (int) Math.min(to, text.length());
-                    // Hyperscan SOM_LEFTMOST may truncate the last 1-2 chars of the match.
-                    // Extend by 2 to compensate, so the phrase can be found in the original text.
                     int eAdj = (int) Math.min(e + 2, text.length());
                     matches.add(new MatchResult(info.prefix, info.category, from, eAdj, text.substring(s, eAdj), location));
                 }

@@ -177,7 +177,7 @@ public class Main {
                 .setPollDurationMilli(pollDurationMilli)
                 .build())
         .setProducerConfig(
-            KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
+            KafkaProducerConfig.newBuilder().setBatchSize(16384).setLingerMs(100).build())
         .setKeySerializer(Serializer.STRING)
         .setValueSerializer(Serializer.BYTE_ARRAY)
         .build();

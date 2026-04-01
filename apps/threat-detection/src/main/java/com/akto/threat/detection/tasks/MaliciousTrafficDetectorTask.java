@@ -464,15 +464,21 @@ public class MaliciousTrafficDetectorTask implements Task {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
       return;
     }
-    Map<String, FilterConfig> filters = this.getFilters();
-    if (filters.isEmpty()) {
-      logger.warnAndAddToDb("No filters found for account " + responseParam.getAccountId());
-      return;
-    }
+    boolean isHyperscanOnly = ThreatDetectionConfig.getDetectionMode() == ThreatDetectionMode.HYPERSCAN_ONLY;
 
-    RawApi rawApi = RawApi.buildFromMessageNew(responseParam);
-    RawApiMetadata metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());
-    rawApi.setRawApiMetdata(metadata);
+    RawApi rawApi = null;
+    RawApiMetadata metadata = null;
+    if (!isHyperscanOnly) {
+      Map<String, FilterConfig> filters = this.getFilters();
+      if (filters.isEmpty()) {
+        logger.warnAndAddToDb("No filters found for account " + responseParam.getAccountId());
+        return;
+      }
+
+      rawApi = RawApi.buildFromMessageNew(responseParam);
+      metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());
+      rawApi.setRawApiMetdata(metadata);
+    }
 
     int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
     responseParam.requestParams.setApiCollectionId(apiCollectionId);
@@ -502,21 +508,21 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     List<SchemaConformanceError> errors = null;
 
-    // Check SuccessfulExploit category filters
-    boolean successfulExploit = false; 
+    // Skip YAML-based exploit/ignore checks for Hyperscan mode
+    boolean successfulExploit = false;
+    boolean isIgnoredEvent = false;
     if (!successfulExploitFilters.isEmpty()) {
       successfulExploit = threatDetector.isSuccessfulExploit(successfulExploitFilters, rawApi, apiInfoKey);
     }
-    // Check IgnoredEvents category filters
-    boolean isIgnoredEvent = false;
-    if (!ignoredEventFilters.isEmpty()) {
-      isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
+    if (!isHyperscanOnly) {
+      if (!ignoredEventFilters.isEmpty()) {
+        isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
+      }
     }
+
     if (apiDistributionEnabled && apiCollectionId != 0) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
 
-      // Use pre-matched template URL for Redis storage
-      // This aggregates requests like /api/users/1, /api/users/2 under /api/users/INTEGER
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, urlForAggregation, method.toString());
       String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, urlForAggregation, method.toString());
       long curEpochMin = responseParam.getTime() / 60;
@@ -537,23 +543,19 @@ public class MaliciousTrafficDetectorTask implements Task {
             + ratelimitConfig.toString());
 
         RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
-        // Send event to BE.
         SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam,
             ipApiRateLimitFilter, metadata, errors, successfulExploit, isIgnoredEvent, redactionType);
         generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq,
             EventType.EVENT_TYPE_AGGREGATED);
 
-        // cool-off sending to BE till mitigationPeriod is over
         this.threatConfigEvaluator.setActorInMitigationPeriod(ipApiCmsKey, ratelimitConfig);
       }
     }
 
-    // Determine detection mode to decide whether to run Hyperscan
-    ThreatDetectionMode detectionMode = ThreatDetectionConfig.getDetectionMode();
     boolean skipFilterLoop = false;
 
     // Run Hyperscan if enabled
-    if (detectionMode == ThreatDetectionMode.HYPERSCAN_ONLY) {
+    if (isHyperscanOnly) {
       RedactionType hsRedactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
       hyperscanEventHandler.detectAndPushEvents(
           responseParam, apiInfoKey, actor, metadata,

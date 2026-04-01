@@ -59,7 +59,7 @@ public class HyperscanEventHandler {
         }
 
         try {
-            Map<String, List<SchemaConformanceError>> errorsByCategory = new HashMap<>();
+            Map<ThreatCategory, List<SchemaConformanceError>> errorsByCategory = new HashMap<>();
 
             // Scan request
             if (responseParam.getRequestParams() != null) {
@@ -81,8 +81,8 @@ public class HyperscanEventHandler {
             }
 
             // Push one event per category
-            for (Map.Entry<String, List<SchemaConformanceError>> entry : errorsByCategory.entrySet()) {
-                FilterConfig filter = Utils.buildHyperscanFilterConfig(entry.getKey(), null);
+            for (Map.Entry<ThreatCategory, List<SchemaConformanceError>> entry : errorsByCategory.entrySet()) {
+                FilterConfig filter = Utils.buildHyperscanFilterConfig(entry.getKey());
                 SampleMaliciousRequest req = Utils.buildSampleMaliciousRequest(
                         actor, responseParam, filter, metadata,
                         entry.getValue(), successfulExploit, isIgnoredEvent, redactionType);
@@ -101,7 +101,7 @@ public class HyperscanEventHandler {
 
     private static void collectMatchErrors(
             Map<String, List<HyperscanThreatMatcher.MatchResult>> matches,
-            Map<String, List<SchemaConformanceError>> errorsByCategory) {
+            Map<ThreatCategory, List<SchemaConformanceError>> errorsByCategory) {
 
         for (List<HyperscanThreatMatcher.MatchResult> matchList : matches.values()) {
             for (HyperscanThreatMatcher.MatchResult match : matchList) {
@@ -116,16 +116,14 @@ public class HyperscanEventHandler {
                         .setPhrase(match.matchedText)
                         .build();
 
-                String topCategory = extractTopCategory(match.prefix);
-                errorsByCategory.computeIfAbsent(topCategory, k -> new ArrayList<>()).add(error);
+                ThreatCategory category = ThreatCategory.fromPatternPrefix(match.prefix);
+                if (category == null) {
+                    logger.errorAndAddToDb("Unrecognized pattern prefix, skipping: " + match.prefix);
+                    continue;
+                }
+                errorsByCategory.computeIfAbsent(category, k -> new ArrayList<>()).add(error);
             }
         }
-    }
-
-    static String extractTopCategory(String prefix) {
-        if (prefix == null || prefix.isEmpty()) return "unknown";
-        int idx = prefix.indexOf('_');
-        return idx > 0 ? prefix.substring(0, idx) : prefix;
     }
 
     private static SchemaConformanceError.Location convertLocation(String location) {
