@@ -6,8 +6,8 @@
 # ========================================================================================
 
 param(
-    [string]$TargetUserHome = "",
-    [string]$AktoGuardrailsUrl = ""
+    [string]$TargetUserHome = $env:USERPROFILE,
+    [string]$AktoDataIngestionUrl = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,17 +37,28 @@ function Write-ErrorLog {
 
 function Test-ClaudeCliInstalled {
     param([string]$UserHome)
-    
-    $claudeExists = Get-Command claude -ErrorAction SilentlyContinue
-    if ($claudeExists) {
+
+    # .claude dir exists after first run
+    if (Test-Path (Join-Path $UserHome ".claude")) {
         return $true
     }
-    
-    $claudeDir = Join-Path $UserHome ".claude"
-    if (Test-Path $claudeDir) {
+
+    # npm global install paths (SYSTEM account has no %APPDATA%, so derive from UserHome)
+    $npmPaths = @(
+        (Join-Path $UserHome "AppData\Roaming\npm\claude"),
+        (Join-Path $UserHome "AppData\Roaming\npm\claude.cmd"),
+        (Join-Path $UserHome "AppData\Local\npm\claude"),
+        (Join-Path $UserHome "AppData\Local\npm\claude.cmd")
+    )
+    foreach ($p in $npmPaths) {
+        if (Test-Path $p) { return $true }
+    }
+
+    # Last resort: Get-Command works if run interactively (non-SYSTEM)
+    if (Get-Command claude -ErrorAction SilentlyContinue) {
         return $true
     }
-    
+
     return $false
 }
 
@@ -98,12 +109,25 @@ function Download-File {
         [string]$Url,
         [string]$Destination
     )
-    
+
     Write-Log "Downloading $(Split-Path $Destination -Leaf)..."
-    
+
+    # Try Invoke-WebRequest first
     try {
-        Invoke-WebRequest -Uri $Url -OutFile $Destination -UseBasicParsing
+        Invoke-WebRequest -Uri $Url -OutFile $Destination -UseBasicParsing -Headers @{"Cache-Control"="no-cache";"Pragma"="no-cache"}
         return $true
+    } catch {
+        Write-Log "Invoke-WebRequest failed, trying curl.exe fallback..."
+    }
+
+    # Fallback: curl.exe (ships with Windows 10+ and handles TLS correctly under SYSTEM)
+    try {
+        $result = & curl.exe -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" $Url -o $Destination 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            return $true
+        }
+        Write-ErrorLog "curl.exe failed (exit $LASTEXITCODE): $result"
+        return $false
     } catch {
         Write-ErrorLog "Failed to download from $Url : $_"
         return $false
@@ -207,14 +231,14 @@ function Update-ClaudeSettings {
         try {
             $settings = Get-Content $SettingsFile -Raw | ConvertFrom-Json -AsHashtable
             $settings["hooks"] = $newHooksConfig["hooks"]
-            $settings | ConvertTo-Json -Depth 10 | Set-Content $SettingsFile
+            [System.IO.File]::WriteAllText($SettingsFile, ($settings | ConvertTo-Json -Depth 10), [System.Text.Encoding]::UTF8)
             Write-Log "Merged hooks into existing settings.json"
         } catch {
-            $newHooksConfig | ConvertTo-Json -Depth 10 | Set-Content $SettingsFile
+            [System.IO.File]::WriteAllText($SettingsFile, ($newHooksConfig | ConvertTo-Json -Depth 10), [System.Text.Encoding]::UTF8)
             Write-Log "Created new settings.json (merge failed)"
         }
     } else {
-        $newHooksConfig | ConvertTo-Json -Depth 10 | Set-Content $SettingsFile
+        [System.IO.File]::WriteAllText($SettingsFile, ($newHooksConfig | ConvertTo-Json -Depth 10), [System.Text.Encoding]::UTF8)
         Write-Log "Created new settings.json with hooks"
     }
 }

@@ -8,7 +8,7 @@
 # ========================================================================================
 
 param(
-    [string]$TargetUserHome = "",
+    [string]$TargetUserHome = $env:USERPROFILE,
     [string]$OpenAIApiKey = "",
     [string]$AktoGuardrailsUrl = "",
     [string]$OriginalProvider = "",
@@ -91,8 +91,36 @@ MODEL_API=$ModelApi
 MODEL_ID=$ModelId
 "@
 
-    $content | Out-File -FilePath $EnvFile -Encoding UTF8
+    [System.IO.File]::WriteAllText($EnvFile, $content, [System.Text.Encoding]::UTF8)
     Write-Log "✓ Env file written: $EnvFile"
+}
+
+# ── OpenClaw installation detection ──────────────────────────────────────────
+function Test-OpenClawInstalled {
+    param([string]$UserHome)
+
+    # .openclaw dir exists after first run
+    if (Test-Path (Join-Path $UserHome ".openclaw")) {
+        return $true
+    }
+
+    # npm global install paths (SYSTEM account has no %APPDATA%, derive from UserHome)
+    $npmPaths = @(
+        (Join-Path $UserHome "AppData\Roaming\npm\openclaw"),
+        (Join-Path $UserHome "AppData\Roaming\npm\openclaw.cmd"),
+        (Join-Path $UserHome "AppData\Local\npm\openclaw"),
+        (Join-Path $UserHome "AppData\Local\npm\openclaw.cmd")
+    )
+    foreach ($p in $npmPaths) {
+        if (Test-Path $p) { return $true }
+    }
+
+    # Last resort: Get-Command works if run interactively (non-SYSTEM)
+    if (Get-Command openclaw -ErrorAction SilentlyContinue) {
+        return $true
+    }
+
+    return $false
 }
 
 # ── Preflight checks ──────────────────────────────────────────────────────────
@@ -172,7 +200,8 @@ function Update-Config {
     $config.agents.defaults.models | Add-Member -NotePropertyName $providerKey -NotePropertyValue @{} -Force
 
     # Write back
-    $config | ConvertTo-Json -Depth 10 | Set-Content $ConfigFile -Encoding UTF8
+    $json = $config | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($ConfigFile, $json, [System.Text.Encoding]::UTF8)
 }
 
 # ── Per-user install ──────────────────────────────────────────────────────────
@@ -186,6 +215,11 @@ function Install-ForUser {
     Write-Log ""
     Write-Log "=== Processing user home: $UserHome ==="
     Write-Log "Config file : $ConfigFile"
+
+    if (!(Test-OpenClawInstalled -UserHome $UserHome)) {
+        Write-Log "OpenClaw not detected - skipping"
+        return
+    }
 
     if (!(Test-Requirements -ConfigFile $ConfigFile)) {
         return

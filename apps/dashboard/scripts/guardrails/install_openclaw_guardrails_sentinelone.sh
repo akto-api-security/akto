@@ -9,6 +9,9 @@
 #   3. Generates/reads .env file at ~/.openclaw/akto.env
 # ========================================================================================
 
+# Ensure common binary paths are available (SentinelOne remote execution uses minimal PATH)
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+
 set -e
 
 # ── Defaults (no $HOME — safe for live response) ──────────────────────────────

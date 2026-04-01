@@ -6,7 +6,7 @@
 # ========================================================================================
 
 param(
-    [string]$TargetUserHome = $env:USERPROFILE,
+    [string]$TargetUserHome = "",
     [string]$AktoDataIngestionUrl = ""
 )
 
@@ -29,8 +29,8 @@ function Test-CursorInstalled {
     
     $cursorDir = Join-Path $UserHome ".cursor"
     $cursorProgramFiles = "C:\Program Files\Cursor"
-    $cursorLocalAppData = Join-Path $env:LOCALAPPDATA "Programs\Cursor"
-    
+    $cursorLocalAppData = Join-Path $UserHome "AppData\Local\Programs\Cursor"
+
     return (Test-Path $cursorDir) -or (Test-Path $cursorProgramFiles) -or (Test-Path $cursorLocalAppData)
 }
 
@@ -79,13 +79,23 @@ function Get-FileFromUrl {
         [string]$Url,
         [string]$Destination
     )
-    
+
+    # Try Invoke-WebRequest first
     try {
-        $webClient = New-Object System.Net.WebClient
-        $webClient.Headers.Add("Cache-Control", "no-cache")
-        $webClient.Headers.Add("Pragma", "no-cache")
-        $webClient.DownloadFile($Url, $Destination)
+        Invoke-WebRequest -Uri $Url -OutFile $Destination -UseBasicParsing -Headers @{"Cache-Control"="no-cache";"Pragma"="no-cache"}
         return $true
+    } catch {
+        Write-Log "Invoke-WebRequest failed, trying curl.exe fallback..."
+    }
+
+    # Fallback: curl.exe (ships with Windows 10+ and handles TLS correctly under SYSTEM)
+    try {
+        $result = & curl.exe -fsSL -H "Cache-Control: no-cache" -H "Pragma: no-cache" $Url -o $Destination 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            return $true
+        }
+        Write-LogError "curl.exe failed (exit $LASTEXITCODE): $result"
+        return $false
     } catch {
         Write-LogError "Failed to download from $Url : $_"
         return $false
@@ -128,14 +138,14 @@ Write-Host "[Cursor Hook] Device ID: `$env:DEVICE_ID" -ForegroundColor Gray
 
 & python "$pythonScript" `$args
 "@
-        Set-Content -Path $wrapperFile -Value $wrapperContent -Encoding UTF8
+        [System.IO.File]::WriteAllText($wrapperFile, $wrapperContent, [System.Text.Encoding]::UTF8)
         return
     }
-    
+
     $content = Get-Content $tempFile -Raw
     $content = $content -replace '\{\{AKTO_DATA_INGESTION_URL\}\}', $IngestionUrl
     $content = $content -replace '\{\{DEVICE_ID \(optional\)\}\}', $DeviceId
-    Set-Content -Path $wrapperFile -Value $content -Encoding UTF8
+    [System.IO.File]::WriteAllText($wrapperFile, $content, [System.Text.Encoding]::UTF8)
     Remove-Item $tempFile -ErrorAction SilentlyContinue
     
     Write-Log "Wrapper configured with URL: $IngestionUrl"
@@ -181,8 +191,7 @@ function Update-CursorHooks {
         
         try {
             $existingConfig = Get-Content $hooksFile -Raw | ConvertFrom-Json
-            
-            # Merge hooks
+
             if (-not $existingConfig.hooks) {
                 $existingConfig | Add-Member -NotePropertyName "hooks" -NotePropertyValue @{} -Force
             }
@@ -192,19 +201,22 @@ function Update-CursorHooks {
             if (-not $existingConfig.hooks.afterAgentResponse) {
                 $existingConfig.hooks | Add-Member -NotePropertyName "afterAgentResponse" -NotePropertyValue @() -Force
             }
-            
+
             $existingConfig.version = $newHooksConfig.version
             $existingConfig.hooks.beforeSubmitPrompt += $newHooksConfig.hooks.beforeSubmitPrompt
             $existingConfig.hooks.afterAgentResponse += $newHooksConfig.hooks.afterAgentResponse
-            
-            $existingConfig | ConvertTo-Json -Depth 10 | Set-Content $hooksFile -Encoding UTF8
+
+            $merged = $existingConfig | ConvertTo-Json -Depth 10
+            [System.IO.File]::WriteAllText($hooksFile, $merged, [System.Text.Encoding]::UTF8)
             Write-Log "Merged hooks into existing hooks.json"
         } catch {
-            $newHooksConfig | ConvertTo-Json -Depth 10 | Set-Content $hooksFile -Encoding UTF8
+            $json = $newHooksConfig | ConvertTo-Json -Depth 10
+            [System.IO.File]::WriteAllText($hooksFile, $json, [System.Text.Encoding]::UTF8)
             Write-Log "Created new hooks.json (merge failed)"
         }
     } else {
-        $newHooksConfig | ConvertTo-Json -Depth 10 | Set-Content $hooksFile -Encoding UTF8
+        $json = $newHooksConfig | ConvertTo-Json -Depth 10
+        [System.IO.File]::WriteAllText($hooksFile, $json, [System.Text.Encoding]::UTF8)
         Write-Log "Created new hooks.json"
     }
 }
@@ -212,34 +224,42 @@ function Update-CursorHooks {
 function Install-ForUser {
     param([string]$UserHome)
     
+    # Skip system/non-real-user profiles (no AppData = not a real user)
+    if (-not (Test-Path (Join-Path $UserHome "AppData"))) { return $true }
+
     try {
         Write-Log "Starting Cursor IDE hook installation..."
         Write-Log "Target user home: $UserHome"
-        
+
         if (-not (Test-CursorInstalled $UserHome)) {
             Write-Log "Cursor IDE not detected - skipping hook installation"
             return $true
         }
-        
+
         Write-Log "Cursor IDE detected"
-        
+
         $ingestionUrl = Get-IngestionUrl $UserHome $AktoDataIngestionUrl
         if (-not $ingestionUrl) {
             Write-Log "Warning: AKTO_GUARDRAILS_URL not configured"
             $ingestionUrl = "https://your-ingestion-url.akto.io"
         }
-        
+
         $deviceId = Get-DeviceId
         if (-not $deviceId) {
             Write-Log "Warning: Could not generate device ID"
             $deviceId = "unknown-device"
         }
-        
+
         Write-Log "Device ID: $deviceId"
-        
+
         $hooksDir = Join-Path $UserHome ".cursor\hooks\akto"
         New-Item -ItemType Directory -Force -Path $hooksDir | Out-Null
         Write-Log "Created hooks directory: $hooksDir"
+
+        # Grant Users read/execute on the .cursor folder so hooks run under the real user
+        $cursorDir = Join-Path $UserHome ".cursor"
+        icacls "$cursorDir" /grant "Users:(OI)(CI)RX" /T /C /Q | Out-Null
+        Write-Log "Set permissions on $cursorDir"
         
         Write-Log "Downloading hook scripts from GitHub..."
         
@@ -288,17 +308,16 @@ function Install-ForUser {
 }
 
 # Main execution
-if ($TargetUserHome -and $TargetUserHome -ne "") {
-    if (-not (Test-Path $TargetUserHome)) {
-        Write-LogError "TARGET_USER_HOME is not a valid directory: $TargetUserHome"
-        exit 1
-    }
+# If an explicit TARGET_USER_HOME was passed, use it directly.
+# Otherwise scan C:\Users\* — this is the correct path when running as SYSTEM
+# since $env:USERPROFILE under SYSTEM resolves to the system profile, not a real user.
+if ($TargetUserHome -and (Test-Path $TargetUserHome)) {
     $success = Install-ForUser $TargetUserHome
     exit $(if ($success) { 0 } else { 1 })
 } else {
     $exitCode = 0
     $userProfiles = Get-ChildItem "C:\Users" -Directory -ErrorAction SilentlyContinue
-    
+
     foreach ($profile in $userProfiles) {
         $userName = $profile.Name
         if ($userName -in @("Public", "Default", "Default User", "All Users")) {
@@ -307,7 +326,7 @@ if ($TargetUserHome -and $TargetUserHome -ne "") {
         if ($userName.StartsWith(".")) {
             continue
         }
-        
+
         $userHome = $profile.FullName
         Write-Log "=== Processing user: $userHome ==="
         $success = Install-ForUser $userHome
@@ -315,6 +334,6 @@ if ($TargetUserHome -and $TargetUserHome -ne "") {
             $exitCode = 1
         }
     }
-    
+
     exit $exitCode
 }
