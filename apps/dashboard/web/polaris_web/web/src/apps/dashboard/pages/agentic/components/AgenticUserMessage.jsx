@@ -4,17 +4,14 @@ function AgenticUserMessage({ content }) {
     return (
         <HorizontalStack align="end" blockAlign="center">
             <Box
-                maxWidth="70%"
-                padding="3"
-                paddingInlineStart="4"
-                paddingInlineEnd="4"
-                borderWidth="1"
-                borderColor="border"
-                background="bg-surface"
-                borderRadius='3'
-                borderRadiusStartEnd='1'
+                style={{
+                    maxWidth: '60%',
+                    padding: '10px 16px',
+                    borderRadius: '18px',
+                    background: '#f4f4f4',
+                }}
             >
-                <Text variant="bodyMd" as="p" color="subdued">
+                <Text variant="bodyMd" as="p">
                     {content}
                 </Text>
             </Box>
