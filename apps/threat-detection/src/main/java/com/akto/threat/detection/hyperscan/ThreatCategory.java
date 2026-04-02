@@ -43,18 +43,6 @@ public enum ThreatCategory {
             new String[]{"lfi"},
             "LocalFileInclusionLFIRFI", "LFI_RFI", "Local File Inclusion / Remote File Inclusion", "HIGH"),
 
-    XXE(
-            new String[]{"xxe"},
-            "XXEInjection", "COMMAND_INJECTION", "Command Injection", "HIGH"),
-
-    LDAP_INJECTION(
-            new String[]{"ldap"},
-            "LDAPInjection", "COMMAND_INJECTION", "Command Injection", "HIGH"),
-
-    SSTI(
-            new String[]{"ssti"},
-            "SSTIInjection", "SSTI", "Server Side Template Injection", "HIGH"),
-
     SECURITY_MISCONFIG(
             new String[]{"debug", "version", "stack_trace"},
             "SecurityMisconfig", "SecurityMisconfig", "Security Misconfiguration", "LOW");

@@ -115,24 +115,6 @@ public class ThreatCategoryMappingTest {
     }
 
     @Test
-    public void prefixMapping_xxe() {
-        assertEquals(ThreatCategory.XXE, ThreatCategory.fromPatternPrefix("xxe_entity_declaration"));
-        assertEquals(ThreatCategory.XXE, ThreatCategory.fromPatternPrefix("xxe_file_access"));
-    }
-
-    @Test
-    public void prefixMapping_ldap() {
-        assertEquals(ThreatCategory.LDAP_INJECTION, ThreatCategory.fromPatternPrefix("ldap_filter_injection"));
-        assertEquals(ThreatCategory.LDAP_INJECTION, ThreatCategory.fromPatternPrefix("ldap_attribute_injection"));
-    }
-
-    @Test
-    public void prefixMapping_ssti() {
-        assertEquals(ThreatCategory.SSTI, ThreatCategory.fromPatternPrefix("ssti_double_curly"));
-        assertEquals(ThreatCategory.SSTI, ThreatCategory.fromPatternPrefix("ssti_expression_lang"));
-    }
-
-    @Test
     public void prefixMapping_securityMisconfig() {
         assertEquals(ThreatCategory.SECURITY_MISCONFIG, ThreatCategory.fromPatternPrefix("debug_enabled"));
         assertEquals(ThreatCategory.SECURITY_MISCONFIG, ThreatCategory.fromPatternPrefix("version_disclosure"));
@@ -248,26 +230,6 @@ public class ThreatCategoryMappingTest {
     @Test
     public void e2e_lfiPhpWrapper() {
         assertCategory("/page?file=php://filter/convert.base64-encode/resource=config.php", "url", ThreatCategory.LFI_RFI);
-    }
-
-    @Test
-    public void e2e_xxeInBody() {
-        assertCategory("<!ENTITY xxe SYSTEM \"file:///etc/passwd\">", "body", ThreatCategory.XXE);
-    }
-
-    @Test
-    public void e2e_ldapInBody() {
-        assertCategory("(&(uid=*)(|(uid=admin)))", "body", ThreatCategory.LDAP_INJECTION);
-    }
-
-    @Test
-    public void e2e_sstiInBody() {
-        assertCategory("{{config.__class__.__init__.__globals__}}", "body", ThreatCategory.SSTI);
-    }
-
-    @Test
-    public void e2e_sstiExpressionLang() {
-        assertCategory("${request.getClass().forName('java.lang.Runtime')}", "body", ThreatCategory.SSTI);
     }
 
     @Test

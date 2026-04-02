@@ -81,23 +81,6 @@ lfi_encoded_traversal::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<lfi_encoded
 lfi_null_byte::REQUEST_URL,REQUEST_BODY::(?P<lfi_null_byte>(?:\.\w{1,5})(?:%00|\\x00))
 lfi_log_files::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<lfi_log_files>(?:/var/log/|/var/www/|/proc/|/etc/)(?:apache|nginx|mysql|syslog|auth\.log|access\.log|error\.log|httpd))
 
-# ===== XXE (XML EXTERNAL ENTITY) INJECTION (Request Only) =====
-xxe_entity_declaration::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xxe_entity_declaration><!ENTITY\s+\w+\s+(?:SYSTEM|PUBLIC))
-xxe_external_dtd::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xxe_external_dtd><!DOCTYPE\s+\w+\s+\[.*SYSTEM.*\]>)
-xxe_file_access::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xxe_file_access><!ENTITY[^>]*(?:file|http|ftp|php|expect)://)
-
-# ===== LDAP INJECTION (Request Only) =====
-# Fixed: require LDAP filter syntax context (parenthesized expressions with operators)
-ldap_filter_injection::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ldap_filter_injection>\(\s*(?:\||\&)\s*\([^)]*=\*\s*\))
-ldap_attribute_injection::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ldap_attribute_injection>\)\s*(?:\(|\||\&)\s*\([^)]*=)
-
-# ===== SSTI (SERVER-SIDE TEMPLATE INJECTION) (Request Only) =====
-ssti_double_curly::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ssti_double_curly>\{\{[^}]*(?:config|request|self|class|import|__[a-z]+__|mro|subclasses|builtins|globals|getattr|popen)[^}]*\}\})
-# Fixed: require double curly {{ for Jinja/Twig template syntax, not single curly
-ssti_jinja_filter::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ssti_jinja_filter>\{\{[^}]*\|[a-z_]+\([^)]*\)[^}]*\}\})
-ssti_expression_lang::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ssti_expression_lang>\$\{[^}]*(?:request|config|session|application|runtime|getclass|forname)[^}]*\})
-ssti_freemarker::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ssti_freemarker><#(?:assign|import|include)\s+)
-
 # ===== SECURITY MISCONFIGURATION (Response Payload Only) =====
 # Fixed: removed X-Powered-By (too noisy, fires on almost every response)
 debug_enabled::RESPONSE_BODY::(?P<debug_enabled>(?:"?debug"?\s*[:=]\s*(?:true|1|"true"|"1")|X-Debug-Token\s*:))

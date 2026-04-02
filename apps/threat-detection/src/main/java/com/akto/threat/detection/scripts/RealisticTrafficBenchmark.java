@@ -17,13 +17,13 @@ import java.util.HashMap;
 
 /**
  * Realistic traffic benchmark: 90% clean traffic, 10% malicious (spread across all threat categories).
- * Average payload size ~10KB.
+ * Average payload size ~200KB.
  *
  * Usage: run main() — pushes numRecords messages to local Kafka, then waits for consumer to process.
  */
 public class RealisticTrafficBenchmark {
 
-    public static long numRecords = 400000L;
+    public static long numRecords = 100L;
 
     public static final String THREAT_TOPIC = "akto.api.logs2";
     public static final String KAFKA_URL = "localhost:29092";
@@ -131,22 +131,6 @@ public class RealisticTrafficBenchmark {
 
         // LFI — PHP wrapper
         {"LFI-php", "GET", "/api/v2/include?page=php://filter/convert.base64-encode/resource=config.php", "", "", ""},
-
-        // XXE — in body
-        {"XXE", "POST", "/api/v2/import/xml", "", "",
-         "<?xml version=\"1.0\"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM \"file:///etc/shadow\">]><root>&xxe;</root>"},
-
-        // LDAP Injection — in body
-        {"LDAP", "POST", "/api/v2/directory/search", "", "",
-         "{\"filter\": \"(|(uid=*)(cn=admin))\"}"},
-
-        // SSTI — Jinja2 in body
-        {"SSTI", "POST", "/api/v2/templates/preview", "", "",
-         "{\"template\": \"Hello {{config.__class__.__init__.__globals__['os'].popen('id').read()}}\"}"},
-
-        // SSTI — expression language
-        {"SSTI-el", "POST", "/api/v2/render", "", "",
-         "{\"expr\": \"${request.getClass().forName('java.lang.Runtime').getMethod('exec',''.getClass()).invoke(null,'id')}\"}"},
     };
 
     // =====================================================================
