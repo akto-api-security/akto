@@ -242,7 +242,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                             <img src="/public/history.svg" alt="History" style={{ width: '20px', height: '20px' }} />
                         </Button>
                     </HorizontalStack>
-                        <Box style={{ flex: 1, overflow: 'hidden', display: 'flex', justifyContent: 'center', width: '100%' }}>
+                        <Box style={{ flex: 1, overflow: 'hidden', display: 'flex', justifyContent: 'center', maxWidth: '100%' }}>
                         <Box style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', maxWidth: '800px' }}>
                             <Box style={{ flex: 1, overflowY: 'auto', paddingBottom: '120px' }}>
                                 <Box paddingBlockStart="16" paddingBlockEnd="19">
@@ -295,7 +295,6 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                     isFixed={true}
                     centerAlign={true}
                     inputWidth="800px"
-                    sidebarWidth="240px"
                 />
 
                 {/* History Modal */}
