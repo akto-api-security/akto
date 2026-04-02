@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.akto.guardrails</groupId>
+    <artifactId>akto-vertex-ai-adk-callbacks</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>Akto Vertex AI ADK Callbacks</name>
+    <description>Akto Guardrails callbacks for Google Vertex AI ADK (Java).</description>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <adk.version>0.6.0</adk.version>
+    </properties>
+
+    <dependencies>
+        <!-- Google ADK core (provides CallbackContext, LlmRequest, LlmResponse, Content, Part) -->
+        <dependency>
+            <groupId>com.google.adk</groupId>
+            <artifactId>google-adk</artifactId>
+            <version>${adk.version}</version>
+        </dependency>
+        <!-- Gson for JSON serialization -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.11.0</version>
+        </dependency>
+    </dependencies>
+
+</project>

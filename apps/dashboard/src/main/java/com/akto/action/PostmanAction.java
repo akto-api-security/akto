@@ -437,8 +437,15 @@ public class PostmanAction extends UserAction {
         }
 
         JsonNode infoNode = collectionDetailsObj.get("info");
-        String collectionId = infoNode.get("_postman_id").asText();
-        String collectionName = infoNode.get("name").asText();
+        if (infoNode == null) {
+            addActionError("Invalid Postman file: missing info");
+            return ERROR.toLowerCase();
+        }
+        JsonNode postmanIdNode = infoNode.get("_postman_id");
+        String collectionId = (postmanIdNode != null && !postmanIdNode.isNull())
+                ? postmanIdNode.asText()
+                : UUID.randomUUID().toString();
+        String collectionName = infoNode.has("name") ? infoNode.get("name").asText() : "Postman Collection " + collectionId;
 
         int accountId = Context.accountId.get();
 

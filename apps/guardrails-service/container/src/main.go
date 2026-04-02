@@ -8,7 +8,9 @@ import (
 
 	"github.com/akto-api-security/guardrails-service/handlers"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
+	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
 	"github.com/akto-api-security/guardrails-service/pkg/kafka"
+	"github.com/akto-api-security/guardrails-service/pkg/mediaprovider"
 	"github.com/akto-api-security/guardrails-service/pkg/validator"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -16,10 +18,7 @@ import (
 )
 
 func main() {
-	// Load configuration
 	cfg := config.LoadConfig()
-
-	// Initialize logger
 	logger := initLogger(cfg.LogLevel)
 	defer logger.Sync()
 
@@ -29,7 +28,6 @@ func main() {
 		zap.String("agent_guard_engine_url", cfg.AgentGuardEngineURL),
 		zap.Bool("kafka_enabled", cfg.KafkaEnabled))
 
-	// Set environment variables for akto-gateway library
 	if cfg.AgentGuardEngineURL != "" {
 		os.Setenv("AGENT_GUARD_ENGINE_URL", cfg.AgentGuardEngineURL)
 	}
@@ -37,13 +35,11 @@ func main() {
 		os.Setenv("AKTO_API_TOKEN", cfg.DatabaseAbstractorToken)
 	}
 
-	// Initialize validator service
 	validatorService, err := validator.NewService(cfg, logger)
 	if err != nil {
 		logger.Fatal("Failed to initialize validator service", zap.Error(err))
 	}
 
-	// Run in Kafka consumer mode or HTTP server mode based on configuration
 	if cfg.KafkaEnabled {
 		runKafkaConsumer(cfg, validatorService, logger)
 	} else {
@@ -51,15 +47,13 @@ func main() {
 	}
 }
 
-// runHTTPServer starts the HTTP server mode
 func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logger *zap.Logger) {
-	// Initialize handlers
-	validationHandler := handlers.NewValidationHandler(validatorService, logger)
+	fileRegistry := fileprocessor.DefaultRegistry(cfg.File.MaxTextFileBytes)
+	registerMediaProcessors(fileRegistry, cfg, logger)
+	validationHandler := handlers.NewValidationHandler(validatorService, logger, cfg, fileRegistry)
 
-	// Setup Gin router
 	router := setupRouter(validationHandler, logger)
 
-	// Start server
 	addr := fmt.Sprintf(":%d", cfg.ServerPort)
 	logger.Info("Server starting in HTTP mode", zap.String("address", addr))
 
@@ -68,7 +62,6 @@ func runHTTPServer(cfg *config.Config, validatorService *validator.Service, logg
 	}
 }
 
-// runKafkaConsumer starts the Kafka consumer mode
 func runKafkaConsumer(cfg *config.Config, validatorService *validator.Service, logger *zap.Logger) {
 	logger.Info("Starting in Kafka consumer mode",
 		zap.String("broker", cfg.KafkaBrokerURL),
@@ -105,33 +98,26 @@ func corsMiddleware() gin.HandlerFunc {
 }
 
 func setupRouter(validationHandler *handlers.ValidationHandler, logger *zap.Logger) *gin.Engine {
-	// Set Gin mode based on environment
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	router := gin.New()
 
-	// Middleware
 	router.Use(gin.Recovery())
 	router.Use(corsMiddleware())
 	router.Use(loggingMiddleware(logger))
 
-	// Health check endpoint
 	router.GET("/health", validationHandler.HealthCheck)
 
-	// API routes
 	api := router.Group("/api")
 	{
 		api.POST("/health", validationHandler.HealthCheck)
-
-		// Batch ingestion endpoint (similar to mini-runtime-service)
 		api.POST("/ingestData", validationHandler.IngestData)
-
-		// Individual validation endpoints
 		api.POST("/validate/request", validationHandler.ValidateRequest)
 		api.POST("/validate/requestWithPolicy", validationHandler.ValidateRequestWithPolicy)
 		api.POST("/validate/response", validationHandler.ValidateResponse)
+		api.POST("/validate/file", validationHandler.ValidateFile)
 	}
 
 	return router
@@ -159,6 +145,59 @@ func initLogger(logLevel string) *zap.Logger {
 	}
 
 	return logger
+}
+
+func registerMediaProcessors(registry *fileprocessor.Registry, cfg *config.Config, logger *zap.Logger) {
+	mc := cfg.File.Media
+	if mc.Provider == "" {
+		return
+	}
+
+	ocr, transcriber := newMediaProviders(mc, logger)
+
+	if ocr != nil {
+		registry.RegisterWithLimit(fileprocessor.NewImageProcessor(ocr, mc.MaxImageBytes), mc.MaxImageBytes)
+		logger.Info("Image processing enabled",
+			zap.String("provider", mc.Provider),
+			zap.Int("maxBytes", mc.MaxImageBytes))
+	}
+	if transcriber != nil {
+		registry.RegisterWithLimit(fileprocessor.NewAudioProcessor(transcriber, mc.MaxAudioBytes), mc.MaxAudioBytes)
+		logger.Info("Audio processing enabled",
+			zap.String("provider", mc.Provider),
+			zap.Int("maxBytes", mc.MaxAudioBytes))
+
+		registry.RegisterWithLimit(fileprocessor.NewVideoProcessor(transcriber, mc.MaxVideoBytes), mc.MaxVideoBytes)
+		logger.Info("Video processing enabled",
+			zap.String("provider", mc.Provider),
+			zap.Int("maxBytes", mc.MaxVideoBytes))
+	}
+}
+
+func newMediaProviders(mc config.MediaConfig, logger *zap.Logger) (mediaprovider.OCRProvider, mediaprovider.TranscriptionProvider) {
+	var ocr mediaprovider.OCRProvider
+	var transcriber mediaprovider.TranscriptionProvider
+
+	visionReady := mc.VisionAPIKey != "" && mc.VisionBaseURL != ""
+	speechReady := mc.SpeechAPIKey != "" && mc.SpeechBaseURL != ""
+
+	if mc.VisionAPIKey == "" || mc.VisionBaseURL == "" {
+		logger.Warn("Image OCR disabled (missing MEDIA_VISION_API_KEY or MEDIA_VISION_BASE_URL)")
+	}
+	if mc.SpeechAPIKey == "" || mc.SpeechBaseURL == "" {
+		logger.Warn("Audio/video transcription disabled (missing MEDIA_SPEECH_API_KEY or MEDIA_SPEECH_BASE_URL)")
+	}
+
+	switch mc.Provider {
+	case "azure":
+		if visionReady {
+			ocr = mediaprovider.NewAzureVision(mc.VisionAPIKey, mc.VisionBaseURL)
+		}
+		if speechReady {
+			transcriber = mediaprovider.NewAzureSpeech(mc.SpeechAPIKey, mc.SpeechBaseURL)
+		}
+	}
+	return ocr, transcriber
 }
 
 func loggingMiddleware(logger *zap.Logger) gin.HandlerFunc {

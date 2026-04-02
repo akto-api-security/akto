@@ -1,20 +1,27 @@
 package com.akto.account_job_executor.executor.executors;
 
 import com.akto.account_job_executor.executor.AccountJobExecutor;
+import com.akto.dao.context.Context;
 import com.akto.dto.jobs.AccountJob;
 import com.akto.jobs.executors.BinaryDownloader;
 import com.akto.jobs.executors.BinaryExecutor;
+import com.akto.jobs.executors.salesforce.IngestorClient;
+import com.akto.jobs.executors.salesforce.SalesforceApiClient;
+import com.akto.jobs.executors.salesforce.SalesforceDataTransformer;
+import com.akto.jobs.executors.salesforce.SalesforceStateManager;
 import com.akto.log.LoggerMaker;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.akto.jobs.executors.AIAgentConnectorConstants.*;
 
 /**
  * Executor for AI Agent Connector jobs.
- * Handles execution of AI Agent Connector integrations (N8N, Langchain, Copilot Studio, etc.).
+ * Handles execution of AI Agent Connector integrations:
+ * - N8N, Langchain, Copilot Studio, Databricks, Snowflake: Binary-based execution
+ * - Salesforce: Direct Java implementation for fetching and pushing chat data
  *
  * This is a singleton executor - use AIAgentConnectorExecutor.INSTANCE to access it.
  */
@@ -75,6 +82,10 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
 
             case "DATABRICKS":
                 executeDatabricksConnector(job, config);
+                break;
+
+            case "SALESFORCE":
+                executeSalesforceConnector(job, config);
                 break;
 
             default:
@@ -148,6 +159,160 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
         executeBinaryConnector(job, config, BINARY_NAME_DATABRICKS);
 
         logger.info("Databricks connector execution completed: jobId={}", job.getId());
+    }
+
+    /**
+     * Execute Salesforce connector logic.
+     * Fetches AI Agent chat data from Salesforce and pushes to Akto ingestion API.
+     */
+    private void executeSalesforceConnector(AccountJob job, Map<String, Object> config) throws Exception {
+        logger.info("Executing Salesforce connector: jobId={}", job.getId());
+
+        try {
+            logger.info("accountId={}", job.getAccountId());
+
+            // Extract and validate configuration
+            String salesforceUrl = getConfigValue(config, "SALESFORCE_URL");
+            String consumerKey = getConfigValue(config, "SALESFORCE_CONSUMER_KEY");
+            String consumerSecret = getConfigValue(config, "SALESFORCE_CONSUMER_SECRET");
+            String ingestionUrl = getConfigValue(config, "DATA_INGESTION_SERVICE_URL");
+            String ingestionApiKey = getConfigValue(config, "INGESTION_API_KEY");
+
+            logger.info("Configuration loaded: salesforce_url={}, ingestion_url={}",
+                salesforceUrl, ingestionUrl);
+
+            // Initialize Salesforce API client
+            // Token will be generated on first API call
+            logger.infoAndAddToDb(">>> Initializing Salesforce API client (token will be generated on first fetch)");
+            SalesforceApiClient salesforceClient = new SalesforceApiClient(
+                salesforceUrl,
+                "v66.0",
+                consumerKey,
+                consumerSecret
+            );
+
+            SalesforceDataTransformer dataTransformer = new SalesforceDataTransformer(
+                salesforceUrl,
+                Context.accountId.toString()
+            );
+
+            IngestorClient ingestorClient = new IngestorClient(ingestionUrl, ingestionApiKey, 50);
+
+            // Initialize state manager for tracking processed data
+            SalesforceStateManager stateManager = new SalesforceStateManager(10000);
+
+            // Load persisted offset from previous execution
+            int currentOffset = loadOffsetFromConfig(config);
+            stateManager = new SalesforceStateManager(10000);
+            // Note: Setting offset explicitly to continue from last position
+            for (int i = 0; i < currentOffset; i++) {
+                stateManager.incrementOffset(1);
+            }
+            logger.info(">>> State manager initialized: loading offset={} from previous execution", currentOffset);
+
+            // Fetch data from Salesforce
+            logger.infoAndAddToDb(">>> Fetching Salesforce AI Agent chat data (limit=100, offset={})...", LoggerMaker.LogDb.AGENTIC_TESTING);
+            long fetchStart = System.currentTimeMillis();
+            List<Map<String, Object>> salesforceData = salesforceClient.fetchChatData(100, currentOffset);
+            long fetchDuration = System.currentTimeMillis() - fetchStart;
+
+            if (salesforceData.isEmpty()) {
+                logger.infoAndAddToDb("No chat data found in Salesforce. Exiting.");
+                return;
+            }
+
+            logger.info(">>> Fetch completed in {}ms: {} records received", fetchDuration, salesforceData.size());
+
+            // Mark fetched records as processed
+            List<String> fetchedIds = new ArrayList<>();
+            for (Map<String, Object> record : salesforceData) {
+                Object id = record.get("id");
+                if (id != null) {
+                    fetchedIds.add(id.toString());
+                }
+            }
+            stateManager.markMultipleAsProcessed(fetchedIds);
+            logger.info(">>> Marked {} records as processed", fetchedIds.size());
+
+            // Transform data to Akto format
+            logger.info(">>> Transforming {} records to Akto format...", salesforceData.size());
+            long transformStart = System.currentTimeMillis();
+            List<Map<String, Object>> aktoData = dataTransformer.transformToAktoFormat(salesforceData);
+            long transformDuration = System.currentTimeMillis() - transformStart;
+
+            if (aktoData.isEmpty()) {
+                logger.warn("No entries after transformation. Exiting.");
+                return;
+            }
+
+            logger.info(">>> Transform completed in {}ms: {} Akto entries created",
+                transformDuration, aktoData.size());
+
+            // Push data to Akto ingestion service
+            logger.info(">>> PUSHING {} ENTRIES TO AKTO INGESTION SERVICE...", aktoData.size());
+            long pushStart = System.currentTimeMillis();
+            IngestorClient.PushResult result = ingestorClient.pushData(aktoData);
+            long pushDuration = System.currentTimeMillis() - pushStart;
+
+            if (result.success) {
+                logger.infoAndAddToDb("✓ SUCCESS: Data pushed in {}ms to ingestion service", LoggerMaker.LogDb.AGENTIC_TESTING);
+                logger.info("  Batches: {} total, {} successful, {} failed",
+                    result.totalBatches, result.successfulBatches, result.failedBatches);
+
+                // Update offset and save to config for next execution
+                int newOffset = currentOffset + salesforceData.size();
+                stateManager.incrementOffset(salesforceData.size());
+                saveOffsetToConfig(config, newOffset);
+            } else {
+                logger.error("✗ FAILED: {} of {} batches failed",
+                    result.failedBatches, result.totalBatches);
+                throw new Exception("Failed to push all batches: " + result.failedBatches + " failed");
+            }
+
+        } catch (Exception e) {
+            logger.error("Error in Salesforce connector: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    /**
+     * Extract configuration value with validation.
+     */
+    private String getConfigValue(Map<String, Object> config, String key) throws Exception {
+        Object value = config.get(key);
+        if (value == null || value.toString().isEmpty()) {
+            throw new IllegalArgumentException("Missing required config: " + key);
+        }
+        return value.toString();
+    }
+
+    /**
+     * Load persisted offset from job config for pagination continuation.
+     * This ensures subsequent executions continue from where the previous execution left off.
+     */
+    private int loadOffsetFromConfig(Map<String, Object> config) {
+        Object offsetObj = config.get("SALESFORCE_OFFSET");
+        if (offsetObj == null) {
+            logger.info("No persisted offset found, starting from offset=0");
+            return 0;
+        }
+        try {
+            int offset = Integer.parseInt(offsetObj.toString());
+            logger.info("Loaded persisted offset from config: {}", offset);
+            return offset;
+        } catch (NumberFormatException e) {
+            logger.error("Invalid offset in config: {}, resetting to 0", offsetObj);
+            return 0;
+        }
+    }
+
+    /**
+     * Save offset to job config for persistence across executions.
+     * This allows pagination to continue on the next job execution.
+     */
+    private void saveOffsetToConfig(Map<String, Object> config, int offset) {
+        config.put("SALESFORCE_OFFSET", String.valueOf(offset));
+        logger.info("Saved offset to config: {}", offset);
     }
 
     /**

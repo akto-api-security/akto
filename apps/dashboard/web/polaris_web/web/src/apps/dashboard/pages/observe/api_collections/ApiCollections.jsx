@@ -1117,6 +1117,15 @@ function ApiCollections(props) {
         resetResourcesSelected();
         fetchData({ current: true }, true) // Force refresh after mutations
     }
+    async function handleUntrackedDelete(apiCollectionIds) {
+        await api.deleteUntrackedCollections(apiCollectionIds).then(() => {
+            func.setToast(true, false, `${apiCollectionIds.length} untracked collection${func.addPlurality(apiCollectionIds.length)} deleted successfully`)
+        }).catch((error) => {
+            func.setToast(true, true, error.message || 'Something went wrong!')
+        })
+        resetResourcesSelected();
+        fetchData({ current: true }, true)
+    }
     async function handleShareCollectionsAction(collectionIdList, userIdList, apiFunction){
         const userCollectionMap = {};
 
@@ -1178,6 +1187,16 @@ function ApiCollections(props) {
                 onAction: () => exportCsv(selectedResources)
             }
         ];
+        if (tableSelectedTab === 'untracked') {
+            actions.push({
+                content: `Delete collection${func.addPlurality(selectedResources.length)}`,
+                onAction: () => {
+                    const deleteConfirmationMessage = `Are you sure, you want to delete these untracked API collection${func.addPlurality(selectedResources.length)}? This will remove them from the untracked list.`
+                    func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => handleUntrackedDelete(selectedResources))
+                }
+            });
+            return actions;
+        }
         const defaultApiGroups = allCollections.filter(x => x.type === "API_GROUP" && x.automated).map(x => x.id);
         const deactivated = deactivateCollections.map(x => x.id);
         const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);

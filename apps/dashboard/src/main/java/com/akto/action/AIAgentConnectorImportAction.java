@@ -73,6 +73,12 @@ public class AIAgentConnectorImportAction extends UserAction {
     private String vertexAIBigQueryTable;
     private String vertexAIJsonAuthFilePath;
 
+    // Salesforce-specific parameters
+    private String salesforceUrl;
+    private String salesforceConsumerKey;
+    private String salesforceConsumerSecret;
+    private String ingestionApiKey;
+
     /**
      * Unified method to initiate import for any AI Agent Connector.
      * The connector type is determined by the connectorType parameter.
@@ -266,6 +272,20 @@ public class AIAgentConnectorImportAction extends UserAction {
                 if (vertexAIJsonAuthFilePath != null && !vertexAIJsonAuthFilePath.isEmpty()) {
                     config.put(CONFIG_VERTEX_AI_JSON_AUTH_FILE_PATH, vertexAIJsonAuthFilePath);
                 }
+                break;
+
+            case CONNECTOR_TYPE_SALESFORCE:
+                if (salesforceUrl == null || salesforceUrl.isEmpty() ||
+                    salesforceConsumerKey == null || salesforceConsumerKey.isEmpty() ||
+                    salesforceConsumerSecret == null || salesforceConsumerSecret.isEmpty() ||
+                    ingestionApiKey == null || ingestionApiKey.isEmpty()) {
+                    loggerMaker.error("Missing required Salesforce configuration", LogDb.DASHBOARD);
+                    return null;
+                }
+                config.put(CONFIG_SALESFORCE_URL, salesforceUrl);
+                config.put(CONFIG_SALESFORCE_CONSUMER_KEY, salesforceConsumerKey);
+                config.put(CONFIG_SALESFORCE_CONSUMER_SECRET, salesforceConsumerSecret);
+                config.put("INGESTION_API_KEY", ingestionApiKey);
                 break;
 
             default:
