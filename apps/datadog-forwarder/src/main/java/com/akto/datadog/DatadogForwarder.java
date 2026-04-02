@@ -143,23 +143,50 @@ public class DatadogForwarder {
             JSONObject reqPayload = new JSONObject(requestPayloadStr);
 
             String modelName = reqPayload.optString("model", "unknown");
-            JSONArray inputMessages = reqPayload.optJSONArray("messages");
-            if (inputMessages == null) inputMessages = new JSONArray();
+            JSONArray rawMessages = reqPayload.optJSONArray("messages");
+            if (rawMessages == null) rawMessages = new JSONArray();
 
-            // Parse tag JSON for session_id and trace_id
+            // Fix null content in input messages (assistant tool_call decisions have content: null)
+            JSONArray inputMessages = new JSONArray();
+            for (int i = 0; i < rawMessages.length(); i++) {
+                try {
+                    JSONObject msg = rawMessages.getJSONObject(i);
+                    Object content = msg.opt("content");
+                    if (content == null || content == JSONObject.NULL) {
+                        JSONArray toolCalls = msg.optJSONArray("tool_calls");
+                        StringBuilder sb = new StringBuilder();
+                        if (toolCalls != null) {
+                            for (int j = 0; j < toolCalls.length(); j++) {
+                                JSONObject tc = toolCalls.optJSONObject(j);
+                                if (tc == null) continue;
+                                JSONObject fn = tc.optJSONObject("function");
+                                if (fn == null) continue;
+                                if (sb.length() > 0) sb.append(", ");
+                                sb.append(fn.optString("name", "tool")).append("(").append(fn.optString("arguments", "{}")).append(")");
+                            }
+                        }
+                        JSONObject fixed = new JSONObject(msg.toString());
+                        fixed.put("content", sb.length() > 0 ? sb.toString() : "");
+                        fixed.remove("tool_calls");
+                        inputMessages.put(fixed);
+                    } else {
+                        inputMessages.put(msg);
+                    }
+                } catch (Exception ignored) {
+                    inputMessages.put(rawMessages.get(i));
+                }
+            }
+
+            // Parse tag JSON for session_id; use session_id as trace_id so all spans in a session form one trace
             String sessionId = null;
-            String traceId = null;
             String tagStr = source.optString("tag", "");
             if (!tagStr.isEmpty()) {
                 try {
                     JSONObject tagJson = new JSONObject(tagStr);
                     sessionId = tagJson.optString("session_id", null);
-                    traceId = tagJson.optString("trace_id", null);
                 } catch (Exception ignored) {}
             }
-            if (traceId == null || traceId.isEmpty()) {
-                traceId = UUID.randomUUID().toString();
-            }
+            String traceId = (sessionId != null && !sessionId.isEmpty()) ? sessionId : UUID.randomUUID().toString();
 
             // Parse timing — time field is unix seconds
             long startNs = 0;
@@ -208,6 +235,30 @@ public class DatadogForwarder {
                     assistantMsg.put("content", responsePayloadStr);
                     outputMessages.put(assistantMsg);
                 }
+            }
+
+            // Fix null content: when LLM makes a tool call, content is null — build a readable string from tool_calls
+            for (int i = 0; i < outputMessages.length(); i++) {
+                try {
+                    JSONObject msg = outputMessages.getJSONObject(i);
+                    Object content = msg.opt("content");
+                    if (content == null || content == JSONObject.NULL) {
+                        JSONArray toolCalls = msg.optJSONArray("tool_calls");
+                        StringBuilder sb = new StringBuilder();
+                        if (toolCalls != null) {
+                            for (int j = 0; j < toolCalls.length(); j++) {
+                                JSONObject tc = toolCalls.optJSONObject(j);
+                                if (tc == null) continue;
+                                JSONObject fn = tc.optJSONObject("function");
+                                if (fn == null) continue;
+                                if (sb.length() > 0) sb.append(", ");
+                                sb.append(fn.optString("name", "tool")).append("(").append(fn.optString("arguments", "{}")).append(")");
+                            }
+                        }
+                        msg.put("content", sb.length() > 0 ? sb.toString() : "");
+                        msg.remove("tool_calls");
+                    }
+                } catch (Exception ignored) {}
             }
 
             // Build meta
@@ -261,11 +312,40 @@ public class DatadogForwarder {
     }
 
     private void flushToAIObservability(List<JSONObject> spans, Config.DatadogForwarderConfig config) {
-        // Each element in spans is already a full {"data": {...}} wrapper
-        // Datadog AI Observability accepts one span per request; send individually
+        // Group spans by session_id and send all spans per session in one POST
+        java.util.Map<String, JSONArray> bySession = new java.util.LinkedHashMap<>();
         for (JSONObject spanData : spans) {
+            JSONObject attrs = spanData.optJSONObject("attributes");
+            if (attrs == null) continue;
+            String sessionId = attrs.optString("session_id", "unknown");
+
+            if (!bySession.containsKey(sessionId)) {
+                bySession.put(sessionId, new JSONArray());
+            }
+
+            JSONArray inner = attrs.optJSONArray("spans");
+            if (inner == null) continue;
+            for (int i = 0; i < inner.length(); i++) {
+                bySession.get(sessionId).put(inner.getJSONObject(i));
+            }
+        }
+
+        for (String sessionId : bySession.keySet()) {
+            JSONArray allSpans = bySession.get(sessionId);
+            if (allSpans.length() == 0) continue;
+
+            JSONObject attributes = new JSONObject();
+            attributes.put("ml_app", "akto-agent-shield");
+            if (!"unknown".equals(sessionId)) attributes.put("session_id", sessionId);
+            attributes.put("tags", new JSONArray(new String[]{"env:prod", "service:akto-agent-shield"}));
+            attributes.put("spans", allSpans);
+
+            JSONObject data = new JSONObject();
+            data.put("type", "span");
+            data.put("attributes", attributes);
+
             JSONObject payload = new JSONObject();
-            payload.put("data", spanData);
+            payload.put("data", data);
             String payloadStr = payload.toString();
 
             boolean success = sendToAIObservability(config, payloadStr);
