@@ -1,10 +1,11 @@
-import { Box, Button, Text, TextField, Banner, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Text, TextField, Banner, VerticalStack, Card, Form } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import settingRequests from '../api'
 import settingFunctions from '../module'
 import func from '@/util/func'
+import { CellType } from '../../../components/tables/rows/GithubRow'
 
 function validateRegex(pattern) {
     if (!pattern || pattern.trim() === '') {
@@ -16,18 +17,21 @@ function validateRegex(pattern) {
 const headers = [
     {
         text: 'Value',
+        title: 'Value',
         value: 'patternValue',
-        itemOrder: 1,
+        type: CellType.TEXT,
     },
     {
         text: 'Created By',
+        title: 'Created By',
         value: 'addedBy',
-        itemOrder: 2,
+        type: CellType.TEXT,
     },
     {
         text: 'Last Updated',
+        title: 'Last Updated',
         value: 'updatedTsFormatted',
-        itemOrder: 3,
+        type: CellType.TEXT,
     },
 ]
 
@@ -46,10 +50,10 @@ function ProxyPatterns() {
     function buildTableData(matchingPatternsForProxy) {
         if (!matchingPatternsForProxy) return []
         return Object.entries(matchingPatternsForProxy).map(([key, info]) => ({
-            patternValue: key,
+            patternValue: info.pattern || key,
             addedBy: info.addedBy || '-',
             updatedTsFormatted: info.updatedTs
-                ? func.epochToDateTime(info.updatedTs)
+                ? func.prettifyEpoch(info.updatedTs)
                 : '-',
         }))
     }
@@ -75,15 +79,15 @@ function ProxyPatterns() {
         if (patternError) setPatternError('')
     }
 
-    async function handleAdd() {
-        const error = validateRegex(pattern)
+    async function handleAdd(value) {
+        const error = validateRegex(value)
         if (error) {
             setPatternError(error)
             return
         }
         setLoading(true)
         try {
-            const resp = await settingRequests.addMatchingPatternForProxy(pattern.trim())
+            const resp = await settingRequests.addMatchingPatternForProxy(value.trim())
             setTableData(buildTableData(resp))
             setPattern('')
             func.setToast(true, false, 'Pattern added successfully')
@@ -95,7 +99,7 @@ function ProxyPatterns() {
     }
 
     const inputCard = (
-        <Box padding="4">
+        <Card>
             <VerticalStack gap="3">
                 <Text variant="headingSm" as="h3">Add Proxy Pattern</Text>
                 <Text variant="bodyMd" color="subdued">
@@ -104,26 +108,28 @@ function ProxyPatterns() {
                 {patternError && (
                     <Banner status="critical">{patternError}</Banner>
                 )}
-                <TextField
-                    label="Pattern"
-                    value={pattern}
-                    onChange={handlePatternChange}
-                    placeholder="e.g. .internal.example.com."
-                    error={patternError ? true : undefined}
-                    autoComplete="off"
-                    connectedRight={
-                        <Button
-                            primary
-                            onClick={handleAdd}
-                            loading={loading}
-                            disabled={!pattern.trim()}
-                        >
-                            Add
-                        </Button>
-                    }
-                />
+                <Form onSubmit={() => handleAdd(pattern)}>
+                    <TextField
+                        label="Pattern"
+                        value={pattern}
+                        onChange={handlePatternChange}
+                        placeholder="e.g. .internal.example.com."
+                        error={patternError ? true : undefined}
+                        autoComplete="off"
+                        connectedRight={
+                            <Button
+                                primary
+                                onClick={() => handleAdd(pattern)}
+                                loading={loading}
+                                disabled={!pattern.trim()}
+                            >
+                                Add
+                            </Button>
+                        }
+                    />
+                </Form>
             </VerticalStack>
-        </Box>
+        </Card>
     )
 
     const tableCard = (
@@ -134,6 +140,9 @@ function ProxyPatterns() {
             headers={headers}
             loading={fetchingData}
             hasRowActions={false}
+            useNewRow={true}
+            condensedHeight={true}
+            headings={headers}
         />
     )
 

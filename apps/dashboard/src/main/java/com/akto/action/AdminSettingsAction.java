@@ -587,8 +587,8 @@ public class AdminSettingsAction extends UserAction {
 
         proxyPattern = proxyPattern.trim();
 
-        String key = proxyPattern;
-        AccountSettings.ProxyPatternInfo info = new AccountSettings.ProxyPatternInfo(user.getLogin(), Context.now());
+        String key = proxyPattern.hashCode() + "";
+        AccountSettings.ProxyPatternInfo info = new AccountSettings.ProxyPatternInfo(proxyPattern, user.getLogin(), Context.now());
 
         try {
             AccountSettingsDao.instance.updateOne(
