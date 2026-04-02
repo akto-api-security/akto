@@ -98,6 +98,7 @@ import ConfigureIgnoredEventsPage from "../dashboard/pages/threat_detection/Conf
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
+import Datadog from "../dashboard/pages/settings/integrations/Datadog";
 import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
@@ -414,6 +415,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/splunk",
                         element: <Splunk/>,
+                    },
+                    {
+                        path: "integrations/datadog",
+                        element: <Datadog/>,
                     },
                     {
                         path: "integrations/f5_waf",
