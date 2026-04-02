@@ -288,7 +288,7 @@ function SampleDetails(props) {
                     let responseContent = conv.responsePayload;
 
                     try {
-                        if (typeof requestContent === 'string') {
+                        if (typeof requestContent === 'string' && requestContent !== '') {
                             const parsed = JSON.parse(requestContent);
                             requestContent = parsed.prompt || parsed.content || requestContent;
                         }
@@ -458,7 +458,7 @@ function SampleDetails(props) {
                                                                 }}
                                                             >
                                                                 <Text variant="bodyMd">
-                                                                    {prompt.content || prompt.snippet || prompt}
+                                                                    {prompt.content || prompt.snippet || (typeof prompt === 'string' ? prompt : "")}
                                                                 </Text>
                                                             </Box>
                                                         </VerticalStack>

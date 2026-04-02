@@ -962,6 +962,13 @@ const settingRequests = {
             method: 'post',
             data: {}
         })
+    },
+    addMatchingPatternForProxy(proxyPattern) {
+        return request({
+            url: '/api/addMatchingPatternForProxy',
+            method: 'post',
+            data: {proxyPattern}
+        })
     }
 }
 

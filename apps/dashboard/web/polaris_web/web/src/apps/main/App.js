@@ -83,6 +83,7 @@ import ThreatReport from "../dashboard/pages/threat_detection/threat_report/Thre
 import {PollingProvider} from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
+import ProxyPatterns from "../dashboard/pages/settings/proxy_patterns/ProxyPatterns";
 import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
 import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 
@@ -541,6 +542,10 @@ const router = createBrowserRouter([
                     {
                         path: 'advanced-filters',
                         element: <AdvancedTrafficFilters/>
+                    },
+                    {
+                        path: 'proxy-patterns',
+                        element: <ProxyPatterns/>
                     },
                     {
                         path: "auth-types/details",

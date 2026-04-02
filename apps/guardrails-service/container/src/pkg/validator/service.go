@@ -338,6 +338,59 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
+// validationContextFromParams builds mcp.ValidationContext from traffic params and explicit payload strings for the context.
+// Callers pass requestPayloadForCtx / responsePayloadForCtx as the strings stored on the context (e.g. summary-injected request body for ProcessRequest).
+func (s *Service) validationContextFromParams(
+	params *models.ValidateRequestParams,
+	sessionID string,
+	requestPayloadForCtx string,
+	responsePayloadForCtx string,
+	logPrefix string,
+) *mcp.ValidationContext {
+	// Parse headers and status code
+	reqHeaders := make(map[string]string)
+	respHeaders := make(map[string]string)
+	if params.RequestHeaders != "" {
+		if err := json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders); err != nil {
+			s.logger.Warn(logPrefix+" - failed to parse request headers, proceeding with empty headers",
+				zap.String("sessionID", sessionID),
+				zap.Error(err))
+		}
+	}
+	if params.ResponseHeaders != "" {
+		if err := json.Unmarshal([]byte(params.ResponseHeaders), &respHeaders); err != nil {
+			s.logger.Warn(logPrefix+" - failed to parse response headers, proceeding with empty headers",
+				zap.String("sessionID", sessionID),
+				zap.Error(err))
+		}
+	}
+
+	statusCode := 0
+	if params.StatusCode != "" {
+		fmt.Sscanf(params.StatusCode, "%d", &statusCode)
+	}
+
+	// Extract host header for McpServerName
+	mcpServerName := extractHostHeader(reqHeaders)
+	contextSource := params.ContextSource
+
+	return &mcp.ValidationContext{
+		IP:              params.IP,
+		DestIP:          params.DestIP,
+		Endpoint:        params.Path,
+		Method:          params.Method,
+		RequestHeaders:  reqHeaders,
+		ResponseHeaders: respHeaders,
+		StatusCode:      statusCode,
+		RequestPayload:  requestPayloadForCtx,
+		ResponsePayload: responsePayloadForCtx,
+		ContextSource:   types.ContextSource(contextSource),
+		McpServerName:   mcpServerName,
+		SessionID:       sessionID,
+		SkipThreat:      params.EffectiveSkipThreat(), // Set skipThreat directly in context
+	}
+}
+
 // ValidateRequest validates a request payload against guardrail policies with session tracking
 func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRequestParams, sessionID string, requestID string) (*mcp.ValidationResult, error) {
 	start := time.Now()
@@ -358,7 +411,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.String("direction", params.Direction),
 		zap.String("tag", params.Tag),
 		zap.String("aktoVxlanId", params.AktoVxlanID),
-		zap.Bool("skipThreat", params.SkipThreat))
+		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
 
 	// Check if session is already malicious
 	if result, isMalicious := session.CheckAndHandleMaliciousSession(s.sessionMgr, s.logger, sessionID, requestID, payload); isMalicious {
@@ -401,61 +454,21 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Strings("policyNames", policyNames(policies)),
 		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
-	// Parse headers and status code
-	reqHeaders := make(map[string]string)
-	respHeaders := make(map[string]string)
-	if params.RequestHeaders != "" {
-		if err := json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders); err != nil {
-			s.logger.Warn("ValidateRequest - failed to parse request headers, proceeding with empty headers",
-				zap.String("sessionID", sessionID),
-				zap.Error(err))
-		}
-	}
-	if params.ResponseHeaders != "" {
-		if err := json.Unmarshal([]byte(params.ResponseHeaders), &respHeaders); err != nil {
-			s.logger.Warn("ValidateRequest - failed to parse response headers, proceeding with empty headers",
-				zap.String("sessionID", sessionID),
-				zap.Error(err))
-		}
-	}
-
-	statusCode := 0
-	if params.StatusCode != "" {
-		fmt.Sscanf(params.StatusCode, "%d", &statusCode)
-	}
-
-	// Extract host header for McpServerName
-	mcpServerName := extractHostHeader(reqHeaders)
-
 	// Create validation context with full request metadata (matching batch flow)
-	valCtx := &mcp.ValidationContext{
-		IP:              params.IP,
-		DestIP:          params.DestIP,
-		Endpoint:        params.Path,
-		Method:          params.Method,
-		RequestHeaders:  reqHeaders,
-		ResponseHeaders: respHeaders,
-		StatusCode:      statusCode,
-		RequestPayload:  payloadToValidate,
-		ResponsePayload: params.ResponsePayload,
-		ContextSource:   types.ContextSource(contextSource),
-		McpServerName:   mcpServerName,
-		SessionID:       sessionID,
-		SkipThreat:   	 params.SkipThreat, // Set skipThreat directly in context
-	}
+	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest")
 
 	s.logger.Info("ValidateRequest - calling ProcessRequest",
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
 		zap.String("sessionID", sessionID),
-		zap.String("mcpServerName", mcpServerName),
+		zap.String("mcpServerName", valCtx.McpServerName),
 		zap.Int("policiesCount", len(policies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
 		zap.Int("compiledRulesCount", len(compiledRules)),
 		zap.Bool("hasAuditRules", hasAuditRules),
-		zap.Bool("skipThreat", params.SkipThreat),
-		zap.Int("reqHeadersCount", len(reqHeaders)),
-		zap.Int("respHeadersCount", len(respHeaders)))
+		zap.Bool("skipThreat", params.EffectiveSkipThreat()),
+		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
+		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
 	// Use the default processor - skipThreat is passed via ValidationContext
 	processStart := time.Now()
@@ -518,58 +531,97 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 }
 
 // ValidateResponse validates a response payload against guardrail policies with session tracking
-func (s *Service) ValidateResponse(ctx context.Context, payload string, contextSource string, sessionID string, requestID string, skipThreat bool) (*mcp.ValidationResult, error) {
-	s.logger.Debug("ValidateResponse - starting validation",
+func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateRequestParams, responseBody string, sessionID string, requestID string) (*mcp.ValidationResult, error) {
+	start := time.Now()
+	contextSource := params.ContextSource
+
+	s.logger.Info("ValidateResponse - starting",
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("account", params.AktoAccountID),
 		zap.String("contextSource", contextSource),
 		zap.String("sessionID", sessionID),
-		zap.String("requestID", requestID))
+		zap.String("requestID", requestID),
+		zap.String("ip", params.IP),
+		zap.String("destIp", params.DestIP),
+		zap.String("statusCode", params.StatusCode),
+		zap.String("source", params.Source),
+		zap.String("direction", params.Direction),
+		zap.String("tag", params.Tag),
+		zap.String("aktoVxlanId", params.AktoVxlanID),
+		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
 
 	// Get cached policies (refreshes if stale)
+	policiesStart := time.Now()
 	policies, _, _, _, err := s.getCachedPolicies(contextSource)
 	if err != nil {
+		s.logger.Error("ValidateResponse - failed to load policies",
+			zap.String("path", params.Path),
+			zap.String("method", params.Method),
+			zap.String("account", params.AktoAccountID),
+			zap.String("contextSource", contextSource),
+			zap.String("sessionID", sessionID),
+			zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()),
+			zap.Error(err))
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
 
-	s.logger.Debug("ValidateResponse - loaded policies for contextSource",
+	s.logger.Info("ValidateResponse - loaded policies",
 		zap.String("contextSource", contextSource),
 		zap.Int("policiesCount", len(policies)),
-		zap.Strings("policyNames", policyNames(policies)))
+		zap.Strings("policyNames", policyNames(policies)),
+		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
-	// Create validation context
-	valCtx := &mcp.ValidationContext{
-		ContextSource: types.ContextSource(contextSource),
-		SessionID:     sessionID,
-		SkipThreat:    skipThreat, // Set skipThreat directly in context
-	}
+	// Create validation context with full request metadata (matching batch flow)
+	valCtx := s.validationContextFromParams(params, sessionID, params.RequestPayload, responseBody, "ValidateResponse")
 
-	s.logger.Debug("ValidateResponse - created validation context",
-		zap.String("contextSource", string(valCtx.ContextSource)),
-		zap.String("sessionID", valCtx.SessionID))
+	s.logger.Info("ValidateResponse - calling ProcessResponse",
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("sessionID", sessionID),
+		zap.String("mcpServerName", valCtx.McpServerName),
+		zap.Int("policiesCount", len(policies)),
+		zap.Bool("skipThreat", params.EffectiveSkipThreat()),
+		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
+		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
 	// Use processor's ProcessResponse method with external policies
-	processResult, err := s.processor.ProcessResponse(ctx, payload, valCtx, policies)
+	processStart := time.Now()
+	processResult, err := s.processor.ProcessResponse(ctx, responseBody, valCtx, policies)
 	if err != nil {
+		s.logger.Error("ValidateResponse - ProcessResponse failed",
+			zap.String("path", params.Path),
+			zap.String("method", params.Method),
+			zap.String("account", params.AktoAccountID),
+			zap.String("sessionID", sessionID),
+			zap.Int64("latencyMs", time.Since(processStart).Milliseconds()),
+			zap.Error(err))
 		return nil, fmt.Errorf("failed to process response: %w", err)
 	}
 
 	// Track response and generate summary
 	isMalicious := processResult.IsBlocked
-	session.TrackResponseAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload, isMalicious)
+	session.TrackResponseAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, responseBody, isMalicious)
 
 	// Convert ProcessResult to ValidationResult for backward compatibility
 	result := &mcp.ValidationResult{
 		Allowed:         !processResult.IsBlocked,
-		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
+		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != responseBody,
 		ModifiedPayload: processResult.ModifiedPayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 		Metadata:        types.ThreatMetadata{},
 	}
 
-	s.logger.Info("Response validation completed",
+	s.logger.Info("ValidateResponse - completed",
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("account", params.AktoAccountID),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID),
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
 		zap.String("reason", result.Reason),
-		zap.String("sessionID", sessionID))
+		zap.Int64("totalLatencyMs", time.Since(start).Milliseconds()))
 
 	return result, nil
 }

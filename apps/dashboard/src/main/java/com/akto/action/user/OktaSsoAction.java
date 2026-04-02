@@ -12,10 +12,12 @@ import org.bson.conversions.Bson;
 import com.akto.action.SignupAction;
 import com.akto.action.UserAction;
 import com.akto.dao.ConfigsDao;
+import com.akto.dao.CustomRoleDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.Config.OktaConfig;
+import com.akto.dto.CustomRole;
 import com.akto.dto.RBAC;
 import com.akto.dto.User;
 import com.akto.util.Constants;
@@ -153,10 +155,17 @@ public class OktaSsoAction extends UserAction {
         Set<String> rolesSeen = new HashSet<>();
         for (Map.Entry<String, String> e : mapping.entrySet()) {
             String role = e.getValue();
+            boolean isStandardRole = true;
             try {
                 RBAC.Role.valueOf(role);
             } catch (IllegalArgumentException ex) {
-                return "Invalid Akto role: " + role + ". Valid values are ADMIN, MEMBER, DEVELOPER, GUEST.";
+                isStandardRole = false;
+            }
+            if (!isStandardRole) {
+                CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
+                if (customRole == null) {
+                    return "Invalid Akto role: " + role + ". Value must be a valid standard role (ADMIN, MEMBER, DEVELOPER, GUEST) or an existing custom role name.";
+                }
             }
             if (!rolesSeen.add(role)) {
                 return "One-to-one mapping required: each Akto role can be assigned to only one Okta group. Role " + role + " is mapped more than once.";
