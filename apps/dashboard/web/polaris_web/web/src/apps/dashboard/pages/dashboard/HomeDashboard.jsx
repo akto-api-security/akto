@@ -123,7 +123,7 @@ function HomeDashboard() {
         navigate('/dashboard/observe/audit');
     }, [navigate])
 
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[4]);
 
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
@@ -1588,9 +1588,10 @@ function HomeDashboard() {
         {id: 'threat-categories', component: threatCategoryComponent},
     ] : [];
 
+    const showCriticalApisOverTime = window.ACTIVE_ACCOUNT !== 1669322524;
     let gridComponents = showTestingComponents ?
         [
-            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            ...(showCriticalApisOverTime ? [{id: 'critical-apis', component: criticalUnsecuredAPIsOverTime}] : []),
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
             ...threatComponents,
@@ -1605,7 +1606,7 @@ function HomeDashboard() {
             {id: 'access-type', component: apisByAccessTypeComponent},
             {id: 'auth-type', component: apisByAuthTypeComponent},
             {id: 'new-domains', component: newDomainsComponent},
-            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            ...(showCriticalApisOverTime ? [{id: 'critical-apis', component: criticalUnsecuredAPIsOverTime}] : []),
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
             ...threatComponents,
