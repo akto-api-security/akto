@@ -26,7 +26,7 @@ on:
         type: boolean
         default: false
         description: Mini-Runtime-Service
-      datadog-forwarder:
+      datadog-trace-exporter:
         type: boolean
         default: false
         description: Datadog-Forwarder
@@ -111,8 +111,8 @@ jobs:
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime-service:$IMAGE_TAG3"
           fi
 
-          if [[ "${{ github.event.inputs.datadog-forwarder }}" == "true" ]]; then
-            cd ../datadog-forwarder
+          if [[ "${{ github.event.inputs.datadog-trace-exporter }}" == "true" ]]; then
+            cd ../datadog-trace-exporter
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-datadog-trace-exporter:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-datadog-trace-exporter:$IMAGE_TAG3 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-datadog-trace-exporter:$IMAGE_TAG3"
           fi
@@ -158,8 +158,8 @@ jobs:
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG3 . --push
           fi
 
-          if [[ "${{ github.event.inputs.datadog-forwarder }}" == "true" ]]; then
-            cd ../datadog-forwarder
+          if [[ "${{ github.event.inputs.datadog-trace-exporter }}" == "true" ]]; then
+            cd ../datadog-trace-exporter
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-security-datadog-trace-exporter:$IMAGE_TAG -t $ECR_REGISTRY/akto-api-security-datadog-trace-exporter:$IMAGE_TAG3 . --push
           fi
 
@@ -280,8 +280,8 @@ jobs:
           omitBody: true
 
       - name: Send Github release notification to Slack - Datadog-Forwarder
-        id: slack-datadog-forwarder
-        if: ${{ github.event.inputs.datadog-forwarder == 'true' }}
+        id: slack-datadog-trace-exporter
+        if: ${{ github.event.inputs.datadog-trace-exporter == 'true' }}
         uses: slackapi/slack-github-action@v1.23.0
         with:
           payload: |
@@ -293,15 +293,15 @@ jobs:
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       - name: Push git tag Datadog-Forwarder
-        if: ${{ github.event.inputs.datadog-forwarder == 'true' }}
+        if: ${{ github.event.inputs.datadog-trace-exporter == 'true' }}
         id: tag_datadog_forwarder
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          custom_tag: datadog-forwarder-${{ github.event.inputs.release_version }}
+          custom_tag: datadog-trace-exporter-${{ github.event.inputs.release_version }}
 
       - name: Create a GitHub release Datadog-Forwarder
-        if: ${{ github.event.inputs.datadog-forwarder == 'true' }}
+        if: ${{ github.event.inputs.datadog-trace-exporter == 'true' }}
         uses: ncipollo/release-action@v1.12.0
         with:
           tag: ${{ steps.tag_datadog_forwarder.outputs.new_tag }}
