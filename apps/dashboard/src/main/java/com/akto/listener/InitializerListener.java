@@ -2592,55 +2592,55 @@ public class InitializerListener implements ServletContextListener {
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
-                    logger.debug("Starting init functions and scheduling jobs at " + now);
+                    // logger.debug("Starting init functions and scheduling jobs at " + now);
 
-                    AccountTask.instance.executeTask(new Consumer<Account>() {
-                        @Override
-                        public void accept(Account account) {
-                            runInitializerFunctions();
-                        }
-                    }, "context-initializer-secondary");
-                    logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
-                    setUpWebhookScheduler();
-                    logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
-                    setUpTrafficAlertScheduler();
-                    logger.warn("Started daily schedulers", LogDb.DASHBOARD);
-                    setUpDailyScheduler();
-                    logger.warn("Started token generator scheduler", LogDb.DASHBOARD);
-                    tokenGeneratorCron.tokenGeneratorScheduler();
-                    logger.warn("Started test template scheduler", LogDb.DASHBOARD);
+                    // AccountTask.instance.executeTask(new Consumer<Account>() {
+                    //     @Override
+                    //     public void accept(Account account) {
+                    //         runInitializerFunctions();
+                    //     }
+                    // }, "context-initializer-secondary");
+                    // logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
+                    // setUpWebhookScheduler();
+                    // logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
+                    // setUpTrafficAlertScheduler();
+                    // logger.warn("Started daily schedulers", LogDb.DASHBOARD);
+                    // setUpDailyScheduler();
+                    // logger.warn("Started token generator scheduler", LogDb.DASHBOARD);
+                    // tokenGeneratorCron.tokenGeneratorScheduler();
+                    // logger.warn("Started test template scheduler", LogDb.DASHBOARD);
                     setUpTestEditorTemplatesScheduler();
-                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-                    if (DashboardMode.isMetered()) {
-                        setupUsageScheduler();
-                    }
+                    // JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+                    // if (DashboardMode.isMetered()) {
+                    //     setupUsageScheduler();
+                    // }
 
-                    if(runJobFunctionsAnyway) {
-                        crons.trafficAlertsScheduler();
-                        crons.insertHistoricalDataJob();
-                        if(DashboardMode.isOnPremDeployment()){
-                            crons.insertHistoricalDataJobForOnPrem();
-                        }
+                    // if(runJobFunctionsAnyway) {
+                    //     crons.trafficAlertsScheduler();
+                    //     crons.insertHistoricalDataJob();
+                    //     if(DashboardMode.isOnPremDeployment()){
+                    //         crons.insertHistoricalDataJobForOnPrem();
+                    //     }
 
-                        // trimCappedCollectionsJob();
-                        updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                        syncCronInfo.setUpUpdateCronScheduler();
-                        agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
-                        updateApiGroupsForAccounts();
-                        setupAutomatedApiGroupsScheduler();
-                        trimCappedCollectionsJob();
-                        setUpPiiAndTestSourcesScheduler();
-                        cleanInventoryJobRunner();
-                        setUpDefaultPayloadRemover();
-                        setUpDependencyFlowScheduler();
-                        crons.deleteTestRunsScheduler();
-                        setUpUpdateCustomCollections();
-                        setUpFillCollectionIdArrayJob();
+                    //     // trimCappedCollectionsJob();
+                    //     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                    //     syncCronInfo.setUpUpdateCronScheduler();
+                    //     agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
+                    //     updateApiGroupsForAccounts();
+                    //     setupAutomatedApiGroupsScheduler();
+                    //     trimCappedCollectionsJob();
+                    //     setUpPiiAndTestSourcesScheduler();
+                    //     cleanInventoryJobRunner();
+                    //     setUpDefaultPayloadRemover();
+                    //     setUpDependencyFlowScheduler();
+                    //     crons.deleteTestRunsScheduler();
+                    //     setUpUpdateCustomCollections();
+                    //     setUpFillCollectionIdArrayJob();
 
-                        // CleanInventory.cleanInventoryJobRunner();
+                    //     // CleanInventory.cleanInventoryJobRunner();
 
-                        // MatchingJob.MatchingJobRunner();
-                    }
+                    //     // MatchingJob.MatchingJobRunner();
+                    // }
 
                     int now2 = Context.now();
                     int diffNow = now2 - now;
@@ -2664,43 +2664,43 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }
 
-                // run backward fill job for query params
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account t) {
-                        if(t.getId() == 1000000 || t.getId() == 1718042191 || t.getId() == 1736798101){
-                            Context.accountId.set(t.getId());
-                            Context.contextSource.set(com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE.API);
-                            logger.infoAndAddToDb("Starting backfill query params for account " + t.getId());
-                            int now = Context.now();
-                            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(Filters.empty());
-                            if(backwardCompatibility.getFillQueryParams() == 0){
-                                BackwardCompatibilityDao.instance.updateOne(
-                                    Filters.eq("_id", backwardCompatibility.getId()),
-                                    Updates.set("fillQueryParams", Context.now())
-                                );
-                                try {
-                                    List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
-                                        Filters.and(
-                                            Filters.ne(ApiCollection._DEACTIVATED, true),
-                                            Filters.exists(ApiCollection.HOST_NAME, true)
-                                        ), Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)
-                                    );
-                                    logger.infoAndAddToDb("Fetched " + apiCollections.size() + " api collections");
-                                    SingleTypeInfo.fetchCustomDataTypes(t.getId());
-                                    for(ApiCollection apiCollection : apiCollections){
-                                        SampleDataDao.instance.backFillIsQueryParamInSingleTypeInfo(apiCollection.getId());
-                                    }
-                                    logger.infoAndAddToDb("Completed backfill query params for account " + t.getId() + " in " + (Context.now() - now) + " seconds");
-                                } catch (Exception e) {
-                                    logger.errorAndAddToDb(e, "Error while filling query params");
-                                }
+                // // run backward fill job for query params
+                // AccountTask.instance.executeTask(new Consumer<Account>() {
+                //     @Override
+                //     public void accept(Account t) {
+                //         if(t.getId() == 1000000 || t.getId() == 1718042191 || t.getId() == 1736798101){
+                //             Context.accountId.set(t.getId());
+                //             Context.contextSource.set(com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE.API);
+                //             logger.infoAndAddToDb("Starting backfill query params for account " + t.getId());
+                //             int now = Context.now();
+                //             BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(Filters.empty());
+                //             if(backwardCompatibility.getFillQueryParams() == 0){
+                //                 BackwardCompatibilityDao.instance.updateOne(
+                //                     Filters.eq("_id", backwardCompatibility.getId()),
+                //                     Updates.set("fillQueryParams", Context.now())
+                //                 );
+                //                 try {
+                //                     List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+                //                         Filters.and(
+                //                             Filters.ne(ApiCollection._DEACTIVATED, true),
+                //                             Filters.exists(ApiCollection.HOST_NAME, true)
+                //                         ), Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)
+                //                     );
+                //                     logger.infoAndAddToDb("Fetched " + apiCollections.size() + " api collections");
+                //                     SingleTypeInfo.fetchCustomDataTypes(t.getId());
+                //                     for(ApiCollection apiCollection : apiCollections){
+                //                         SampleDataDao.instance.backFillIsQueryParamInSingleTypeInfo(apiCollection.getId());
+                //                     }
+                //                     logger.infoAndAddToDb("Completed backfill query params for account " + t.getId() + " in " + (Context.now() - now) + " seconds");
+                //                 } catch (Exception e) {
+                //                     logger.errorAndAddToDb(e, "Error while filling query params");
+                //                 }
                                 
-                            }
+                //             }
                             
-                        }
-                    }
-                }, "backfill-query-params");
+                //         }
+                //     }
+                // }, "backfill-query-params");
             }
         }, 0, TimeUnit.SECONDS);
 
@@ -3667,67 +3667,76 @@ public class InitializerListener implements ServletContextListener {
         return url != null ? url : "https://stairway.akto.io/deployment/status";
     }
 
-    public void setUpTestEditorTemplatesScheduler() {
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                byte[] testingTemplates = TestTemplateUtils.getTestingTemplates();
-                if(testingTemplates == null){
-                    logger.errorAndAddToDb("Error while fetching Test Editor Templates from Github and local", LogDb.DASHBOARD);
+    /**
+     * Same work as the 4-hour scheduler: fetch tests-library zip, sync remediations + compliance to common DB,
+     * then refresh YAML templates and push compliance into each account (when configured).
+     * Call from an authenticated admin API for local/manual runs.
+     */
+    public static void runTestEditorTemplatesSyncJob() {
+        byte[] testingTemplates = TestTemplateUtils.getTestingTemplates();
+        if (testingTemplates == null) {
+            logger.errorAndAddToDb("Error while fetching Test Editor Templates from Github and local", LogDb.DASHBOARD);
+            return;
+        }
+
+        try {
+            processRemedationFilesZip(testingTemplates);
+            processComplianceInfosFromZip(testingTemplates);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            logger.errorAndAddToDb("Unable to import remediations", LogDb.DASHBOARD);
+        }
+        Map<String, ComplianceInfo> complianceCommonMap = getFromCommonDb();
+        Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoDefaultTestLibs());
+        AccountTask.instance.executeTask((account) -> {
+            try {
+
+                if (account.getId() == 1753372418) {
                     return;
                 }
 
-                try {
-                    processRemedationFilesZip(testingTemplates);
-                    processComplianceInfosFromZip(testingTemplates);
-                    
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    logger.errorAndAddToDb("Unable to import remediations", LogDb.DASHBOARD);
-                }
-                Map<String, ComplianceInfo> complianceCommonMap = getFromCommonDb();
-                Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoDefaultTestLibs());
-                AccountTask.instance.executeTask((account) -> {
-                    try {
+                logger.infoAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
+                processTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                if (!DashboardMode.isMetered()) return;
 
-                        if (account.getId() == 1753372418) {
-                            return;
-                        }
+                logger.infoAndAddToDb("Updating Pro and Standard Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
 
-                        logger.infoAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
-                        processTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
-                        if (!DashboardMode.isMetered()) return;
+                AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
 
-                        logger.infoAndAddToDb("Updating Pro and Standard Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
-                        
-                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                if (accountSettings == null || accountSettings.getTestLibraries() == null) return;
 
-                        if (accountSettings == null ||accountSettings.getTestLibraries() == null) return;
-
-                        for(TestLibrary testLibrary: accountSettings.getTestLibraries()) {
-                            String repoUrl = testLibrary.getRepositoryUrl();
-                            if (repoUrl.contains("akto-api-security/tests-library")) {
-                                byte[] zipFile = allYamlTemplates.get(testLibrary.getRepositoryUrl());
-                                processTemplateFilesZip(zipFile, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
-                            }
-                        }
-
-                        if (accountSettings.getComplianceInfosUpdatedTs() > 0) {                            
-                            logger.infoAndAddToDb("Updating Compliances for accountId: " + account.getId(), LogDb.DASHBOARD);
-                            addComplianceFromCommonToAccount(complianceCommonMap);
-                            replaceComplianceFromCommonToAccount(complianceCommonMap);    
-                        }
-
-                        if (accountSettings.getThreatPolicies() != null && !accountSettings.getThreatPolicies().isEmpty()) {
-                            logger.infoAndAddToDb("Updating Threat Policies for accountId: " + account.getId(), LogDb.DASHBOARD);
-                            processThreatFilterTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
-                        }
-                         
-                    } catch (Exception e) {
-                        cacheLoggerMaker.errorAndAddToDb(e,
-                                String.format("Error while updating Test Editor Files %s", e.toString()),
-                                LogDb.DASHBOARD);
+                for (TestLibrary testLibrary : accountSettings.getTestLibraries()) {
+                    String repoUrl = testLibrary.getRepositoryUrl();
+                    if (repoUrl.contains("akto-api-security/tests-library")) {
+                        byte[] zipFile = allYamlTemplates.get(testLibrary.getRepositoryUrl());
+                        processTemplateFilesZip(zipFile, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                     }
-                }, "update-test-editor-templates-github");
+                }
+
+                if (accountSettings.getComplianceInfosUpdatedTs() > 0) {
+                    logger.infoAndAddToDb("Updating Compliances for accountId: " + account.getId(), LogDb.DASHBOARD);
+                    addComplianceFromCommonToAccount(complianceCommonMap);
+                    replaceComplianceFromCommonToAccount(complianceCommonMap);
+                }
+
+                if (accountSettings.getThreatPolicies() != null && !accountSettings.getThreatPolicies().isEmpty()) {
+                    logger.infoAndAddToDb("Updating Threat Policies for accountId: " + account.getId(), LogDb.DASHBOARD);
+                    processThreatFilterTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
+                }
+
+            } catch (Exception e) {
+                cacheLoggerMaker.errorAndAddToDb(e,
+                        String.format("Error while updating Test Editor Files %s", e.toString()),
+                        LogDb.DASHBOARD);
+            }
+        }, "update-test-editor-templates-github");
+    }
+
+    public void setUpTestEditorTemplatesScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                runTestEditorTemplatesSyncJob();
             }
         }, 0, 4, TimeUnit.HOURS);
     }
