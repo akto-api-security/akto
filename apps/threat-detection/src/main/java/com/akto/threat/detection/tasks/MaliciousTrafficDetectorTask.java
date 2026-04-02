@@ -19,8 +19,6 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.enums.RedactionType;
 import com.akto.threat.detection.cache.AccountConfig;
 import com.akto.threat.detection.cache.AccountConfigurationCache;
-import com.akto.threat.detection.config.ThreatDetectionConfig;
-import com.akto.threat.detection.enums.ThreatDetectionMode;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -65,6 +63,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Pa
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.threat.detection.utils.ThreatDetector;
+import com.akto.threat.detection.utils.ThreatDetectorWithStrategy;
 import com.akto.threat.detection.utils.Utils;
 import com.akto.threat.detection.hyperscan.HyperscanEventHandler;
 import com.akto.util.Constants;
@@ -177,7 +176,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     this.distributionCalculator = distributionCalculator;
     this.apiDistributionEnabled = apiDistributionEnabled;
 
-    this.threatDetector = new com.akto.threat.detection.utils.ThreatDetectorWithStrategy();
+    this.threatDetector = new ThreatDetectorWithStrategy();
     this.hyperscanEventHandler = new HyperscanEventHandler(this::generateAndPushMaliciousEventRequest);
   }
 
@@ -464,7 +463,8 @@ public class MaliciousTrafficDetectorTask implements Task {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
       return;
     }
-    boolean isHyperscanOnly = ThreatDetectionConfig.getDetectionMode() == ThreatDetectionMode.HYPERSCAN_ONLY;
+    AccountConfig accountConfig = AccountConfigurationCache.getInstance().getConfig(dataActor);
+    boolean isHyperscanOnly = accountConfig != null && accountConfig.isHyperscanEnabled();
 
     RawApi rawApi = null;
     RawApiMetadata metadata = null;
@@ -511,12 +511,12 @@ public class MaliciousTrafficDetectorTask implements Task {
     // Skip YAML-based exploit/ignore checks for Hyperscan mode
     boolean successfulExploit = false;
     boolean isIgnoredEvent = false;
-    if (!successfulExploitFilters.isEmpty()) {
-      successfulExploit = threatDetector.isSuccessfulExploit(successfulExploitFilters, rawApi, apiInfoKey);
-    }
     if (!isHyperscanOnly) {
       if (!ignoredEventFilters.isEmpty()) {
         isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
+      }
+      if (!successfulExploitFilters.isEmpty()) {
+        successfulExploit = threatDetector.isSuccessfulExploit(successfulExploitFilters, rawApi, apiInfoKey);
       }
     }
 
