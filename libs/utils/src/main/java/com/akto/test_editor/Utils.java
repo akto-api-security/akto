@@ -2,8 +2,10 @@ package com.akto.test_editor;
 
 import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;
 
+import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.TestingRunWebhook;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.HttpResponseParams;
@@ -48,6 +50,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import org.apache.commons.collections.MapUtils;
+import org.bson.types.ObjectId;
 
 public class Utils {
 
@@ -858,7 +861,95 @@ public class Utils {
         return result;
     }
 
-    public static ExecutorSingleOperationResp sendRequestToSsrfServer(String requestUrl, String redirectUrl, String tokenVal){
+    private static final String SSRF_WEBHOOK_SERVICE_DEFAULT_BASE = "https://webhook.test-util.akto.io";
+
+    /**
+     * Dedicated base URL for the new webhook SSRF service (POST /token, callback UUIDs).
+     * When set, enables webhook SSRF mode even if {@code SSRF_SERVICE_NAME} is the legacy test-services URL.
+     * Falls back to {@value #SSRF_WEBHOOK_SERVICE_DEFAULT_BASE} when env var is not set.
+     */
+    public static String getSsrfWebhookServiceBase() {
+        String w = System.getenv("SSRF_WEBHOOK_SERVICE_NAME");
+        if (w == null || w.trim().isEmpty()) {
+            return SSRF_WEBHOOK_SERVICE_DEFAULT_BASE;
+        }
+        return w.trim();
+    }
+
+    /**
+     * True when the new webhook SSRF service is configured ({@code SSRF_WEBHOOK_SERVICE_NAME} is set).
+     * When both {@code SSRF_SERVICE_NAME} (legacy) and {@code SSRF_WEBHOOK_SERVICE_NAME} (new) are set,
+     * the Executor chooses the flow by template: new flow only if the template has {@code wordList_url_webhook}.
+     */
+    public static boolean isWebhookService() {
+        return getSsrfWebhookServiceBase() != null;
+    }
+
+    /**
+     * Create a webhook token via POST {baseUrl}/token. Returns the uuid for the capture URL, or null if baseUrl invalid or on failure.
+     */
+    public static String createWebhookSiteToken(String baseUrl) {
+        if (baseUrl == null || baseUrl.trim().isEmpty()) {
+            return null;
+        }
+        String base = baseUrl.trim();
+        String tokenUrl = (base.endsWith("/") ? base : base + "/") + "token";
+        RequestBody emptyBody = RequestBody.create(new byte[]{}, null);
+        Request request = new Request.Builder()
+            .url(tokenUrl)
+            .post(emptyBody)
+            .build();
+        Response okResponse = null;
+        try {
+            okResponse = client.newCall(request).execute();
+            if (!okResponse.isSuccessful() || okResponse.body() == null) {
+                return null;
+            }
+            BasicDBObject bd = BasicDBObject.parse(okResponse.body().string());
+            Object uuid = bd.get("uuid");
+            return uuid != null ? uuid.toString() : null;
+        } catch (Exception e) {
+            return null;
+        } finally {
+            if (okResponse != null) {
+                okResponse.close();
+            }
+        }
+    }
+
+    /**
+     * Inserts a TestingRunWebhook mapping when varMap contains accountId, apiInfoKey, testSubType.
+     * runId and summaryId are optional (parsed from testRunId/testRunResultSummaryId when valid).
+     */
+    public static void storeSsrfWebhookMapping(String uuid, Map<String, Object> varMap) {
+        try {
+            Integer accountId = (Integer) varMap.get("accountId");
+            String apiInfoKeyStr = (String) varMap.get("apiInfoKey");
+            String testSubType = (String) varMap.get("testSubType");
+            if (accountId == null || apiInfoKeyStr == null || testSubType == null) {
+                return;
+            }
+            String testRunIdStr = (String) varMap.get("testRunId");
+            String testRunResultSummaryIdStr = (String) varMap.get("testRunResultSummaryId");
+            ObjectId runId = (testRunIdStr != null && !testRunIdStr.isEmpty() && ObjectId.isValid(testRunIdStr))
+                    ? new ObjectId(testRunIdStr) : null;
+            ObjectId summaryId = (testRunResultSummaryIdStr != null && !testRunResultSummaryIdStr.isEmpty() && ObjectId.isValid(testRunResultSummaryIdStr))
+                    ? new ObjectId(testRunResultSummaryIdStr) : null;
+            TestingRunWebhook mapping = new TestingRunWebhook(
+                    uuid,
+                    accountId,
+                    runId,
+                    summaryId,
+                    apiInfoKeyStr,
+                    testSubType,
+                    Context.now()
+            );
+            TestingRunWebhookDao.instance.insertOne(mapping);
+        } catch (Exception ignored) {
+        }
+    }
+
+    public static ExecutorSingleOperationResp sendRequestToWebhookService(String requestUrl, String redirectUrl, String tokenVal){
         RequestBody emptyBody = RequestBody.create(new byte[]{}, null);
         
         Request request = new Request.Builder()
@@ -884,38 +975,42 @@ public class Utils {
         }
     }
 
-    public static Boolean sendRequestToSsrfServer(String url){
-        String requestUrl = "";
-        if(!(url.startsWith("http"))){
-            String hostName ="https://test-services.akto.io/";
-            if(System.getenv("SSRF_SERVICE_NAME") != null && System.getenv("SSRF_SERVICE_NAME").length() > 0){
-                hostName = System.getenv("SSRF_SERVICE_NAME");
-            }
-            requestUrl = hostName + "validate/" + url;
-        }
-
-        Request request = new Request.Builder()
-            .url(requestUrl)
-            .get()
-            .build();
-            Response okResponse = null;
-        
-        try {
-            okResponse = client.newCall(request).execute();
-            if (!okResponse.isSuccessful()) {
-                return false;
-            }else{
-                ResponseBody responseBody = okResponse.body();
-                BasicDBObject bd = BasicDBObject.parse(responseBody.string());
-                return bd.getBoolean("url-hit");
-            }
-        }catch (Exception e){
+    /**
+     * Checks if the given UUID was hit by GETting baseUrl/token/{uuid}/requests.
+     * Returns true if response has total &gt; 0. Used for callback polling (legacy and new webhook).
+     */
+    public static boolean checkWebhookHit(String baseUrl, String uuid) {
+        if (baseUrl == null || baseUrl.trim().isEmpty() || uuid == null || uuid.isEmpty() || uuid.startsWith("http")) {
             return false;
-        } finally {
-            if (okResponse != null) {
-                okResponse.close(); // Manually close the response body
-            }
         }
+        String requestUrl = (baseUrl.endsWith("/") ? baseUrl : baseUrl + "/") + "token/" + uuid + "/requests";
+        Request request = new Request.Builder().url(requestUrl).get().build();
+        try (Response okResponse = client.newCall(request).execute()) {
+            if (!okResponse.isSuccessful()) return false;
+            ResponseBody responseBody = okResponse.body();
+            if (responseBody == null) return false;
+            BasicDBObject bd = BasicDBObject.parse(responseBody.string());
+            Object total = bd.get("total");
+            return total != null && (total instanceof Number) && ((Number) total).intValue() > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Checks if the given UUID was hit by polling both legacy (SSRF_SERVICE_NAME) and new webhook (SSRF_WEBHOOK_SERVICE_NAME)
+     * bases, so callback status works for both flows.
+     */
+    public static Boolean sendRequestToWebhookService(String url) {
+        if (url == null || url.isEmpty() || url.startsWith("http")) {
+            return false;
+        }
+        String legacyBaseUrl = System.getenv("SSRF_SERVICE_NAME");
+        if (legacyBaseUrl != null && !legacyBaseUrl.trim().isEmpty() && checkWebhookHit(legacyBaseUrl.trim(), url)) {
+            return true;
+        }
+        String webhookBaseUrl = getSsrfWebhookServiceBase();
+        return webhookBaseUrl != null && checkWebhookHit(webhookBaseUrl, url);
     }
 
     public static ApiAccessType getApiAccessTypeFromString(String apiAccessType){

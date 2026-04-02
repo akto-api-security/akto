@@ -194,10 +194,11 @@ function getScanFrequency(periodInSeconds) {
 const transform = {
 
   tagList: (list, linkType) => {
+    const items = Array.isArray(list) ? list : []
 
-    let ret = list?.map((tag, index) => {
-
+    return items.map((tag, index) => {
       let linkUrl = ""
+      let badgeContent = tag
       switch (linkType) {
         case "CWE":
           linkUrl = getCweLink(tag)
@@ -205,17 +206,20 @@ const transform = {
         case "CVE":
           linkUrl = getCveLink(tag)
           break;
+        case "ASI":
+          linkUrl = typeof tag === "object" && tag?.url ? tag.url : ""
+          badgeContent = typeof tag === "object" && tag?.label != null ? tag.label : (typeof tag === "string" ? tag : "")
+          break;
         default:
           break;
       }
 
       return (
         <Link key={index} url={linkUrl} target="_blank">
-          <Badge progress="complete" key={index}>{tag}</Badge>
+          <Badge progress="complete" key={index}>{badgeContent}</Badge>
         </Link>
       )
     })
-    return ret;
   },
   prepareDataFromSummary: (data, testRunState) => {
     let obj = {};
@@ -378,6 +382,7 @@ const transform = {
     obj['cweDisplay'] = minimizeTagList(obj['cwe'])
     obj['cve'] = subCategoryMap[data.testSubType]?.cve ? subCategoryMap[data.testSubType]?.cve : []
     obj['cveDisplay'] = minimizeTagList(obj['cve'])
+    obj['superCategoryName'] = subCategoryMap[data.testSubType]?.superCategory?.name || data.testSuperType || ""
     obj['errorsList'] = data.errorsList || []
     obj['testCategoryId'] = data.testSubType
     obj['conversationId'] = data?.conversationId
@@ -540,6 +545,18 @@ const transform = {
             </HorizontalStack>
           )
           break;
+        case "ASI Category": {
+          const agenticOwasp = func.agenticCategoryMapping[category?.superCategory?.name]
+          if (!agenticOwasp?.label) {
+            return
+          }
+          sectionLocal.content = (
+            <HorizontalStack gap="2">
+              {transform.tagList([agenticOwasp], "ASI")}
+            </HorizontalStack>
+          )
+          break
+        }
         case "Compliance":
           if (category?.compliance?.mapComplianceToListClauses && Object.keys(category?.compliance?.mapComplianceToListClauses).length > 0) {
             sectionLocal.content = (
@@ -829,6 +846,12 @@ const transform = {
         title: "References",
         content: "",
         tooltipContent: "References for the above test"
+      },
+      {
+        icon: FraudProtectMajor,
+        title: "ASI Category",
+        content: "",
+        tooltipContent: "OWASP Agentic Security Top 10 (ASI) categories applicable to this test"
       },
       {
         icon: ResourcesMajor,
@@ -1449,6 +1472,7 @@ const transform = {
       recurringWeekly: testRun.recurringWeekly,
       recurringMonthly: testRun.recurringMonthly,
       miniTestingServiceName: testRun.miniTestingServiceName,
+      allowedMiniTestingServiceNames: testRun.miniTestingServiceNames,
       testSuiteIds: testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
       selectedSlackChannelId: testRun?.slackChannel || 0,

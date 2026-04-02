@@ -4,9 +4,11 @@ import com.akto.action.UserAction;
 import com.akto.dao.HistoricalDataDao;
 import com.akto.dao.RBACDao;
 import com.akto.action.testing.StartTestAction;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
@@ -42,8 +44,6 @@ import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
 import com.opensymphony.xwork2.Action;
@@ -87,6 +87,17 @@ public class IssuesAction extends UserAction {
     private List<String> filterSubCategory;
     private List<TestingRunIssues> similarlyAffectedIssues;
     private boolean activeCollections;
+
+    @Setter
+    @Getter
+    private List<String> filterCollectionNames;
+    @Setter
+    @Getter
+    private String siteUrl;
+    @Getter
+    private List<BasicDBObject> issueDetails;
+    @Getter
+    private BasicDBObject fetchIssuesFromCollectionsResponse;
 
     private int startEpoch;
     long endTimeStamp;
@@ -239,6 +250,169 @@ public class IssuesAction extends UserAction {
         }
 
         return SUCCESS.toUpperCase();
+    }
+
+    public String fetchIssuesFromCollections() {
+        try {
+            if (limit <= 0) limit = 100;
+            if (limit > 10000) limit = 10000;
+
+            if (filterCollectionNames == null || filterCollectionNames.isEmpty()) {
+                addActionError("filterCollectionNames is required");
+                return buildFetchIssuesResponse(new ArrayList<>(), ERROR.toUpperCase());
+            }
+
+            // Resolve collection names → IDs
+            if (filterCollectionNames != null && !filterCollectionNames.isEmpty()) {
+                List<ApiCollection> matched = ApiCollectionsDao.instance.findAll(
+                    Filters.or(
+                        Filters.in(ApiCollection.NAME, filterCollectionNames),
+                        Filters.in(ApiCollection.HOST_NAME, filterCollectionNames)
+                    ),
+                    Projections.exclude(ApiCollection._URLS));
+                filterCollectionsId = matched.stream().map(ApiCollection::getId).collect(Collectors.toList());
+                if (filterCollectionsId.isEmpty()) {
+                    addActionError("No API collections found matching: " + String.join(", ", filterCollectionNames));
+                    return buildFetchIssuesResponse(new ArrayList<>(), ERROR.toUpperCase());
+                }
+            }
+
+            // Fetch paginated issues
+            Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(createFilters(true));
+            List<Bson> pipeline = new ArrayList<>();
+            pipeline.add(Aggregates.match(dashboardFilter));
+            if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
+                pipeline.add(Aggregates.addFields(new Field<>("severityValue", new BasicDBObject("$switch",
+                        new BasicDBObject("branches", Arrays.asList(
+                                new BasicDBObject("case", new BasicDBObject("$eq", Arrays.asList("$severity", Severity.CRITICAL.name()))).append("then", 4),
+                                new BasicDBObject("case", new BasicDBObject("$eq", Arrays.asList("$severity", Severity.HIGH.name()))).append("then", 3),
+                                new BasicDBObject("case", new BasicDBObject("$eq", Arrays.asList("$severity", Severity.MEDIUM.name()))).append("then", 2),
+                                new BasicDBObject("case", new BasicDBObject("$eq", Arrays.asList("$severity", Severity.LOW.name()))).append("then", 1)
+                        )).append("default", 0)))));
+                pipeline.add(Aggregates.sort(sortOrder == 1
+                        ? Sorts.ascending("severityValue", TestingRunIssues.CREATION_TIME)
+                        : Sorts.descending("severityValue", TestingRunIssues.CREATION_TIME)));
+            } else if (TestingRunIssues.CREATION_TIME.equals(sortKey)) {
+                pipeline.add(Aggregates.sort(sortOrder == 1
+                        ? Sorts.ascending(TestingRunIssues.CREATION_TIME)
+                        : Sorts.descending(TestingRunIssues.CREATION_TIME)));
+            }
+            pipeline.add(Aggregates.skip(skip));
+            pipeline.add(Aggregates.limit(limit));
+            List<TestingRunIssues> rawIssues = TestingRunIssuesDao.instance.getMCollection()
+                    .aggregate(pipeline, TestingRunIssues.class).into(new ArrayList<>());
+
+            // Counts
+            Bson countFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(createFilters(false));
+            openIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
+                    Filters.and(countFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name())));
+            fixedIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
+                    Filters.and(countFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name())));
+            ignoredIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
+                    Filters.and(countFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED.name())));
+
+            // Attach TestSourceConfig for custom http-based tests
+            for (TestingRunIssues runIssue : rawIssues) {
+                if (runIssue.getId().getTestSubCategory().startsWith("http")) {
+                    runIssue.getId().setTestSourceConfig(TestSourceConfigsDao.instance
+                            .getTestSourceConfig(runIssue.getId().getTestCategoryFromSourceConfig()));
+                }
+            }
+
+            // Batch fetch YAML test info for all non-http subcategories
+            Set<String> subCategoryIds = rawIssues.stream()
+                    .map(issue -> issue.getId().getTestSubCategory())
+                    .filter(sc -> !sc.startsWith("http"))
+                    .collect(Collectors.toSet());
+            Map<String, Info> infoMap = subCategoryIds.isEmpty() ? new HashMap<>()
+                    : YamlTemplateDao.instance.fetchTestInfoMap(Filters.in("_id", new ArrayList<>(subCategoryIds)));
+
+            // Batch fetch TestingRunResult IDs (needed for the correct issue URL)
+            List<ObjectId> summaryIds = rawIssues.stream()
+                    .filter(i -> i.getLatestTestingRunSummaryId() != null)
+                    .map(TestingRunIssues::getLatestTestingRunSummaryId)
+                    .distinct()
+                    .collect(Collectors.toList());
+            Map<String, String> resultHexIdMap = new HashMap<>();
+            if (!summaryIds.isEmpty()) {
+                List<TestingRunResult> resultRefs = VulnerableTestingRunResultDao.instance.findAll(
+                        Filters.in(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryIds),
+                        Projections.include(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
+                                TestingRunResult.TEST_SUB_TYPE, TestingRunResult.API_INFO_KEY));
+                for (TestingRunResult r : resultRefs) {
+                    if (r.getTestRunResultSummaryId() != null && r.getApiInfoKey() != null && r.getId() != null) {
+                        String key = r.getTestRunResultSummaryId().toHexString() + "|" + r.getTestSubType()
+                                + "|" + r.getApiInfoKey().getUrl() + "|" + r.getApiInfoKey().getMethod()
+                                + "|" + r.getApiInfoKey().getApiCollectionId();
+                        resultHexIdMap.put(key, r.getId().toHexString());
+                    }
+                }
+            }
+
+            // Build enriched issueDetails
+            String base = (siteUrl != null && !siteUrl.isEmpty()) ? siteUrl : "https://app.akto.io";
+            issueDetails = new ArrayList<>();
+            for (TestingRunIssues issue : rawIssues) {
+                TestingIssuesId id = issue.getId();
+                BasicDBObject obj = new BasicDBObject();
+
+                if (id.getApiInfoKey() != null) {
+                    obj.put("apiUrl", id.getApiInfoKey().getUrl());
+                    obj.put("apiMethod", id.getApiInfoKey().getMethod() != null ? id.getApiInfoKey().getMethod().toString() : null);
+                    obj.put("apiCollectionId", id.getApiInfoKey().getApiCollectionId());
+                }
+                obj.put("testSubCategory", id.getTestSubCategory());
+                obj.put("status", issue.getTestRunIssueStatus() != null ? issue.getTestRunIssueStatus().name() : null);
+                obj.put("severity", issue.getSeverity() != null ? issue.getSeverity().name() : null);
+                obj.put("creationTime", issue.getCreationTime());
+                obj.put("lastSeen", issue.getLastSeen());
+                if (issue.getLatestTestingRunSummaryId() != null && id.getApiInfoKey() != null) {
+                    String subType = id.getTestSubCategory().startsWith("http")
+                            ? id.getTestCategoryFromSourceConfig()
+                            : id.getTestSubCategory();
+                    String key = issue.getLatestTestingRunSummaryId().toHexString() + "|" + subType
+                            + "|" + id.getApiInfoKey().getUrl() + "|" + id.getApiInfoKey().getMethod()
+                            + "|" + id.getApiInfoKey().getApiCollectionId();
+                    String resultHexId = resultHexIdMap.get(key);
+                    if (resultHexId != null) {
+                        obj.put("issueUrl", base + "/dashboard/reports/issues?result=" + resultHexId);
+                    }
+                }
+
+                Info info = infoMap.get(id.getTestSubCategory());
+                if (info != null) {
+                    obj.put("testName", info.getName());
+                    obj.put("testDescription", info.getDescription());
+                    obj.put("testDetails", info.getDetails());
+                    obj.put("testImpact", info.getImpact());
+                    obj.put("testRemediation", info.getRemediation());
+                    obj.put("testSeverityFromTemplate", info.getSeverity());
+                    obj.put("testTags", info.getTags());
+                    obj.put("testReferences", info.getReferences());
+                    obj.put("testCwe", info.getCwe());
+                    obj.put("testCve", info.getCve());
+                    if (info.getCategory() != null) {
+                        obj.put("testCategory", info.getCategory().getDisplayName());
+                    }
+                }
+                issueDetails.add(obj);
+            }
+
+            return buildFetchIssuesResponse(issueDetails, SUCCESS.toUpperCase());
+        } catch (Exception e) {
+            logger.error("Unexpected error in fetchIssuesFromCollections", e);
+            addActionError(e.getMessage());
+            return buildFetchIssuesResponse(new ArrayList<>(), ERROR.toUpperCase());
+        }
+    }
+
+    private String buildFetchIssuesResponse(List<BasicDBObject> details, String result) {
+        fetchIssuesFromCollectionsResponse = new BasicDBObject();
+        fetchIssuesFromCollectionsResponse.put("issueDetails", details);
+        fetchIssuesFromCollectionsResponse.put("openIssuesCount", openIssuesCount);
+        fetchIssuesFromCollectionsResponse.put("fixedIssuesCount", fixedIssuesCount);
+        fetchIssuesFromCollectionsResponse.put("ignoredIssuesCount", ignoredIssuesCount);
+        return result;
     }
 
     List<Integer> totalIssuesCountDayWise;

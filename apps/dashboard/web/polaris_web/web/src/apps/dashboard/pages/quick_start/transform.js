@@ -62,9 +62,18 @@ import {
     DESCRIPTION_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
     DOCS_URL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
     INTERVAL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
-    VERTEX_AI_CUSTOM_DEPLOYED_MODEL_FIELDS
+    VERTEX_AI_CUSTOM_DEPLOYED_MODEL_FIELDS,
+    CONNECTOR_TYPE_SALESFORCE,
+    CONNECTOR_NAME_SALESFORCE,
+    DESCRIPTION_SALESFORCE,
+    DOCS_URL_SALESFORCE,
+    INTERVAL_SALESFORCE,
+    SALESFORCE_FIELDS
 } from "./constants/aiAgentConnectorConstants"
 import DataDogConnector from "./components/DataDogConnector"
+import MicrosoftDefenderConnector from "./components/MicrosoftDefenderConnector"
+import MicrosoftDefenderRunQueriesConnector from "./components/MicrosoftDefenderRunQueriesConnector"
+import SentinelOneConnector from "./components/SentinelOneConnector"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -531,6 +540,33 @@ const agenticShieldObj = {
     docsUrl: 'https://docs.akto.io/agentic-shield',
     key: "AGENTIC_SHIELD",
     component: <AgenticShield/>
+}
+
+const sentinelOneObj = {
+    icon: '/public/sentinelone.svg',
+    label: "SentinelOne",
+    text: "Connect SentinelOne to Akto to detect AI coding tools (Claude, Cursor) running on managed endpoints.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-sentinelone',
+    key: "SENTINELONE",
+    component: <SentinelOneConnector/>
+}
+
+const microsoftDefenderObj = {
+    icon: '/public/microsoft_defender.svg',
+    label: "Microsoft Defender for Endpoint",
+    text: "Connect your Microsoft Defender for Endpoint account to Akto for enhanced security insights.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
+    key: "MICROSOFT_DEFENDER",
+    component: <MicrosoftDefenderConnector/>
+}
+
+const microsoftDefenderRunQueriesObj = {
+    icon: '/public/microsoft_defender.svg',
+    label: "Microsoft Defender Run Queries",
+    text: "Select devices from your Microsoft Defender inventory and run live responses and KQL queries",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
+    key: "MICROSOFT_DEFENDER_RUN_QUERIES",
+    component: <MicrosoftDefenderRunQueriesConnector/>
 }
 
 const mcpScanObj = {
@@ -1049,6 +1085,22 @@ const vertexAICustomDeployedModelImportObj = {
     />
 }
 
+const salesforceImportObj = {
+    icon: '/public/salesforce.svg',
+    label: "Salesforce",
+    text: "Import Salesforce agents seamlessly into AKTO.",
+    docsUrl: DOCS_URL_SALESFORCE,
+    key: "SALESFORCE_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_SALESFORCE}
+        connectorName={CONNECTOR_NAME_SALESFORCE}
+        description={DESCRIPTION_SALESFORCE}
+        fields={SALESFORCE_FIELDS}
+        docsUrl={DOCS_URL_SALESFORCE}
+        recurringIntervalSeconds={INTERVAL_SALESFORCE}
+    />
+}
+
 const litellmImportObj = {
     icon: '/public/litellm.svg',
     label: "LiteLLM",
@@ -1097,6 +1149,42 @@ const githubCopilotHookObj = {
     />
 }
 
+const codexHookObj = {
+    icon: '/public/openai.svg',
+    label: "Codex CLI Hook",
+    text: "Monitor and secure OpenAI Codex CLI interactions with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/codex-cli-hooks',
+    key: "CODEX_CLI_HOOK",
+    component: <BannerComponent
+        content="Monitor and secure OpenAI Codex CLI interactions with Akto guardrails."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/codex-cli-hooks'
+    />
+}
+
+const intellijHookObj = {
+    icon: '/public/intellij.svg',
+    label: "IntelliJ/JetBrains Hook",
+    text: "IDE-level protection monitoring AI-powered code completions in JetBrains IDEs.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/intellij-hooks',
+    key: "INTELLIJ_HOOK",
+    component: <BannerComponent
+        content="IDE-level protection monitoring AI-powered code completions in JetBrains IDEs."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/intellij-hooks'
+    />
+}
+
+const antigravityObj = {
+    icon: '/public/antigravity.svg',
+    label: "Antigravity Hook",
+    text: "Secure your Antigravity AI agent interactions with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/antigravity-hooks',
+    key: "ANTIGRAVITY_HOOK",
+    component: <BannerComponent
+        content="Secure your Antigravity AI agent interactions with Akto guardrails."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/antigravity-hooks'
+    />
+}
+
 const dataDogConnectorObj = {
     icon: '/public/datadog-1.svg',
     label: "DataDog Connector",
@@ -1109,11 +1197,11 @@ const trueFoundryImportObj = {
     icon: '/public/trueFoundry.svg',
     label: "TrueFoundry",
     text: "Import your TrueFoundry proxy traffic, seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/truefoundry',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/truefoundry',
     key: "TRUEFOUNDRY",
     component: <BannerComponent
         content="Import your TrueFoundry proxy traffic, seamlessly in AKTO."
-        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/truefoundry'
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/truefoundry'
     />
 }
 
@@ -1784,7 +1872,7 @@ const quickStartFunc = {
         const aiAgentConnectors = [
             awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, snowflakeObj,
-            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj
+            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, salesforceImportObj
         ]
 
         // MCP Scan
@@ -1808,7 +1896,12 @@ const quickStartFunc = {
 
         // Endpoint Agents
         const endpointAgents = [
-            cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj
+            cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj
+        ]
+
+        // Endpoint Management
+        const endpointManagement = [
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
         ]
 
        if(func.checkLocal() || func.isLimitedAccount()){
@@ -1838,6 +1931,7 @@ const quickStartFunc = {
 
             connectors = {
                 "Endpoint Agents": endpointAgents,
+                "Endpoint Management": endpointManagement,
                 "Agentic Proxies": agenticProxies,
                 "Browser Extension": browserExtensions,
                 "Secure Web Networks": secureWebNetworks,
@@ -1873,25 +1967,27 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, databricksImportObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
-            cloudflareWarpObj, zscalerObj, snowflakeObj
+            cloudflareWarpObj, zscalerObj, snowflakeObj,
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
         ]
 
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
                 awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, trueFoundryImportObj, arcadeImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
-                apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
+                apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
+                microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
             ])
         }
 

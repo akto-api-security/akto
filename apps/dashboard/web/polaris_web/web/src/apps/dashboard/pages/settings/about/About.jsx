@@ -26,6 +26,7 @@ function About() {
     const [setupType,setSetuptype] = useState('')
     const [redactPayload, setRedactPayload] = useState(false)
     const [newMerging, setNewMerging] = useState(false)
+    const [doBodyMatch, setDoBodyMatch] = useState(false)
     const [trafficThreshold, setTrafficThreshold] = useState(trafficAlertDurations[0].value)
     const [trafficFiltersMap, setTrafficFiltersMap] = useState({})
     const [headerKey, setHeaderKey] = useState('');
@@ -78,6 +79,7 @@ function About() {
         setSetuptype(resp.setupType)
         setRedactPayload(resp.redactPayload)
         setNewMerging(resp.urlRegexMatchingEnabled)
+        setDoBodyMatch(resp.bodyMatchEnabled ?? true)
         setTrafficThreshold(resp.trafficAlertThresholdSeconds)
         setObjectArr(arr)
         setEnableTelemetry(resp.telemetrySettings?.customerEnabled || false)
@@ -235,6 +237,11 @@ function About() {
     const handleNewMerging = async(val) => {
         setNewMerging(val);
         await settingRequests.toggleNewMergingEnabled(val);
+    }
+
+    const handleDoBodyMatch = async(val) => {
+        setDoBodyMatch(val);
+        await settingRequests.toggleDoBodyMatch(val);
     }
 
     const toggleTelemetry = async(val) => {
@@ -527,6 +534,7 @@ function About() {
             </Box>
             <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} disabled={window.USER_ROLE !== "ADMIN"}/>
             <ToggleComponent text={"Use akto's testing module"} onToggle={toggleMiniTesting} initial={miniTesting} disabled={window.USER_ROLE !== "ADMIN"}/>
+            <ToggleComponent text={"Enable body match in merging"} initial={doBodyMatch} onToggle={handleDoBodyMatch} disabled={window.USER_ROLE !== "ADMIN"}/>
             <ToggleComponent text={"Allow merging on versions"} onToggle={() => setModalOpen(true)} initial={mergingOnVersions} disabled={window.USER_ROLE !== "ADMIN"}/>
             {(window?.DASHBOARD_MODE === 'ON_PREM' || window?.USER_NAME?.toLowerCase()?.includes("@akto.io")) &&
                 <VerticalStack gap={2}>

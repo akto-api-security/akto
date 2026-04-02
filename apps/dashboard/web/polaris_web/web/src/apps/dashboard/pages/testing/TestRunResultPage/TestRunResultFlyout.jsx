@@ -429,10 +429,16 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
-    const categoryKey = selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] || selectedTestRunResult?.testCategory;
+    const categoryKey =
+      selectedTestRunResult?.superCategoryName ||
+      selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] ||
+      selectedTestRunResult?.testCategory;
     const owaspData = func.categoryMapping[categoryKey] || {};
     const owaspMapping = owaspData.label || "";
     const owaspUrl = owaspData.url || "";
+    const owaspAgenticData = func.agenticCategoryMapping[categoryKey] || {};
+    const owaspAgenticMapping = owaspAgenticData.label || "";
+    const owaspAgenticUrl = owaspAgenticData.url || "";
 
     function ActionsComp() {
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
@@ -526,6 +532,11 @@ function TestRunResultFlyout(props) {
                                 {owaspMapping.length > 0 ? (
                                     <Link onClick={() => owaspUrl && window.open(owaspUrl, '_blank')}>
                                         <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
+                                    </Link>
+                                ) : null}
+                                {owaspAgenticMapping.length > 0 ? (
+                                    <Link onClick={() => owaspAgenticUrl && window.open(owaspAgenticUrl, '_blank')}>
+                                        <Badge size="small">{owaspAgenticMapping}</Badge>
                                     </Link>
                                 ) : null}
                             </VerticalStack>

@@ -66,8 +66,45 @@ const categoryMapping = {
   "CI": { label: "API10:2023 Unsafe Consumption of APIs", url: "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/" }
 }
 
+const AGENTIC_ASI_URL = "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/"
+
+const ASI01 = { label: "OWASP Agentic ASI01 - Agent Goal Hijack", url: AGENTIC_ASI_URL }
+const ASI02 = { label: "OWASP Agentic ASI02 - Tool Misuse and Exploitation", url: AGENTIC_ASI_URL }
+const ASI03 = { label: "OWASP Agentic ASI03 - Identity and Privilege Abuse", url: AGENTIC_ASI_URL }
+const ASI04 = { label: "OWASP Agentic ASI04 - Agentic Supply Chain Vulnerabilities", url: AGENTIC_ASI_URL }
+const ASI05 = { label: "OWASP Agentic ASI05 - Unexpected Code Execution", url: AGENTIC_ASI_URL }
+const ASI06 = { label: "OWASP Agentic ASI06 - Memory and Context Poisoning", url: AGENTIC_ASI_URL }
+const ASI07 = { label: "OWASP Agentic ASI07 - Insecure Inter-Agent Communication", url: AGENTIC_ASI_URL }
+const ASI08 = { label: "OWASP Agentic ASI08 - Cascading Failures", url: AGENTIC_ASI_URL }
+const ASI09 = { label: "OWASP Agentic ASI09 - Human-Agent Trust Exploitation", url: AGENTIC_ASI_URL }
+const ASI10 = { label: "OWASP Agentic ASI10 - Rogue Agents", url: AGENTIC_ASI_URL }
+
+/** Keys are {@code TestCategory} / YAML {@code info.category} names; aliases cover legacy Agent Security-* categories. */
+const agenticCategoryMapping = {
+  "AGENT_GOAL_HIJACK": ASI01,
+  "AGENTIC_SECURITY_PROMPT_INJECTION": ASI01,
+  "AGENTIC_SECURITY": ASI01,
+  "TOOL_MISUSE_AND_EXPLOITATION": ASI02,
+  "AGENTIC_SECURITY_AGENT_EXPLOITATION": ASI02,
+  "IDENTITY_AND_PRIVILEGE_ABUSE": ASI03,
+  "AGENTIC_SUPPLY_CHAIN": ASI04,
+  "AGENTIC_SECURITY_INFRASTRUCTURE": ASI04,
+  "UNEXPECTED_CODE_EXECUTION": ASI05,
+  "AGENTIC_SECURITY_CODE_EXECUTION": ASI05,
+  "MEMORY_AND_CONTEXT_POISONING": ASI06,
+  "AGENTIC_SECURITY_DATA_EXPOSURE": ASI06,
+  "INSECURE_INTER_AGENT_COMMUNICATION": ASI07,
+  "CASCADING_FAILURES": ASI08,
+  "HUMAN_AGENT_TRUST_EXPLOITATION": ASI09,
+  "AGENTIC_BUSINESS_ALIGNMENT": ASI09,
+  "AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS": ASI09,
+  "AGENTIC_SAFETY": ASI09,
+  "ROGUE_AGENTS": ASI10,
+}
+
 const func = {
   categoryMapping: categoryMapping,
+  agenticCategoryMapping: agenticCategoryMapping,
   setToast (isActive, isError, message) {
     Store.getState().setToastConfig({
           isActive: isActive,
@@ -177,10 +214,10 @@ prettifyEpoch(epoch) {
     if (diffMonths > 2) {
       return this.toDateStr(new Date(epoch * 1000), true)
     } else if (diffWeeks > 4) {
-      count = Math.round(diffMonths + 0.5)
+      count = Math.max(1, Math.floor(diffDays / 30))
       unit = 'month'
     } else if (diffDays > 11) {
-      count = Math.round(diffWeeks + 0.5)
+      count = Math.max(1, Math.floor(diffWeeks))
       unit = 'week'
     } else if (diffDays === 1) {
       return sign > 0 ? 'tomorrow' : 'yesterday'
@@ -1175,6 +1212,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
               lastTested: apiInfoMap[key] ? apiInfoMap[key]["lastTested"] : 0,
               isThreatEnabled: apiInfoMap[key] ? apiInfoMap[key]["threatScore"] > 0 : false,
               agentProxyGuardrailEnabled: apiInfoMap[key] ? (apiInfoMap[key]["agentProxyGuardrailEnabled"] || false) : false,
+              guardrailSchema: apiInfoMap[key] ? (apiInfoMap[key]["guardrailSchema"] || null) : null,
           }
 
       }
@@ -2386,14 +2424,6 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   isLimitedAccount(){
     return window?.ACTIVE_ACCOUNT === 1753372418
   },
-
-  isModuleRestrictedOrg(){
-    const restrictedOrgIds = [
-      '11ea8bfd-0997-4bf9-9c4c-76f9640af7a2'
-    ];
-    const orgId = window?.STIGG_CUSTOMER_ID || '';
-    return restrictedOrgIds.includes(orgId);
-  },
   /**
    * Validates if a string is a valid URL with http or https protocol
    * @param {string} url - The URL string to validate
@@ -2459,27 +2489,27 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   extractEmailDetails(email) {
     // Define the regex pattern
     const pattern = /^(.*?)@([\w.-]+)\.[a-z]{2,}$/;
-  
+
     // Match the regex pattern
     const match = email.match(pattern);
-  
+
     if (match) {
       let rawUsername = match[1]; // Extract username
       let mailserver = match[2]; // Extract mailserver (including subdomains)
-  
+
       let username = rawUsername
       .split(/[^a-zA-Z]+/) // Split by any non-alphabet character
       .filter(Boolean) // Remove empty segments
       .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1)) // Capitalize each segment
       .join(' '); // Join segments with a space
-          
+
       mailserver = mailserver.charAt(0).toUpperCase() + mailserver.slice(1);
-  
+
       return { username, mailserver };
     } else {
       return { error: "Invalid email format" };
     }
-  }
+  },
 }
 
 export default func

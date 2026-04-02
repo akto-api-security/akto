@@ -8,6 +8,7 @@ import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.monitoring.EndpointShieldLogsDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -91,6 +92,7 @@ import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.DependencyNode.ParamInfo;
+import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.agents.Model;
 import com.akto.dto.agents.ModelType;
 import com.akto.dto.agents.State;
@@ -317,6 +319,7 @@ public class DaoInit {
         ClassModel<Model> agentModel = ClassModel.builder(Model.class).enableDiscriminator(true).build();
         ClassModel<ModuleInfo> ModuleInfoClassModel = ClassModel.builder(ModuleInfo.class).enableDiscriminator(true).build();
         ClassModel<TLSAuthParam> tlsAuthClassModel = ClassModel.builder(TLSAuthParam.class).enableDiscriminator(true).build();
+        ClassModel<DigestAuthParam> digestAuthParamClassModel = ClassModel.builder(DigestAuthParam.class).enableDiscriminator(true).build();
         ClassModel<ApiHitCountInfo> apiHitCountInfoClassModel = ClassModel.builder(ApiHitCountInfo.class).enableDiscriminator(true).build();
         ClassModel<BidirectionalSyncSettings> testingIssueTicketsModel = ClassModel.builder(BidirectionalSyncSettings.class).enableDiscriminator(true).build();
         ClassModel<TicketSyncJobParams> ticketSyncJobParamsClassModel = ClassModel.builder(TicketSyncJobParams.class).enableDiscriminator(true).build();
@@ -332,7 +335,8 @@ public class DaoInit {
         ClassModel<Trace> traceClassModel = ClassModel.builder(Trace.class).enableDiscriminator(true).build();
         ClassModel<Span> spanClassModel = ClassModel.builder(Span.class).enableDiscriminator(true).build();
         ClassModel<Span.ToolDefinition> toolDefinitionClassModel = ClassModel.builder(Span.ToolDefinition.class).enableDiscriminator(true).build();
-
+        ClassModel<UserAnalysisData.UserAnalysisDataKey> userAnalysisDataKeyClassModel = ClassModel.builder(UserAnalysisData.UserAnalysisDataKey.class).enableDiscriminator(true).build();
+        ClassModel<AccountSettings.ProxyPatternInfo> proxyPatternInfoClassModel = ClassModel.builder(AccountSettings.ProxyPatternInfo.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -344,7 +348,7 @@ public class DaoInit {
                 cappedListClassModel,
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel,
                 testingRunResultClassModel, testResultClassModel, genericTestResultClassModel,
-                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel, sampleDataAuthParamClassModel,
+                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel, sampleDataAuthParamClassModel, digestAuthParamClassModel,
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel, CustomWebhookClassModel, WorkflowNodeDetailsClassModel, CustomWebhookResultClassModel,
@@ -375,7 +379,7 @@ public class DaoInit {
                 jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, testingIssueTicketsModel, tlsAuthClassModel,
                 ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
-                traceClassModel, spanClassModel, toolDefinitionClassModel)
+                traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -478,10 +482,12 @@ public class DaoInit {
         ApiInfoDao.instance.createIndicesIfAbsent();
         ApiSequencesDao.instance.createIndicesIfAbsent();
         RuntimeLogsDao.instance.createIndicesIfAbsent();
+        ProtectionLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();
         AgenticTestingLogsDao.instance.createIndicesIfAbsent();
         DashboardLogsDao.instance.createIndicesIfAbsent();
         DataIngestionLogsDao.instance.createIndicesIfAbsent();
+        AwsApiGatewayLogsDao.instance.createIndicesIfAbsent();
         AnalyserLogsDao.instance.createIndicesIfAbsent();
         SampleDataDao.instance.createIndicesIfAbsent();
         LoadersDao.instance.createIndicesIfAbsent();
@@ -516,6 +522,7 @@ public class DaoInit {
         McpReconRequestDao.instance.createIndicesIfAbsent();
         GuardrailPoliciesDao.instance.createIndicesIfAbsent();
         EndpointShieldLogsDao.instance.createIndicesIfAbsent();
+        ModuleInfoDao.instance.createIndicesIfAbsent();
         AgentConversationDao.instance.createIndexIfAbsent();
         AgentConversationResultDao.instance.createIndexIfAbsent();
         IpReputationScoreDao.instance.createIndicesIfAbsent();

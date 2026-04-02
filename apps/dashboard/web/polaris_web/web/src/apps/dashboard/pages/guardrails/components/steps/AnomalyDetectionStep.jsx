@@ -4,6 +4,7 @@ import {
     Box,
     Banner
 } from "@shopify/polaris";
+import OwaspTag from "../OwaspTag";
 
 const ANOMALY_CATEGORIES = [
     "Statistical Anomalies",
@@ -30,6 +31,7 @@ const AnomalyDetectionStep = () => {
             <Text variant="bodyMd" tone="subdued">
                 Configure anomaly detection rules to identify unusual patterns in agent behavior, tool usage, and system metrics.
             </Text>
+            <OwaspTag stepNumber={8} />
 
             <Banner title="Coming Soon" status="info">
                 <Text variant="bodyMd">

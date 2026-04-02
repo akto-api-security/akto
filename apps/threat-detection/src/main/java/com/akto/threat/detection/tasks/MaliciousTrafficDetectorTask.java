@@ -4,8 +4,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -44,8 +42,6 @@ import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
-import com.akto.dto.type.APICatalog;
-import com.akto.runtime.RuntimeUtil;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
@@ -69,7 +65,9 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Pa
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.threat.detection.utils.ThreatDetector;
+import com.akto.threat.detection.utils.ThreatDetectorWithStrategy;
 import com.akto.threat.detection.utils.Utils;
+import com.akto.threat.detection.hyperscan.HyperscanEventHandler;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.utils.GzipUtils;
@@ -110,7 +108,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static final FilterConfig ipApiRateLimitFilter = Utils.getipApiRateLimitFilter();
   private static Supplier<String> lazyToString;
   private DistributionCalculator distributionCalculator;
-  private ThreatDetector threatDetector = new ThreatDetector();
+  private com.akto.threat.detection.utils.ThreatDetectorWithStrategy threatDetector;
   private boolean apiDistributionEnabled;
   private ApiCountCacheLayer apiCacheCountLayer;
   private static List<FilterConfig> successfulExploitFilters = new ArrayList<>();
@@ -126,6 +124,8 @@ public class MaliciousTrafficDetectorTask implements Task {
   // Valid hostname tracking (non-IP, not localhost, no port)
   private int validHostnameCount = 0;
   private long lastValidHostnameLogTime = System.currentTimeMillis();
+
+  private final HyperscanEventHandler hyperscanEventHandler;
 
     public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled, String instanceId) throws Exception {
@@ -189,6 +189,9 @@ public class MaliciousTrafficDetectorTask implements Task {
     this.rawApiFactory = new RawApiMetadataFactory(new IPLookupClient());
     this.distributionCalculator = distributionCalculator;
     this.apiDistributionEnabled = apiDistributionEnabled;
+
+    this.threatDetector = new ThreatDetectorWithStrategy();
+    this.hyperscanEventHandler = new HyperscanEventHandler(this::generateAndPushMaliciousEventRequest);
   }
 
   private int MAX_KAFKA_DEBUG_MSGS = 100;
@@ -503,15 +506,22 @@ public class MaliciousTrafficDetectorTask implements Task {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
       return;
     }
-    Map<String, FilterConfig> filters = this.getFilters();
-    if (filters.isEmpty()) {
-      logger.warnAndAddToDb("No filters found for account " + responseParam.getAccountId());
-      return;
-    }
+    AccountConfig accountConfig = AccountConfigurationCache.getInstance().getConfig(dataActor);
+    boolean isHyperscanOnly = accountConfig != null && accountConfig.isHyperscanEnabled();
 
-    RawApi rawApi = RawApi.buildFromMessageNew(responseParam);
-    RawApiMetadata metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());
-    rawApi.setRawApiMetdata(metadata);
+    RawApi rawApi = null;
+    RawApiMetadata metadata = null;
+    if (!isHyperscanOnly) {
+      Map<String, FilterConfig> filters = this.getFilters();
+      if (filters.isEmpty()) {
+        logger.warnAndAddToDb("No filters found for account " + responseParam.getAccountId());
+        return;
+      }
+
+      rawApi = RawApi.buildFromMessageNew(responseParam);
+      metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());
+      rawApi.setRawApiMetdata(metadata);
+    }
 
     int apiCollectionId = httpCallParser.createApiCollectionId(responseParam);
     responseParam.requestParams.setApiCollectionId(apiCollectionId);
@@ -541,21 +551,21 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     List<SchemaConformanceError> errors = null;
 
-    // Check SuccessfulExploit category filters
-    boolean successfulExploit = false; 
-    if (!successfulExploitFilters.isEmpty()) {
-      successfulExploit = threatDetector.isSuccessfulExploit(successfulExploitFilters, rawApi, apiInfoKey);
-    }
-    // Check IgnoredEvents category filters
+    // Skip YAML-based exploit/ignore checks for Hyperscan mode
+    boolean successfulExploit = false;
     boolean isIgnoredEvent = false;
-    if (!ignoredEventFilters.isEmpty()) {
-      isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
+    if (!isHyperscanOnly) {
+      if (!ignoredEventFilters.isEmpty()) {
+        isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
+      }
+      if (!successfulExploitFilters.isEmpty()) {
+        successfulExploit = threatDetector.isSuccessfulExploit(successfulExploitFilters, rawApi, apiInfoKey);
+      }
     }
+
     if (apiDistributionEnabled && apiCollectionId != 0) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
 
-      // Use pre-matched template URL for Redis storage
-      // This aggregates requests like /api/users/1, /api/users/2 under /api/users/INTEGER
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, urlForAggregation, method.toString());
       String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, urlForAggregation, method.toString());
       long curEpochMin = responseParam.getTime() / 60;
@@ -576,18 +586,29 @@ public class MaliciousTrafficDetectorTask implements Task {
             + ratelimitConfig.toString());
 
         RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
-        // Send event to BE.
         SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam,
             ipApiRateLimitFilter, metadata, errors, successfulExploit, isIgnoredEvent, redactionType);
         generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq,
             EventType.EVENT_TYPE_AGGREGATED);
 
-        // cool-off sending to BE till mitigationPeriod is over
         this.threatConfigEvaluator.setActorInMitigationPeriod(ipApiCmsKey, ratelimitConfig);
       }
     }
 
-    for (FilterConfig apiFilter : apiFilters.values()) {
+    boolean skipFilterLoop = false;
+
+    // Run Hyperscan if enabled
+    if (isHyperscanOnly) {
+      RedactionType hsRedactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
+      hyperscanEventHandler.detectAndPushEvents(
+          responseParam, apiInfoKey, actor, metadata,
+          successfulExploit, isIgnoredEvent, hsRedactionType);
+      skipFilterLoop = true;
+    }
+
+    // Only run filter loop if not skipped
+    if (!skipFilterLoop) {
+      for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = false;
        // Create a fresh vulnerable list for each filter
       List<SchemaConformanceError> vulnerable = null;
@@ -720,11 +741,9 @@ public class MaliciousTrafficDetectorTask implements Task {
           }
         }
       }
-    } 
-
-  }
-
-  
+    }
+    }
+    }
 
   private void generateAndPushMaliciousEventRequest(
       FilterConfig apiFilter,

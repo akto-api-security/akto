@@ -93,16 +93,17 @@ export default function Header() {
 
     const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {};
-    const isRestricted = func.isModuleRestrictedOrg();
-    const agenticSecurityGranted =
-        isRestricted ? false : (stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || true)
-    const mcpSecurityGranted =
-        isRestricted ? false : (stiggFeatures?.MCP_SECURITY?.isGranted || true);
+    const agenticSecurityGranted =(stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false)
+    const mcpSecurityGranted =(stiggFeatures?.MCP_SECURITY?.isGranted || true);
     const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
-    const endpointSecurityGranted = isRestricted ? false : (stiggFeatures?.ENDPOINT_SECURITY?.isGranted || true)
+    let endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted;
+    const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true;
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];
+        if(func.checkLocal()){
+            return disabled;
+        }
         if (mcpSecurityGranted === false) {
             disabled.push("MCP Security");
         }

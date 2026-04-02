@@ -139,12 +139,12 @@ export default {
             }
         })
     },
-    attachFileToIssue(origReq, testReq, issueId) {
+    attachFileToIssue(origReq, testReq, issueId, agenticResult = false) {
         return request({
             url: '/api/attachFileToIssue',
             method: 'post',
             data: {
-                origReq, testReq, issueId
+                origReq, testReq, issueId, agenticResult
             }
         })
     },
@@ -199,14 +199,26 @@ export default {
             return resp
         })
     },
-    uploadRecordedLoginFlow(content, tokenFetchCommand) {
+    uploadRecordedLoginFlow(content, tokenFetchCommand, roleName) {
+        const data = { content, tokenFetchCommand }
+        if (roleName) {
+            data.roleName = roleName
+        }
         return request({
             url: '/api/uploadRecordedFlow',
             method: 'post',
-            data: {content, tokenFetchCommand}
+            data
         }).then((resp) => {
             return resp
         })
+    },
+
+    fetchRecordedLoginScreenshots(roleName) {
+        return request({
+            url: '/api/fetchRecordedLoginScreenshots',
+            method: 'post',
+            data: { roleName }
+        }).then((resp) => resp)
     },
 
     fetchRecordedLoginFlow(nodeId) {
@@ -481,18 +493,18 @@ export default {
             data: {reportId, organizationName, reportDate, reportUrl, username, firstPollRequest}
         })
     },
-    fetchScript() {
+    fetchScript(scriptType = 'PRE_REQUEST') {
         return request({
             url: '/api/fetchScript',
             method: 'post',
-            data: {}
+            data: { scriptType }
         })
     },
-    addScript({javascript}) {
+    addScript({ javascript, scriptType = 'PRE_REQUEST' }) {
         return request({
             url: '/api/addScript',
             method: 'post',
-            data: {testScript:{javascript}}
+            data: { testScript: { javascript, type: scriptType } }
         })
     },
     updateScript(id, javascript) {

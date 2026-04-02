@@ -12,6 +12,8 @@ const TYPE_TAG_TO_DISPLAY = {
 // agentType is used to infer the type for agent rows (not from tags)
 const KNOWN_CLIENTS = {
     claude: { displayName: 'Claude', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
+    claude1: { displayName: 'Claude Desktop', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
+    claude2: { displayName: 'Claude CLI', domain: 'claude.ai', agentType: CLIENT_TYPES.AI_AGENT },
     chatgpt: { displayName: 'ChatGPT', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     openai: { displayName: 'OpenAI', domain: 'openai.com', agentType: CLIENT_TYPES.AI_AGENT },
     gemini: { displayName: 'Gemini', domain: 'gemini.google.com', agentType: CLIENT_TYPES.LLM },
