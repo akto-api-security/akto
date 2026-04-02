@@ -47,6 +47,7 @@ public class SentinelOneIntegrationAction extends UserAction {
     private static final int DEFAULT_INTERVAL = 3600;
     private static final int CONNECT_TIMEOUT_MS = 30_000;
     private static final int SOCKET_TIMEOUT_MS = 60_000;
+    private static final int MAX_GUARDRAIL_RETRIES = 3;
 
 
     private String apiToken;
@@ -54,16 +55,6 @@ public class SentinelOneIntegrationAction extends UserAction {
     private String dataIngestionUrl;
     private String guardrailsUrl;
     private Integer recurringIntervalSeconds;
-
-    // Remote scripts fields
-    private String scriptName;
-    private String scriptContent;
-    private String scriptId;
-    private List<String> executeAgentIds;  // agent IDs to run the script on
-    private String executeTaskDescription;
-    private String executeInputParams;
-    private List<Map<String, Object>> remoteScripts;
-    private String parentTaskId;
 
     private SentinelOneIntegration sentinelOneIntegration;
     private List<Map<String, Object>> agents;
@@ -282,112 +273,6 @@ public class SentinelOneIntegrationAction extends UserAction {
         return null;
     }
 
-    /** Execute a remote script on selected agents. */
-    public String executeSentinelOneRemoteScript() {
-        if (scriptId == null || scriptId.trim().isEmpty()) {
-            addActionError("scriptId is required.");
-            return Action.ERROR.toUpperCase();
-        }
-        if (executeAgentIds == null || executeAgentIds.isEmpty()) {
-            addActionError("At least one agent ID is required.");
-            return Action.ERROR.toUpperCase();
-        }
-        SentinelOneIntegration integration = SentinelOneIntegrationDao.instance.findOne(new BasicDBObject());
-        if (integration == null) {
-            addActionError("SentinelOne integration not configured.");
-            return Action.ERROR.toUpperCase();
-        }
-        String normalizedConsoleUrl = normalizeUrl(integration.getConsoleUrl());
-
-        Map<String, Object> data = new HashMap<>();
-        data.put("scriptId", scriptId.trim());
-        data.put("outputDestination", "SentinelCloud");
-        data.put("taskDescription", executeTaskDescription != null ? executeTaskDescription : "Akto script execution");
-        if (executeInputParams != null && !executeInputParams.trim().isEmpty()) {
-            data.put("inputParams", executeInputParams.trim());
-        }
-
-        Map<String, Object> filter = new HashMap<>();
-        filter.put("ids", executeAgentIds);
-
-        Map<String, Object> body = new HashMap<>();
-        body.put("data", data);
-        body.put("filter", filter);
-
-        RequestConfig requestConfig = RequestConfig.custom()
-            .setConnectTimeout(CONNECT_TIMEOUT_MS).setSocketTimeout(SOCKET_TIMEOUT_MS).build();
-        try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
-            HttpPost post = new HttpPost(normalizedConsoleUrl + "/web/api/v2.1/remote-scripts/execute");
-            post.setHeader("Authorization", "ApiToken " + integration.getApiToken());
-            post.setHeader("Content-Type", "application/json");
-            post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
-
-            try (CloseableHttpResponse response = httpClient.execute(post)) {
-                int statusCode = response.getStatusLine().getStatusCode();
-                String responseBody = EntityUtils.toString(response.getEntity());
-                if (statusCode != 200 && statusCode != 201) {
-                    loggerMaker.error("Execute remote script failed: HTTP " + statusCode + " - " + responseBody, LogDb.DASHBOARD);
-                    addActionError("Execute failed: " + responseBody);
-                    return Action.ERROR.toUpperCase();
-                }
-                JsonNode json = OBJECT_MAPPER.readTree(responseBody);
-                parentTaskId = json.path("data").path("parentTaskId").asText(null);
-            }
-            return Action.SUCCESS.toUpperCase();
-        } catch (IOException e) {
-            loggerMaker.error("Error executing remote script: " + e.getMessage(), LogDb.DASHBOARD);
-            addActionError("Error executing remote script: " + e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
-    }
-
-    /** Poll the status of a remote script task by parentTaskId. */
-    public String getSentinelOneScriptTaskStatus() {
-        if (parentTaskId == null || parentTaskId.trim().isEmpty()) {
-            addActionError("parentTaskId is required.");
-            return Action.ERROR.toUpperCase();
-        }
-        SentinelOneIntegration integration = SentinelOneIntegrationDao.instance.findOne(new BasicDBObject());
-        if (integration == null) {
-            addActionError("SentinelOne integration not configured.");
-            return Action.ERROR.toUpperCase();
-        }
-        String normalizedConsoleUrl = normalizeUrl(integration.getConsoleUrl());
-        RequestConfig requestConfig = RequestConfig.custom()
-            .setConnectTimeout(CONNECT_TIMEOUT_MS).setSocketTimeout(SOCKET_TIMEOUT_MS).build();
-        try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
-            HttpGet get = new HttpGet(normalizedConsoleUrl + "/web/api/v2.1/remote-scripts/status?parenttaskid=" + parentTaskId);
-            get.setHeader("Authorization", "ApiToken " + integration.getApiToken());
-            try (CloseableHttpResponse response = httpClient.execute(get)) {
-                int statusCode = response.getStatusLine().getStatusCode();
-                String responseBody = EntityUtils.toString(response.getEntity());
-                if (statusCode != 200) {
-                    loggerMaker.error("Failed to get task status: HTTP " + statusCode + " - " + responseBody, LogDb.DASHBOARD);
-                    addActionError("Failed to get task status: HTTP " + statusCode + " - " + responseBody);
-                    return Action.ERROR.toUpperCase();
-                }
-                JsonNode json = OBJECT_MAPPER.readTree(responseBody);
-                remoteScripts = new ArrayList<>();
-                JsonNode data = json.path("data");
-                if (data.isArray()) {
-                    for (JsonNode task : data) {
-                        Map<String, Object> entry = new HashMap<>();
-                        entry.put("agentComputerName", task.path("agentComputerName").asText(""));
-                        entry.put("status", task.path("status").asText(""));
-                        entry.put("detailedStatus", task.path("detailedStatus").asText(""));
-                        entry.put("updatedAt", task.path("updatedAt").asText(""));
-                        remoteScripts.add(entry);
-                    }
-                }
-            }
-            return Action.SUCCESS.toUpperCase();
-        } catch (IOException e) {
-            loggerMaker.error("Error getting script task status: " + e.getMessage(), LogDb.DASHBOARD);
-            addActionError("Error getting script task status: " + e.getMessage());
-            return Action.ERROR.toUpperCase();
-        }
-    }
-
     // ══════════════════════════════════════════════════════════════════════════
     // Guardrails Management
     // ══════════════════════════════════════════════════════════════════════════
@@ -570,7 +455,7 @@ public class SentinelOneIntegrationAction extends UserAction {
                         String osName = (String) agentDetails.get("osName");
                         
                         // Execute script based on OS
-                        boolean success = executeGuardrailScript(
+                        boolean success = executeGuardrailScriptWithRetry(
                             agentId,
                             osName,
                             scriptPath,
@@ -761,6 +646,29 @@ public class SentinelOneIntegrationAction extends UserAction {
 
         // Execute script
         return executeScriptOnAgent(uploadedScriptId, agentId, inputParams.toString().trim(), token, consoleUrl);
+    }
+
+    private boolean executeGuardrailScriptWithRetry(String agentId, String osName, String scriptBasePath,
+                                                    Map<String, String> envVars, String token, String consoleUrl) {
+        for (int attempt = 1; attempt <= MAX_GUARDRAIL_RETRIES; attempt++) {
+            try {
+                boolean success = executeGuardrailScript(agentId, osName, scriptBasePath, envVars, token, consoleUrl);
+                if (success) {
+                    if (attempt > 1) {
+                        loggerMaker.info("Guardrail execution succeeded on retry " + attempt + " for agent " + agentId, LogDb.DASHBOARD);
+                    }
+                    return true;
+                }
+            } catch (Exception e) {
+                loggerMaker.error("Guardrail execution attempt " + attempt + " failed for agent " + agentId + ": " + e.getMessage(), LogDb.DASHBOARD);
+            }
+
+            if (attempt < MAX_GUARDRAIL_RETRIES) {
+                loggerMaker.info("Retrying guardrail execution for agent " + agentId + " (attempt " + (attempt + 1) + " of " + MAX_GUARDRAIL_RETRIES + ")", LogDb.DASHBOARD);
+            }
+        }
+
+        return false;
     }
 
     private String uploadScriptForGuardrails(String scriptName, String scriptContent, String token, String consoleUrl) {

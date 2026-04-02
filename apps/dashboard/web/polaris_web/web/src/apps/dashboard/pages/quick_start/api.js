@@ -390,30 +390,6 @@ const api = {
         })
     },
 
-    executeGuardrails() {
-        return request({
-            url: '/api/executeGuardrails',
-            method: 'post',
-            data: {}
-        })
-    },
-
-    executeSentinelOneRemoteScript(scriptId, executeAgentIds, executeTaskDescription, executeInputParams) {
-        return request({
-            url: '/api/executeSentinelOneRemoteScript',
-            method: 'post',
-            data: { scriptId, executeAgentIds, executeTaskDescription, executeInputParams }
-        })
-    },
-
-    getSentinelOneScriptTaskStatus(parentTaskId) {
-        return request({
-            url: '/api/getSentinelOneScriptTaskStatus',
-            method: 'post',
-            data: { parentTaskId }
-        })
-    },
-
 }
 
 export default api
