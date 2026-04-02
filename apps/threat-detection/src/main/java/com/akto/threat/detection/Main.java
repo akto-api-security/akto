@@ -26,6 +26,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
+import com.akto.threat.detection.hyperscan.HyperscanThreatMatcher;
 import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
@@ -61,6 +62,19 @@ public class Main {
     logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
     ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
 
+    // Eagerly initialize Hyperscan so it's ready if Stigg flag switches to hyperscan mode at runtime
+    try {
+      HyperscanThreatMatcher matcher = HyperscanThreatMatcher.getInstance();
+      boolean hsReady = matcher.initializeFromClasspath("threat-patterns-example.txt");
+      if (hsReady) {
+        logger.infoAndAddToDb("Hyperscan initialized eagerly with " + matcher.getPatternCount() + " patterns");
+      } else {
+        logger.warnAndAddToDb("Hyperscan initialization failed - hyperscan mode will be unavailable");
+      }
+    } catch (Exception e) {
+      logger.warnAndAddToDb("Hyperscan initialization error (non-fatal): " + e.getMessage());
+    }
+
     int accountId = ClientActor.getAccountId();
     Context.accountId.set(accountId);
     String instanceId = ModuleInfoWorker.getModuleName(ModuleInfo.ModuleType.THREAT_DETECTION); 
@@ -79,6 +93,7 @@ public class Main {
     startModuleConfigPoller();
 
     initCustomDataTypeScheduler();
+
     CmsCounterLayer.initialize(localRedis);
     DistributionCalculator distributionCalculator = new DistributionCalculator();
     DistributionDataForwardLayer distributionDataForwardLayer = new DistributionDataForwardLayer(localRedis, distributionCalculator);
@@ -172,7 +187,7 @@ public class Main {
                 .setPollDurationMilli(pollDurationMilli)
                 .build())
         .setProducerConfig(
-            KafkaProducerConfig.newBuilder().setBatchSize(100).setLingerMs(100).build())
+            KafkaProducerConfig.newBuilder().setBatchSize(16384).setLingerMs(100).build())
         .setKeySerializer(Serializer.STRING)
         .setValueSerializer(Serializer.BYTE_ARRAY)
         .build();
