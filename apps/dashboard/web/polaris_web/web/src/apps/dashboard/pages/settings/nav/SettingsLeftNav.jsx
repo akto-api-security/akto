@@ -149,7 +149,13 @@ const SettingsLeftNav = () => {
                         icon: AdjustMinor,
                         selected: page === "advanced-filters",
                         onClick: () => navigate("/dashboard/settings/advanced-filters")
-                    }, 
+                    },
+                    {
+                        label: 'Proxy Patterns',
+                        icon: CodeMajor,
+                        selected: page === "proxy-patterns",
+                        onClick: () => navigate("/dashboard/settings/proxy-patterns")
+                    },
                     {
                         label: 'Test library',
                         icon: VocabularyMajor,

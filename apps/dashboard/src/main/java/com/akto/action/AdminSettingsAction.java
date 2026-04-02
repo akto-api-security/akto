@@ -572,6 +572,40 @@ public class AdminSettingsAction extends UserAction {
         }
     }
 
+    private String proxyPattern;
+    @Getter
+    private Map<String, AccountSettings.ProxyPatternInfo> matchingPatternsForProxy;
+
+    public String addMatchingPatternForProxy() {
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+
+        if (proxyPattern == null || proxyPattern.trim().isEmpty()) {
+            addActionError("Pattern cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        proxyPattern = proxyPattern.trim();
+
+        String key = proxyPattern;
+        AccountSettings.ProxyPatternInfo info = new AccountSettings.ProxyPatternInfo(user.getLogin(), Context.now());
+
+        try {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.MATCHING_PATTERNS_FOR_PROXY + "." + key, info)
+            );
+
+            AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            this.matchingPatternsForProxy = settings != null ? settings.getMatchingPatternsForProxy() : null;
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error adding matching pattern for proxy", e);
+            return ERROR.toUpperCase();
+        }
+    }
+
     public void setAccountPermission(String accountPermission) {
         this.accountPermission = accountPermission;
     }
@@ -699,6 +733,10 @@ public class AdminSettingsAction extends UserAction {
 
     public void setCompulsoryDescription(Map<String, Boolean> compulsoryDescription) {
         this.compulsoryDescription = compulsoryDescription;
+    }
+
+    public void setProxyPattern(String proxyPattern) {
+        this.proxyPattern = proxyPattern;
     }
 
 }
