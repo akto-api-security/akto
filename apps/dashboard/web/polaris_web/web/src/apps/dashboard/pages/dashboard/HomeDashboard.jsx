@@ -1582,16 +1582,15 @@ function HomeDashboard() {
         />
     );
 
+    const showForAccount = window.ACTIVE_ACCOUNT !== 1669322524;
     const threatComponents = func.checkForFeatureSaas('THREAT_DETECTION') ? [
-        {id: 'threat-timeline', component: threatActorsTimelineComponent},
+        ...(showForAccount ? [{id: 'threat-timeline', component: threatActorsTimelineComponent}] : []),
         {id: 'threat-severity', component: threatSeverityComponent},
         {id: 'threat-categories', component: threatCategoryComponent},
     ] : [];
-
-    const showCriticalApisOverTime = window.ACTIVE_ACCOUNT !== 1669322524;
     let gridComponents = showTestingComponents ?
         [
-            ...(showCriticalApisOverTime ? [{id: 'critical-apis', component: criticalUnsecuredAPIsOverTime}] : []),
+            ...(showForAccount ? [{id: 'critical-apis', component: criticalUnsecuredAPIsOverTime}] : []),
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
             ...threatComponents,
@@ -1606,7 +1605,7 @@ function HomeDashboard() {
             {id: 'access-type', component: apisByAccessTypeComponent},
             {id: 'auth-type', component: apisByAuthTypeComponent},
             {id: 'new-domains', component: newDomainsComponent},
-            ...(showCriticalApisOverTime ? [{id: 'critical-apis', component: criticalUnsecuredAPIsOverTime}] : []),
+            ...(showForAccount ? [{id: 'critical-apis', component: criticalUnsecuredAPIsOverTime}] : []),
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
             ...threatComponents,
