@@ -113,8 +113,8 @@ jobs:
 
           if [[ "${{ github.event.inputs.datadog-forwarder }}" == "true" ]]; then
             cd ../datadog-forwarder
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/datadog-forwarder:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/datadog-forwarder:$IMAGE_TAG3 . --push
-            echo "::set-output name=image::$ECR_REGISTRY/datadog-forwarder:$IMAGE_TAG3"
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-datadog-trace-exporter:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-datadog-trace-exporter:$IMAGE_TAG3 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-datadog-trace-exporter:$IMAGE_TAG3"
           fi
 
 
@@ -160,7 +160,7 @@ jobs:
 
           if [[ "${{ github.event.inputs.datadog-forwarder }}" == "true" ]]; then
             cd ../datadog-forwarder
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/datadog-forwarder:$IMAGE_TAG -t $ECR_REGISTRY/datadog-forwarder:$IMAGE_TAG3 . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-security-datadog-trace-exporter:$IMAGE_TAG -t $ECR_REGISTRY/akto-api-security-datadog-trace-exporter:$IMAGE_TAG3 . --push
           fi
 
       - name: Send Github release notification to Slack - Mini-Runtime
