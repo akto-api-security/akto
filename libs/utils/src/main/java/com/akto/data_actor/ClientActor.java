@@ -107,6 +107,31 @@ public class ClientActor extends DataActor {
         return dbAbsHost + "/api";
     }
 
+    public Config.DatadogForwarderConfig fetchDatadogForwarderConfig() {
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDatadogForwarderConfig", "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchDatadogForwarderConfig", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            try {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBObject configObj = (BasicDBObject) payloadObj.get("datadogForwarderConfig");
+                if (configObj == null) return null;
+                return objectMapper.readValue(configObj.toJson(), Config.DatadogForwarderConfig.class);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error parsing fetchDatadogForwarderConfig response: " + e, LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchDatadogForwarderConfig: " + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
     public AccountSettings fetchAccountSettings() {
         AccountSettings acc = null;
         for (int i=0; i < 5; i++) {
