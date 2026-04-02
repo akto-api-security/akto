@@ -49,13 +49,16 @@ function ProxyPatterns() {
 
     function buildTableData(matchingPatternsForProxy) {
         if (!matchingPatternsForProxy) return []
-        return Object.entries(matchingPatternsForProxy).map(([key, info]) => ({
+        const data =  Object.entries(matchingPatternsForProxy).map(([key, info]) => ({
             patternValue: info.pattern || key,
             addedBy: info.addedBy || '-',
             updatedTsFormatted: info.updatedTs
                 ? func.prettifyEpoch(info.updatedTs)
                 : '-',
+            updatedTs: info.updatedTs
         }))
+        data.sort((a, b) => b.updatedTs - a.updatedTs)
+        return data
     }
 
     async function fetchData() {
@@ -143,6 +146,7 @@ function ProxyPatterns() {
             useNewRow={true}
             condensedHeight={true}
             headings={headers}
+            pageLimit={15}
         />
     )
 
