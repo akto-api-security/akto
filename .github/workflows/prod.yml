@@ -26,6 +26,10 @@ on:
         type: boolean
         default: false
         description: Mini-Runtime-Service
+      datadog-forwarder:
+        type: boolean
+        default: false
+        description: Datadog-Forwarder
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -106,7 +110,13 @@ jobs:
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime-service:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime-service:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime-service:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime-service:$IMAGE_TAG3 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime-service:$IMAGE_TAG3"
           fi
-          
+
+          if [[ "${{ github.event.inputs.datadog-forwarder }}" == "true" ]]; then
+            cd ../datadog-forwarder
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-datadog-forwarder:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-datadog-forwarder:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-datadog-forwarder:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-datadog-forwarder:$IMAGE_TAG3 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-datadog-forwarder:$IMAGE_TAG3"
+          fi
+
 
       - name: DockerHub login
         env:
@@ -146,6 +156,11 @@ jobs:
           if [[ "${{ github.event.inputs.mini-runtime-service }}" == "true" ]]; then
             cd ../mini-runtime-service
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG3 . --push
+          fi
+
+          if [[ "${{ github.event.inputs.datadog-forwarder }}" == "true" ]]; then
+            cd ../datadog-forwarder
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/datadog-forwarder:$IMAGE_TAG -t $ECR_REGISTRY/datadog-forwarder:$IMAGE_TAG1 -t $ECR_REGISTRY/datadog-forwarder:$IMAGE_TAG2 -t $ECR_REGISTRY/datadog-forwarder:$IMAGE_TAG3 . --push
           fi
 
       - name: Send Github release notification to Slack - Mini-Runtime
@@ -262,4 +277,33 @@ jobs:
         with:
           tag: ${{ steps.tag_mini_runtime_service.outputs.new_tag }}
           name: Release ${{ steps.tag_mini_runtime_service.outputs.new_tag }}
+          omitBody: true
+
+      - name: Send Github release notification to Slack - Datadog-Forwarder
+        id: slack-datadog-forwarder
+        if: ${{ github.event.inputs.datadog-forwarder == 'true' }}
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "📊 Datadog-Forwarder version v${{ github.event.inputs.release_version }} released!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Push git tag Datadog-Forwarder
+        if: ${{ github.event.inputs.datadog-forwarder == 'true' }}
+        id: tag_datadog_forwarder
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: datadog-forwarder-${{ github.event.inputs.release_version }}
+
+      - name: Create a GitHub release Datadog-Forwarder
+        if: ${{ github.event.inputs.datadog-forwarder == 'true' }}
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_datadog_forwarder.outputs.new_tag }}
+          name: Release ${{ steps.tag_datadog_forwarder.outputs.new_tag }}
           omitBody: true
