@@ -7,9 +7,12 @@ import testingFunc from "../../testing/transform.js"
 import BarGraph from '../../../components/charts/BarGraph.jsx';
 import LocalStore from "../../../../main/LocalStorageStore";
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
+import { getCategoriesBasedOnDashboardCategory } from '../../test_editor/tests_table/categoryUtil';
 
 const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl, complianceMode }) => {
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
+    const categoryMap = LocalStore(state => state.categoryMap);
+    const dashboardCategory = getDashboardCategory();
 
     const [criticalFindingsData, setCriticalFindingsData] = useState([])
     const [showTestingComponents, setShowTestingComponents] = useState(false)
@@ -29,9 +32,16 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
     const fetchGraphData = async () => {
         setShowTestingComponents(false)
         const subcategoryDataResp = await testingApi.getSummaryInfo(startTimestamp, endTimestamp)
+        const allowedCategories = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMap);
+        const filteredResp = Object.fromEntries(
+            Object.entries(subcategoryDataResp).filter(([testId]) => {
+                const superCategoryName = subCategoryMap[testId]?.superCategory?.name;
+                return superCategoryName ? allowedCategories.includes(superCategoryName) : true;
+            })
+        );
         let tempResultSubCategoryMap = {}
         if (complianceMode) {
-            Object.entries(subcategoryDataResp).forEach(([testId, count]) => {
+            Object.entries(filteredResp).forEach(([testId, count]) => {
                 let clauses = (subCategoryMap[testId]?.compliance?.mapComplianceToListClauses || {})[complianceMode] || []
                 clauses.forEach(clause => {
                     tempResultSubCategoryMap[clause] = tempResultSubCategoryMap[clause] || {text: 0, key: clause}
@@ -39,7 +49,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
                 });
             })
         } else {
-            const result = await testingFunc.convertSubIntoSubcategory(subcategoryDataResp);
+            const result = await testingFunc.convertSubIntoSubcategory(filteredResp);
             tempResultSubCategoryMap = result.subCategoryMap;
         }
         convertSubCategoryInfo(tempResultSubCategoryMap)
@@ -48,7 +58,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
 
     useEffect(() => {
         fetchGraphData()
-    }, [startTimestamp, endTimestamp, complianceMode])
+    }, [startTimestamp, endTimestamp, complianceMode, dashboardCategory])
 
     const defaultChartOptions = {
         "legend": {
