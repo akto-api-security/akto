@@ -1,10 +1,12 @@
 import { Navigation, Box } from "@shopify/polaris"
 import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ComposeMajor, ProfileMajor} from "@shopify/polaris-icons"
-import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
+import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
 import { VariantMajor, VocabularyMajor, AdjustMinor, UndoMajor, CodeMajor, GlobeMajor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 import func from "@/util/func"
 import Store from "../../../store";
+import PersistStore from "../../../../main/PersistStore"
+import { CATEGORY_ENDPOINT_SECURITY } from "../../../../main/labelHelper"
 
 const SettingsLeftNav = () => {
     const navigate = useNavigate()
@@ -84,6 +86,8 @@ const SettingsLeftNav = () => {
         onClick: () => navigate("/dashboard/settings/threat-configuration")
     }] : [];
 
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
+
     return (
         <Navigation>
             <Navigation.Section
@@ -149,7 +153,13 @@ const SettingsLeftNav = () => {
                         icon: AdjustMinor,
                         selected: page === "advanced-filters",
                         onClick: () => navigate("/dashboard/settings/advanced-filters")
-                    }, 
+                    },
+                    ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
+                        label: 'Proxy Patterns',
+                        icon: CodeMajor,
+                        selected: page === "proxy-patterns",
+                        onClick: () => navigate("/dashboard/settings/proxy-patterns")
+                    }] : []),
                     {
                         label: 'Test library',
                         icon: VocabularyMajor,
