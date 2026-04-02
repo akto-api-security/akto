@@ -10,8 +10,8 @@
         <version>${revision}</version>
     </parent>
 
-    <groupId>com.akto.apps.datadog-forwarder</groupId>
-    <artifactId>datadog-forwarder</artifactId>
+    <groupId>com.akto.apps.datadog-trace-exporter</groupId>
+    <artifactId>datadog-trace-exporter</artifactId>
     <packaging>jar</packaging>
 
     <dependencies>

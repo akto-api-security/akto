@@ -60,10 +60,10 @@ while true; do
 done &
 
 start_java() {
-    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/datadog-forwarder-1.0-SNAPSHOT-jar-with-dependencies.jar 2>&1 | tee -a "$LOG_FILE" &
+    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/datadog-trace-exporter-1.0-SNAPSHOT-jar-with-dependencies.jar 2>&1 | tee -a "$LOG_FILE" &
 
     JAVA_PID=$!
-    echo "Started Datadog Forwarder with PID: $JAVA_PID" | tee -a "$LOG_FILE"
+    echo "Started Datadog Trace Exporter with PID: $JAVA_PID" | tee -a "$LOG_FILE"
 
     monitor_memory &
     MONITOR_PID=$!
@@ -75,6 +75,6 @@ start_java() {
 
 while true; do
     start_java
-    echo "Restarting Datadog Forwarder after crash or memory limit..." | tee -a "$LOG_FILE"
+    echo "Restarting Datadog Trace Exporter after crash or memory limit..." | tee -a "$LOG_FILE"
     sleep 2
 done

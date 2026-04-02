@@ -62,14 +62,14 @@
             </modules>
         </profile>
         <profile>
-            <id>datadog-forwarder</id>
+            <id>datadog-trace-exporter</id>
             <activation>
                 <file>
-                    <exists>datadog-forwarder/pom.xml</exists>
+                    <exists>datadog-trace-exporter/pom.xml</exists>
                 </file>
             </activation>
             <modules>
-                <module>datadog-forwarder</module>
+                <module>datadog-trace-exporter</module>
             </modules>
         </profile>
         <profile>
