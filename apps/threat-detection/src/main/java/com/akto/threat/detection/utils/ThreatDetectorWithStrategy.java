@@ -38,8 +38,8 @@ public class ThreatDetectorWithStrategy {
         return threatDetector.findMatchingUrlTemplate(httpResponseParams);
     }
 
-    public boolean shouldIgnoreApi(FilterConfig apiFilter, RawApi rawApi, ApiInfoKey apiInfoKey) {
-        return threatDetector.shouldIgnoreApi(apiFilter, rawApi, apiInfoKey);
+    public boolean shouldIgnoreApi(FilterConfig apiFilter, RawApi rawApi, ApiInfoKey apiInfoKey, String actor) {
+        return threatDetector.shouldIgnoreApi(apiFilter, rawApi, apiInfoKey, actor);
     }
 
     public boolean isSuccessfulExploit(List<FilterConfig> successfulExploitFilters,
