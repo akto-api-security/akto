@@ -29,7 +29,7 @@ on:
       datadog-trace-exporter:
         type: boolean
         default: false
-        description: Datadog-Forwarder
+        description: Datadog-Trace-Exporter
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -279,20 +279,20 @@ jobs:
           name: Release ${{ steps.tag_mini_runtime_service.outputs.new_tag }}
           omitBody: true
 
-      - name: Send Github release notification to Slack - Datadog-Forwarder
+      - name: Send Github release notification to Slack - Datadog-Trace-Exporter
         id: slack-datadog-trace-exporter
         if: ${{ github.event.inputs.datadog-trace-exporter == 'true' }}
         uses: slackapi/slack-github-action@v1.23.0
         with:
           payload: |
             {
-              "text": "📊 Datadog-Forwarder version v${{ github.event.inputs.release_version }} released!"
+              "text": "📊 Datadog-Trace-Exporter version v${{ github.event.inputs.release_version }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
-      - name: Push git tag Datadog-Forwarder
+      - name: Push git tag Datadog-Trace-Exporter
         if: ${{ github.event.inputs.datadog-trace-exporter == 'true' }}
         id: tag_datadog_forwarder
         uses: mathieudutour/github-tag-action@v6.1
@@ -300,7 +300,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           custom_tag: datadog-trace-exporter-${{ github.event.inputs.release_version }}
 
-      - name: Create a GitHub release Datadog-Forwarder
+      - name: Create a GitHub release Datadog-Trace-Exporter
         if: ${{ github.event.inputs.datadog-trace-exporter == 'true' }}
         uses: ncipollo/release-action@v1.12.0
         with:
