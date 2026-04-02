@@ -1,5 +1,5 @@
 import { Link, Text } from '@shopify/polaris';
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import InfoCard from '../../dashboard/new_components/InfoCard';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import testingApi from "../../testing/api.js"
@@ -8,6 +8,7 @@ import BarGraph from '../../../components/charts/BarGraph.jsx';
 import LocalStore from "../../../../main/LocalStorageStore";
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import { getCategoriesBasedOnDashboardCategory } from '../../test_editor/tests_table/categoryUtil';
+import issuesTransform from '../transform.js';
 
 const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl, complianceMode }) => {
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
@@ -29,7 +30,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
         setCriticalFindingsData(data)
     }
 
-    const fetchGraphData = async () => {
+    const fetchGraphData = useCallback(async () => {
         setShowTestingComponents(false)
         const subcategoryDataResp = await testingApi.getSummaryInfo(startTimestamp, endTimestamp)
         const allowedCategories = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMap);
@@ -41,8 +42,14 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
         );
         let tempResultSubCategoryMap = {}
         if (complianceMode) {
+            if (!subCategoryMap || Object.keys(subCategoryMap).length === 0) {
+                setCriticalFindingsData([])
+                setShowTestingComponents(false)
+                return
+            }
             Object.entries(filteredResp).forEach(([testId, count]) => {
-                let clauses = (subCategoryMap[testId]?.compliance?.mapComplianceToListClauses || {})[complianceMode] || []
+                const mapComplianceToListClauses = subCategoryMap[testId]?.compliance?.mapComplianceToListClauses || {}
+                const clauses = issuesTransform.getClausesForCompliance(mapComplianceToListClauses, complianceMode)
                 clauses.forEach(clause => {
                     tempResultSubCategoryMap[clause] = tempResultSubCategoryMap[clause] || {text: 0, key: clause}
                     tempResultSubCategoryMap[clause].text += count
@@ -54,11 +61,11 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
         }
         convertSubCategoryInfo(tempResultSubCategoryMap)
         setShowTestingComponents(true)
-    }
+    }, [startTimestamp, endTimestamp, complianceMode, subCategoryMap, categoryMap, dashboardCategory])
 
     useEffect(() => {
         fetchGraphData()
-    }, [startTimestamp, endTimestamp, complianceMode, dashboardCategory])
+    }, [fetchGraphData])
 
     const defaultChartOptions = {
         "legend": {

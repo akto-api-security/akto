@@ -7,6 +7,11 @@ import { history } from "@/util/history";
 import IssuesCheckbox from "./IssuesPage/IssuesCheckbox.jsx"
 import TooltipText from "../../components/shared/TooltipText.jsx"
 
+function normalizeComplianceLabel(s) {
+    if (!s || typeof s !== 'string') return '';
+    return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 const transform = {
     sortIssues: (issueItem, sortKey, sortOrder) => {
         return issueItem.sort((a, b) => {
@@ -157,7 +162,39 @@ const transform = {
         )
         
         return processedData
-    }
+    },
+
+    /** Clause list for a framework key; matches YAML keys ignoring case / spaces / punctuation. */
+    getClausesForCompliance(mapComplianceToListClauses, complianceMode) {
+        if (!mapComplianceToListClauses || !complianceMode) {
+            return [];
+        }
+        const map = mapComplianceToListClauses;
+        const direct = map[complianceMode];
+        if (direct?.length) {
+            return direct;
+        }
+        const keys = Object.keys(map);
+        const trimmedLower = complianceMode.toLowerCase().trim();
+        const byCase = keys.find((k) => k.toLowerCase().trim() === trimmedLower);
+        if (byCase && map[byCase]?.length) {
+            return map[byCase];
+        }
+        const nMode = normalizeComplianceLabel(complianceMode);
+        if (!nMode) {
+            return [];
+        }
+        const byNorm = keys.find((k) => normalizeComplianceLabel(k) === nMode);
+        if (byNorm && map[byNorm]?.length) {
+            return map[byNorm];
+        }
+        return [];
+    },
+
+    subcategoryMatchesComplianceFramework(infoCompliance, complianceMode) {
+        const map = infoCompliance?.mapComplianceToListClauses;
+        return this.getClausesForCompliance(map, complianceMode).length > 0;
+    },
 }
 
 export default transform
