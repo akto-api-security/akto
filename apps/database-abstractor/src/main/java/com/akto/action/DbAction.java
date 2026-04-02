@@ -120,6 +120,7 @@ public class DbAction extends ActionSupport {
     List<AktoDataType> aktoDataTypes;
     List<CustomAuthTypeMapper> customAuthTypes;
     AccountSettings accountSettings;
+    Config.DatadogForwarderConfig datadogForwarderConfig;
     List<ApiInfo> apiInfos;
     APIConfig apiConfig;
     List<SingleTypeInfo> stis;
@@ -551,6 +552,20 @@ public class DbAction extends ActionSupport {
             accountSettings = DbLayer.fetchAccountSettings(accountId);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchAccountSettings " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchDatadogForwarderConfig() {
+        try {
+            int accountId = Context.accountId.get();
+            String configId = Config.DatadogForwarderConfig.CONFIG_ID + "_" + accountId;
+            datadogForwarderConfig = (Config.DatadogForwarderConfig) ConfigsDao.instance.findOne(
+                com.mongodb.client.model.Filters.eq("_id", configId)
+            );
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchDatadogForwarderConfig " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -3996,6 +4011,14 @@ public class DbAction extends ActionSupport {
 
     public void setAccountSettings(AccountSettings accountSettings) {
         this.accountSettings = accountSettings;
+    }
+
+    public Config.DatadogForwarderConfig getDatadogForwarderConfig() {
+        return datadogForwarderConfig;
+    }
+
+    public void setDatadogForwarderConfig(Config.DatadogForwarderConfig datadogForwarderConfig) {
+        this.datadogForwarderConfig = datadogForwarderConfig;
     }
 
     public List<ApiInfo> getApiInfos() {
