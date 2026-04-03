@@ -733,15 +733,27 @@ public class SentinelOneIntegrationAction extends UserAction {
             scriptExt = ".sh";
         }
         
-        String fullScriptPath = "apps/mcp-endpoint-shield/sentinelone/" + scriptBasePath + scriptExt;
+        String scriptFileName = scriptBasePath + scriptExt;
+        String classpathResource = "/sentinelone/" + scriptFileName;
         
-        // Read script content from file
+        // Read script content from classpath
         String scriptContent;
         try {
-            java.nio.file.Path path = java.nio.file.Paths.get(fullScriptPath);
-            scriptContent = new String(java.nio.file.Files.readAllBytes(path));
+            java.io.InputStream inputStream = getClass().getResourceAsStream(classpathResource);
+            if (inputStream == null) {
+                loggerMaker.error("Script not found in classpath: " + classpathResource, LogDb.DASHBOARD);
+                return false;
+            }
+            java.io.ByteArrayOutputStream result = new java.io.ByteArrayOutputStream();
+            byte[] buffer = new byte[1024];
+            int length;
+            while ((length = inputStream.read(buffer)) != -1) {
+                result.write(buffer, 0, length);
+            }
+            scriptContent = result.toString("UTF-8");
+            inputStream.close();
         } catch (Exception e) {
-            loggerMaker.error("Failed to read script file: " + fullScriptPath + " - " + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.error("Failed to read script from classpath: " + classpathResource + " - " + e.getMessage(), LogDb.DASHBOARD);
             return false;
         }
 
