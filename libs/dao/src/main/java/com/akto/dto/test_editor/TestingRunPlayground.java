@@ -14,9 +14,12 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRun.State;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
+@Getter
+@Setter
 public class TestingRunPlayground {
 
     public static final String ID = "id";
@@ -39,6 +42,8 @@ public class TestingRunPlayground {
 
     public static final String RECORDED_FLOW_ROLE_NAME = "recordedFlowRoleName";
 
+    public static final String RECORDED_FLOW_OWNER_USER_ID = "recordedFlowOwnerUserId";
+
     public static final String TESTING_RUN_PLAYGROUND_TYPE = "testingRunPlaygroundType";
 
     public static final String RECORDED_FLOW_TOKEN_RESULT = "recordedFlowTokenResult";
@@ -53,13 +58,16 @@ public class TestingRunPlayground {
     private int createdAt;
     private TestingRunResult testingRunResult;
     private String miniTestingName;
-    @Getter
-    @Setter
     private TestingRunConfig testingRunConfig;
     private OriginalHttpRequest originalHttpRequest;
     private OriginalHttpResponse originalHttpResponse;
     @BsonIgnore
+    @Getter(AccessLevel.NONE)
+    @Setter
     private String hexId;
+
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
     private TestingRunPlaygroundType testingRunPlaygroundType;
 
     private AuthMechanism loginFlowAuthMechanism;
@@ -73,6 +81,8 @@ public class TestingRunPlayground {
     private String recordedFlowTokenFetchCommand;
 
     private String recordedFlowRoleName;
+
+    private int recordedFlowOwnerUserId;
 
     private String recordedFlowTokenResult;
 
@@ -104,162 +114,13 @@ public class TestingRunPlayground {
         this.createdAt = createdAt;
     }
 
-    public TestingRunPlayground(){
+    public TestingRunPlayground() {
     }
 
-    public int getCreatedAt() {
-        return createdAt;
-    }
-
-
-    public void setCreatedAt(int createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public ApiInfoKey getApiInfoKey() {
-        return apiInfoKey;
-    }
-    public void setApiInfoKey(ApiInfoKey apiInfoKey) {
-        this.apiInfoKey = apiInfoKey;
-    }
-    public ObjectId getId() {
-        return id;
-    }
-    public void setId(ObjectId id) {
-        this.id = id;
-    }
-    public List<String> getSamples() {
-        return samples;
-    }
-    public void setSamples(List<String> samples) {
-        this.samples = samples;
-    }
-    public State getState() {
-        return state;
-    }
-    public void setState(State state) {
-        this.state = state;
-    }
-    public String getTestTemplate() {
-        return testTemplate;
-    }
-    public void setTestTemplate(String testTemplate) {
-        this.testTemplate = testTemplate;
-    }
     public String getHexId() {
-        if (hexId == null) {
-            return this.id.toHexString();
+        if (hexId == null && id != null) {
+            return id.toHexString();
         }
         return hexId;
-    }
-    public TestingRunResult getTestingRunResult() {
-        return testingRunResult;
-    }
-    public void setTestingRunResult(TestingRunResult testingRunResult) {
-        this.testingRunResult = testingRunResult;
-    }
-
-    public String getMiniTestingName() {
-        return miniTestingName;
-    }
-
-    public void setMiniTestingName(String miniTestingName) {
-        this.miniTestingName = miniTestingName;
-    }
-
-    public OriginalHttpRequest getOriginalHttpRequest() {
-        return originalHttpRequest;
-    }
-
-    public void setOriginalHttpRequest(OriginalHttpRequest originalHttpRequest) {
-        this.originalHttpRequest = originalHttpRequest;
-    }
-
-    public OriginalHttpResponse getOriginalHttpResponse() {
-        return originalHttpResponse;
-    }
-
-    public void setOriginalHttpResponse(OriginalHttpResponse originalHttpResponse) {
-        this.originalHttpResponse = originalHttpResponse;
-    }
-
-    public AuthMechanism getLoginFlowAuthMechanism() {
-        return loginFlowAuthMechanism;
-    }
-
-    public void setLoginFlowAuthMechanism(AuthMechanism loginFlowAuthMechanism) {
-        this.loginFlowAuthMechanism = loginFlowAuthMechanism;
-    }
-
-    public String getLoginFlowNodeId() {
-        return loginFlowNodeId;
-    }
-
-    public void setLoginFlowNodeId(String loginFlowNodeId) {
-        this.loginFlowNodeId = loginFlowNodeId;
-    }
-
-    public int getLoginFlowUserId() {
-        return loginFlowUserId;
-    }
-
-    public void setLoginFlowUserId(int loginFlowUserId) {
-        this.loginFlowUserId = loginFlowUserId;
-    }
-
-    public boolean isLoginFlowSingleStepOnly() {
-        return loginFlowSingleStepOnly;
-    }
-
-    public void setLoginFlowSingleStepOnly(boolean loginFlowSingleStepOnly) {
-        this.loginFlowSingleStepOnly = loginFlowSingleStepOnly;
-    }
-
-    public LoginFlowResponse getLoginFlowResponse() {
-        return loginFlowResponse;
-    }
-
-    public void setLoginFlowResponse(LoginFlowResponse loginFlowResponse) {
-        this.loginFlowResponse = loginFlowResponse;
-    }
-
-    public String getRecordedFlowContent() {
-        return recordedFlowContent;
-    }
-
-    public void setRecordedFlowContent(String recordedFlowContent) {
-        this.recordedFlowContent = recordedFlowContent;
-    }
-
-    public String getRecordedFlowTokenFetchCommand() {
-        return recordedFlowTokenFetchCommand;
-    }
-
-    public void setRecordedFlowTokenFetchCommand(String recordedFlowTokenFetchCommand) {
-        this.recordedFlowTokenFetchCommand = recordedFlowTokenFetchCommand;
-    }
-
-    public String getRecordedFlowRoleName() {
-        return recordedFlowRoleName;
-    }
-
-    public void setRecordedFlowRoleName(String recordedFlowRoleName) {
-        this.recordedFlowRoleName = recordedFlowRoleName;
-    }
-
-    public String getRecordedFlowTokenResult() {
-        return recordedFlowTokenResult;
-    }
-
-    public void setRecordedFlowTokenResult(String recordedFlowTokenResult) {
-        this.recordedFlowTokenResult = recordedFlowTokenResult;
-    }
-
-    public String getRecordedFlowErrorMessage() {
-        return recordedFlowErrorMessage;
-    }
-
-    public void setRecordedFlowErrorMessage(String recordedFlowErrorMessage) {
-        this.recordedFlowErrorMessage = recordedFlowErrorMessage;
     }
 }

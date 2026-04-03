@@ -31,12 +31,14 @@ public class RecordedLoginFlowUtil {
     private static final Logger logger = LoggerFactory.getLogger(RecordedLoginFlowUtil.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    private static volatile RecordedLoginScreenshotsPersistence screenshotsPersistence =
-            (roleName, userId, screenshotsBase64) -> {
-                /* no-op until mini-testing registers DataActor / cyborg DbLayer */
-            };
+    @FunctionalInterface
+    public interface ScreenshotsPersistence {
+        void persist(String roleName, int userId, List<String> screenshotsBase64);
+    }
 
-    public static void setRecordedLoginScreenshotsPersistence(RecordedLoginScreenshotsPersistence persistence) {
+    private static volatile ScreenshotsPersistence screenshotsPersistence = (roleName, userId, screenshotsBase64) -> { };
+
+    public static void setScreenshotsPersistence(ScreenshotsPersistence persistence) {
         if (persistence != null) {
             screenshotsPersistence = persistence;
         }
