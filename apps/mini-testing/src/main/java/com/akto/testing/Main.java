@@ -71,7 +71,7 @@ public class Main {
     private static final String customMiniTestingServiceName;
     static {
         customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_TESTING_NAME");
-        RecordedLoginFlowUtil.setRecordedLoginScreenshotsPersistence(
+        RecordedLoginFlowUtil.setScreenshotsPersistence(
                 (roleName, userId, screenshotsBase64) -> dataActor.persistRecordedLoginFlowScreenshots(roleName, userId, screenshotsBase64));
     }
 
