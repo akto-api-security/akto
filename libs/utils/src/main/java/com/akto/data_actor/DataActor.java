@@ -297,6 +297,8 @@ public abstract class DataActor {
 
     public abstract void updateLoginFlowStepsData(int userId, Map<String, Object> valuesMap);
 
+    public abstract void persistRecordedLoginFlowScreenshots(String roleName, int userId, List<String> screenshotsBase64);
+
     public abstract Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String url, String method);
 
     public abstract List<SampleData> fetchSampleDataForEndpoints(List<ApiInfo.ApiInfoKey> endpoints);

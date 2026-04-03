@@ -628,6 +628,10 @@ public class DbActor extends DataActor {
         DbLayer.updateLoginFlowStepsData(userId, valuesMap);
     }
 
+    public void persistRecordedLoginFlowScreenshots(String roleName, int userId, List<String> screenshotsBase64) {
+        DbLayer.persistRecordedLoginFlowScreenshots(roleName, userId, screenshotsBase64);
+    }
+
     public Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String url, String method) {
         return DbLayer.fetchDependencyFlowNodesByApiInfoKey(apiCollectionId, url, method);
     }

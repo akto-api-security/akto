@@ -34,9 +34,11 @@ import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.utility.UtilityServer;
 import com.akto.usage.OrgUtils;
 import com.akto.util.Constants;
+import com.akto.util.RecordedLoginFlowUtil;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.util.DashboardMode;
+import org.apache.commons.io.FileUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -44,7 +46,9 @@ import org.bson.types.ObjectId;
 
 import static com.akto.testing.Utils.readJsonContentFromFile;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -67,6 +71,8 @@ public class Main {
     private static final String customMiniTestingServiceName;
     static {
         customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_TESTING_NAME");
+        RecordedLoginFlowUtil.setRecordedLoginScreenshotsPersistence(
+                (roleName, userId, screenshotsBase64) -> dataActor.persistRecordedLoginFlowScreenshots(roleName, userId, screenshotsBase64));
     }
 
     private static void setupRateLimitWatcher (AccountSettings settings) {
@@ -112,9 +118,13 @@ public class Main {
                             break;
                         case POSTMAN_IMPORTS:
                             handlePostmanImports(testingRunPlayground);
+                            break;
                         case LOGIN_FLOW_TEST:
                             handleLoginFlowTestPlayground(testingRunPlayground);
-                        break;
+                            break;
+                        case RECORDED_JSON_FLOW:
+                            handleRecordedJsonFlowPlayground(testingRunPlayground);
+                            break;
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in running playground tests: " + e.getMessage());
@@ -211,6 +221,43 @@ public class Main {
         }
         testingRunPlayground.setLoginFlowResponse(loginFlowResponse);
         dataActor.updateTestingRunPlayground(testingRunPlayground);
+    }
+
+    private static void handleRecordedJsonFlowPlayground(TestingRunPlayground testingRunPlayground) {
+        File tmpOutputFile = null;
+        File tmpErrorFile = null;
+        try {
+            tmpOutputFile = File.createTempFile("output", ".json");
+            tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
+            String roleName = testingRunPlayground.getRecordedFlowRoleName();
+            if (roleName != null && roleName.trim().isEmpty()) {
+                roleName = null;
+            }
+            // userId 0 skips RecordedLoginInputDao / RecordedLoginScreenshotDao inside util (no direct DB from mini-testing).
+            // Token is returned via TestingRunPlayground + dataActor.updateTestingRunPlayground.
+            RecordedLoginFlowUtil.triggerFlow(
+                    testingRunPlayground.getRecordedFlowTokenFetchCommand(),
+                    testingRunPlayground.getRecordedFlowContent(),
+                    tmpOutputFile.getPath(),
+                    tmpErrorFile.getPath(),
+                    0,
+                    roleName);
+            String tokenJson = FileUtils.readFileToString(tmpOutputFile, StandardCharsets.UTF_8);
+            testingRunPlayground.setRecordedFlowTokenResult(tokenJson);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in recorded JSON flow playground: " + e.getMessage());
+            String msg = e.getMessage();
+            testingRunPlayground.setRecordedFlowErrorMessage(msg != null ? msg : "Recorded JSON flow failed");
+        } finally {
+            testingRunPlayground.setState(State.COMPLETED);
+            dataActor.updateTestingRunPlayground(testingRunPlayground);
+            if (tmpOutputFile != null) {
+                tmpOutputFile.delete();
+            }
+            if (tmpErrorFile != null) {
+                tmpErrorFile.delete();
+            }
+        }
     }
 
     private static void handlePostmanImports(TestingRunPlayground testingRunPlayground) {
