@@ -412,6 +412,8 @@ public class DbAction extends ActionSupport {
     LoginFlowStepsData loginFlowStepsData;
     int userId;
     Map<String, Object> valuesMap;
+    String recordedLoginScreenshotRoleName;
+    List<String> recordedLoginFlowScreenshotsBase64;
     Node node;
     List<Node> nodes;
     boolean removeZeroLevel;
@@ -3107,6 +3109,22 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String persistRecordedLoginFlowScreenshots() {
+        try {
+            if (recordedLoginScreenshotRoleName == null) {
+                return Action.ERROR.toUpperCase();
+            }
+            DbLayer.persistRecordedLoginFlowScreenshots(
+                    recordedLoginScreenshotRoleName,
+                    userId,
+                    recordedLoginFlowScreenshotsBase64);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in persistRecordedLoginFlowScreenshots " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchDependencyFlowNodesByApiInfoKey() {
         try {
             node = DbLayer.fetchDependencyFlowNodesByApiInfoKey(apiCollectionId, url, methodVal);
@@ -3335,6 +3353,7 @@ public class DbAction extends ActionSupport {
                     }
                     break;
                 case LOGIN_FLOW_TEST:
+                case RECORDED_JSON_FLOW:
                     if (this.testingRunPlayground != null) {
                         DbLayer.updateTestingRunPlayground(this.testingRunPlayground);
                     }
@@ -4983,6 +5002,22 @@ public class DbAction extends ActionSupport {
 
     public void setValuesMap(Map<String, Object> valuesMap) {
         this.valuesMap = valuesMap;
+    }
+
+    public String getRecordedLoginScreenshotRoleName() {
+        return recordedLoginScreenshotRoleName;
+    }
+
+    public void setRecordedLoginScreenshotRoleName(String recordedLoginScreenshotRoleName) {
+        this.recordedLoginScreenshotRoleName = recordedLoginScreenshotRoleName;
+    }
+
+    public List<String> getRecordedLoginFlowScreenshotsBase64() {
+        return recordedLoginFlowScreenshotsBase64;
+    }
+
+    public void setRecordedLoginFlowScreenshotsBase64(List<String> recordedLoginFlowScreenshotsBase64) {
+        this.recordedLoginFlowScreenshotsBase64 = recordedLoginFlowScreenshotsBase64;
     }
 
     public Node getNode() {
