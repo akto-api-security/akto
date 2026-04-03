@@ -194,21 +194,21 @@ export default {
         })
     },
 
-    triggerLoginSteps(type, requestData, authParamData) {
+    triggerLoginSteps(type, requestData, authParamData, miniTestingServiceName) {
         return request({
             url: 'api/triggerLoginSteps',
             method: 'post',
-            data: {type, requestData, authParamData}
+            data: { type, requestData, authParamData, miniTestingServiceName }
         }).then((resp) => {
             return resp
         })
     },
 
-    triggerSingleStep(type, nodeId, requestData) {
+    triggerSingleStep(type, nodeId, requestData, miniTestingServiceName) {
         return request({
             url: 'api/triggerSingleLoginFlow',
             method: 'post',
-            data: {type, nodeId, requestData}
+            data: { type, nodeId, requestData, miniTestingServiceName }
         }).then((resp) => {
             return resp
         })
