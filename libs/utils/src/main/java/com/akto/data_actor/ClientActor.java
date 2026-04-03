@@ -42,12 +42,9 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import com.alibaba.fastjson2.JSON;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -58,15 +55,18 @@ import org.bson.codecs.DecoderContext;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class ClientActor extends DataActor {
 
     private static final int batchWriteLimit = 8;
+    private static final int batchWriteLimitApiInfo = 256;
+
+    private static final int batchWriteLimitSti = 512;
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
     private static final String url = buildDbAbstractorUrl();
     private static final int maxConcurrentBatchWrites = 150;
-    private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     public static final String CYBORG_URL = "https://cyborg.akto.io";
     public static final String ULTRON_URL = "https://ultron.akto.io";
@@ -242,7 +242,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("moduleInfo", moduleInfo);
 
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateModuleInfoForHeartbeat", "", "POST", gson.toJson(obj), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateModuleInfoForHeartbeat", "", "POST", JSON.toJSONString(obj), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
@@ -275,7 +275,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("moduleInfoList", moduleInfoList);
 
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkUpdateModuleInfoForHeartbeat", "", "POST", gson.toJson(obj), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkUpdateModuleInfoForHeartbeat", "", "POST", JSON.toJSONString(obj), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             if (response.getStatusCode() != 200) {
@@ -293,7 +293,7 @@ public class ClientActor extends DataActor {
         obj.put("moduleType", moduleType != null ? moduleType.name() : null);
         obj.put("miniRuntimeName", miniRuntimeName);
 
-        String requestPayload = gson.toJson(obj);
+        String requestPayload = JSON.toJSONString(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAndUpdateModuleForReboot", "", "POST", requestPayload, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -348,10 +348,14 @@ public class ClientActor extends DataActor {
 
 
     public void bulkWrite(List<Object> bulkWrites, String path, String key) {
+        bulkWriteWithBatchSize(bulkWrites, path, key, batchWriteLimit);
+    }
+
+    private void bulkWriteWithBatchSize(List<Object> bulkWrites, String path, String key, int batchSize) {
         ArrayList<BulkUpdates> writes = new ArrayList<>();
         for (int i = 0; i < bulkWrites.size(); i++) {
             writes.add((BulkUpdates) bulkWrites.get(i));
-            if (writes.size() % batchWriteLimit == 0) {
+            if (writes.size() >= batchSize) {
                 List<BulkUpdates> finalWrites = writes;
                 threadPool.submit(
                         () -> writeBatch(finalWrites, path, key)
@@ -371,7 +375,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put(key, writesForSti);
         Map<String, List<String>> headers = buildHeaders();
-        String objString = gson.toJson(obj);
+        String objString = JSON.toJSONString(obj);
 
         OriginalHttpRequest request = new OriginalHttpRequest(url + path, "", "POST", objString, headers, "");
         try {
@@ -385,7 +389,7 @@ public class ClientActor extends DataActor {
     }
 
     public void bulkWriteSingleTypeInfo(List<Object> writesForSti) {
-        bulkWrite(writesForSti, "/bulkWriteSti", "writesForSti");
+        bulkWriteWithBatchSize(writesForSti, "/bulkWriteSti", "writesForSti", batchWriteLimitSti);
     }
 
     public void bulkWriteSensitiveParamInfo(List<Object> writesForSensitiveParamInfo) {
@@ -494,7 +498,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("metricData", metricData);
-        String objString = gson.toJson(obj);
+        String objString = JSON.toJSONString(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/ingestMetricsData", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -1011,24 +1015,18 @@ public class ClientActor extends DataActor {
     }
 
     private void bulkWriteApiInfoWithPath(List<ApiInfo> apiInfoList, String path) {
-        ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
-
         List<ApiInfo> apiInfoBatch = new ArrayList<>();
         for (int i = 0; i < apiInfoList.size(); i++) {
             apiInfoBatch.add(apiInfoList.get(i));
-            if (apiInfoBatch.size() % batchWriteLimit == 0) {
+            if (apiInfoBatch.size() >= batchWriteLimitApiInfo) {
                 List<ApiInfo> finalWrites = apiInfoBatch;
-                threadPool.submit(
-                        () -> writeApiInfoBatch(finalWrites, path)
-                );
+                threadPool.submit(() -> writeApiInfoBatch(finalWrites, path));
                 apiInfoBatch = new ArrayList<>();
             }
         }
         if (apiInfoBatch.size() > 0) {
             List<ApiInfo> finalWrites = apiInfoBatch;
-            threadPool.submit(
-                    () -> writeApiInfoBatch(finalWrites, path)
-            );
+            threadPool.submit(() -> writeApiInfoBatch(finalWrites, path));
         }
     }
 
@@ -1036,7 +1034,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("apiInfoList", writesForApiInfo);
 
-        String objString = gson.toJson(obj);
+        String objString = JSON.toJSONString(obj);
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + path, "", "POST", objString, headers, "");
         try {
@@ -1079,7 +1077,7 @@ public class ClientActor extends DataActor {
                     cursorObj.put("url", lastApiInfoKey.getUrl());
                     requestObj.put("lastApiInfoKey", cursorObj);
                 }
-                String requestBody = gson.toJson(requestObj);
+                String requestBody = JSON.toJSONString(requestObj);
 
                 OriginalHttpRequest request = new OriginalHttpRequest(
                     url + "/fetchApiIds",
@@ -1097,20 +1095,20 @@ public class ClientActor extends DataActor {
                     break;
                 }
 
-                JsonObject responseObj = gson.fromJson(response.getBody(), JsonObject.class);
-                JsonArray apiIdsPage = responseObj.getAsJsonArray("apiIds");
+                JSONObject responseObj = new JSONObject(response.getBody());
+                JSONArray apiIdsPage = responseObj.optJSONArray("apiIds");
 
-                if (apiIdsPage == null || apiIdsPage.size() == 0) {
+                if (apiIdsPage == null || apiIdsPage.length() == 0) {
                     break;
                 }
 
                 // Convert to ApiInfo.ApiInfoKey objects
-                for (JsonElement elem : apiIdsPage) {
+                for (int j = 0; j < apiIdsPage.length(); j++) {
                     try {
-                        JsonObject apiIdObj = elem.getAsJsonObject();
-                        int apiCollectionId = apiIdObj.get("apiCollectionId").getAsInt();
-                        String urlStr = apiIdObj.get("url").getAsString();
-                        String methodStr = apiIdObj.get("method").getAsString();
+                        JSONObject apiIdObj = apiIdsPage.getJSONObject(j);
+                        int apiCollectionId = apiIdObj.getInt("apiCollectionId");
+                        String urlStr = apiIdObj.getString("url");
+                        String methodStr = apiIdObj.getString("method");
                         URLMethods.Method method = URLMethods.Method.fromString(methodStr);
 
                         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlStr, method);
@@ -1419,7 +1417,7 @@ public class ClientActor extends DataActor {
         obj.put("vpcId", vpcId);
         obj.put("tagsList", tags);
         obj.put("accessType", accessType);
-        String objString = gson.toJson(obj);
+        String objString = JSON.toJSONString(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForHostAndVpc", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -1440,7 +1438,7 @@ public class ClientActor extends DataActor {
         obj.put("vpcId", vpcId);
         obj.put("tagsList", tags);
         obj.put("accessType", accessType);
-        String objString = gson.toJson(obj);
+        String objString = JSON.toJSONString(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionSimpleForVpc", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -2042,7 +2040,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("trrs", trrs);
-        String objString = gson.toJson(obj);
+        String objString = JSON.toJSONString(obj);
         
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingRunResultSummary", "", "POST", objString, headers, "");
         try {
@@ -2392,7 +2390,7 @@ public class ClientActor extends DataActor {
             testedApisMapObj.put(entry.getKey().toString(), entry.getValue());
         }
         obj.put("testedApisMap", testedApisMapObj);
-        String objString = gson.toJson(obj);
+        String objString = JSON.toJSONString(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkUpdateLastTestedField", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -2411,7 +2409,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResult", testingRunResult);
-        String objString = gson.toJson(obj);
+        String objString = JSON.toJSONString(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingRunResults", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -2459,7 +2457,7 @@ public class ClientActor extends DataActor {
                 return null;
             }
             BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
-            return gson.fromJson(payloadObj.get("trrs").toString(), TestingRunResultSummary.class);
+            return JSON.parseObject(payloadObj.get("trrs").toString(), TestingRunResultSummary.class);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in updateMetadataInSummary" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
@@ -2879,7 +2877,7 @@ public class ClientActor extends DataActor {
         obj.put("tagsList", tags);
         obj.put("hostName", hostName);
         obj.put("accessType", accessType);
-        String objString = gson.toJson(obj);
+        String objString = JSON.toJSONString(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForServiceTag", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -2898,7 +2896,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("colId", collectionId);
         obj.put("hostName", hostName);
-        String objString = gson.toJson(obj);
+        String objString = JSON.toJSONString(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/addHostNameToServiceTagCollection", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -3555,7 +3553,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("dependencyNodeList", dependencyNodeList);
 
-        String objString = gson.toJson(obj);
+        String objString = JSON.toJSONString(obj);
 
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkWriteDependencyNodes", "", "POST", objString, headers, "");
@@ -4095,7 +4093,7 @@ public class ClientActor extends DataActor {
             now
         );
 
-        String objString = gson.toJson(new BasicDBObject("job", job));
+        String objString = JSON.toJSONString(new BasicDBObject("job", job));
         loggerMaker.debug(objString);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertJob", "", "POST", objString, headers, "");
         try {
@@ -4182,7 +4180,7 @@ public class ClientActor extends DataActor {
                 obj.put("originalHttpResponse", testingRunPlayground.getOriginalHttpResponse());
                 break;
         }
-        String jsonString = gson.toJson(obj);
+        String jsonString = JSON.toJSONString(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRunPlaygroundStateAndResult", "", "POST",  jsonString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -4460,7 +4458,7 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("conversationResults", conversationResults);
-        String jsonBody = gson.toJson(obj);
+        String jsonBody = JSON.toJSONString(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeConversationResults", "", "POST", jsonBody, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -4489,7 +4487,7 @@ public class ClientActor extends DataActor {
                 BasicDBObject obj = new BasicDBObject();
                 obj.put("agentTrafficLogs", agentTrafficLogs);
                 
-                String objString = gson.toJson(obj);
+                String objString = JSON.toJSONString(obj);
                 
                 Map<String, List<String>> headers = buildHeaders();
                 OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkWriteAgentTrafficLogs", "", "POST", objString, headers, "");
@@ -4536,7 +4534,7 @@ public class ClientActor extends DataActor {
         // Use HashMap instead of BasicDBObject to avoid MongoDB codec issues with POJOs
         Map<String, Object> payload = new HashMap<>();
         payload.put("trace", trace);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeTrace", "", "POST", gson.toJson(payload), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeTrace", "", "POST", JSON.toJSONString(payload), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
@@ -4555,7 +4553,7 @@ public class ClientActor extends DataActor {
         // Use HashMap instead of BasicDBObject to avoid MongoDB codec issues with POJOs
         Map<String, Object> payload = new HashMap<>();
         payload.put("spans", spans);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeSpans", "", "POST", gson.toJson(payload), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeSpans", "", "POST", JSON.toJSONString(payload), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
@@ -4574,7 +4572,7 @@ public class ClientActor extends DataActor {
         Map<String, Object> payload = new HashMap<>();
         payload.put("apiCollectionId", apiCollectionId);
         payload.put("serviceGraphEdges", serviceGraphEdges);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateServiceGraphEdges", "", "POST", gson.toJson(payload), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateServiceGraphEdges", "", "POST", JSON.toJSONString(payload), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             if (response.getStatusCode() != 200) {

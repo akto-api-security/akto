@@ -26,8 +26,24 @@ public class KafkaConfig {
     public static final String SASL_MECHANISM = "sasl.mechanism";
     public static final String SASL_JAAS_CONFIG = "sasl.jaas.config";
 
+    public static final String SECURITY_PROTOCOL_PLAINTEXT = "PLAINTEXT";
+    public static final String SECURITY_PROTOCOL_SSL = "SSL";
     public static final String SECURITY_PROTOCOL_SASL_PLAINTEXT = "SASL_PLAINTEXT";
+    public static final String SECURITY_PROTOCOL_SASL_SSL = "SASL_SSL";
     public static final String SASL_MECHANISM_PLAIN = "PLAIN";
+
+    // New environment variable for SASL mechanism
+    public static final String ENV_KAFKA_SASL_MECHANISM = "AKTO_KAFKA_SASL_MECHANISM";
+
+    // Environment variable for security protocol
+    public static final String ENV_KAFKA_SECURITY_PROTOCOL = "AKTO_KAFKA_SECURITY_PROTOCOL";
+
+    // New SASL mechanism constants
+    public static final String SASL_MECHANISM_SCRAM_SHA_256 = "SCRAM-SHA-256";
+    public static final String SASL_MECHANISM_SCRAM_SHA_512 = "SCRAM-SHA-512";
+
+    // Default SASL mechanism (for backward compatibility)
+    public static final String DEFAULT_SASL_MECHANISM = SASL_MECHANISM_PLAIN;
 
     // Default Kafka broker URLs
     public static final String DEFAULT_KAFKA_BROKER_URL = "kafka1:19092";
@@ -79,20 +95,103 @@ public class KafkaConfig {
     }
 
     /**
-     * Adds Kafka authentication properties to the given Properties object.
+     * Gets the configured SASL mechanism from environment variable with validation.
      *
-     * @param properties The Properties object to add authentication to
-     * @param username   Kafka username
-     * @param password   Kafka password
+     * @return SASL mechanism (PLAIN, SCRAM-SHA-256, or SCRAM-SHA-512)
      */
-    public static void addAuthenticationProperties(Properties properties, String username, String password) {
-        properties.put(SECURITY_PROTOCOL, SECURITY_PROTOCOL_SASL_PLAINTEXT);
-        properties.put(SASL_MECHANISM, SASL_MECHANISM_PLAIN);
+    public static String getKafkaSaslMechanism() {
+        String mechanism = System.getenv().getOrDefault(ENV_KAFKA_SASL_MECHANISM, DEFAULT_SASL_MECHANISM);
 
-        String jaasConfig = String.format(
-                "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
-                username, password);
+        // Validate mechanism
+        if (!mechanism.equals(SASL_MECHANISM_PLAIN) &&
+            !mechanism.equals(SASL_MECHANISM_SCRAM_SHA_256) &&
+            !mechanism.equals(SASL_MECHANISM_SCRAM_SHA_512)) {
+            logger.error("Invalid SASL mechanism: {}. Using default: {}", mechanism, DEFAULT_SASL_MECHANISM);
+            return DEFAULT_SASL_MECHANISM;
+        }
+
+        return mechanism;
+    }
+
+    /**
+     * Gets the configured security protocol from environment variable with validation.
+     *
+     * @param hasCredentials Whether SASL credentials (username/password) are provided
+     * @return Security protocol (PLAINTEXT, SSL, SASL_PLAINTEXT, SASL_SSL)
+     */
+    public static String getKafkaSecurityProtocol(boolean hasCredentials) {
+        String protocol = System.getenv(ENV_KAFKA_SECURITY_PROTOCOL);
+
+        // If explicitly set, validate it
+        if (protocol != null && !protocol.isEmpty()) {
+            // Validate: SASL protocols require credentials
+            if ((protocol.equals(SECURITY_PROTOCOL_SASL_PLAINTEXT) ||
+                 protocol.equals(SECURITY_PROTOCOL_SASL_SSL)) && !hasCredentials) {
+                logger.warn("SASL security protocol '{}' set but no credentials provided. Falling back to PLAINTEXT.", protocol);
+                return SECURITY_PROTOCOL_PLAINTEXT;
+            }
+            return protocol;
+        }
+
+        // Auto-detect based on credentials
+        return hasCredentials ? SECURITY_PROTOCOL_SASL_PLAINTEXT : SECURITY_PROTOCOL_PLAINTEXT;
+    }
+
+    /**
+     * Adds Kafka authentication properties to the given Properties object with specified security protocol.
+     *
+     * @param properties       The Properties object to add authentication to
+     * @param username         Kafka username
+     * @param password         Kafka password
+     * @param securityProtocol Security protocol (SASL_PLAINTEXT, SASL_SSL)
+     */
+    public static void addAuthenticationProperties(Properties properties, String username, String password, String securityProtocol) {
+        properties.put(SECURITY_PROTOCOL, securityProtocol);
+
+        String saslMechanism = getKafkaSaslMechanism();
+        properties.put(SASL_MECHANISM, saslMechanism);
+
+        String jaasConfig;
+        if (saslMechanism.equals(SASL_MECHANISM_PLAIN)) {
+            jaasConfig = String.format(
+                    "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
+                    username, password);
+        } else {
+            // SCRAM-SHA-256 or SCRAM-SHA-512 use the same ScramLoginModule
+            jaasConfig = String.format(
+                    "org.apache.kafka.common.security.scram.ScramLoginModule required username=\"%s\" password=\"%s\";",
+                    username, password);
+        }
+
         properties.put(SASL_JAAS_CONFIG, jaasConfig);
+
+        // If using SSL, disable hostname verification for NLB with SSL termination
+        if (SECURITY_PROTOCOL_SASL_SSL.equals(securityProtocol)) {
+            properties.put("ssl.endpoint.identification.algorithm", "");
+        }
+    }
+
+    /**
+     * Validates credentials and adds authentication properties with proper security protocol.
+     * This is a convenience method that combines credential validation, security protocol detection,
+     * and authentication property configuration.
+     *
+     * @param properties Properties object to configure
+     * @param username Kafka username
+     * @param password Kafka password
+     * @return true if authentication was added successfully, false if credentials are missing
+     */
+    public static boolean addValidatedAuthenticationProperties(Properties properties, String username, String password) {
+        boolean hasCredentials = !StringUtils.isEmpty(username) && !StringUtils.isEmpty(password);
+
+        if (!hasCredentials) {
+            logger.error("Kafka authentication credentials not provided");
+            return false;
+        }
+
+        String securityProtocol = getKafkaSecurityProtocol(hasCredentials);
+        addAuthenticationProperties(properties, username, password, securityProtocol);
+        return true;
     }
 
     /**
@@ -111,11 +210,9 @@ public class KafkaConfig {
         adminProps.put("bootstrap.servers", brokerUrl);
 
         if (isAuthEnabled) {
-            if (StringUtils.isEmpty(username) || StringUtils.isEmpty(password)) {
-                logger.error("Kafka authentication enabled but credentials not provided");
+            if (!addValidatedAuthenticationProperties(adminProps, username, password)) {
                 return null;
             }
-            addAuthenticationProperties(adminProps, username, password);
         }
 
         return adminProps;
@@ -152,11 +249,6 @@ public class KafkaConfig {
     public static Properties createProducerProperties(String brokerUrl, int lingerMS, int batchSize,
             int maxRequestTimeout, int maxRetries,
             boolean isAuthEnabled, String username, String password) {
-        if (isAuthEnabled && (StringUtils.isEmpty(username) || StringUtils.isEmpty(password))) {
-            logger.error("Kafka authentication credentials not provided");
-            return null;
-        }
-
         Properties kafkaProps = new Properties();
         kafkaProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerUrl);
         kafkaProps.put(ProducerConfig.BATCH_SIZE_CONFIG, batchSize);
@@ -170,7 +262,9 @@ public class KafkaConfig {
         }
 
         if (isAuthEnabled) {
-            addAuthenticationProperties(kafkaProps, username, password);
+            if (!addValidatedAuthenticationProperties(kafkaProps, username, password)) {
+                return null;
+            }
         }
 
         return kafkaProps;

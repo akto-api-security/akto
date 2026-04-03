@@ -190,6 +190,10 @@ public class HttpRequestResponseUtils {
             } else if (acceptableContentType.equals(GRPC_CONTENT_TYPE)) {
                 return convertGRPCEncodedToJson(rawRequest);
             } else if (acceptableContentType.equals(MULTIPART_FORM_DATA_CONTENT_TYPE)) {
+                // Mislabeled JSON is common; never run Commons FileUpload on it (saves seconds on large bodies).
+                if (rawRequest.startsWith("{") || rawRequest.startsWith("[")) {
+                    return rawRequest;
+                }
                 // For multipart, we need the full header value with boundary parameter
                 // getAcceptableContentType() returns only the constant, so get the actual header value
                 String contentTypeHeader = getHeaderValue(requestHeaders, CONTENT_TYPE);
@@ -449,7 +453,13 @@ public class HttpRequestResponseUtils {
         for (String part : parts) {
             part = part.trim();
             if (part.startsWith("boundary=")) {
-                return part.substring("boundary=".length()).trim();
+                String b = part.substring("boundary=".length()).trim();
+                if (b.length() >= 2 && b.charAt(0) == '"' && b.charAt(b.length() - 1) == '"') {
+                    b = b.substring(1, b.length() - 1);
+                } else if (b.length() >= 2 && b.charAt(0) == '\'' && b.charAt(b.length() - 1) == '\'') {
+                    b = b.substring(1, b.length() - 1);
+                }
+                return b;
             }
         }
         return null;

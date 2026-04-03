@@ -38,7 +38,6 @@ import com.akto.util.DashboardMode;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -63,7 +62,7 @@ public class Main {
     private static final ClientLayer clientLayer = new ClientLayer();
 
     // this sync threshold time is used for deleting sample data
-    public static final int sync_threshold_time = 120;
+    public static final int sync_threshold_time = 300;
     public static final boolean isKafkaAuthenticationEnabled = KafkaConfig.isKafkaAuthenticationEnabled();
     public static final String kafkaUsername = KafkaConfig.getKafkaUsername();
     public static final String kafkaPassword = KafkaConfig.getKafkaPassword();
@@ -87,24 +86,24 @@ public class Main {
 
     static boolean isDashboardInstance = false;
 
+    private static final Gson collectionNameGson = new Gson();
+
     public static boolean tryForCollectionName(String message) {
         boolean ret = false;
         try {
-            Gson gson = new Gson();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> json = collectionNameGson.fromJson(message, Map.class);
 
-            Map<String, Object> json = gson.fromJson(message, Map.class);
-
-            // loggerMaker.info("Json size: " + json.size());
             boolean withoutCidrCond = json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID);
             boolean withCidrCond = json.containsKey(GROUP_NAME) && json.containsKey(VXLAN_ID) && json.containsKey(VPC_CIDR);
             if (withCidrCond || withoutCidrCond) {
                 ret = true;
-                String groupName = (String) (json.get(GROUP_NAME));
-                String vxlanIdStr = ((Double) json.get(VXLAN_ID)).intValue() + "";
-                int vxlanId = Integer.parseInt(vxlanIdStr);
+                String groupName = (String) json.get(GROUP_NAME);
+                int vxlanId = ((Number) json.get(VXLAN_ID)).intValue();
                 dataActor.updateApiCollectionNameForVxlan(vxlanId, groupName);
 
                 if (json.containsKey(VPC_CIDR)) {
+                    @SuppressWarnings("unchecked")
                     List<String> cidrList = (List<String>) json.get(VPC_CIDR);
                     loggerMaker.info("cidrList: " + cidrList);
                     dataActor.updateCidrList(cidrList);
@@ -174,6 +173,7 @@ public class Main {
 
             kafkaProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
             kafkaProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+            kafkaProps.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
 
             protobufKafkaProducer = new KafkaProducer<>(kafkaProps);
             loggerMaker.info("Connected to protobuf kafka producer @ " + Context.now());
@@ -771,7 +771,7 @@ public class Main {
                     loggerMaker.infoAndAddToDb("Committing offset at position: " + lastSyncOffset);
                 }
 
-                if (Context.getActualAccountId() != 1759692400 && tryForCollectionName(r.value())) {
+                if ((Context.getActualAccountId() != 1759692400 && Context.getActualAccountId() != 1758787662 && Context.getActualAccountId() != 1662680463) && tryForCollectionName(r.value())) {
                     continue;
                 }
 
@@ -935,7 +935,7 @@ public class Main {
                 }
             }
         } else {
-            loggerMaker.error("Kafka producer is null");
+            //loggerMaker.error("Kafka producer is null");
         }
     }
 
@@ -1213,11 +1213,10 @@ public class Main {
         }
         
         if (isKafkaAuthenticationEnabled) {
-            if(StringUtils.isEmpty(kafkaPassword) || StringUtils.isEmpty(kafkaUsername)){
+            if (!KafkaConfig.addValidatedAuthenticationProperties(properties, kafkaUsername, kafkaPassword)) {
                 loggerMaker.errorAndAddToDb("Kafka authentication credentials not provided");
                 return null;
             }
-            KafkaConfig.addAuthenticationProperties(properties, kafkaUsername, kafkaPassword);
         }
 
         return properties;
