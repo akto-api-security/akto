@@ -29,6 +29,8 @@ public class CustomRole {
             case "DEVELOPER":
             case "MEMBER":
             case "GUEST":
+            case "THREAT ENGINEER":
+            case "THREAT VIEWER":
                 break;
             default:
                 baseRole = "GUEST";

@@ -10,11 +10,30 @@ import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
 import Dropdown from "../../../components/layouts/Dropdown";
 
 const rolesOptions = [
-    { label: 'Admin', value: 'ADMIN' },
-    { label: 'Security Engineer', value: 'MEMBER' },
-    { label: 'Developer', value: 'DEVELOPER' },
-    { label: 'Guest', value: 'GUEST' },
-]
+    {
+        label: 'Admin',
+        value: 'ADMIN',
+    },
+    {
+        label: 'Security Engineer',
+        value: 'MEMBER',
+    },
+    {
+        label: 'Developer',
+        value: 'DEVELOPER',
+    },
+    {
+        label: 'Guest',
+        value: 'GUEST',
+    },
+    {
+        label: 'Threat Engineer',
+        value: 'THREAT_ENGINEER',
+    },
+    {
+        label: 'Threat Viewer',
+        value: 'THREAT_VIEWER',
+    }]
 
 function getRoleDisplayName(role) {
     for (const item of rolesOptions) {

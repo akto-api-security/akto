@@ -7,28 +7,20 @@ import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import com.akto.dto.RBAC.Role;
 
-public class MemberRoleStrategy implements RoleStrategy{
+public class NoAccessRoleStrategy implements RoleStrategy{
     @Override
     public Role[] getRoleHierarchy() {
-        return new Role[]{Role.MEMBER, Role.DEVELOPER, Role.GUEST};
+        return new Role[]{Role.NO_ACCESS};
     }
 
     @Override
     public Map<Feature, ReadWriteAccess> getFeatureAccessMap() {
         Map<Feature, ReadWriteAccess> accessMap = new HashMap<>();
         for (AccessGroups group : AccessGroups.getAccessGroups()) {
-            ReadWriteAccess access = ReadWriteAccess.READ ;
-            if(group != AccessGroups.SETTINGS && group != AccessGroups.ADMIN){
-                access = ReadWriteAccess.READ_WRITE;
-            }
             for (Feature feature : Feature.getFeaturesForAccessGroup(group)) {
-                accessMap.put(feature, access);
+                accessMap.put(feature, ReadWriteAccess.NO_ACCESS);
             }
         }
-
-        accessMap.put(Feature.API_TOKENS, ReadWriteAccess.READ_WRITE);
-        accessMap.put(Feature.THREAT_PROTECTION, ReadWriteAccess.NO_ACCESS);
-
         RbacEnums.mergeUserFeaturesAccess(accessMap);
         return accessMap;
     }

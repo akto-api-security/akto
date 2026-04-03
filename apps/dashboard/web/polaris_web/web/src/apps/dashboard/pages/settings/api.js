@@ -6,11 +6,11 @@ const settingRequests = {
         return request({
             url: '/api/inviteUsers',
             method: 'post',
-            data: { 
+            data: {
                 inviteeName: apiSpec.inviteeName,
                 inviteeEmail: apiSpec.inviteeEmail,
                 websiteHostName: apiSpec.websiteHostName,
-                inviteeRole: apiSpec.inviteeRole,
+                scopeRoleMapping: apiSpec.scopeRoleMapping
             }
         })
     },
@@ -30,18 +30,30 @@ const settingRequests = {
             }
         })
     },
-    makeAdmin(email, roleVal) {
+    makeAdmin(email, roleVal, productScopes) {
         return request({
             url: '/api/makeAdmin',
             method: 'post',
             data: {
                 email: email,
-                userRole: roleVal
+                userRole: roleVal,
+                productScopes: productScopes || ["API"]
             }
         })
     },
 
-    
+    updateUserScopeRoleMapping(email, scopeRoleMapping) {
+        return request({
+            url: '/api/updateUserScopeRoleMapping',
+            method: 'post',
+            data: {
+                email: email,
+                scopeRoleMapping: scopeRoleMapping
+            }
+        })
+    },
+
+
     fetchApiTokens() {
         return request({
             url: '/api/fetchApiTokens',
