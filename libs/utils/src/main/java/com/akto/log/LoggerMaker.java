@@ -127,10 +127,7 @@ public class LoggerMaker  {
         scheduler2.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
-                String cliTestIds = System.getenv("TEST_IDS");
-                if(cliTestIds==null && Context.accountId.get() == 1_000_000){
-                    updateAccountSettings();
-                }
+                updateAccountSettings();
             }
         }, 0, 2, TimeUnit.MINUTES);
     }

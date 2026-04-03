@@ -115,6 +115,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static List<FilterConfig> ignoredEventFilters = new ArrayList<>();
   private final AtomicInteger applyFilterLogCount = new AtomicInteger(0);
   private static final int MAX_APPLY_FILTER_LOGS = 1000;
+  private static final int MAX_PAYLOAD_SIZE_BYTES = 50 * 1024; // 50 KB
 
   // Kafka records per minute tracking
   private int recordsReadCount = 0;
@@ -269,6 +270,9 @@ public class MaliciousTrafficDetectorTask implements Task {
               }
 
               for (ConsumerRecord<String, byte[]> record : records) {
+                if (record.value().length > MAX_PAYLOAD_SIZE_BYTES) {
+                  continue;
+                }
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
                 if(MAX_KAFKA_DEBUG_MSGS > 0){
                   MAX_KAFKA_DEBUG_MSGS--;
