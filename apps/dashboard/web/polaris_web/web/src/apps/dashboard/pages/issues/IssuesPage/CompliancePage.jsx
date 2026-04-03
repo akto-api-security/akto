@@ -26,10 +26,11 @@ import values from "@/util/values";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
 import TableStore from "../../../components/tables/TableStore.js";
 import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
+import ComplianceMenu from "./ComplianceMenu.jsx";
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
-import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory  } from "../../../../main/labelHelper";
+import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import testingApi from "../../testing/api.js"
 
 const sortOptions = [
@@ -42,13 +43,11 @@ const sortOptions = [
 ];
 
 const getCompliances = () => {
-    const isDemoAccount = func.isDemoAccount();
     const isMCP = isMCPSecurityCategory();
     const isGenAiSecurity = isGenAISecurityCategory();
     const isAgenticSecurity = isAgenticSecurityCategory();
 
     if (isMCP || isAgenticSecurity || isGenAiSecurity) {
-        // Different compliances for demo account + MCP + Agentic Security
         return ["OWASP Agentic Top 10", "OWASP LLM", "EU AI Act", "NIST AI Risk Management Framework", "CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP", "MITRE ATLAS"];
     }
     
@@ -162,9 +161,9 @@ function CompliancePage() {
 
 
     function calcFilteredTestIds(complianceView) {
-        let ret = Object.entries(subCategoryMap).filter(([_, v]) => {return !!v.compliance?.mapComplianceToListClauses[complianceView]}).map(([k, _]) => k)
-        
-        return ret
+        return Object.entries(subCategoryMap)
+            .filter(([_, v]) => transform.subcategoryMatchesComplianceFramework(v.compliance, complianceView))
+            .map(([k]) => k);
     }
 
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
@@ -808,17 +807,10 @@ function CompliancePage() {
                     >
                         <Popover.Pane fixed>
                             <Popover.Section>
-                            <VerticalStack gap={"2"}>
-                                {allCompliances.map(compliance => {return <Button textAlign="left" plain onClick={() => {onSelectCompliance(compliance)}} removeUnderline>
-                                    <Box>
-                                        <HorizontalStack gap={2}>
-                                            <Avatar source={func.getComplianceIcon(compliance)} shape="square"  size="extraSmall"/> 
-                                            <Text>{compliance}</Text>
-                                        </HorizontalStack>
-                                    </Box>
-                                </Button>} )}
-                            </VerticalStack>
-                                
+                                <ComplianceMenu
+                                    items={allCompliances}
+                                    onSelect={onSelectCompliance}
+                                />
                             </Popover.Section>
                         </Popover.Pane>
                     </Popover>

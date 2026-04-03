@@ -7,7 +7,6 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 
 import static com.akto.listener.InitializerListener.loadTemplateFilesFromDirectory;
-
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -101,7 +100,7 @@ public class TestTemplateUtils {
             TestCategory.MCP_SECURITY,
         };
 
-        TestCategory[] llmCategories = {
+        final TestCategory[] llmCategories = {
             GlobalEnums.TestCategory.LLM,
             GlobalEnums.TestCategory.PROMPT_INJECTION,
             GlobalEnums.TestCategory.SENSITIVE_INFORMATION_DISCLOSURE,
@@ -136,15 +135,18 @@ public class TestTemplateUtils {
 
         switch (contextSource) {
             case MCP:
-                return Arrays.stream(allCategories)
-                .filter(category ->  !Arrays.asList(llmCategories).contains(category))
-                .toArray(TestCategory[]::new);
+                return mcpCategories;
 
             case GEN_AI:
                 return llmCategories;
 
             case AGENTIC:
-                return allCategories;
+            case ENDPOINT:
+                // ARGUS / ATLAS should include both MCP and LLM/Agentic probe libraries,
+                // while excluding classic API-only categories.
+                return Arrays.stream(allCategories)
+                    .filter(category -> Arrays.asList(mcpCategories).contains(category) || Arrays.asList(llmCategories).contains(category))
+                    .toArray(TestCategory[]::new);
 
             // for DAST and API security
             case DAST:
