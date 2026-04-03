@@ -126,6 +126,9 @@ import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
+import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx";
+import ViolationsPage from "../dashboard/pages/nhi_governance/ViolationsPage.jsx";
+import PoliciesPage from "../dashboard/pages/nhi_governance/PoliciesPage.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -351,6 +354,23 @@ const router = createBrowserRouter([
                             {
                                 path: "policies",
                                 element: <GuardrailPolicies/>
+                            }
+                        ]
+                    },
+                    {
+                        path: "nhi",
+                        children: [
+                            {
+                                path: "identities",
+                                element: <IdentitiesPage/>
+                            },
+                            {
+                                path: "violations",
+                                element: <ViolationsPage/>
+                            },
+                            {
+                                path: "policies",
+                                element: <PoliciesPage/>
                             }
                         ]
                     }
