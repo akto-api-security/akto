@@ -45,6 +45,19 @@ public class TestingRunPlayground {
 
     public static final String LOGIN_FLOW_SINGLE_STEP_ONLY = "loginFlowSingleStepOnly";
 
+    public static final String RECORDED_FLOW_CONTENT = "recordedFlowContent";
+
+    public static final String RECORDED_FLOW_TOKEN_FETCH_COMMAND = "recordedFlowTokenFetchCommand";
+
+    public static final String RECORDED_FLOW_ROLE_NAME = "recordedFlowRoleName";
+
+    public static final String TESTING_RUN_PLAYGROUND_TYPE = "testingRunPlaygroundType";
+
+    /** Token JSON when {@link TestingRunPlaygroundType#RECORDED_JSON_FLOW} ran with {@code userId=0} (mini-testing, no RecordedLoginInputDao). */
+    public static final String RECORDED_FLOW_TOKEN_RESULT = "recordedFlowTokenResult";
+
+    public static final String RECORDED_FLOW_ERROR_MESSAGE = "recordedFlowErrorMessage";
+
     private ObjectId id;
 
     private String testTemplate;
@@ -79,6 +92,17 @@ public class TestingRunPlayground {
 
     private LoginFlowResponse loginFlowResponse;
 
+    /** For {@link TestingRunPlaygroundType#RECORDED_JSON_FLOW}: JSON replay + puppeteer on mini-testing. */
+    private String recordedFlowContent;
+
+    private String recordedFlowTokenFetchCommand;
+
+    private String recordedFlowRoleName;
+
+    private String recordedFlowTokenResult;
+
+    private String recordedFlowErrorMessage;
+
     public TestingRunPlaygroundType getTestingRunPlaygroundType() {
         if (testingRunPlaygroundType == null) {
             return TestingRunPlaygroundType.TEST_EDITOR_PLAYGROUND;
@@ -93,7 +117,8 @@ public class TestingRunPlayground {
     public enum TestingRunPlaygroundType {
         TEST_EDITOR_PLAYGROUND,
         POSTMAN_IMPORTS,
-        LOGIN_FLOW_TEST
+        LOGIN_FLOW_TEST,
+        RECORDED_JSON_FLOW
     }
 
     public TestingRunPlayground(String testTemplate, State state, List<String> samples, ApiInfoKey apiInfoKey, int createdAt) {
@@ -233,5 +258,45 @@ public class TestingRunPlayground {
 
     public void setLoginFlowResponse(LoginFlowResponse loginFlowResponse) {
         this.loginFlowResponse = loginFlowResponse;
+    }
+
+    public String getRecordedFlowContent() {
+        return recordedFlowContent;
+    }
+
+    public void setRecordedFlowContent(String recordedFlowContent) {
+        this.recordedFlowContent = recordedFlowContent;
+    }
+
+    public String getRecordedFlowTokenFetchCommand() {
+        return recordedFlowTokenFetchCommand;
+    }
+
+    public void setRecordedFlowTokenFetchCommand(String recordedFlowTokenFetchCommand) {
+        this.recordedFlowTokenFetchCommand = recordedFlowTokenFetchCommand;
+    }
+
+    public String getRecordedFlowRoleName() {
+        return recordedFlowRoleName;
+    }
+
+    public void setRecordedFlowRoleName(String recordedFlowRoleName) {
+        this.recordedFlowRoleName = recordedFlowRoleName;
+    }
+
+    public String getRecordedFlowTokenResult() {
+        return recordedFlowTokenResult;
+    }
+
+    public void setRecordedFlowTokenResult(String recordedFlowTokenResult) {
+        this.recordedFlowTokenResult = recordedFlowTokenResult;
+    }
+
+    public String getRecordedFlowErrorMessage() {
+        return recordedFlowErrorMessage;
+    }
+
+    public void setRecordedFlowErrorMessage(String recordedFlowErrorMessage) {
+        this.recordedFlowErrorMessage = recordedFlowErrorMessage;
     }
 }

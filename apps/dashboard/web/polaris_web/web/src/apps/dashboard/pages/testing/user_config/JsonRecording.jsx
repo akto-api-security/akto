@@ -23,7 +23,7 @@ function ReplayScreenshotImg({ b64, stepIndex }) {
     )
 }
 
-function JsonRecording({extractInformation, showOnlyApi, setStoreData, roleName}) {
+function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName, miniTestingServiceName = '' }) {
 
     const authMechanism = TestingStore(state => state.authMechanism)
     const setToastConfig = Store(state => state.setToastConfig)
@@ -176,7 +176,12 @@ function JsonRecording({extractInformation, showOnlyApi, setStoreData, roleName}
 
         reader.onload = () => {
             setContent(reader.result)
-            const result = api.uploadRecordedLoginFlow(reader.result, tokenFetchCommand, roleName)
+            const result = api.uploadRecordedLoginFlow(
+                reader.result,
+                tokenFetchCommand,
+                roleName,
+                miniTestingServiceName || undefined
+            )
 
             result.then((resp) => {
                 setToastConfig({ isActive: true, isError: false, message: "JSON recording uploaded" })

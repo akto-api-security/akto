@@ -398,6 +398,7 @@ const AuthComponent = ({
                 showOnlyApi={true}
                 setStoreData={handleLoginInfo}
                 roleName={roleName}
+                miniTestingServiceName={selectedMiniTestingServiceName}
               />
             )}
           </Collapsible>

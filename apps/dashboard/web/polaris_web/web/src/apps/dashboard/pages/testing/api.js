@@ -199,10 +199,13 @@ export default {
             return resp
         })
     },
-    uploadRecordedLoginFlow(content, tokenFetchCommand, roleName) {
+    uploadRecordedLoginFlow(content, tokenFetchCommand, roleName, miniTestingServiceName) {
         const data = { content, tokenFetchCommand }
         if (roleName) {
             data.roleName = roleName
+        }
+        if (miniTestingServiceName) {
+            data.miniTestingServiceName = miniTestingServiceName
         }
         return request({
             url: '/api/uploadRecordedFlow',
