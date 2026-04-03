@@ -1,8 +1,14 @@
 package com.akto.dto;
 
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@Setter
+@NoArgsConstructor
 public class RecordedLoginFlowInput {
 
-    /** Mongo field: inline token JSON when replay ran off-dashboard (e.g. mini-testing). */
     public static final String TOKEN_RESULT = "tokenResult";
 
     private String content;
@@ -18,47 +24,4 @@ public class RecordedLoginFlowInput {
         this.outputFilePath = outputFilePath;
         this.errorFilePath = errorFilePath;
     }
-
-    public RecordedLoginFlowInput() { }
-
-    public String getContent() {
-        return content;
-    }
-
-    public void setContent(String content) {
-        this.content = content;
-    }
-
-    public String getTokenFetchCommand() {
-        return tokenFetchCommand;
-    }
-
-    public void setTokenFetchCommand(String tokenFetchCommand) {
-        this.tokenFetchCommand = tokenFetchCommand;
-    }
-
-    public String getOutputFilePath() {
-        return outputFilePath;
-    }
-
-    public void setOutputFilePath(String outputFilePath) {
-        this.outputFilePath = outputFilePath;
-    }
-
-    public String getErrorFilePath() {
-        return errorFilePath;
-    }
-
-    public void setErrorFilePath(String errorFilePath) {
-        this.errorFilePath = errorFilePath;
-    }
-
-    public String getTokenResult() {
-        return tokenResult;
-    }
-
-    public void setTokenResult(String tokenResult) {
-        this.tokenResult = tokenResult;
-    }
-
 }

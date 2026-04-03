@@ -121,7 +121,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
             }
 
             try {
-                const resp = await api.fetchRecordedLoginFlow("x1")
+                const resp = await api.fetchRecordedLoginFlow("x1", miniTestingServiceName || undefined)
                 if (trimmedRole && resp.tokenFetchInProgress) {
                     await refreshScreenshotsWhileActive()
                 }

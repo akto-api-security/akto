@@ -224,11 +224,15 @@ export default {
         }).then((resp) => resp)
     },
 
-    fetchRecordedLoginFlow(nodeId) {
+    fetchRecordedLoginFlow(nodeId, miniTestingServiceName) {
+        const data = { nodeId }
+        if (miniTestingServiceName) {
+            data.miniTestingServiceName = miniTestingServiceName
+        }
         return request({
             url: '/api/fetchRecordedFlowOutput',
             method: 'post',
-            data: {nodeId}
+            data
         }).then((resp) => {
             return resp
         })

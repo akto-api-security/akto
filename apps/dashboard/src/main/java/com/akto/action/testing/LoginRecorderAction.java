@@ -38,7 +38,7 @@ import org.bson.types.ObjectId;
 
 public class LoginRecorderAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(LoginRecorderAction.class, LogDb.DASHBOARD);;
+    private static final LoggerMaker loggerMaker = new LoggerMaker(LoginRecorderAction.class, LogDb.DASHBOARD);
 
     private String content;
 
@@ -90,6 +90,7 @@ public class LoginRecorderAction extends UserAction {
             playground.setState(TestingRun.State.SCHEDULED);
             playground.setCreatedAt(Context.now());
             playground.setMiniTestingName(miniTestingServiceName.trim());
+            playground.setRecordedFlowOwnerUserId(userId);
             playground.setRecordedFlowContent(payload);
             playground.setRecordedFlowTokenFetchCommand(tokenFetchCommand);
             playground.setRecordedFlowRoleName(roleName != null ? roleName.trim() : null);
@@ -132,9 +133,65 @@ public class LoginRecorderAction extends UserAction {
     public String fetchRecordedFlowOutput() {
 
         int userIdInt = getSUser().getId();
-        RecordedLoginFlowInput recordedLoginInput = RecordedLoginInputDao.instance.findOne(Filters.eq("userId", userIdInt));
+        boolean hybridPoll = StringUtils.isNotBlank(miniTestingServiceName);
 
-        if (recordedLoginInput != null) {
+        RecordedLoginFlowInput recordedLoginInput = null;
+        if (!hybridPoll) {
+            recordedLoginInput = RecordedLoginInputDao.instance.findOne(Filters.eq("userId", userIdInt));
+            if (recordedLoginInput != null) {
+                String inlineToken = recordedLoginInput.getTokenResult();
+                if (inlineToken != null && !inlineToken.trim().isEmpty()) {
+                    token = inlineToken;
+                    applyExtractedTokenToLoginFlowSteps(token);
+                    return SUCCESS.toUpperCase();
+                }
+            }
+        }
+
+        List<Bson> hybridCriteria = new ArrayList<>();
+        hybridCriteria.add(Filters.eq(TestingRunPlayground.TESTING_RUN_PLAYGROUND_TYPE,
+                TestingRunPlayground.TestingRunPlaygroundType.RECORDED_JSON_FLOW.name()));
+        hybridCriteria.add(Filters.eq(TestingRunPlayground.STATE, TestingRun.State.COMPLETED.name()));
+        hybridCriteria.add(Filters.or(
+                Filters.exists(TestingRunPlayground.RECORDED_FLOW_TOKEN_RESULT, true),
+                Filters.exists(TestingRunPlayground.RECORDED_FLOW_ERROR_MESSAGE, true)));
+
+        List<Bson> ownerOrLegacy = new ArrayList<>();
+        ownerOrLegacy.add(Filters.eq(TestingRunPlayground.RECORDED_FLOW_OWNER_USER_ID, userIdInt));
+        if (hybridPoll) {
+            ownerOrLegacy.add(Filters.and(
+                    Filters.exists(TestingRunPlayground.RECORDED_FLOW_OWNER_USER_ID, false),
+                    Filters.eq("miniTestingName", miniTestingServiceName.trim())));
+        }
+        hybridCriteria.add(Filters.or(ownerOrLegacy));
+
+        if (hybridPoll) {
+            hybridCriteria.add(Filters.eq("miniTestingName", miniTestingServiceName.trim()));
+        }
+        Bson hybridPlaygroundFilter = Filters.and(hybridCriteria);
+        TestingRunPlayground hybridPg = TestingRunPlaygroundDao.instance.findLatestOne(hybridPlaygroundFilter);
+
+        if (hybridPg != null) {
+            String err = hybridPg.getRecordedFlowErrorMessage();
+            if (err != null && !err.isEmpty()) {
+                addActionError(err);
+                clearHybridRecordedFlowFieldsOnPlayground(hybridPg.getId());
+                return ERROR.toUpperCase();
+            }
+
+            String hybridToken = hybridPg.getRecordedFlowTokenResult();
+            if (hybridToken == null || hybridToken.isEmpty()) {
+                tokenFetchInProgress = true;
+                return SUCCESS.toUpperCase();
+            }
+
+            token = hybridToken;
+            applyExtractedTokenToLoginFlowSteps(token);
+            clearHybridRecordedFlowFieldsOnPlayground(hybridPg.getId());
+            return SUCCESS.toUpperCase();
+        }
+
+        if (!hybridPoll && recordedLoginInput != null) {
             try {
                 token = RecordedLoginFlowUtil.fetchToken(recordedLoginInput);
             } catch (Exception e) {
@@ -145,36 +202,7 @@ public class LoginRecorderAction extends UserAction {
             return SUCCESS.toUpperCase();
         }
 
-        Bson hybridPlaygroundFilter = Filters.and(
-                Filters.eq(TestingRunPlayground.TESTING_RUN_PLAYGROUND_TYPE,
-                        TestingRunPlayground.TestingRunPlaygroundType.RECORDED_JSON_FLOW.name()),
-                Filters.eq(TestingRunPlayground.STATE, TestingRun.State.COMPLETED.name()),
-                Filters.or(
-                        Filters.exists(TestingRunPlayground.RECORDED_FLOW_TOKEN_RESULT, true),
-                        Filters.exists(TestingRunPlayground.RECORDED_FLOW_ERROR_MESSAGE, true)));
-        TestingRunPlayground hybridPg = TestingRunPlaygroundDao.instance.findLatestOne(hybridPlaygroundFilter);
-
-        if (hybridPg == null) {
-            tokenFetchInProgress = true;
-            return SUCCESS.toUpperCase();
-        }
-
-        String err = hybridPg.getRecordedFlowErrorMessage();
-        if (err != null && !err.isEmpty()) {
-            addActionError(err);
-            clearHybridRecordedFlowFieldsOnPlayground(hybridPg.getId());
-            return ERROR.toUpperCase();
-        }
-
-        String hybridToken = hybridPg.getRecordedFlowTokenResult();
-        if (hybridToken == null || hybridToken.isEmpty()) {
-            tokenFetchInProgress = true;
-            return SUCCESS.toUpperCase();
-        }
-
-        token = hybridToken;
-        applyExtractedTokenToLoginFlowSteps(token);
-        clearHybridRecordedFlowFieldsOnPlayground(hybridPg.getId());
+        tokenFetchInProgress = true;
         return SUCCESS.toUpperCase();
     }
 
