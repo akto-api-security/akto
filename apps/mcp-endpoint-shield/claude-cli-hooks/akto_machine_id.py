@@ -6,6 +6,7 @@ Mimics the Go implementation for generating unique device identifiers.
 import os
 import platform
 import pwd
+import socket
 import subprocess
 import uuid
 
@@ -174,6 +175,46 @@ def get_username() -> str:
     return _username
 
 
+_device_name = None
+_device_label = None
+
+
+def get_device_name() -> str:
+    """
+    Get hostname stripped of .local suffix, lowercased, spaces replaced with dashes.
+    Mirrors Go's GetDeviceName() in utils/device.go.
+    """
+    global _device_name
+    if _device_name is not None:
+        return _device_name
+
+    try:
+        name = socket.gethostname()
+        if name.endswith('.local'):
+            name = name[:-6]
+        _device_name = name.lower().replace(' ', '-')
+    except Exception:
+        _device_name = get_machine_id()
+
+    return _device_name
+
+
+def get_device_label() -> str:
+    """
+    Returns "{hostname}-{first8ofMachineID}" (e.g. "macbook-pro-a1b2c3d4").
+    Mirrors Go's GetDeviceLabel() in utils/device.go.
+    Must stay in sync with that implementation.
+    """
+    global _device_label
+    if _device_label is not None:
+        return _device_label
+
+    name = get_device_name()
+    mid = get_machine_id()
+    short = mid[:8] if len(mid) >= 8 else mid
+    _device_label = f"{name}-{short}"
+    return _device_label
+
+
 if __name__ == "__main__":
-    # Print machine ID when script is executed directly
-    print(get_machine_id())
+    print(get_device_label())
