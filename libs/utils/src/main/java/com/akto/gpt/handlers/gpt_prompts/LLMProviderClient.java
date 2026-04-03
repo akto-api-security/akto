@@ -27,10 +27,10 @@ public class LLMProviderClient {
      */
     public static String callLLM(Model model, String prompt, OkHttpClient client) throws Exception {
         if (model == null) {
-            logger.infoAndAddToDb("No model configured, falling back to Azure OpenAI env vars");
+            logger.info("No model configured, falling back to Azure OpenAI env vars");
             return callAzureOpenAIFromEnv(prompt, client);
         }
-        logger.infoAndAddToDb("Routing LLM call to provider: " + model.getType() + ", model: " + model.getName());
+        logger.info("Routing LLM call to provider: " + model.getType() + ", model: " + model.getName());
         switch (model.getType()) {
             case AZURE_OPENAI:
                 return callAzureOpenAI(model, prompt, client);
@@ -90,7 +90,7 @@ public class LLMProviderClient {
 
     static String extractChatCompletionsContent(String rawResponse) throws org.json.JSONException {
         if (rawResponse == null) {
-            logger.infoAndAddToDb("Received null response from LLM provider");
+            logger.info("Received null response from LLM provider");
             return null;
         }
         JSONObject jsonResponse = new JSONObject(rawResponse);
@@ -101,9 +101,9 @@ public class LLMProviderClient {
     }
 
     private static String executeRequest(Request request, OkHttpClient client) throws IOException {
-        logger.infoAndAddToDb("Sending request to: " + request.url());
+        logger.info("Sending request to: " + request.url());
         try (Response response = client.newCall(request).execute()) {
-            logger.infoAndAddToDb("Received response with status: " + response.code());
+            logger.info("Received response with status: " + response.code());
             ResponseBody responseBody = response.body();
             String bodyStr = responseBody != null ? responseBody.string() : null;
             if (!response.isSuccessful()) {
@@ -135,7 +135,7 @@ public class LLMProviderClient {
         String url = String.format("%s/openai/deployments/%s/chat/completions?api-version=%s",
                 endpoint, modelName, apiVersion);
 
-        logger.infoAndAddToDb("Calling Azure OpenAI, deployment: " + modelName + ", endpoint: " + endpoint);
+        logger.info("Calling Azure OpenAI, deployment: " + modelName + ", endpoint: " + endpoint);
 
         JSONObject payload = buildChatCompletionsPayload(prompt, null);
         RequestBody body = RequestBody.create(payload.toString(), JSON_MEDIA_TYPE);
@@ -148,7 +148,7 @@ public class LLMProviderClient {
 
         String rawResponse = executeRequest(request, client);
         String content = extractChatCompletionsContent(rawResponse);
-        logger.infoAndAddToDb("Azure OpenAI response extracted successfully");
+        logger.info("Azure OpenAI response extracted successfully");
         return content;
     }
 
@@ -174,10 +174,10 @@ public class LLMProviderClient {
 
         String url = databricksEndpoint;
 
-        logger.infoAndAddToDb("Calling Databricks, model: " + modelName + ", endpoint: " + databricksEndpoint);
+        logger.info("Calling Databricks, model: " + modelName + ", endpoint: " + databricksEndpoint);
 
         JSONObject payload = buildDatabricksPayload(prompt, modelName);
-        logger.infoAndAddToDb("Databricks request payload keys: " + payload.names() + ", prompt length: " + (prompt != null ? prompt.length() : 0));
+        logger.info("Databricks request payload keys: " + payload.names() + ", prompt length: " + (prompt != null ? prompt.length() : 0));
         RequestBody body = RequestBody.create(payload.toString(), JSON_MEDIA_TYPE);
         Request request = new Request.Builder()
                 .url(url)
@@ -188,7 +188,7 @@ public class LLMProviderClient {
 
         String rawResponse = executeRequest(request, client);
         String content = extractChatCompletionsContent(rawResponse);
-        logger.infoAndAddToDb("Databricks response extracted successfully");
+        logger.info("Databricks response extracted successfully");
         return content;
     }
 
@@ -217,7 +217,7 @@ public class LLMProviderClient {
         String url = String.format("%s/openai/deployments/%s/chat/completions?api-version=%s",
                 host, deployment, apiVersion);
 
-        logger.infoAndAddToDb("Calling Azure OpenAI (env fallback), deployment: " + deployment + ", host: " + host);
+        logger.info("Calling Azure OpenAI (env fallback), deployment: " + deployment + ", host: " + host);
 
         JSONObject payload = buildChatCompletionsPayload(prompt, null);
         RequestBody body = RequestBody.create(payload.toString(), JSON_MEDIA_TYPE);
@@ -230,7 +230,7 @@ public class LLMProviderClient {
 
         String rawResponse = executeRequest(request, client);
         String content = extractChatCompletionsContent(rawResponse);
-        logger.infoAndAddToDb("Azure OpenAI (env fallback) response extracted successfully");
+        logger.info("Azure OpenAI (env fallback) response extracted successfully");
         return content;
     }
 }
