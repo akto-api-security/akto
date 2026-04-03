@@ -7,11 +7,8 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 
 import static com.akto.listener.InitializerListener.loadTemplateFilesFromDirectory;
-
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -138,63 +135,27 @@ public class TestTemplateUtils {
 
         switch (contextSource) {
             case MCP:
-                return copyAllExcept(allCategories, llmCategories);
+                return mcpCategories;
 
             case GEN_AI:
-                return Arrays.copyOf(llmCategories, llmCategories.length);
+                return llmCategories;
 
             case AGENTIC:
             case ENDPOINT:
                 // ARGUS / ATLAS should include both MCP and LLM/Agentic probe libraries,
                 // while excluding classic API-only categories.
-                return unionCategories(allCategories, mcpCategories, llmCategories);
+                return Arrays.stream(allCategories)
+                    .filter(category -> Arrays.asList(mcpCategories).contains(category) || Arrays.asList(llmCategories).contains(category))
+                    .toArray(TestCategory[]::new);
 
             // for DAST and API security
             case DAST:
             case API:
             default:
-                return copyExcludingBoth(allCategories, mcpCategories, llmCategories);
+                return Arrays.stream(allCategories)
+                    .filter(category -> !Arrays.asList(mcpCategories).contains(category) && !Arrays.asList(llmCategories).contains(category))
+                    .toArray(TestCategory[]::new);
         }
-    }
-
-    private static boolean containsCategory(TestCategory[] arr, TestCategory category) {
-        for (TestCategory c : arr) {
-            if (c == category) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static TestCategory[] copyAllExcept(TestCategory[] all, TestCategory[] exclude) {
-        List<TestCategory> out = new ArrayList<>();
-        for (TestCategory c : all) {
-            if (!containsCategory(exclude, c)) {
-                out.add(c);
-            }
-        }
-        return out.toArray(new TestCategory[0]);
-    }
-
-    private static TestCategory[] copyExcludingBoth(TestCategory[] all, TestCategory[] a, TestCategory[] b) {
-        List<TestCategory> out = new ArrayList<>();
-        for (TestCategory c : all) {
-            if (!containsCategory(a, c) && !containsCategory(b, c)) {
-                out.add(c);
-            }
-        }
-        return out.toArray(new TestCategory[0]);
-    }
-
-    /** Categories present in {@code all} that appear in either {@code first} or {@code second}. */
-    private static TestCategory[] unionCategories(TestCategory[] all, TestCategory[] first, TestCategory[] second) {
-        List<TestCategory> out = new ArrayList<>();
-        for (TestCategory c : all) {
-            if (containsCategory(first, c) || containsCategory(second, c)) {
-                out.add(c);
-            }
-        }
-        return out.toArray(new TestCategory[0]);
     }
 
 }

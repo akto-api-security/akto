@@ -1634,7 +1634,12 @@ updateQueryParams(searchParams, setSearchParams, key, value) {
   setSearchParams(newSearchParams);
 },
  getComplianceIcon: (complianceName) => {
-  return "/public/"+complianceName.toUpperCase()+".svg";
+  if (!complianceName || typeof complianceName !== "string") return "";
+  const trimmed = complianceName.trim();
+  if (trimmed === "OWASP Agentic Top 10") {
+    return "/public/OWASP.svg";
+  }
+  return "/public/" + trimmed.toUpperCase() + ".svg";
 },
 
  convertToDisambiguateLabel(value, convertFunc, maxAllowed){
