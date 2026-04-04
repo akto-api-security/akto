@@ -10,6 +10,7 @@ import func from "@/util/func"
 import ForbiddenRole from '../../../components/shared/ForbiddenRole';
 import TestRunResultChat from './TestRunResultChat';
 import MarkdownViewer from '../../../components/shared/MarkdownViewer';
+import WhyFlaggedSection from './WhyFlaggedSection';
 
 function MoreInformationComponent(props) {
     return (
@@ -47,7 +48,8 @@ function TestRunResultFull(props) {
     const {
         selectedTestRunResult, testingRunResult, loading, issueDetails, getDescriptionText, infoState, headerDetails,
         hexId, source,
-        remediationSrc, conversations, conversationRemediationText, showForbidden    } = props
+        remediationSrc, conversations, conversationRemediationText, showForbidden,
+        scanFlaggingDecision, validationFallbackFromScan } = props
 
     const [fullDescription, setFullDescription] = useState(false)
     const [remediationText, setRemediationText] = useState("")
@@ -158,9 +160,27 @@ function TestRunResultFull(props) {
 
     const remediationCard = remediationText && selectedTestRunResult?.vulnerable && (
         <LegacyCard title="Remediation" sectioned key="remediation">
-            <MarkdownViewer markdown={remediationText} />
+            <VerticalStack gap="3">
+                <Text variant="bodySm" tone="subdued" fontWeight="semibold">
+                    General remediation guidance
+                </Text>
+                <MarkdownViewer markdown={remediationText} />
+            </VerticalStack>
         </LegacyCard>
     )
+
+    const whyFlaggedBlock = selectedTestRunResult?.vulnerable ? (
+        <WhyFlaggedSection
+            key="why-flagged"
+            flaggingDecision={scanFlaggingDecision}
+            validationFallback={validationFallbackFromScan}
+            hasConversations={(conversations?.length || 0) > 0}
+            conversations={conversations}
+            selectedTestRunResult={selectedTestRunResult}
+            issueDetails={issueDetails}
+            httpExplain={null}
+        />
+    ) : null
 
     const mainComponents = [
           issueDetails.id &&
@@ -170,6 +190,7 @@ function TestRunResultFull(props) {
           </LegacyCard>
         ,
         (testingRunResult && testingRunResult["testLogs"] && testingRunResult["testLogs"].length > 0) ? testLogsComponent : null,
+        whyFlaggedBlock,
         !hasConversations && (!func.showTestSampleData(selectedTestRunResult)) && testErrorComponent,
         attemptCard,
         evidenceCard,

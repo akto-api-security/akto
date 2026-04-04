@@ -21,6 +21,8 @@ public class AgentConversationResult extends GenericAgentConversation {
     private String remediationMessage;
     private List<String> conversation;
     private List<Pair<String, String>> addedConversations;
+    /** Structured why-flagged data from agent /chat when validation is true */
+    private FlaggingDecision flaggingDecision;
 
     public AgentConversationResult(String conversationId, String originalPrompt, String response, List<String> conversation, int timestamp, boolean validation, String validationMessage, String finalSentPrompt, String remediationMessage, int externalApiTokens){
         super("", conversationId, originalPrompt, response, finalSentPrompt, timestamp, timestamp, 0, externalApiTokens, 0, ConversationType.TEST_EXECUTION_RESULT);
