@@ -41,6 +41,7 @@ import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.tracing.ServiceGraphBuilder;
 import com.akto.tracing.TraceParseResult;
 import com.akto.tracing.n8n.N8nTraceParser;
+import com.akto.tracing.vertexai.VertexAITraceParser;
 import com.akto.usage.OrgUtils;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
@@ -626,6 +627,29 @@ public class HttpCallParser {
         }
     }
 
+    private boolean isVertexAITraffic(HttpResponseParams httpResponseParam) {
+      try {
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) {
+                return false;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return false;
+            }
+
+            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            return Constants.AI_AGENT_SOURCE_VERTEX.equals(source);
+        
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking if traffic is Vertex AI: " + e.getMessage());
+            return false;
+        }
+    }
+      
+      
     /**
      * Checks if the HTTP response is Arcade traffic by examining tags.
      *
@@ -654,6 +678,171 @@ public class HttpCallParser {
         }
     }
 
+    private void parseVertexAITrace(HttpResponseParams httpResponseParam) {
+        try {
+            String payload = httpResponseParam.getPayload();
+            if (payload == null || payload.isEmpty()) {
+                return;
+            }
+
+            // Parse the responsePayload JSON to extract traces array
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payloadMap = gson.fromJson(payload, Map.class);
+            if (payloadMap == null || !payloadMap.containsKey("traces")) {
+                return;
+            }
+
+            Object tracesObj = payloadMap.get("traces");
+            if (tracesObj == null) {
+                return;
+            }
+
+            // Extract model from request payload
+            String model = "unknown";
+            try {
+                String requestPayload = httpResponseParam.getRequestParams().getPayload();
+                if (requestPayload != null && !requestPayload.isEmpty()) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> reqMap = gson.fromJson(requestPayload, Map.class);
+                    String bodyStr = (String) reqMap.get("body");
+                    if (bodyStr != null) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> bodyMap = gson.fromJson(bodyStr, Map.class);
+                        if (bodyMap != null && bodyMap.get("model") != null) {
+                            model = (String) bodyMap.get("model");
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error extracting model from Vertex AI request payload");
+            }
+
+            // Extract reasoning engine ID and agent name from tags
+            String reasoningEngineId = "";
+            String agentName = "";
+            try {
+                String tagsJson = httpResponseParam.getTags();
+                if (tagsJson != null && !tagsJson.isEmpty()) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+                    if (tagsMap != null) {
+                        reasoningEngineId = tagsMap.getOrDefault(Constants.AI_AGENT_TAG_BOT_NAME, "");
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error extracting tags from Vertex AI traffic");
+            }
+
+            // Extract agent name from responsePayload (set by Python callbacks)
+            try {
+                Object agentNameObj = payloadMap.get("agent_name");
+                if (agentNameObj != null && !agentNameObj.toString().isEmpty()) {
+                    agentName = agentNameObj.toString();
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error extracting agent_name from Vertex AI response payload");
+            }
+
+            // Extract invocation_id from the first trace step
+            String invocationId = "";
+            if (tracesObj instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> tracesList = (List<Map<String, Object>>) tracesObj;
+                if (!tracesList.isEmpty()) {
+                    Object invId = tracesList.get(0).get("invocation_id");
+                    if (invId != null) {
+                        invocationId = invId.toString();
+                    }
+                }
+            }
+
+            // Build wrapper JSON for the parser
+            Map<String, Object> wrapperMap = new HashMap<>();
+            wrapperMap.put("traces", tracesObj);
+
+            // Pass body field through so the parser can extract model name and final LLM text
+            Object bodyObj = payloadMap.get("body");
+            if (bodyObj != null) {
+                wrapperMap.put("body", bodyObj);
+            }
+
+            Map<String, Object> metadataMap = new HashMap<>();
+            metadataMap.put("timestamp", (long) httpResponseParam.getTime() * 1000L);
+            metadataMap.put("statusCode", httpResponseParam.getStatusCode());
+            metadataMap.put("model", model);
+            metadataMap.put("agentName", agentName);
+            metadataMap.put("reasoningEngineId", reasoningEngineId);
+            metadataMap.put("invocationId", invocationId);
+            wrapperMap.put("metadata", metadataMap);
+
+            String wrapperJson = gson.toJson(wrapperMap);
+
+            // Validate if this is parseable Vertex AI trace data
+            boolean canParse = VertexAITraceParser.getInstance().canParse(wrapperJson);
+            loggerMaker.info("parseVertexAITrace: VertexAITraceParser.canParse() = " + canParse, LogDb.RUNTIME);
+
+            if (!canParse) {
+                loggerMaker.info("traces found but not valid Vertex AI trace format", LogDb.RUNTIME);
+                return;
+            }
+
+            loggerMaker.info("Found valid Vertex AI agent execution trace", LogDb.RUNTIME);
+
+            // Parse trace
+            TraceParseResult result = VertexAITraceParser.getInstance().parse(wrapperJson);
+
+            // Store trace and spans
+            dataActor.storeTrace(result.getTrace());
+            if (result.getSpans() != null && !result.getSpans().isEmpty()) {
+                dataActor.storeSpans(result.getSpans());
+                loggerMaker.info("Stored Vertex AI trace with " + result.getSpans().size() + " spans", LogDb.RUNTIME);
+            }
+
+            // Remove traces and agent_name from payload so they don't appear in dashboard sample data
+            payloadMap.remove("traces");
+            payloadMap.remove("agent_name");
+            String cleanedPayload = gson.toJson(payloadMap);
+            httpResponseParam.setPayload(cleanedPayload);
+
+            // Also update orig (used for sample data storage) with cleaned responsePayload
+            try {
+                String origStr = httpResponseParam.getOrig();
+                if (origStr != null) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> origMap = gson.fromJson(origStr, Map.class);
+                    origMap.put("responsePayload", cleanedPayload);
+                    httpResponseParam.setOrig(gson.toJson(origMap));
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error updating orig for Vertex AI trace cleanup");
+            }
+
+            // Extract workflowId and update service graph
+            String workflowId = result.getWorkflowId();
+            if (workflowId == null || workflowId.isEmpty()) {
+                loggerMaker.info("Vertex AI trace missing workflowId, skipping service graph update", LogDb.RUNTIME);
+                return;
+            }
+
+            String hostname = getHostnameForCollection(httpResponseParam);
+            int apiCollectionId = ServiceGraphBuilder.getInstance().getApiCollectionIdFromWorkflowId(workflowId, hostname);
+
+            if (apiCollectionId != -1) {
+                Map<String, ServiceGraphEdgeInfo> edges = VertexAITraceParser.getInstance().extractServiceGraph(wrapperJson);
+                if (edges != null && !edges.isEmpty()) {
+                    ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+                    loggerMaker.info("Updated service graph for Vertex AI agent: " + workflowId
+                        + " (collection: " + apiCollectionId + ", hostname: " + hostname + ") with " + edges.size() + " edges", LogDb.RUNTIME);
+                }
+            } else {
+                loggerMaker.info("Invalid API collection ID for Vertex AI reasoningEngineId: " + workflowId, LogDb.RUNTIME);
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Vertex AI trace: " + e.getMessage());
+        }
+    }
+    
     /**
      * Builds and updates service graph edges for Arcade traffic.
      * Extracts tool metadata from Arcade-specific request headers.
@@ -1382,6 +1571,10 @@ public class HttpCallParser {
                 parseN8nTrace(httpResponseParam);
             }
 
+            // Parse Vertex AI trace metadata if it is Vertex AI traffic
+            if (isVertexAITraffic(httpResponseParam)) {
+                parseVertexAITrace(httpResponseParam);
+              
             // Build service graph edges for Arcade traffic
             if (isArcadeTraffic(httpResponseParam)) {
                 parseArcadeServiceGraph(httpResponseParam);
