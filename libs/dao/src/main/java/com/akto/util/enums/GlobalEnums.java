@@ -178,6 +178,24 @@ public class GlobalEnums {
     public enum CONTEXT_SOURCE {
         API, MCP, GEN_AI, AGENTIC, DAST, ENDPOINT
     }
+    
+    public enum DashboardCategory {
+        // FeatureLabel(DashboardCategory)
+        API_SECURITY("API Security"), // Note: API_SECURITY is not an explicit feature created in stigg     
+        SECURITY_TYPE_AGENTIC("Agentic Security"),
+        ENDPOINT_SECURITY("Endpoint Security"),
+        AKTO_DAST("DAST");
+
+        private final String dashboardCategory;
+
+        DashboardCategory(String dashboardCategory) {
+            this.dashboardCategory = dashboardCategory;
+        }
+
+        public String getDashboardCategory() {
+            return dashboardCategory;
+        }
+    }
 
     /* ********************************************************************** */
 }
