@@ -1273,7 +1273,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
 
     /**
      * Main entry point for MCP config and skill discovery.
-     * Uploads scripts, executes on all agents, ingests results to Akto.
+     * Uploads scripts, executes on all agents in batches, ingests results to Akto.
      * 
      * @param integration SentinelOne integration config
      * @return Combined discovery results
@@ -1301,52 +1301,155 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             return results;
         }
         
-        List<String> agentIds = new ArrayList<>();
+        // Separate agents by OS type
+        List<String> unixAgentIds = new ArrayList<>();
+        List<String> windowsAgentIds = new ArrayList<>();
+        
         for (Map<String, Object> agent : agentList) {
-            agentIds.add(agent.get("id").toString());
-        }
-        
-        loggerMaker.info("Starting MCP/skill discovery on " + agentIds.size() + " agent(s)", LogDb.DASHBOARD);
-        
-        // Upload and execute MCP config scan
-        String mcpScriptId = uploadScriptFromClasspath("scan_mcp_configs.sh", apiToken, consoleUrl);
-        if (mcpScriptId != null) {
-            String mcpTaskId = executeRemoteScript(mcpScriptId, agentIds, apiToken, consoleUrl);
-            if (mcpTaskId != null) {
-                // Poll for up to 5 minutes - scripts can take 2-3 minutes to complete
-                Map<String, String> mcpTasks = pollTaskStatus(mcpTaskId, apiToken, consoleUrl, 300000);
-                if (!mcpTasks.isEmpty()) {
-                    Map<String, JsonNode> mcpOutputsByAgent = fetchScriptOutputsWithAgentId(mcpTasks, apiToken, consoleUrl);
-                    results.put("mcp_configs", new ArrayList<>(mcpOutputsByAgent.values()));
-                    
-                    // Ingest MCP config discoveries to Akto
-                    ingestMCPDiscoveries(mcpOutputsByAgent, ingestUrl, consoleDomain);
-                    
-                    loggerMaker.info("MCP config discovery completed: " + mcpOutputsByAgent.size() + " results", LogDb.DASHBOARD);
-                }
+            String agentId = agent.get("id").toString();
+            String osType = getStringOrDefault(agent, "osType", "").toLowerCase();
+            
+            if (osType.contains("windows")) {
+                windowsAgentIds.add(agentId);
+            } else {
+                unixAgentIds.add(agentId);
             }
         }
         
-        // Upload and execute skill scan
-        String skillScriptId = uploadScriptFromClasspath("scan_skills.sh", apiToken, consoleUrl);
-        if (skillScriptId != null) {
-            String skillTaskId = executeRemoteScript(skillScriptId, agentIds, apiToken, consoleUrl);
-            if (skillTaskId != null) {
-                // Poll for up to 5 minutes - scripts can take 2-3 minutes to complete
-                Map<String, String> skillTasks = pollTaskStatus(skillTaskId, apiToken, consoleUrl, 300000);
-                if (!skillTasks.isEmpty()) {
-                    Map<String, JsonNode> skillOutputsByAgent = fetchScriptOutputsWithAgentId(skillTasks, apiToken, consoleUrl);
-                    results.put("skills", new ArrayList<>(skillOutputsByAgent.values()));
-                    
-                    // Ingest skill discoveries to Akto
-                    ingestSkillDiscoveries(skillOutputsByAgent, ingestUrl, consoleDomain);
-                    
-                    loggerMaker.info("Skill discovery completed: " + skillOutputsByAgent.size() + " results", LogDb.DASHBOARD);
-                }
+        loggerMaker.info("Starting MCP/skill discovery: " + unixAgentIds.size() + " Unix/Linux/macOS agents, " + 
+            windowsAgentIds.size() + " Windows agents", LogDb.DASHBOARD);
+        
+        // 30 minute timeout (cron runs every hour)
+        int timeoutMs = 30 * 60 * 1000;
+        
+        // Batch size for large fleets
+        int batchSize = 150;
+        
+        // Execute MCP config discovery
+        Map<String, JsonNode> allMcpOutputs = new HashMap<>();
+        
+        // Unix agents with .sh script
+        if (!unixAgentIds.isEmpty()) {
+            String mcpScriptIdSh = uploadScriptFromClasspath("scan_mcp_configs.sh", apiToken, consoleUrl);
+            if (mcpScriptIdSh != null) {
+                Map<String, JsonNode> unixMcpOutputs = executeBatchedDiscovery(
+                    mcpScriptIdSh, unixAgentIds, batchSize, timeoutMs, 
+                    "MCP Config (Unix)", apiToken, consoleUrl, ingestUrl, consoleDomain, true);
+                allMcpOutputs.putAll(unixMcpOutputs);
             }
+        }
+        
+        // Windows agents with .ps1 script
+        if (!windowsAgentIds.isEmpty()) {
+            String mcpScriptIdPs1 = uploadScriptFromClasspath("scan_mcp_configs.ps1", apiToken, consoleUrl);
+            if (mcpScriptIdPs1 != null) {
+                Map<String, JsonNode> windowsMcpOutputs = executeBatchedDiscovery(
+                    mcpScriptIdPs1, windowsAgentIds, batchSize, timeoutMs, 
+                    "MCP Config (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, true);
+                allMcpOutputs.putAll(windowsMcpOutputs);
+            }
+        }
+        
+        if (!allMcpOutputs.isEmpty()) {
+            ingestMCPDiscoveries(allMcpOutputs, ingestUrl, consoleDomain);
+            results.put("mcp_configs", new ArrayList<>(allMcpOutputs.values()));
+            loggerMaker.info("MCP config discovery completed: " + allMcpOutputs.size() + " total results", LogDb.DASHBOARD);
+        }
+        
+        // Execute skill discovery
+        Map<String, JsonNode> allSkillOutputs = new HashMap<>();
+        
+        // Unix agents with .sh script
+        if (!unixAgentIds.isEmpty()) {
+            String skillScriptIdSh = uploadScriptFromClasspath("scan_skills.sh", apiToken, consoleUrl);
+            if (skillScriptIdSh != null) {
+                Map<String, JsonNode> unixSkillOutputs = executeBatchedDiscovery(
+                    skillScriptIdSh, unixAgentIds, batchSize, timeoutMs, 
+                    "Skills (Unix)", apiToken, consoleUrl, ingestUrl, consoleDomain, false);
+                allSkillOutputs.putAll(unixSkillOutputs);
+            }
+        }
+        
+        // Windows agents with .ps1 script
+        if (!windowsAgentIds.isEmpty()) {
+            String skillScriptIdPs1 = uploadScriptFromClasspath("scan_skills.ps1", apiToken, consoleUrl);
+            if (skillScriptIdPs1 != null) {
+                Map<String, JsonNode> windowsSkillOutputs = executeBatchedDiscovery(
+                    skillScriptIdPs1, windowsAgentIds, batchSize, timeoutMs, 
+                    "Skills (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, false);
+                allSkillOutputs.putAll(windowsSkillOutputs);
+            }
+        }
+        
+        if (!allSkillOutputs.isEmpty()) {
+            ingestSkillDiscoveries(allSkillOutputs, ingestUrl, consoleDomain);
+            results.put("skills", new ArrayList<>(allSkillOutputs.values()));
+            loggerMaker.info("Skill discovery completed: " + allSkillOutputs.size() + " total results", LogDb.DASHBOARD);
         }
         
         return results;
+    }
+    
+    /**
+     * Executes discovery script on agents in batches for better scalability.
+     * 
+     * @param scriptId Uploaded script ID
+     * @param agentIds List of all agent IDs to target
+     * @param batchSize Number of agents per batch
+     * @param timeoutMs Timeout per batch in milliseconds
+     * @param description Human-readable description for logging
+     * @param apiToken SentinelOne API token
+     * @param consoleUrl SentinelOne console URL
+     * @param ingestUrl Akto ingestion URL
+     * @param consoleDomain SentinelOne console domain
+     * @param isMcpConfig True if MCP config discovery, false if skill discovery
+     * @return Combined outputs from all batches
+     */
+    private static Map<String, JsonNode> executeBatchedDiscovery(
+            String scriptId, 
+            List<String> agentIds, 
+            int batchSize, 
+            int timeoutMs,
+            String description,
+            String apiToken, 
+            String consoleUrl,
+            String ingestUrl,
+            String consoleDomain,
+            boolean isMcpConfig) {
+        
+        Map<String, JsonNode> allOutputs = new HashMap<>();
+        int totalBatches = (int) Math.ceil((double) agentIds.size() / batchSize);
+        
+        loggerMaker.info(description + ": Processing " + agentIds.size() + " agents in " + totalBatches + " batch(es)", LogDb.DASHBOARD);
+        
+        for (int i = 0; i < agentIds.size(); i += batchSize) {
+            int batchNum = (i / batchSize) + 1;
+            List<String> batch = agentIds.subList(i, Math.min(i + batchSize, agentIds.size()));
+            
+            loggerMaker.info(description + " - Batch " + batchNum + "/" + totalBatches + 
+                ": Executing on " + batch.size() + " agents", LogDb.DASHBOARD);
+            
+            String taskId = executeRemoteScript(scriptId, batch, apiToken, consoleUrl);
+            if (taskId != null) {
+                Map<String, String> tasks = pollTaskStatus(taskId, apiToken, consoleUrl, timeoutMs);
+                if (!tasks.isEmpty()) {
+                    Map<String, JsonNode> batchOutputs = fetchScriptOutputsWithAgentId(tasks, apiToken, consoleUrl);
+                    allOutputs.putAll(batchOutputs);
+                    
+                    loggerMaker.info(description + " - Batch " + batchNum + "/" + totalBatches + 
+                        ": Collected " + batchOutputs.size() + " results", LogDb.DASHBOARD);
+                } else {
+                    loggerMaker.error(description + " - Batch " + batchNum + "/" + totalBatches + 
+                        ": No results returned (timeout or failure)", LogDb.DASHBOARD);
+                }
+            } else {
+                loggerMaker.error(description + " - Batch " + batchNum + "/" + totalBatches + 
+                    ": Failed to execute script", LogDb.DASHBOARD);
+            }
+        }
+        
+        loggerMaker.info(description + ": Completed all batches, total outputs: " + allOutputs.size(), LogDb.DASHBOARD);
+        return allOutputs;
     }
 
     /**
@@ -1663,6 +1766,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                 // Create tag JSON string with source=ENDPOINT
                 Map<String, String> tagMap = new HashMap<>();
                 tagMap.put("source", "ENDPOINT");
+                tagMap.put("bot-name", agentId);
                 
                 try {
                     String reqHeadersJson = OBJECT_MAPPER.writeValueAsString(reqHeaders);
