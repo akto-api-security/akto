@@ -3,14 +3,14 @@ import { devtools, persist } from "zustand/middleware";
 
 import pako from "pako"; // Gzip Compression
 
-// Custom Storage with Gzip Compression
-const gzipStorage = {
+// Factory function to create Custom Storage with Gzip Compression
+export const createGzipStorage = (storage) => ({
     getItem: (name) => {
-        const compressedData = sessionStorage.getItem(name);
+        const compressedData = storage.getItem(name);
         if (!compressedData) return null;
 
         try {
-            // Decode base64 & Gunzip (decompress)
+            // Try to decode base64 & Gunzip (decompress)
             const binaryData = atob(compressedData);
             const uint8Array = new Uint8Array(binaryData.length);
             for (let i = 0; i < binaryData.length; i++) {
@@ -19,8 +19,18 @@ const gzipStorage = {
             const decompressed = pako.inflate(uint8Array, { to: "string" });
             return JSON.parse(decompressed);
         } catch (error) {
-            console.error("Error decompressing state:", error);
-            return null;
+            // Fallback: Try to parse as plain JSON (for backward compatibility with old uncompressed data)
+            try {
+                const parsed = JSON.parse(compressedData);
+                // If successful, re-save it in compressed format
+                storage.setItem(name, btoa(Array.from(pako.deflate(compressedData, { level: 9 }))
+                    .map((byte) => String.fromCharCode(byte))
+                    .join("")));
+                return parsed;
+            } catch (fallbackError) {
+                console.error("Error reading state (tried both compressed and uncompressed):", error);
+                return null;
+            }
         }
     },
     setItem: (name, value) => {
@@ -32,13 +42,16 @@ const gzipStorage = {
                 .map((byte) => String.fromCharCode(byte))
                 .join("");
             const base64Encoded = btoa(binaryString);
-            sessionStorage.setItem(name, base64Encoded);
+            storage.setItem(name, base64Encoded);
         } catch (error) {
             console.error("Error compressing state:", error);
         }
     },
-    removeItem: (name) => sessionStorage.removeItem(name),
-};
+    removeItem: (name) => storage.removeItem(name),
+});
+
+// Custom Storage with Gzip Compression for sessionStorage
+const gzipStorage = createGzipStorage(sessionStorage);
 
 const initialState = {
     quickstartTasksCompleted: 0,

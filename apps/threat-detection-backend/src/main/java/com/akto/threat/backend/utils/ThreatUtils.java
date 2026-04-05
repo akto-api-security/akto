@@ -16,17 +16,43 @@ import java.util.*;
 
 public class ThreatUtils {
 
+    private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
+      System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
+    );
+
     private static final List<String> ENDPOINT_POLICY_FILTER_IDS = Arrays.asList(
         "MCPGuardrails", "AuditPolicy", "MCPMaliciousComponent"
     );
+
+    public static Document buildSimpleContextFilterNew(String contextSource) {
+        if (contextSource == null || contextSource.isEmpty()) {
+            contextSource = CONTEXT_SOURCE.API.name();
+        }
+
+        if (USE_ACTOR_INFO_TABLE &&"API".equalsIgnoreCase(contextSource)) {
+            return new Document("contextSource", "API");
+        }
+
+        // For ENDPOINT and AGENTIC, need to include legacy filter for backward compatibility
+        Document contextSourceFilter = new Document("contextSource", contextSource);
+        Document legacyFilter = buildLegacyContextFilter(contextSource);
+
+        return new Document("$or", Arrays.asList(contextSourceFilter, legacyFilter));
+    }
 
     public static Document buildSimpleContextFilter(String contextSource) {
         if (contextSource == null || contextSource.isEmpty()) {
             contextSource = CONTEXT_SOURCE.API.name();
         }
 
-        Document contextSourceFilter = new Document("contextSource", contextSource);
+        // For API context, just return simple equality filter (most common case - 70% of data)
+        // This allows MongoDB to use indexes efficiently
+        // if ("API".equalsIgnoreCase(contextSource)) {
+        //     return new Document("contextSource", "API");
+        // }
 
+        // For ENDPOINT and AGENTIC, need to include legacy filter for backward compatibility
+        Document contextSourceFilter = new Document("contextSource", contextSource);
         Document legacyFilter = buildLegacyContextFilter(contextSource);
 
         return new Document("$or", Arrays.asList(contextSourceFilter, legacyFilter));

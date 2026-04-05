@@ -71,7 +71,9 @@ message ListMaliciousRequestsRequest {
     Filter filter = 4;
 }
 
-message FetchAlertFiltersRequest {}
+message FetchAlertFiltersRequest {
+  optional TimeRangeFilter detected_at_time_range = 1;
+}
 
 message FetchAlertFiltersResponse {
   repeated string actors = 1;
@@ -96,6 +98,7 @@ message ListThreatActorsRequest {
   Filter filter = 4;
   uint32 start_ts = 5;
   uint32 end_ts = 6;
+  optional string cursor = 7;  // ObjectId hex string for cursor-based pagination (new flow)
 }
 
 message ListThreatActorResponse {
@@ -119,6 +122,7 @@ message ListThreatActorResponse {
     string latest_subcategory = 8;
     string latest_api_host = 9;
     string latest_metadata = 10;
+    optional string object_id = 11;  // MongoDB ObjectId hex string for cursor-based pagination
   }
   repeated ThreatActor actors = 1;
   uint64 total = 2;
@@ -281,7 +285,16 @@ message ModifyThreatActorStatusRequest {
   uint64 updated_ts = 3;
 }
 
-message ModifyThreatActorStatusResponse {  
+message ModifyThreatActorStatusResponse {
+}
+
+message BulkModifyThreatActorStatusRequest {
+  repeated string ips = 1;
+  string status = 2;
+  uint64 updated_ts = 3;
+}
+
+message BulkModifyThreatActorStatusResponse {
 }
 
 message UpdateMaliciousEventStatusRequest {
@@ -444,4 +457,15 @@ message FetchThreatsForActorResponse {
     string metadata = 7;
   }
   repeated ActivityData activities = 1;
+}
+
+message ActorCountsFromActorInfoRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
+  repeated string latest_attack = 3;
+}
+
+message ActorCountsFromActorInfoResponse {
+  int32 critical_actors = 1;  // Actors with isCritical=true (HIGH or CRITICAL severity)
+  int32 active_actors = 2;    // Actors with status=ACTIVE
 }

@@ -782,6 +782,7 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
     }
 
     public long fetchEndpointsCount(int startTimestamp, int endTimestamp, Set<Integer> deactivatedCollections, boolean useRbacUserCollections) {
+        long prep1Start = System.currentTimeMillis();
         List <Integer> nonHostApiCollectionIds = ApiCollectionsDao.instance.fetchNonTrafficApiCollectionsIds();
         nonHostApiCollectionIds.addAll(deactivatedCollections);
 
@@ -790,6 +791,9 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         List<Integer> existingCollectionIds = existingCollections.stream()
                 .map(ApiCollection::getId)
                 .collect(Collectors.toList());
+        long prep1Time = System.currentTimeMillis() - prep1Start;
+        System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Prep1 (fetch collections): time=" + prep1Time + "ms, nonHostCount=" + nonHostApiCollectionIds.size() + ", existingCount=" + existingCollectionIds.size());
+
         Bson userCollectionFilter = Filters.empty();
         Bson collectionFilter = Filters.in(SingleTypeInfo._API_COLLECTION_ID, existingCollectionIds);
         if (useRbacUserCollections) {
@@ -797,14 +801,15 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
                 List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                         Context.accountId.get());
                 if (collectionIds != null) {
-                    userCollectionFilter = Filters.in("collectionIds", collectionIds);
+                    System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] RBAC filter applied: collectionIds size=" + collectionIds.size());
+                    userCollectionFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds);
+                } else {
+                    System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] RBAC filter: collectionIds is null");
                 }
             } catch (Exception e) {
+                System.out.println("[SingleTypeInfoDao.fetchEndpointsCount] Exception getting RBAC collectionIds: " + e.getMessage());
             }
         }
-
-        // OPTIMIZED APPROACH: Count all, then subtract excluded (total - excluded)
-        // This is much faster than using $nin with large arrays
 
         // Query 1: Count ALL documents matching host filter + timestamp
         Bson filterAllWithTs = Filters.and(
@@ -868,6 +873,7 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             pipeline.add(Aggregates.match(Filters.lte("startTs", endTimestamp)));
             pipeline.add(Aggregates.sort(Sorts.descending("startTs")));
             pipeline.add(Aggregates.count());
+
             MongoCursor<BasicDBObject> endpointsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
 
             while (endpointsCursor.hasNext()) {

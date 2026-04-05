@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeMCPExecution": [
+      {
+        "command": "/path/to/userhome/.cursor/hooks/akto/akto-mcp-guard-before.sh"
+      }
+    ],
+    "afterMCPExecution": [
+      {
+        "command": "/path/to/userhome/.cursor/hooks/akto/akto-mcp-guard-after.sh"
+      }
+    ]
+  }
+}

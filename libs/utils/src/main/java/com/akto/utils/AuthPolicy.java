@@ -45,7 +45,7 @@ public class AuthPolicy {
         return SESSION_TOKEN_PATTERN.matcher(cookieName).find();
     }
 
-    private static List<ApiInfo.AuthType> findBearerBasicAuth(String header, String value){
+    private static List<String> findBearerBasicAuth(String header, String value){
         value = value.trim();
         boolean twoFields = value.split(" ").length == 2;
         if (twoFields && value.substring(0, Math.min(6, value.length())).equalsIgnoreCase("bearer")) {
@@ -82,8 +82,8 @@ public class AuthPolicy {
      * Find all auth types present in headers (without requiring ApiInfo).
      * This is useful for threat detection where we just need to know the auth types.
      */
-    public static Set<ApiInfo.AuthType> findAuthTypes(Map<String, List<String>> headers) {
-        Set<ApiInfo.AuthType> authTypes = new HashSet<>();
+    public static Set<String> findAuthTypes(Map<String, List<String>> headers) {
+        Set<String> authTypes = new HashSet<>();
         if (headers == null) return authTypes;
 
         List<String> cookieList = headers.getOrDefault(COOKIE_NAME, new ArrayList<>());
@@ -201,7 +201,7 @@ public class AuthPolicy {
     }
 
     public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes) {
-        Set<Set<ApiInfo.AuthType>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
+        Set<Set<String>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
         if (allAuthTypesFound == null) allAuthTypesFound = new HashSet<>();
 
         // TODO: from custom api-token
@@ -212,7 +212,7 @@ public class AuthPolicy {
         Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
         List<String> cookieList = headers.getOrDefault(COOKIE_NAME, new ArrayList<>());
         Map<String,String> cookieMap = parseCookie(cookieList);
-        Set<ApiInfo.AuthType> authTypes = new HashSet<>();
+        Set<String> authTypes = new HashSet<>();
 
         BasicDBObject flattenedPayload = null;
         try{

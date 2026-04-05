@@ -89,6 +89,12 @@ public class AktoIngestAdapter {
                     if (tag != null) {
                         batch.setTag(objectMapper.writeValueAsString(tag));
                     }
+
+                    // Extract IP address from metadata if available
+                    Object extractedIp = metadata.get("ip");
+                    if (extractedIp != null && !extractedIp.toString().isEmpty()) {
+                        batch.setIp(extractedIp.toString());
+                    }
                 }
             } else {
                 batch.setMethod("");

@@ -27,21 +27,28 @@ import com.akto.dto.testing.LoginRequestAuthParam;
 import com.akto.dto.testing.RequestData;
 import com.akto.dto.testing.SampleDataAuthParam;
 import com.akto.dto.testing.TLSAuthParam;
+import com.akto.dto.testing.DigestAuthParam;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.log.LoggerMaker;
+import com.akto.test_editor.execution.Executor;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
+
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 import org.bson.conversions.Bson;
 
 public class TestRolesAction extends UserAction {
@@ -55,6 +62,8 @@ public class TestRolesAction extends UserAction {
     private String roleName;
     private List<AuthParamData> authParamData;
     private Map<String, String> apiCond;
+    @Getter @Setter
+    private String urlRegex;
     private String authAutomationType;
     private ArrayList<RequestData> reqData;
     private RecordedLoginFlowInput recordedLoginFlowInput;
@@ -154,11 +163,49 @@ public class TestRolesAction extends UserAction {
                         param = new SampleDataAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
                             authParamDataElem.getValue(), true);
                         break;
+                    case DIGEST_AUTH:
+                        // For digest auth, we only create one param from all the data
+                        // Skip individual processing since we handle it below
+                        param = null;
+                        break;
                     default:
                         break;
                 }
 
-                authParams.add(param);
+                if (param != null) {
+                    authParams.add(param);
+                }
+            }
+
+            // Handle DIGEST_AUTH separately since it needs all parameters combined
+            if (AuthMechanismTypes.valueOf(authAutomationType.toUpperCase()) == AuthMechanismTypes.DIGEST_AUTH) {
+                String username = null, password = null, targetUrl = null, method = "GET", algorithm = "SHA-256";
+                
+                // Extract digest auth parameters from authParamData
+                for (AuthParamData data : authParamData) {
+                    switch (data.getKey()) {
+                        case DigestAuthParam.USERNAME_KEY:
+                            username = data.getValue();
+                            break;
+                        case DigestAuthParam.PASSWORD_KEY:
+                            password = data.getValue();
+                            break;
+                        case DigestAuthParam.TARGET_URL_KEY:
+                            targetUrl = data.getValue();
+                            break;
+                        case DigestAuthParam.METHOD_KEY:
+                            method = data.getValue();
+                            break;
+                        case DigestAuthParam.ALGORITHM_KEY:
+                            algorithm = data.getValue();
+                            break;
+                    }
+                }
+                
+                // Create single DigestAuthParam with all the information
+                DigestAuthParam digestParam = new DigestAuthParam(username, password, targetUrl, method, algorithm);
+                authParams.clear(); // Remove any null entries
+                authParams.add(digestParam);
             }
 
             // Extract otpRefUuid from fetchOtpData URLs
@@ -182,7 +229,7 @@ public class TestRolesAction extends UserAction {
             }
 
             AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType, null);
-            AuthWithCond authWithCond = new AuthWithCond(authM, apiCond, recordedLoginFlowInput);
+            AuthWithCond authWithCond = new AuthWithCond(authM, apiCond, recordedLoginFlowInput, urlRegex);
             return authWithCond;
         } else {
             return null;
@@ -211,6 +258,19 @@ public class TestRolesAction extends UserAction {
         }
 
         return role;
+    }
+
+    private boolean validateUrlRegex() {
+        if (urlRegex == null || urlRegex.trim().isEmpty()) {
+            return true;
+        }
+        try {
+            Pattern.compile(urlRegex.trim());
+            return true;
+        } catch (PatternSyntaxException e) {
+            addActionError("Invalid URL path regex");
+            return false;
+        }
     }
 
     @Audit(description = "User deleted a test role", resource = Resource.TEST_ROLE, operation = Operation.DELETE, metadataGenerators = {"getRoleName"})
@@ -251,6 +311,7 @@ public class TestRolesAction extends UserAction {
         accessMatrixTaskAction.setRoleName(roleName);
         accessMatrixTaskAction.deleteAccessMatrix();
 
+        Executor.clearRoleCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -301,6 +362,7 @@ public class TestRolesAction extends UserAction {
         }
 
         TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.combine(Updates.set(TestRoles.LAST_UPDATED_TS, Context.now()), Updates.set(TestRoles.LAST_UPDATED_BY, sUser.getLogin())));
+        Executor.clearRoleCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -314,8 +376,9 @@ public class TestRolesAction extends UserAction {
             }
             Bson roleFilter = Filters.eq(Constants.ID, role.getId());
             TestRolesDao.instance.updateOne(roleFilter,  Updates.set(TestRoles.SCOPE_ROLES, scopeRoles));
+            Executor.clearRoleCache();
             return SUCCESS.toUpperCase();
-        } 
+        }
         addActionError("Scope roles are empty");
         return ERROR.toUpperCase();
     }
@@ -349,6 +412,7 @@ public class TestRolesAction extends UserAction {
                 createLogicalGroup(logicalGroupName, andConditions,orConditions,this.getSUser().getLogin());
         selectedRole = TestRolesDao.instance.createTestRole(roleName, logicalGroup.getId(), this.getSUser().getLogin());
         selectedRole.setEndpointLogicalGroup(logicalGroup);
+        Executor.clearRoleCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -377,6 +441,7 @@ public class TestRolesAction extends UserAction {
         TestRolesDao.instance.updateOne(roleFilter, removeFromArr);
         TestRolesDao.instance.updateOne(roleFilter, removeNull);
         this.selectedRole = getRole();
+        Executor.clearRoleCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -385,12 +450,16 @@ public class TestRolesAction extends UserAction {
         if (role == null) {
             return ERROR.toUpperCase();
         }
+        if (!validateUrlRegex()) {
+            return ERROR.toUpperCase();
+        }
         Bson roleFilter = Filters.eq(TestRoles.NAME, roleName);
         AuthWithCond authWithCond = makeAuthWithConditionFromParamData(role);
         TestRolesDao.instance.updateOne(roleFilter,
             Updates.set(TestRoles.AUTH_WITH_COND_LIST+"."+index, authWithCond)
         );
         this.selectedRole = getRole();
+        Executor.clearRoleCache();
         return SUCCESS.toUpperCase();
     }
 
@@ -399,9 +468,13 @@ public class TestRolesAction extends UserAction {
         if (role == null) {
             return ERROR.toUpperCase();
         }
+        if (!validateUrlRegex()) {
+            return ERROR.toUpperCase();
+        }
 
         addAuthMechanism(role);
         this.selectedRole = getRole();
+        Executor.clearRoleCache();
         return SUCCESS.toUpperCase();
     }
 

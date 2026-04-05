@@ -113,7 +113,6 @@ bin/cmp
 bin/cobc
 bin/cobcrun
 bin/column
-bin/comm
 bin/command
 bin/composer
 bin/compress

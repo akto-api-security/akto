@@ -248,6 +248,13 @@
             <version>2.9.6</version>
         </dependency>
 
+        <!-- Hyperscan for high-performance regex matching -->
+        <dependency>
+            <groupId>com.gliwka.hyperscan</groupId>
+            <artifactId>hyperscan</artifactId>
+            <version>5.4.11-3.1.0</version>
+        </dependency>
+
     </dependencies>
     <build>
         <plugins>

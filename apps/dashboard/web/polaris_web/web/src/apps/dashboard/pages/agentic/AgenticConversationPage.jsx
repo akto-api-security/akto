@@ -137,6 +137,11 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                 return;
             }
 
+            // Ignore if any modifier keys are being held (keyboard shortcuts)
+            if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) {
+                return;
+            }
+
             // Ignore special keys
             const ignoredKeys = ['Escape', 'Tab', 'Enter', 'Shift', 'Control', 'Alt', 'Meta', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
             if (ignoredKeys.includes(e.key)) {
@@ -238,7 +243,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                         </Button>
                     </HorizontalStack>
                         <Box style={{ flex: 1, overflow: 'hidden', display: 'flex', justifyContent: 'center', maxWidth: '100%' }}>
-                        <Box style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', maxWidth: '500px' }}>
+                        <Box style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', maxWidth: '800px' }}>
                             <Box style={{ flex: 1, overflowY: 'auto', paddingBottom: '120px' }}>
                                 <Box paddingBlockStart="16" paddingBlockEnd="19">
                                     <VerticalStack gap="4" align="start">
@@ -289,7 +294,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                     isStreaming={isStreaming}
                     isFixed={true}
                     centerAlign={true}
-                    inputWidth="600px"
+                    inputWidth="800px"
                 />
 
                 {/* History Modal */}

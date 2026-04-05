@@ -21,6 +21,7 @@ public final class AIAgentConnectorConstants {
     public static final String CONNECTOR_TYPE_DATABRICKS = "DATABRICKS";
     public static final String CONNECTOR_TYPE_SNOWFLAKE = "SNOWFLAKE";
     public static final String CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = "VERTEX_AI_CUSTOM_DEPLOYED_MODEL";
+    public static final String CONNECTOR_TYPE_SALESFORCE = "SALESFORCE";
 
     // Binary Names
     public static final String BINARY_NAME_N8N = "n8n-shield";
@@ -73,6 +74,51 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_VERTEX_AI_BIGQUERY_DATASET = "VERTEX_AI_BIGQUERY_DATASET";
     public static final String CONFIG_VERTEX_AI_BIGQUERY_TABLE = "VERTEX_AI_BIGQUERY_TABLE";
     public static final String CONFIG_VERTEX_AI_JSON_AUTH_FILE_PATH = "VERTEX_AI_JSON_AUTH_FILE_PATH";
+
+    // Configuration Keys - Salesforce
+    public static final String CONFIG_SALESFORCE_URL = "SALESFORCE_URL";
+    public static final String CONFIG_SALESFORCE_CONSUMER_KEY = "SALESFORCE_CONSUMER_KEY";
+    public static final String CONFIG_SALESFORCE_CONSUMER_SECRET = "SALESFORCE_CONSUMER_SECRET";
+    public static final String CONFIG_INGESTION_API_KEY = "INGESTION_API_KEY";
+
+    // Salesforce API Configuration
+    public static final String SALESFORCE_API_VERSION = "v66.0";
+    public static final String SALESFORCE_OAUTH_TOKEN_ENDPOINT = "/services/oauth2/token";
+    public static final String SALESFORCE_QUERY_SQL_ENDPOINT = "/services/data/{version}/ssot/query-sql";
+    public static final String SALESFORCE_OAUTH_GRANT_TYPE = "client_credentials";
+    public static final String SALESFORCE_TABLE_NAME = "ssot__AiAgentInteractionMessage__dlm";
+    public static final String SALESFORCE_ORDER_BY = "ssot__Id__c";
+
+    // HTTP Headers & Constants
+    public static final String HEADER_AUTHORIZATION = "Authorization";
+    public static final String HEADER_CONTENT_TYPE = "Content-Type";
+    public static final String HEADER_X_API_KEY = "X-API-KEY";
+    public static final String HEADER_X_BATCH_ID = "X-Batch-ID";
+    public static final String CONTENT_TYPE_JSON = "application/json";
+    public static final String AUTH_BEARER_PREFIX = "Bearer ";
+
+    // HTTP Methods & Status
+    public static final String HTTP_METHOD_POST = "POST";
+    public static final String HTTP_METHOD_GET = "GET";
+    public static final int HTTP_STATUS_200 = 200;
+    public static final int HTTP_STATUS_401 = 401;
+    public static final int HTTP_STATUS_500 = 500;
+    public static final int HTTP_STATUS_503 = 503;
+    public static final String HTTP_VERSION = "HTTP/1.1";
+    public static final String HTTP_STATUS_OK = "OK";
+
+    // Ingestion API Configuration
+    public static final String INGESTION_API_ENDPOINT = "/api/ingestData";
+    public static final String INGESTION_BATCH_DATA_KEY = "batchData";
+    public static final int INGESTION_DEFAULT_BATCH_SIZE = 50;
+
+    // Data Transformation Constants
+    public static final String DATA_SOURCE_MIRRORING = "MIRRORING";
+    public static final String DATA_TAG_GEN_AI = "Gen AI";
+    public static final String AKTO_VXLAN_ID_DEFAULT = "0";
+    public static final String IS_PENDING_FALSE = "false";
+    public static final String IP_ADDRESS_DEFAULT = "10.0.0.1";
+    public static final String AKTO_ACCOUNT_ID_CONSTANT = "1000000";
 
     // Common Configuration Keys
     public static final String CONFIG_DATA_INGESTION_SERVICE_URL = "DATA_INGESTION_SERVICE_URL";

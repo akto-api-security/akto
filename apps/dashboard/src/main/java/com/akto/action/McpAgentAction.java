@@ -41,6 +41,13 @@ public class McpAgentAction extends UserAction {
 
     public String chatAndStoreConversation() {
         try {
+
+            String userId = getSUser().getLogin();
+            if (userId != null && userId.startsWith("akash+") && userId.endsWith("@akto.io")) {
+                addActionError("You are not allowed to use this feature");
+                return ERROR.toUpperCase();
+            }
+
             // check for conversation type
             if(conversationType == null) {
                 addActionError("Conversation type is required");
@@ -102,11 +109,33 @@ public class McpAgentAction extends UserAction {
                         // Increase timeout for large data
                         tokensLimit = 60000; // 60 seconds
                     }
+                } else if(StringUtils.isNotEmpty(type) && type.equals("test_execution_result")) {
+                    Object data = metaData.get("data");
+                    if(data != null && data instanceof Map) {
+                        Map<String, Object> dataMap = (Map<String, Object>) data;
+                        StringBuilder sb = new StringBuilder("Test Execution Result Context:\n");
+                        sb.append("Test Name: ").append(dataMap.getOrDefault("testName", "")).append("\n");
+                        sb.append("Test Category: ").append(dataMap.getOrDefault("testCategory", "")).append("\n");
+                        sb.append("Vulnerable: ").append(dataMap.getOrDefault("vulnerable", false)).append("\n");
+                        sb.append("Severity: ").append(dataMap.getOrDefault("severity", "")).append("\n");
+                        sb.append("URL: ").append(dataMap.getOrDefault("url", "")).append("\n");
+                        Object originalMsg = dataMap.get("originalMessage");
+                        if(originalMsg != null) {
+                            sb.append("Original API Request+Response: ").append(originalMsg).append("\n");
+                        }
+                        Object attemptMsg = dataMap.get("attemptMessage");
+                        if(attemptMsg != null) {
+                            sb.append("Test Attempt Request+Response: ").append(attemptMsg).append("\n");
+                        }
+                        contextString = sb.toString();
+                        tokensLimit = 40000;
+                    }
                 }
             }
 
             String userEmail = getSUser() != null ? getSUser().getLogin() : null;
-            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail);
+            String contextSource = Context.contextSource.get() != null ? Context.contextSource.get().toString() : null;
+            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail, contextSource);
             if(responseFromMcpServer != null) {
                 responseFromMcpServer.setCreatedAt(timeNow);
                 AgentConversationDao.instance.insertOne(responseFromMcpServer);

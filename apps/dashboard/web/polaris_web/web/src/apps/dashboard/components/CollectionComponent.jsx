@@ -23,7 +23,7 @@ const HTTP_METHODS = [
 ]
 
 // Auth types matching ApiInfo.AuthType enum
-const AUTH_TYPES = [
+export const AUTH_TYPES = [
     { label: 'Unauthenticated', value: 'UNAUTHENTICATED' },
     { label: 'Basic', value: 'BASIC' },
     { label: 'Authorization Header', value: 'AUTHORIZATION_HEADER' },

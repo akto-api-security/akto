@@ -8,7 +8,8 @@ import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor,
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 import ShowListInBadge from "../../components/shared/ShowListInBadge";
-import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory } from "../../../main/labelHelper";
+import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../main/labelHelper";
+import { CollectionIcon } from "../../components/shared/CollectionIcon";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -587,8 +588,15 @@ const transform = {
                 ? <Text></Text>
                 : (isLoading ? loadingComp : <Badge key={c?.id} status={this.getStatus(c.riskScore)} size="small">{c.riskScore}</Badge>);
 
+            // Create iconComp for collections if not already present
+            const showIcon = isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory() || ((isApiSecurityCategory() || isDastCategory()) && c.hostName);
+            const iconComp = c.iconComp || (showIcon ? (
+                <Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList} /></Box>
+            ) : undefined);
+
             return{
                 ...c,
+                ...(iconComp ? { iconComp } : {}),
                 id: c.id,
                 nextUrl: '/dashboard/observe/inventory/' + c.id,
                 displayName: c.displayName,
@@ -737,13 +745,15 @@ const transform = {
             }else{
                 lastTestedText = func.prettifyEpoch(url?.lastTested)
             }
+            // Check both camelCase and snake_case field names
+            const guardrailEnabled = url.agentProxyGuardrailEnabled || url.agent_proxy_guardrail_enabled || false
             return{
                 ...url,
                 last_seen: url.last_seen,
                 hostName: (hostNameMap[url.apiCollectionId] !== null ? hostNameMap[url.apiCollectionId] : this.getHostName(url.endpoint)),
                 access_type: url.access_type,
                 auth_type: url.auth_type,
-                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} isNew={this.isNewEndpoint(url.lastSeenTs)} />,
+                endpointComp: <GetPrettifyEndpoint method={url.method} url={url.endpoint} isNew={this.isNewEndpoint(url.lastSeenTs)} guardrailEnabled={guardrailEnabled} />,
                 sensitiveTagsComp: this.prettifySubtypes(url.sensitiveTags),
                 riskScoreComp: <Badge status={this.getStatus(url.riskScore)} size="small">{url?.riskScore.toString()}</Badge>,
                 isNew: this.isNewEndpoint(url.lastSeenTs),
@@ -753,6 +763,7 @@ const transform = {
                 severity: url.severityObj? Object.keys(url.severityObj):[],
                 description: url.description,
                 lastTestedComp: <Text variant="bodyMd" fontWeight={this.isNewEndpoint(url?.lastTested) ? "regular" : "semibold"} color={this.isNewEndpoint(url?.lastTested) ? "" : "subdued"}>{lastTestedText}</Text>,
+                agentProxyGuardrailEnabled: guardrailEnabled,
             }
         })
 
@@ -945,7 +956,31 @@ const transform = {
             serviceName: parts.slice(2).join('.'),   // <3> (can contain dots)
             apiCollectionName: parts.slice(1).join('.') // <2>.<3> for backward compatibility
         };
-    }
+    },
+
+
+    extractMcpComponentNameFromPath(endpoint) {
+        const path = this.normalizeEndpointToPath(endpoint);
+        if (!path) return null;
+        const segments = path.split('/').filter(Boolean);
+        if (segments.length < 3) return null;
+        const mcpMethodSegments = [['tools', 'call'], ['resources', 'read'], ['prompts', 'get']];
+        for (const [first, second] of mcpMethodSegments) {
+            const i = segments.indexOf(first);
+            if (i === -1 || segments[i + 1] !== second) continue;
+            const component = segments[i + 2];
+            return component != null && component !== '' ? component : null;
+        }
+        return null;
+    },
+
+    normalizeEndpointToPath(endpoint) {
+        if (endpoint == null || typeof endpoint !== 'string') return '';
+        const s = endpoint.trim();
+        if (!s) return '';
+        const path = func.convertToRelativePath(s) || s;
+        return path.replace(/\?.*$/, '').replace(/\/+$/, '') || '/';
+    },
 }
 
 export default transform

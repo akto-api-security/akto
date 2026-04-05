@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Button,
@@ -22,7 +22,8 @@ import JsonRecording from '../user_config/JsonRecording';
 import Dropdown from '../../../components/layouts/Dropdown';
 import TlsAuth from '../user_config/TlsAuth';
 import SampleDataAuth from '../user_config/SampleDataAuth';
-import { HARDCODED, LOGIN_REQUEST, SAMPLE_DATA, TLS_AUTH } from "./TestRoleConstants"; 
+import DigestAuth from '../user_config/DigestAuth';
+import { HARDCODED, LOGIN_REQUEST, SAMPLE_DATA, TLS_AUTH, DIGEST_AUTH } from "./TestRoleConstants"; 
 
 
 
@@ -40,17 +41,31 @@ const AuthComponent = ({
   openAuth,
   setOpenAuth,
   advancedHeaderSettingsOpen,
-  setAdvancedHeaderSettingsOpen
+  setAdvancedHeaderSettingsOpen,
+  roleName,
 }) => {
 
 
   const [currentInfo, setCurrentInfo] = useState({ steps: [], authParams: {} });
   const [headerKey, setHeaderKey] = useState("");
   const [headerValue, setHeaderValue] = useState("");
+  const [urlRegex, setUrlRegex] = useState("");
   const [automationType, setAutomationType] = useState("LOGIN_STEP_BUILDER");
   const [hardCodeAuthInfo, setHardCodeAuthInfo] = useState({ authParams: [] });
   const [sampleDataAuthInfo, setSampleDataAuthInfo] = useState({ authParams: [] });
   const [tlsAuthInfo, setTlsAuthInfo] = useState({authParams:[]})
+  const [digestAuthInfo, setDigestAuthInfo] = useState({ authParams: [] });
+
+  useEffect(() => {
+    if (showAuthComponent && editableDoc >= 0 && initialItems?.authWithCondList?.[editableDoc]) {
+      const authObj = initialItems.authWithCondList[editableDoc];
+      const headerKVPairs = authObj.headerKVPairs || {};
+      const keys = Object.keys(headerKVPairs);
+      setHeaderKey(keys.length > 0 ? keys[0] : "");
+      setHeaderValue(keys.length > 0 ? headerKVPairs[keys[0]] : "");
+      setUrlRegex(authObj.urlRegex && String(authObj.urlRegex).trim() ? authObj.urlRegex : "");
+    }
+  }, [showAuthComponent, editableDoc, initialItems?.authWithCondList]);
 
   const automationOptions = [
     { label: "Login Step Builder", value: "LOGIN_STEP_BUILDER" },
@@ -90,20 +105,30 @@ const AuthComponent = ({
     }));
   };
 
-  const handleCancel = () => {
+  const setDigestInfo = (obj) => {
+    setDigestAuthInfo((prev) => ({
+      ...prev,
+      authParams: obj.authParams,
+    }));
+  };
 
+  const handleCancel = () => {
     setShowAuthComponent(false);
     setCurrentInfo({});
     setHeaderKey("");
     setHeaderValue("");
+    setUrlRegex("");
     setHardCodeAuthInfo({ authParams: [] });
     setSampleDataAuthInfo ({authParams: []});
     setAuthMechanism(null);
     setHardcodedOpen(true);
     setEditableDocs(-1);
     setTlsAuthInfo({authParams:[]})
+    setDigestAuthInfo({authParams:[]})
     setOpenAuth(HARDCODED)
   };
+
+  const urlRegexToSend = urlRegex != null && String(urlRegex).trim() !== "" ? String(urlRegex).trim() : null;
 
   function checkOpenAuth(type) {
       return openAuth === type;
@@ -119,6 +144,7 @@ const AuthComponent = ({
         resp = await api.updateAuthInRole(
           initialItems.name,
           apiCond,
+          urlRegexToSend,
           editableDoc,
           authParamData,
           currentAutomationType
@@ -127,6 +153,7 @@ const AuthComponent = ({
         resp = await api.addAuthToRole(
           initialItems.name,
           apiCond,
+          urlRegexToSend,
           authParamData,
           currentAutomationType,
           null
@@ -150,6 +177,7 @@ const AuthComponent = ({
           resp = await api.updateAuthInRole(
             initialItems.name,
             apiCond,
+            urlRegexToSend,
             editableDoc,
             currentInfo.authParams,
             currentAutomationType,
@@ -160,6 +188,7 @@ const AuthComponent = ({
           resp = await api.addAuthToRole(
             initialItems.name,
             apiCond,
+            urlRegexToSend,
             currentInfo.authParams,
             currentAutomationType,
             currentInfo.steps,
@@ -173,9 +202,9 @@ const AuthComponent = ({
         const currentAutomationType = TLS_AUTH;
         const authParamData = tlsAuthInfo.authParams
         if(editableDoc > -1){
-            resp = await api.updateAuthInRole(initialItems.name, apiCond, editableDoc, authParamData, currentAutomationType)
+            resp = await api.updateAuthInRole(initialItems.name, apiCond, urlRegexToSend, editableDoc, authParamData, currentAutomationType)
         }else{
-            resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, currentAutomationType, null)
+            resp = await api.addAuthToRole(initialItems.name, apiCond, urlRegexToSend, authParamData, currentAutomationType, null)
         }
     } else if (openAuth == SAMPLE_DATA) {
         const currentAutomationType = SAMPLE_DATA;
@@ -184,6 +213,7 @@ const AuthComponent = ({
           resp = await api.updateAuthInRole(
             initialItems.name,
             apiCond,
+            urlRegexToSend,
             editableDoc,
             authParamData,
             currentAutomationType
@@ -192,12 +222,34 @@ const AuthComponent = ({
           resp = await api.addAuthToRole(
             initialItems.name,
             apiCond,
+            urlRegexToSend,
             authParamData,
             currentAutomationType,
             null
           );
         }
-
+    } else if (openAuth === DIGEST_AUTH) {
+        const currentAutomationType = DIGEST_AUTH;
+        const authParamData = digestAuthInfo.authParams;
+        if (editableDoc > -1) {
+          resp = await api.updateAuthInRole(
+            initialItems.name,
+            apiCond,
+            urlRegexToSend,
+            editableDoc,
+            authParamData,
+            currentAutomationType
+          );
+        } else {
+          resp = await api.addAuthToRole(
+            initialItems.name,
+            apiCond,
+            urlRegexToSend,
+            authParamData,
+            currentAutomationType,
+            null
+          );
+        }
     }
     handleCancel();
     await saveAction(true, resp.selectedRole.authWithCondList);
@@ -310,6 +362,7 @@ const AuthComponent = ({
                 extractInformation={true}
                 showOnlyApi={true}
                 setStoreData={handleLoginInfo}
+                roleName={roleName}
               />
             )}
           </Collapsible>
@@ -333,8 +386,28 @@ const AuthComponent = ({
               <TlsAuth setInformation={setTlsInfo}/>
           </Collapsible>
       </LegacyStack>
+
+      <LegacyStack vertical>
+          <Button
+            id={"digest-auth-expand-button"}
+            onClick={() => setOpenAuth(DIGEST_AUTH)}
+            ariaExpanded={checkOpenAuth(DIGEST_AUTH)}
+            icon={checkOpenAuth(DIGEST_AUTH) ? ChevronDownMinor : ChevronRightMinor}
+            ariaControls="digest-auth"
+          >
+            Digest Authentication
+          </Button>
+          <Collapsible
+            open={checkOpenAuth(DIGEST_AUTH)}
+            id="digest-auth"
+            transition={{ duration: "500ms", timingFunction: "ease-in-out" }}
+            expandOnPrint
+          >
+            <DigestAuth setInformation={setDigestInfo}/>
+          </Collapsible>
+      </LegacyStack>
       </LegacyCard.Section>
-      <LegacyCard.Section title="More settings">
+      <LegacyCard.Section>
         <VerticalStack gap={"2"}>
           <Box>
             <Button
@@ -350,17 +423,59 @@ const AuthComponent = ({
             open={advancedHeaderSettingsOpen}
             transition={{ duration: "300ms", timingFunction: "ease-in-out" }}
           >
-            <VerticalStack gap={"2"}>
-              <Text variant="headingMd">Api header conditions</Text>
-              <FormLayout>
-                <FormLayout.Group>
+            <VerticalStack gap={"4"}>
+              <VerticalStack gap={"2"}>
+                <Text variant="headingMd">API header conditions</Text>
+                <FormLayout>
+                  <FormLayout.Group>
+                    <TextField
+                      id={"auth-header-key-field"}
+                      label={
+                        <HorizontalStack gap="2">
+                          <Text>Header key</Text>
+                          <Tooltip
+                            content="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization"
+                            dismissOnMouseOut
+                            width="wide"
+                            preferredPosition="below"
+                          >
+                            <Icon source={InfoMinor} color="base" />
+                          </Tooltip>
+                        </HorizontalStack>
+                      }
+                      value={headerKey}
+                      onChange={setHeaderKey}
+                    />
+                    <TextField
+                      id={"auth-header-value-field"}
+                      label={
+                        <HorizontalStack gap="2">
+                          <Text>Header value</Text>
+                          <Tooltip
+                            content="Please enter the value of the auth token."
+                            dismissOnMouseOut
+                            width="wide"
+                            preferredPosition="below"
+                          >
+                            <Icon source={InfoMinor} color="base" />
+                          </Tooltip>
+                        </HorizontalStack>
+                      }
+                      value={headerValue}
+                      onChange={setHeaderValue}
+                    />
+                  </FormLayout.Group>
+                </FormLayout>
+              </VerticalStack>
+              <VerticalStack gap={"2"}>
+                <Box width="100%">
                   <TextField
-                    id={"auth-header-key-field"}
+                    id={"auth-url-regex-field"}
                     label={
                       <HorizontalStack gap="2">
-                        <Text>Header key</Text>
+                        <Text>URL path regex</Text>
                         <Tooltip
-                          content="Please enter name of the header which contains your auth token. This field is case-sensitive. eg Authorization"
+                          content="Request URL path must match this regex. Leave empty to skip path matching."
                           dismissOnMouseOut
                           width="wide"
                           preferredPosition="below"
@@ -369,29 +484,13 @@ const AuthComponent = ({
                         </Tooltip>
                       </HorizontalStack>
                     }
-                    value={headerKey}
-                    onChange={setHeaderKey}
+                    value={urlRegex}
+                    onChange={setUrlRegex}
+                    placeholder="e.g. ^/api/v1/.*"
+                    autoComplete="off"
                   />
-                  <TextField
-                    id={"auth-header-value-field"}
-                    label={
-                      <HorizontalStack gap="2">
-                        <Text>Header value</Text>
-                        <Tooltip
-                          content="Please enter the value of the auth token."
-                          dismissOnMouseOut
-                          width="wide"
-                          preferredPosition="below"
-                        >
-                          <Icon source={InfoMinor} color="base" />
-                        </Tooltip>
-                      </HorizontalStack>
-                    }
-                    value={headerValue}
-                    onChange={setHeaderValue}
-                  />
-                </FormLayout.Group>
-              </FormLayout>
+                </Box>
+              </VerticalStack>
             </VerticalStack>
           </Collapsible>
         </VerticalStack>

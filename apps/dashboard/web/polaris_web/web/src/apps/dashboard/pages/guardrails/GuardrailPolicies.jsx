@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { EmptySearchResult, VerticalStack, Button, Badge, Text } from '@shopify/polaris';
+import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
 import CreateGuardrailModal from "./components/CreateGuardrailModal";
+import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
@@ -9,6 +10,7 @@ import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import api from "./api";
+import { transformPolicyForBackend, SEVERITY } from "./utils";
 
 const resourceName = {
   singular: "policy",
@@ -112,6 +114,16 @@ const sortOptions = [
   },
 ];
 
+const isSystemPolicy = (row) => (row.createdBy || "").toLowerCase().includes("system");
+
+const sortPinnedSystemPolicies = (systemRows) =>
+  [...systemRows].sort((a, b) => {
+    if (a.status !== b.status) return a.status === "Active" ? -1 : 1;
+    const tsA = a.originalData?.updatedTimestamp ?? a.originalData?.createdTimestamp ?? 0;
+    const tsB = b.originalData?.updatedTimestamp ?? b.originalData?.createdTimestamp ?? 0;
+    return tsB - tsA;
+  });
+
 function GuardrailPolicies() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [policyData, setPolicyData] = useState([]);
@@ -129,25 +141,24 @@ function GuardrailPolicies() {
         try {
             const response = await api.fetchGuardrailPolicies();
             if (response && response.guardrailPolicies) {
-                const formattedPolicies = response.guardrailPolicies
-                    .sort((a, b) => {
-                        // First sort by active status (active first)
-                        if (a.active !== b.active) {
-                            return b.active - a.active;
-                        }
-                        // Then by timestamp (latest first)
-                        return (b.updatedTimestamp || b.createdTimestamp) - (a.updatedTimestamp || a.createdTimestamp);
-                    })
-                    .map(policy => ({
+                const showSystemTag = func.isDemoAccount();
+                let formattedPolicies = response.guardrailPolicies.map(policy => ({
                         id: policy.hexId,
-                        policy: policy.name,
+                        policy: showSystemTag && (policy.createdBy || "").toLowerCase().includes("system")
+                            ? (
+                                <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                                    <Tag>Default</Tag>
+                                    <Text as="span" style={{ fontWeight: "medium" }}>{policy.name}</Text>
+                                </HorizontalStack>
+                            )
+                            : policy.name,
                         category: determineCategoryFromPolicy(policy),
                         status: policy.active ? "Active" : "Inactive",
                         statusWithSummary: generateStatusWithSummary(policy),
-                        severity: policy.severity,
+                        severity: policy.severity || SEVERITY.MEDIUM.value,
                         severityComp: (
-                            <div className={`badge-wrapper-${policy.severity.toUpperCase()}`}>
-                                <Badge size="small">{policy.severity.toUpperCase()}</Badge>
+                            <div className={`badge-wrapper-${(policy.severity || SEVERITY.MEDIUM.value).toUpperCase()}`}>
+                                <Badge size="small">{(policy.severity || SEVERITY.MEDIUM.value).toUpperCase()}</Badge>
                             </div>
                         ),
                         createdTs: func.prettifyEpoch(policy.createdTimestamp),
@@ -156,6 +167,13 @@ function GuardrailPolicies() {
                         updatedBy: policy.updatedBy || "-",
                         originalData: policy
                     }));
+                if (!func.isDemoAccount()) {
+                    formattedPolicies = formattedPolicies.sort((a, b) => {
+                        if (a.status !== b.status) return a.status === "Active" ? -1 : 1;
+                        return (b.originalData?.updatedTimestamp ?? b.originalData?.createdTimestamp ?? 0) -
+                            (a.originalData?.updatedTimestamp ?? a.originalData?.createdTimestamp ?? 0);
+                    });
+                }
                 setPolicyData(formattedPolicies);
             }
         } catch (error) {
@@ -164,6 +182,22 @@ function GuardrailPolicies() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const modifyData = (filters, dataSortKey, sortOrder) => {
+        const systemRows = policyData.filter(isSystemPolicy);
+        const customRows = policyData.filter((row) => !isSystemPolicy(row));
+        const pinned = sortPinnedSystemPolicies(systemRows);
+        const custom =
+            dataSortKey && customRows.length > 0
+                ? func.sortFunc([...customRows], dataSortKey, sortOrder, false)
+                : [...customRows].sort((a, b) => {
+                        if (a.status !== b.status) return a.status === "Active" ? -1 : 1;
+                        const tsA = a.originalData?.updatedTimestamp ?? a.originalData?.createdTimestamp ?? 0;
+                        const tsB = b.originalData?.updatedTimestamp ?? b.originalData?.createdTimestamp ?? 0;
+                        return tsB - tsA;
+                    });
+        return [...pinned, ...custom];
     };
 
     const determineCategoryFromPolicy = (policy) => {
@@ -420,31 +454,27 @@ function GuardrailPolicies() {
         try {
             setLoading(true);
 
-            // Determine severity based on configuration
-            let severity = "Low";
-            if (guardrailData.contentFilters?.harmfulCategories || guardrailData.contentFilters?.promptAttacks || guardrailData.contentFilters?.code) {
-                severity = "High";
-            } else if (guardrailData.deniedTopics?.length > 0 || guardrailData.piiFilters?.length > 0) {
-                severity = "Medium";
-            }
-
             // Prepare GuardrailPolicies object for backend
+            // Transform field names using shared utility (same as playground)
+            guardrailData = transformPolicyForBackend(guardrailData);
+            
             const guardrailPolicyObject = {
                 name: guardrailData.name,
                 description: guardrailData.description || '',
                 blockedMessage: guardrailData.blockedMessage || '',
-                severity: severity.toUpperCase(),
+                severity: guardrailData.severity || SEVERITY.MEDIUM.value,
                 selectedMcpServers: guardrailData.selectedMcpServers || [],
                 selectedAgentServers: guardrailData.selectedAgentServers || [],
                 // Add V2 fields for enhanced server data
                 selectedMcpServersV2: guardrailData.selectedMcpServersV2 || [],
                 selectedAgentServersV2: guardrailData.selectedAgentServersV2 || [],
                 deniedTopics: guardrailData.deniedTopics || [],
-                piiTypes: guardrailData.piiFilters || [],
                 regexPatterns: guardrailData.regexPatterns || [],
                 // Add V2 field for enhanced regex data
                 regexPatternsV2: guardrailData.regexPatternsV2 || [],
-                contentFiltering: guardrailData.contentFilters || {},
+                // Use transformed field names from shared utility
+                piiTypes: guardrailData.piiTypes,
+                contentFiltering: guardrailData.contentFiltering,
                 // Add LLM policy if present
                 ...(guardrailData.llmRule ? { llmRule: guardrailData.llmRule } : {}),
                 // Add Base Prompt Rule if present
@@ -509,7 +539,23 @@ function GuardrailPolicies() {
     };
 
 
-      const components = [
+    // If showing create/edit page, render the full page component
+    if (showCreateModal) {
+        return (
+            <CreateGuardrailPage
+                onClose={() => {
+                    setShowCreateModal(false);
+                    setEditingPolicy(null);
+                    setIsEditMode(false);
+                }}
+                onSave={handleCreateGuardrail}
+                editingPolicy={editingPolicy}
+                isEditMode={isEditMode}
+            />
+        );
+    }
+
+    const components = [
         <GithubSimpleTable
             key={`policies-table-${policyData.length}`}
             resourceName={resourceName}
@@ -530,19 +576,7 @@ function GuardrailPolicies() {
             loading={loading}
             selectable={true}
             promotedBulkActions={promotedBulkActions}
-
-        />,   
-        <CreateGuardrailModal
-            key={2}
-            isOpen={showCreateModal}
-            onClose={() => {
-                setShowCreateModal(false);
-                setEditingPolicy(null);
-                setIsEditMode(false);
-            }}
-            onSave={handleCreateGuardrail}
-            editingPolicy={editingPolicy}
-            isEditMode={isEditMode}
+            {...(func.isDemoAccount() && { customFilters: true, modifyData })}
         />
     ];
 

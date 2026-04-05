@@ -388,7 +388,7 @@ const tableFunc = {
     return value;
   },
 
-  getFiltersMapFromUrl(searchString, labelFunc, handleRemoveAppliedFilter, pageKey){
+  getFiltersMapFromUrl(searchString, labelFunc, handleRemoveAppliedFilter, pageKey, skipPersist = false){
     const result = [];
     if(searchString.length === 0){
       return []
@@ -424,6 +424,10 @@ const tableFunc = {
         onRemove: handleRemoveAppliedFilter
       });
     });
+
+    if (skipPersist) {
+      return result
+    }
 
     const currentFilters = PersistStore.getState().filtersMap
     const setPageFilters = PersistStore.getState().setFiltersMap

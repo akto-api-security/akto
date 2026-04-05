@@ -41,7 +41,13 @@ public class UsageInterceptor extends AbstractInterceptor {
             }
 
             Map<String, Object> session = invocation.getInvocationContext().getSession();
-            int sessionAccId = (Integer) session.get(UserDetailsFilter.ACCOUNT_ID);
+            Object accountIdObj = session.get(UserDetailsFilter.ACCOUNT_ID);
+            if (accountIdObj == null) {
+                throw new Exception("Account id not found in session");
+            }
+            int sessionAccId = accountIdObj instanceof Integer
+                    ? (Integer) accountIdObj
+                    : Integer.parseInt(String.valueOf(accountIdObj));
 
             Organization organization = OrganizationsDao.instance.findOne(
                     Filters.in(Organization.ACCOUNTS, sessionAccId));

@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.net.ssl.X509TrustManager;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,9 @@ public class HTTPClientHandler {
     private final OkHttpClient clientWithoutFollowRedirect;
     private final OkHttpClient http2ClientWithoutFollowRedirect;
     private final OkHttpClient http2ClientWithFollowRedirect;
+    // gRPC over HTTPS: HTTP/2 + HTTP/1.1 (ALPN)
+    private final OkHttpClient http2httpsClientWithoutFollowRedirect;
+    private final OkHttpClient http2httpsClientWithFollowRedirect;
     private final OkHttpClient clientWithFollowRedirect;
 
     private static OkHttpClient.Builder builder(boolean followRedirects, int readTimeout) {
@@ -37,18 +41,26 @@ public class HTTPClientHandler {
         if(isSaas) readTimeout = 60;
 
         clientWithoutFollowRedirect = builder(false, readTimeout).build();
+        clientWithFollowRedirect = builder(true, readTimeout).build();
+        // gRPC over HTTP/2 cleartext (--plaintext)
         http2ClientWithoutFollowRedirect = builder(false, readTimeout).protocols(Collections.singletonList(Protocol.H2_PRIOR_KNOWLEDGE)).build();
         http2ClientWithFollowRedirect = builder(false, readTimeout).protocols(Collections.singletonList(Protocol.H2_PRIOR_KNOWLEDGE)).build();
-        clientWithFollowRedirect = builder(true, readTimeout).build();
+        // gRPC over HTTPS (--https): HTTP/2, HTTP/1.1 via ALPN
+        http2httpsClientWithoutFollowRedirect = builder(false, readTimeout).protocols(Arrays.asList(Protocol.HTTP_2, Protocol.HTTP_1_1)).build();
+        http2httpsClientWithFollowRedirect = builder(true, readTimeout).protocols(Arrays.asList(Protocol.HTTP_2, Protocol.HTTP_1_1)).build();
     }
 
-    public OkHttpClient getNewDebugClient(boolean isSaas, boolean followRedirects, List<TestingRunResult.TestLog> testLogs, String contentType) {
+    public OkHttpClient getNewDebugClient(boolean isSaas, boolean followRedirects, List<TestingRunResult.TestLog> testLogs, String contentType, boolean isHttps) {
         if(isSaas) readTimeout = 60;
         OkHttpClient.Builder builder = builder(followRedirects, readTimeout)
                 .addInterceptor(new NormalResponseInterceptor(testLogs))
                 .addNetworkInterceptor(new NetworkResponseInterceptor(testLogs));
         if (contentType != null && contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
-            builder.protocols(Collections.singletonList(Protocol.H2_PRIOR_KNOWLEDGE));
+            if (isHttps) {
+                builder.protocols(Arrays.asList(Protocol.HTTP_2, Protocol.HTTP_1_1));
+            } else {
+                builder.protocols(Collections.singletonList(Protocol.H2_PRIOR_KNOWLEDGE));
+            }
         }
         return builder.build();
     }
@@ -141,12 +153,18 @@ public class HTTPClientHandler {
         }
     }
 
-    public OkHttpClient getHTTPClient (boolean followRedirect, String contentType) {
+    /** Same paradigm as PR #2435: isHttps first for gRPC over HTTPS. */
+    public OkHttpClient getHTTPClient(boolean isHttps, boolean followRedirect, String contentType) {
         if (contentType != null && contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
             if (followRedirect) {
+                if (isHttps) {
+                    return http2httpsClientWithFollowRedirect;
+                }
                 return http2ClientWithFollowRedirect;
             }
-            return http2ClientWithoutFollowRedirect;
+            if (isHttps) {
+                return http2httpsClientWithoutFollowRedirect;
+            }            return http2ClientWithoutFollowRedirect;
         }
         if (followRedirect) {
             return clientWithFollowRedirect;

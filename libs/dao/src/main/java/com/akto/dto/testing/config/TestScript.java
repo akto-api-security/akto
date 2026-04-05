@@ -16,6 +16,7 @@ public class TestScript {
     @BsonId
     private String id;
 
+    public static final String TYPE = "type";
     public static final String JAVASCRIPT = "javascript";
     private String javascript;
     

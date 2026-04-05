@@ -104,7 +104,7 @@ public class ModuleInfoWorker {
             moduleInfo.setLastHeartbeatReceived(Context.now());
             assert _this.dataActor != null;
             _this.dataActor.updateModuleInfo(moduleInfo);
-            loggerMaker.info("Sending heartbeat at :" + moduleInfo.getLastHeartbeatReceived() + " for module:" + moduleInfo.getModuleType().name());
+            loggerMaker.debug("Sending heartbeat at :" + moduleInfo.getLastHeartbeatReceived() + " for module:" + moduleInfo.getModuleType().name());
         }, 0, 60, TimeUnit.SECONDS);
     }
 

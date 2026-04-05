@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { VerticalStack, Text, FormLayout, TextField, RangeSlider, Box, Checkbox } from "@shopify/polaris";
+import OwaspTag from "../OwaspTag";
 
 // URL validation function
 const validateUrl = (url) => {
@@ -63,10 +64,10 @@ const CustomGuardrailsStep = ({
 
     return (
         <VerticalStack gap="4">
-            <Text variant="headingMd">Custom Guardrails</Text>
             <Text variant="bodyMd" tone="subdued">
                 Create custom guardrails using LLM prompts or external model endpoints.
             </Text>
+            <OwaspTag stepNumber={6} />
 
             <VerticalStack gap="4">
                 {/* LLM Prompt Based Rule */}

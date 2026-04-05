@@ -63,6 +63,7 @@ import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import okhttp3.*;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.bson.Document;
@@ -101,6 +102,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private String origReq;
     private String testReq;
     private String issueId;
+    private boolean agenticResult;
 
     private String dashboardUrl;
 
@@ -738,7 +740,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
         if(jiraIntegration != null){
-            jiraIntegration.setApiToken("****************************");
+            jiraIntegration.setApiToken(Constants.ASTERISK);
             // Also set jiraType for frontend
             if (jiraIntegration.getJiraType() == null) {
                 jiraIntegration.setJiraType(JiraIntegration.JiraType.CLOUD); // Default
@@ -878,7 +880,21 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             jiraType = jiraIntegration.getJiraType();
             
             String url = jiraIntegration.getBaseUrl() + getCreateIssueEndpoint() + "/" + issueId + ATTACH_FILE_ENDPOINT;
-            File tmpOutputFile = createRequestFile(origReq, testReq);
+            File tmpOutputFile;
+            if (agenticResult) {
+                if (origReq == null || origReq.isEmpty()) {
+                    return Action.SUCCESS.toUpperCase();
+                }
+                try {
+                    tmpOutputFile = File.createTempFile("agentic_conversation", ".txt");
+                    FileUtils.writeStringToFile(tmpOutputFile, origReq, (String) null);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error creating agentic conversation file", LogDb.DASHBOARD);
+                    return Action.SUCCESS.toUpperCase();
+                }
+            } else {
+                tmpOutputFile = createRequestFile(origReq, testReq);
+            }
             if(tmpOutputFile == null) {
                 return Action.SUCCESS.toUpperCase();
             }
@@ -1351,6 +1367,14 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     public void setIssueId(String issueId) {
         this.issueId = issueId;
+    }
+
+    public boolean isAgenticResult() {
+        return agenticResult;
+    }
+
+    public void setAgenticResult(boolean agenticResult) {
+        this.agenticResult = agenticResult;
     }
 
     public Map<String, List<BasicDBObject>> getProjectAndIssueMap() {

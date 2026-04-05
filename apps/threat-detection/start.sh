@@ -33,9 +33,14 @@ fi
 MEM_LIMIT_MB=$((MEM_LIMIT_BYTES / 1024 / 1024))
 echo "Detected container memory limit: ${MEM_LIMIT_MB} MB" | tee -a "$LOG_FILE"
 
-# 4. Calculate 80% of that limit for Xmx
-XMX_MEM=$((MEM_LIMIT_MB * 80 / 100))
-echo "Calculated -Xmx value: ${XMX_MEM} MB" | tee -a "$LOG_FILE"
+# 4. Calculate 80% of that limit for Xmx, or use OVERWRITE_XMX if set
+if [ -n "$OVERWRITE_XMX" ]; then
+    XMX_MEM="$OVERWRITE_XMX"
+    echo "Using OVERWRITE_XMX: ${XMX_MEM} MB" | tee -a "$LOG_FILE"
+else
+    XMX_MEM=$((MEM_LIMIT_MB * 80 / 100))
+    echo "Calculated -Xmx value: ${XMX_MEM} MB" | tee -a "$LOG_FILE"
+fi
 
 # Function to rotate the log file
 rotate_log() {

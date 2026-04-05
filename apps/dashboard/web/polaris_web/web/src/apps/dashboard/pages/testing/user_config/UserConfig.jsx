@@ -1,8 +1,7 @@
-import { TextField, Button, Collapsible, Divider, LegacyCard, LegacyStack, Text, Box } from "@shopify/polaris"
+import { Button, Collapsible, Divider, LegacyCard, LegacyStack, Text, Box } from "@shopify/polaris"
 import { ChevronRightMinor, ChevronDownMinor } from '@shopify/polaris-icons';
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import api from "../api"
-import { useEffect } from "react";
 import HardCoded from "./HardCoded";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
 import TestingStore from "../testingStore";
@@ -24,15 +23,24 @@ function UserConfig() {
     const [isLoading, setIsLoading] = useState(true)
     const [hardcodedOpen, setHardcodedOpen] = useState(true);
     const [initialLimit, setInitialLimit] = useState(0);
-    const [preRequestScript, setPreRequestScript] = useState({javascript: ""});
+    const [preRequestScript, setPreRequestScript] = useState({ javascript: "" });
+    const [preRequestScriptInitial, setPreRequestScriptInitial] = useState({ message: "" });
+    const preRequestScriptContentRef = useRef("");
+    const [postRequestScript, setPostRequestScript] = useState({ javascript: "" });
+    const [postRequestScriptInitial, setPostRequestScriptInitial] = useState({ message: "" });
+    const postRequestScriptContentRef = useRef("");
     const [commonTestTemplate, setCommonTestTemplate] = useState({message: ""});
     const [commonTestTemplate2, setCommonTestTemplate2] = useState("");
     const [initialDeltaTime, setInitialDeltaTime] = useState(120) ;
 
     const handleToggleHardcodedOpen = () => setHardcodedOpen((prev) => !prev)
 
-    const handlePreRequestScriptChange = (value) => { 
-        setPreRequestScript({...preRequestScript, javascript: value})
+    const handlePreRequestScriptChange = (value) => {
+        preRequestScriptContentRef.current = value
+    }
+
+    const handlePostRequestScriptChange = (value) => {
+        postRequestScriptContentRef.current = value
     }
 
     async function fetchAuthMechanismData() {
@@ -54,9 +62,20 @@ function UserConfig() {
             })
         }
         try {
-            await api.fetchScript().then((resp)=> {
-                if (resp && resp.testScript) { 
+            await api.fetchScript('PRE_REQUEST').then((resp)=> {
+                if (resp && resp.testScript) {
+                    const js = resp.testScript.javascript ?? ""
                     setPreRequestScript(resp.testScript)
+                    setPreRequestScriptInitial({ message: js })
+                    preRequestScriptContentRef.current = js
+                }
+            });
+            await api.fetchScript('POST_REQUEST').then((resp)=> {
+                if (resp && resp.testScript) {
+                    const js = resp.testScript.javascript ?? ""
+                    setPostRequestScript(resp.testScript)
+                    setPostRequestScriptInitial({ message: js })
+                    postRequestScriptContentRef.current = js
                 }
             });
         } catch(e){
@@ -77,13 +96,25 @@ function UserConfig() {
         fetchCommonTestTemplate()
     }, [])
 
-    async function addOrUpdateScript() {
+    async function addOrUpdatePreRequestScript() {
+        const currentJavascript = preRequestScriptContentRef.current
         if (preRequestScript.id) {
-            api.updateScript(preRequestScript.id, preRequestScript.javascript)
+            api.updateScript(preRequestScript.id, currentJavascript)
             func.setToast(true, false, "Pre-request script updated")
         } else {
-            api.addScript(preRequestScript)
+            api.addScript({ javascript: currentJavascript, scriptType: 'PRE_REQUEST' })
             func.setToast(true, false, "Pre-request script added")
+        }
+    }
+
+    async function addOrUpdatePostRequestScript() {
+        const currentJavascript = postRequestScriptContentRef.current
+        if (postRequestScript.id) {
+            api.updateScript(postRequestScript.id, currentJavascript)
+            func.setToast(true, false, "Post-request script updated")
+        } else {
+            api.addScript({ javascript: currentJavascript, scriptType: 'POST_REQUEST' })
+            func.setToast(true, false, "Post-request script added")
         }
     }
 
@@ -214,28 +245,41 @@ function UserConfig() {
 
     const preRequestScriptComponent = (
         <LegacyCard sectioned title="Configure Pre-request script" key="preRequestScript"  primaryFooterAction={
-            
-                { 
-                    content: "Save", destructive: false, onAction: () => {addOrUpdateScript()}
+                {
+                    content: "Save", destructive: false, onAction: () => { addOrUpdatePreRequestScript() }
                 }
-            
         }>
             <Divider />
             <LegacyCard.Section>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "10px", alignItems: "center" }}>
-                    <TextField
-                        placeholder="Enter pre-request javascript here..."
-                        value={preRequestScript?.javascript || ""}
-                        onChange={handlePreRequestScriptChange}
-                        multiline={10}
-                        monospaced
-                        autoComplete="off"
-                    />
-
-                </div>
+                <SampleData
+                    data={preRequestScriptInitial}
+                    editorLanguage="javascript"
+                    minHeight="500px"
+                    readOnly={false}
+                    getEditorData={handlePreRequestScriptChange}
+                    wordWrap={false}
+                />
             </LegacyCard.Section>
+        </LegacyCard>
+    )
 
-            
+    const postRequestScriptComponent = (
+        <LegacyCard sectioned title="Configure Post-request script" key="postRequestScript" primaryFooterAction={
+                {
+                    content: "Save", destructive: false, onAction: () => { addOrUpdatePostRequestScript() }
+                }
+        }>
+            <Divider />
+            <LegacyCard.Section>
+                <SampleData
+                    data={postRequestScriptInitial}
+                    editorLanguage="javascript"
+                    minHeight="500px"
+                    readOnly={false}
+                    getEditorData={handlePostRequestScriptChange}
+                    wordWrap={false}
+                />
+            </LegacyCard.Section>
         </LegacyCard>
     )
 
@@ -265,6 +309,7 @@ function UserConfig() {
 
     if (func.checkForFeatureSaas("TEST_PRE_SCRIPT")) {
         components.push(preRequestScriptComponent)
+        components.push(postRequestScriptComponent)
     }
 
     return (

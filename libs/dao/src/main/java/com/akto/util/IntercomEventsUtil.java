@@ -111,8 +111,8 @@ public class IntercomEventsUtil {
             }
 
             // 2. unauthenticated apis
-            List<AuthType> authTypes = apiInfo.getActualAuthType();
-            if(authTypes != null && !authTypes.isEmpty() && authTypes.contains(AuthType.UNAUTHENTICATED)){
+            List<String> authTypes = apiInfo.getActualAuthType();
+            if(authTypes != null && !authTypes.isEmpty() && authTypes.contains(ApiInfo.AuthType.UNAUTHENTICATED)){
                 insertEventsIntoPostureMap(localPostureMap, "unauthenticatedAPIs", currentExampleList);
             }
 

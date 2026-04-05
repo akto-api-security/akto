@@ -32,6 +32,8 @@ import About from "../dashboard/pages/settings/about/About";
 import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TrafficCollectorsMetrics from "../dashboard/pages/settings/metrics/TrafficCollectorsMetrics";
+import ThreatDetectionMetrics from "../dashboard/pages/settings/metrics/ThreatDetectionMetrics";
+import MiniRuntimeMetrics from "../dashboard/pages/settings/metrics/MiniRuntimeMetrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import PromptHardening from "../dashboard/pages/prompt_hardening/PromptHardening";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
@@ -81,6 +83,7 @@ import ThreatReport from "../dashboard/pages/threat_detection/threat_report/Thre
 import {PollingProvider} from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
+import ProxyPatterns from "../dashboard/pages/settings/proxy_patterns/ProxyPatterns";
 import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
 import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 
@@ -95,6 +98,7 @@ import ConfigureIgnoredEventsPage from "../dashboard/pages/threat_detection/Conf
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
+import Datadog from "../dashboard/pages/settings/integrations/Datadog";
 import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
@@ -106,11 +110,12 @@ import Wiz from "@/apps/dashboard/pages/settings/integrations/Wiz.jsx";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
+import BrowserExtensionSettings from "../dashboard/pages/settings/browser_extension/BrowserExtensionSettings";
 import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhookCore";
 import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 import AuditData from "../dashboard/pages/observe/AuditData";
-import EndpointShieldMetadata from "../dashboard/pages/observe/EndpointShieldMetadata";
+import EndpointShieldMetadata from "../dashboard/pages/observe/atlas/EndpointShieldMetadata";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
@@ -121,7 +126,7 @@ import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastP
 import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
-import EndpointDashboard from "../dashboard/pages/dashboard/EndpointDashboard.jsx";
+import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -144,7 +149,7 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "endpoint-dashboard",
-                        element: <EndpointDashboard/>,
+                        element: <EndpointPosture/>,
                     },
                     {
                         path: "view",
@@ -389,6 +394,14 @@ const router = createBrowserRouter([
                         element: <TrafficCollectorsMetrics/>,
                     },
                     {
+                        path: "threat-detection-metrics",
+                        element: <ThreatDetectionMetrics/>,
+                    },
+                    {
+                        path: "mini-runtime-metrics",
+                        element: <MiniRuntimeMetrics/>,
+                    },
+                    {
                         path: "integrations/burp",
                         element: <BurpSuite/>,
                     },
@@ -403,6 +416,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/splunk",
                         element: <Splunk/>,
+                    },
+                    {
+                        path: "integrations/datadog",
+                        element: <Datadog/>,
                     },
                     {
                         path: "integrations/f5_waf",
@@ -537,6 +554,10 @@ const router = createBrowserRouter([
                         element: <AdvancedTrafficFilters/>
                     },
                     {
+                        path: 'proxy-patterns',
+                        element: <ProxyPatterns/>
+                    },
+                    {
                         path: "auth-types/details",
                         element: <AuthTypeDetails/>
                     },
@@ -559,6 +580,10 @@ const router = createBrowserRouter([
                     {
                         path: 'undo-demerge-apis',
                         element: <UndoDemergedApis/>
+                    },
+                    {
+                        path: 'browser-extension',
+                        element: <BrowserExtensionSettings/>
                     }
                 ]
             },

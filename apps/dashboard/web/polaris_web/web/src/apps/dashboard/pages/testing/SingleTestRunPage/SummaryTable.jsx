@@ -30,6 +30,10 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
             title: `Total ${mapLabel('APIs Tested', getDashboardCategory())}`,
             value: 'totalApis',
         },
+        {
+            title: 'External API Tokens',
+            value: 'totalExternalApiTokens',
+        },
     ], []);
 
     // Ensure all headings have unique id properties to avoid duplicate key warnings

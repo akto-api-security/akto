@@ -13,6 +13,7 @@ import com.akto.dto.RawApiMetadata;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
+import com.akto.threat.detection.hyperscan.ThreatCategory;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
@@ -100,6 +101,22 @@ public class Utils {
         return ipApiRateLimitFilter;
     }
 
+    /**
+     * Build a synthetic FilterConfig for a Hyperscan-detected threat category.
+     * This allows Hyperscan results to flow through the same event pipeline as YAML filters.
+     * Uses ThreatCategory enum as single source of truth for filter ID, category, and severity.
+     */
+    public static FilterConfig buildHyperscanFilterConfig(ThreatCategory tc) {
+        FilterConfig filter = new FilterConfig(tc.getFilterId(), null, null, null);
+        Info info = new Info();
+        info.setName(tc.getFilterId());
+        info.setCategory(tc.toYamlCategory());
+        info.setSubCategory(tc.getCategoryName());
+        info.setSeverity(tc.getSeverity());
+        filter.setInfo(info);
+        return filter;
+    }
+
     public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors, boolean successfulExploit, boolean ignoredEvent, RedactionType redactionType) {
         Metadata.Builder metadataBuilder = Metadata.newBuilder();
         if (errors != null && !errors.isEmpty()) {
@@ -118,22 +135,25 @@ public class Utils {
                 // If redaction fails, fall back to original message
             }
         }
-            SampleMaliciousRequest.Builder maliciousReqBuilder = SampleMaliciousRequest.newBuilder()
-                    .setUrl(responseParam.getRequestParams().getURL())
-                    .setMethod(responseParam.getRequestParams().getMethod())
-                    .setPayload(redactedPayload)
-                    .setIp(actor) // For now using actor as IP
-                    .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
-                    .setTimestamp(responseParam.getTime())
-                    .setFilterId(apiFilter.getId())
-                    .setSuccessfulExploit(successfulExploit)
-                    .setStatus(status);
+        SampleMaliciousRequest.Builder maliciousReqBuilder = SampleMaliciousRequest.newBuilder()
+                .setUrl(responseParam.getRequestParams().getURL())
+                .setMethod(responseParam.getRequestParams().getMethod())
+                .setPayload(redactedPayload)
+                .setIp(actor) // For now using actor as IP
+                .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
+                .setTimestamp(responseParam.getTime())
+                .setFilterId(apiFilter.getId())
+                .setSuccessfulExploit(successfulExploit)
+                .setStatus(status);
 
+        
+        if (metadata != null) {
             metadataBuilder.setCountryCode(metadata.getCountryCode());
             metadataBuilder.setDestCountryCode(metadata.getDestCountryCode() != null ? metadata.getDestCountryCode() : "");
             maliciousReqBuilder.setMetadata(metadataBuilder.build());
-            return maliciousReqBuilder.build();
         }
+        return maliciousReqBuilder.build();
+    }
 
     public static boolean apiDistributionEnabled(boolean redisEnabled, boolean apiDistributionEnabled) {
         if (!redisEnabled) {

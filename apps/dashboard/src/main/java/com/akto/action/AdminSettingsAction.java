@@ -77,7 +77,12 @@ public class AdminSettingsAction extends UserAction {
     }
 
     public AccountSettings.SetupType setupType;
-    public Boolean newMergingEnabled;
+    @Setter
+    @Getter
+    public boolean newMergingEnabled;
+    @Setter
+    @Getter
+    public boolean doBodyMatch;
     private Set<String> privateCidrList;
 
     public Boolean enableTelemetry;
@@ -103,6 +108,10 @@ public class AdminSettingsAction extends UserAction {
     private List<String> filterLogPolicy;
 
     public String updateSetupType() {
+        if (this.setupType == null) {
+            addActionError("setupType is required");
+            return ERROR.toUpperCase();
+        }
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.SETUP_TYPE, this.setupType),
@@ -124,6 +133,16 @@ public class AdminSettingsAction extends UserAction {
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.URL_REGEX_MATCHING_ENABLED, this.newMergingEnabled),
+                new UpdateOptions().upsert(true)
+        );
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String toggleDoBodyMatch() {
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.BODY_MATCH_ENABLED, this.doBodyMatch),
                 new UpdateOptions().upsert(true)
         );
 
@@ -553,6 +572,40 @@ public class AdminSettingsAction extends UserAction {
         }
     }
 
+    private String proxyPattern;
+    @Getter
+    private Map<String, AccountSettings.ProxyPatternInfo> matchingPatternsForProxy;
+
+    public String addMatchingPatternForProxy() {
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+
+        if (proxyPattern == null || proxyPattern.trim().isEmpty()) {
+            addActionError("Pattern cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        proxyPattern = proxyPattern.trim();
+
+        String key = proxyPattern.hashCode() + "";
+        AccountSettings.ProxyPatternInfo info = new AccountSettings.ProxyPatternInfo(proxyPattern, user.getLogin(), Context.now());
+
+        try {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.MATCHING_PATTERNS_FOR_PROXY + "." + key, info)
+            );
+
+            AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            this.matchingPatternsForProxy = settings != null ? settings.getMatchingPatternsForProxy() : null;
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error adding matching pattern for proxy", e);
+            return ERROR.toUpperCase();
+        }
+    }
+
     public void setAccountPermission(String accountPermission) {
         this.accountPermission = accountPermission;
     }
@@ -583,14 +636,6 @@ public class AdminSettingsAction extends UserAction {
 
     public void setSetupType(AccountSettings.SetupType setupType) {
         this.setupType = setupType;
-    }
-
-    public Boolean getNewMergingEnabled() {
-        return newMergingEnabled;
-    }
-
-    public void setNewMergingEnabled(Boolean newMergingEnabled) {
-        this.newMergingEnabled = newMergingEnabled;
     }
 
     public void setEnableDebugLogs(boolean enableDebugLogs) {
@@ -688,6 +733,10 @@ public class AdminSettingsAction extends UserAction {
 
     public void setCompulsoryDescription(Map<String, Boolean> compulsoryDescription) {
         this.compulsoryDescription = compulsoryDescription;
+    }
+
+    public void setProxyPattern(String proxyPattern) {
+        this.proxyPattern = proxyPattern;
     }
 
 }

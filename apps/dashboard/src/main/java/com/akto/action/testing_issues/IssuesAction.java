@@ -4,9 +4,11 @@ import com.akto.action.UserAction;
 import com.akto.dao.HistoricalDataDao;
 import com.akto.dao.RBACDao;
 import com.akto.action.testing.StartTestAction;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
@@ -86,6 +88,17 @@ public class IssuesAction extends UserAction {
     private List<TestingRunIssues> similarlyAffectedIssues;
     private boolean activeCollections;
 
+    @Setter
+    @Getter
+    private List<String> filterCollectionNames;
+    @Setter
+    @Getter
+    private String siteUrl;
+    @Getter
+    private List<BasicDBObject> issueDetails;
+    @Getter
+    private BasicDBObject fetchIssuesFromCollectionsResponse;
+
     private int startEpoch;
     long endTimeStamp;
     private Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
@@ -164,7 +177,13 @@ public class IssuesAction extends UserAction {
                         Filters.eq(ID + "." + TestingIssuesId.TEST_SUB_CATEGORY, subCategory),
                         Filters.in(ID + "." + TestingIssuesId.TEST_CATEGORY_FROM_SOURCE_CONFIG, sourceConfigIds)
                 ), Filters.ne(ID, issueId));
-        similarlyAffectedIssues = TestingRunIssuesDao.instance.findAll(filters, 0,3, sort);
+        // Apply dashboard filtering to allow issues from deleted collections
+        Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(filters);
+        similarlyAffectedIssues = TestingRunIssuesDao.instance.getMCollection()
+            .find(dashboardFilter)
+            .sort(sort)
+            .limit(3)
+            .into(new ArrayList<>());
         return SUCCESS.toUpperCase();
     }
 
@@ -175,16 +194,12 @@ public class IssuesAction extends UserAction {
     int sortOrder;
     public String fetchAllIssues() {
         Bson filters = createFilters(true);
+        
+        // Apply dashboard filtering (RBAC + dashboardContext)
+        Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(filters);
 
         List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(filters));
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
-            }
-        } catch(Exception e){
-        }
+        pipeline.add(Aggregates.match(dashboardFilter));
         if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
             Bson addSeverityValueStage = Aggregates.addFields(
                     new Field<>("severityValue", new BasicDBObject("$switch",
@@ -218,9 +233,14 @@ public class IssuesAction extends UserAction {
                 .into(new ArrayList<>());
 
         Bson countingFilters = createFilters(false);
-        openIssuesCount = TestingRunIssuesDao.instance.count(Filters.and(countingFilters, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name())));
-        fixedIssuesCount = TestingRunIssuesDao.instance.count(Filters.and(countingFilters, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name())));
-        ignoredIssuesCount = TestingRunIssuesDao.instance.count(Filters.and(countingFilters, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED.name())));
+        // Apply dashboard filtering for counts too
+        Bson dashboardCountingFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(countingFilters);
+        openIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
+            Filters.and(dashboardCountingFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name())));
+        fixedIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
+            Filters.and(dashboardCountingFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name())));
+        ignoredIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
+            Filters.and(dashboardCountingFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED.name())));
 
         for (TestingRunIssues runIssue : issues) {
             if (runIssue.getId().getTestSubCategory().startsWith("http")) {
@@ -232,58 +252,211 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchIssuesFromCollections() {
+        try {
+            if (limit <= 0) limit = 100;
+            if (limit > 10000) limit = 10000;
+
+            if (filterCollectionNames == null || filterCollectionNames.isEmpty()) {
+                addActionError("filterCollectionNames is required");
+                return buildFetchIssuesResponse(new ArrayList<>(), ERROR.toUpperCase());
+            }
+
+            // Resolve collection names → IDs
+            if (filterCollectionNames != null && !filterCollectionNames.isEmpty()) {
+                List<ApiCollection> matched = ApiCollectionsDao.instance.findAll(
+                    Filters.or(
+                        Filters.in(ApiCollection.NAME, filterCollectionNames),
+                        Filters.in(ApiCollection.HOST_NAME, filterCollectionNames)
+                    ),
+                    Projections.exclude(ApiCollection._URLS));
+                filterCollectionsId = matched.stream().map(ApiCollection::getId).collect(Collectors.toList());
+                if (filterCollectionsId.isEmpty()) {
+                    addActionError("No API collections found matching: " + String.join(", ", filterCollectionNames));
+                    return buildFetchIssuesResponse(new ArrayList<>(), ERROR.toUpperCase());
+                }
+            }
+
+            // Fetch paginated issues
+            Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(createFilters(true));
+            List<Bson> pipeline = new ArrayList<>();
+            pipeline.add(Aggregates.match(dashboardFilter));
+            if (TestingRunIssues.KEY_SEVERITY.equals(sortKey)) {
+                pipeline.add(Aggregates.addFields(new Field<>("severityValue", new BasicDBObject("$switch",
+                        new BasicDBObject("branches", Arrays.asList(
+                                new BasicDBObject("case", new BasicDBObject("$eq", Arrays.asList("$severity", Severity.CRITICAL.name()))).append("then", 4),
+                                new BasicDBObject("case", new BasicDBObject("$eq", Arrays.asList("$severity", Severity.HIGH.name()))).append("then", 3),
+                                new BasicDBObject("case", new BasicDBObject("$eq", Arrays.asList("$severity", Severity.MEDIUM.name()))).append("then", 2),
+                                new BasicDBObject("case", new BasicDBObject("$eq", Arrays.asList("$severity", Severity.LOW.name()))).append("then", 1)
+                        )).append("default", 0)))));
+                pipeline.add(Aggregates.sort(sortOrder == 1
+                        ? Sorts.ascending("severityValue", TestingRunIssues.CREATION_TIME)
+                        : Sorts.descending("severityValue", TestingRunIssues.CREATION_TIME)));
+            } else if (TestingRunIssues.CREATION_TIME.equals(sortKey)) {
+                pipeline.add(Aggregates.sort(sortOrder == 1
+                        ? Sorts.ascending(TestingRunIssues.CREATION_TIME)
+                        : Sorts.descending(TestingRunIssues.CREATION_TIME)));
+            }
+            pipeline.add(Aggregates.skip(skip));
+            pipeline.add(Aggregates.limit(limit));
+            List<TestingRunIssues> rawIssues = TestingRunIssuesDao.instance.getMCollection()
+                    .aggregate(pipeline, TestingRunIssues.class).into(new ArrayList<>());
+
+            // Counts
+            Bson countFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(createFilters(false));
+            openIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
+                    Filters.and(countFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name())));
+            fixedIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
+                    Filters.and(countFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name())));
+            ignoredIssuesCount = TestingRunIssuesDao.instance.getMCollection().countDocuments(
+                    Filters.and(countFilter, Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED.name())));
+
+            // Attach TestSourceConfig for custom http-based tests
+            for (TestingRunIssues runIssue : rawIssues) {
+                if (runIssue.getId().getTestSubCategory().startsWith("http")) {
+                    runIssue.getId().setTestSourceConfig(TestSourceConfigsDao.instance
+                            .getTestSourceConfig(runIssue.getId().getTestCategoryFromSourceConfig()));
+                }
+            }
+
+            // Batch fetch YAML test info for all non-http subcategories
+            Set<String> subCategoryIds = rawIssues.stream()
+                    .map(issue -> issue.getId().getTestSubCategory())
+                    .filter(sc -> !sc.startsWith("http"))
+                    .collect(Collectors.toSet());
+            Map<String, Info> infoMap = subCategoryIds.isEmpty() ? new HashMap<>()
+                    : YamlTemplateDao.instance.fetchTestInfoMap(Filters.in("_id", new ArrayList<>(subCategoryIds)));
+
+            // Batch fetch TestingRunResult IDs (needed for the correct issue URL)
+            List<ObjectId> summaryIds = rawIssues.stream()
+                    .filter(i -> i.getLatestTestingRunSummaryId() != null)
+                    .map(TestingRunIssues::getLatestTestingRunSummaryId)
+                    .distinct()
+                    .collect(Collectors.toList());
+            Map<String, String> resultHexIdMap = new HashMap<>();
+            if (!summaryIds.isEmpty()) {
+                List<TestingRunResult> resultRefs = VulnerableTestingRunResultDao.instance.findAll(
+                        Filters.in(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryIds),
+                        Projections.include(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
+                                TestingRunResult.TEST_SUB_TYPE, TestingRunResult.API_INFO_KEY));
+                for (TestingRunResult r : resultRefs) {
+                    if (r.getTestRunResultSummaryId() != null && r.getApiInfoKey() != null && r.getId() != null) {
+                        String key = r.getTestRunResultSummaryId().toHexString() + "|" + r.getTestSubType()
+                                + "|" + r.getApiInfoKey().getUrl() + "|" + r.getApiInfoKey().getMethod()
+                                + "|" + r.getApiInfoKey().getApiCollectionId();
+                        resultHexIdMap.put(key, r.getId().toHexString());
+                    }
+                }
+            }
+
+            // Build enriched issueDetails
+            String base = (siteUrl != null && !siteUrl.isEmpty()) ? siteUrl : "https://app.akto.io";
+            issueDetails = new ArrayList<>();
+            for (TestingRunIssues issue : rawIssues) {
+                TestingIssuesId id = issue.getId();
+                BasicDBObject obj = new BasicDBObject();
+
+                if (id.getApiInfoKey() != null) {
+                    obj.put("apiUrl", id.getApiInfoKey().getUrl());
+                    obj.put("apiMethod", id.getApiInfoKey().getMethod() != null ? id.getApiInfoKey().getMethod().toString() : null);
+                    obj.put("apiCollectionId", id.getApiInfoKey().getApiCollectionId());
+                }
+                obj.put("testSubCategory", id.getTestSubCategory());
+                obj.put("status", issue.getTestRunIssueStatus() != null ? issue.getTestRunIssueStatus().name() : null);
+                obj.put("severity", issue.getSeverity() != null ? issue.getSeverity().name() : null);
+                obj.put("creationTime", issue.getCreationTime());
+                obj.put("lastSeen", issue.getLastSeen());
+                if (issue.getLatestTestingRunSummaryId() != null && id.getApiInfoKey() != null) {
+                    String subType = id.getTestSubCategory().startsWith("http")
+                            ? id.getTestCategoryFromSourceConfig()
+                            : id.getTestSubCategory();
+                    String key = issue.getLatestTestingRunSummaryId().toHexString() + "|" + subType
+                            + "|" + id.getApiInfoKey().getUrl() + "|" + id.getApiInfoKey().getMethod()
+                            + "|" + id.getApiInfoKey().getApiCollectionId();
+                    String resultHexId = resultHexIdMap.get(key);
+                    if (resultHexId != null) {
+                        obj.put("issueUrl", base + "/dashboard/reports/issues?result=" + resultHexId);
+                    }
+                }
+
+                Info info = infoMap.get(id.getTestSubCategory());
+                if (info != null) {
+                    obj.put("testName", info.getName());
+                    obj.put("testDescription", info.getDescription());
+                    obj.put("testDetails", info.getDetails());
+                    obj.put("testImpact", info.getImpact());
+                    obj.put("testRemediation", info.getRemediation());
+                    obj.put("testSeverityFromTemplate", info.getSeverity());
+                    obj.put("testTags", info.getTags());
+                    obj.put("testReferences", info.getReferences());
+                    obj.put("testCwe", info.getCwe());
+                    obj.put("testCve", info.getCve());
+                    if (info.getCategory() != null) {
+                        obj.put("testCategory", info.getCategory().getDisplayName());
+                    }
+                }
+                issueDetails.add(obj);
+            }
+
+            return buildFetchIssuesResponse(issueDetails, SUCCESS.toUpperCase());
+        } catch (Exception e) {
+            logger.error("Unexpected error in fetchIssuesFromCollections", e);
+            addActionError(e.getMessage());
+            return buildFetchIssuesResponse(new ArrayList<>(), ERROR.toUpperCase());
+        }
+    }
+
+    private String buildFetchIssuesResponse(List<BasicDBObject> details, String result) {
+        fetchIssuesFromCollectionsResponse = new BasicDBObject();
+        fetchIssuesFromCollectionsResponse.put("issueDetails", details);
+        fetchIssuesFromCollectionsResponse.put("openIssuesCount", openIssuesCount);
+        fetchIssuesFromCollectionsResponse.put("fixedIssuesCount", fixedIssuesCount);
+        fetchIssuesFromCollectionsResponse.put("ignoredIssuesCount", ignoredIssuesCount);
+        return result;
+    }
+
     List<Integer> totalIssuesCountDayWise;
     List<Integer> openIssuesCountDayWise;
     List<Integer> criticalIssuesCountDayWise;
     public String findTotalIssuesByDay() {
         long daysBetween = (endTimeStamp - startEpoch) / ONE_DAY_TIMESTAMP;
-        List<Bson> pipeline = new ArrayList<>();
-
+        
+        // Base filters (excluding deactivated collections for backward compatibility)
         Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
         Bson notIncludedCollections = Filters.nin(ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, deactivatedCollections);
 
-        Bson filters = Filters.and(
+        Bson baseFilters = Filters.and(
                 notIncludedCollections,
                 Filters.gte(TestingRunIssues.CREATION_TIME, startEpoch),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
         );
+        
+        // Apply dashboard filtering (handles API Security backward compatibility internally)
+        Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilters);
 
-        Bson totalIssuesMatchStage = Aggregates.match(filters);
+        Bson totalIssuesMatchStage = Aggregates.match(dashboardFilter);
         Bson openIssuesMatchStage = Aggregates.match(Filters.and(
-                filters,
+                dashboardFilter,
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name())
         ));
         Bson criticalIssuesMatchStage = Aggregates.match(Filters.and(
-                filters,
+                dashboardFilter,
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name()),
                 Filters.in(TestingRunIssues.KEY_SEVERITY, Severity.CRITICAL.name(), Severity.HIGH.name())
         ));
 
+        List<Bson> pipeline = new ArrayList<>();
         pipeline.add(totalIssuesMatchStage);
-        List<Integer> collectionIds = null;
-        try {
-            collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
-            }
-        } catch(Exception e){
-        }
         totalIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, totalIssuesCountDayWise);
         pipeline.clear();
 
         pipeline.add(openIssuesMatchStage);
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
-        }
         openIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, openIssuesCountDayWise);
         pipeline.clear();
 
         pipeline.add(criticalIssuesMatchStage);
-        if(collectionIds != null) {
-            pipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
-        }
         criticalIssuesCountDayWise = new ArrayList<>();
         filterIssuesDataByTimeRange(daysBetween, pipeline, criticalIssuesCountDayWise);
         pipeline.clear();
@@ -357,9 +530,12 @@ public class IssuesAction extends UserAction {
         try {
             List<TestingRunIssues> issues = new ArrayList<>();
             if(issuesIds != null && !issuesIds.isEmpty()){
-                issues =  TestingRunIssuesDao.instance.findAll(Filters.in(Constants.ID, issuesIds));
+                // For specific issue IDs (from dashboard list), bypass RBAC to allow deleted collections
+                issues = TestingRunIssuesDao.instance.getMCollection().find(Filters.in(Constants.ID, issuesIds)).into(new ArrayList<>());
             }else{
-                issues =  TestingRunIssuesDao.instance.findAll(filters, skip, 50, null);
+                // Apply dashboard filtering for list queries
+                Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(filters);
+                issues = TestingRunIssuesDao.instance.getMCollection().find(dashboardFilter).skip(skip).limit(50).into(new ArrayList<>());
             }
             List<Bson> andFilters = new ArrayList<>();
             List<Bson> filtersForNewCollection = new ArrayList<>();
@@ -474,7 +650,13 @@ public class IssuesAction extends UserAction {
 
         Role currentUserRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
 
-        TestingRunIssues issue = TestingRunIssuesDao.instance.findOne(Filters.eq(ID, issueId));
+        // Use findOneNoRbacFilter to allow access to issues from deleted collections
+        // (the issue appeared in the list via dashboard filtering, so user has access)
+        TestingRunIssues issue = TestingRunIssuesDao.instance.findOneNoRbacFilter(Filters.eq(ID, issueId), null);
+        if (issue == null) {
+            addActionError("Issue not found or you don't have access to it");
+            return ERROR.toUpperCase();
+        }
         String testSubType = null;
         // ?? enum stored in db
         String subCategory = issue.getId().getTestSubCategory();
@@ -493,8 +675,12 @@ public class IssuesAction extends UserAction {
             logger.debug("Issue id from db to be marked as read " + issueId);
             Bson update = Updates.combine(Updates.set(TestingRunIssues.UNREAD, false),
                     Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
-            TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(ID, issueId), update);
-            issueId = updatedIssue.getId();
+            // Issue was already verified via findOneNoRbacFilter, so safe to update directly
+            TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.getMCollection()
+                .findOneAndUpdate(Filters.eq(ID, issueId), update, new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
+            if (updatedIssue != null) {
+                issueId = updatedIssue.getId();
+            }
         }
         return SUCCESS.toUpperCase();
     }
@@ -615,10 +801,18 @@ public class IssuesAction extends UserAction {
         } else {
             update = Updates.combine(update, Updates.unset(TestingRunIssues.IGNORE_REASON));
         }
-        TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.updateOne(Filters.eq(ID, issueId), update);
-        issueId = updatedIssue.getId();
-        ignoreReason = updatedIssue.getIgnoreReason();
-        statusToBeUpdated = updatedIssue.getTestRunIssueStatus();
+        // Verify issue exists and user has access (via dashboard filtering) before updating
+        Bson accessFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.eq(ID, issueId));
+        TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.getMCollection()
+            .findOneAndUpdate(accessFilter, update, new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
+        if (updatedIssue != null) {
+            issueId = updatedIssue.getId();
+            ignoreReason = updatedIssue.getIgnoreReason();
+            statusToBeUpdated = updatedIssue.getTestRunIssueStatus();
+        } else {
+            addActionError("Issue not found or you don't have access to it");
+            return ERROR.toUpperCase();
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -646,7 +840,9 @@ public class IssuesAction extends UserAction {
         if(!StringUtils.isEmpty(this.description)) {
             update = Updates.combine(update, Updates.set(TestingRunIssues.DESCRIPTION, this.description));
         }
-        TestingRunIssuesDao.instance.updateMany(Filters.in(ID, issueIdArray), update);
+        // Apply dashboard filtering to ensure user has access to all issues before updating
+        Bson accessFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.in(ID, issueIdArray));
+        TestingRunIssuesDao.instance.getMCollection().updateMany(accessFilter, update);
 
         int accountId = Context.accountId.get();
         executorService.schedule( new Runnable() {
@@ -1124,12 +1320,15 @@ public class IssuesAction extends UserAction {
     List<TestingIssuesId> issuesIds;
 
     public String fetchIssuesFromResultIds(){
-        issues = TestingRunIssuesDao.instance.findAll(
-            Filters.and(
-                Filters.in(Constants.ID, issuesIds),
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery)
-            ), Projections.include("_id", TestingRunIssues.TEST_RUN_ISSUES_STATUS)
+        // For specific issue IDs (from dashboard list), bypass RBAC to allow deleted collections
+        Bson filter = Filters.and(
+            Filters.in(Constants.ID, issuesIds),
+            Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery)
         );
+        issues = TestingRunIssuesDao.instance.getMCollection()
+            .find(filter)
+            .projection(Projections.include("_id", TestingRunIssues.TEST_RUN_ISSUES_STATUS))
+            .into(new ArrayList<>());
         return SUCCESS.toUpperCase();
     }
 
@@ -1193,17 +1392,9 @@ public class IssuesAction extends UserAction {
     }
 
     public String fetchSeverityInfoForIssues() {
-        Bson filter = createFilters(true);
-
-        if (issuesIds != null && !issuesIds.isEmpty()) {
-            filter = Filters.and(filter, Filters.in(Constants.ID, issuesIds));
-        }
-
-        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
-        filter = Filters.and(
-            filter,
-            Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, deactivatedCollections)
-        );
+        Bson filters = createFilters(true);      
+        // Apply dashboard filtering (RBAC + dashboardContext)
+        Bson filter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(filters);
 
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
                 .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
@@ -1221,7 +1412,9 @@ public class IssuesAction extends UserAction {
             return ERROR.toUpperCase();
         }
         
-        TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, issueId), Updates.set(TestingRunIssues.DESCRIPTION, description));
+        // Verify issue exists and user has access (via dashboard filtering) before updating
+        Bson accessFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.eq(Constants.ID, issueId));
+        TestingRunIssuesDao.instance.getMCollection().updateOne(accessFilter, Updates.set(TestingRunIssues.DESCRIPTION, description));
         return SUCCESS.toUpperCase();
     }
 

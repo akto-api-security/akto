@@ -42,7 +42,7 @@ public class CustomAuthUtil {
                 Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiInfo.getId().getApiCollectionId()));
     }
 
-    private static Set<ApiInfo.AuthType> unauthenticatedTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED));
+    private static Set<String> unauthenticatedTypes = new HashSet<>(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED));
 
     final static Gson gson = new Gson();
 
@@ -79,9 +79,13 @@ public class CustomAuthUtil {
 
         FailableFunction<ApiInfo, UpdateOneModel<ApiInfo>, Exception> func = (apiInfo) -> {
 
-            Set<Set<ApiInfo.AuthType>> authTypes = apiInfo.getAllAuthTypesFound();
+            Set<Set<String>> authTypes = apiInfo.getAllAuthTypesFound();
+            if (authTypes == null) {
+                authTypes = new HashSet<>();
+            }
             authTypes.remove(new HashSet<>());
             authTypes.remove(unauthenticatedTypes);
+            apiInfo.setAllAuthTypesFound(authTypes);
 
             SampleData sampleData = SampleDataDao.instance.fetchAllSampleDataForApi(
                     apiInfo.getId().getApiCollectionId(),
@@ -121,12 +125,23 @@ public class CustomAuthUtil {
     public static void resetAllCustomAuthTypes() {
 
         /*
-         * 1. remove custom auth type from all entries. 
+         * 1. remove all non-standard auth types (custom auth types use their custom names)
          * 2. remove unauthenticated auth type from all entries since on reset,
          * auth type should be calculated again.
+         * Note: We remove everything except standard auth types (BASIC, BEARER, JWT, etc.)
          */
+        List<String> standardAuthTypes = new ArrayList<>();
+        standardAuthTypes.add(ApiInfo.AuthType.BASIC);
+        standardAuthTypes.add(ApiInfo.AuthType.BEARER);
+        standardAuthTypes.add(ApiInfo.AuthType.JWT);
+        standardAuthTypes.add(ApiInfo.AuthType.AUTHORIZATION_HEADER);
+        standardAuthTypes.add(ApiInfo.AuthType.API_TOKEN);
+        standardAuthTypes.add(ApiInfo.AuthType.API_KEY);
+        standardAuthTypes.add(ApiInfo.AuthType.MTLS);
+        standardAuthTypes.add(ApiInfo.AuthType.SESSION_TOKEN);
+        
+        // Remove all auth types that are NOT in the standard list
         ApiInfoDao.instance.updateMany(new BasicDBObject(),
-                Updates.pull(ALL_AUTH_TYPES_FOUND + ".$[]", new BasicDBObject().append("$in",
-                        new String[] { ApiInfo.AuthType.CUSTOM.name(), ApiInfo.AuthType.UNAUTHENTICATED.name() })));
+                Updates.pull(ALL_AUTH_TYPES_FOUND + ".$[]", new BasicDBObject().append("$nin", standardAuthTypes)));
     }
 }

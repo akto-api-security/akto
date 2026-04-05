@@ -1,4 +1,5 @@
 import { useReducer, useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
@@ -46,10 +47,31 @@ function ThreatActorPage() {
   const [actorDetails, setActorDetails] = useState(null);
   const [showActorDetails, setShowActorDetails] = useState(false);
 
-  const initialVal = values.ranges[2];
+  const [searchParams] = useSearchParams();
+  const getInitialDateRange = () => {
+    const rangeAlias = searchParams.get('range');
+    if (rangeAlias) {
+      const preset = values.ranges.find((r) => r.alias === rangeAlias);
+      if (preset) return preset;
+    }
+    const sinceParam = searchParams.get('since');
+    const untilParam = searchParams.get('until');
+    if (sinceParam != null && untilParam != null) {
+      const sinceTs = parseInt(sinceParam, 10);
+      const untilTs = parseInt(untilParam, 10);
+      if (!Number.isNaN(sinceTs) && !Number.isNaN(untilTs)) {
+        const sinceDate = new Date(sinceTs * 1000);
+        const untilDate = new Date(untilTs * 1000);
+        const title = sinceDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) + " - " + untilDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+        return { alias: "custom", title, period: { since: sinceDate, until: untilDate } };
+      }
+    }
+    return values.ranges[2];
+  };
+  const initialDateRange = getInitialDateRange();
   const [currDateRange, dispatchCurrDateRange] = useReducer(
     produce((draft, action) => func.dateRangeReducer(draft, action)),
-    initialVal
+    initialDateRange
   );
 
   const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000);

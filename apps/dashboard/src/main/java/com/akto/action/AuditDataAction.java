@@ -1,24 +1,32 @@
 package com.akto.action;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.McpAuditInfo;
+import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.dto.User;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 
 import lombok.Getter;
 import lombok.Setter;
+
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +53,49 @@ public class AuditDataAction extends UserAction {
     @Getter
     private long total;
 
+    @Setter
+    private int apiCollectionId = -1;
+
+    @Getter
+    @Setter
+    private List<McpAuditInfo> mcpAuditInfoList;
+
+    public String fetchMcpAuditInfoByCollection() {
+        mcpAuditInfoList = new ArrayList<>();
+
+        if (Context.contextSource.get() != null && Context.contextSource.get() != CONTEXT_SOURCE.ENDPOINT)  {
+            mcpAuditInfoList = Collections.emptyList();
+            return SUCCESS.toUpperCase();
+        }
+
+        try {
+            if (apiCollectionId == -1) {
+                addActionError("API Collection ID cannot be -1");
+                return ERROR.toUpperCase();
+            }
+            ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(
+                    Filters.eq(Constants.ID, apiCollectionId),
+                    Projections.include(ApiCollection.HOST_NAME)
+            );
+            if (apiCollection == null) {
+                addActionError("No such collection exists");
+                return ERROR.toUpperCase();
+            }
+            String mcpName = McpRequestResponseUtils.extractServiceNameFromHost(apiCollection.getHostName());
+            if (StringUtils.isBlank(mcpName)) {
+                loggerMaker.errorAndAddToDb("MCP server name is null or empty for collection: " + apiCollection.getHostName() + " id: " + apiCollectionId, LogDb.DASHBOARD);
+                return SUCCESS.toUpperCase();
+            }
+            Bson filter = Filters.eq(McpAuditInfo.MCP_HOST, mcpName);
+            mcpAuditInfoList = McpAuditInfoDao.instance.findAll(filter, 0, 1_000, null);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching McpAuditInfo by collection: " + e.getMessage(), LogDb.DASHBOARD);
+            mcpAuditInfoList = Collections.emptyList();
+            return ERROR.toUpperCase();
+        }
+    }
+
     public String fetchAuditData() {
         try {
             if (sortKey == null || sortKey.isEmpty()) {
@@ -60,17 +111,18 @@ public class AuditDataAction extends UserAction {
             List<Integer> collectionsIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                 Context.accountId.get());
 
-            List<Bson> filterList = prepareFilters(filters);
-            
+            Bson filter = Filters.eq(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get().name());
+
             if (collectionsIds != null) {
-                filterList.add(Filters.in("hostCollectionId", collectionsIds));
+                Bson collectionsFilter = Filters.and(Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false),
+                        Filters.in(McpAuditInfo.HOST_COLLECTION_ID, collectionsIds));
+                filter = Filters.or(filter, collectionsFilter);
             }
             
-            Bson finalFilter = filterList.isEmpty() ? new BasicDBObject() : Filters.and(filterList);
             Bson sort = sortOrder == 1 ? Sorts.ascending(sortKey) : Sorts.descending(sortKey);
             
-            this.auditData = McpAuditInfoDao.instance.findAll(finalFilter, skip, limit, sort);   
-            this.total = McpAuditInfoDao.instance.count(finalFilter);          
+            this.auditData = McpAuditInfoDao.instance.findAll(filter, skip, limit, sort);   
+            this.total = McpAuditInfoDao.instance.count(filter);          
             loggerMaker.info("Fetched " + auditData.size() + " audit records out of " + total + " total");
             
             return SUCCESS.toUpperCase();

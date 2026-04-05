@@ -366,6 +366,26 @@ function SingleTestRunPage() {
             console.error("Error fetching collection endpoints:", error);
           }
         }
+      } else if (testingEndpoints.type === "MULTI_COLLECTION" && testingEndpoints.apiCollectionIds) {
+        try {
+          let allEndpoints = [];
+          for (const collectionId of testingEndpoints.apiCollectionIds) {
+            try {
+              const response = await observeApi.fetchApiInfosForCollection(collectionId);
+              if (response?.apiInfoList) {
+                allEndpoints = allEndpoints.concat(response.apiInfoList);
+              }
+            } catch (error) {
+            }
+          }
+
+          const limitedEndpoints = allEndpoints.slice(0, 5000);
+          const limitedEndpointsIds = limitedEndpoints.map(endpoint => endpoint.id);
+          populateTestingEndpointsApisList(limitedEndpointsIds);
+
+          apiEndpoints = getApiEndpointsMap(limitedEndpoints, testingEndpoints.type);
+        } catch (error) {
+        }
       } else if (testingEndpoints.type === "CUSTOM"
         && testingEndpoints.apisList) {
         const limitedApis = testingEndpoints.apisList.slice(0, 5000);
@@ -387,7 +407,7 @@ function SingleTestRunPage() {
   }
 
   const getApiEndpointsMap = (endpoints, type) => {
-    if (type === null || type === undefined || type === "COLLECTION_WISE") {
+    if (type === null || type === undefined || type === "COLLECTION_WISE" || type === "MULTI_COLLECTION") {
       return endpoints.map(endpoint => ({
         label: endpoint.id.url,
         value: endpoint.id.url
@@ -704,6 +724,14 @@ function SingleTestRunPage() {
       </div> : null
   )
 
+  const tokenRateLimitBannerComp = selectedTestRun?.metadata?.tokenRateLimited ? (
+    <div className="banner-wrapper">
+      <Banner status="warning">
+        <Text>{selectedTestRun.metadata.tokenRateLimited}</Text>
+      </Banner>
+    </div>
+  ) : null
+
   const definedTableTabs = ['Vulnerable', 'Need configurations', 'Skipped', 'No vulnerability found', 'Domain unreachable', 'Ignored Issues']
 
   const { tabsInfo } = useTable()
@@ -773,6 +801,10 @@ function SingleTestRunPage() {
 
     if (testingEndpoints.type === "COLLECTION_WISE") {
       return testingEndpoints.apiCollectionId;
+    }
+
+    if (testingEndpoints.type === "MULTI_COLLECTION") {
+      return testingEndpoints.apiCollectionIds;
     }
 
     return (testingEndpoints.apisList?.length > 0) ? testingEndpoints.apisList[0].apiCollectionId : undefined;
@@ -872,25 +904,28 @@ function SingleTestRunPage() {
   )
 
   const metadataComponent = () => {
-
-    if (!selectedTestRun.metadata) {
-      return undefined
-    }
-
-    return (
-      <LegacyCard title="Metadata" sectioned key="metadata">
-        {
-          selectedTestRun.metadata ? Object.keys(selectedTestRun.metadata).map((key) => {
-            return (
-              <HorizontalStack key={key} spacing="tight">
-                <Text>{key} : {selectedTestRun.metadata[key]}</Text>
-              </HorizontalStack>
-            )
-          }) : ""
-        }
-      </LegacyCard>
-    )
+  if (!selectedTestRun.metadata) {
+    return undefined;
   }
+
+  // Filter out keys with empty string values and the 'error' key
+  const filteredMetadata = Object.keys(selectedTestRun.metadata)
+    .filter(key => key !== 'error' && key !== 'tokenRateLimited' && selectedTestRun.metadata[key] !== '');
+
+  if (filteredMetadata.length === 0) {
+    return undefined;
+  }
+
+  return (
+    <LegacyCard title="Metadata" sectioned key="metadata">
+      {filteredMetadata.map((key) => (
+        <HorizontalStack key={key} spacing="tight">
+          <Text>{key} : {selectedTestRun.metadata[key]}</Text>
+        </HorizontalStack>
+      ))}
+    </LegacyCard>
+  );
+};
 
   const progress = useMemo(() => {
     return currentTestObj.testsInitiated === 0 ? 0 : Math.floor((currentTestObj.testsInsertedInDb * 100) / currentTestObj.testsInitiated);
@@ -913,7 +948,7 @@ function SingleTestRunPage() {
 
   const components = [
     runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} refreshTrigger={chartRefreshCounter} />,
-    metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
+    tokenRateLimitBannerComp, metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
   const openVulnerabilityReport = async (summaryMode = false) => {
     const currentPageKey = "/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab
@@ -1021,12 +1056,34 @@ function SingleTestRunPage() {
             <Text color="subdued" variant="bodyMd">{selectedTestRun.userEmail}</Text>
           </HorizontalStack>
           <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
-          <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
-            <HorizontalStack gap={"1"}>
-              <Box><Icon color="subdued" source={ArchiveMinor} /></Box>
-              <Text color="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
-            </HorizontalStack>
-          </Link>
+          {selectedTestRun?.testingEndpoints?.type === "MULTI_COLLECTION" && Array.isArray(selectedTestRun?.testingEndpoints?.apiCollectionIds) ? (() => {
+            const ids = selectedTestRun.testingEndpoints.apiCollectionIds;
+            const showCount = 2;
+            const shown = ids.slice(0, showCount);
+            const hidden = ids.length - showCount;
+            return (
+              <>
+                {shown.map((cid) => (
+                  <Link key={cid} monochrome target="_blank" url={"/dashboard/observe/inventory/" + cid} removeUnderline>
+                    <HorizontalStack gap={"1"}>
+                      <Box><Icon color="subdued" source={ArchiveMinor} /></Box>
+                      <Text color="subdued" variant="bodyMd">{collectionsMap[cid]}</Text>
+                    </HorizontalStack>
+                  </Link>
+                ))}
+                {hidden > 0 && (
+                  <Badge status="info">+{hidden}</Badge>
+                )}
+              </>
+            );
+          })() : (
+            <Link monochrome target="_blank" url={"/dashboard/observe/inventory/" + selectedTestRun?.apiCollectionId} removeUnderline>
+              <HorizontalStack gap={"1"}>
+                <Box><Icon color="subdued" source={ArchiveMinor} /></Box>
+                <Text color="subdued" variant="bodyMd">{collectionsMap[selectedTestRun?.apiCollectionId]}</Text>
+              </HorizontalStack>
+            </Link>
+          )}
           <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
           <HorizontalStack gap={"1"}>
             <Box><Icon color="subdued" source={PriceLookupMinor} /></Box>
@@ -1225,7 +1282,14 @@ function SingleTestRunPage() {
       {
         content: 'See ' + mapLabel("APIs", getDashboardCategory()),
         icon: ViewMajor,
-        onAction: () => { setShowTestingEndpointsModal(true) }
+        onAction: () => {
+          if (selectedTestRun?.testingEndpoints?.type === "MULTI_COLLECTION" && Array.isArray(selectedTestRun?.testingEndpoints?.apiCollectionIds)) {
+            // Show modal for all collections
+            setShowTestingEndpointsModal({ multi: true, collectionIds: selectedTestRun.testingEndpoints.apiCollectionIds });
+          } else {
+            setShowTestingEndpointsModal({ multi: false, collectionId: selectedTestRun?.apiCollectionId });
+          }
+        }
       },
       {
         content: 'Re-Calculate Issues Count',

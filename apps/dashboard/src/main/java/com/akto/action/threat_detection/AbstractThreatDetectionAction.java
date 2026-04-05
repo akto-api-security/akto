@@ -124,6 +124,7 @@ public class AbstractThreatDetectionAction extends UserAction {
                   smr.getApiCollectionId(),
                   smr.getIp(),
                   smr.getCountry(),
+                  smr.getDestCountry(),
                   smr.getDetectedAt(),
                   smr.getType(),
                   smr.getRefId(),

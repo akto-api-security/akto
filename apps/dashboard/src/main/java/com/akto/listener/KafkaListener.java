@@ -11,6 +11,7 @@ import javax.servlet.ServletContextListener;
 
 public class KafkaListener implements ServletContextListener {
     public static Kafka kafka;
+    /** Used as Kafka producer batch size; also 0.8 * this value is the max per-message size in pushDataToKafka (~780 KB). */
     public static final int BATCH_SIZE_CONFIG = 999900;
     private static final LoggerMaker loggerMaker = new LoggerMaker(KafkaListener.class, LogDb.DASHBOARD);
     @Override

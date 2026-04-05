@@ -1,6 +1,6 @@
 package com.akto.util;
 
-import com.akto.cache.IconCache;
+// IconCache removed - no longer needed
 import com.akto.dao.ApiCollectionIconsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
@@ -43,18 +43,20 @@ public class IconUtils {
             return;
         }
 
-        IconCache iconCache = IconCache.getInstance();
+        Set<String> processedRootDomains = new HashSet<>();
 
-        // Process each hostname with cache-first approach
+        // Process each hostname for background icon fetching
         for (ApiCollection collection : apiCollections) {
-            // First check cache (includes domain-stripping logic)
             String hostname = collection.getHostName();
-            IconCache.IconData cachedIcon = iconCache.getIconData(hostname);
-            if (cachedIcon != null) {
-                continue;
-            }
+            if (hostname == null || hostname.trim().isEmpty()) continue;
 
-            // Not in cache, submit for async fetching from Google Favicon API
+            // Extract root domain (last 2 parts) to deduplicate
+            String[] parts = hostname.trim().toLowerCase().split("\\.");
+            String rootDomain = parts.length >= 2 ? parts[parts.length - 2] + "." + parts[parts.length - 1] : hostname;
+
+            if (processedRootDomains.contains(rootDomain)) continue;
+
+            processedRootDomains.add(rootDomain);
             executorService.submit(() -> {
                 try {
                     fetchAndStoreIconWithCascade(hostname);
@@ -83,7 +85,7 @@ public class IconUtils {
             tryFetchAndStoreIcon(cleanHostName, cleanHostName);
             return;
         }
-        
+
         // Try from full hostname down to main domain (last 2 parts)
         for (int i = 0; i <= parts.length - 2; i++) {
             StringBuilder domainBuilder = new StringBuilder();
@@ -92,14 +94,12 @@ public class IconUtils {
                 domainBuilder.append(parts[j]);
             }
             String candidateDomain = domainBuilder.toString();
-            
+
             // Try to fetch icon for this domain level
             if (tryFetchAndStoreIcon(candidateDomain, fullHostname)) {
                 return; // Success - stop trying other levels
             }
         }
-        
-        loggerMaker.infoAndAddToDb("Failed to fetch icon for hostname: " + fullHostname + " after trying all domain levels", LogDb.DASHBOARD);
     }
 
     /**
@@ -144,9 +144,8 @@ public class IconUtils {
                                     Updates.set(ApiCollectionIcon.UPDATED_AT, Context.now())
                                 )
                             );
-                            loggerMaker.infoAndAddToDb("Updated existing domain entry: " + domain + " with hostname: " + originalHostname, LogDb.DASHBOARD);
                         } else {
-                            loggerMaker.infoAndAddToDb("Domain: " + domain + " already contains hostname: " + originalHostname, LogDb.DASHBOARD);
+                           //Domain already contains hostname
                         }
                     } else {
                         // Create new entry
@@ -155,16 +154,11 @@ public class IconUtils {
                         
                         ApiCollectionIcon icon = new ApiCollectionIcon(domain, matchingHostnames, base64Data);
                         ApiCollectionIconsDao.instance.insertOne(icon);
-                        
-                        loggerMaker.infoAndAddToDb("Successfully fetched and cached new icon for domain: " + domain + " (from hostname: " + originalHostname + ")", LogDb.DASHBOARD);
                     }
                     
                     return true;
                 }
             }
-            
-            // Failed at this level - try next level
-            loggerMaker.infoAndAddToDb("No valid icon at domain level: " + domain + ", trying next level", LogDb.DASHBOARD);
             return false;
                 
         } catch (IOException e) {

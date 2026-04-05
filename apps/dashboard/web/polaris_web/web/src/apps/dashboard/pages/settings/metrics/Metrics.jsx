@@ -344,12 +344,20 @@ function Metrics() {
                         <Dropdown
                             menuItems={[
                                 { label: "All", value: "ALL" },
-                                { label: "Traffic Collectors", value: "TRAFFIC_COLLECTORS" }
+                                { label: "Traffic Collectors", value: "TRAFFIC_COLLECTORS" },
+                                { label: "Threat Detection", value: "THREAT_DETECTION" },
+                                { label: "Mini Runtime", value: "MINI_RUNTIME" }
                             ]}
                             initial="ALL"
                             selected={(val) => {
                                 if (val === "TRAFFIC_COLLECTORS") {
                                     navigate("/dashboard/settings/traffic-collectors-metrics");
+                                }
+                                if (val === "THREAT_DETECTION") {
+                                    navigate("/dashboard/settings/threat-detection-metrics");
+                                }
+                                if (val === "MINI_RUNTIME") {
+                                    navigate("/dashboard/settings/mini-runtime-metrics");
                                 }
                             }}
                         />

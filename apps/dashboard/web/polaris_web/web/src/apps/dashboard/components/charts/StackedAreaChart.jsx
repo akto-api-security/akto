@@ -15,8 +15,12 @@ function StackedAreaChart(props) {
     defaultChartOptions,
     exportingDisabled,
     showGridLines,
-    customXaxis
+    customXaxis,
+    onPointClick
   } = props;
+
+  const onPointClickRef = useRef(onPointClick);
+  useEffect(() => { onPointClickRef.current = onPointClick; }, [onPointClick]);
   
   const chartComponentRef = useRef(null);
 
@@ -47,7 +51,11 @@ function StackedAreaChart(props) {
         marker: { enabled: false },
         lineWidth: 0,
         states: { hover: { lineWidthPlus: 0 } },
-        fillOpacity: 0.9
+        fillOpacity: 0.9,
+        cursor: 'pointer',
+        events: {
+          click: function() { onPointClickRef.current?.(this); }
+        }
       }
     },
     xAxis: customXaxis ? customXaxis : {
