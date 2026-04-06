@@ -14,6 +14,7 @@ import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import values from "@/util/values";
 import { isEndpointSecurityCategory } from "../../../main/labelHelper";
+import IdentityDetailsPanel from "./IdentityDetailsPanel";
 
 // ── Identity icon via Google favicon API ───────────────────────────────────────
 const IDENTITY_DOMAIN_MAP = {
@@ -246,7 +247,9 @@ export default function IdentitiesPage() {
     const [selected, setSelected]               = useState(
         func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab)
     );
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal]     = useState(false);
+    const [selectedRow, setSelectedRow]             = useState(null);
+    const [showDetailsPanel, setShowDetailsPanel]   = useState(false);
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
         values.ranges[2]
@@ -294,9 +297,18 @@ export default function IdentitiesPage() {
                     promotedBulkActions={() => [
                         { content: "Delete identity", destructive: true, onAction: () => setShowDeleteModal(true) },
                     ]}
+                    onRowClick={(row) => { setSelectedRow(row); setShowDetailsPanel(true); }}
+                    rowClickable={true}
                 />,
             ]}
         />
+        {selectedRow && (
+            <IdentityDetailsPanel
+                row={selectedRow}
+                show={showDetailsPanel}
+                setShow={setShowDetailsPanel}
+            />
+        )}
         <Modal
             open={showDeleteModal}
             onClose={() => setShowDeleteModal(false)}
