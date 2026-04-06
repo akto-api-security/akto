@@ -21,6 +21,10 @@ import com.akto.runtime.policies.UserAgentTypePolicy;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DashboardMode;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.utils.AlertUtils;
+import com.akto.notifications.slack.SlackAlerts;
+import com.akto.notifications.slack.UserBlockedNoScopeAccessAlert;
+import com.akto.notifications.slack.SlackSender;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.BasicDBObject;
@@ -243,6 +247,26 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 String contextSourceStr = contextSource.toString();
                 logger.debug("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr);
                 loggerMaker.infoAndAddToDb("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr + " (" + scopeDisplayName + "). User scopes: " + userProductScopes);
+
+                // Send Slack alert with caching to prevent duplicate alerts
+
+                if (AlertUtils.shouldSendNoAccessAlert(user.getLogin(), contextSourceStr, String.valueOf(sessionAccId))) {
+                    try {
+                        SlackAlerts noScopeAccessAlert = new UserBlockedNoScopeAccessAlert(
+                            user.getLogin(),
+                            scopeDisplayName,
+                            contextSourceStr,
+                            String.valueOf(sessionAccId)
+                        );
+                        SlackSender.sendAlert(sessionAccId, noScopeAccessAlert, null, true);
+                        logger.infoAndAddToDb("Sent Slack alert for NO_ACCESS denial: " + user.getLogin() + " to scope " + scopeDisplayName);
+                    } catch (Exception e) {
+                        logger.errorAndAddToDb(e, "Failed to send Slack alert for NO_ACCESS denial: " + e.getMessage());
+                    }
+                }  else {
+                    logger.infoAndAddToDb("Skipped duplicate Slack alert for user " + user.getLogin() + " (cached)");
+                }
+
                 // Block the request - return FORBIDDEN instead of invoking
                 return FORBIDDEN;
             }
@@ -275,6 +299,28 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 HttpServletResponse response = (HttpServletResponse) ServletActionContext.getResponse();
                 response.setHeader("X-No-Access-Error", "true");
                 ((ActionSupport) invocation.getAction()).addActionError("You do not have access to this product. Please ask Admin to grant access or navigate to accessible product");
+
+                // Send Slack alert with caching to prevent duplicate alerts
+                String scopeDisplayName = getContextSourceDisplayName(contextSource);
+                String contextSourceStr = contextSource.toString();
+
+                if (AlertUtils.shouldSendNoAccessAlert(user.getLogin(), contextSourceStr, String.valueOf(sessionAccId))) {
+                    try {
+                        SlackAlerts noScopeAccessAlert = new UserBlockedNoScopeAccessAlert(
+                            user.getLogin(),
+                            scopeDisplayName,
+                            contextSourceStr,
+                            String.valueOf(sessionAccId)
+                        );
+                        SlackSender.sendAlert(sessionAccId, noScopeAccessAlert, null, true);
+                        logger.infoAndAddToDb("Sent Slack alert for NO_ACCESS denial: " + user.getLogin() + " to scope " + scopeDisplayName);
+                    } catch (Exception e) {
+                        logger.errorAndAddToDb(e, "Failed to send Slack alert for NO_ACCESS denial: " + e.getMessage());
+                    }
+                }  else {
+                    logger.infoAndAddToDb("Skipped duplicate Slack alert for user " + user.getLogin() + " (cached)");
+                }
+
                 return FORBIDDEN;
             }
 
