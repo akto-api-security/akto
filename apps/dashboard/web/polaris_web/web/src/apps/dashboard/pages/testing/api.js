@@ -190,19 +190,22 @@ export default {
         }).then((resp) => {
             return resp
         })},
-    triggerSingleStep(type, nodeId, requestData) {
+    triggerSingleStep(type, nodeId, requestData, miniTestingServiceName) {
         return request({
             url: 'api/triggerSingleLoginFlow',
             method: 'post',
-            data: {type, nodeId, requestData}
+            data: { type, nodeId, requestData, miniTestingServiceName }
         }).then((resp) => {
             return resp
         })
     },
-    uploadRecordedLoginFlow(content, tokenFetchCommand, roleName) {
+    uploadRecordedLoginFlow(content, tokenFetchCommand, roleName, miniTestingServiceName) {
         const data = { content, tokenFetchCommand }
         if (roleName) {
             data.roleName = roleName
+        }
+        if (miniTestingServiceName) {
+            data.miniTestingServiceName = miniTestingServiceName
         }
         return request({
             url: '/api/uploadRecordedFlow',
@@ -221,11 +224,15 @@ export default {
         }).then((resp) => resp)
     },
 
-    fetchRecordedLoginFlow(nodeId) {
+    fetchRecordedLoginFlow(nodeId, testingRunPlaygroundId) {
+        const data = { nodeId }
+        if (testingRunPlaygroundId) {
+            data.testingRunPlaygroundId = testingRunPlaygroundId
+        }
         return request({
             url: '/api/fetchRecordedFlowOutput',
             method: 'post',
-            data: {nodeId}
+            data
         }).then((resp) => {
             return resp
         })
