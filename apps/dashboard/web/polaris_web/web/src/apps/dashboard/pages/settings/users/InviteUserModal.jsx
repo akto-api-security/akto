@@ -203,29 +203,36 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
                     </Text>
                     <Box padding="400">
                         {availableScopes.map((scope) => (
-                            <HorizontalStack key={scope.value} gap="200" align="start" style={{
-                                marginBottom: "12px",
-                                borderBottom: "1px solid #e5e5e5",
-                                paddingBottom: "12px"
-                            }}>
+                            <Box
+                                key={scope.value}
+                                style={{
+                                    marginBottom: "12px",
+                                    borderBottom: "1px solid #e5e5e5",
+                                    paddingBottom: "12px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "16px"
+                                }}
+                            >
                                 <Checkbox
                                     label=""
                                     checked={Object.keys(scopeRoleMapping).includes(scope.value)}
                                     onChange={() => handleScopeToggle(scope.value)}
                                 />
-                                <Text variant="bodyMd" style={{ minWidth: "120px" }}>
+                                <Text variant="bodyMd" style={{ minWidth: "120px", flexShrink: 0 }}>
                                     {scope.label}
                                 </Text>
                                 {Object.keys(scopeRoleMapping).includes(scope.value) && (
-                                    <Dropdown
-                                        id={`role-${scope.value}`}
-                                        selected={(value) => handleScopeRoleChange(scope.value, value)}
-                                        menuItems={filteredRoleOptions}
-                                        initial={scopeRoleMapping[scope.value]}
-                                        style={{ minWidth: "200px" }}
-                                    />
+                                    <Box style={{ marginLeft: "80px" }}>
+                                        <Dropdown
+                                            id={`role-${scope.value}`}
+                                            selected={(value) => handleScopeRoleChange(scope.value, value)}
+                                            menuItems={filteredRoleOptions}
+                                            initial={scopeRoleMapping[scope.value]}
+                                        />
+                                    </Box>
                                 )}
-                            </HorizontalStack>
+                            </Box>
                         ))}
                     </Box>
 

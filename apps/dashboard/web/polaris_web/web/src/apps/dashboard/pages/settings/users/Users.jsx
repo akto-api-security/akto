@@ -754,14 +754,15 @@ const Users = () => {
                                     const selectedRole = editScopeRoleModal.editingScopeRoleMapping[scope.value]
 
                                     return (
-                                        <HorizontalStack
+                                        <Box
                                             key={scope.value}
-                                            gap="400"
-                                            align="start"
                                             style={{
                                                 marginBottom: "12px",
                                                 borderBottom: "1px solid #e5e5e5",
-                                                paddingBottom: "12px"
+                                                paddingBottom: "12px",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "16px"
                                             }}
                                         >
                                             <Checkbox
@@ -769,22 +770,23 @@ const Users = () => {
                                                 checked={isSelected}
                                                 onChange={() => handleScopesToggleInModal(scope.value)}
                                             />
-                                            <Text variant="bodyMd" style={{ minWidth: "120px" }}>
+                                            <Text variant="bodyMd" style={{ minWidth: "120px", flexShrink: 0 }}>
                                                 {scope.label}
                                             </Text>
                                             {isSelected && (
-                                                <Dropdown
-                                                    id={`edit-role-${scope.value}`}
-                                                    selected={(value) => handleScopeRoleChangeInModal(scope.value, value)}
-                                                    menuItems={rolesOptions[0]?.items?.map((role) => ({
-                                                        label: role.content,
-                                                        value: role.role
-                                                    })) || []}
-                                                    initial={selectedRole || "MEMBER"}
-                                                    style={{ minWidth: "200px" }}
-                                                />
+                                                <Box style={{ marginLeft: "80px" }}>
+                                                    <Dropdown
+                                                        id={`edit-role-${scope.value}`}
+                                                        selected={(value) => handleScopeRoleChangeInModal(scope.value, value)}
+                                                        menuItems={rolesOptions[0]?.items?.map((role) => ({
+                                                            label: role.content,
+                                                            value: role.role
+                                                        })) || []}
+                                                        initial={selectedRole || "MEMBER"}
+                                                    />
+                                                </Box>
                                             )}
-                                        </HorizontalStack>
+                                        </Box>
                                     )
                                 })}
                             </Box>
