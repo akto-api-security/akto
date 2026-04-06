@@ -69,6 +69,51 @@ public class TestInviteUserAction extends MongoBasedTest{
     }
 
     @Test
+    public void testIsSameDomain() {
+        // Setup: alpha <-> beta (bidirectional, each maps to the other)
+        InviteUserAction.commonOrganisationsMap.put("alpha-corp.example", "beta-corp.example");
+        InviteUserAction.commonOrganisationsMap.put("beta-corp.example", "alpha-corp.example");
+
+        // admin is alpha, invitee is beta — should be allowed
+        String code = InviteUserAction.validateEmail("user@beta-corp.example", "admin@alpha-corp.example");
+        assertNull(code);
+
+        // admin is beta, invitee is alpha — symmetric, should also be allowed
+        code = InviteUserAction.validateEmail("user@alpha-corp.example", "admin@beta-corp.example");
+        assertNull(code);
+
+        // Same domain — always allowed
+        code = InviteUserAction.validateEmail("user@alpha-corp.example", "admin@alpha-corp.example");
+        assertNull(code);
+
+        // Unrelated domain — should be rejected
+        code = InviteUserAction.validateEmail("user@unrelated.example", "admin@alpha-corp.example");
+        assertEquals(InviteUserAction.DIFFERENT_ORG_EMAIL_ERROR, code);
+
+        // Setup: parent/child — both map to same canonical org
+        InviteUserAction.commonOrganisationsMap.put("parent-org.example", "parent-org.example");
+        InviteUserAction.commonOrganisationsMap.put("child-org.example", "parent-org.example");
+
+        // admin is parent, invitee is child — should be allowed
+        code = InviteUserAction.validateEmail("user@child-org.example", "admin@parent-org.example");
+        assertNull(code);
+
+        // admin is child, invitee is parent — symmetric
+        code = InviteUserAction.validateEmail("user@parent-org.example", "admin@child-org.example");
+        assertNull(code);
+
+        // consulting-for subdomain — should be allowed
+        code = InviteUserAction.validateEmail("user@consulting-for.alpha-corp.example", "admin@alpha-corp.example");
+        assertNull(code);
+
+        // Invitee from akto.io — always allowed regardless of admin domain
+        code = InviteUserAction.validateEmail("user@akto.io", "admin@alpha-corp.example");
+        assertNull(code);
+
+        InviteUserAction.commonOrganisationsMap = new HashMap<>();
+    }
+
+    @Test
     public void testInviteUserAction() {
         RBACDao.instance.deleteAll(new BasicDBObject());
         UsersDao.instance.deleteAll(new BasicDBObject());
