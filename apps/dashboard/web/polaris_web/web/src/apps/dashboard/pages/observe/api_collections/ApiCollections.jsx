@@ -80,7 +80,7 @@ const headers = [
             textValue: 'endpointId',
             showFilter: true,
             isText: CellType.TEXT,
-            boxWidth: '160px'
+            boxWidth: '100px'
         },
         {
             title: "Username",
