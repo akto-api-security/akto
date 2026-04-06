@@ -1,6 +1,6 @@
 import { useState, useMemo, useReducer } from "react";
 import { IndexFiltersMode } from "@shopify/polaris";
-import { Badge, HorizontalStack, Icon, Text } from "@shopify/polaris";
+import { Badge, HorizontalStack, Icon, Modal, Text } from "@shopify/polaris";
 import { SettingsMajor } from "@shopify/polaris-icons";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
 import { produce } from "immer";
@@ -13,6 +13,7 @@ import useTable from "../../components/tables/TableContext";
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import values from "@/util/values";
+import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 
 // ── Identity icon via Google favicon API ───────────────────────────────────────
 const IDENTITY_DOMAIN_MAP = {
@@ -102,25 +103,25 @@ const expiryComp = (s) => {
 
 // ── 10 Critical Curated (all others non-critical) ──────────────────────────────
 const CRITICAL_CURATED = [
-    { identityName:"aws-cursor-key",     agent:"Cursor Prod",     type:"API Key",      access:"Admin",       violCrit:3, violHigh:0, violMed:0, lastUsed:"2h ago",  expiryStatus:"2d left"                },
-    { identityName:"hr-slack-token",     agent:"HR Assistant",    type:"Bearer Token", access:"Write",      violCrit:1, violHigh:3, violMed:0, lastUsed:"45m ago", expiryStatus:"Rotation Due in 2 days" },
-    { identityName:"aws-env-sa",         agent:"New Env Agent",   type:"Bearer Token", access:"Write",      violCrit:2, violHigh:1, violMed:0, lastUsed:"1d ago",  expiryStatus:"Rotation due today"     },
-    { identityName:"github-oauth-456",   agent:"Code Reviewer",   type:"Bearer Token", access:"Read/Write", violCrit:1, violHigh:3, violMed:2, lastUsed:"3h ago",  expiryStatus:"60d left"               },
-    { identityName:"jira-token",         agent:"My Assistant",    type:"API Key",      access:"Read",       violCrit:2, violHigh:4, violMed:1, lastUsed:"Never",   expiryStatus:"15d left"               },
-    { identityName:"internal-api-token", agent:"Connector",       type:"Bearer Token", access:"Read",       violCrit:1, violHigh:0, violMed:1, lastUsed:"2d ago",  expiryStatus:"60d left"               },
-    { identityName:"entra-service",      agent:"Entra Bot",       type:"Bearer Token", access:"Read",       violCrit:2, violHigh:5, violMed:0, lastUsed:"6h ago",  expiryStatus:"7d left"                },
-    { identityName:"vscode-oauth",       agent:"Agent Studio",    type:"API Key",      access:"Write",      violCrit:1, violHigh:2, violMed:1, lastUsed:"Never",   expiryStatus:"No expiry"              },
-    { identityName:"stripe-key",         agent:"Finance Bot",     type:"API Key",      access:"Admin",      violCrit:3, violHigh:0, violMed:2, lastUsed:"5h ago",  expiryStatus:"Rotation due today"     },
-    { identityName:"github-actions-key", agent:"CI Bot",          type:"Bearer Token", access:"Write",      violCrit:1, violHigh:1, violMed:0, lastUsed:"10m ago", expiryStatus:"Expired 1d ago"         },
+    { identityName:"aws-cursor-key",     agent:"Cursor Prod",     type:"API Key",      access:"Admin",       violCrit:3, violHigh:0, violMed:0, lastUsed:"2h ago",  expiryStatus:"2d left",                owner:"Evelyn Carter"     },
+    { identityName:"hr-slack-token",     agent:"HR Assistant",    type:"Bearer Token", access:"Write",      violCrit:1, violHigh:3, violMed:0, lastUsed:"45m ago", expiryStatus:"Rotation Due in 2 days", owner:"John Matthews"     },
+    { identityName:"aws-env-sa",         agent:"New Env Agent",   type:"Bearer Token", access:"Write",      violCrit:2, violHigh:1, violMed:0, lastUsed:"1d ago",  expiryStatus:"Rotation due today",     owner:"Adam Brooks"       },
+    { identityName:"github-oauth-456",   agent:"Code Reviewer",   type:"Bearer Token", access:"Read/Write", violCrit:1, violHigh:3, violMed:2, lastUsed:"3h ago",  expiryStatus:"60d left",               owner:"Sarah Williams"    },
+    { identityName:"jira-token",         agent:"My Assistant",    type:"API Key",      access:"Read",       violCrit:2, violHigh:4, violMed:1, lastUsed:"Never",   expiryStatus:"15d left",               owner:"Noah Bennett"      },
+    { identityName:"internal-api-token", agent:"Connector",       type:"Bearer Token", access:"Read",       violCrit:1, violHigh:0, violMed:1, lastUsed:"2d ago",  expiryStatus:"60d left",               owner:"Theodore Collins"  },
+    { identityName:"entra-service",      agent:"Entra Bot",       type:"Bearer Token", access:"Read",       violCrit:2, violHigh:5, violMed:0, lastUsed:"6h ago",  expiryStatus:"7d left",                owner:"Michael Alvarez"   },
+    { identityName:"vscode-oauth",       agent:"Agent Studio",    type:"API Key",      access:"Write",      violCrit:1, violHigh:2, violMed:1, lastUsed:"Never",   expiryStatus:"No expiry",              owner:"Nina Nolan"        },
+    { identityName:"stripe-key",         agent:"Finance Bot",     type:"API Key",      access:"Admin",      violCrit:3, violHigh:0, violMed:2, lastUsed:"5h ago",  expiryStatus:"Rotation due today",     owner:"Lisa Wong"         },
+    { identityName:"github-actions-key", agent:"CI Bot",          type:"Bearer Token", access:"Write",      violCrit:1, violHigh:1, violMed:0, lastUsed:"10m ago", expiryStatus:"Expired 1d ago",         owner:"Kevin O'Connor"    },
 ];
 
 // ── Non-critical curated (high/medium/low violations) ──────────────────────────
 const NON_CRITICAL_CURATED = [
-    { identityName:"zendesk-api-key",    agent:"Support Bot",     type:"Bearer Token", access:"Write",      violCrit:0, violHigh:1, violMed:0, lastUsed:"3h ago",  expiryStatus:"15d left"               },
-    { identityName:"gcp-service-key",    agent:"Infra Agent",     type:"API Key",      access:"Admin",      violCrit:0, violHigh:1, violMed:1, lastUsed:"6h ago",  expiryStatus:"5d left"                },
-    { identityName:"notion-token",       agent:"Docs Assistant",  type:"API Key",      access:"Read",       violCrit:0, violHigh:1, violMed:0, lastUsed:"1d ago",  expiryStatus:"1d left"                },
-    { identityName:"hubspot-oauth",      agent:"Marketing Bot",   type:"Bearer Token", access:"Write",      violCrit:0, violHigh:1, violMed:0, lastUsed:"10m ago", expiryStatus:"No expiry"              },
-    { identityName:"snowflake-key",      agent:"Data Agent",      type:"API Key",      access:"Read/Write", violCrit:0, violHigh:3, violMed:1, lastUsed:"3h ago",  expiryStatus:"No expiry"              },
+    { identityName:"zendesk-api-key",    agent:"Support Bot",     type:"Bearer Token", access:"Write",      violCrit:0, violHigh:1, violMed:0, lastUsed:"3h ago",  expiryStatus:"15d left",  owner:"Sarah Williams"  },
+    { identityName:"gcp-service-key",    agent:"Infra Agent",     type:"API Key",      access:"Admin",      violCrit:0, violHigh:1, violMed:1, lastUsed:"6h ago",  expiryStatus:"5d left",   owner:"Adam Brooks"     },
+    { identityName:"notion-token",       agent:"Docs Assistant",  type:"API Key",      access:"Read",       violCrit:0, violHigh:1, violMed:0, lastUsed:"1d ago",  expiryStatus:"1d left",   owner:"Noah Bennett"    },
+    { identityName:"hubspot-oauth",      agent:"Marketing Bot",   type:"Bearer Token", access:"Write",      violCrit:0, violHigh:1, violMed:0, lastUsed:"10m ago", expiryStatus:"No expiry", owner:"Evelyn Carter"   },
+    { identityName:"snowflake-key",      agent:"Data Agent",      type:"API Key",      access:"Read/Write", violCrit:0, violHigh:3, violMed:1, lastUsed:"3h ago",  expiryStatus:"No expiry", owner:"John Matthews"   },
 ];
 
 // ── Generation pools ───────────────────────────────────────────────────────────
@@ -141,6 +142,11 @@ const IDENTITY_POOL = [
     "vercel-token","netlify-token","heroku-api-key","fly-io-token","render-token",
     "datadog-agent-key","newrelic-license","grafana-cloud-key","sentry-auth","launchdarkly-sdk",
     "mixpanel-token","amplitude-key","segment-write-key","intercom-token","zendesk-jwt",
+];
+const OWNERS_POOL   = [
+    "Evelyn Carter","John Matthews","Adam Brooks","Sarah Williams","Noah Bennett",
+    "Theodore Collins","Michael Alvarez","Nina Nolan","Lisa Wong","Kevin O'Connor",
+    "Grace Mitchell","Daniel Harper","Rachel Foster","James Sullivan","Claire Anderson",
 ];
 const TYPES_POOL    = ["API Key", "Bearer Token", "API Key", "Bearer Token", "API Key"];
 const ACCESS_POOL   = ["Admin", "Read", "Write", "Read/Write", "Read", "Write"];
@@ -168,6 +174,7 @@ const GENERATED = Array.from({ length: 109 }, (_, i) => {
         violMed:      hasViol ? (idx % 3) : 0,
         lastUsed:     pick(LAST_USED_P, idx + 4),
         expiryStatus: pick(EXPIRY_POOL, idx + 5),
+        owner:        pick(OWNERS_POOL, idx + 6),
     };
 });
 
@@ -206,7 +213,8 @@ const summaryItems = [
 // ── Headers ────────────────────────────────────────────────────────────────────
 const headers = [
     { text: "Identity",      value: "identityComp",   title: "Identity"                           },
-    { text: "Agent",         value: "agentComp",      title: "Agent"                                },
+    { text: "Agent",         value: "agentComp",      title: "Agent"                              },
+    ...(isEndpointSecurityCategory() ? [{ text: "Owner", value: "owner", title: "Owner", type: CellType.TEXT }] : []),
     { text: "Type",          value: "typeComp",       title: "Type"                               },
     { text: "Access",        value: "access",         title: "Access",      type: CellType.TEXT   },
     { text: "Violations",    value: "violationsComp", title: "Violations"                         },
@@ -234,10 +242,11 @@ export default function IdentitiesPage() {
     const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
     const initialSelectedTab  = tableSelectedTab[window.location.pathname] || "all";
 
-    const [selectedTab, setSelectedTab] = useState(initialSelectedTab);
-    const [selected, setSelected]       = useState(
+    const [selectedTab, setSelectedTab]         = useState(initialSelectedTab);
+    const [selected, setSelected]               = useState(
         func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab)
     );
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
         values.ranges[2]
@@ -259,6 +268,7 @@ export default function IdentitiesPage() {
     );
 
     return (
+        <>
         <PageWithMultipleCards
             title={pageTitle}
             isFirstPage
@@ -281,8 +291,29 @@ export default function IdentitiesPage() {
                     tableTabs={tableTabs}
                     onSelect={(i) => setSelected(i)}
                     selected={selected}
+                    promotedBulkActions={() => [
+                        { content: "Delete identity", destructive: true, onAction: () => setShowDeleteModal(true) },
+                    ]}
                 />,
             ]}
         />
+        <Modal
+            open={showDeleteModal}
+            onClose={() => setShowDeleteModal(false)}
+            title="Delete identity?"
+            primaryAction={{
+                content: "Delete identity",
+                destructive: true,
+                onAction: () => setShowDeleteModal(false),
+            }}
+            secondaryActions={[{ content: "Cancel", onAction: () => setShowDeleteModal(false) }]}
+        >
+            <Modal.Section>
+                <Text variant="bodyMd">
+                    Are you sure you want to delete the selected identities? This action cannot be undone.
+                </Text>
+            </Modal.Section>
+        </Modal>
+        </>
     );
 }

@@ -379,6 +379,10 @@ export default function ViolationsPage() {
                     tableTabs={tableTabs}
                     onSelect={(i) => setSelected(i)}
                     selected={selected}
+                    promotedBulkActions={() => [
+                        { content: "Mark as fixed", onAction: () => {} },
+                        { content: "Open Jira ticket", onAction: () => {} },
+                    ]}
                 />,
             ]}
         />

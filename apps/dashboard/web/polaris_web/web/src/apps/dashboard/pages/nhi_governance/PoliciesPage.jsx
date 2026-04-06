@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { IndexFiltersMode } from "@shopify/polaris";
-import { Badge, Button, HorizontalStack, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Badge, Button, HorizontalStack, Modal, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
@@ -220,10 +220,11 @@ export default function PoliciesPage() {
     const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
     const initialSelectedTab  = tableSelectedTab[window.location.pathname] || "all";
 
-    const [selectedTab, setSelectedTab] = useState(initialSelectedTab);
-    const [selected, setSelected]       = useState(
+    const [selectedTab, setSelectedTab]         = useState(initialSelectedTab);
+    const [selected, setSelected]               = useState(
         func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab)
     );
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     const dataByTab = useMemo(() => ({
         all:      tableData,
@@ -243,6 +244,7 @@ export default function PoliciesPage() {
     );
 
     return (
+        <>
         <PageWithMultipleCards
             title={policiesPageTitle}
             isFirstPage
@@ -265,8 +267,36 @@ export default function PoliciesPage() {
                     tableTabs={tableTabs}
                     onSelect={(i) => setSelected(i)}
                     selected={selected}
+                    promotedBulkActions={(selectedIds) => {
+                        const selectedRows = dataByTab[selectedTab].filter((r) => selectedIds.includes(r.id) || selectedIds.includes(String(r.id)));
+                        const hasActive = selectedRows.length === 0 || selectedRows.some((r) => r.status === "Active");
+                        const hasDraft  = selectedRows.some((r) => r.status === "Draft");
+                        return [
+                            ...(hasActive ? [{ content: "Mark as inactive", onAction: () => {} }] : []),
+                            ...(hasDraft  ? [{ content: "Mark as active",   onAction: () => {} }] : []),
+                            { content: "Delete policy", destructive: true, onAction: () => setShowDeleteModal(true) },
+                        ];
+                    }}
                 />,
             ]}
         />
+        <Modal
+            open={showDeleteModal}
+            onClose={() => setShowDeleteModal(false)}
+            title="Delete policy?"
+            primaryAction={{
+                content: "Delete policy",
+                destructive: true,
+                onAction: () => setShowDeleteModal(false),
+            }}
+            secondaryActions={[{ content: "Cancel", onAction: () => setShowDeleteModal(false) }]}
+        >
+            <Modal.Section>
+                <Text variant="bodyMd">
+                    Are you sure you want to delete the selected policies? This action cannot be undone.
+                </Text>
+            </Modal.Section>
+        </Modal>
+        </>
     );
 }
