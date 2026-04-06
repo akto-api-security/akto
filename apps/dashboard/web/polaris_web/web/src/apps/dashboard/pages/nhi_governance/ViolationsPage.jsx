@@ -1,7 +1,9 @@
 import { useState, useMemo, useReducer } from "react";
 import { IndexFiltersMode } from "@shopify/polaris";
-import { Badge, HorizontalStack, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Avatar, Badge, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { SettingsMinor } from "@shopify/polaris-icons";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
+import CollectionIcon from "../../components/shared/CollectionIcon";
 import { produce } from "immer";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
@@ -14,6 +16,35 @@ import useTable from "../../components/tables/TableContext";
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import values from "@/util/values";
+
+// ── Identity icon via Google favicon API ───────────────────────────────────────
+const IDENTITY_DOMAIN_MAP = {
+    aws: "aws.amazon.com", gcp: "cloud.google.com", azure: "azure.microsoft.com",
+    github: "github.com", okta: "okta.com", twilio: "twilio.com",
+    hubspot: "hubspot.com", salesforce: "salesforce.com", mongo: "mongodb.com",
+    redis: "redis.com", elastic: "elastic.co", vault: "vaultproject.io",
+    argo: "argoproj.io", terraform: "hashicorp.com", jenkins: "jenkins.io",
+    splunk: "splunk.com", pagerduty: "pagerduty.com", opsgenie: "atlassian.com",
+    linear: "linear.app", notion: "notion.so", zoom: "zoom.us", box: "box.com",
+    dropbox: "dropbox.com", figma: "figma.com", cloudflare: "cloudflare.com",
+    vercel: "vercel.com", netlify: "netlify.com", heroku: "heroku.com",
+    fly: "fly.io", render: "render.com", datadog: "datadoghq.com",
+    newrelic: "newrelic.com", grafana: "grafana.com", sentry: "sentry.io",
+    launchdarkly: "launchdarkly.com", mixpanel: "mixpanel.com",
+    amplitude: "amplitude.com", segment: "segment.io", intercom: "intercom.com",
+    zendesk: "zendesk.com", stripe: "stripe.com", jira: "atlassian.com",
+    slack: "slack.com", vscode: "code.visualstudio.com", entra: "microsoft.com",
+    snowflake: "snowflake.com",
+};
+const INTERNAL_KEYWORDS = new Set(["internal", "connector"]);
+function IdentityIcon({ name }) {
+    const parts = (name || "").toLowerCase().split(/[-_\d]+/).filter(p => p.length > 2);
+    if (parts.some(p => INTERNAL_KEYWORDS.has(p)))
+        return <Icon source={SettingsMinor} color="subdued" />;
+    const domain = parts.reduce((found, p) => found || IDENTITY_DOMAIN_MAP[p] || null, null);
+    if (!domain) return null;
+    return <Avatar size="extraSmall" shape="square" source={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} />;
+}
 
 const definedTableTabs = ["All", "Open", "Fixed"];
 const resourceName = { singular: "violation", plural: "violations" };
@@ -165,8 +196,8 @@ const tableData = ALL_RAW.map((r, i) => ({
     severityComp:  sevBadge(r.severity),
     // Violation is the "main" column — shown bold
     violationComp: <Text variant="bodyMd" fontWeight="medium">{r.violation}</Text>,
-    // Identity is secondary — plain text
-    identityText:  r.identity,
+    identityComp:  <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identity} /><Text variant="bodyMd">{r.identity}</Text></HorizontalStack>,
+    agentComp:     <HorizontalStack gap="2" blockAlign="center" wrap={false}><CollectionIcon assetTagValue={r.agent} displayName={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
     policyComp:    <PolicyCell policy={r.policy} />,
 }));
 
@@ -223,8 +254,8 @@ function DonutCard({ title, donutData }) {
 // ── Headers ────────────────────────────────────────────────────────────────────
 const headers = [
     { text: "Violation",  value: "violationComp", title: "Violation"                           },
-    { text: "Identity",   value: "identityText",  title: "Identity",   type: CellType.TEXT     },
-    { text: "Agent",      value: "agent",         title: "Agent",      type: CellType.TEXT     },
+    { text: "Identity",   value: "identityComp",  title: "Identity"                            },
+    { text: "Agent",      value: "agentComp",     title: "Agent"                               },
     { text: "Severity",   value: "severityComp",  title: "Severity"                            },
     { text: "Policy",     value: "policyComp",    title: "Policy"                              },
     { text: "Discovered", value: "discovered",    title: "Discovered", type: CellType.TEXT     },
