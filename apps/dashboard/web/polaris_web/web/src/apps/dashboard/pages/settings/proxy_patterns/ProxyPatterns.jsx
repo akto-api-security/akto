@@ -1,4 +1,4 @@
-import { Box, Button, Text, TextField, Banner, VerticalStack, Card, Form } from '@shopify/polaris'
+import { Button, Text, TextField, Banner, VerticalStack, Card, Form } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
@@ -6,6 +6,7 @@ import settingRequests from '../api'
 import settingFunctions from '../module'
 import func from '@/util/func'
 import { CellType } from '../../../components/tables/rows/GithubRow'
+import { ToggleComponent } from '../about/About'
 
 function validateRegex(pattern) {
     if (!pattern || pattern.trim() === '') {
@@ -46,6 +47,7 @@ function ProxyPatterns() {
     const [loading, setLoading] = useState(false)
     const [tableData, setTableData] = useState([])
     const [fetchingData, setFetchingData] = useState(false)
+    const [switchProxyMode, setSwitchProxyMode] = useState(false)
 
     function buildTableData(matchingPatternsForProxy) {
         if (!matchingPatternsForProxy) return []
@@ -66,6 +68,7 @@ function ProxyPatterns() {
         try {
             const { resp } = await settingFunctions.fetchAdminInfo()
             setTableData(buildTableData(resp?.matchingPatternsForProxy))
+            setSwitchProxyMode(resp?.switchProxyMode || false)
         } catch (e) {
             func.setToast(true, true, 'Failed to load proxy patterns')
         } finally {
@@ -82,7 +85,22 @@ function ProxyPatterns() {
         if (patternError) setPatternError('')
     }
 
+    async function handleToggleProxyMode(value) {
+        setSwitchProxyMode(value)
+        try {
+            await settingRequests.addMatchingPatternForProxy("",value)
+            func.setToast(true, false, `Proxy mode ${value ? 'enabled' : 'disabled'}`)
+        } catch (e) {
+            setSwitchProxyMode(!value)
+            func.setToast(true, true, 'Failed to update proxy mode')
+        }
+    }
+
     async function handleAdd(value) {
+        if (!switchProxyMode) {
+            func.setToast(true, true, 'Enable proxy mode before adding patterns')
+            return
+        }
         const error = validateRegex(value)
         if (error) {
             setPatternError(error)
@@ -90,8 +108,8 @@ function ProxyPatterns() {
         }
         setLoading(true)
         try {
-            const resp = await settingRequests.addMatchingPatternForProxy(value.trim())
-            setTableData(buildTableData(resp))
+            const resp = await settingRequests.addMatchingPatternForProxy(value, switchProxyMode)
+            setTableData(buildTableData(resp?.matchingPatternsForProxy || resp))
             setPattern('')
             func.setToast(true, false, 'Pattern added successfully')
         } catch (e) {
@@ -108,6 +126,14 @@ function ProxyPatterns() {
                 <Text variant="bodyMd" color="subdued">
                     Add patterns to match proxy traffic. These are used to identify requests routed through a proxy.
                 </Text>
+                <ToggleComponent
+                    text="Proxy Mode"
+                    onToggle={handleToggleProxyMode}
+                    initial={switchProxyMode}
+                />
+                {!switchProxyMode && (
+                    <Banner status="warning">Enable proxy mode to add patterns.</Banner>
+                )}
                 {patternError && (
                     <Banner status="critical">{patternError}</Banner>
                 )}
@@ -119,12 +145,13 @@ function ProxyPatterns() {
                         placeholder="e.g. .internal.example.com."
                         error={patternError ? true : undefined}
                         autoComplete="off"
+                        disabled={!switchProxyMode}
                         connectedRight={
                             <Button
                                 primary
                                 onClick={() => handleAdd(pattern)}
                                 loading={loading}
-                                disabled={!pattern.trim()}
+                                disabled={!pattern.trim() || !switchProxyMode}
                             >
                                 Add
                             </Button>

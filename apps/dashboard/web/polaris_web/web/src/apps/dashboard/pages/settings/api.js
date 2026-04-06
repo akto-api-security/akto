@@ -1003,11 +1003,11 @@ const settingRequests = {
             data: {}
         })
     },
-    addMatchingPatternForProxy(proxyPattern) {
+    addMatchingPatternForProxy(proxyPattern, switchProxyMode) {
         return request({
             url: '/api/addMatchingPatternForProxy',
             method: 'post',
-            data: {proxyPattern}
+            data: {proxyPattern, switchProxyMode}
         })
     }
 }
