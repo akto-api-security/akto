@@ -25,21 +25,12 @@ import {
     createEnvTypeFilter,
     createHostnameFilter,
     extractEndpointId,
-    ROW_TYPES
+    ROW_TYPES,
+    SKILL_TAG_KEY
 } from "./constants";
 import { CLIENT_TYPES } from "./mcpClientHelper";
-import SkillsTreeTable from "./SkillsTreeTable";
 
 const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
-const SKILLS_TAB_KEY = 'skills';
-
-// Registry of custom tab renderers. Each entry receives (data, commonTabProps).
-// Add new custom tabs here without touching the render logic below.
-const CUSTOM_TAB_RENDERERS = {
-    [SKILLS_TAB_KEY]: (data, commonTabProps) => (
-        <SkillsTreeTable skillGroups={data.skills} {...commonTabProps} />
-    ),
-};
 
 function Endpoints() {
     const navigate = useNavigate();
@@ -192,6 +183,9 @@ function Endpoints() {
             if (row.hostNames?.length > 0) {
                 updatedFiltersMap[INVENTORY_FILTER_KEY] = createHostnameFilter(row.hostNames);
             }
+        } else if (row.rowType === ROW_TYPES.SKILL) {
+            const filterValue = `${SKILL_TAG_KEY}=${row.groupKey}`;
+            updatedFiltersMap[INVENTORY_FILTER_KEY] = createEnvTypeFilter([filterValue], false);
         } else {
             delete updatedFiltersMap[INVENTORY_FILTER_KEY];
         }
@@ -224,11 +218,9 @@ function Endpoints() {
 
     const tableComponent = useMemo(() => {
         const commonTabProps = { tableTabs, onSelect: handleSelectedTab, selected };
-        const customRenderer = CUSTOM_TAB_RENDERERS[selectedTab];
-        if (customRenderer) return customRenderer(data, commonTabProps);
-
         return (
             <GithubSimpleTable
+                key="table"
                 pageLimit={PAGE_LIMIT}
                 data={data[selectedTab]}
                 sortOptions={sortOptions}
