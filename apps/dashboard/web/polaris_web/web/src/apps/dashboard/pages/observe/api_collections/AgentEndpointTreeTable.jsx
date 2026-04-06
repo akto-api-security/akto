@@ -35,7 +35,7 @@ const parentHeaders = [
         textValue: 'username',
         showFilter: true,
         isText: CellType.TEXT,
-        boxWidth: '150px'
+        boxWidth: '100px'
     },
     {
         title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of collection is maximum risk score of the endpoints inside this collection</Text>} title="Risk score" />,
