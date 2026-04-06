@@ -76,25 +76,17 @@ public class Main {
       logger.warnAndAddToDb("Hyperscan initialization error (non-fatal): " + e.getMessage());
     }
 
-    // Start PatternUpdateService for periodic pattern updates from Azure Blob Storage
+    // Start PatternUpdateService for periodic pattern updates from public URL
     try {
-      String azureBlobConnection = System.getenv("AZURE_BLOB_STORAGE_CONNECTION");
-      String azureBlobContainer = System.getenv().getOrDefault("AZURE_BLOB_CONTAINER", "binaries");
-      String azureBlobFileName = System.getenv().getOrDefault("AZURE_BLOB_FILE_NAME", "threat-patterns.txt");
+      String patternFileUrl = "https://akto.blob.core.windows.net/threat-config/threat-patterns.txt";
       String localPatternFile = System.getenv().getOrDefault("LOCAL_PATTERN_FILE", "threat-patterns-example.txt");
 
-      if (azureBlobConnection != null && !azureBlobConnection.isEmpty()) {
-        PatternUpdateService patternUpdateService = new PatternUpdateService(
-            localPatternFile,
-            azureBlobConnection,
-            azureBlobContainer,
-            azureBlobFileName
-        );
-        patternUpdateService.startPeriodicUpdates();
-        logger.infoAndAddToDb("PatternUpdateService started - will check for pattern updates every 15 minutes");
-      } else {
-        logger.infoAndAddToDb("PatternUpdateService skipped - AZURE_BLOB_STORAGE_CONNECTION not configured");
-      }
+      PatternUpdateService patternUpdateService = new PatternUpdateService(
+          localPatternFile,
+          patternFileUrl
+      );
+      patternUpdateService.startPeriodicUpdates();
+      logger.infoAndAddToDb("PatternUpdateService started - will check for pattern updates every 15 minutes from: " + patternFileUrl);
     } catch (Exception e) {
       logger.warnAndAddToDb("PatternUpdateService initialization error (non-fatal): " + e.getMessage());
     }
