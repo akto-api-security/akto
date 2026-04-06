@@ -48,7 +48,7 @@ public class MaliciousEventService {
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
 
   private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
-  private static final List<String> IGNORED_POLICIES_FOR_ACCOUNT = Arrays.asList("WeakOrMissingAuth", "PIIDataLeak");
+  private static final List<String> IGNORED_POLICIES_FOR_ACCOUNT = Arrays.asList("SQLInjection");
 
   private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
       System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
@@ -125,8 +125,9 @@ public class MaliciousEventService {
 
     MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder();
     String severity = evt.getSeverity();
-    // Skip recording for specific policies on specific account
-    if("1763355072".equals(accountId)){
+    // Skip recording for specific policies on specific account.
+    // TODO: Remove once policy is fixed.
+    if("1758787662".equals(accountId)){
       if (IGNORED_POLICIES_FOR_ACCOUNT.contains(filterId)) {
         return;
       }
