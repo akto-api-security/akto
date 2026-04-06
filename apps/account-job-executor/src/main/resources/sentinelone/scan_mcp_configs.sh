@@ -122,14 +122,14 @@ find_files() {
         return
     fi
     
-    find "$base_path" -maxdepth "$max_depth" -name "$pattern" -type f 2>/dev/null | while read -r file; do
+    while IFS= read -r file; do
         # Skip backup files
         case "$file" in
             *.backup|*.backup.json|*backup*|*.akto-backup-*|*.shield_*) continue ;;
         esac
-        
+
         add_file "$file" "$client_type"
-    done
+    done < <(find "$base_path" -maxdepth "$max_depth" -name "$pattern" -type f 2>/dev/null)
 }
 
 # Get all user home directories (scan ALL users, not just $HOME)

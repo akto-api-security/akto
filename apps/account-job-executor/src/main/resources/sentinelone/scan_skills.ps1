@@ -55,11 +55,23 @@ function Add-Skill {
     if (Test-Path -Path $Path -PathType Leaf) {
         $item = Get-Item -Path $Path -Force
         
+        # Extract skill_name from parent directory (e.g. ...\mcp-gateway-dev\SKILL.md -> mcp-gateway-dev)
+        $skillName = (Split-Path $Path -Parent | Split-Path -Leaf).ToLower() -replace '[^a-z0-9-]', '-'
+        
+        # Read file content
+        try {
+            $skillContent = Get-Content -Path $Path -Raw -Encoding UTF8 -ErrorAction Stop
+        } catch {
+            $skillContent = ''
+        }
+        
         $results.skills_found += @{
             path = $Path
             agent = $Agent
             size = $item.Length
             modified = [int][double]::Parse((Get-Date $item.LastWriteTime -UFormat %s))
+            skill_name = $skillName
+            skill_content = $skillContent
         }
     }
 }

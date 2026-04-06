@@ -977,15 +977,18 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {}
         }
         
-        // Separate agents by OS type
+        // Separate agents by OS type and build agent name mapping
         List<String> unixAgentIds = new ArrayList<>();
         List<String> windowsAgentIds = new ArrayList<>();
+        Map<String, String> agentNames = new HashMap<>();  // agentId -> computerName
         
         for (Map<String, Object> agent : agentList) {
             String agentId = agent.get("id").toString();
             String agentName = getStringOrDefault(agent, "computerName", "unknown");
             String osType = getStringOrDefault(agent, "osType", "").toLowerCase();
             String osName = getStringOrDefault(agent, "osName", "").toLowerCase();
+            
+            agentNames.put(agentId, agentName);
             
             loggerMaker.info("Agent OS detection: name=" + agentName + ", osType=" + osType + ", osName=" + osName, LogDb.DASHBOARD);
             
@@ -1001,8 +1004,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         loggerMaker.info("Starting MCP/skill discovery: " + unixAgentIds.size() + " Unix/Linux/macOS agents, " + 
             windowsAgentIds.size() + " Windows agents", LogDb.DASHBOARD);
         
-        // 5 minute timeout for offline agents (reduced from 30 min)
-        int timeoutMs = 1 * 20 * 1000;
+        // 5 minute timeout per script execution
+        int timeoutMs = 10 * 60 * 1000;
         
         // Batch size for large fleets
         int batchSize = 150;
@@ -1035,7 +1038,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         }
         
         if (!allMcpOutputs.isEmpty()) {
-            ingestMCPDiscoveries(allMcpOutputs, ingestUrl, consoleDomain);
+            ingestMCPDiscoveries(allMcpOutputs, ingestUrl, consoleDomain, agentNames);
             results.put("mcp_configs", new ArrayList<>(allMcpOutputs.values()));
             loggerMaker.info("MCP config discovery completed: " + allMcpOutputs.size() + " total results", LogDb.DASHBOARD);
         }
@@ -1068,7 +1071,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         }
         
         if (!allSkillOutputs.isEmpty()) {
-            ingestSkillDiscoveries(allSkillOutputs, ingestUrl, consoleDomain);
+            ingestSkillDiscoveries(allSkillOutputs, ingestUrl, consoleDomain, agentNames);
             results.put("skills", new ArrayList<>(allSkillOutputs.values()));
             loggerMaker.info("Skill discovery completed: " + allSkillOutputs.size() + " total results", LogDb.DASHBOARD);
         }
@@ -1124,7 +1127,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         return allOutputs;
     }
 
-    private static void ingestMCPDiscoveries(Map<String, JsonNode> discoveriesByAgent, String ingestUrl, String consoleDomain) {
+    private static void ingestMCPDiscoveries(Map<String, JsonNode> discoveriesByAgent, String ingestUrl, String consoleDomain, Map<String, String> agentNames) {
         loggerMaker.info("Starting MCP discovery ingestion for " + discoveriesByAgent.size() + " agent(s)", LogDb.DASHBOARD);
         
         List<Map<String, Object>> batchData = new ArrayList<>();
@@ -1132,6 +1135,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         
         for (Map.Entry<String, JsonNode> entry : discoveriesByAgent.entrySet()) {
             String agentId = entry.getKey();
+            String computerName = agentNames.getOrDefault(agentId, agentId);
             JsonNode discovery = entry.getValue();
             
             String hostname = discovery.path("hostname").asText("unknown");
@@ -1210,7 +1214,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                         Map<String, String> tagMap = new HashMap<>();
                         tagMap.put("source", "ENDPOINT");
                         tagMap.put("mcp-server", "MCP Server");
-                        tagMap.put("bot-name", agentId);
+                        tagMap.put("bot-name", computerName);
                         
                         try {
                             String reqHeadersJson = OBJECT_MAPPER.writeValueAsString(reqHeaders);
@@ -1370,7 +1374,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         return Math.abs(hash);
     }
 
-    private static void ingestSkillDiscoveries(Map<String, JsonNode> discoveriesByAgent, String ingestUrl, String consoleDomain) {
+    private static void ingestSkillDiscoveries(Map<String, JsonNode> discoveriesByAgent, String ingestUrl, String consoleDomain, Map<String, String> agentNames) {
         List<Map<String, Object>> batchData = new ArrayList<>();
         Set<SkillCollectionInfo> skillCollections = new HashSet<>();
         
@@ -1378,6 +1382,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         
         for (Map.Entry<String, JsonNode> entry : discoveriesByAgent.entrySet()) {
             String agentId = entry.getKey();
+            String computerName = agentNames.getOrDefault(agentId, agentId);
             JsonNode discovery = entry.getValue();
             String hostname = discovery.path("hostname").asText("unknown");
             String os = discovery.path("os").asText("unknown");
@@ -1393,10 +1398,12 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                 String agent = skill.path("agent").asText("unknown");
                 long size = skill.path("size").asLong(0);
                 long modified = skill.path("modified").asLong(0);
-                
+                String skillContent = skill.path("skill_content").asText("");
+
                 if (path.isEmpty()) continue;
-                
-                String skillName = extractSkillName(path);
+
+                String skillNameFromScript = skill.path("skill_name").asText("");
+                String skillName = !skillNameFromScript.isEmpty() ? skillNameFromScript : extractSkillName(path);
                 String collectionName = hostname + "." + agent + "." + skillName;
                 collectionName = collectionName.toLowerCase();
                 
@@ -1413,7 +1420,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                 
                 Map<String, String> tagMap = new HashMap<>();
                 tagMap.put("source", "ENDPOINT");
-                tagMap.put("bot-name", agentId);
+                tagMap.put("bot-name", computerName);
                 tagMap.put("mcp-server", "MCP Server");
                 tagMap.put("mcp-client", agent);
                 
@@ -1425,9 +1432,9 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                     batch.put("path", "https://" + syntheticHost + "/skill/" + skillName);
                     batch.put("requestHeaders", reqHeadersJson);
                     batch.put("responseHeaders", "{}");
-                    batch.put("method", "GET");
-                    batch.put("requestPayload", "");
-                    batch.put("responsePayload", "Skill file discovered at: " + path);
+                    batch.put("method", "POST");
+                    batch.put("requestPayload", skillContent.isEmpty() ? "Skill file discovered at: " + path : skillContent);
+                    batch.put("responsePayload", "{\"status\":\"ok\"}");
                     batch.put("ip", "127.0.0.1");
                     batch.put("time", String.valueOf(System.currentTimeMillis() / 1000));
                     batch.put("statusCode", "200");
