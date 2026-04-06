@@ -291,7 +291,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         String agentId      = getStringOrDefault(app, "agentId", null);
         String appName      = getStringOrDefault(app, "name", "unknown-app");
 
-        String botName   = agentId != null ? agentId : (computerName != null ? computerName : "unknown-device");
+        String botName   = computerName != null ? computerName : (agentId != null ? agentId : "unknown-device");
         String deviceSeg = (computerName != null ? computerName : (agentId != null ? agentId : "unknown-device")).replaceAll("[^a-zA-Z0-9_\\-]+", "-");
         String appSeg    = appName.toLowerCase().replaceAll("[^a-z0-9_\\-]+", "-");
 
@@ -507,7 +507,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
 
         String agentIdVal = getStringOrDefault(event, "agentId", null);
         if (agentIdVal == null) agentIdVal = getStringOrDefault(event, "id", null);
-        String botName = agentIdVal != null ? agentIdVal : deviceName;
+        String botName = deviceName != null ? deviceName : (agentIdVal != null ? agentIdVal : "unknown-device");
         String pathSeg = deviceName.replaceAll("[^a-zA-Z0-9_\\-]+", "-");
 
         record.put("path", "/sentinelone/dv-events/" + pathSeg);
@@ -808,6 +808,15 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                     if (allCompleted) {
                         loggerMaker.info("All tasks completed for parentTaskId=" + parentTaskId + 
                             ", returning " + agentToTaskId.size() + " task IDs", LogDb.DASHBOARD);
+                        
+                        // Wait for SentinelOne to finalize output files (Linux agents need more time than Mac)
+                        try {
+                            loggerMaker.info("Waiting 30 seconds for output finalization before fetch-files...", LogDb.DASHBOARD);
+                            Thread.sleep(30000);  // 30 seconds
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                        
                         return agentToTaskId;
                     }
                 }
@@ -934,7 +943,9 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                             } else {
                                 loggerMaker.error("No stdout found in ZIP for agentId=" + agentId, LogDb.DASHBOARD);
                                 if (stderrContent != null && !stderrContent.isEmpty()) {
-                                    loggerMaker.error("Stderr content: " + stderrContent, LogDb.DASHBOARD);
+                                    loggerMaker.error("Script failed with stderr for agentId=" + agentId + ": " + stderrContent, LogDb.DASHBOARD);
+                                } else {
+                                    loggerMaker.error("No stderr content either - script may not have executed for agentId=" + agentId, LogDb.DASHBOARD);
                                 }
                             }
                         }
@@ -1004,8 +1015,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         loggerMaker.info("Starting MCP/skill discovery: " + unixAgentIds.size() + " Unix/Linux/macOS agents, " + 
             windowsAgentIds.size() + " Windows agents", LogDb.DASHBOARD);
         
-        // 5 minute timeout per script execution
-        int timeoutMs = 10 * 60 * 1000;
+        // 3 minute timeout per script execution
+        int timeoutMs = 3 * 60 * 1000;
         
         // Batch size for large fleets
         int batchSize = 150;
@@ -1108,6 +1119,14 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             if (taskId != null) {
                 Map<String, String> tasks = pollTaskStatus(taskId, apiToken, consoleUrl, timeoutMs, jobId);
                 if (!tasks.isEmpty()) {
+                    // Wait for SentinelOne to finalize and upload output files to S3
+                    try {
+                        loggerMaker.info(description + " - Batch " + batchNum + "/" + totalBatches + 
+                            ": Waiting 10 seconds for output files to be ready...", LogDb.DASHBOARD);
+                        Thread.sleep(10000);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
                     Map<String, JsonNode> batchOutputs = fetchScriptOutputsWithAgentId(tasks, apiToken, consoleUrl);
                     allOutputs.putAll(batchOutputs);
                     
