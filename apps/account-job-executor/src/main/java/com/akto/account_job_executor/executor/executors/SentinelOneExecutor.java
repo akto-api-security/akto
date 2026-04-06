@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
@@ -43,6 +44,9 @@ public class SentinelOneExecutor extends AccountJobExecutor {
     private static final int DV_POLL_INTERVAL_MS = 3_000;
     private static final int DV_MAX_WAIT_MS      = 60_000;
     private static final int DV_LOOKBACK_HOURS   = 6;
+    
+    // Track running jobs to prevent duplicate execution
+    private static final Set<String> runningJobs = new HashSet<>();
 
     public static final List<String> APPS_TOOL_LIST = Arrays.asList(
         "Claude",
@@ -89,6 +93,28 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             loggerMaker.error("SentinelOneExecutor.execute called with null integration", LogDb.DASHBOARD);
             return;
         }
+        
+        String jobIdStr = jobId != null ? jobId.toString() : "unknown";
+        
+        // Prevent duplicate execution
+        synchronized (runningJobs) {
+            if (runningJobs.contains(jobIdStr)) {
+                loggerMaker.info("Job already running, skipping duplicate execution: jobId=" + jobIdStr, LogDb.DASHBOARD);
+                return;
+            }
+            runningJobs.add(jobIdStr);
+        }
+        
+        try {
+            executeInternal(integration, jobId);
+        } finally {
+            synchronized (runningJobs) {
+                runningJobs.remove(jobIdStr);
+            }
+        }
+    }
+    
+    private static void executeInternal(SentinelOneIntegration integration, ObjectId jobId) {
 
         String consoleUrl    = normalizeUrl(integration.getConsoleUrl());
         String ingestUrl     = normalizeUrl(integration.getDataIngestionUrl());
@@ -608,7 +634,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                     siteId = siteData.get(0).path("id").asText();
                 }
 
-                // Check if script already exists and delete it (overwrite mode)
+                // Delete existing script to ensure latest classpath version is deployed
                 HttpGet getScripts = new HttpGet(consoleUrl + "/web/api/v2.1/remote-scripts?scriptName=" + 
                     java.net.URLEncoder.encode(scriptResourcePath, "UTF-8"));
                 getScripts.setHeader("Authorization", "ApiToken " + apiToken);
@@ -616,11 +642,13 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                     String scriptsBody = EntityUtils.toString(scriptsResp.getEntity());
                     JsonNode scriptsData = OBJECT_MAPPER.readTree(scriptsBody).path("data");
                     if (scriptsData.isArray() && scriptsData.size() > 0) {
-                        // Script already exists — reuse its ID to avoid redundant uploads on every run
                         String existingScriptId = scriptsData.get(0).path("id").asText();
                         if (!existingScriptId.isEmpty()) {
-                            loggerMaker.info("Reusing existing script: " + scriptResourcePath + " (ID: " + existingScriptId + ")", LogDb.DASHBOARD);
-                            return existingScriptId;
+                            HttpDelete deleteScript = new HttpDelete(consoleUrl + "/web/api/v2.1/remote-scripts/" + existingScriptId);
+                            deleteScript.setHeader("Authorization", "ApiToken " + apiToken);
+                            try (CloseableHttpResponse deleteResp = httpClient.execute(deleteScript)) {
+                                loggerMaker.info("Deleted stale script for re-upload: " + scriptResourcePath + " (ID: " + existingScriptId + ")", LogDb.DASHBOARD);
+                            }
                         }
                     }
                 }
@@ -943,6 +971,11 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             loggerMaker.error("Failed to fetch agents: " + e.getMessage(), LogDb.DASHBOARD);
             return results;
         }
+
+        // Send heartbeat after potentially slow fetchAgentList to prevent job re-claim during uploads
+        if (jobId != null) {
+            try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {}
+        }
         
         // Separate agents by OS type
         List<String> unixAgentIds = new ArrayList<>();
@@ -968,8 +1001,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         loggerMaker.info("Starting MCP/skill discovery: " + unixAgentIds.size() + " Unix/Linux/macOS agents, " + 
             windowsAgentIds.size() + " Windows agents", LogDb.DASHBOARD);
         
-        // 30 minute timeout (cron runs every hour)
-        int timeoutMs = 30 * 60 * 1000;
+        // 5 minute timeout for offline agents (reduced from 30 min)
+        int timeoutMs = 1 * 20 * 1000;
         
         // Batch size for large fleets
         int batchSize = 150;
@@ -979,6 +1012,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         
         // Unix agents with .sh script
         if (!unixAgentIds.isEmpty()) {
+            if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
             String mcpScriptIdSh = uploadScriptFromClasspath("scan_mcp_configs.sh", apiToken, consoleUrl);
             if (mcpScriptIdSh != null) {
                 Map<String, JsonNode> unixMcpOutputs = executeBatchedDiscovery(
@@ -990,6 +1024,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         
         // Windows agents with .ps1 script
         if (!windowsAgentIds.isEmpty()) {
+            if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
             String mcpScriptIdPs1 = uploadScriptFromClasspath("scan_mcp_configs.ps1", apiToken, consoleUrl);
             if (mcpScriptIdPs1 != null) {
                 Map<String, JsonNode> windowsMcpOutputs = executeBatchedDiscovery(
@@ -1010,6 +1045,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         
         // Unix agents with .sh script
         if (!unixAgentIds.isEmpty()) {
+            if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
             String skillScriptIdSh = uploadScriptFromClasspath("scan_skills.sh", apiToken, consoleUrl);
             if (skillScriptIdSh != null) {
                 Map<String, JsonNode> unixSkillOutputs = executeBatchedDiscovery(
@@ -1021,6 +1057,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         
         // Windows agents with .ps1 script
         if (!windowsAgentIds.isEmpty()) {
+            if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
             String skillScriptIdPs1 = uploadScriptFromClasspath("scan_skills.ps1", apiToken, consoleUrl);
             if (skillScriptIdPs1 != null) {
                 Map<String, JsonNode> windowsSkillOutputs = executeBatchedDiscovery(
@@ -1130,8 +1167,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                         
                         if (serverName.isEmpty()) continue;
                         
-                        String collectionName = client + "." + serverName;
-                        collectionName = collectionName.toLowerCase();
+                        // Collection name is just the server name (no client prefix like cursor., claude., etc)
+                        String collectionName = serverName.toLowerCase();
                         
                         // Track server for collection creation
                         if (!serverCollections.containsKey(collectionName)) {
