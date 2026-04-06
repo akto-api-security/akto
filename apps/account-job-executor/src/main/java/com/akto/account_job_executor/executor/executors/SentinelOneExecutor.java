@@ -14,16 +14,20 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class SentinelOneExecutor extends AccountJobExecutor {
 
@@ -38,27 +42,20 @@ public class SentinelOneExecutor extends AccountJobExecutor {
     private static final int DV_MAX_WAIT_MS      = 60_000;
     private static final int DV_LOOKBACK_HOURS   = 6;
 
-    /**
-     * Tools to look up in the installed-app inventory (case-insensitive contains match).
-     * Add any new AI coding tools here.
-     */
     public static final List<String> APPS_TOOL_LIST = Arrays.asList(
         "Claude",
         "Cursor",
         "Copilot",
         "Windsurf",
         "Antigravity",
-        "Codex"
+        "Codex",
+        "Ollama"
     );
 
-    /**
-     * Tools to query for via Deep Visibility process events. (case sensitive)
-     * Matched against processCmd and processName (exact string contains).
-     * Add new tools here when they appear as process names.
-     */
     public static final List<String> DV_TOOL_LIST = Arrays.asList(
     "openclaw",
-    "gemini"
+    "gemini",
+    "ollama"
     );
 
     // ── Executor implementation ───────────────────────────────────────────────
@@ -85,11 +82,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
 
     // ── Main execution logic ──────────────────────────────────────────────────
 
-    /**
-     * Main entry point – runs the full apps + DV pipeline for every tool in the respective lists.
-     *
-     * @param integration fully-populated SentinelOneIntegration (with apiToken)
-     */
     private static void execute(SentinelOneIntegration integration) {
         if (integration == null) {
             loggerMaker.error("SentinelOneExecutor.execute called with null integration", LogDb.DASHBOARD);
@@ -148,6 +140,14 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                 loggerMaker.error("SentinelOneExecutor: DV query failed — " + e.getMessage(), LogDb.DASHBOARD);
             }
         }
+
+        // ── Pass 3: MCP Discovery via RemoteOps ───────────────────────────────
+        try {
+            discoverMCPConfigsAndSkills(integration);
+        } catch (Exception e) {
+            loggerMaker.error("SentinelOneExecutor: MCP discovery failed — " + e.getMessage(), LogDb.DASHBOARD);
+        }
+
     }
 
     // ── Agent helpers ─────────────────────────────────────────────────────────
@@ -176,6 +176,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                         Map<String, Object> entry = new HashMap<>();
                         entry.put("id", node.path("id").asText(""));
                         entry.put("computerName", node.path("computerName").asText(""));
+                        entry.put("osType", node.path("osType").asText(""));
+                        entry.put("osName", node.path("osName").asText(""));
                         result.add(entry);
                     }
                 }
@@ -303,11 +305,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
 
     // ── Deep Visibility ───────────────────────────────────────────────────────
 
-    /**
-     * Run a SINGLE combined DV query for all tools to avoid rate limiting.
-     * Query format: (processCmd contains "tool1" OR processName contains "tool1") OR 
-     *               (processCmd contains "tool2" OR processName contains "tool2") ...
-     */
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> runDvQueryForAllTools(
             List<String> tools,
@@ -409,10 +406,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         }
     }
 
-    /**
-     * Group events by which tool was detected in the process command/name.
-     * An event can match multiple tools - we'll assign it to the first match.
-     */
     private static Map<String, List<Map<String, Object>>> groupEventsByTool(
             List<Map<String, Object>> events,
             List<String> tools) {
@@ -579,5 +572,981 @@ public class SentinelOneExecutor extends AccountJobExecutor {
     private static String getStringOrDefault(Map<String, Object> map, String key, String defaultValue) {
         Object val = map.get(key);
         return val != null ? val.toString() : defaultValue;
+    }
+
+    // ── MCP Configuration & Skill Discovery ───────────────────────────────────
+
+    private static String uploadScriptFromClasspath(String scriptResourcePath, String apiToken, String consoleUrl) {
+        String classpathResource = "/sentinelone/" + scriptResourcePath;
+        
+        try (java.io.InputStream scriptStream = SentinelOneExecutor.class.getResourceAsStream(classpathResource)) {
+            if (scriptStream == null) {
+                loggerMaker.error("Script not found in classpath: " + classpathResource, LogDb.DASHBOARD);
+                return null;
+            }
+
+            RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                .build();
+
+            try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
+                // Get site ID
+                HttpGet getSite = new HttpGet(consoleUrl + "/web/api/v2.1/sites?limit=1");
+                getSite.setHeader("Authorization", "ApiToken " + apiToken);
+                String siteId;
+                try (CloseableHttpResponse siteResp = httpClient.execute(getSite)) {
+                    String siteBody = EntityUtils.toString(siteResp.getEntity());
+                    JsonNode siteData = OBJECT_MAPPER.readTree(siteBody).path("data").path("sites");
+                    if (!siteData.isArray() || siteData.size() == 0) {
+                        loggerMaker.error("No sites found in SentinelOne", LogDb.DASHBOARD);
+                        return null;
+                    }
+                    siteId = siteData.get(0).path("id").asText();
+                }
+
+                // Check if script already exists and delete it (overwrite mode)
+                HttpGet getScripts = new HttpGet(consoleUrl + "/web/api/v2.1/remote-scripts?scriptName=" + 
+                    java.net.URLEncoder.encode(scriptResourcePath, "UTF-8"));
+                getScripts.setHeader("Authorization", "ApiToken " + apiToken);
+                try (CloseableHttpResponse scriptsResp = httpClient.execute(getScripts)) {
+                    String scriptsBody = EntityUtils.toString(scriptsResp.getEntity());
+                    JsonNode scriptsData = OBJECT_MAPPER.readTree(scriptsBody).path("data");
+                    if (scriptsData.isArray() && scriptsData.size() > 0) {
+                        // Script exists, delete it first
+                        for (JsonNode script : scriptsData) {
+                            String existingScriptId = script.path("id").asText();
+                            if (!existingScriptId.isEmpty()) {
+                                loggerMaker.info("Deleting existing script: " + scriptResourcePath + " (ID: " + existingScriptId + ")", LogDb.DASHBOARD);
+                                
+                                Map<String, Object> deleteBody = new HashMap<>();
+                                Map<String, Object> deleteFilter = new HashMap<>();
+                                deleteFilter.put("ids", java.util.Collections.singletonList(existingScriptId));
+                                deleteBody.put("filter", deleteFilter);
+                                
+                                HttpPost deletePost = new HttpPost(consoleUrl + "/web/api/v2.1/remote-scripts/delete");
+                                deletePost.setHeader("Authorization", "ApiToken " + apiToken);
+                                deletePost.setHeader("Content-Type", "application/json");
+                                deletePost.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(deleteBody), ContentType.APPLICATION_JSON));
+                                
+                                try (CloseableHttpResponse deleteResp = httpClient.execute(deletePost)) {
+                                    int deleteStatus = deleteResp.getStatusLine().getStatusCode();
+                                    if (deleteStatus != 200 && deleteStatus != 204) {
+                                        loggerMaker.error("Failed to delete existing script: HTTP " + deleteStatus, LogDb.DASHBOARD);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Determine OS types based on script extension
+                String osTypesValue = scriptResourcePath.endsWith(".ps1") ? "windows" : "linux,macos";
+
+                // Upload script (multipart form-data)
+                MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+                builder.addTextBody("scriptName", scriptResourcePath);
+                builder.addTextBody("scriptType", "action");
+                builder.addTextBody("scopeLevel", "site");
+                builder.addTextBody("scopeId", siteId);
+                builder.addTextBody("inputRequired", "false");
+                builder.addTextBody("osTypes", osTypesValue);
+                builder.addBinaryBody("file", scriptStream, ContentType.TEXT_PLAIN, scriptResourcePath);
+
+                HttpPost post = new HttpPost(consoleUrl + "/web/api/v2.1/remote-scripts");
+                post.setHeader("Authorization", "ApiToken " + apiToken);
+                post.setEntity(builder.build());
+
+                try (CloseableHttpResponse response = httpClient.execute(post)) {
+                    int statusCode = response.getStatusLine().getStatusCode();
+                    String responseBody = EntityUtils.toString(response.getEntity());
+                    
+                    if (statusCode != 200 && statusCode != 201) {
+                        loggerMaker.error("Upload script failed: HTTP " + statusCode + " - " + responseBody, LogDb.DASHBOARD);
+                        return null;
+                    }
+
+                    JsonNode json = OBJECT_MAPPER.readTree(responseBody);
+                    String scriptId = json.path("data").path("id").asText();
+                    loggerMaker.info("Script uploaded successfully: " + scriptResourcePath + " (ID: " + scriptId + ")", LogDb.DASHBOARD);
+                    return scriptId;
+                }
+            }
+        } catch (IOException e) {
+            loggerMaker.error("Failed to upload script: " + scriptResourcePath + " - " + e.getMessage(), LogDb.DASHBOARD);
+            return null;
+        }
+    }
+
+    private static String executeRemoteScript(String scriptId, List<String> agentIds, String apiToken, String consoleUrl) {
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("scriptId", scriptId);
+            data.put("outputDestination", "SentinelCloud");
+            data.put("taskDescription", "MCP/Skill Discovery");
+
+            Map<String, Object> filter = new HashMap<>();
+            filter.put("ids", agentIds);
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("data", data);
+            body.put("filter", filter);
+
+            RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                .build();
+
+            try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
+                HttpPost post = new HttpPost(consoleUrl + "/web/api/v2.1/remote-scripts/execute");
+                post.setHeader("Authorization", "ApiToken " + apiToken);
+                post.setHeader("Content-Type", "application/json");
+                post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
+
+                try (CloseableHttpResponse response = httpClient.execute(post)) {
+                    int statusCode = response.getStatusLine().getStatusCode();
+                    String responseBody = EntityUtils.toString(response.getEntity());
+                    
+                    if (statusCode != 200 && statusCode != 201) {
+                        loggerMaker.error("Execute script failed: HTTP " + statusCode + " - " + responseBody, LogDb.DASHBOARD);
+                        return null;
+                    }
+
+                    JsonNode json = OBJECT_MAPPER.readTree(responseBody);
+                    String parentTaskId = json.path("data").path("parentTaskId").asText();
+                    loggerMaker.info("Script execution started: parentTaskId=" + parentTaskId, LogDb.DASHBOARD);
+                    return parentTaskId;
+                }
+            }
+        } catch (IOException e) {
+            loggerMaker.error("Failed to execute script: " + e.getMessage(), LogDb.DASHBOARD);
+            return null;
+        }
+    }
+
+    private static Map<String, String> pollTaskStatus(String parentTaskId, String apiToken, String consoleUrl, int maxWaitMs) {
+        Map<String, String> agentToTaskId = new HashMap<>();
+        long startTime = System.currentTimeMillis();
+        
+        loggerMaker.info("Starting to poll task status for parentTaskId=" + parentTaskId, LogDb.DASHBOARD);
+        
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            int pollCount = 0;
+            while (System.currentTimeMillis() - startTime < maxWaitMs) {
+                pollCount++;
+                HttpGet get = new HttpGet(consoleUrl + "/web/api/v2.1/remote-scripts/status?parent_task_id=" + parentTaskId);
+                get.setHeader("Authorization", "ApiToken " + apiToken);
+                
+                try (CloseableHttpResponse response = httpClient.execute(get)) {
+                    String responseBody = EntityUtils.toString(response.getEntity());
+                    JsonNode json = OBJECT_MAPPER.readTree(responseBody);
+                    JsonNode tasks = json.path("data");
+                    
+                    loggerMaker.info("Poll #" + pollCount + " for parentTaskId=" + parentTaskId + 
+                        ", tasks returned: " + (tasks.isArray() ? tasks.size() : 0), LogDb.DASHBOARD);
+                    
+                    if (!tasks.isArray() || tasks.size() == 0) {
+                        Thread.sleep(3000);
+                        continue;
+                    }
+                    
+                    boolean allCompleted = true;
+                    int completedCount = 0;
+                    int failedCount = 0;
+                    int pendingCount = 0;
+                    int runningCount = 0;
+                    StringBuilder statusDetails = new StringBuilder();
+                    
+                    for (JsonNode task : tasks) {
+                        String status = task.path("status").asText("");
+                        String agentId = task.path("agentId").asText("");
+                        String taskId = task.path("id").asText("");
+                        String agentName = task.path("agentComputerName").asText("unknown");
+                        
+                        statusDetails.append(agentName).append("=").append(status).append("; ");
+                        
+                        if ("completed".equalsIgnoreCase(status)) {
+                            completedCount++;
+                        } else if ("failed".equalsIgnoreCase(status)) {
+                            failedCount++;
+                        } else if ("pending".equalsIgnoreCase(status)) {
+                            pendingCount++;
+                        } else if ("running".equalsIgnoreCase(status)) {
+                            runningCount++;
+                        }
+                        
+                        if (!"completed".equalsIgnoreCase(status) && !"failed".equalsIgnoreCase(status)) {
+                            allCompleted = false;
+                        }
+                        
+                        if ("completed".equalsIgnoreCase(status) && !agentId.isEmpty() && !taskId.isEmpty()) {
+                            agentToTaskId.put(agentId, taskId);
+                        }
+                    }
+                    
+                    loggerMaker.info("Task status: completed=" + completedCount + ", failed=" + failedCount + 
+                        ", pending=" + pendingCount + ", running=" + runningCount + 
+                        ", allCompleted=" + allCompleted + " | Details: " + statusDetails.toString(), LogDb.DASHBOARD);
+                    
+                    if (allCompleted) {
+                        loggerMaker.info("All tasks completed for parentTaskId=" + parentTaskId + 
+                            ", returning " + agentToTaskId.size() + " task IDs", LogDb.DASHBOARD);
+                        return agentToTaskId;
+                    }
+                }
+                
+                Thread.sleep(3000);
+            }
+            
+            loggerMaker.error("Task polling timeout for parentTaskId=" + parentTaskId, LogDb.DASHBOARD);
+        } catch (Exception e) {
+            loggerMaker.error("Failed to poll task status: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+        
+        return agentToTaskId;
+    }
+
+    private static Map<String, JsonNode> fetchScriptOutputsWithAgentId(Map<String, String> agentToTaskId, String apiToken, String consoleUrl) {
+        Map<String, JsonNode> outputs = new HashMap<>();
+        
+        loggerMaker.info("Fetching script outputs for " + agentToTaskId.size() + " agent(s)", LogDb.DASHBOARD);
+        loggerMaker.info("Agent-to-Task mapping: " + agentToTaskId.toString(), LogDb.DASHBOARD);
+        
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("taskIds", new ArrayList<>(agentToTaskId.values()));
+            
+            Map<String, Object> body = new HashMap<>();
+            body.put("data", data);
+            
+            HttpPost post = new HttpPost(consoleUrl + "/web/api/v2.1/remote-scripts/fetch-files");
+            post.setHeader("Authorization", "ApiToken " + apiToken);
+            post.setHeader("Content-Type", "application/json");
+            post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
+            
+            try (CloseableHttpResponse response = httpClient.execute(post)) {
+                int statusCode = response.getStatusLine().getStatusCode();
+                String responseBody = EntityUtils.toString(response.getEntity());
+                
+                loggerMaker.info("fetch-files response: HTTP " + statusCode, LogDb.DASHBOARD);
+                
+                if (statusCode != 200) {
+                    loggerMaker.error("fetch-files failed: HTTP " + statusCode + " - " + responseBody, LogDb.DASHBOARD);
+                    return outputs;
+                }
+                
+                JsonNode json = OBJECT_MAPPER.readTree(responseBody);
+                JsonNode downloadLinks = json.path("data").path("download_links");
+                
+                if (!downloadLinks.isArray()) {
+                    loggerMaker.error("No download links found in fetch-files response", LogDb.DASHBOARD);
+                    return outputs;
+                }
+                
+                loggerMaker.info("Found " + downloadLinks.size() + " download link(s)", LogDb.DASHBOARD);
+                
+                // Create reverse map: taskId -> agentId
+                Map<String, String> taskToAgent = new HashMap<>();
+                for (Map.Entry<String, String> entry : agentToTaskId.entrySet()) {
+                    taskToAgent.put(entry.getValue(), entry.getKey());
+                }
+                
+                // Download and parse each output
+                int linkCount = 0;
+                for (JsonNode linkNode : downloadLinks) {
+                    linkCount++;
+                    String url = linkNode.path("downloadUrl").asText("");
+                    String taskId = linkNode.path("taskId").asText("");
+                    String agentId = taskToAgent.get(taskId);
+                    
+                    if (url.isEmpty()) {
+                        loggerMaker.info("Skipping empty download link #" + linkCount, LogDb.DASHBOARD);
+                        continue;
+                    }
+                    
+                    loggerMaker.info("Downloading output #" + linkCount + " from S3 for agentId=" + agentId, LogDb.DASHBOARD);
+                    
+                    HttpGet get = new HttpGet(url);
+                    try (CloseableHttpResponse dlResp = httpClient.execute(get)) {
+                        byte[] zipData = EntityUtils.toByteArray(dlResp.getEntity());
+                        loggerMaker.info("Downloaded ZIP size: " + zipData.length + " bytes for agentId=" + agentId, LogDb.DASHBOARD);
+                        
+                        // Extract stdout from ZIP
+                        try (java.io.ByteArrayInputStream bais = new java.io.ByteArrayInputStream(zipData);
+                             java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(bais)) {
+                            
+                            String stdoutContent = null;
+                            String stderrContent = null;
+                            
+                            java.util.zip.ZipEntry entry;
+                            while ((entry = zis.getNextEntry()) != null) {
+                                String entryName = entry.getName();
+                                loggerMaker.info("ZIP entry found: " + entryName + " for agentId=" + agentId, LogDb.DASHBOARD);
+                                
+                                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                                byte[] buffer = new byte[8192];
+                                int len;
+                                while ((len = zis.read(buffer)) > 0) {
+                                    baos.write(buffer, 0, len);
+                                }
+                                String content = new String(baos.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+                                
+                                // Match stdout or stdout_*.txt (SentinelOne adds timestamps)
+                                if (entryName.equals("stdout") || entryName.startsWith("stdout_") || entryName.startsWith("/stdout")) {
+                                    stdoutContent = content;
+                                    loggerMaker.info("Found stdout entry: " + entryName + ", length: " + content.length() + " bytes", LogDb.DASHBOARD);
+                                } else if (entryName.equals("stderr") || entryName.startsWith("stderr_") || entryName.startsWith("/stderr")) {
+                                    stderrContent = content;
+                                    loggerMaker.info("Found stderr entry: " + entryName + ", length: " + content.length() + " bytes", LogDb.DASHBOARD);
+                                }
+                            }
+                            
+                            // Process stdout if found
+                            if (stdoutContent != null && !stdoutContent.isEmpty()) {
+                                loggerMaker.info("Processing stdout for agentId=" + agentId, LogDb.DASHBOARD);
+                                try {
+                                    JsonNode output = OBJECT_MAPPER.readTree(stdoutContent);
+                                    if (agentId != null) {
+                                        outputs.put(agentId, output);
+                                    }
+                                    loggerMaker.info("Successfully parsed stdout as JSON for agentId=" + agentId, LogDb.DASHBOARD);
+                                } catch (Exception e) {
+                                    loggerMaker.error("Failed to parse stdout as JSON: " + e.getMessage(), LogDb.DASHBOARD);
+                                    loggerMaker.error("Full stdout content: " + stdoutContent, LogDb.DASHBOARD);
+                                }
+                            } else {
+                                loggerMaker.error("No stdout found in ZIP for agentId=" + agentId, LogDb.DASHBOARD);
+                                if (stderrContent != null && !stderrContent.isEmpty()) {
+                                    loggerMaker.error("Stderr content: " + stderrContent, LogDb.DASHBOARD);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.error("Failed to fetch script outputs: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+        
+        return outputs;
+    }
+
+
+    public static Map<String, Object> discoverMCPConfigsAndSkills(SentinelOneIntegration integration) {
+        Map<String, Object> results = new HashMap<>();
+        results.put("mcp_configs", new ArrayList<>());
+        results.put("skills", new ArrayList<>());
+        
+        String consoleUrl = normalizeUrl(integration.getConsoleUrl());
+        String ingestUrl = normalizeUrl(integration.getDataIngestionUrl());
+        String consoleDomain = extractDomain(integration.getConsoleUrl());
+        String apiToken = integration.getApiToken();
+        
+        // Fetch all agents
+        List<Map<String, Object>> agentList;
+        try {
+            agentList = fetchAgentList(apiToken, consoleUrl);
+            if (agentList.isEmpty()) {
+                loggerMaker.error("No agents found for MCP/skill discovery", LogDb.DASHBOARD);
+                return results;
+            }
+        } catch (IOException e) {
+            loggerMaker.error("Failed to fetch agents: " + e.getMessage(), LogDb.DASHBOARD);
+            return results;
+        }
+        
+        // Separate agents by OS type
+        List<String> unixAgentIds = new ArrayList<>();
+        List<String> windowsAgentIds = new ArrayList<>();
+        
+        for (Map<String, Object> agent : agentList) {
+            String agentId = agent.get("id").toString();
+            String agentName = getStringOrDefault(agent, "computerName", "unknown");
+            String osType = getStringOrDefault(agent, "osType", "").toLowerCase();
+            String osName = getStringOrDefault(agent, "osName", "").toLowerCase();
+            
+            loggerMaker.info("Agent OS detection: name=" + agentName + ", osType=" + osType + ", osName=" + osName, LogDb.DASHBOARD);
+            
+            if (osType.contains("windows") || osName.contains("windows")) {
+                windowsAgentIds.add(agentId);
+                loggerMaker.info("Classified as Windows: " + agentName, LogDb.DASHBOARD);
+            } else {
+                unixAgentIds.add(agentId);
+                loggerMaker.info("Classified as Unix/Linux/macOS: " + agentName, LogDb.DASHBOARD);
+            }
+        }
+        
+        loggerMaker.info("Starting MCP/skill discovery: " + unixAgentIds.size() + " Unix/Linux/macOS agents, " + 
+            windowsAgentIds.size() + " Windows agents", LogDb.DASHBOARD);
+        
+        // 30 minute timeout (cron runs every hour)
+        int timeoutMs = 30 * 60 * 1000;
+        
+        // Batch size for large fleets
+        int batchSize = 150;
+        
+        // Execute MCP config discovery
+        Map<String, JsonNode> allMcpOutputs = new HashMap<>();
+        
+        // Unix agents with .sh script
+        if (!unixAgentIds.isEmpty()) {
+            String mcpScriptIdSh = uploadScriptFromClasspath("scan_mcp_configs.sh", apiToken, consoleUrl);
+            if (mcpScriptIdSh != null) {
+                Map<String, JsonNode> unixMcpOutputs = executeBatchedDiscovery(
+                    mcpScriptIdSh, unixAgentIds, batchSize, timeoutMs, 
+                    "MCP Config (Unix)", apiToken, consoleUrl, ingestUrl, consoleDomain, true);
+                allMcpOutputs.putAll(unixMcpOutputs);
+            }
+        }
+        
+        // Windows agents with .ps1 script
+        if (!windowsAgentIds.isEmpty()) {
+            String mcpScriptIdPs1 = uploadScriptFromClasspath("scan_mcp_configs.ps1", apiToken, consoleUrl);
+            if (mcpScriptIdPs1 != null) {
+                Map<String, JsonNode> windowsMcpOutputs = executeBatchedDiscovery(
+                    mcpScriptIdPs1, windowsAgentIds, batchSize, timeoutMs, 
+                    "MCP Config (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, true);
+                allMcpOutputs.putAll(windowsMcpOutputs);
+            }
+        }
+        
+        if (!allMcpOutputs.isEmpty()) {
+            ingestMCPDiscoveries(allMcpOutputs, ingestUrl, consoleDomain);
+            results.put("mcp_configs", new ArrayList<>(allMcpOutputs.values()));
+            loggerMaker.info("MCP config discovery completed: " + allMcpOutputs.size() + " total results", LogDb.DASHBOARD);
+        }
+        
+        // Execute skill discovery
+        Map<String, JsonNode> allSkillOutputs = new HashMap<>();
+        
+        // Unix agents with .sh script
+        if (!unixAgentIds.isEmpty()) {
+            String skillScriptIdSh = uploadScriptFromClasspath("scan_skills.sh", apiToken, consoleUrl);
+            if (skillScriptIdSh != null) {
+                Map<String, JsonNode> unixSkillOutputs = executeBatchedDiscovery(
+                    skillScriptIdSh, unixAgentIds, batchSize, timeoutMs, 
+                    "Skills (Unix)", apiToken, consoleUrl, ingestUrl, consoleDomain, false);
+                allSkillOutputs.putAll(unixSkillOutputs);
+            }
+        }
+        
+        // Windows agents with .ps1 script
+        if (!windowsAgentIds.isEmpty()) {
+            String skillScriptIdPs1 = uploadScriptFromClasspath("scan_skills.ps1", apiToken, consoleUrl);
+            if (skillScriptIdPs1 != null) {
+                Map<String, JsonNode> windowsSkillOutputs = executeBatchedDiscovery(
+                    skillScriptIdPs1, windowsAgentIds, batchSize, timeoutMs, 
+                    "Skills (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, false);
+                allSkillOutputs.putAll(windowsSkillOutputs);
+            }
+        }
+        
+        if (!allSkillOutputs.isEmpty()) {
+            ingestSkillDiscoveries(allSkillOutputs, ingestUrl, consoleDomain);
+            results.put("skills", new ArrayList<>(allSkillOutputs.values()));
+            loggerMaker.info("Skill discovery completed: " + allSkillOutputs.size() + " total results", LogDb.DASHBOARD);
+        }
+        
+        return results;
+    }
+
+    private static Map<String, JsonNode> executeBatchedDiscovery(
+            String scriptId, 
+            List<String> agentIds, 
+            int batchSize, 
+            int timeoutMs,
+            String description,
+            String apiToken, 
+            String consoleUrl,
+            String ingestUrl,
+            String consoleDomain,
+            boolean isMcpConfig) {
+        
+        Map<String, JsonNode> allOutputs = new HashMap<>();
+        int totalBatches = (int) Math.ceil((double) agentIds.size() / batchSize);
+        
+        loggerMaker.info(description + ": Processing " + agentIds.size() + " agents in " + totalBatches + " batch(es)", LogDb.DASHBOARD);
+        
+        for (int i = 0; i < agentIds.size(); i += batchSize) {
+            int batchNum = (i / batchSize) + 1;
+            List<String> batch = agentIds.subList(i, Math.min(i + batchSize, agentIds.size()));
+            
+            loggerMaker.info(description + " - Batch " + batchNum + "/" + totalBatches + 
+                ": Executing on " + batch.size() + " agents", LogDb.DASHBOARD);
+            
+            String taskId = executeRemoteScript(scriptId, batch, apiToken, consoleUrl);
+            if (taskId != null) {
+                Map<String, String> tasks = pollTaskStatus(taskId, apiToken, consoleUrl, timeoutMs);
+                if (!tasks.isEmpty()) {
+                    Map<String, JsonNode> batchOutputs = fetchScriptOutputsWithAgentId(tasks, apiToken, consoleUrl);
+                    allOutputs.putAll(batchOutputs);
+                    
+                    loggerMaker.info(description + " - Batch " + batchNum + "/" + totalBatches + 
+                        ": Collected " + batchOutputs.size() + " results", LogDb.DASHBOARD);
+                } else {
+                    loggerMaker.error(description + " - Batch " + batchNum + "/" + totalBatches + 
+                        ": No results returned (timeout or failure)", LogDb.DASHBOARD);
+                }
+            } else {
+                loggerMaker.error(description + " - Batch " + batchNum + "/" + totalBatches + 
+                    ": Failed to execute script", LogDb.DASHBOARD);
+            }
+        }
+        
+        loggerMaker.info(description + ": Completed all batches, total outputs: " + allOutputs.size(), LogDb.DASHBOARD);
+        return allOutputs;
+    }
+
+    private static void ingestMCPDiscoveries(Map<String, JsonNode> discoveriesByAgent, String ingestUrl, String consoleDomain) {
+        loggerMaker.info("Starting MCP discovery ingestion for " + discoveriesByAgent.size() + " agent(s)", LogDb.DASHBOARD);
+        
+        List<Map<String, Object>> batchData = new ArrayList<>();
+        Map<String, ServerCollectionInfo> serverCollections = new HashMap<>();
+        
+        for (Map.Entry<String, JsonNode> entry : discoveriesByAgent.entrySet()) {
+            String agentId = entry.getKey();
+            JsonNode discovery = entry.getValue();
+            
+            String hostname = discovery.path("hostname").asText("unknown");
+            String os = discovery.path("os").asText("unknown");
+            String user = discovery.path("user").asText("unknown");
+            JsonNode configsFound = discovery.path("configs_found");
+            
+            loggerMaker.info("Processing discovery from agentId=" + agentId + ", hostname=" + hostname + ", os=" + os, LogDb.DASHBOARD);
+            
+            if (!configsFound.isArray()) {
+                loggerMaker.info("No configs_found array in discovery from " + hostname, LogDb.DASHBOARD);
+                continue;
+            }
+            
+            loggerMaker.info("Found " + configsFound.size() + " config file(s) from " + hostname, LogDb.DASHBOARD);
+            
+            for (JsonNode config : configsFound) {
+                String path = config.path("path").asText("");
+                String client = config.path("client").asText("unknown");
+                long size = config.path("size").asLong(0);
+                long modified = config.path("modified").asLong(0);
+                JsonNode servers = config.path("servers");
+                
+                if (path.isEmpty()) continue;
+                
+                // Process each MCP server in this config file
+                if (servers.isArray() && servers.size() > 0) {
+                    for (JsonNode server : servers) {
+                        String serverName = server.path("name").asText("");
+                        String serverType = server.path("type").asText("unknown");
+                        String command = server.path("command").asText("");
+                        String url = server.path("url").asText("");
+                        
+                        if (serverName.isEmpty()) continue;
+                        
+                        String collectionName = client + "." + serverName;
+                        collectionName = collectionName.toLowerCase();
+                        
+                        // Track server for collection creation
+                        if (!serverCollections.containsKey(collectionName)) {
+                            ServerCollectionInfo info = new ServerCollectionInfo();
+                            info.collectionName = collectionName;
+                            info.serverName = serverName;
+                            info.clientType = client;
+                            info.timestamp = modified;
+                            info.command = command;
+                            info.url = url;
+                            info.type = serverType;
+                            serverCollections.put(collectionName, info);
+                        }
+                        
+                        // Build synthetic host for ingestion (matches collection name)
+                        String syntheticHost = client + "." + serverName;
+                        
+                        // Create request headers (JSON string)
+                        Map<String, String> reqHeaders = new HashMap<>();
+                        reqHeaders.put("content-type", "application/json");
+                        reqHeaders.put("host", syntheticHost);
+                        reqHeaders.put("x-transport", "DISCOVERY");
+                        reqHeaders.put("x-discovery-type", "mcp-config");
+                        
+                        // Create request payload (discovery metadata)
+                        Map<String, Object> reqPayload = new HashMap<>();
+                        reqPayload.put("file_path", path);
+                        reqPayload.put("client_type", client);
+                        reqPayload.put("server_name", serverName);
+                        reqPayload.put("server_type", serverType);
+                        reqPayload.put("command", command);
+                        reqPayload.put("url", url);
+                        reqPayload.put("file_size", size);
+                        reqPayload.put("modified_time", modified);
+                        reqPayload.put("os", os);
+                        reqPayload.put("user", user);
+                        
+                        // Create tag JSON string with source=ENDPOINT and mcp-server label
+                        Map<String, String> tagMap = new HashMap<>();
+                        tagMap.put("source", "ENDPOINT");
+                        tagMap.put("mcp-server", "MCP Server");
+                        tagMap.put("bot-name", agentId);
+                        
+                        try {
+                            String reqHeadersJson = OBJECT_MAPPER.writeValueAsString(reqHeaders);
+                            String reqPayloadJson = OBJECT_MAPPER.writeValueAsString(reqPayload);
+                            String tagJson = OBJECT_MAPPER.writeValueAsString(tagMap);
+                            
+                            Map<String, Object> batch = new HashMap<>();
+                            batch.put("path", "https://" + syntheticHost + "/mcp");
+                            batch.put("requestHeaders", reqHeadersJson);
+                            batch.put("responseHeaders", "{}");
+                            batch.put("method", "POST");
+                            batch.put("requestPayload", reqPayloadJson);
+                            batch.put("responsePayload", "{}");
+                            batch.put("ip", "127.0.0.1");
+                            batch.put("time", String.valueOf(modified));
+                            batch.put("statusCode", "200");
+                            batch.put("status", "OK");
+                            batch.put("akto_account_id", "1000000");
+                            batch.put("akto_vxlan_id", "0");
+                            batch.put("is_pending", "false");
+                            batch.put("source", "MIRRORING");
+                            batch.put("tag", tagJson);
+                            
+                            batchData.add(batch);
+                        } catch (Exception e) {
+                            loggerMaker.error("Failed to serialize MCP server discovery: " + e.getMessage(), LogDb.DASHBOARD);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Create collections for all discovered MCP servers
+        if (!serverCollections.isEmpty()) {
+            createMCPServerCollections(serverCollections, ingestUrl);
+        }
+        
+        // Ingest discovery data
+        if (!batchData.isEmpty()) {
+            try {
+                sendBatch(batchData, ingestUrl);
+                loggerMaker.info("Ingested " + batchData.size() + " MCP server discoveries", LogDb.DASHBOARD);
+            } catch (IOException e) {
+                loggerMaker.error("Failed to ingest MCP discoveries: " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }
+    }
+
+    private static class ServerCollectionInfo {
+        String collectionName;
+        String serverName;
+        String clientType;
+        long timestamp;
+        String command;
+        String url;
+        String type;
+    }
+
+    private static void createMCPServerCollections(Map<String, ServerCollectionInfo> serverCollections, String ingestUrl) {
+        loggerMaker.info("Creating collections for " + serverCollections.size() + " MCP server(s)", LogDb.DASHBOARD);
+        
+        // Build database abstractor URL from environment or use ingest URL base
+        String dbAbstractorUrl;
+        String dbAbstractorEnv = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        if (dbAbstractorEnv != null && !dbAbstractorEnv.isEmpty()) {
+            dbAbstractorUrl = dbAbstractorEnv.endsWith("/") 
+                ? dbAbstractorEnv.substring(0, dbAbstractorEnv.length() - 1) 
+                : dbAbstractorEnv;
+            dbAbstractorUrl += "/api/createCollectionForHostAndVpc";
+            loggerMaker.info("Using DATABASE_ABSTRACTOR_SERVICE_URL: " + dbAbstractorUrl, LogDb.DASHBOARD);
+        } else {
+            // Fallback: derive from ingest URL
+            dbAbstractorUrl = ingestUrl.replaceAll("/api/ingestData.*", "") + "/api/createCollectionForHostAndVpc";
+        }
+        
+        loggerMaker.info("Creating collections for " + serverCollections.size() + " MCP server(s)", LogDb.DASHBOARD);
+        
+        for (ServerCollectionInfo info : serverCollections.values()) {
+            try {
+                // Generate unique collection ID (hash of collection name + timestamp)
+                int colId = generateCollectionId(info.collectionName, info.timestamp);
+                
+                // Build tags list
+                List<Map<String, Object>> tagsList = new ArrayList<>();
+                
+                // Add mcp-server tag
+                Map<String, Object> mcpServerTag = new HashMap<>();
+                mcpServerTag.put("lastUpdatedTs", info.timestamp);
+                mcpServerTag.put("keyName", "mcp-server");
+                mcpServerTag.put("value", "MCP Server");
+                mcpServerTag.put("source", "KUBERNETES");
+                tagsList.add(mcpServerTag);
+                
+                // Add source tag
+                Map<String, Object> sourceTag = new HashMap<>();
+                sourceTag.put("lastUpdatedTs", info.timestamp);
+                sourceTag.put("keyName", "source");
+                sourceTag.put("value", "ENDPOINT");
+                sourceTag.put("source", "KUBERNETES");
+                tagsList.add(sourceTag);
+                
+                // Add mcp-client tag
+                if (info.clientType != null && !info.clientType.isEmpty()) {
+                    Map<String, Object> clientTag = new HashMap<>();
+                    clientTag.put("lastUpdatedTs", info.timestamp);
+                    clientTag.put("keyName", "mcp-client");
+                    clientTag.put("value", info.clientType);
+                    clientTag.put("source", "KUBERNETES");
+                    tagsList.add(clientTag);
+                }
+                
+                // Build request
+                Map<String, Object> request = new HashMap<>();
+                request.put("colId", colId);
+                request.put("host", info.collectionName);
+                request.put("tagsList", tagsList);
+                
+                String requestJson = OBJECT_MAPPER.writeValueAsString(request);
+                
+                // Send request
+                RequestConfig cfg = RequestConfig.custom()
+                    .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                    .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                    .build();
+                
+                try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+                    HttpPost post = new HttpPost(dbAbstractorUrl);
+                    post.setHeader("Content-Type", "application/json");
+                    
+                    String aktoApiToken = System.getenv("AKTO_API_TOKEN");
+                    if (aktoApiToken != null && !aktoApiToken.isEmpty()) {
+                        post.setHeader("Authorization", aktoApiToken);
+                    }
+                    
+                    post.setEntity(new StringEntity(requestJson, ContentType.APPLICATION_JSON));
+                    
+                    try (CloseableHttpResponse resp = client.execute(post)) {
+                        int status = resp.getStatusLine().getStatusCode();
+                        String responseBody = EntityUtils.toString(resp.getEntity());
+                        
+                        if (status == 200) {
+                            loggerMaker.info("Created collection for MCP server: " + info.collectionName, LogDb.DASHBOARD);
+                        } else {
+                            loggerMaker.error("Failed to create collection: HTTP " + status + " - " + responseBody, LogDb.DASHBOARD);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.error("Failed to create collection for " + info.collectionName + ": " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }
+    }
+
+    private static int generateCollectionId(String collectionName, long timestamp) {
+        String combined = collectionName + timestamp;
+        int hash = combined.hashCode();
+        return Math.abs(hash);
+    }
+
+    private static void ingestSkillDiscoveries(Map<String, JsonNode> discoveriesByAgent, String ingestUrl, String consoleDomain) {
+        List<Map<String, Object>> batchData = new ArrayList<>();
+        Set<SkillCollectionInfo> skillCollections = new HashSet<>();
+        
+        loggerMaker.info("Starting skill discovery ingestion for " + discoveriesByAgent.size() + " agent(s)", LogDb.DASHBOARD);
+        
+        for (Map.Entry<String, JsonNode> entry : discoveriesByAgent.entrySet()) {
+            String agentId = entry.getKey();
+            JsonNode discovery = entry.getValue();
+            String hostname = discovery.path("hostname").asText("unknown");
+            String os = discovery.path("os").asText("unknown");
+            String user = discovery.path("user").asText("unknown");
+            JsonNode skillsFound = discovery.path("skills_found");
+            
+            if (!skillsFound.isArray()) continue;
+            
+            loggerMaker.info("Processing " + skillsFound.size() + " skill(s) from agentId=" + agentId + ", hostname=" + hostname, LogDb.DASHBOARD);
+            
+            for (JsonNode skill : skillsFound) {
+                String path = skill.path("path").asText("");
+                String agent = skill.path("agent").asText("unknown");
+                long size = skill.path("size").asLong(0);
+                long modified = skill.path("modified").asLong(0);
+                
+                if (path.isEmpty()) continue;
+                
+                String skillName = extractSkillName(path);
+                String collectionName = hostname + "." + agent + "." + skillName;
+                collectionName = collectionName.toLowerCase();
+                
+                skillCollections.add(new SkillCollectionInfo(collectionName, agent, System.currentTimeMillis()));
+                
+                String syntheticHost = collectionName;
+                
+                Map<String, String> reqHeaders = new HashMap<>();
+                reqHeaders.put("content-type", "text/markdown");
+                reqHeaders.put("host", syntheticHost);
+                reqHeaders.put("x-transport", "SKILL");
+                reqHeaders.put("x-skill-name", skillName);
+                reqHeaders.put("x-agent-type", agent);
+                
+                Map<String, String> tagMap = new HashMap<>();
+                tagMap.put("source", "ENDPOINT");
+                tagMap.put("bot-name", agentId);
+                tagMap.put("mcp-server", "MCP Server");
+                tagMap.put("mcp-client", agent);
+                
+                try {
+                    String reqHeadersJson = OBJECT_MAPPER.writeValueAsString(reqHeaders);
+                    String tagJson = OBJECT_MAPPER.writeValueAsString(tagMap);
+                    
+                    Map<String, Object> batch = new HashMap<>();
+                    batch.put("path", "https://" + syntheticHost + "/skill/" + skillName);
+                    batch.put("requestHeaders", reqHeadersJson);
+                    batch.put("responseHeaders", "{}");
+                    batch.put("method", "GET");
+                    batch.put("requestPayload", "");
+                    batch.put("responsePayload", "Skill file discovered at: " + path);
+                    batch.put("ip", "127.0.0.1");
+                    batch.put("time", String.valueOf(System.currentTimeMillis() / 1000));
+                    batch.put("statusCode", "200");
+                    batch.put("status", "OK");
+                    batch.put("akto_account_id", "1000000");
+                    batch.put("akto_vxlan_id", "0");
+                    batch.put("is_pending", "false");
+                    batch.put("source", "MIRRORING");
+                    batch.put("tag", tagJson);
+                    
+                    batchData.add(batch);
+                } catch (Exception e) {
+                    loggerMaker.error("Failed to serialize skill discovery: " + e.getMessage(), LogDb.DASHBOARD);
+                }
+            }
+        }
+        
+        if (!batchData.isEmpty()) {
+            try {
+                sendBatch(batchData, ingestUrl);
+                loggerMaker.info("Ingested " + batchData.size() + " skill discoveries", LogDb.DASHBOARD);
+            } catch (IOException e) {
+                loggerMaker.error("Failed to ingest skill discoveries: " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }
+        
+        if (!skillCollections.isEmpty()) {
+            createSkillCollections(skillCollections);
+        }
+    }
+    
+    private static String extractSkillName(String filePath) {
+        String fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+        fileName = fileName.substring(filePath.lastIndexOf('\\') + 1);
+        
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex > 0) {
+            fileName = fileName.substring(0, dotIndex);
+        }
+        
+        fileName = fileName.toLowerCase()
+            .replaceAll("[\\s_]+", "-")
+            .replaceAll("[^a-z0-9-]", "");
+        
+        return fileName;
+    }
+    
+    private static void createSkillCollections(Set<SkillCollectionInfo> skillCollections) {
+        String dbAbstractorUrl = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        if (dbAbstractorUrl == null || dbAbstractorUrl.isEmpty()) {
+            dbAbstractorUrl = "http://localhost:5678";
+        }
+        dbAbstractorUrl = normalizeUrl(dbAbstractorUrl) + "/api/createCollectionForHostAndVpc";
+        
+        loggerMaker.info("Using DATABASE_ABSTRACTOR_SERVICE_URL: " + dbAbstractorUrl, LogDb.DASHBOARD);
+        loggerMaker.info("Creating collections for " + skillCollections.size() + " skill(s)", LogDb.DASHBOARD);
+        
+        for (SkillCollectionInfo info : skillCollections) {
+            try {
+                List<Map<String, Object>> tagsList = new ArrayList<>();
+                
+                Map<String, Object> mcpServerTag = new HashMap<>();
+                mcpServerTag.put("lastUpdatedTs", info.timestamp);
+                mcpServerTag.put("keyName", "mcp-server");
+                mcpServerTag.put("value", "MCP Server");
+                mcpServerTag.put("source", "KUBERNETES");
+                tagsList.add(mcpServerTag);
+                
+                Map<String, Object> sourceTag = new HashMap<>();
+                sourceTag.put("lastUpdatedTs", info.timestamp);
+                sourceTag.put("keyName", "source");
+                sourceTag.put("value", "ENDPOINT");
+                sourceTag.put("source", "KUBERNETES");
+                tagsList.add(sourceTag);
+                
+                if (info.agentType != null && !info.agentType.isEmpty()) {
+                    Map<String, Object> clientTag = new HashMap<>();
+                    clientTag.put("lastUpdatedTs", info.timestamp);
+                    clientTag.put("keyName", "mcp-client");
+                    clientTag.put("value", info.agentType);
+                    clientTag.put("source", "KUBERNETES");
+                    tagsList.add(clientTag);
+                }
+                
+                Map<String, Object> request = new HashMap<>();
+                request.put("colId", generateCollectionId(info.collectionName, info.timestamp));
+                request.put("host", info.collectionName);
+                request.put("tagsList", tagsList);
+                
+                String requestJson = OBJECT_MAPPER.writeValueAsString(request);
+                
+                RequestConfig cfg = RequestConfig.custom()
+                    .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                    .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                    .build();
+                
+                try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+                    HttpPost post = new HttpPost(dbAbstractorUrl);
+                    post.setHeader("Content-Type", "application/json");
+                    
+                    String aktoApiToken = System.getenv("AKTO_API_TOKEN");
+                    if (aktoApiToken != null && !aktoApiToken.isEmpty()) {
+                        post.setHeader("Authorization", aktoApiToken);
+                    }
+                    
+                    post.setEntity(new StringEntity(requestJson, ContentType.APPLICATION_JSON));
+                    
+                    try (CloseableHttpResponse resp = client.execute(post)) {
+                        int status = resp.getStatusLine().getStatusCode();
+                        String responseBody = EntityUtils.toString(resp.getEntity());
+                        
+                        if (status == 200) {
+                            loggerMaker.info("Created collection for skill: " + info.collectionName, LogDb.DASHBOARD);
+                        } else {
+                            loggerMaker.error("Failed to create collection: HTTP " + status + " - " + responseBody, LogDb.DASHBOARD);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.error("Failed to create collection for " + info.collectionName + ": " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }
+    }
+    
+    private static class SkillCollectionInfo {
+        String collectionName;
+        String agentType;
+        long timestamp;
+        
+        SkillCollectionInfo(String collectionName, String agentType, long timestamp) {
+            this.collectionName = collectionName;
+            this.agentType = agentType;
+            this.timestamp = timestamp;
+        }
+        
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            SkillCollectionInfo that = (SkillCollectionInfo) o;
+            return collectionName.equals(that.collectionName);
+        }
+        
+        @Override
+        public int hashCode() {
+            return collectionName.hashCode();
+        }
     }
 }
