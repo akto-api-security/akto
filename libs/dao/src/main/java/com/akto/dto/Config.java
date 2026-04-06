@@ -26,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, SLACK_ALERT_CYBORG, CYBORG_TOOLS_AUTH;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, SLACK_ALERT_CYBORG, CYBORG_TOOLS_AUTH, DATADOG_FORWARDER;
     }
 
     ConfigType configType;
@@ -698,6 +698,37 @@ public abstract class Config {
         public void setStaticToken(String staticToken) {
             this.staticToken = staticToken;
         }
+    }
+
+    @BsonDiscriminator
+    public static class DatadogForwarderConfig extends Config {
+        public static final String API_KEY = "apiKey";
+        public static final String DATADOG_SITE = "datadogSite";
+        public static final String ENABLED = "enabled";
+
+        private String apiKey;
+        private String datadogSite;
+        private boolean enabled;
+
+        public static final String CONFIG_ID = ConfigType.DATADOG_FORWARDER.name() + CONFIG_SALT;
+
+        public DatadogForwarderConfig() {
+            this.configType = ConfigType.DATADOG_FORWARDER;
+        }
+
+        public DatadogForwarderConfig(int accountId) {
+            this.configType = ConfigType.DATADOG_FORWARDER;
+            this.id = CONFIG_ID + "_" + accountId;
+        }
+
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+
+        public String getDatadogSite() { return datadogSite; }
+        public void setDatadogSite(String datadogSite) { this.datadogSite = datadogSite; }
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
     }
 
 }

@@ -59,6 +59,7 @@ public class AccountConfig {
     // Account field constants
     public static final String TYPE = "type";
     public static final String AWS_ACCOUNT_IDS = "awsAccountIds";
+    public static final String DATABASE_ABSTRACTOR_TOKEN = "databaseAbstractorToken";
     public static final String CREATED_TIMESTAMP = "createdTimestamp";
     public static final String LAST_UPDATED_TIMESTAMP = "lastUpdatedTimestamp";
 }
