@@ -513,6 +513,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		ModifiedPayload: processResult.ModifiedPayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 		Metadata:        types.ThreatMetadata{},
+		IsWarn:          processResult.IsWarn,
 	}
 
 	s.logger.Info("ValidateRequest - completed",
@@ -610,6 +611,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		ModifiedPayload: processResult.ModifiedPayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 		Metadata:        types.ThreatMetadata{},
+		IsWarn:          processResult.IsWarn,
 	}
 
 	s.logger.Info("ValidateResponse - completed",
@@ -620,6 +622,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("requestID", requestID),
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
+		zap.Bool("isWarn", result.IsWarn),
 		zap.String("reason", result.Reason),
 		zap.Int64("totalLatencyMs", time.Since(start).Milliseconds()))
 
@@ -735,6 +738,7 @@ func (s *Service) ValidateRequestWithPolicy(
 		zap.Bool("shouldForward", processResult.ShouldForward),
 		zap.String("modifiedPayload", processResult.ModifiedPayload),
 		zap.Any("blockedResponse", processResult.BlockedResponse),
+		zap.Bool("isWarn", processResult.IsWarn),
 		zap.String("fullProcessResultJSON", string(processResultJSON)))
 
 	// Convert ProcessResult to ValidationResult
@@ -744,11 +748,13 @@ func (s *Service) ValidateRequestWithPolicy(
 		ModifiedPayload: processResult.ModifiedPayload,
 		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
 		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
+		IsWarn:          processResult.IsWarn,
 	}
 
 	s.logger.Info("Request validation completed with provided policy",
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
+		zap.Bool("isWarn", result.IsWarn),
 		zap.String("sessionID", sessionID))
 
 	return result, nil
@@ -843,6 +849,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				s.logger.Debug("ProcessRequest result",
 					zap.Int("index", i),
 					zap.Bool("isBlocked", processResult.IsBlocked),
+					zap.Bool("isWarn", processResult.IsWarn),
 					zap.String("modifiedPayload", processResult.ModifiedPayload))
 
 				reqResult = &mcp.ValidationResult{
@@ -851,11 +858,13 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					ModifiedPayload: processResult.ModifiedPayload,
 					Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 					Metadata:        types.ThreatMetadata{},
+					IsWarn:          processResult.IsWarn,
 				}
 				result.RequestAllowed = reqResult.Allowed
 				result.RequestModified = reqResult.Modified
 				result.RequestModifiedPayload = reqResult.ModifiedPayload
 				result.RequestReason = reqResult.Reason
+				result.RequestWarn = reqResult.IsWarn
 			}
 		}
 
@@ -872,11 +881,13 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					ModifiedPayload: processResult.ModifiedPayload,
 					Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 					Metadata:        types.ThreatMetadata{},
+					IsWarn:          processResult.IsWarn,
 				}
 				result.ResponseAllowed = respResult.Allowed
 				result.ResponseModified = respResult.Modified
 				result.ResponseModifiedPayload = respResult.ModifiedPayload
 				result.ResponseReason = respResult.Reason
+				result.ResponseWarn = respResult.IsWarn
 			}
 		}
 
@@ -893,6 +904,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.String("path", data.Path),
 				zap.Bool("allowed", reqResult.Allowed),
 				zap.Bool("modified", reqResult.Modified),
+				zap.Bool("isWarn", reqResult.IsWarn),
 				zap.String("reason", result.RequestReason))
 		}
 
@@ -904,6 +916,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.String("path", data.Path),
 				zap.Bool("allowed", respResult.Allowed),
 				zap.Bool("modified", respResult.Modified),
+				zap.Bool("isWarn", respResult.IsWarn),
 				zap.String("reason", result.ResponseReason))
 		}
 
@@ -940,12 +953,14 @@ type ValidationBatchResult struct {
 	Index                   int    `json:"index"`
 	Method                  string `json:"method"`
 	Path                    string `json:"path"`
+	RequestWarn             bool   `json:"requestWarn"`
 	RequestAllowed          bool   `json:"requestAllowed"`
 	RequestModified         bool   `json:"requestModified"`
 	RequestModifiedPayload  string `json:"requestModifiedPayload,omitempty"`
 	RequestReason           string `json:"requestReason,omitempty"`
 	RequestError            string `json:"requestError,omitempty"`
 	ResponseAllowed         bool   `json:"responseAllowed"`
+	ResponseWarn            bool   `json:"responseWarn"`
 	ResponseModified        bool   `json:"responseModified"`
 	ResponseModifiedPayload string `json:"responseModifiedPayload,omitempty"`
 	ResponseReason          string `json:"responseReason,omitempty"`

@@ -192,7 +192,7 @@ public class GuardrailPolicies {
     @NoArgsConstructor
     public static class PiiType {
         private String type;
-        private String behavior; // "Block" or "Mask"
+        private String behavior; // "Block" or "Mask" or "Warn"
 
         public PiiType(String type, String behavior) {
             this.type = type;
@@ -205,7 +205,7 @@ public class GuardrailPolicies {
     @NoArgsConstructor
     public static class RegexPattern {
         private String pattern;
-        private String behavior; // "Block" or "Mask"
+        private String behavior; // "Block" or "Mask" or "Warn"
 
         public RegexPattern(String pattern, String behavior) {
             this.pattern = pattern;
