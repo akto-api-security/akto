@@ -48,7 +48,7 @@ public class MaliciousEventService {
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
 
   private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
-  private static final List<String> IGNORED_POLICIES_FOR_ACCOUNT = Arrays.asList("SQLInjection");
+  private static final List<String> IGNORED_POLICIES_FOR_ACCOUNT = Arrays.asList("SQLInjection", "SSRF");
 
   private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
       System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
