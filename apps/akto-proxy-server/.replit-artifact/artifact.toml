@@ -1,0 +1,56 @@
+kind = "api"
+previewPath = "/proxy"
+title = "Akto Proxy Server"
+version = "1.0.0"
+id = "akto-proxy-server"
+
+[[services]]
+localPort = 9876
+name = "Akto Proxy Server"
+paths = ["/proxy"]
+
+# [services.env]
+# PORT = "9876"
+# TARGET_URL="http://localhost:8080"
+# AKTO_DATABASE_ABSTRACTOR_TOKEN="<token>"
+# AKTO_BASE_URL="https://1726615470-guardrails.akto.io"
+# AKTO_ENABLE_GUARDRAILS="true"
+# AKTO_ENABLE_GUARDRAILS_ON_URL="/api"
+
+# [services.development]
+# run = "python3 -m pip install -r requirements.txt -q --break-system-packages && python3 -m uvicorn src.main:app --host 0.0.0.0 --port 9876 --reload"
+
+[services.development]
+
+[services.development.build]
+args = ["python3", "-m", "pip", "install", "-r", "artifacts/akto-proxy-server/requirements.txt", "--break-system-packages"]
+
+[services.development.run]
+args = ["sh", "-c", "cd artifacts/akto-proxy-server && uvicorn src.main:app --host 0.0.0.0 --port 9876"]
+
+[services.development.run.env]
+PORT = "9876"
+TARGET_URL="http://localhost:8080"
+AKTO_DATABASE_ABSTRACTOR_TOKEN="<token>"
+AKTO_BASE_URL="https://1726615470-guardrails.akto.io"
+AKTO_ENABLE_GUARDRAILS="true"
+AKTO_ENABLE_GUARDRAILS_ON_URL="/api/v1"
+
+[services.production]
+
+[services.production.build]
+args = ["python3", "-m", "pip", "install", "-r", "artifacts/akto-proxy-server/requirements.txt", "--break-system-packages"]
+
+[services.production.run]
+args = ["sh", "-c", "cd artifacts/akto-proxy-server && uvicorn src.main:app --host 0.0.0.0 --port 9876"]
+
+[services.production.run.env]
+PORT = "9876"
+TARGET_URL="http://localhost:8080"
+AKTO_DATABASE_ABSTRACTOR_TOKEN="<token>"
+AKTO_BASE_URL="https://1726615470-guardrails.akto.io"
+AKTO_ENABLE_GUARDRAILS="true"
+AKTO_ENABLE_GUARDRAILS_ON_URL="/api"
+
+[services.production.health.startup]
+path = "/api/healthz"
