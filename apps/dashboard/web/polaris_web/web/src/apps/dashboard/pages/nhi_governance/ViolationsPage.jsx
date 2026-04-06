@@ -1,9 +1,8 @@
 import { useState, useMemo, useReducer } from "react";
 import { IndexFiltersMode } from "@shopify/polaris";
-import { Avatar, Badge, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
-import { SettingsMinor } from "@shopify/polaris-icons";
+import { Badge, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { SettingsMajor } from "@shopify/polaris-icons";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
-import CollectionIcon from "../../components/shared/CollectionIcon";
 import { produce } from "immer";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
@@ -40,10 +39,29 @@ const INTERNAL_KEYWORDS = new Set(["internal", "connector"]);
 function IdentityIcon({ name }) {
     const parts = (name || "").toLowerCase().split(/[-_\d]+/).filter(p => p.length > 2);
     if (parts.some(p => INTERNAL_KEYWORDS.has(p)))
-        return <Icon source={SettingsMinor} color="subdued" />;
+        return <div style={{width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon source={SettingsMajor} color="subdued" /></div>;
     const domain = parts.reduce((found, p) => found || IDENTITY_DOMAIN_MAP[p] || null, null);
     if (!domain) return null;
-    return <Avatar size="extraSmall" shape="square" source={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} />;
+    return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={20} height={20} style={{borderRadius:3,flexShrink:0}} alt="" />;
+}
+
+// ── Agent icon — named agents get specific icons, others get AI model favicons ──
+const AGENT_SPECIFIC_DOMAIN = {
+    "cursor prod": "cursor.sh",
+    "cursor":      "cursor.sh",
+    "entra bot":   "microsoft.com",
+};
+const AI_ICON_POOL = [
+    "claude.ai", "openai.com", "deepseek.com", "azure.microsoft.com",
+    "gemini.google.com", "mistral.ai", "perplexity.ai", "cohere.com",
+];
+function AgentIcon({ name }) {
+    const key = (name || "").toLowerCase().trim();
+    const specific = AGENT_SPECIFIC_DOMAIN[key];
+    const domain = specific || AI_ICON_POOL[
+        key.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % AI_ICON_POOL.length
+    ];
+    return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={20} height={20} style={{borderRadius:3,flexShrink:0}} alt="" />;
 }
 
 const definedTableTabs = ["All", "Open", "Fixed"];
@@ -197,7 +215,7 @@ const tableData = ALL_RAW.map((r, i) => ({
     // Violation is the "main" column — shown bold
     violationComp: <Text variant="bodyMd" fontWeight="medium">{r.violation}</Text>,
     identityComp:  <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identity} /><Text variant="bodyMd">{r.identity}</Text></HorizontalStack>,
-    agentComp:     <HorizontalStack gap="2" blockAlign="center" wrap={false}><CollectionIcon assetTagValue={r.agent} displayName={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
+    agentComp:     <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
     policyComp:    <PolicyCell policy={r.policy} />,
 }));
 
