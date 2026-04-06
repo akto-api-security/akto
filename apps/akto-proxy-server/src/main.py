@@ -50,11 +50,19 @@ def _fire(coro) -> None:
 
 @app.api_route("/proxy/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
 async def proxy(path: str, request: Request) -> Response:
-    full_path = f"/{path}"  # /proxy is already stripped by FastAPI
+    full_path = f"/{path}"
+    logger.info("[akto-proxy-server] >> HEADERS  %s", dict(request.headers))
     body = await request.body()
     req_headers = dict(request.headers)
+    original_req_headers = dict(request.headers)  # preserved for guardrails/discovery
+    # Use x-forwarded-host as the real host; if missing or localhost, fall back to target's host
+    real_host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+    if not real_host or "localhost" in real_host:
+        real_host = os.environ.get("REPLIT_DOMAINS", "").split(",")[0].strip()
+    original_req_headers["host"] = real_host
+    logger.info("[akto-proxy-server]    real_host=%s", real_host)
     query = request.url.query
-    client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or "127.0.0.1"
     run_guardrails = _should_run_guardrails(full_path)
 
     logger.info("[akto-proxy-server] >> REQUEST  %s %s  body=%d bytes  guardrails=%s", request.method, full_path, len(body), run_guardrails)
@@ -66,7 +74,7 @@ async def proxy(path: str, request: Request) -> Response:
             method=request.method,
             path=full_path,
             query=query,
-            headers=req_headers,
+            headers=original_req_headers,
             body=body,
             client_ip=client_ip,
         )
@@ -81,6 +89,9 @@ async def proxy(path: str, request: Request) -> Response:
     target = f"{TARGET_URL}/{path}"
     if query:
         target = f"{target}?{query}"
+
+    # Strip host header so httpx sets the correct one for the target
+    req_headers.pop("host", None)
 
     logger.info("[akto-proxy-server]    forwarding -> %s %s  body=%d bytes", request.method, target, len(forward_body))
     start = time.monotonic()
@@ -109,7 +120,7 @@ async def proxy(path: str, request: Request) -> Response:
             full_path=full_path,
             query=query,
             req_body=forward_body,
-            req_headers=req_headers,
+            req_headers=original_req_headers,
             client_ip=client_ip,
             run_guardrails=run_guardrails,
         )
@@ -120,7 +131,7 @@ async def proxy(path: str, request: Request) -> Response:
             full_path=full_path,
             query=query,
             req_body=forward_body,
-            req_headers=req_headers,
+            req_headers=original_req_headers,
             client_ip=client_ip,
             run_guardrails=run_guardrails,
         )
