@@ -10,21 +10,25 @@
 #
 # Requirements: POSIX shell (bash/zsh), find, stat, python3 (for JSON parsing)
 
-set -e
+# Ensure JSON is always closed even if the script exits early
+JSON_STARTED=false
+JSON_CLOSED=false
+cleanup() {
+    if [ "$JSON_STARTED" = true ] && [ "$JSON_CLOSED" = false ]; then
+        echo ""
+        echo "  ]"
+        echo "}"
+    fi
+}
+trap cleanup EXIT
 
-# Check if python3 is available for JSON parsing
-if ! command -v python3 &> /dev/null; then
-    echo "{\"error\":\"python3 not found - required for JSON parsing\"}" >&2
-    exit 1
-fi
-
-# Output JSON format
 echo "{"
 echo "  \"scan_time\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\","
 echo "  \"hostname\": \"$(hostname)\","
 echo "  \"os\": \"$(uname -s)\","
 echo "  \"user\": \"$(whoami)\","
 echo "  \"configs_found\": ["
+JSON_STARTED=true
 
 FIRST=true
 
@@ -236,3 +240,4 @@ done
 echo ""
 echo "  ]"
 echo "}"
+JSON_CLOSED=true

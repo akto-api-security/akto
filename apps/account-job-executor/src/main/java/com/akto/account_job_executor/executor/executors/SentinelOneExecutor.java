@@ -12,7 +12,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ContentType;
@@ -634,8 +633,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                     siteId = siteData.get(0).path("id").asText();
                 }
 
-                // Delete existing script to ensure latest classpath version is deployed
-                HttpGet getScripts = new HttpGet(consoleUrl + "/web/api/v2.1/remote-scripts?scriptName=" + 
+                // Reuse existing script if already uploaded — avoids creating duplicate pending tasks
+                HttpGet getScripts = new HttpGet(consoleUrl + "/web/api/v2.1/remote-scripts?scriptName=" +
                     java.net.URLEncoder.encode(scriptResourcePath, "UTF-8"));
                 getScripts.setHeader("Authorization", "ApiToken " + apiToken);
                 try (CloseableHttpResponse scriptsResp = httpClient.execute(getScripts)) {
@@ -644,11 +643,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                     if (scriptsData.isArray() && scriptsData.size() > 0) {
                         String existingScriptId = scriptsData.get(0).path("id").asText();
                         if (!existingScriptId.isEmpty()) {
-                            HttpDelete deleteScript = new HttpDelete(consoleUrl + "/web/api/v2.1/remote-scripts/" + existingScriptId);
-                            deleteScript.setHeader("Authorization", "ApiToken " + apiToken);
-                            try (CloseableHttpResponse deleteResp = httpClient.execute(deleteScript)) {
-                                loggerMaker.info("Deleted stale script for re-upload: " + scriptResourcePath + " (ID: " + existingScriptId + ")", LogDb.DASHBOARD);
-                            }
+                            loggerMaker.info("Reusing existing script: " + scriptResourcePath + " (ID: " + existingScriptId + ")", LogDb.DASHBOARD);
+                            return existingScriptId;
                         }
                     }
                 }
@@ -918,12 +914,15 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                                 String content = new String(baos.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
                                 
                                 // Match stdout or stdout_*.txt (SentinelOne adds timestamps)
-                                if (entryName.equals("stdout") || entryName.startsWith("stdout_") || entryName.startsWith("/stdout")) {
+                                String baseName = entryName.contains("/") ? entryName.substring(entryName.lastIndexOf('/') + 1) : entryName;
+                                if (baseName.equals("stdout") || baseName.startsWith("stdout_")) {
                                     stdoutContent = content;
                                     loggerMaker.info("Found stdout entry: " + entryName + ", length: " + content.length() + " bytes", LogDb.DASHBOARD);
-                                } else if (entryName.equals("stderr") || entryName.startsWith("stderr_") || entryName.startsWith("/stderr")) {
+                                } else if (baseName.equals("stderr") || baseName.startsWith("stderr_")) {
                                     stderrContent = content;
                                     loggerMaker.info("Found stderr entry: " + entryName + ", length: " + content.length() + " bytes", LogDb.DASHBOARD);
+                                } else {
+                                    loggerMaker.info("Skipping unrecognized ZIP entry: " + entryName, LogDb.DASHBOARD);
                                 }
                             }
                             
@@ -1036,17 +1035,18 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             }
         }
         
-        // Windows agents with .ps1 script
-        if (!windowsAgentIds.isEmpty()) {
-            if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
-            String mcpScriptIdPs1 = uploadScriptFromClasspath("scan_mcp_configs.ps1", apiToken, consoleUrl);
-            if (mcpScriptIdPs1 != null) {
-                Map<String, JsonNode> windowsMcpOutputs = executeBatchedDiscovery(
-                    mcpScriptIdPs1, windowsAgentIds, batchSize, timeoutMs, 
-                    "MCP Config (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, true, jobId);
-                allMcpOutputs.putAll(windowsMcpOutputs);
-            }
-        }
+        // TODO: re-enable when Windows agents are online
+        // // Windows agents with .ps1 script
+        // if (!windowsAgentIds.isEmpty()) {
+        //     if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
+        //     String mcpScriptIdPs1 = uploadScriptFromClasspath("scan_mcp_configs.ps1", apiToken, consoleUrl);
+        //     if (mcpScriptIdPs1 != null) {
+        //         Map<String, JsonNode> windowsMcpOutputs = executeBatchedDiscovery(
+        //             mcpScriptIdPs1, windowsAgentIds, batchSize, timeoutMs,
+        //             "MCP Config (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, true, jobId);
+        //         allMcpOutputs.putAll(windowsMcpOutputs);
+        //     }
+        // }
         
         if (!allMcpOutputs.isEmpty()) {
             ingestMCPDiscoveries(allMcpOutputs, ingestUrl, consoleDomain, agentNames);
@@ -1069,17 +1069,18 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             }
         }
         
-        // Windows agents with .ps1 script
-        if (!windowsAgentIds.isEmpty()) {
-            if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
-            String skillScriptIdPs1 = uploadScriptFromClasspath("scan_skills.ps1", apiToken, consoleUrl);
-            if (skillScriptIdPs1 != null) {
-                Map<String, JsonNode> windowsSkillOutputs = executeBatchedDiscovery(
-                    skillScriptIdPs1, windowsAgentIds, batchSize, timeoutMs, 
-                    "Skills (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, false, jobId);
-                allSkillOutputs.putAll(windowsSkillOutputs);
-            }
-        }
+        // TODO: re-enable when Windows agents are online
+        // // Windows agents with .ps1 script
+        // if (!windowsAgentIds.isEmpty()) {
+        //     if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
+        //     String skillScriptIdPs1 = uploadScriptFromClasspath("scan_skills.ps1", apiToken, consoleUrl);
+        //     if (skillScriptIdPs1 != null) {
+        //         Map<String, JsonNode> windowsSkillOutputs = executeBatchedDiscovery(
+        //             skillScriptIdPs1, windowsAgentIds, batchSize, timeoutMs,
+        //             "Skills (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, false, jobId);
+        //         allSkillOutputs.putAll(windowsSkillOutputs);
+        //     }
+        // }
         
         if (!allSkillOutputs.isEmpty()) {
             ingestSkillDiscoveries(allSkillOutputs, ingestUrl, consoleDomain, agentNames);
@@ -1395,10 +1396,9 @@ public class SentinelOneExecutor extends AccountJobExecutor {
 
     private static void ingestSkillDiscoveries(Map<String, JsonNode> discoveriesByAgent, String ingestUrl, String consoleDomain, Map<String, String> agentNames) {
         List<Map<String, Object>> batchData = new ArrayList<>();
-        Set<SkillCollectionInfo> skillCollections = new HashSet<>();
-        
+
         loggerMaker.info("Starting skill discovery ingestion for " + discoveriesByAgent.size() + " agent(s)", LogDb.DASHBOARD);
-        
+
         for (Map.Entry<String, JsonNode> entry : discoveriesByAgent.entrySet()) {
             String agentId = entry.getKey();
             String computerName = agentNames.getOrDefault(agentId, agentId);
@@ -1407,11 +1407,11 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             String os = discovery.path("os").asText("unknown");
             String user = discovery.path("user").asText("unknown");
             JsonNode skillsFound = discovery.path("skills_found");
-            
+
             if (!skillsFound.isArray()) continue;
-            
+
             loggerMaker.info("Processing " + skillsFound.size() + " skill(s) from agentId=" + agentId + ", hostname=" + hostname, LogDb.DASHBOARD);
-            
+
             for (JsonNode skill : skillsFound) {
                 String path = skill.path("path").asText("");
                 String agent = skill.path("agent").asText("unknown");
@@ -1423,12 +1423,9 @@ public class SentinelOneExecutor extends AccountJobExecutor {
 
                 String skillNameFromScript = skill.path("skill_name").asText("");
                 String skillName = !skillNameFromScript.isEmpty() ? skillNameFromScript : extractSkillName(path);
-                String collectionName = hostname + "." + agent + "." + skillName;
-                collectionName = collectionName.toLowerCase();
-                
-                skillCollections.add(new SkillCollectionInfo(collectionName, agent, System.currentTimeMillis()));
-                
-                String syntheticHost = collectionName;
+                String collectionName = skillName.toLowerCase();
+
+                String syntheticHost = agent + "." + skillName;
                 
                 Map<String, String> reqHeaders = new HashMap<>();
                 reqHeaders.put("content-type", "text/markdown");
@@ -1479,12 +1476,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                 loggerMaker.error("Failed to ingest skill discoveries: " + e.getMessage(), LogDb.DASHBOARD);
             }
         }
-        
-        if (!skillCollections.isEmpty()) {
-            createSkillCollections(skillCollections);
-        }
     }
-    
+
     private static String extractSkillName(String filePath) {
         String fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
         fileName = fileName.substring(filePath.lastIndexOf('\\') + 1);
@@ -1501,105 +1494,4 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         return fileName;
     }
     
-    private static void createSkillCollections(Set<SkillCollectionInfo> skillCollections) {
-        String dbAbstractorUrl = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
-        if (dbAbstractorUrl == null || dbAbstractorUrl.isEmpty()) {
-            dbAbstractorUrl = "http://localhost:5678";
-        }
-        dbAbstractorUrl = normalizeUrl(dbAbstractorUrl) + "/api/createCollectionForHostAndVpc";
-        
-        loggerMaker.info("Using DATABASE_ABSTRACTOR_SERVICE_URL: " + dbAbstractorUrl, LogDb.DASHBOARD);
-        loggerMaker.info("Creating collections for " + skillCollections.size() + " skill(s)", LogDb.DASHBOARD);
-        
-        for (SkillCollectionInfo info : skillCollections) {
-            try {
-                List<Map<String, Object>> tagsList = new ArrayList<>();
-                
-                Map<String, Object> mcpServerTag = new HashMap<>();
-                mcpServerTag.put("lastUpdatedTs", info.timestamp);
-                mcpServerTag.put("keyName", "mcp-server");
-                mcpServerTag.put("value", "MCP Server");
-                mcpServerTag.put("source", "KUBERNETES");
-                tagsList.add(mcpServerTag);
-                
-                Map<String, Object> sourceTag = new HashMap<>();
-                sourceTag.put("lastUpdatedTs", info.timestamp);
-                sourceTag.put("keyName", "source");
-                sourceTag.put("value", "ENDPOINT");
-                sourceTag.put("source", "KUBERNETES");
-                tagsList.add(sourceTag);
-                
-                if (info.agentType != null && !info.agentType.isEmpty()) {
-                    Map<String, Object> clientTag = new HashMap<>();
-                    clientTag.put("lastUpdatedTs", info.timestamp);
-                    clientTag.put("keyName", "mcp-client");
-                    clientTag.put("value", info.agentType);
-                    clientTag.put("source", "KUBERNETES");
-                    tagsList.add(clientTag);
-                }
-                
-                Map<String, Object> request = new HashMap<>();
-                request.put("colId", generateCollectionId(info.collectionName, info.timestamp));
-                request.put("host", info.collectionName);
-                request.put("tagsList", tagsList);
-                
-                String requestJson = OBJECT_MAPPER.writeValueAsString(request);
-                
-                RequestConfig cfg = RequestConfig.custom()
-                    .setConnectTimeout(CONNECT_TIMEOUT_MS)
-                    .setSocketTimeout(SOCKET_TIMEOUT_MS)
-                    .build();
-                
-                try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-                    HttpPost post = new HttpPost(dbAbstractorUrl);
-                    post.setHeader("Content-Type", "application/json");
-                    
-                    String aktoApiToken = System.getenv("AKTO_API_TOKEN");
-                    if (aktoApiToken != null && !aktoApiToken.isEmpty()) {
-                        post.setHeader("Authorization", aktoApiToken);
-                    }
-                    
-                    post.setEntity(new StringEntity(requestJson, ContentType.APPLICATION_JSON));
-                    
-                    try (CloseableHttpResponse resp = client.execute(post)) {
-                        int status = resp.getStatusLine().getStatusCode();
-                        String responseBody = EntityUtils.toString(resp.getEntity());
-                        
-                        if (status == 200) {
-                            loggerMaker.info("Created collection for skill: " + info.collectionName, LogDb.DASHBOARD);
-                        } else {
-                            loggerMaker.error("Failed to create collection: HTTP " + status + " - " + responseBody, LogDb.DASHBOARD);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                loggerMaker.error("Failed to create collection for " + info.collectionName + ": " + e.getMessage(), LogDb.DASHBOARD);
-            }
-        }
-    }
-    
-    private static class SkillCollectionInfo {
-        String collectionName;
-        String agentType;
-        long timestamp;
-        
-        SkillCollectionInfo(String collectionName, String agentType, long timestamp) {
-            this.collectionName = collectionName;
-            this.agentType = agentType;
-            this.timestamp = timestamp;
-        }
-        
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            SkillCollectionInfo that = (SkillCollectionInfo) o;
-            return collectionName.equals(that.collectionName);
-        }
-        
-        @Override
-        public int hashCode() {
-            return collectionName.hashCode();
-        }
-    }
 }
