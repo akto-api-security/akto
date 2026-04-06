@@ -18,7 +18,7 @@ public class GuestRoleStrategy implements RoleStrategy{
         Map<Feature, ReadWriteAccess> accessMap = new HashMap<>();
         for (AccessGroups group : AccessGroups.getAccessGroups()) {
             ReadWriteAccess access = ReadWriteAccess.READ ;
-            if(group == AccessGroups.PII_DATA){
+            if(group == AccessGroups.PII_DATA || group == AccessGroups.THREAT_PROTECTION){
                 access = ReadWriteAccess.NO_ACCESS;
             }
             for (Feature feature : Feature.getFeaturesForAccessGroup(group)) {

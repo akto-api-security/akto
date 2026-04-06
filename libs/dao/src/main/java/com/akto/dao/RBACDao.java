@@ -28,6 +28,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
     //Caching for RBACDAO
     private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<Role, Integer>> userRolesMap = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<List<String>, Integer>> allowedFeaturesMapForUser = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<RBAC, Integer>> rbacEntryCache = new ConcurrentHashMap<>();
     private static final int EXPIRY_TIME = 15 * 60; // 15 minute
     public void createIndicesIfAbsent() {
 
@@ -50,6 +51,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
     public void deleteUserEntryFromCache(Pair<Integer, Integer> key) {
         userRolesMap.remove(key);
         allowedFeaturesMapForUser.remove(key);
+        rbacEntryCache.remove(key);
     }
 
     /*
@@ -73,7 +75,10 @@ public class RBACDao extends CommonContextDao<RBAC> {
             } else {
                 currentRole = Role.MEMBER.name();
             }
-            
+
+            if(currentRole == null){
+                return null;
+            }
             CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
             if (customRole != null) {
                 actualRole = Role.valueOf(customRole.getBaseRole());
@@ -196,6 +201,41 @@ public class RBACDao extends CommonContextDao<RBAC> {
         RBACDao.instance.updateOne(Filters.and(eq(RBAC.USER_ID, userId), eq(RBAC.ACCOUNT_ID, accountId)),
                 set(RBAC.API_COLLECTIONS_ID, apiCollectionList));
     }
+
+    /**
+     * Get the full RBAC entry for a user with caching support.
+     * This method caches the entire RBAC object to support scope-role mapping (n:n mapping).
+     * Uses 15-minute cache expiry time. Falls back to backward-compatible single role if scopeRoleMapping is not set.
+     *
+     * @param userId the user ID
+     * @param accountId the account ID
+     * @return the cached or freshly fetched RBAC entry, or null if not found
+     */
+    public static RBAC getCurrentRBACForUser(int userId, int accountId) {
+        Pair<Integer, Integer> key = new Pair<>(userId, accountId);
+        Pair<RBAC, Integer> cachedEntry = rbacEntryCache.get(key);
+        RBAC rbacEntry;
+
+        // Check if cache exists and is still valid
+        if (cachedEntry != null && (Context.now() - cachedEntry.getSecond() <= EXPIRY_TIME)) {
+            return cachedEntry.getFirst();
+        }
+
+        // Fetch from database if cache miss or expired
+        Bson filterRbac = Filters.and(
+                Filters.eq(RBAC.USER_ID, userId),
+                Filters.eq(RBAC.ACCOUNT_ID, accountId));
+
+        rbacEntry = RBACDao.instance.findOne(filterRbac);
+
+        // Cache the result (even if null)
+        if (rbacEntry != null || cachedEntry == null) {
+            rbacEntryCache.put(key, new Pair<>(rbacEntry, Context.now()));
+        }
+
+        return rbacEntry;
+    }
+
 
     @Override
     public String getCollName() {
