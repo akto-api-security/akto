@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 public class PatternUpdateService {
 
     private static final LoggerMaker logger = new LoggerMaker(PatternUpdateService.class, LogDb.THREAT_DETECTION);
-    private static final long UPDATE_INTERVAL_MINUTES = 1;
+    private static final long UPDATE_INTERVAL_MINUTES = 15;
     private static final int MAX_RETRIES = 1;
     private static final long RETRY_DELAY_MS = 1000;
 
