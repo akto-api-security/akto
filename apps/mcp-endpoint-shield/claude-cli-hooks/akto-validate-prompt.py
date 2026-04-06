@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import hashlib
 import json
 import logging
 import os
@@ -6,7 +7,7 @@ import ssl
 import sys
 import time
 import urllib.request
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Set, Tuple, Union
 
 from akto_machine_id import get_machine_id, get_username
 
@@ -40,6 +41,7 @@ AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
+WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_prompt_warn_pending.json")
 
 # SSL Configuration
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
@@ -159,12 +161,12 @@ def build_validation_request(query: str) -> dict:
     }
 
 
-def call_guardrails(query: str) -> Tuple[bool, str]:
+def call_guardrails(query: str) -> Tuple[bool, str, bool]:
     if not query.strip():
-        return True, ""
+        return True, "", False
     if not AKTO_DATA_INGESTION_URL:
         logger.warning("AKTO_DATA_INGESTION_URL not set, allowing prompt (fail-open)")
-        return True, ""
+        return True, "", False
 
     logger.info("Validating prompt against guardrails")
     if LOG_PAYLOADS:
@@ -183,18 +185,75 @@ def call_guardrails(query: str) -> Tuple[bool, str]:
         guardrails_result = data.get("guardrailsResult", {})
         allowed = guardrails_result.get("Allowed", True)
         reason = guardrails_result.get("Reason", "")
+        is_warn = guardrails_result.get("IsWarn", False)
 
         if allowed:
             logger.info("Prompt ALLOWED by guardrails")
         else:
             logger.warning(f"Prompt DENIED by guardrails: {reason}")
 
-        return allowed, reason
+        return allowed, reason, is_warn
 
     except Exception as e:
         logger.error(f"Guardrails validation error: {e}")
+        return True, "", False
+
+
+def prompt_fingerprint(prompt: str) -> str:
+    canonical = json.dumps({"p": prompt, "a": []}, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def load_warn_pending() -> Set[str]:
+    if not os.path.exists(WARN_STATE_PATH):
+        return set()
+    try:
+        with open(WARN_STATE_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return set(data.get("warn_pending", []))
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Could not read warn-pending map: {e}")
+        return set()
+
+
+def save_warn_pending(hashes: Set[str]) -> None:
+    tmp_path = WARN_STATE_PATH + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
+            f.write("\n")
+        os.replace(tmp_path, WARN_STATE_PATH)
+    except OSError as e:
+        logger.error(f"Could not persist warn-pending map: {e}")
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
+def apply_warn_resubmit_flow(
+    gr_allowed: bool,
+    reason: str,
+    is_warn: bool,
+    fingerprint: str,
+) -> Tuple[bool, str]:
+    if gr_allowed:
         return True, ""
 
+    if not is_warn:
+        return False, reason
+
+    pending = load_warn_pending()
+    if fingerprint in pending:
+        pending.discard(fingerprint)
+        save_warn_pending(pending)
+        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
+        return True, ""
+
+    pending.add(fingerprint)
+    save_warn_pending(pending)
+    return False, reason
 
 def ingest_blocked_request(user_prompt: str, reason: str):
     if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
@@ -243,15 +302,28 @@ def main():
     logger.info(f"Processing prompt (length: {len(prompt)} chars)")
 
     if AKTO_SYNC_MODE:
-        allowed, reason = call_guardrails(prompt)
+        gr_allowed, gr_reason, is_warn = call_guardrails(prompt)
+        fingerprint = prompt_fingerprint(prompt)
+        allowed, _ = apply_warn_resubmit_flow(
+            gr_allowed, gr_reason, is_warn, fingerprint
+        )
+
         if not allowed:
+            if is_warn:
+                block_reason = (
+                    "Warning!!, prompt blocked, please review it. Send again to bypass. "
+                    f"Reason for blocking: {gr_reason}"
+                )
+            else:
+                block_reason = f"Prompt blocked: {gr_reason}"
+
             output = {
                 "decision": "block",
-                "reason": f"Blocked by Akto Guardrails"
+                "reason": block_reason,
             }
-            logger.warning(f"BLOCKING prompt - Reason: {reason}")
+            logger.warning(f"BLOCKING prompt - Reason: {gr_reason}")
             print(json.dumps(output))
-            ingest_blocked_request(prompt, reason)
+            ingest_blocked_request(prompt, gr_reason)
             sys.exit(0)
 
     logger.info("Prompt allowed")
