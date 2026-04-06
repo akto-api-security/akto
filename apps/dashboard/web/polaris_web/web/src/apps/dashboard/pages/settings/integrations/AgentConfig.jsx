@@ -70,10 +70,10 @@ function getModelSections(type, data, setData, isEdit=false) {
       break;
     case MODEL_TYPES.DATABRICKS:
       sections.push({
-        title: "Databricks Workspace Endpoint",
+        title: "Databricks Model Serving Endpoint or AI Gateway Endpoint",
         type: "text",
         id: "databricksEndpoint",
-        placeholder: "https://<workspace>.cloud.databricks.com",
+        placeholder: "The URL for your Databricks model serving or AI Gateway endpoint",
       })
       break;
     case MODEL_TYPES.AZURE_OPENAI:

@@ -58,4 +58,24 @@ public class Model {
         this.type = type;
     }
 
+    public String getModelName() {
+        return params != null ? params.get(PARAM_MODEL) : null;
+    }
+
+    public String getApiKey() {
+        return params != null ? params.get(PARAM_API_KEY) : null;
+    }
+
+    public String getAzureEndpoint() {
+        return params != null ? params.get(PARAM_AZURE_OPENAI_ENDPOINT) : null;
+    }
+
+    public String getOllamaEndpoint() {
+        return params != null ? params.get(PARAM_OLLAMA_ENDPOINT) : null;
+    }
+
+    public String getDatabricksEndpoint() {
+        return params != null ? params.get(PARAM_DATABRICKS_ENDPOINT) : null;
+    }
+
 }
