@@ -224,10 +224,10 @@ export default {
         }).then((resp) => resp)
     },
 
-    fetchRecordedLoginFlow(nodeId, miniTestingServiceName) {
+    fetchRecordedLoginFlow(nodeId, testingRunPlaygroundId) {
         const data = { nodeId }
-        if (miniTestingServiceName) {
-            data.miniTestingServiceName = miniTestingServiceName
+        if (testingRunPlaygroundId) {
+            data.testingRunPlaygroundId = testingRunPlaygroundId
         }
         return request({
             url: '/api/fetchRecordedFlowOutput',

@@ -62,6 +62,9 @@ public class LoginRecorderAction extends UserAction {
 
     private String miniTestingServiceName;
 
+    /** Set on hybrid {@link #uploadRecordedFlow()} response; sent on {@link #fetchRecordedFlowOutput()} polls. */
+    private String testingRunPlaygroundId;
+
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     private boolean shouldRunRecordedFlowOnMiniTesting() {
@@ -78,7 +81,6 @@ public class LoginRecorderAction extends UserAction {
 
         int accountId = Context.accountId.get();
 
-        // Delete recorded login flow input for user (if exists)
         int userId = getSUser().getId();
         if (userId != 0) {
             RecordedLoginInputDao.instance.deleteAll(Filters.eq("userId", userId));
@@ -90,13 +92,15 @@ public class LoginRecorderAction extends UserAction {
             playground.setState(TestingRun.State.SCHEDULED);
             playground.setCreatedAt(Context.now());
             playground.setMiniTestingName(miniTestingServiceName.trim());
-            playground.setRecordedFlowOwnerUserId(userId);
             playground.setRecordedFlowContent(payload);
             playground.setRecordedFlowTokenFetchCommand(tokenFetchCommand);
             playground.setRecordedFlowRoleName(roleName != null ? roleName.trim() : null);
             TestingRunPlaygroundDao.instance.insertOne(playground);
+            this.testingRunPlaygroundId = playground.getId().toHexString();
             return SUCCESS.toUpperCase();
         }
+
+        this.testingRunPlaygroundId = null;
 
         executorService.schedule( new Runnable() {
             public void run() {
@@ -133,45 +137,26 @@ public class LoginRecorderAction extends UserAction {
     public String fetchRecordedFlowOutput() {
 
         int userIdInt = getSUser().getId();
-        boolean hybridPoll = StringUtils.isNotBlank(miniTestingServiceName);
 
-        RecordedLoginFlowInput recordedLoginInput = null;
-        if (!hybridPoll) {
-            recordedLoginInput = RecordedLoginInputDao.instance.findOne(Filters.eq("userId", userIdInt));
-            if (recordedLoginInput != null) {
-                String inlineToken = recordedLoginInput.getTokenResult();
-                if (inlineToken != null && !inlineToken.trim().isEmpty()) {
-                    token = inlineToken;
-                    applyExtractedTokenToLoginFlowSteps(token);
-                    return SUCCESS.toUpperCase();
-                }
+        if (StringUtils.isNotBlank(testingRunPlaygroundId)) {
+            ObjectId playgroundObjectId;
+            try {
+                playgroundObjectId = new ObjectId(testingRunPlaygroundId.trim());
+            } catch (IllegalArgumentException e) {
+                addActionError("Invalid testing run playground id");
+                return ERROR.toUpperCase();
             }
-        }
+            Bson hybridById = Filters.and(
+                    Filters.eq(Constants.ID, playgroundObjectId),
+                    Filters.eq(TestingRunPlayground.TESTING_RUN_PLAYGROUND_TYPE,
+                            TestingRunPlayground.TestingRunPlaygroundType.RECORDED_JSON_FLOW.name()),
+                    Filters.eq(TestingRunPlayground.STATE, TestingRun.State.COMPLETED.name()));
+            TestingRunPlayground hybridPg = TestingRunPlaygroundDao.instance.findOne(hybridById);
+            if (hybridPg == null) {
+                tokenFetchInProgress = true;
+                return SUCCESS.toUpperCase();
+            }
 
-        List<Bson> hybridCriteria = new ArrayList<>();
-        hybridCriteria.add(Filters.eq(TestingRunPlayground.TESTING_RUN_PLAYGROUND_TYPE,
-                TestingRunPlayground.TestingRunPlaygroundType.RECORDED_JSON_FLOW.name()));
-        hybridCriteria.add(Filters.eq(TestingRunPlayground.STATE, TestingRun.State.COMPLETED.name()));
-        hybridCriteria.add(Filters.or(
-                Filters.exists(TestingRunPlayground.RECORDED_FLOW_TOKEN_RESULT, true),
-                Filters.exists(TestingRunPlayground.RECORDED_FLOW_ERROR_MESSAGE, true)));
-
-        List<Bson> ownerOrLegacy = new ArrayList<>();
-        ownerOrLegacy.add(Filters.eq(TestingRunPlayground.RECORDED_FLOW_OWNER_USER_ID, userIdInt));
-        if (hybridPoll) {
-            ownerOrLegacy.add(Filters.and(
-                    Filters.exists(TestingRunPlayground.RECORDED_FLOW_OWNER_USER_ID, false),
-                    Filters.eq("miniTestingName", miniTestingServiceName.trim())));
-        }
-        hybridCriteria.add(Filters.or(ownerOrLegacy));
-
-        if (hybridPoll) {
-            hybridCriteria.add(Filters.eq("miniTestingName", miniTestingServiceName.trim()));
-        }
-        Bson hybridPlaygroundFilter = Filters.and(hybridCriteria);
-        TestingRunPlayground hybridPg = TestingRunPlaygroundDao.instance.findLatestOne(hybridPlaygroundFilter);
-
-        if (hybridPg != null) {
             String err = hybridPg.getRecordedFlowErrorMessage();
             if (err != null && !err.isEmpty()) {
                 addActionError(err);
@@ -191,7 +176,14 @@ public class LoginRecorderAction extends UserAction {
             return SUCCESS.toUpperCase();
         }
 
-        if (!hybridPoll && recordedLoginInput != null) {
+        RecordedLoginFlowInput recordedLoginInput = RecordedLoginInputDao.instance.findOne(Filters.eq("userId", userIdInt));
+        if (recordedLoginInput != null) {
+            String inlineToken = recordedLoginInput.getTokenResult();
+            if (inlineToken != null && !inlineToken.trim().isEmpty()) {
+                token = inlineToken;
+                applyExtractedTokenToLoginFlowSteps(token);
+                return SUCCESS.toUpperCase();
+            }
             try {
                 token = RecordedLoginFlowUtil.fetchToken(recordedLoginInput);
             } catch (Exception e) {
@@ -276,5 +268,13 @@ public class LoginRecorderAction extends UserAction {
 
     public void setMiniTestingServiceName(String miniTestingServiceName) {
         this.miniTestingServiceName = miniTestingServiceName;
+    }
+
+    public String getTestingRunPlaygroundId() {
+        return testingRunPlaygroundId;
+    }
+
+    public void setTestingRunPlaygroundId(String testingRunPlaygroundId) {
+        this.testingRunPlaygroundId = testingRunPlaygroundId;
     }
 }

@@ -51,7 +51,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
                 setTokenFetchCommand(authMechanism.requestData[0].tokenFetchCommand)
                 setAuthParams(authMechanism.authParams)
                 setShowVerify(true)
-                pollExtractedToken(roleName)
+                pollExtractedToken(roleName, null)
             }
         } else {
             return;
@@ -95,7 +95,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    async function pollExtractedToken(screenshotRoleName) {
+    async function pollExtractedToken(screenshotRoleName, playgroundId) {
         setIsLoading(true)
         const initialWaitPeriod = 5000
         await sleep(initialWaitPeriod)
@@ -121,7 +121,7 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
             }
 
             try {
-                const resp = await api.fetchRecordedLoginFlow("x1", miniTestingServiceName || undefined)
+                const resp = await api.fetchRecordedLoginFlow("x1", playgroundId || undefined)
                 if (trimmedRole && resp.tokenFetchInProgress) {
                     await refreshScreenshotsWhileActive()
                 }
@@ -190,7 +190,8 @@ function JsonRecording({ extractInformation, showOnlyApi, setStoreData, roleName
                 if (trimmed) {
                     setHasScreenshots(false)
                 }
-                pollExtractedToken(roleName)
+                const pgId = resp && resp.testingRunPlaygroundId
+                pollExtractedToken(roleName, pgId || null)
             }).catch((err) => {
                 setToastConfig({ isActive: true, isError: true, message: `Upload JSON recording failed. Error: ${err}` })
             })
