@@ -66,7 +66,7 @@ type MediaConfig struct {
 func LoadConfig() *Config {
 	dbAbstractorToken := getEnv("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "")
 	return &Config{
-		ServerPort:               getEnvAsInt("SERVER_PORT", 8080),
+		ServerPort:               getEnvAsInt("SERVER_PORT", 7070),
 		DatabaseAbstractorURL:    getEnv("DATABASE_ABSTRACTOR_SERVICE_URL", "https://ultron.akto.io"),
 		DatabaseAbstractorToken:  dbAbstractorToken,
 		AgentGuardEngineURL:      getEnv("AGENT_GUARD_ENGINE_URL", "https://akto-agent-guard-engine.billing-53a.workers.dev"),
