@@ -376,12 +376,12 @@ function GuardrailPolicies() {
             };
             
             await api.createGuardrailPolicy(requestPayload);
-            
+
             func.setToast(true, false, `Guardrail ${newStatus ? 'activated' : 'deactivated'} successfully`);
-            // Refresh the page to ensure data gets updated on screen
-            window.location.reload();
+            await fetchGuardrailPolicies();
         } catch (error) {
             func.setToast(true, true, "Failed to update guardrail status");
+        } finally {
             setLoading(false);
         }
     };
@@ -413,7 +413,7 @@ function GuardrailPolicies() {
                         try {
                             await api.deleteGuardrailPolicies(selectedPolicies);
                             func.setToast(true, false, `${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"} deleted successfully`);
-                            window.location.reload();
+                            await fetchGuardrailPolicies();
                         } catch (error) {
                             func.setToast(true, true, "Failed to delete policies");
                         }
@@ -497,36 +497,17 @@ function GuardrailPolicies() {
                 hexId: isEditMode && guardrailData.hexId ? guardrailData.hexId : null
             };
 
-            let response;
-
-                if (isEditMode && guardrailData.hexId) {
-                    // Update existing policy
-                    response = await api.createGuardrailPolicy(requestPayload);
-                    if (response) {
-                        func.setToast(true, false, "Guardrail updated successfully");
-                    }
-                } else {
-                    // Create new policy
-
-                    response = await api.createGuardrailPolicy(requestPayload);
-                    if (response) {
-                        func.setToast(true, false, "Guardrail created successfully");
-                    }
-                }
-
-            
-            if (response) {
-                setShowCreateModal(false);
-                setEditingPolicy(null);
-                setIsEditMode(false);
-                // Refresh the page to ensure data gets updated on screen
-                if (isEditMode) {
-                    window.location.reload();
-                } else {
-                    // For create, just refresh the policy list
-                    await fetchGuardrailPolicies();
-                }
-            }
+            const wasEdit = isEditMode && guardrailData.hexId;
+            await api.createGuardrailPolicy(requestPayload);
+            func.setToast(
+                true,
+                false,
+                wasEdit ? "Guardrail updated successfully" : "Guardrail created successfully"
+            );
+            setShowCreateModal(false);
+            setEditingPolicy(null);
+            setIsEditMode(false);
+            await fetchGuardrailPolicies();
         } catch (error) {
             func.setToast(true, true, isEditMode ? "Failed to update guardrail" : "Failed to create guardrail");
         } finally {
@@ -553,7 +534,7 @@ function GuardrailPolicies() {
 
     const components = [
         <GithubSimpleTable
-            key={`policies-table-${policyData.length}`}
+            key={`policies-table-${JSON.stringify(policyData.map((row) => row.originalData))}`}
             resourceName={resourceName}
             useNewRow={true}
             headers={headings}
