@@ -516,11 +516,24 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 }
 
 // ValidateResponse validates a response payload against guardrail policies with session tracking
-func (s *Service) ValidateResponse(ctx context.Context, payload string, contextSource string, sessionID string, requestID string, skipThreat bool) (*mcp.ValidationResult, error) {
-	s.logger.Debug("ValidateResponse - starting validation",
+func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateResponseParams, sessionID string, requestID string) (*mcp.ValidationResult, error) {
+	payload := params.ResponsePayload
+	contextSource := params.ContextSource
+
+	s.logger.Info("ValidateResponse - starting validation",
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("account", params.AktoAccountID),
 		zap.String("contextSource", contextSource),
 		zap.String("sessionID", sessionID),
-		zap.String("requestID", requestID))
+		zap.String("requestID", requestID),
+		zap.String("ip", params.IP),
+		zap.String("destIp", params.DestIP),
+		zap.String("statusCode", params.StatusCode),
+		zap.String("source", params.Source),
+		zap.String("direction", params.Direction),
+		zap.String("tag", params.Tag),
+		zap.Bool("skipThreat", params.SkipThreat))
 
 	// Get cached policies (refreshes if stale)
 	policies, _, _, _, err := s.getCachedPolicies(contextSource)
@@ -528,21 +541,53 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
 
-	s.logger.Debug("ValidateResponse - loaded policies for contextSource",
+	s.logger.Info("ValidateResponse - loaded policies for contextSource",
 		zap.String("contextSource", contextSource),
 		zap.Int("policiesCount", len(policies)),
 		zap.Strings("policyNames", policyNames(policies)))
 
-	// Create validation context
-	valCtx := &mcp.ValidationContext{
-		ContextSource: types.ContextSource(contextSource),
-		SessionID:     sessionID,
-		SkipThreat:    skipThreat, // Set skipThreat directly in context
+	// Parse headers and status code
+	reqHeaders := make(map[string]string)
+	respHeaders := make(map[string]string)
+	if params.RequestHeaders != "" {
+		if err := json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders); err != nil {
+			s.logger.Warn("ValidateResponse - failed to parse request headers, proceeding with empty headers",
+				zap.String("sessionID", sessionID),
+				zap.Error(err))
+		}
+	}
+	if params.ResponseHeaders != "" {
+		if err := json.Unmarshal([]byte(params.ResponseHeaders), &respHeaders); err != nil {
+			s.logger.Warn("ValidateResponse - failed to parse response headers, proceeding with empty headers",
+				zap.String("sessionID", sessionID),
+				zap.Error(err))
+		}
 	}
 
-	s.logger.Debug("ValidateResponse - created validation context",
-		zap.String("contextSource", string(valCtx.ContextSource)),
-		zap.String("sessionID", valCtx.SessionID))
+	statusCode := 0
+	if params.StatusCode != "" {
+		fmt.Sscanf(params.StatusCode, "%d", &statusCode)
+	}
+
+	// Extract host header for McpServerName
+	mcpServerName := extractHostHeader(reqHeaders)
+
+	// Create validation context with full request metadata
+	valCtx := &mcp.ValidationContext{
+		IP:              params.IP,
+		DestIP:          params.DestIP,
+		Endpoint:        params.Path,
+		Method:          params.Method,
+		RequestHeaders:  reqHeaders,
+		ResponseHeaders: respHeaders,
+		StatusCode:      statusCode,
+		RequestPayload:  params.RequestPayload,
+		ResponsePayload: payload,
+		ContextSource:   types.ContextSource(contextSource),
+		McpServerName:   mcpServerName,
+		SessionID:       sessionID,
+		SkipThreat:      params.SkipThreat,
+	}
 
 	// Use processor's ProcessResponse method with external policies
 	processResult, err := s.processor.ProcessResponse(ctx, payload, valCtx, policies)
@@ -563,10 +608,13 @@ func (s *Service) ValidateResponse(ctx context.Context, payload string, contextS
 		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
 	}
 
-	s.logger.Info("Response validation completed",
+	s.logger.Info("ValidateResponse - completed",
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("account", params.AktoAccountID),
+		zap.String("sessionID", sessionID),
 		zap.Bool("allowed", result.Allowed),
-		zap.Bool("modified", result.Modified),
-		zap.String("sessionID", sessionID))
+		zap.Bool("modified", result.Modified))
 
 	return result, nil
 }
