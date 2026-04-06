@@ -93,6 +93,25 @@ public class ArcadeWebhookAction extends ActionSupport {
                 }
             }
 
+            if (gatewayResponse != null && gatewayResponse.containsKey("responseGuardrailsResult")) {
+                Map<String, Object> responseGuardrailsResult = (Map<String, Object>) gatewayResponse.get("responseGuardrailsResult");
+                if (responseGuardrailsResult != null) {
+                    Object allowed = responseGuardrailsResult.get("Allowed");
+                    if (allowed != null && !Boolean.TRUE.equals(allowed) && !"true".equalsIgnoreCase(String.valueOf(allowed))) {
+                        code = "CHECK_FAILED";
+                        Object reasonObj = responseGuardrailsResult.get("Reason");
+                        String reason = reasonObj != null ? reasonObj.toString() : "Response blocked by guardrails policy";
+                        error_message = "Blocked by Akto Guardrails " + reason;
+                        loggerMaker.info("Arcade webhook response blocked by guardrails - hookType: " + hookType + ", reason: " + reason);
+
+                        ingestBlockedRequest(requestData);
+
+                        return Action.SUCCESS.toUpperCase();
+                    }
+                }
+                ingestAllowedResponse(requestData);
+            }
+
             code = "OK";
             loggerMaker.info("Arcade webhook processed successfully - hookType: " + hookType);
             return Action.SUCCESS.toUpperCase();
@@ -130,6 +149,19 @@ public class ArcadeWebhookAction extends ActionSupport {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error parsing JSON body: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
+        }
+    }
+
+    private void ingestAllowedResponse(Map<String, Object> requestData) {
+        try {
+            Map<String, Object> ingestData = new HashMap<>(requestData);
+            ingestData.put("ingest_data", "true");
+            ingestData.put("response_guardrails", null);
+
+            gateway.processHttpProxy(ingestData);
+            loggerMaker.info("Allowed response ingested into Kafka");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error ingesting allowed response: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
         }
     }
 
@@ -216,7 +248,7 @@ public class ArcadeWebhookAction extends ActionSupport {
         if (HOOK_TYPE_PRE.equals(hookType)) {
             requestData.put("guardrails", "true");
         } else if (HOOK_TYPE_POST.equals(hookType)) {
-            requestData.put("ingest_data", "true");
+            requestData.put("response_guardrails", "true");
         }
 
         return requestData;
