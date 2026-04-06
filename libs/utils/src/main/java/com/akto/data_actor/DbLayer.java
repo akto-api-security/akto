@@ -2243,6 +2243,17 @@ public class DbLayer {
         return RecordedLoginInputDao.instance.findOne(new BasicDBObject());
     }
 
+    public static void persistRecordedLoginFlowScreenshots(String roleName, int userId, List<String> screenshotsBase64) {
+        Bson filter = Filters.and(Filters.eq("roleName", roleName), Filters.eq("userId", userId));
+        Bson update = Updates.combine(
+                Updates.setOnInsert("roleName", roleName),
+                Updates.setOnInsert("userId", userId),
+                Updates.set("screenshotsBase64", screenshotsBase64 != null ? screenshotsBase64 : Collections.emptyList()),
+                Updates.set("updatedAt", Context.now())
+        );
+        RecordedLoginScreenshotDao.instance.updateOne(filter, update);
+    }
+
     public static LoginFlowStepsData fetchLoginFlowStepsData(int userId) {
         Bson filters = Filters.and(
                 Filters.eq("userId", userId));
@@ -2384,14 +2395,40 @@ public class DbLayer {
         );
     }
     public static void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
-        TestingRunPlaygroundDao.instance.updateOne(
-                Filters.eq(Constants.ID, testingRunPlayground.getId()),
-                Updates.combine(
-                        Updates.set(TestingRunPlayground.STATE, State.COMPLETED),
-                        Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, testingRunPlayground.getTestingRunResult()
+        Bson stateUpdate = Updates.set(TestingRunPlayground.STATE, State.COMPLETED);
+        if (testingRunPlayground.getTestingRunPlaygroundType()
+                == TestingRunPlayground.TestingRunPlaygroundType.LOGIN_FLOW_TEST) {
+            TestingRunPlaygroundDao.instance.updateOne(
+                    Filters.eq(Constants.ID, testingRunPlayground.getId()),
+                    Updates.combine(
+                            stateUpdate,
+                            Updates.set(TestingRunPlayground.LOGIN_FLOW_RESPONSE,
+                                    testingRunPlayground.getLoginFlowResponse())));
+        } else if (testingRunPlayground.getTestingRunPlaygroundType()
+                == TestingRunPlayground.TestingRunPlaygroundType.RECORDED_JSON_FLOW) {
+            List<Bson> recordedFlowUpdates = new ArrayList<>();
+            recordedFlowUpdates.add(stateUpdate);
+            if (testingRunPlayground.getRecordedFlowTokenResult() != null) {
+                recordedFlowUpdates.add(Updates.set(TestingRunPlayground.RECORDED_FLOW_TOKEN_RESULT,
+                        testingRunPlayground.getRecordedFlowTokenResult()));
+            }
+            if (testingRunPlayground.getRecordedFlowErrorMessage() != null) {
+                recordedFlowUpdates.add(Updates.set(TestingRunPlayground.RECORDED_FLOW_ERROR_MESSAGE,
+                        testingRunPlayground.getRecordedFlowErrorMessage()));
+            }
+            TestingRunPlaygroundDao.instance.updateOne(
+                    Filters.eq(Constants.ID, new ObjectId(testingRunPlayground.getHexId())),
+                    Updates.combine(recordedFlowUpdates));
+        } else {
+            TestingRunPlaygroundDao.instance.updateOne(
+                    Filters.eq(Constants.ID, new ObjectId(testingRunPlayground.getHexId())),
+                    Updates.combine(
+                            stateUpdate,
+                            Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, testingRunPlayground.getTestingRunResult()
+                            )
                     )
-                )
             );
+        }
     }
 
     public static void updateTestingRunPlayground(ObjectId id, TestingRunResult testingRunResult) {

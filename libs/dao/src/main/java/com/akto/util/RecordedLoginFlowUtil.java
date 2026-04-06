@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import com.akto.dao.RecordedLoginInputDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.RecordedLoginFlowInput;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
@@ -60,7 +61,8 @@ public class RecordedLoginFlowUtil {
                     Updates.setOnInsert("createdAt", Context.now()),
                     Updates.set("updatedAt", Context.now()),
                     Updates.set("outputFilePath", outputFilePath),
-                    Updates.set("errorFilePath", errorFilePath)
+                    Updates.set("errorFilePath", errorFilePath),
+                    Updates.set(RecordedLoginFlowInput.TOKEN_RESULT, token)
                 );
                 RecordedLoginInputDao.instance.updateOne(filter, update);
             }
@@ -79,7 +81,8 @@ public class RecordedLoginFlowUtil {
                     Updates.setOnInsert("createdAt", Context.now()),
                     Updates.set("updatedAt", Context.now()),
                     Updates.set("outputFilePath", outputFilePath),
-                    Updates.set("errorFilePath", errorFilePath)
+                    Updates.set("errorFilePath", errorFilePath),
+                    Updates.unset(RecordedLoginFlowInput.TOKEN_RESULT)
                 );
                 RecordedLoginInputDao.instance.updateOne(filter, update);
             }
@@ -88,6 +91,17 @@ public class RecordedLoginFlowUtil {
             throw new Exception("error executing recorded login flow " + e.getMessage());
         }
 
+    }
+
+    public static String fetchToken(RecordedLoginFlowInput recordedLoginInput) throws Exception {
+        if (recordedLoginInput != null && recordedLoginInput.getTokenResult() != null
+                && !recordedLoginInput.getTokenResult().isEmpty()) {
+            return recordedLoginInput.getTokenResult();
+        }
+        if (recordedLoginInput == null) {
+            throw new Exception("recorded login input is null");
+        }
+        return fetchToken(recordedLoginInput.getOutputFilePath(), recordedLoginInput.getErrorFilePath());
     }
 
     public static String fetchToken(String outputFilePath, String errorFilePath) throws Exception {
