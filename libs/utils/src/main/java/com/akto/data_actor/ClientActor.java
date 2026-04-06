@@ -4192,6 +4192,20 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         Map<String, Object> body = new HashMap<>();
         body.put("testingRunPlayground", testingRunPlayground);
+        switch (testingRunPlayground.getTestingRunPlaygroundType()) {
+            case TEST_EDITOR_PLAYGROUND:
+                body.put("testingRunPlaygroundId", testingRunPlayground.getHexId());
+                body.put("testingRunPlaygroundType", TestingRunPlayground.TestingRunPlaygroundType.TEST_EDITOR_PLAYGROUND);
+                body.put("testingRunResult", testingRunPlayground.getTestingRunResult());
+                break;
+            case POSTMAN_IMPORTS:
+                body.put("testingRunPlaygroundId", testingRunPlayground.getHexId());
+                body.put("testingRunPlaygroundType", TestingRunPlayground.TestingRunPlaygroundType.POSTMAN_IMPORTS);
+                body.put("originalHttpResponse", testingRunPlayground.getOriginalHttpResponse());
+                break;
+            default:
+                break;
+        }
         String jsonString = gson.toJson(body);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRunPlaygroundStateAndResult", "", "POST",  jsonString, headers, "");
         try {
