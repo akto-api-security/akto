@@ -43,6 +43,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 public class AdminSettingsAction extends UserAction {
@@ -576,29 +578,39 @@ public class AdminSettingsAction extends UserAction {
     @Getter
     private Map<String, AccountSettings.ProxyPatternInfo> matchingPatternsForProxy;
 
+    @Setter
+    private boolean switchProxyMode;
+
     public String addMatchingPatternForProxy() {
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();
 
-        if (proxyPattern == null || proxyPattern.trim().isEmpty()) {
-            addActionError("Pattern cannot be empty");
+        if (!switchProxyMode) {
+            addActionError("Enable proxy mode.");
             return ERROR.toUpperCase();
         }
 
-        proxyPattern = proxyPattern.trim();
+        Bson updates = Updates.set("switchProxyMode", true);
+        if(!StringUtils.isEmpty(proxyPattern)){
+            proxyPattern = proxyPattern.trim();
+            String key = proxyPattern.hashCode() + "";
+            AccountSettings.ProxyPatternInfo info = new AccountSettings.ProxyPatternInfo(proxyPattern, user.getLogin(), Context.now());
+            updates = Updates.combine(
+                updates,
+                Updates.set(AccountSettings.MATCHING_PATTERNS_FOR_PROXY + "." + key, info)
+            );
+        }
+       
 
-        String key = proxyPattern.hashCode() + "";
-        AccountSettings.ProxyPatternInfo info = new AccountSettings.ProxyPatternInfo(proxyPattern, user.getLogin(), Context.now());
+       
 
         try {
             AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(),
-                Updates.set(AccountSettings.MATCHING_PATTERNS_FOR_PROXY + "." + key, info)
+               updates
             );
-
             AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             this.matchingPatternsForProxy = settings != null ? settings.getMatchingPatternsForProxy() : null;
-
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.error("Error adding matching pattern for proxy", e);

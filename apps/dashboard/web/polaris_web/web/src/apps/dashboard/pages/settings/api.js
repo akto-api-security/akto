@@ -1003,21 +1003,11 @@ const settingRequests = {
             data: {}
         })
     },
-    addMatchingPatternForProxy(proxyPattern) {
+    addMatchingPatternForProxy(proxyPattern, switchProxyMode) {
         return request({
             url: '/api/addMatchingPatternForProxy',
             method: 'post',
-            data: {proxyPattern}
-        })
-    },
-    toggleSwitchProxyMode(switchProxyMode) {
-        return request({
-            url: '/api/modifyAccountSettings',
-            method: 'post',
-            data: {
-                accountPermission: 'switchProxyMode',
-                modifiedValueForAccount: switchProxyMode
-            }
+            data: {proxyPattern, switchProxyMode}
         })
     }
 }

@@ -88,7 +88,7 @@ function ProxyPatterns() {
     async function handleToggleProxyMode(value) {
         setSwitchProxyMode(value)
         try {
-            await settingRequests.toggleSwitchProxyMode(value)
+            await settingRequests.addMatchingPatternForProxy("",value)
             func.setToast(true, false, `Proxy mode ${value ? 'enabled' : 'disabled'}`)
         } catch (e) {
             setSwitchProxyMode(!value)
@@ -108,7 +108,7 @@ function ProxyPatterns() {
         }
         setLoading(true)
         try {
-            const resp = await settingRequests.addMatchingPatternForProxy(value.trim())
+            const resp = await settingRequests.addMatchingPatternForProxy(value, switchProxyMode)
             setTableData(buildTableData(resp?.matchingPatternsForProxy || resp))
             setPattern('')
             func.setToast(true, false, 'Pattern added successfully')
