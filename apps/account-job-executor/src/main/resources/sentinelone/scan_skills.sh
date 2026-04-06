@@ -20,7 +20,18 @@
 # Requirements: POSIX shell (bash/zsh), find
 # Optional: None (uses shell builtins only)
 
-set -e
+# Ensure JSON output even on error
+cleanup() {
+    if [ "$JSON_STARTED" = true ] && [ "$JSON_CLOSED" = false ]; then
+        echo ""
+        echo "  ]"
+        echo "}"
+    fi
+}
+trap cleanup EXIT
+
+JSON_STARTED=false
+JSON_CLOSED=false
 
 echo "{"
 echo "  \"scan_time\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\","
@@ -28,6 +39,7 @@ echo "  \"hostname\": \"$(hostname)\","
 echo "  \"os\": \"$(uname -s)\","
 echo "  \"user\": \"$(whoami)\","
 echo "  \"skills_found\": ["
+JSON_STARTED=true
 
 FIRST=true
 
@@ -36,15 +48,16 @@ add_skill() {
     local agent="$2"
     
     if [ -f "$path" ]; then
-        if [ "$FIRST" = false ]; then
+        if [ "$FIRST" = true ]; then
+            FIRST=false
+        else
             echo ","
         fi
-        FIRST=false
         
         local size=$(stat -f%z "$path" 2>/dev/null || stat -c%s "$path" 2>/dev/null || echo "0")
         local mtime=$(stat -f%m "$path" 2>/dev/null || stat -c%Y "$path" 2>/dev/null || echo "0")
         
-        echo -n "    {\"path\":\"$path\",\"agent\":\"$agent\",\"size\":$size,\"modified\":$mtime}"
+        echo "    {\"path\":\"$path\",\"agent\":\"$agent\",\"size\":$size,\"modified\":$mtime}"
     fi
 }
 
@@ -67,14 +80,7 @@ scan_agent_dir() {
     fi
     
     # Find skill files matching exact patterns (case-insensitive)
-    find "$base_path" -maxdepth "$max_depth" -type f \( \
-        -iname "SKILL.md" -o \
-        -iname "skill.md" -o \
-        -iname "skills.md" -o \
-        -iname "SKILLS.MD" -o \
-        -iname "PROMPT.md" -o \
-        -iname "prompt.md" \
-    \) 2>/dev/null | while read -r file; do
+    while IFS= read -r file; do
         # Skip if in junk directory
         skip=false
         IFS='/' read -ra PARTS <<< "$file"
@@ -88,7 +94,14 @@ scan_agent_dir() {
         if [ "$skip" = false ]; then
             add_skill "$file" "$agent_name"
         fi
-    done
+    done < <(find "$base_path" -maxdepth "$max_depth" -type f \( \
+        -iname "SKILL.md" -o \
+        -iname "skill.md" -o \
+        -iname "skills.md" -o \
+        -iname "SKILLS.MD" -o \
+        -iname "PROMPT.md" -o \
+        -iname "prompt.md" \
+    \) 2>/dev/null)
 }
 
 # Get all user home directories
@@ -139,20 +152,38 @@ for user_home in $USER_HOMES; do
     done
     
     # Find skill files in home (depth 6)
-    eval "find \"$user_home\" -maxdepth 6 $EXCLUDE_PATHS -type f \( \
+    while IFS= read -r file; do
+        # Determine agent from parent directory name
+        dir_name=$(basename "$(dirname "$file")" | tr '[:upper:]' '[:lower:]' | tr ' _' '--')
+        add_skill "$file" "$dir_name"
+    done < <(eval "find \"$user_home\" -maxdepth 6 $EXCLUDE_PATHS -type f \( \
         -iname \"SKILL.md\" -o \
         -iname \"skill.md\" -o \
         -iname \"skills.md\" -o \
         -iname \"SKILLS.MD\" -o \
         -iname \"PROMPT.md\" -o \
         -iname \"prompt.md\" \
-    \) -print 2>/dev/null" | while read -r file; do
-        # Determine agent from parent directory name
-        dir_name=$(basename "$(dirname "$file")" | tr '[:upper:]' '[:lower:]' | tr ' _' '--')
-        add_skill "$file" "$dir_name"
-    done
+    \) -print 2>/dev/null")
+done
+
+# Phase 3: Scan common Docker/container paths (depth 6)
+for container_path in /app /workspace /opt /srv; do
+    if [ -d "$container_path" ]; then
+        while IFS= read -r file; do
+            dir_name=$(basename "$(dirname "$file")" | tr '[:upper:]' '[:lower:]' | tr ' _' '--')
+            add_skill "$file" "$dir_name"
+        done < <(find "$container_path" -maxdepth 6 -type f \( \
+            -iname "SKILL.md" -o \
+            -iname "skill.md" -o \
+            -iname "skills.md" -o \
+            -iname "SKILLS.MD" -o \
+            -iname "PROMPT.md" -o \
+            -iname "prompt.md" \
+        \) 2>/dev/null)
+    fi
 done
 
 echo ""
 echo "  ]"
 echo "}"
+JSON_CLOSED=true

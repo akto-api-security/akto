@@ -24,8 +24,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class SentinelOneExecutor extends AccountJobExecutor {
 
@@ -40,10 +42,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
     private static final int DV_MAX_WAIT_MS      = 60_000;
     private static final int DV_LOOKBACK_HOURS   = 6;
 
-    /**
-     * Tools to look up in the installed-app inventory (case-insensitive contains match).
-     * Add any new AI coding tools here.
-     */
     public static final List<String> APPS_TOOL_LIST = Arrays.asList(
         "Claude",
         "Cursor",
@@ -54,11 +52,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         "Ollama"
     );
 
-    /**
-     * Tools to query for via Deep Visibility process events. (case sensitive)
-     * Matched against processCmd and processName (exact string contains).
-     * Add new tools here when they appear as process names.
-     */
     public static final List<String> DV_TOOL_LIST = Arrays.asList(
     "openclaw",
     "gemini",
@@ -89,11 +82,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
 
     // ── Main execution logic ──────────────────────────────────────────────────
 
-    /**
-     * Main entry point – runs the full apps + DV pipeline for every tool in the respective lists.
-     *
-     * @param integration fully-populated SentinelOneIntegration (with apiToken)
-     */
     private static void execute(SentinelOneIntegration integration) {
         if (integration == null) {
             loggerMaker.error("SentinelOneExecutor.execute called with null integration", LogDb.DASHBOARD);
@@ -160,23 +148,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             loggerMaker.error("SentinelOneExecutor: MCP discovery failed — " + e.getMessage(), LogDb.DASHBOARD);
         }
 
-        // ── Pass 4: Deep Visibility (Network Connections for MCP Traffic) ─────
-        // TODO: Enable after fixing rate limiting - currently causes 429 errors
-        // Monitor actual MCP JSON-RPC traffic (tools/list, tools/call, etc.)
-        /*
-        try {
-            List<Map<String, Object>> mcpNetworkEvents = queryMCPNetworkTraffic(apiToken, consoleUrl, DV_LOOKBACK_HOURS);
-            if (!mcpNetworkEvents.isEmpty()) {
-                ingestMCPNetworkTraffic(mcpNetworkEvents, ingestUrl, consoleDomain);
-                loggerMaker.info("SentinelOneExecutor: ingested " + mcpNetworkEvents.size() + 
-                    " MCP network events", LogDb.DASHBOARD);
-            } else {
-                loggerMaker.info("SentinelOneExecutor: no MCP network traffic found", LogDb.DASHBOARD);
-            }
-        } catch (IOException e) {
-            loggerMaker.error("SentinelOneExecutor: MCP network traffic query failed — " + e.getMessage(), LogDb.DASHBOARD);
-        }
-        */
     }
 
     // ── Agent helpers ─────────────────────────────────────────────────────────
@@ -205,6 +176,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                         Map<String, Object> entry = new HashMap<>();
                         entry.put("id", node.path("id").asText(""));
                         entry.put("computerName", node.path("computerName").asText(""));
+                        entry.put("osType", node.path("osType").asText(""));
+                        entry.put("osName", node.path("osName").asText(""));
                         result.add(entry);
                     }
                 }
@@ -332,11 +305,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
 
     // ── Deep Visibility ───────────────────────────────────────────────────────
 
-    /**
-     * Run a SINGLE combined DV query for all tools to avoid rate limiting.
-     * Query format: (processCmd contains "tool1" OR processName contains "tool1") OR 
-     *               (processCmd contains "tool2" OR processName contains "tool2") ...
-     */
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> runDvQueryForAllTools(
             List<String> tools,
@@ -438,10 +406,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         }
     }
 
-    /**
-     * Group events by which tool was detected in the process command/name.
-     * An event can match multiple tools - we'll assign it to the first match.
-     */
     private static Map<String, List<Map<String, Object>>> groupEventsByTool(
             List<Map<String, Object>> events,
             List<String> tools) {
@@ -494,187 +458,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             loggerMaker.info("SentinelOneExecutor: ingested " + batch.size() + " DV event(s) for " + tool, LogDb.DASHBOARD);
         } else {
             loggerMaker.info("SentinelOneExecutor: no process events to ingest for " + tool + " (filtered out " + events.size() + " non-process events)", LogDb.DASHBOARD);
-        }
-    }
-
-    /**
-     * Query Deep Visibility for MCP network traffic.
-     * Looks for Network Connection events on common MCP ports (stdio proxies, HTTP servers).
-     * Captures actual JSON-RPC traffic (tools/list, tools/call, etc.)
-     */
-    @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> queryMCPNetworkTraffic(
-            String apiToken,
-            String consoleUrl,
-            int lookbackHours) throws IOException {
-
-        // Query for network connections on common MCP ports
-        // Port 57294 = mcp-endpoint-shield default proxy port
-        // Also look for localhost connections which MCP servers commonly use
-        String query = "EventType = \"Network Connection\" AND " +
-                       "((dstPort = 57294) OR " +
-                       "(dstIp In (\"127.0.0.1\", \"::1\", \"localhost\")) OR " +
-                       "(srcProcessName Contains \"mcp\") OR " +
-                       "(dstProcessName Contains \"mcp\"))";
-        
-        String toDate = java.time.Instant.now().toString();
-        String fromDate = java.time.Instant.now().minus(lookbackHours, java.time.temporal.ChronoUnit.HOURS).toString();
-        
-        loggerMaker.info("SentinelOneExecutor: MCP network query: " + query, LogDb.DASHBOARD);
-
-        RequestConfig requestConfig = RequestConfig.custom()
-            .setConnectTimeout(CONNECT_TIMEOUT_MS)
-            .setSocketTimeout(SOCKET_TIMEOUT_MS)
-            .build();
-
-        try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(requestConfig).build()) {
-
-            // Step 1: init-query
-            Map<String, Object> body = new HashMap<>();
-            body.put("query", query);
-            body.put("fromDate", fromDate);
-            body.put("toDate", toDate);
-            body.put("limit", 1000);
-
-            HttpPost post = new HttpPost(consoleUrl + "/web/api/v2.1/dv/init-query");
-            post.setHeader("Authorization", "ApiToken " + apiToken);
-            post.setHeader("Content-Type", "application/json");
-            post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(body), ContentType.APPLICATION_JSON));
-
-            String queryId;
-            try (CloseableHttpResponse response = httpClient.execute(post)) {
-                int statusCode = response.getStatusLine().getStatusCode();
-                String responseBody = EntityUtils.toString(response.getEntity());
-                if (statusCode != 200) {
-                    loggerMaker.error("MCP network DV init-query failed: HTTP " + statusCode + " - " + responseBody, LogDb.DASHBOARD);
-                    throw new IOException("MCP network DV init-query failed: HTTP " + statusCode);
-                }
-                JsonNode json = OBJECT_MAPPER.readTree(responseBody);
-                queryId = json.path("data").path("queryId").asText(null);
-                if (queryId == null || queryId.isEmpty()) {
-                    throw new IOException("No queryId returned from SentinelOne for MCP network query.");
-                }
-            }
-
-            // Step 2: poll query-status until FINISHED or terminal
-            long deadline = System.currentTimeMillis() + DV_MAX_WAIT_MS;
-            while (System.currentTimeMillis() < deadline) {
-                HttpGet statusGet = new HttpGet(consoleUrl + "/web/api/v2.1/dv/query-status?queryId=" + queryId);
-                statusGet.setHeader("Authorization", "ApiToken " + apiToken);
-                try (CloseableHttpResponse response = httpClient.execute(statusGet)) {
-                    String responseBody = EntityUtils.toString(response.getEntity());
-                    JsonNode json = OBJECT_MAPPER.readTree(responseBody);
-                    String responseState = json.path("data").path("responseState").asText("");
-                    if ("FINISHED".equalsIgnoreCase(responseState) || "EMPTY_RESULTS".equalsIgnoreCase(responseState)) break;
-                    if ("FAILED".equalsIgnoreCase(responseState) || "FAILED_CLIENT".equalsIgnoreCase(responseState)
-                            || "TIMED_OUT".equalsIgnoreCase(responseState) || "QUERY_EXPIRED".equalsIgnoreCase(responseState)) {
-                        throw new IOException("MCP network query ended with state: " + responseState);
-                    }
-                }
-                try { Thread.sleep(DV_POLL_INTERVAL_MS); } catch (InterruptedException ignored) {}
-            }
-
-            // Step 3: fetch events
-            List<Map<String, Object>> networkEvents = new ArrayList<>();
-            HttpGet eventsGet = new HttpGet(consoleUrl + "/web/api/v2.1/dv/events?queryId=" + queryId + "&limit=1000");
-            eventsGet.setHeader("Authorization", "ApiToken " + apiToken);
-            try (CloseableHttpResponse response = httpClient.execute(eventsGet)) {
-                int statusCode = response.getStatusLine().getStatusCode();
-                String responseBody = EntityUtils.toString(response.getEntity());
-                if (statusCode != 200) {
-                    loggerMaker.error("MCP network DV events fetch failed: HTTP " + statusCode, LogDb.DASHBOARD);
-                    throw new IOException("Failed to fetch MCP network events: HTTP " + statusCode);
-                }
-                JsonNode json = OBJECT_MAPPER.readTree(responseBody);
-                JsonNode data = json.path("data");
-                if (data.isArray()) {
-                    for (JsonNode event : data) {
-                        networkEvents.add(OBJECT_MAPPER.convertValue(event, Map.class));
-                    }
-                }
-            }
-
-            loggerMaker.info("SentinelOneExecutor: MCP network query returned " + networkEvents.size() + " event(s)", LogDb.DASHBOARD);
-            return networkEvents;
-        }
-    }
-
-    /**
-     * Ingest MCP network traffic events into Akto.
-     * These represent actual MCP JSON-RPC calls captured by Deep Visibility.
-     */
-    private static void ingestMCPNetworkTraffic(
-            List<Map<String, Object>> events,
-            String ingestUrl,
-            String consoleDomain) throws IOException {
-
-        List<Map<String, Object>> batch = new ArrayList<>();
-        for (Map<String, Object> event : events) {
-            // Extract network connection details
-            String srcIp = getStringOrDefault(event, "srcIp", "unknown");
-            String dstIp = getStringOrDefault(event, "dstIp", "unknown");
-            String dstPort = getStringOrDefault(event, "dstPort", "unknown");
-            String srcProcessName = getStringOrDefault(event, "srcProcessName", "unknown");
-            String dstProcessName = getStringOrDefault(event, "dstProcessName", "unknown");
-            String agentName = getStringOrDefault(event, "agentName", "unknown");
-            String eventTime = getStringOrDefault(event, "eventTime", "");
-            
-            // Build synthetic host for MCP traffic
-            String host = agentName + ".mcp-network." + dstPort;
-            
-            Map<String, Object> record = new HashMap<>();
-            record.put("path", "https://" + host + "/mcp/network");
-            record.put("method", "POST");
-            record.put("statusCode", "200");
-            record.put("status", "OK");
-            record.put("ip", srcIp);
-            record.put("time", eventTime);
-            record.put("akto_account_id", String.valueOf(Context.accountId.get()));
-            record.put("akto_vxlan_id", "0");
-            record.put("source", "MIRRORING");
-            
-            // Request headers
-            Map<String, String> reqHeaders = new HashMap<>();
-            reqHeaders.put("host", host);
-            reqHeaders.put("content-type", "application/json");
-            reqHeaders.put("x-transport", "NETWORK");
-            reqHeaders.put("x-source-process", srcProcessName);
-            reqHeaders.put("x-dest-process", dstProcessName);
-            reqHeaders.put("x-dest-port", dstPort);
-            
-            // Request payload - network connection metadata
-            Map<String, Object> reqPayload = new HashMap<>();
-            reqPayload.put("event_type", "network_connection");
-            reqPayload.put("src_ip", srcIp);
-            reqPayload.put("dst_ip", dstIp);
-            reqPayload.put("dst_port", dstPort);
-            reqPayload.put("src_process", srcProcessName);
-            reqPayload.put("dst_process", dstProcessName);
-            reqPayload.put("agent_name", agentName);
-            reqPayload.put("event_time", eventTime);
-            reqPayload.put("console_domain", consoleDomain);
-            
-            // Tag with source=ENDPOINT and mcp-server label
-            Map<String, String> tagMap = new HashMap<>();
-            tagMap.put("source", "ENDPOINT");
-            tagMap.put("mcp-server", "MCP Server");
-            
-            try {
-                record.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(reqHeaders));
-                record.put("responseHeaders", "{}");
-                record.put("requestPayload", OBJECT_MAPPER.writeValueAsString(reqPayload));
-                record.put("responsePayload", "{}");
-                record.put("tag", OBJECT_MAPPER.writeValueAsString(tagMap));
-                
-                batch.add(record);
-            } catch (Exception e) {
-                loggerMaker.error("Error serializing MCP network event: " + e.getMessage(), LogDb.DASHBOARD);
-            }
-        }
-        
-        if (!batch.isEmpty()) {
-            sendBatch(batch, ingestUrl);
-            loggerMaker.info("SentinelOneExecutor: ingested " + batch.size() + " MCP network event(s)", LogDb.DASHBOARD);
         }
     }
 
@@ -793,15 +576,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
 
     // ── MCP Configuration & Skill Discovery ───────────────────────────────────
 
-    /**
-     * Uploads a script from classpath to SentinelOne RemoteOps.
-     * Uses overwrite mode: checks if script exists, deletes it, then uploads fresh copy.
-     * 
-     * @param scriptResourcePath Path relative to /sentinelone/ in classpath (e.g., "scan_mcp_configs.sh")
-     * @param apiToken SentinelOne API token
-     * @param consoleUrl SentinelOne console URL
-     * @return Script ID if upload succeeds, null otherwise
-     */
     private static String uploadScriptFromClasspath(String scriptResourcePath, String apiToken, String consoleUrl) {
         String classpathResource = "/sentinelone/" + scriptResourcePath;
         
@@ -904,15 +678,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         }
     }
 
-    /**
-     * Executes a RemoteOps script on specified agents.
-     * 
-     * @param scriptId Script ID from upload
-     * @param agentIds List of agent IDs to execute on
-     * @param apiToken SentinelOne API token
-     * @param consoleUrl SentinelOne console URL
-     * @return Parent task ID if execution succeeds, null otherwise
-     */
     private static String executeRemoteScript(String scriptId, List<String> agentIds, String apiToken, String consoleUrl) {
         try {
             Map<String, Object> data = new HashMap<>();
@@ -959,15 +724,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         }
     }
 
-    /**
-     * Polls RemoteOps task status until completion or timeout.
-     * 
-     * @param parentTaskId Parent task ID from execute
-     * @param apiToken SentinelOne API token
-     * @param consoleUrl SentinelOne console URL
-     * @param maxWaitMs Maximum time to wait in milliseconds
-     * @return Map of agent ID to task ID, or empty map on failure
-     */
     private static Map<String, String> pollTaskStatus(String parentTaskId, String apiToken, String consoleUrl, int maxWaitMs) {
         Map<String, String> agentToTaskId = new HashMap<>();
         long startTime = System.currentTimeMillis();
@@ -1050,18 +806,11 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         return agentToTaskId;
     }
 
-    /**
-     * Fetches script output from completed tasks with agent ID mapping.
-     * 
-     * @param agentToTaskId Map of agent ID to task ID
-     * @param apiToken SentinelOne API token
-     * @param consoleUrl SentinelOne console URL
-     * @return Map of agent ID to parsed JSON output
-     */
     private static Map<String, JsonNode> fetchScriptOutputsWithAgentId(Map<String, String> agentToTaskId, String apiToken, String consoleUrl) {
         Map<String, JsonNode> outputs = new HashMap<>();
         
         loggerMaker.info("Fetching script outputs for " + agentToTaskId.size() + " agent(s)", LogDb.DASHBOARD);
+        loggerMaker.info("Agent-to-Task mapping: " + agentToTaskId.toString(), LogDb.DASHBOARD);
         
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             Map<String, Object> data = new HashMap<>();
@@ -1120,39 +869,55 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                     HttpGet get = new HttpGet(url);
                     try (CloseableHttpResponse dlResp = httpClient.execute(get)) {
                         byte[] zipData = EntityUtils.toByteArray(dlResp.getEntity());
+                        loggerMaker.info("Downloaded ZIP size: " + zipData.length + " bytes for agentId=" + agentId, LogDb.DASHBOARD);
                         
                         // Extract stdout from ZIP
                         try (java.io.ByteArrayInputStream bais = new java.io.ByteArrayInputStream(zipData);
                              java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(bais)) {
                             
+                            String stdoutContent = null;
+                            String stderrContent = null;
+                            
                             java.util.zip.ZipEntry entry;
                             while ((entry = zis.getNextEntry()) != null) {
                                 String entryName = entry.getName();
+                                loggerMaker.info("ZIP entry found: " + entryName + " for agentId=" + agentId, LogDb.DASHBOARD);
+                                
+                                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                                byte[] buffer = new byte[8192];
+                                int len;
+                                while ((len = zis.read(buffer)) > 0) {
+                                    baos.write(buffer, 0, len);
+                                }
+                                String content = new String(baos.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
+                                
                                 // Match stdout or stdout_*.txt (SentinelOne adds timestamps)
                                 if (entryName.equals("stdout") || entryName.startsWith("stdout_") || entryName.startsWith("/stdout")) {
-                                    loggerMaker.info("Found stdout entry: " + entryName, LogDb.DASHBOARD);
-                                    
-                                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                                    byte[] buffer = new byte[8192];
-                                    int len;
-                                    while ((len = zis.read(buffer)) > 0) {
-                                        baos.write(buffer, 0, len);
+                                    stdoutContent = content;
+                                    loggerMaker.info("Found stdout entry: " + entryName + ", length: " + content.length() + " bytes", LogDb.DASHBOARD);
+                                } else if (entryName.equals("stderr") || entryName.startsWith("stderr_") || entryName.startsWith("/stderr")) {
+                                    stderrContent = content;
+                                    loggerMaker.info("Found stderr entry: " + entryName + ", length: " + content.length() + " bytes", LogDb.DASHBOARD);
+                                }
+                            }
+                            
+                            // Process stdout if found
+                            if (stdoutContent != null && !stdoutContent.isEmpty()) {
+                                loggerMaker.info("Processing stdout for agentId=" + agentId, LogDb.DASHBOARD);
+                                try {
+                                    JsonNode output = OBJECT_MAPPER.readTree(stdoutContent);
+                                    if (agentId != null) {
+                                        outputs.put(agentId, output);
                                     }
-                                    String stdout = new String(baos.toByteArray(), java.nio.charset.StandardCharsets.UTF_8);
-                                    
-                                    loggerMaker.info("Stdout content length: " + stdout.length() + " bytes", LogDb.DASHBOARD);
-                                    
-                                    try {
-                                        JsonNode output = OBJECT_MAPPER.readTree(stdout);
-                                        if (agentId != null) {
-                                            outputs.put(agentId, output);
-                                        }
-                                        loggerMaker.info("Successfully parsed stdout as JSON for agentId=" + agentId, LogDb.DASHBOARD);
-                                    } catch (Exception e) {
-                                        loggerMaker.error("Failed to parse stdout as JSON: " + e.getMessage() + 
-                                            " | First 200 chars: " + stdout.substring(0, Math.min(200, stdout.length())), LogDb.DASHBOARD);
-                                    }
-                                    break;
+                                    loggerMaker.info("Successfully parsed stdout as JSON for agentId=" + agentId, LogDb.DASHBOARD);
+                                } catch (Exception e) {
+                                    loggerMaker.error("Failed to parse stdout as JSON: " + e.getMessage(), LogDb.DASHBOARD);
+                                    loggerMaker.error("Full stdout content: " + stdoutContent, LogDb.DASHBOARD);
+                                }
+                            } else {
+                                loggerMaker.error("No stdout found in ZIP for agentId=" + agentId, LogDb.DASHBOARD);
+                                if (stderrContent != null && !stderrContent.isEmpty()) {
+                                    loggerMaker.error("Stderr content: " + stderrContent, LogDb.DASHBOARD);
                                 }
                             }
                         }
@@ -1166,14 +931,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         return outputs;
     }
 
-    /**
-     * Fetches script output from completed tasks.
-     * 
-     * @param taskIds List of task IDs
-     * @param apiToken SentinelOne API token
-     * @param consoleUrl SentinelOne console URL
-     * @return List of JSON output from each task
-     */
     private static List<JsonNode> fetchScriptOutputs(List<String> taskIds, String apiToken, String consoleUrl) {
         List<JsonNode> outputs = new ArrayList<>();
         
@@ -1271,13 +1028,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         return outputs;
     }
 
-    /**
-     * Main entry point for MCP config and skill discovery.
-     * Uploads scripts, executes on all agents in batches, ingests results to Akto.
-     * 
-     * @param integration SentinelOne integration config
-     * @return Combined discovery results
-     */
     public static Map<String, Object> discoverMCPConfigsAndSkills(SentinelOneIntegration integration) {
         Map<String, Object> results = new HashMap<>();
         results.put("mcp_configs", new ArrayList<>());
@@ -1307,12 +1057,18 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         
         for (Map<String, Object> agent : agentList) {
             String agentId = agent.get("id").toString();
+            String agentName = getStringOrDefault(agent, "computerName", "unknown");
             String osType = getStringOrDefault(agent, "osType", "").toLowerCase();
+            String osName = getStringOrDefault(agent, "osName", "").toLowerCase();
             
-            if (osType.contains("windows")) {
+            loggerMaker.info("Agent OS detection: name=" + agentName + ", osType=" + osType + ", osName=" + osName, LogDb.DASHBOARD);
+            
+            if (osType.contains("windows") || osName.contains("windows")) {
                 windowsAgentIds.add(agentId);
+                loggerMaker.info("Classified as Windows: " + agentName, LogDb.DASHBOARD);
             } else {
                 unixAgentIds.add(agentId);
+                loggerMaker.info("Classified as Unix/Linux/macOS: " + agentName, LogDb.DASHBOARD);
             }
         }
         
@@ -1389,22 +1145,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         
         return results;
     }
-    
-    /**
-     * Executes discovery script on agents in batches for better scalability.
-     * 
-     * @param scriptId Uploaded script ID
-     * @param agentIds List of all agent IDs to target
-     * @param batchSize Number of agents per batch
-     * @param timeoutMs Timeout per batch in milliseconds
-     * @param description Human-readable description for logging
-     * @param apiToken SentinelOne API token
-     * @param consoleUrl SentinelOne console URL
-     * @param ingestUrl Akto ingestion URL
-     * @param consoleDomain SentinelOne console domain
-     * @param isMcpConfig True if MCP config discovery, false if skill discovery
-     * @return Combined outputs from all batches
-     */
+
     private static Map<String, JsonNode> executeBatchedDiscovery(
             String scriptId, 
             List<String> agentIds, 
@@ -1452,15 +1193,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         return allOutputs;
     }
 
-    /**
-     * Ingests MCP config discoveries to Akto using the standard IngestDataBatch format.
-     * Mirrors the format from mcp-endpoint-shield/mcp/ingest.go GenerateIngestDataV2.
-     * Also creates collections for each MCP server found.
-     * 
-     * @param discoveriesByAgent Map of agent ID to discovery results
-     * @param ingestUrl Akto data ingestion URL
-     * @param consoleDomain SentinelOne console domain
-     */
     private static void ingestMCPDiscoveries(Map<String, JsonNode> discoveriesByAgent, String ingestUrl, String consoleDomain) {
         loggerMaker.info("Starting MCP discovery ingestion for " + discoveriesByAgent.size() + " agent(s)", LogDb.DASHBOARD);
         
@@ -1504,8 +1236,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                         
                         if (serverName.isEmpty()) continue;
                         
-                        // Build collection name: hostname.client.serverName
-                        String collectionName = hostname + "." + client + "." + serverName;
+                        String collectionName = client + "." + serverName;
                         collectionName = collectionName.toLowerCase();
                         
                         // Track server for collection creation
@@ -1521,8 +1252,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                             serverCollections.put(collectionName, info);
                         }
                         
-                        // Build synthetic host for ingestion
-                        String syntheticHost = hostname + "." + client + "." + serverName;
+                        // Build synthetic host for ingestion (matches collection name)
+                        String syntheticHost = client + "." + serverName;
                         
                         // Create request headers (JSON string)
                         Map<String, String> reqHeaders = new HashMap<>();
@@ -1596,10 +1327,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             }
         }
     }
-    
-    /**
-     * Helper class to track server collection info.
-     */
+
     private static class ServerCollectionInfo {
         String collectionName;
         String serverName;
@@ -1609,14 +1337,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         String url;
         String type;
     }
-    
-    /**
-     * Creates collections for discovered MCP servers.
-     * Mirrors db_abstractor.CreateCollectionForMCPServer from Go code.
-     * 
-     * @param serverCollections Map of collection names to server info
-     * @param ingestUrl Akto data ingestion URL (used to derive database abstractor URL)
-     */
+
     private static void createMCPServerCollections(Map<String, ServerCollectionInfo> serverCollections, String ingestUrl) {
         loggerMaker.info("Creating collections for " + serverCollections.size() + " MCP server(s)", LogDb.DASHBOARD);
         
@@ -1687,6 +1408,12 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                 try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
                     HttpPost post = new HttpPost(dbAbstractorUrl);
                     post.setHeader("Content-Type", "application/json");
+                    
+                    String aktoApiToken = System.getenv("AKTO_API_TOKEN");
+                    if (aktoApiToken != null && !aktoApiToken.isEmpty()) {
+                        post.setHeader("Authorization", aktoApiToken);
+                    }
+                    
                     post.setEntity(new StringEntity(requestJson, ContentType.APPLICATION_JSON));
                     
                     try (CloseableHttpResponse resp = client.execute(post)) {
@@ -1705,26 +1432,18 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             }
         }
     }
-    
-    /**
-     * Generates a unique collection ID from collection name and timestamp.
-     * Mirrors generateUniqueCollectionId from Go code.
-     */
+
     private static int generateCollectionId(String collectionName, long timestamp) {
         String combined = collectionName + timestamp;
         int hash = combined.hashCode();
         return Math.abs(hash);
     }
 
-    /**
-     * Ingests skill discoveries to Akto using the standard IngestDataBatch format.
-     * 
-     * @param discoveries List of discovery results from agents
-     * @param ingestUrl Akto data ingestion URL
-     * @param consoleDomain SentinelOne console domain
-     */
     private static void ingestSkillDiscoveries(Map<String, JsonNode> discoveriesByAgent, String ingestUrl, String consoleDomain) {
         List<Map<String, Object>> batchData = new ArrayList<>();
+        Set<SkillCollectionInfo> skillCollections = new HashSet<>();
+        
+        loggerMaker.info("Starting skill discovery ingestion for " + discoveriesByAgent.size() + " agent(s)", LogDb.DASHBOARD);
         
         for (Map.Entry<String, JsonNode> entry : discoveriesByAgent.entrySet()) {
             String agentId = entry.getKey();
@@ -1736,6 +1455,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             
             if (!skillsFound.isArray()) continue;
             
+            loggerMaker.info("Processing " + skillsFound.size() + " skill(s) from agentId=" + agentId + ", hostname=" + hostname, LogDb.DASHBOARD);
+            
             for (JsonNode skill : skillsFound) {
                 String path = skill.path("path").asText("");
                 String agent = skill.path("agent").asText("unknown");
@@ -1744,42 +1465,38 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                 
                 if (path.isEmpty()) continue;
                 
-                // Build synthetic host: hostname.agent.sentinel
-                String syntheticHost = hostname + "." + agent + ".sentinel";
+                String skillName = extractSkillName(path);
+                String collectionName = hostname + "." + agent + "." + skillName;
+                collectionName = collectionName.toLowerCase();
                 
-                // Create request headers (JSON string)
+                skillCollections.add(new SkillCollectionInfo(collectionName, agent, System.currentTimeMillis()));
+                
+                String syntheticHost = collectionName;
+                
                 Map<String, String> reqHeaders = new HashMap<>();
-                reqHeaders.put("content-type", "application/json");
+                reqHeaders.put("content-type", "text/markdown");
                 reqHeaders.put("host", syntheticHost);
-                reqHeaders.put("x-transport", "DISCOVERY");
-                reqHeaders.put("x-discovery-type", "skill");
+                reqHeaders.put("x-transport", "SKILL");
+                reqHeaders.put("x-skill-name", skillName);
+                reqHeaders.put("x-agent-type", agent);
                 
-                // Create request payload (discovery metadata)
-                Map<String, Object> reqPayload = new HashMap<>();
-                reqPayload.put("file_path", path);
-                reqPayload.put("agent_type", agent);
-                reqPayload.put("file_size", size);
-                reqPayload.put("modified_time", modified);
-                reqPayload.put("os", os);
-                reqPayload.put("user", user);
-                
-                // Create tag JSON string with source=ENDPOINT
                 Map<String, String> tagMap = new HashMap<>();
                 tagMap.put("source", "ENDPOINT");
                 tagMap.put("bot-name", agentId);
+                tagMap.put("mcp-server", "MCP Server");
+                tagMap.put("mcp-client", agent);
                 
                 try {
                     String reqHeadersJson = OBJECT_MAPPER.writeValueAsString(reqHeaders);
-                    String reqPayloadJson = OBJECT_MAPPER.writeValueAsString(reqPayload);
                     String tagJson = OBJECT_MAPPER.writeValueAsString(tagMap);
                     
                     Map<String, Object> batch = new HashMap<>();
-                    batch.put("path", "https://" + syntheticHost + "/skills/discovery");
+                    batch.put("path", "https://" + syntheticHost + "/skill/" + skillName);
                     batch.put("requestHeaders", reqHeadersJson);
                     batch.put("responseHeaders", "{}");
-                    batch.put("method", "POST");
-                    batch.put("requestPayload", reqPayloadJson);
-                    batch.put("responsePayload", "{}");
+                    batch.put("method", "GET");
+                    batch.put("requestPayload", "");
+                    batch.put("responsePayload", "Skill file discovered at: " + path);
                     batch.put("ip", "127.0.0.1");
                     batch.put("time", String.valueOf(System.currentTimeMillis() / 1000));
                     batch.put("statusCode", "200");
@@ -1804,6 +1521,128 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             } catch (IOException e) {
                 loggerMaker.error("Failed to ingest skill discoveries: " + e.getMessage(), LogDb.DASHBOARD);
             }
+        }
+        
+        if (!skillCollections.isEmpty()) {
+            createSkillCollections(skillCollections);
+        }
+    }
+    
+    private static String extractSkillName(String filePath) {
+        String fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+        fileName = fileName.substring(filePath.lastIndexOf('\\') + 1);
+        
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex > 0) {
+            fileName = fileName.substring(0, dotIndex);
+        }
+        
+        fileName = fileName.toLowerCase()
+            .replaceAll("[\\s_]+", "-")
+            .replaceAll("[^a-z0-9-]", "");
+        
+        return fileName;
+    }
+    
+    private static void createSkillCollections(Set<SkillCollectionInfo> skillCollections) {
+        String dbAbstractorUrl = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        if (dbAbstractorUrl == null || dbAbstractorUrl.isEmpty()) {
+            dbAbstractorUrl = "http://localhost:5678";
+        }
+        dbAbstractorUrl = normalizeUrl(dbAbstractorUrl) + "/api/createCollectionForHostAndVpc";
+        
+        loggerMaker.info("Using DATABASE_ABSTRACTOR_SERVICE_URL: " + dbAbstractorUrl, LogDb.DASHBOARD);
+        loggerMaker.info("Creating collections for " + skillCollections.size() + " skill(s)", LogDb.DASHBOARD);
+        
+        for (SkillCollectionInfo info : skillCollections) {
+            try {
+                List<Map<String, Object>> tagsList = new ArrayList<>();
+                
+                Map<String, Object> mcpServerTag = new HashMap<>();
+                mcpServerTag.put("lastUpdatedTs", info.timestamp);
+                mcpServerTag.put("keyName", "mcp-server");
+                mcpServerTag.put("value", "MCP Server");
+                mcpServerTag.put("source", "KUBERNETES");
+                tagsList.add(mcpServerTag);
+                
+                Map<String, Object> sourceTag = new HashMap<>();
+                sourceTag.put("lastUpdatedTs", info.timestamp);
+                sourceTag.put("keyName", "source");
+                sourceTag.put("value", "ENDPOINT");
+                sourceTag.put("source", "KUBERNETES");
+                tagsList.add(sourceTag);
+                
+                if (info.agentType != null && !info.agentType.isEmpty()) {
+                    Map<String, Object> clientTag = new HashMap<>();
+                    clientTag.put("lastUpdatedTs", info.timestamp);
+                    clientTag.put("keyName", "mcp-client");
+                    clientTag.put("value", info.agentType);
+                    clientTag.put("source", "KUBERNETES");
+                    tagsList.add(clientTag);
+                }
+                
+                Map<String, Object> request = new HashMap<>();
+                request.put("colId", generateCollectionId(info.collectionName, info.timestamp));
+                request.put("host", info.collectionName);
+                request.put("tagsList", tagsList);
+                
+                String requestJson = OBJECT_MAPPER.writeValueAsString(request);
+                
+                RequestConfig cfg = RequestConfig.custom()
+                    .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                    .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                    .build();
+                
+                try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+                    HttpPost post = new HttpPost(dbAbstractorUrl);
+                    post.setHeader("Content-Type", "application/json");
+                    
+                    String aktoApiToken = System.getenv("AKTO_API_TOKEN");
+                    if (aktoApiToken != null && !aktoApiToken.isEmpty()) {
+                        post.setHeader("Authorization", aktoApiToken);
+                    }
+                    
+                    post.setEntity(new StringEntity(requestJson, ContentType.APPLICATION_JSON));
+                    
+                    try (CloseableHttpResponse resp = client.execute(post)) {
+                        int status = resp.getStatusLine().getStatusCode();
+                        String responseBody = EntityUtils.toString(resp.getEntity());
+                        
+                        if (status == 200) {
+                            loggerMaker.info("Created collection for skill: " + info.collectionName, LogDb.DASHBOARD);
+                        } else {
+                            loggerMaker.error("Failed to create collection: HTTP " + status + " - " + responseBody, LogDb.DASHBOARD);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.error("Failed to create collection for " + info.collectionName + ": " + e.getMessage(), LogDb.DASHBOARD);
+            }
+        }
+    }
+    
+    private static class SkillCollectionInfo {
+        String collectionName;
+        String agentType;
+        long timestamp;
+        
+        SkillCollectionInfo(String collectionName, String agentType, long timestamp) {
+            this.collectionName = collectionName;
+            this.agentType = agentType;
+            this.timestamp = timestamp;
+        }
+        
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            SkillCollectionInfo that = (SkillCollectionInfo) o;
+            return collectionName.equals(that.collectionName);
+        }
+        
+        @Override
+        public int hashCode() {
+            return collectionName.hashCode();
         }
     }
 }

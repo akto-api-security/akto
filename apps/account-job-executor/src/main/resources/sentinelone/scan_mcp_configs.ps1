@@ -9,14 +9,31 @@
 #
 # Requirements: PowerShell 5.1+
 
-$ErrorActionPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'Continue'
 
-$results = @{
-    scan_time = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-    hostname = $env:COMPUTERNAME
-    os = "Windows"
-    user = $env:USERNAME
-    configs_found = @()
+# Log to stderr for debugging (won't interfere with JSON stdout)
+function Write-Log {
+    param([string]$Message)
+    [Console]::Error.WriteLine("[MCP-SCAN] $Message")
+}
+
+Write-Log "Script started"
+Write-Log "PowerShell version: $($PSVersionTable.PSVersion)"
+Write-Log "Computer: $env:COMPUTERNAME"
+Write-Log "User: $env:USERNAME"
+
+try {
+    $results = @{
+        scan_time = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+        hostname = $env:COMPUTERNAME
+        os = "Windows"
+        user = $env:USERNAME
+        configs_found = @()
+    }
+    Write-Log "Results object initialized"
+} catch {
+    Write-Log "ERROR: Failed to initialize results: $_"
+    exit 1
 }
 
 function Parse-MCPServers {
@@ -82,6 +99,7 @@ function Add-File {
     )
     
     if (Test-Path -Path $Path -PathType Leaf) {
+        Write-Log "Found config: $Path (client: $ClientType)"
         $item = Get-Item -Path $Path -Force
         
         # Skip backup files
@@ -92,13 +110,18 @@ function Add-File {
         # Parse mcpServers from the config file
         $servers = Parse-MCPServers -FilePath $Path
         
+        # Ensure servers is always an array (PowerShell's ConvertTo-Json can unwrap single-item arrays)
+        if ($servers -isnot [array]) {
+            $servers = @($servers)
+        }
+        
         $results.configs_found += @{
             path = $Path
             client = $ClientType
             size = $item.Length
             modified = [int][double]::Parse((Get-Date $item.LastWriteTime -UFormat %s))
             permissions = $item.Attributes.ToString()
-            servers = $servers
+            servers = @($servers)  # Force array
         }
     }
 }
@@ -125,14 +148,25 @@ function Find-Files {
 
 # Get all user profile directories
 $userProfiles = @()
-if (Test-Path "C:\Users") {
-    $userProfiles = Get-ChildItem "C:\Users" -Directory -Force -ErrorAction SilentlyContinue | 
-        Where-Object { $_.Name -notin @('Public', 'Default', 'Default User', 'All Users') } |
-        Select-Object -ExpandProperty FullName
+try {
+    if (Test-Path "C:\Users") {
+        Write-Log "Scanning C:\Users for user profiles"
+        $userProfiles = Get-ChildItem "C:\Users" -Directory -Force -ErrorAction SilentlyContinue | 
+            Where-Object { $_.Name -notin @('Public', 'Default', 'Default User', 'All Users') } |
+            Select-Object -ExpandProperty FullName
+        Write-Log "Found $($userProfiles.Count) user profile(s)"
+    } else {
+        Write-Log "C:\Users not found"
+    }
+} catch {
+    Write-Log "ERROR: Failed to enumerate user profiles: $_"
 }
 
 # Scan each user profile
 foreach ($userProfile in $userProfiles) {
+    try {
+    Write-Log "Scanning profile: $userProfile"
+    
     # 1. Cursor
     Add-File -Path "$userProfile\.cursor\mcp.json" -ClientType "cursor"
     
@@ -184,27 +218,60 @@ foreach ($userProfile in $userProfiles) {
         Add-File -Path "$appData\Antigravity\mcp_config.json" -ClientType "antigravity"
         Find-Files -BasePath "$appData\Antigravity\User\globalStorage" -Pattern "mcp_config.json" -ClientType "antigravity" -MaxDepth 3
     }
-}
-
-# Project-level Claude CLI configs (scan current working directory)
-$cwd = Get-Location
-if ($cwd) {
-    Find-Files -BasePath $cwd.Path -Pattern "settings.json" -ClientType "claude-cli-project" -MaxDepth 6
-    Find-Files -BasePath $cwd.Path -Pattern "settings.local.json" -ClientType "claude-cli-local" -MaxDepth 6
-}
-
-# Enterprise configs (system-wide)
-$programData = $env:ProgramData
-if ($programData) {
-    Add-File -Path "$programData\ClaudeCode\managed-mcp.json" -ClientType "claude-cli-enterprise"
-}
-
-# Container/cloud environments
-foreach ($containerPath in @("C:\app", "C:\workspace")) {
-    if (Test-Path $containerPath) {
-        Find-Files -BasePath $containerPath -Pattern "mcp*.json" -ClientType "container" -MaxDepth 4
+    
+    Write-Log "Completed scanning profile: $userProfile"
+    } catch {
+        Write-Log "ERROR: Failed to scan profile $userProfile : $_"
     }
 }
 
-# Output JSON
-$results | ConvertTo-Json -Depth 10
+# Project-level Claude CLI configs (scan current working directory)
+try {
+    $cwd = Get-Location
+    if ($cwd) {
+        Write-Log "Scanning current directory: $($cwd.Path)"
+        Find-Files -BasePath $cwd.Path -Pattern "settings.json" -ClientType "claude-cli-project" -MaxDepth 6
+        Find-Files -BasePath $cwd.Path -Pattern "settings.local.json" -ClientType "claude-cli-local" -MaxDepth 6
+    }
+} catch {
+    Write-Log "ERROR: Failed to scan current directory: $_"
+}
+
+# Enterprise configs (system-wide)
+try {
+    $programData = $env:ProgramData
+    if ($programData) {
+        Write-Log "Scanning ProgramData: $programData"
+        Add-File -Path "$programData\ClaudeCode\managed-mcp.json" -ClientType "claude-cli-enterprise"
+    }
+} catch {
+    Write-Log "ERROR: Failed to scan ProgramData: $_"
+}
+
+# Container/cloud environments
+try {
+    foreach ($containerPath in @("C:\app", "C:\workspace")) {
+        if (Test-Path $containerPath) {
+            Write-Log "Scanning container path: $containerPath"
+            Find-Files -BasePath $containerPath -Pattern "mcp*.json" -ClientType "container" -MaxDepth 4
+        }
+    }
+} catch {
+    Write-Log "ERROR: Failed to scan container paths: $_"
+}
+
+# Output JSON - wrap in try-catch to ensure output even on errors
+Write-Log "Scan complete. Found $($results.configs_found.Count) config file(s)"
+Write-Log "Outputting JSON to stdout"
+
+try {
+    $jsonOutput = $results | ConvertTo-Json -Depth 10 -Compress:$false
+    Write-Output $jsonOutput
+    Write-Log "JSON output successful, length: $($jsonOutput.Length) chars"
+} catch {
+    Write-Log "ERROR: Failed to convert to JSON: $_"
+    # Output minimal valid JSON on error
+    Write-Output '{"scan_time":"","hostname":"","os":"Windows","user":"","configs_found":[]}'
+}
+
+Write-Log "Script finished"

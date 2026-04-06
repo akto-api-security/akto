@@ -19,14 +19,31 @@
 # Requirements: PowerShell 5.1+
 # Optional: None (uses PowerShell builtins only)
 
-$ErrorActionPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'Continue'
 
-$results = @{
-    scan_time = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-    hostname = $env:COMPUTERNAME
-    os = "Windows"
-    user = $env:USERNAME
-    skills_found = @()
+# Log to stderr for debugging
+function Write-Log {
+    param([string]$Message)
+    [Console]::Error.WriteLine("[SKILL-SCAN] $Message")
+}
+
+Write-Log "Script started"
+Write-Log "PowerShell version: $($PSVersionTable.PSVersion)"
+Write-Log "Computer: $env:COMPUTERNAME"
+Write-Log "User: $env:USERNAME"
+
+try {
+    $results = @{
+        scan_time = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+        hostname = $env:COMPUTERNAME
+        os = "Windows"
+        user = $env:USERNAME
+        skills_found = @()
+    }
+    Write-Log "Results object initialized"
+} catch {
+    Write-Log "ERROR: Failed to initialize results: $_"
+    exit 1
 }
 
 function Add-Skill {
@@ -93,21 +110,35 @@ function Scan-AgentDir {
 
 # Get all user profile directories
 $userProfiles = @()
-if (Test-Path "C:\Users") {
-    $userProfiles = Get-ChildItem "C:\Users" -Directory -Force -ErrorAction SilentlyContinue | 
-        Where-Object { $_.Name -notin @('Public', 'Default', 'Default User', 'All Users') } |
-        Select-Object -ExpandProperty FullName
+try {
+    if (Test-Path "C:\Users") {
+        Write-Log "Scanning C:\Users for user profiles"
+        $userProfiles = Get-ChildItem "C:\Users" -Directory -Force -ErrorAction SilentlyContinue | 
+            Where-Object { $_.Name -notin @('Public', 'Default', 'Default User', 'All Users') } |
+            Select-Object -ExpandProperty FullName
+        Write-Log "Found $($userProfiles.Count) user profile(s)"
+    } else {
+        Write-Log "C:\Users not found"
+    }
+} catch {
+    Write-Log "ERROR: Failed to enumerate user profiles: $_"
 }
 
 # Phase 1: Scan hardcoded agent directories (depth 5)
 foreach ($userProfile in $userProfiles) {
-    Scan-AgentDir -BasePath "$userProfile\.cursor" -AgentName "cursor"
-    Scan-AgentDir -BasePath "$userProfile\.claude" -AgentName "claude"
-    Scan-AgentDir -BasePath "$userProfile\.codeium\windsurf" -AgentName "windsurf"
-    Scan-AgentDir -BasePath "$userProfile\.antigravity" -AgentName "antigravity"
-    Scan-AgentDir -BasePath "$userProfile\.copilot" -AgentName "copilot"
-    Scan-AgentDir -BasePath "$userProfile\.vscode" -AgentName "vscode"
-    Scan-AgentDir -BasePath "$userProfile\.gemini\antigravity" -AgentName "antigravity"
+    try {
+        Write-Log "Scanning profile: $userProfile"
+        Scan-AgentDir -BasePath "$userProfile\.cursor" -AgentName "cursor"
+        Scan-AgentDir -BasePath "$userProfile\.claude" -AgentName "claude"
+        Scan-AgentDir -BasePath "$userProfile\.codeium\windsurf" -AgentName "windsurf"
+        Scan-AgentDir -BasePath "$userProfile\.antigravity" -AgentName "antigravity"
+        Scan-AgentDir -BasePath "$userProfile\.copilot" -AgentName "copilot"
+        Scan-AgentDir -BasePath "$userProfile\.vscode" -AgentName "vscode"
+        Scan-AgentDir -BasePath "$userProfile\.gemini\antigravity" -AgentName "antigravity"
+        Write-Log "Completed scanning profile: $userProfile"
+    } catch {
+        Write-Log "ERROR: Failed to scan profile $userProfile : $_"
+    }
 }
 
 # Phase 2: Scan user profile (depth 6) with skip logic
@@ -150,5 +181,50 @@ foreach ($userProfile in $userProfiles) {
         }
 }
 
-# Output JSON
-$results | ConvertTo-Json -Depth 10
+# Phase 3: Scan common Docker/container paths (depth 6)
+Write-Log "Scanning container paths"
+foreach ($containerPath in @("C:\app", "C:\workspace", "C:\opt", "C:\srv")) {
+    if (Test-Path -Path $containerPath -PathType Container) {
+        Write-Log "Scanning container path: $containerPath"
+        try {
+            $skillPatterns = @('SKILL.md', 'skill.md', 'skills.md', 'SKILLS.MD', 'PROMPT.md', 'prompt.md')
+            
+            Get-ChildItem -Path $containerPath -Recurse -Depth 6 -File -Force -ErrorAction SilentlyContinue | 
+                Where-Object { $skillPatterns -contains $_.Name } | 
+                ForEach-Object {
+                    # Skip if in junk directory
+                    $skip = $false
+                    $pathParts = $_.FullName -split '\\'
+                    foreach ($part in $pathParts) {
+                        if (Should-SkipDir -DirName $part) {
+                            $skip = $true
+                            break
+                        }
+                    }
+                    
+                    if (-not $skip) {
+                        $dirName = (Split-Path $_.FullName -Parent | Split-Path -Leaf).ToLower() -replace '[ _]', '-'
+                        Add-Skill -Path $_.FullName -Agent $dirName
+                    }
+                }
+        } catch {
+            Write-Log "ERROR: Failed to scan container path $containerPath : $_"
+        }
+    }
+}
+
+# Output JSON - wrap in try-catch to ensure output even on errors
+Write-Log "Scan complete. Found $($results.skills_found.Count) skill file(s)"
+Write-Log "Outputting JSON to stdout"
+
+try {
+    $jsonOutput = $results | ConvertTo-Json -Depth 10 -Compress:$false
+    Write-Output $jsonOutput
+    Write-Log "JSON output successful, length: $($jsonOutput.Length) chars"
+} catch {
+    Write-Log "ERROR: Failed to convert to JSON: $_"
+    # Output minimal valid JSON on error
+    Write-Output '{"scan_time":"","hostname":"","os":"Windows","user":"","skills_found":[]}'
+}
+
+Write-Log "Script finished"
