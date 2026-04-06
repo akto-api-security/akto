@@ -8,6 +8,7 @@ export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="claude_code_cli"
 export CONTEXT_SOURCE="ENDPOINT"
+export DEVICE_ID="{{DEVICE_ID (optional)}}"
 
 # Logging Configuration
 export LOG_LEVEL="INFO"

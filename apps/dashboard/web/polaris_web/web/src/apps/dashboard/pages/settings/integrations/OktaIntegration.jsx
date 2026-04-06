@@ -55,6 +55,8 @@ function OktaIntegration() {
     /** Fetched from Okta Management API (all groups) when Edit + API token; used to autosuggest group name. */
     const [oktaGroupNames, setOktaGroupNames] = useState([])
     const [loadingOktaGroups, setLoadingOktaGroups] = useState(false)
+    /** Custom roles fetched from server; combined with standard rolesOptions for the Akto role autocomplete. */
+    const [customRoleOptions, setCustomRoleOptions] = useState([])
 
     const redirectUri = `${hostname}/authorization-code/callback`
     const initiateLoginUri = `${hostname}/okta-initiate-login?accountId=${window.ACTIVE_ACCOUNT}`
@@ -219,6 +221,7 @@ function OktaIntegration() {
         setEditMode(false)
         setEditApiToken('')
         setOktaGroupNames([])
+        setCustomRoleOptions([])
         resetMappingDraft()
     }
 
@@ -230,17 +233,23 @@ function OktaIntegration() {
         setNewGroupName('')
         setNewAktoRole('')
         setAktoRoleText('')
-        if (hasSavedManagementToken) {
-            setLoadingOktaGroups(true)
-            try {
-                const resp = await settingRequests.fetchOktaGroups()
-                const names = resp?.oktaGroupNames || []
-                setOktaGroupNames(Array.isArray(names) ? names : [])
-            } catch (e) {
-                func.setToast(true, true, dashboardActionError(e, 'Could not fetch Okta groups.'))
-            } finally {
-                setLoadingOktaGroups(false)
-            }
+
+        const [oktaGroupsResult, customRolesResult] = await Promise.allSettled([
+            hasSavedManagementToken ? (() => { setLoadingOktaGroups(true); return settingRequests.fetchOktaGroups() })() : Promise.resolve(null),
+            settingRequests.getCustomRoles(),
+        ])
+
+        if (oktaGroupsResult.status === 'fulfilled' && oktaGroupsResult.value != null) {
+            const names = oktaGroupsResult.value?.oktaGroupNames || []
+            setOktaGroupNames(Array.isArray(names) ? names : [])
+        } else if (oktaGroupsResult.status === 'rejected') {
+            func.setToast(true, true, dashboardActionError(oktaGroupsResult.reason, 'Could not fetch Okta groups.'))
+        }
+        setLoadingOktaGroups(false)
+
+        if (customRolesResult.status === 'fulfilled') {
+            const roles = customRolesResult.value?.roles || []
+            setCustomRoleOptions(roles.map(r => ({ label: r.name, value: r.name })))
         }
     }
 
@@ -317,8 +326,9 @@ function OktaIntegration() {
         </VerticalStack>
     )
 
+    const allRoleOptions = [...rolesOptions, ...customRoleOptions]
     const usedRolesForAdd = Object.values(oktaGroupToAktoUserRoleMap)
-    const availableRoleOptions = rolesOptions.filter((r) => !usedRolesForAdd.includes(r.value))
+    const availableRoleOptions = allRoleOptions.filter((r) => !usedRolesForAdd.includes(r.value))
     const roleAutocompleteQuery = (aktoRoleText || '').trim().toLowerCase()
     const roleAutocompleteOptions = availableRoleOptions
         .filter((r) => !roleAutocompleteQuery || r.label.toLowerCase().includes(roleAutocompleteQuery) || r.value.toLowerCase().includes(roleAutocompleteQuery))
@@ -379,7 +389,7 @@ function OktaIntegration() {
                 <Box minWidth="200px" width="100%">
                     <Autocomplete
                         options={roleAutocompleteOptions}
-                        selected={newAktoRole && availableRoleOptions.some((r) => r.value === newAktoRole) ? [newAktoRole] : []}
+                        selected={newAktoRole && allRoleOptions.some((r) => r.value === newAktoRole) ? [newAktoRole] : []}
                         onSelect={(selected) => {
                             const v = selected.length > 0 ? selected[0] : ''
                             setNewAktoRole(v)

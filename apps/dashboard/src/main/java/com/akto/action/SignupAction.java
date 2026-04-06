@@ -494,6 +494,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             } else {
                 BasicDBObject parsedState = BasicDBObject.parse(new String(java.util.Base64.getDecoder().decode(state)));
                 setAccountId(Integer.parseInt(parsedState.getString("accountId")));
+                Context.accountId.set(this.accountId);
                 if (parsedState.containsKey("signupInvitationCode") && parsedState.containsKey("signupEmailId")) {
                     setSignupInvitationCode(parsedState.getString("signupInvitationCode"));
                     setSignupEmailId(parsedState.getString("signupEmailId"));
@@ -579,6 +580,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
     /**
      * Resolves Akto user role from Okta group membership: custom {@code oktaGroupToAktoUserRoleMap} first, then convention.
+     * Custom role names are supported in {@code oktaGroupToAktoUserRoleMap}; priority is derived from the custom role's baseRole.
      */
     private String resolveAktoRoleFromOktaGroupNames(List<String> groupNames, Map<String, String> oktaGroupToAktoUserRoleMap) {
         if (groupNames == null || groupNames.isEmpty()) {
@@ -676,13 +678,26 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         for (String key : keys) {
             String mappedRole = mapping.get(key);
             if (mappedRole == null) continue;
+            int priority;
             try {
-                int priority = RBAC.Role.valueOf(mappedRole).ordinal();
-                if (priority < bestPriority) {
-                    bestPriority = priority;
-                    bestRole = mappedRole;
+                priority = RBAC.Role.valueOf(mappedRole).ordinal();
+                String dbName = Context.accountId.get()+"";
+                logger.info("Role " + mappedRole + " found in mapping");
+                logger.info("DB Name: " + dbName);
+            } catch (IllegalArgumentException e) {
+                String dbName = Context.accountId.get()+"";
+                CustomRole customRole = CustomRoleDao.instance.findRoleByName(mappedRole);
+                if (customRole == null) continue;
+                try {
+                    priority = RBAC.Role.valueOf(customRole.getBaseRole()).ordinal();
+                } catch (IllegalArgumentException ex) {
+                    continue;
                 }
-            } catch (IllegalArgumentException ignored) {}
+            }
+            if (priority < bestPriority) {
+                bestPriority = priority;
+                bestRole = mappedRole;
+            }
         }
         return bestRole;
     }

@@ -342,6 +342,78 @@ const api = {
         })
     },
 
+    fetchSentinelOneIntegration() {
+        return request({
+            url: '/api/fetchSentinelOneIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addSentinelOneIntegration(apiToken, consoleUrl, dataIngestionUrl, recurringIntervalSeconds) {
+        return request({
+            url: '/api/addSentinelOneIntegration',
+            method: 'post',
+            data: { apiToken, consoleUrl, dataIngestionUrl, recurringIntervalSeconds }
+        })
+    },
+
+    removeSentinelOneIntegration() {
+        return request({
+            url: '/api/removeSentinelOneIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchSentinelOneAgents() {
+        return request({
+            url: '/api/fetchSentinelOneAgents',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    getGuardrailTypes() {
+        return request({
+            url: '/api/getGuardrailTypes',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveGuardrailsConfig(guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailAgentIds) {
+        return request({
+            url: '/api/saveGuardrailsConfig',
+            method: 'post',
+            data: { guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailAgentIds }
+        })
+    },
+
+    executeGuardrails() {
+        return request({
+            url: '/api/executeGuardrails',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    executeSentinelOneRemoteScript(scriptId, executeAgentIds, executeTaskDescription, executeInputParams) {
+        return request({
+            url: '/api/executeSentinelOneRemoteScript',
+            method: 'post',
+            data: { scriptId, executeAgentIds, executeTaskDescription, executeInputParams }
+        })
+    },
+
+    getSentinelOneScriptTaskStatus(parentTaskId) {
+        return request({
+            url: '/api/getSentinelOneScriptTaskStatus',
+            method: 'post',
+            data: { parentTaskId }
+        })
+    },
+
 }
 
 export default api

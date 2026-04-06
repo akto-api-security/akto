@@ -676,6 +676,34 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchDatadogIntegration() {
+        return request({
+            url: '/api/fetchDatadogIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addDatadogIntegration(apiKey, datadogSite, enabled) {
+        return request({
+            url: '/api/addDatadogIntegration',
+            method: 'post',
+            data: { apiKey, datadogSite, enabled }
+        })
+    },
+    deleteDatadogIntegration() {
+        return request({
+            url: '/api/deleteDatadogIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    testDatadogIntegration(apiKey, datadogSite) {
+        return request({
+            url: '/api/testDatadogIntegration',
+            method: 'post',
+            data: { apiKey, datadogSite }
+        })
+    },
 
     fetchAzureBoardsIntegration() {
         return request({
@@ -961,6 +989,13 @@ const settingRequests = {
             url: '/api/fetchFilterYamlTemplate',
             method: 'post',
             data: {}
+        })
+    },
+    addMatchingPatternForProxy(proxyPattern) {
+        return request({
+            url: '/api/addMatchingPatternForProxy',
+            method: 'post',
+            data: {proxyPattern}
         })
     }
 }

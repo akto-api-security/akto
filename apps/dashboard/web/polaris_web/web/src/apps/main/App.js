@@ -83,6 +83,7 @@ import ThreatReport from "../dashboard/pages/threat_detection/threat_report/Thre
 import {PollingProvider} from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
+import ProxyPatterns from "../dashboard/pages/settings/proxy_patterns/ProxyPatterns";
 import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
 import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 
@@ -97,6 +98,7 @@ import ConfigureIgnoredEventsPage from "../dashboard/pages/threat_detection/Conf
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
+import Datadog from "../dashboard/pages/settings/integrations/Datadog";
 import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
@@ -415,6 +417,10 @@ const router = createBrowserRouter([
                         element: <Splunk/>,
                     },
                     {
+                        path: "integrations/datadog",
+                        element: <Datadog/>,
+                    },
+                    {
                         path: "integrations/f5_waf",
                         element: <F5Waf/>,
                     },
@@ -541,6 +547,10 @@ const router = createBrowserRouter([
                     {
                         path: 'advanced-filters',
                         element: <AdvancedTrafficFilters/>
+                    },
+                    {
+                        path: 'proxy-patterns',
+                        element: <ProxyPatterns/>
                     },
                     {
                         path: "auth-types/details",
