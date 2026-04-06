@@ -35,7 +35,7 @@ const parentHeaders = [
         textValue: 'username',
         showFilter: true,
         isText: CellType.TEXT,
-        boxWidth: '100px'
+        boxWidth: '150px'
     },
     {
         title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of collection is maximum risk score of the endpoints inside this collection</Text>} title="Risk score" />,
@@ -86,6 +86,7 @@ const getChildColumnConfig = (filterType) => {
             return { title: "MCP Server source", displayField: 'sourceId' };
         case FILTER_TYPES.BROWSER_LLM:
             return { title: "LLM source", displayField: 'sourceId' };
+        case FILTER_TYPES.SKILL:
         case FILTER_TYPES.AI_AGENT:
         default:
             return { title: "Agentic resource name", displayField: 'serviceName' };
