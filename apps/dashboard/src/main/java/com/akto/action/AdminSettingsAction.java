@@ -585,13 +585,12 @@ public class AdminSettingsAction extends UserAction {
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();
 
-        if (!switchProxyMode) {
-            addActionError("Enable proxy mode.");
-            return ERROR.toUpperCase();
-        }
-
-        Bson updates = Updates.set("switchProxyMode", true);
+        Bson updates = Updates.set("switchProxyMode", switchProxyMode);
         if(!StringUtils.isEmpty(proxyPattern)){
+            if (!switchProxyMode) {
+                addActionError("Enable proxy mode.");
+                return ERROR.toUpperCase();
+            }
             proxyPattern = proxyPattern.trim();
             String key = proxyPattern.hashCode() + "";
             AccountSettings.ProxyPatternInfo info = new AccountSettings.ProxyPatternInfo(proxyPattern, user.getLogin(), Context.now());
@@ -600,9 +599,6 @@ public class AdminSettingsAction extends UserAction {
                 Updates.set(AccountSettings.MATCHING_PATTERNS_FOR_PROXY + "." + key, info)
             );
         }
-       
-
-       
 
         try {
             AccountSettingsDao.instance.updateOne(
