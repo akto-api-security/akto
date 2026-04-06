@@ -49,6 +49,7 @@ import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.threat_detection.HyperScanTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
@@ -262,6 +263,8 @@ public class DbAction extends ActionSupport {
     String logicalGroupName;
     BasicDBList issuesIds;
     List<YamlTemplate> activeAdvancedFilters;
+    List<HyperScanTemplate> hyperScanTemplates;
+    boolean fetchActiveOnly = false;
     Set<MergedUrls> mergedUrls;
     List<TestingRunResultSummary> currentlyRunningTests;
     String state;
@@ -2837,6 +2840,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchHyperScanTemplates() {
+        try {
+            hyperScanTemplates = DbLayer.fetchHyperScanTemplates(fetchActiveOnly);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchHyperScanTemplates " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchMergedUrls() {
         try {
             this.mergedUrls = DbLayer.fetchMergedUrls();
@@ -4945,6 +4958,22 @@ public class DbAction extends ActionSupport {
 
     public void setActiveAdvancedFilters(List<YamlTemplate> activeAdvancedFilters) {
         this.activeAdvancedFilters = activeAdvancedFilters;
+    }
+
+    public List<HyperScanTemplate> getHyperScanTemplates() {
+        return hyperScanTemplates;
+    }
+
+    public void setHyperScanTemplates(List<HyperScanTemplate> hyperScanTemplates) {
+        this.hyperScanTemplates = hyperScanTemplates;
+    }
+
+    public boolean isFetchActiveOnly() {
+        return fetchActiveOnly;
+    }
+
+    public void setFetchActiveOnly(boolean fetchActiveOnly) {
+        this.fetchActiveOnly = fetchActiveOnly;
     }
 
     public Set<MergedUrls> getMergedUrls() {

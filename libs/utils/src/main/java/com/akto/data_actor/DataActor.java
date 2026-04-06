@@ -11,6 +11,7 @@ import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.threat_detection.HyperScanTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AgentConversationResult;
@@ -274,6 +275,8 @@ public abstract class DataActor {
     public abstract void insertProtectionLog(Log log);
     
     public abstract List<YamlTemplate> fetchActiveAdvancedFilters();
+
+    public abstract List<HyperScanTemplate> fetchHyperScanTemplates(boolean fetchActiveOnly);
 
     public abstract Set<MergedUrls> fetchMergedUrls();
 

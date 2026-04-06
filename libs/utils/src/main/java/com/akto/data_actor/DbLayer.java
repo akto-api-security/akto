@@ -51,6 +51,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.file.FilesDao;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
+import com.akto.dao.threat_detection.HyperScanTemplateDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
@@ -84,6 +85,7 @@ import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.threat_detection.HyperScanTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
@@ -2187,6 +2189,15 @@ public class DbLayer {
         return AdvancedTrafficFiltersDao.instance.findAll(
             Filters.ne(YamlTemplate.INACTIVE, false)
         );
+    }
+
+    public static List<HyperScanTemplate> fetchHyperScanTemplates(boolean fetchActiveOnly) {
+        if (fetchActiveOnly) {
+            return HyperScanTemplateDao.instance.findAll(
+                Filters.ne(HyperScanTemplate.INACTIVE, false)
+            );
+        }
+        return HyperScanTemplateDao.instance.findAll(Filters.empty());
     }
 
     public static Set<MergedUrls> fetchMergedUrls() {

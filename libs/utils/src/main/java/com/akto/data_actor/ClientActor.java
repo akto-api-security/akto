@@ -35,6 +35,7 @@ import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.threat_detection.HyperScanTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
@@ -3553,6 +3554,37 @@ public class ClientActor extends DataActor {
             return null;
         }
         return respList;
+    }
+
+    public List<HyperScanTemplate> fetchHyperScanTemplates(boolean fetchActiveOnly) {
+        Map<String, List<String>> headers = buildHeaders();
+        List<HyperScanTemplate> templates = new ArrayList<>();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("fetchActiveOnly", fetchActiveOnly);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchHyperScanTemplates", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchHyperScanTemplates", LoggerMaker.LogDb.THREAT_DETECTION);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList hyperScanTemplates = (BasicDBList) payloadObj.get("hyperScanTemplates");
+                for (Object template: hyperScanTemplates) {
+                    BasicDBObject obj2 = (BasicDBObject) template;
+                    templates.add(objectMapper.readValue(obj2.toJson(), HyperScanTemplate.class));
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchHyperScanTemplates" + e, LoggerMaker.LogDb.THREAT_DETECTION);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchHyperScanTemplates" + e, LoggerMaker.LogDb.THREAT_DETECTION);
+            return null;
+        }
+        return templates;
     }
 
     public Set<MergedUrls> fetchMergedUrls() {
