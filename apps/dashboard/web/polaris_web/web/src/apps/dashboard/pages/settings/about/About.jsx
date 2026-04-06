@@ -12,6 +12,22 @@ import DropdownSearch from '../../../components/shared/DropdownSearch'
 import { handleIpsChange } from '../../../components/shared/ipUtils'
 import UpdateIpsComponent from '../../../components/shared/UpdateIpsComponent'
 
+export function ToggleComponent({text, onToggle, initial, disabled}){
+    return(
+        <VerticalStack gap={1}>
+            <Text color="subdued">{text}</Text>
+            <ButtonGroup segmented>
+                <Button size="slim" onClick={() => onToggle(true)} pressed={initial === true} disabled={disabled}>
+                    True
+                </Button>
+                <Button size="slim" onClick={() => onToggle(false)} pressed={initial === false}>
+                    False
+                </Button>
+            </ButtonGroup>
+        </VerticalStack>
+    )
+}
+
 function About() {
 
     const trafficAlertDurations= [
@@ -288,21 +304,6 @@ function About() {
         func.setToast(true, false, "Access type configuration is being applied. Please wait for some time for the results to be reflected.")
     }
 
-    function ToggleComponent({text,onToggle,initial, disabled}){
-        return(
-            <VerticalStack gap={1}>
-                <Text color="subdued">{text}</Text>
-                <ButtonGroup segmented>
-                    <Button size="slim" onClick={() => onToggle(true)} pressed={initial === true} disabled={disabled}>
-                        True
-                    </Button>
-                    <Button size="slim" onClick={() => onToggle(false)} pressed={initial === false}>
-                        False
-                    </Button>
-                </ButtonGroup>
-            </VerticalStack>
-        )
-    }
 
 
     const checkSaveActive = (param) => {

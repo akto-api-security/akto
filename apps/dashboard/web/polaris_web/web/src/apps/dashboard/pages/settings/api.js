@@ -1009,6 +1009,16 @@ const settingRequests = {
             method: 'post',
             data: {proxyPattern}
         })
+    },
+    toggleSwitchProxyMode(switchProxyMode) {
+        return request({
+            url: '/api/modifyAccountSettings',
+            method: 'post',
+            data: {
+                accountPermission: 'switchProxyMode',
+                modifiedValueForAccount: switchProxyMode
+            }
+        })
     }
 }
 
