@@ -74,16 +74,27 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
 
+	// Build request headers JSON from the hostname form field so that
+	// validationContextFromParams can extract McpServerName (Host header) and
+	// the threat dashboard shows the correct hostname — mirroring validate/request.
+	requestHeaders := strings.TrimSpace(c.PostForm("requestHeaders"))
+	if requestHeaders == "" {
+		if hostname := strings.TrimSpace(c.PostForm("hostname")); hostname != "" {
+			requestHeaders = `{"Host":"` + hostname + `"}`
+		}
+	}
+
 	// Collect optional request-metadata form fields so they are reflected in the
 	// threat dashboard exactly as they are for validate/request JSON calls.
 	meta := &models.ValidateRequestParams{
-		ContextSource: contextSource,
-		Path:          strings.TrimSpace(c.PostForm("path")),
-		Method:        strings.TrimSpace(c.PostForm("method")),
-		AktoAccountID: strings.TrimSpace(c.PostForm("akto_account_id")),
-		AktoVxlanID:   strings.TrimSpace(c.PostForm("akto_vxlan_id")),
-		IP:            strings.TrimSpace(c.PostForm("ip")),
-		Source:        "file",
+		ContextSource:  contextSource,
+		Path:           strings.TrimSpace(c.PostForm("path")),
+		Method:         strings.TrimSpace(c.PostForm("method")),
+		AktoAccountID:  strings.TrimSpace(c.PostForm("akto_account_id")),
+		AktoVxlanID:    strings.TrimSpace(c.PostForm("akto_vxlan_id")),
+		IP:             strings.TrimSpace(c.PostForm("ip")),
+		RequestHeaders: requestHeaders,
+		Source:         "file",
 	}
 
 	ctx := c.Request.Context()
@@ -394,6 +405,7 @@ func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload strin
 		AktoAccountID:  meta.AktoAccountID,
 		AktoVxlanID:    meta.AktoVxlanID,
 		IP:             meta.IP,
+		RequestHeaders: meta.RequestHeaders,
 		Source:         meta.Source,
 	}
 	maxRetries := h.cfg.File.MaxRetries
