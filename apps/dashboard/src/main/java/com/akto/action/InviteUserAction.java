@@ -148,9 +148,13 @@ public class InviteUserAction extends UserAction{
 
         loggerMaker.debugAndAddToDb("inviteeOrg: " + inviteeOrg);
         loggerMaker.debugAndAddToDb("adminOrg: " + adminOrg);
-        if (inviteeOrg == null || adminOrg == null) return false;
 
-        if (inviteeOrg.equalsIgnoreCase(adminOrg)) return true;
+        // Check if inviteeDomain maps directly to adminDomain or vice versa
+        if (inviteeOrg != null && adminDomain.equalsIgnoreCase(inviteeOrg)) return true;
+        if (adminOrg != null && inviteeDomain.equalsIgnoreCase(adminOrg)) return true;
+
+        // Check if both map to the same canonical org
+        if (inviteeOrg != null && adminOrg != null && inviteeOrg.equalsIgnoreCase(adminOrg)) return true;
 
         loggerMaker.debugAndAddToDb("inviteeOrg and adminOrg different");
         return false;
