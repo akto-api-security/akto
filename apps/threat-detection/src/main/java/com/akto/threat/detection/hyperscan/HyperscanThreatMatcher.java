@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
@@ -29,7 +30,7 @@ public class HyperscanThreatMatcher {
     private static final java.util.regex.Pattern NAMED_GROUP_PATTERN =
             java.util.regex.Pattern.compile("\\(\\?P<([^>]+)>");
 
-    private static HyperscanThreatMatcher INSTANCE;
+    private static final AtomicReference<HyperscanThreatMatcher> INSTANCE_REF = new AtomicReference<>();
 
     private Database hyperscanDatabase;
     private Map<Integer, PatternInfo> patternMap;
@@ -84,10 +85,10 @@ public class HyperscanThreatMatcher {
     private HyperscanThreatMatcher() {}
 
     public static synchronized HyperscanThreatMatcher getInstance() {
-        if (INSTANCE == null) {
-            INSTANCE = new HyperscanThreatMatcher();
+        if (INSTANCE_REF.get() == null) {
+            INSTANCE_REF.set(new HyperscanThreatMatcher());
         }
-        return INSTANCE;
+        return INSTANCE_REF.get();
     }
 
     public synchronized boolean initialize(String patternFilePath) {
@@ -118,6 +119,37 @@ public class HyperscanThreatMatcher {
             return initializeFromLines(lines);
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Failed to initialize Hyperscan from classpath: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Reload patterns from updated pattern lines and swap the active instance.
+     * Creates a new HyperscanThreatMatcher instance with updated patterns,
+     * then swaps it via AtomicReference. Old threads keep using their existing scanners
+     * from the old instance, while new threads use the new instance with updated patterns.
+     *
+     * This ensures thread safety during pattern updates without breaking existing scanners.
+     *
+     * @param patternLines Updated pattern lines to load
+     * @return true if reload successful, false otherwise
+     */
+    public synchronized boolean reloadPatternsFromLines(List<String> patternLines) {
+        try {
+            HyperscanThreatMatcher newInstance = new HyperscanThreatMatcher();
+            if (!newInstance.initializeFromLines(patternLines)) {
+                logger.errorAndAddToDb("Failed to initialize new Hyperscan instance with updated patterns");
+                return false;
+            }
+
+            // Swap the instance atomically
+            HyperscanThreatMatcher oldInstance = INSTANCE_REF.getAndSet(newInstance);
+            logger.warnAndAddToDb("HyperscanThreatMatcher: Patterns reloaded successfully. " +
+                    "Old instance will be garbage collected once all threads stop using it. " +
+                    "New patterns: " + newInstance.patternMap.size() + " patterns");
+            return true;
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Failed to reload patterns: " + e.getMessage());
             return false;
         }
     }
