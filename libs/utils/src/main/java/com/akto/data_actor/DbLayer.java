@@ -2417,11 +2417,11 @@ public class DbLayer {
                         testingRunPlayground.getRecordedFlowErrorMessage()));
             }
             TestingRunPlaygroundDao.instance.updateOne(
-                    Filters.eq(Constants.ID, testingRunPlayground.getId()),
+                    Filters.eq(Constants.ID, new ObjectId(testingRunPlayground.getHexId())),
                     Updates.combine(recordedFlowUpdates));
         } else {
             TestingRunPlaygroundDao.instance.updateOne(
-                    Filters.eq(Constants.ID, testingRunPlayground.getId()),
+                    Filters.eq(Constants.ID, new ObjectId(testingRunPlayground.getHexId())),
                     Updates.combine(
                             stateUpdate,
                             Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, testingRunPlayground.getTestingRunResult()
