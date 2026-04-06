@@ -126,6 +126,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private int validHostnameCount = 0;
   private long lastValidHostnameLogTime = System.currentTimeMillis();
 
+  private boolean modeLogged = false;
   private final HyperscanEventHandler hyperscanEventHandler;
 
     public MaliciousTrafficDetectorTask(
@@ -221,6 +222,7 @@ public class MaliciousTrafficDetectorTask implements Task {
           }
           
           logger.warnAndAddToDb(this.instanceId + ": Starting Kafka polling loop");
+          logger.warnAndAddToDb(this.instanceId + ": Threat detection mode configured (will be determined per-account)");
           AllMetrics.instance.collectInfraMetrics();
 
           while (kafkaPollingEnabled) {
@@ -512,6 +514,12 @@ public class MaliciousTrafficDetectorTask implements Task {
     }
     AccountConfig accountConfig = AccountConfigurationCache.getInstance().getConfig(dataActor);
     boolean isHyperscanOnly = accountConfig != null && accountConfig.isHyperscanEnabled();
+
+    if (!modeLogged) {
+      String mode = isHyperscanOnly ? "HYPERSCAN" : "FILTER MODE";
+      logger.warnAndAddToDb(instanceId + ": Running " + mode + " detection");
+      modeLogged = true;
+    }
 
     RawApi rawApi = null;
     RawApiMetadata metadata = null;
