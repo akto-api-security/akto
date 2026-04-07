@@ -526,6 +526,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Bool("modified", result.Modified),
 		zap.String("behaviour", result.Behaviour),
 		zap.String("reason", result.Reason),
+		zap.String("sessionID", sessionID),
 		zap.Int64("totalLatencyMs", time.Since(start).Milliseconds()))
 
 	return result, nil
