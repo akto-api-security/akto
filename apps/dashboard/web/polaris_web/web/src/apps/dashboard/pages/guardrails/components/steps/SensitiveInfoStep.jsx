@@ -152,8 +152,7 @@ const SensitiveInfoStep = ({
 
     const behaviorOptions = [
         { label: "Block", value: "block" },
-        { label: "Mask", value: "mask" },
-        { label: "Warn", value: "warn" }
+        { label: "Mask", value: "mask" }
     ];
 
     return (

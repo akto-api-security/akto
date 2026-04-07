@@ -10,7 +10,7 @@ import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import api from "./api";
-import { transformPolicyForBackend, SEVERITY } from "./utils";
+import { transformPolicyForBackend, SEVERITY, normalizeBehaviourValue } from "./utils";
 
 const resourceName = {
   singular: "policy",
@@ -486,6 +486,9 @@ function GuardrailPolicies() {
                 ...(guardrailData.tokenLimitDetection ? { tokenLimitDetection: guardrailData.tokenLimitDetection } : {}),
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
+                behaviour: guardrailData.behaviour != null
+                    ? normalizeBehaviourValue(guardrailData.behaviour)
+                    : null,
                 url: guardrailData.url || '',
                 confidenceScore: guardrailData.confidenceScore || 0,
                 active: true

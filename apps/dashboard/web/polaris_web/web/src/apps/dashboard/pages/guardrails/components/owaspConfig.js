@@ -98,6 +98,8 @@ export const RULE_OWASP_THREATS = {
     // Step 5
     codeFilter: [{ id: "ASI05", name: "Unexpected Code Execution" }],
     banCode: [{ id: "ASI05", name: "Unexpected Code Execution" }],
+    // Step 7
+    tokenLimit: [{ id: "ASI08", name: "Cascading Failures" }],
     // Step 8
     anomaly: [{ id: "ASI08", name: "Cascading Failures" }, { id: "ASI10", name: "Rogue Agents" }],
     // Step 9
