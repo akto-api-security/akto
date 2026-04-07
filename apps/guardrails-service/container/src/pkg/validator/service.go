@@ -17,10 +17,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// const (
-// 	ContextSource = types.ContextSourceAgentic
-// )
-
 // policyCache holds cached policies and their metadata
 type policyCache struct {
 	policies      []types.Policy
