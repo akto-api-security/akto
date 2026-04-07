@@ -713,6 +713,14 @@ const Users = () => {
                     }}
                     secondaryActions={[
                         {
+                            content: 'Remove User',
+                            destructive: true,
+                            onAction: async () => {
+                                await handleRemoveUser(editScopeRoleModal.email)
+                                closeEditScopeRoleModal()
+                            },
+                        },
+                        {
                             content: 'Cancel',
                             onAction: closeEditScopeRoleModal,
                         },
