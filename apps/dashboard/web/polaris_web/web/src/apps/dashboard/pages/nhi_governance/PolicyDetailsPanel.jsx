@@ -478,10 +478,10 @@ export default function PolicyDetailsPanel({ row, show, setShow, onSave }) {
     // ── TitleComponent ────────────────────────────────────────────────────────
     const TitleComponent = () => (
         <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
-            <HorizontalStack align="space-between" blockAlign="start">
-                <VerticalStack gap="2">
-                    <HorizontalStack gap="2" blockAlign="center" wrap>
-                        <Text variant="headingMd" fontWeight="semibold">{row.policyName}</Text>
+            <VerticalStack gap="1">
+                <HorizontalStack align="space-between" blockAlign="center">
+                    <HorizontalStack gap="2" blockAlign="center">
+                        <Text as="span" variant="headingMd" fontWeight="semibold">{row.policyName}</Text>
                         <Badge status={STATUS_COLOR[row.status] || ""}>{row.status}</Badge>
                         {[
                             { count: violCrit, bg: "#DF2909", fg: "white"   },
@@ -497,35 +497,35 @@ export default function PolicyDetailsPanel({ row, show, setShow, onSave }) {
                             }}>{count}</span>
                         ))}
                     </HorizontalStack>
-                    <HorizontalStack gap="0">
-                        <Text variant="bodySm" color="subdued">{scopeLabel}</Text>
-                        <Text variant="bodySm" color="subdued">&nbsp;|&nbsp;</Text>
-                        <Text variant="bodySm" color="subdued">Last Triggered {row.lastTriggered}</Text>
-                        <Text variant="bodySm" color="subdued">&nbsp;|&nbsp;</Text>
-                        <Text variant="bodySm" color="subdued">Last Modified by {row.lastModified}</Text>
+                    <HorizontalStack gap="2" blockAlign="center">
+                        <Button size="slim" disabled={!isDirty} onClick={handleSave}>Save</Button>
+                        <Popover
+                            active={actionActive}
+                            activator={
+                                <Button size="slim" disclosure onClick={() => setActionActive((v) => !v)}>
+                                    Action
+                                </Button>
+                            }
+                            onClose={() => setActionActive(false)}
+                        >
+                            <ActionList items={[
+                                ...(row.status === "Active"
+                                    ? [{ content: "Mark as Inactive", onAction: () => setActionActive(false) }]
+                                    : [{ content: "Mark as Active",   onAction: () => setActionActive(false) }]
+                                ),
+                                { content: "Delete Policy", destructive: true, onAction: () => setActionActive(false) },
+                            ]} />
+                        </Popover>
                     </HorizontalStack>
-                </VerticalStack>
-                <HorizontalStack gap="2" blockAlign="center">
-                    <Button size="slim" disabled={!isDirty} onClick={handleSave}>Save</Button>
-                    <Popover
-                        active={actionActive}
-                        activator={
-                            <Button size="slim" disclosure onClick={() => setActionActive((v) => !v)}>
-                                Action
-                            </Button>
-                        }
-                        onClose={() => setActionActive(false)}
-                    >
-                        <ActionList items={[
-                            ...(row.status === "Active"
-                                ? [{ content: "Mark as Inactive", onAction: () => setActionActive(false) }]
-                                : [{ content: "Mark as Active",   onAction: () => setActionActive(false) }]
-                            ),
-                            { content: "Delete Policy", destructive: true, onAction: () => setActionActive(false) },
-                        ]} />
-                    </Popover>
                 </HorizontalStack>
-            </HorizontalStack>
+                <HorizontalStack gap="0">
+                    <Text variant="bodySm" color="subdued">{scopeLabel}</Text>
+                    <Text variant="bodySm" color="subdued">&nbsp;|&nbsp;</Text>
+                    <Text variant="bodySm" color="subdued">Last Triggered {row.lastTriggered}</Text>
+                    <Text variant="bodySm" color="subdued">&nbsp;|&nbsp;</Text>
+                    <Text variant="bodySm" color="subdued">Last Modified by {row.lastModified}</Text>
+                </HorizontalStack>
+            </VerticalStack>
         </Box>
     );
 

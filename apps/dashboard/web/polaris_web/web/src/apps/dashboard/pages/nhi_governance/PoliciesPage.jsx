@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { IndexFiltersMode } from "@shopify/polaris";
-import { Badge, Box, Button, HorizontalStack, Modal, Select, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Modal, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
@@ -445,15 +445,6 @@ function CreatePolicyModal({ open, onClose, onCreatePolicy }) {
             onClose={handleClose}
             title="Create Policy"
             large
-            footer={
-                <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
-                    <Button onClick={handleClose}>Cancel</Button>
-                    <HorizontalStack gap="2">
-                        <Button onClick={() => buildAndCreate("Draft")}>Create Draft</Button>
-                        <Button variant="primary" onClick={() => buildAndCreate("Active")}>Create Policy</Button>
-                    </HorizontalStack>
-                </div>
-            }
         >
             <Modal.Section>
                 <VerticalStack gap="4">
@@ -494,6 +485,13 @@ function CreatePolicyModal({ open, onClose, onCreatePolicy }) {
                             minHeight="420px"
                         />
                     </div>
+                    <HorizontalStack align="space-between" blockAlign="center">
+                        <Button onClick={() => buildAndCreate("Draft")}>Create Draft</Button>
+                        <HorizontalStack gap="2">
+                            <Button onClick={handleClose}>Cancel</Button>
+                            <Button primary onClick={() => buildAndCreate("Active")}>Create Policy</Button>
+                        </HorizontalStack>
+                    </HorizontalStack>
                 </VerticalStack>
             </Modal.Section>
         </Modal>
