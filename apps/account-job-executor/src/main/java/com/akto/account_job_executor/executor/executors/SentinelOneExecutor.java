@@ -1021,7 +1021,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             windowsAgentIds.size() + " Windows agents", LogDb.DASHBOARD);
         
         // 3 minute timeout per script execution
-        int timeoutMs = 3 * 60 * 1000;
+        int timeoutMs = 30 * 60 * 1000;
         
         // Batch size for large fleets
         int batchSize = 150;
@@ -1375,7 +1375,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                     HttpPost post = new HttpPost(dbAbstractorUrl);
                     post.setHeader("Content-Type", "application/json");
                     
-                    String aktoApiToken = System.getenv("AKTO_API_TOKEN");
+                    String aktoApiToken = System.getenv("DATABASE_ABSTRACTOR_TOKEN");
                     if (aktoApiToken != null && !aktoApiToken.isEmpty()) {
                         post.setHeader("Authorization", aktoApiToken);
                     }
