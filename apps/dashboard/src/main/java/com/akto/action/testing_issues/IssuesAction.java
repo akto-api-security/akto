@@ -39,6 +39,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.util.ComplianceResolutionUtils;
 import com.akto.utils.ApiInfoKeyResult;
 import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
@@ -699,11 +700,7 @@ public class IssuesAction extends UserAction {
         BasicDBObject superCategory = new BasicDBObject();
         BasicDBObject severity = new BasicDBObject();
 
-        ComplianceMapping complianceMapping = info.getCompliance();
-
-        if (complianceMapping == null) {
-            complianceMapping = new ComplianceMapping(new HashMap<>(), "", "", 0);
-        }
+        ComplianceMapping complianceMapping = ComplianceResolutionUtils.resolveComplianceForTestConfig(testConfig);
 
         infoObj.put("issueDescription", info.getDescription());
         infoObj.put("issueDetails", info.getDetails());
