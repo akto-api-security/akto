@@ -30,6 +30,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class SentinelOneExecutor extends AccountJobExecutor {
 
@@ -1017,73 +1021,69 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             windowsAgentIds.size() + " Windows agents", LogDb.DASHBOARD);
         
         // 3 minute timeout per script execution
-        int timeoutMs = 30 * 60 * 1000;
+        int timeoutMs = 3 * 60 * 1000;
         
         // Batch size for large fleets
         int batchSize = 150;
         
-        // Execute MCP config discovery
-        Map<String, JsonNode> allMcpOutputs = new HashMap<>();
-        
-        // Unix agents with .sh script
-        if (!unixAgentIds.isEmpty()) {
-            if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
-            String mcpScriptIdSh = uploadScriptFromClasspath("scan_mcp_configs.sh", apiToken, consoleUrl);
-            if (mcpScriptIdSh != null) {
-                Map<String, JsonNode> unixMcpOutputs = executeBatchedDiscovery(
-                    mcpScriptIdSh, unixAgentIds, batchSize, timeoutMs, 
-                    "MCP Config (Unix)", apiToken, consoleUrl, ingestUrl, consoleDomain, true, jobId);
-                allMcpOutputs.putAll(unixMcpOutputs);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+
+        // ── Phase 1: MCP config discovery (Unix + Windows in parallel) ────────
+        Map<String, JsonNode> allMcpOutputs = new ConcurrentHashMap<>();
+
+        Future<?> mcpUnixFuture = unixAgentIds.isEmpty() ? null : pool.submit(() -> {
+            String scriptId = uploadScriptFromClasspath("scan_mcp_configs.sh", apiToken, consoleUrl);
+            if (scriptId != null) {
+                allMcpOutputs.putAll(executeBatchedDiscovery(
+                    scriptId, unixAgentIds, batchSize, timeoutMs,
+                    "MCP Config (Unix)", apiToken, consoleUrl, ingestUrl, consoleDomain, true, jobId));
             }
-        }
-        
-        // TODO: re-enable when Windows agents are online
-        //Windows agents with .ps1 script
-        if (!windowsAgentIds.isEmpty()) {
-            if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
-            String mcpScriptIdPs1 = uploadScriptFromClasspath("scan_mcp_configs.ps1", apiToken, consoleUrl);
-            if (mcpScriptIdPs1 != null) {
-                Map<String, JsonNode> windowsMcpOutputs = executeBatchedDiscovery(
-                    mcpScriptIdPs1, windowsAgentIds, batchSize, timeoutMs,
-                    "MCP Config (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, true, jobId);
-                allMcpOutputs.putAll(windowsMcpOutputs);
+        });
+
+        Future<?> mcpWindowsFuture = windowsAgentIds.isEmpty() ? null : pool.submit(() -> {
+            String scriptId = uploadScriptFromClasspath("scan_mcp_configs.ps1", apiToken, consoleUrl);
+            if (scriptId != null) {
+                allMcpOutputs.putAll(executeBatchedDiscovery(
+                    scriptId, windowsAgentIds, batchSize, timeoutMs,
+                    "MCP Config (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, true, jobId));
             }
-        }
-        
+        });
+
+        waitForFuture(mcpUnixFuture, "MCP Config (Unix)");
+        waitForFuture(mcpWindowsFuture, "MCP Config (Windows)");
+
         if (!allMcpOutputs.isEmpty()) {
             ingestMCPDiscoveries(allMcpOutputs, ingestUrl, consoleDomain, agentNames);
             results.put("mcp_configs", new ArrayList<>(allMcpOutputs.values()));
             loggerMaker.info("MCP config discovery completed: " + allMcpOutputs.size() + " total results", LogDb.DASHBOARD);
         }
-        
-        // Execute skill discovery
-        Map<String, JsonNode> allSkillOutputs = new HashMap<>();
-        
-        // Unix agents with .sh script
-        if (!unixAgentIds.isEmpty()) {
-            if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
-            String skillScriptIdSh = uploadScriptFromClasspath("scan_skills.sh", apiToken, consoleUrl);
-            if (skillScriptIdSh != null) {
-                Map<String, JsonNode> unixSkillOutputs = executeBatchedDiscovery(
-                    skillScriptIdSh, unixAgentIds, batchSize, timeoutMs, 
-                    "Skills (Unix)", apiToken, consoleUrl, ingestUrl, consoleDomain, false, jobId);
-                allSkillOutputs.putAll(unixSkillOutputs);
+
+        // ── Phase 2: Skills discovery (Unix + Windows in parallel) ────────────
+        Map<String, JsonNode> allSkillOutputs = new ConcurrentHashMap<>();
+
+        Future<?> skillUnixFuture = unixAgentIds.isEmpty() ? null : pool.submit(() -> {
+            String scriptId = uploadScriptFromClasspath("scan_skills.sh", apiToken, consoleUrl);
+            if (scriptId != null) {
+                allSkillOutputs.putAll(executeBatchedDiscovery(
+                    scriptId, unixAgentIds, batchSize, timeoutMs,
+                    "Skills (Unix)", apiToken, consoleUrl, ingestUrl, consoleDomain, false, jobId));
             }
-        }
-        
-        // TODO: re-enable when Windows agents are online
-        // Windows agents with .ps1 script
-        if (!windowsAgentIds.isEmpty()) {
-            if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
-            String skillScriptIdPs1 = uploadScriptFromClasspath("scan_skills.ps1", apiToken, consoleUrl);
-            if (skillScriptIdPs1 != null) {
-                Map<String, JsonNode> windowsSkillOutputs = executeBatchedDiscovery(
-                    skillScriptIdPs1, windowsAgentIds, batchSize, timeoutMs,
-                    "Skills (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, false, jobId);
-                allSkillOutputs.putAll(windowsSkillOutputs);
+        });
+
+        Future<?> skillWindowsFuture = windowsAgentIds.isEmpty() ? null : pool.submit(() -> {
+            String scriptId = uploadScriptFromClasspath("scan_skills.ps1", apiToken, consoleUrl);
+            if (scriptId != null) {
+                allSkillOutputs.putAll(executeBatchedDiscovery(
+                    scriptId, windowsAgentIds, batchSize, timeoutMs,
+                    "Skills (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, false, jobId));
             }
-        }
-        
+        });
+
+        waitForFuture(skillUnixFuture, "Skills (Unix)");
+        waitForFuture(skillWindowsFuture, "Skills (Windows)");
+
+        pool.shutdown();
+
         if (!allSkillOutputs.isEmpty()) {
             ingestSkillDiscoveries(allSkillOutputs, ingestUrl, consoleDomain, agentNames);
             results.put("skills", new ArrayList<>(allSkillOutputs.values()));
@@ -1091,6 +1091,15 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         }
         
         return results;
+    }
+
+    private static void waitForFuture(Future<?> future, String label) {
+        if (future == null) return;
+        try {
+            future.get();
+        } catch (Exception e) {
+            loggerMaker.error(label + ": thread interrupted or failed — " + e.getMessage(), LogDb.DASHBOARD);
+        }
     }
 
     private static Map<String, JsonNode> executeBatchedDiscovery(
@@ -1452,17 +1461,18 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                     batch.put("requestHeaders", reqHeadersJson);
                     batch.put("responseHeaders", "{}");
                     batch.put("method", "POST");
+                    batch.put("type", "HTTP/1.1");
                     Map<String, Object> reqPayload = new HashMap<>();
                     reqPayload.put("path", path);
                     reqPayload.put("skill_content", skillContent);
                     batch.put("requestPayload", OBJECT_MAPPER.writeValueAsString(reqPayload));
                     batch.put("responsePayload", "{\"status\":\"ok\"}");
-                    batch.put("ip", "127.0.0.1");
-                    batch.put("time", String.valueOf(System.currentTimeMillis() / 1000));
+                    batch.put("ip", "");
+                    batch.put("time", String.valueOf(System.currentTimeMillis()));
                     batch.put("statusCode", "200");
                     batch.put("status", "OK");
-                    batch.put("akto_account_id", "1000000");
-                    batch.put("akto_vxlan_id", "0");
+                    batch.put("akto_account_id", String.valueOf(Context.accountId.get()));
+                    batch.put("akto_vxlan_id", "");
                     batch.put("is_pending", "false");
                     batch.put("source", "MIRRORING");
                     batch.put("tag", tagJson);
