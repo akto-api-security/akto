@@ -258,11 +258,10 @@ public class AgentClient {
             return false;
         }
     }
-    public void initializeAgent(String sseUrl, String authorizationToken, String requestMethod) {
+    public void initializeAgent(String sseUrl, String authorizationToken) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("sseUrl", sseUrl);
         requestBody.put("authorization", authorizationToken);
-        requestBody.put("requestMethod", requestMethod != null && !requestMethod.isEmpty() ? requestMethod : "GET");
         initializeAgent(requestBody);
     }
 
