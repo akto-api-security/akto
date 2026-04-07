@@ -1,4 +1,4 @@
-import { useState, useMemo, useReducer } from "react";
+import { useState, useMemo, useReducer, useEffect } from "react";
 import { IndexFiltersMode } from "@shopify/polaris";
 import { HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
@@ -14,6 +14,7 @@ import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import values from "@/util/values";
 import { violationsTableData, violationsHeaders, violationsSortOptions } from "./nhiViolationsData";
+import ViolationDetailsPanel from "./ViolationDetailsPanel";
 
 const definedTableTabs = ["All", "Open", "Fixed"];
 const resourceName = { singular: "violation", plural: "violations" };
@@ -81,10 +82,24 @@ export default function ViolationsPage() {
     const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
     const initialSelectedTab  = tableSelectedTab[window.location.pathname] || "open";
 
-    const [selectedTab, setSelectedTab] = useState(initialSelectedTab);
-    const [selected, setSelected]       = useState(
+    const [selectedTab, setSelectedTab]             = useState(initialSelectedTab);
+    const [selected, setSelected]                   = useState(
         func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab)
     );
+    const [selectedViolation, setSelectedViolation] = useState(null);
+    const [showViolationPanel, setShowViolationPanel] = useState(false);
+
+    useEffect(() => {
+        const pending = sessionStorage.getItem("nhi_pending_violation");
+        if (pending) {
+            sessionStorage.removeItem("nhi_pending_violation");
+            try {
+                setSelectedViolation(JSON.parse(pending));
+                setShowViolationPanel(true);
+            } catch (_) {}
+        }
+    }, []);
+
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
         values.ranges[2]
@@ -107,6 +122,7 @@ export default function ViolationsPage() {
     );
 
     return (
+        <>
         <PageWithMultipleCards
             title={violationsPageTitle}
             isFirstPage
@@ -163,8 +179,18 @@ export default function ViolationsPage() {
                         { content: "Mark as fixed", onAction: () => {} },
                         { content: "Open Jira ticket", onAction: () => {} },
                     ]}
+                    onRowClick={(r) => { setSelectedViolation(r); setShowViolationPanel(true); }}
+                    rowClickable={true}
                 />,
             ]}
         />
+        {selectedViolation && (
+            <ViolationDetailsPanel
+                row={selectedViolation}
+                show={showViolationPanel}
+                setShow={setShowViolationPanel}
+            />
+        )}
+        </>
     );
 }

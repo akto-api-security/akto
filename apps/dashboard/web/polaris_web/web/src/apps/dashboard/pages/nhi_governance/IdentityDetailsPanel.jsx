@@ -6,6 +6,8 @@ import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { IdentityIcon, violationsTableData, violationsHeaders, violationsSortOptions } from "./nhiViolationsData";
 
+const NHI_VIOLATIONS_PATH = "/dashboard/nhi/violations";
+
 export default function IdentityDetailsPanel({ row, show, setShow }) {
     const [actionActive, setActionActive] = useState(false);
 
@@ -15,7 +17,13 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
     const violMed  = identityViolations.filter((v) => v.severity === "Medium").length;
     const totalViolations = identityViolations.length;
 
-    // ── TitleComponent (first component in the scrollable list) ───────────────
+    const handleViolationClick = (violationRow) => {
+        sessionStorage.setItem("nhi_pending_violation", JSON.stringify(violationRow));
+        setShow(false);
+        window.location.href = NHI_VIOLATIONS_PATH;
+    };
+
+    // ── TitleComponent ────────────────────────────────────────────────────────
     const TitleComponent = () => (
         <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
             <HorizontalStack align="space-between" blockAlign="start">
@@ -66,8 +74,8 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
         component: (
             <Box padding="4">
                 <VerticalStack gap="3">
-                    <Text variant="headingSm">Description</Text>
-                    <Text variant="bodyMd" color="subdued">
+                    <Text variant="headingSm" color="subdued">Description</Text>
+                    <Text variant="bodyMd">
                         {totalViolations > 0
                             ? `This identity is actively used by ${row.agent} with ${row.access.toLowerCase()}-level access via ${row.type}. It currently has ${totalViolations} security violation${totalViolations > 1 ? "s" : ""} that increase the risk of misuse or unauthorized access.`
                             : `This identity is actively used by ${row.agent} with ${row.access.toLowerCase()}-level access via ${row.type}. No active security violations detected.`
@@ -95,6 +103,8 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
                     headings={violationsHeaders}
                     useNewRow={true}
                     condensedHeight={true}
+                    onRowClick={handleViolationClick}
+                    rowClickable={true}
                 />
             </Box>
         ) : (
@@ -104,21 +114,20 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
         ),
     };
 
-    const tabsComponent = (
-        <LayoutWithTabs
-            key={row.identityName}
-            tabs={[overviewTab, violationsTab]}
-            currTab={() => {}}
-            noLoading
-        />
-    );
-
     return (
         <FlyLayout
             title="Identity details"
             show={show}
             setShow={setShow}
-            components={[<TitleComponent key="title" />, tabsComponent]}
+            components={[
+                <TitleComponent key="title" />,
+                <LayoutWithTabs
+                    key={row.identityName}
+                    tabs={[overviewTab, violationsTab]}
+                    currTab={() => {}}
+                    noLoading
+                />,
+            ]}
             showDivider
             newComp
         />
