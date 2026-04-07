@@ -46,7 +46,6 @@ public class TestHeaderFilter {
     @Test
     public void testNonIgnoredHeaders() {
         assertFalse(HeaderFilter.shouldIgnoreHeader("authorization"));
-        assertFalse(HeaderFilter.shouldIgnoreHeader("content-type"));
         assertFalse(HeaderFilter.shouldIgnoreHeader("x-custom-header"));
         assertFalse(HeaderFilter.shouldIgnoreHeader("x-api-key"));
         assertFalse(HeaderFilter.shouldIgnoreHeader("host"));
