@@ -25,13 +25,28 @@ public class HeaderFilter {
         "cdn-loop",
         "accept-language",
         "etag",
-        "x-src-id"
+        "x-src-id",
+        "te",
+        "x-tls-version",
+        "x-forwarded-version",
+        "x-ag-akamai-production",
+        "ak-client-ip-hash",
+        "referer",
+        "zz-fwd-cname-chain",
+        "x-agoda-chinamobile-sr",
+        "reporter",
+        "apc-source-service-nam",
+        "source_service_version",
+        "source_service_name",
+        "x-agoda-ssot-name"
     ));
 
     // Header prefixes to ignore - Akto and Envoy specific headers
     private static final String[] IGNORED_HEADER_PREFIXES = {
         "x-akto-k8s",
-        "x-envoy"
+        "x-envoy",
+        "zz-client",
+        "x-akamai"
     };
 
     /**
