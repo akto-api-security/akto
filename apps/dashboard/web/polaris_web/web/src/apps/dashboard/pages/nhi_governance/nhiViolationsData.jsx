@@ -275,7 +275,7 @@ const VIOLATION_DETAIL_MAP = {
             "Enable access logging to monitor future usage patterns",
         ],
         timeline: [
-            { time: "Now",     event: "Violation remains active — admin credential still accessible in runtime" },
+            { time: "Now",     event: "Violation remains active \u2014 admin credential still accessible in runtime" },
             { time: "2h ago",  event: "Violation detected by policy engine during scheduled scan" },
             { time: "2h ago",  event: "Alert triggered for identity owner" },
             { time: "1d ago",  event: "Credential was last rotated" },

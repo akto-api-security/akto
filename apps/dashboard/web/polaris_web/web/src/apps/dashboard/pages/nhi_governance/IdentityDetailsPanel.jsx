@@ -5,6 +5,7 @@ import FlyLayout from "../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { IdentityIcon, violationsTableData, violationsHeaders, violationsSortOptions } from "./nhiViolationsData";
+import IdentityGraph from "./IdentityGraph";
 
 const NHI_VIOLATIONS_PATH = "/dashboard/nhi/violations";
 
@@ -73,14 +74,20 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
         content: "Overview",
         component: (
             <Box padding="4">
-                <VerticalStack gap="3">
-                    <Text variant="headingSm" color="subdued">Description</Text>
-                    <Text variant="bodyMd">
-                        {totalViolations > 0
-                            ? `This identity is actively used by ${row.agent} with ${row.access.toLowerCase()}-level access via ${row.type}. It currently has ${totalViolations} security violation${totalViolations > 1 ? "s" : ""} that increase the risk of misuse or unauthorized access.`
-                            : `This identity is actively used by ${row.agent} with ${row.access.toLowerCase()}-level access via ${row.type}. No active security violations detected.`
-                        }
-                    </Text>
+                <VerticalStack gap="4">
+                    <VerticalStack gap="2">
+                        <Text variant="headingSm" color="subdued">Graph</Text>
+                        <IdentityGraph row={row} violations={totalViolations} />
+                    </VerticalStack>
+                    <VerticalStack gap="2">
+                        <Text variant="headingSm" color="subdued">Description</Text>
+                        <Text variant="bodyMd">
+                            {totalViolations > 0
+                                ? `This identity is actively used by ${row.agent} with ${row.access.toLowerCase()}-level access via ${row.type}. It currently has ${totalViolations} security violation${totalViolations > 1 ? "s" : ""} that increase the risk of misuse or unauthorized access.`
+                                : `This identity is actively used by ${row.agent} with ${row.access.toLowerCase()}-level access via ${row.type}. No active security violations detected.`
+                            }
+                        </Text>
+                    </VerticalStack>
                 </VerticalStack>
             </Box>
         ),
