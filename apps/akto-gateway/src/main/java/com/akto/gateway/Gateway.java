@@ -94,7 +94,7 @@ public class Gateway {
         if (incoming == null) return existing;
 
         Map<String, Object> merged = new HashMap<>(existing);
-        boolean allowed = isAllowed(existing) || isAllowed(incoming);
+        boolean allowed = isAllowed(existing) && isAllowed(incoming);
         merged.put("Allowed", allowed);
         merged.put("requestResult", existing);
         merged.put("responseResult", incoming);

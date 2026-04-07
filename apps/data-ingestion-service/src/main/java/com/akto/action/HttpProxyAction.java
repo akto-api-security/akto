@@ -23,6 +23,7 @@ public class HttpProxyAction extends ActionSupport {
     }
 
     private String guardrails;
+    private String response_guardrails;
     private String akto_connector;
     private String ingest_data;
 
@@ -103,6 +104,7 @@ public class HttpProxyAction extends ActionSupport {
         Map<String, Object> requestData = new HashMap<>();
 
         requestData.put("guardrails", guardrails);
+        requestData.put("response_guardrails", response_guardrails);
         requestData.put("akto_connector", akto_connector);
         requestData.put("ingest_data", ingest_data);
 
