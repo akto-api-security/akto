@@ -22,6 +22,10 @@ foreach ($arg in $args) {
 }
 
 if ($AktoDataIngestionUrl) {
+    # Strip KEY=VALUE prefix if caller passed the full env var line (e.g. "AKTO_DATA_INGESTION_URL=https://...")
+    if ($AktoDataIngestionUrl -match "^[A-Z_]+=(.+)$") {
+        $AktoDataIngestionUrl = $Matches[1].Trim()
+    }
     $env:AKTO_DATA_INGESTION_URL = $AktoDataIngestionUrl
 }
 
@@ -79,7 +83,7 @@ function Get-GuardrailsUrl {
         }
     }
 
-    return "https://guardrails.akto.io"
+    return "https://1764882677-guardrails.akto.io"
 }
 
 function Get-DeviceId {
@@ -284,8 +288,10 @@ function Install-ForUser {
     }
     Write-Log "Downloaded akto-validate-response.py"
 
+    # akto_machine_id.py is fetched from master branch (has Windows-compatible import pwd fix)
     $machineIdPy = Join-Path $ClaudeHooksDir "akto_machine_id.py"
-    if (-not (Get-FileFromUrl "$GITHUB_RAW_BASE/akto_machine_id.py" $machineIdPy)) {
+    $machineIdUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/apps/mcp-endpoint-shield/claude-cli-hooks/akto_machine_id.py"
+    if (-not (Get-FileFromUrl $machineIdUrl $machineIdPy)) {
         Write-ErrorLog "Failed to download akto_machine_id.py"
         return $false
     }
