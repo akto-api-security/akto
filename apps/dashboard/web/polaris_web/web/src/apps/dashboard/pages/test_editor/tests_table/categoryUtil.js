@@ -47,12 +47,41 @@ const mcpCategories = [
     "MCP"
 ]
 
+/** Mirrors {@code GlobalEnums.TestCategory} API test *_AGENTIC categories (agentic context). */
+export const apiAgenticCategories = [
+    "BOLA_AGENTIC",
+    "NO_AUTH_AGENTIC",
+    "BFLA_AGENTIC",
+    "IAM_AGENTIC",
+    "EDE_AGENTIC",
+    "RL_AGENTIC",
+    "MA_AGENTIC",
+    "INJ_AGENTIC",
+    "ILM_AGENTIC",
+    "SM_AGENTIC",
+    "SSRF_AGENTIC",
+    "UC_AGENTIC",
+    "UHM_AGENTIC",
+    "VEM_AGENTIC",
+    "MHH_AGENTIC",
+    "SVD_AGENTIC",
+    "CORS_AGENTIC",
+    "COMMAND_INJECTION_AGENTIC",
+    "CRLF_AGENTIC",
+    "SSTI_AGENTIC",
+    "LFI_AGENTIC",
+    "XSS_AGENTIC",
+    "IIM_AGENTIC",
+    "INJECT_AGENTIC",
+    "INPUT_AGENTIC",
+]
+
 export function getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMap){
     let categoriesName = Object.keys(categoryMap);
     if(dashboardCategory === "MCP Security"){
         categoriesName = mcpCategories;
     } else if (dashboardCategory === "Agentic Security") {
-        categoriesName = [...llmCategories, ...mcpCategories];
+        categoriesName = [...llmCategories, ...mcpCategories, ...apiAgenticCategories];
     }
     return categoriesName;
 }

@@ -86,6 +86,7 @@ const getChildColumnConfig = (filterType) => {
             return { title: "MCP Server source", displayField: 'sourceId' };
         case FILTER_TYPES.BROWSER_LLM:
             return { title: "LLM source", displayField: 'sourceId' };
+        case FILTER_TYPES.SKILL:
         case FILTER_TYPES.AI_AGENT:
         default:
             return { title: "Agentic resource name", displayField: 'serviceName' };

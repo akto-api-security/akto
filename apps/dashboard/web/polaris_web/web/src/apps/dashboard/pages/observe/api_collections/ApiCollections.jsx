@@ -90,6 +90,7 @@ const headers = [
             textValue: 'username',
             showFilter: true,
             isText: CellType.TEXT,
+            boxWidth: '150px'
         }
     ] : [{
         title: mapLabel("API collection name", getDashboardCategory()),
@@ -1512,8 +1513,8 @@ function ApiCollections(props) {
               ]
             : []),
     
-        // For agentic filter: show Unique Endpoints and Unique Sources (except for AI Agent which uses tree view)
-        ...(activeFilterTitle && activeFilterType !== FILTER_TYPES.AI_AGENT
+        // For agentic filter: show Unique Endpoints and Unique Sources (except for AI Agent/Skill which uses tree view)
+        ...(activeFilterTitle && activeFilterType !== FILTER_TYPES.AI_AGENT && activeFilterType !== FILTER_TYPES.SKILL
             ? [
                   {
                       title: "Unique Endpoints",
@@ -1732,10 +1733,8 @@ function ApiCollections(props) {
             });
             // Move source column after Endpoint ID
             modifiedHeaders = moveSourceColumnAfterEndpointId(modifiedHeaders);
-        } else if (activeFilterType === FILTER_TYPES.AI_AGENT) {
-            // Remove "Total components" column for AI Agent
+        } else if (activeFilterType === FILTER_TYPES.AI_AGENT || activeFilterType === FILTER_TYPES.SKILL) {
             modifiedHeaders = modifiedHeaders.filter(h => h.value !== 'urlsCount');
-            // Rename column to "Agentic resource name", remove filter
             modifiedHeaders = modifiedHeaders.map(h => {
                 if (h.value === 'displayNameComp') {
                     return { ...h, title: 'Agentic resource name', text: 'Agentic resource name', textValue: 'serviceName', showFilter: false };
@@ -1773,8 +1772,7 @@ function ApiCollections(props) {
         if (activeFilterType === FILTER_TYPES.BROWSER_LLM) {
             // Remove endpoints sorting for LLM
             modifiedSortOptions = modifiedSortOptions.filter(opt => opt.sortKey !== 'urlsCount');
-        } else if (activeFilterType === FILTER_TYPES.AI_AGENT) {
-            // Remove "Components" sorting for AI Agents (column is hidden)
+        } else if (activeFilterType === FILTER_TYPES.AI_AGENT || activeFilterType === FILTER_TYPES.SKILL) {
             modifiedSortOptions = modifiedSortOptions.filter(opt => opt.sortKey !== 'urlsCount');
         } else if (activeFilterType === FILTER_TYPES.MCP_SERVER) {
             // Change "Endpoints" to "Tools" for MCP Servers
@@ -1832,7 +1830,8 @@ function ApiCollections(props) {
     const useTreeView = isEndpointSecurityCategory() && (
                         activeFilterType === FILTER_TYPES.AI_AGENT || 
                         activeFilterType === FILTER_TYPES.MCP_SERVER || 
-                        activeFilterType === FILTER_TYPES.BROWSER_LLM);
+                        activeFilterType === FILTER_TYPES.BROWSER_LLM ||
+                        activeFilterType === FILTER_TYPES.SKILL);
     
     // For agentic filters, use the tree view component grouped by endpoint ID
     const getTableComponent = () => {
@@ -1931,6 +1930,8 @@ function ApiCollections(props) {
                 return `AI Agent - ${activeFilterTitle}`;
             case FILTER_TYPES.MCP_SERVER:
                 return `MCP Server - ${activeFilterTitle}`;
+            case FILTER_TYPES.SKILL:
+                return `Skill - ${activeFilterTitle}`;
             default:
                 return `${activeFilterTitle}`;
         }
