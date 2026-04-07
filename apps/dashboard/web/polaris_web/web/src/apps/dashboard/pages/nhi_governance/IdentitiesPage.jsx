@@ -34,9 +34,10 @@ const IDENTITY_DOMAIN_MAP = {
     amplitude: "amplitude.com", segment: "segment.io", intercom: "intercom.com",
     zendesk: "zendesk.com", stripe: "stripe.com", jira: "atlassian.com",
     slack: "slack.com", vscode: "code.visualstudio.com", entra: "microsoft.com",
-    snowflake: "snowflake.com",
+    snowflake: "snowflake.com", docker: "docker.com", airbnb: "airbnb.com",
+    playwright: "playwright.dev", huggingface: "huggingface.co", anthropic: "anthropic.com",
 };
-const INTERNAL_KEYWORDS = new Set(["internal", "connector"]);
+const INTERNAL_KEYWORDS = new Set(["internal", "connector", "filesystem"]);
 function IdentityIcon({ name }) {
     const parts = (name || "").toLowerCase().split(/[-_\d]+/).filter(p => p.length > 2);
     if (parts.some(p => INTERNAL_KEYWORDS.has(p)))
@@ -48,8 +49,12 @@ function IdentityIcon({ name }) {
 
 // ── Agent icon — named agents get specific icons, others get AI model favicons ──
 const AGENT_SPECIFIC_DOMAIN = {
-    "cursor prod": "cursor.sh",
-    "cursor":      "cursor.sh",
+    "cursor prod":    "cursor.sh",
+    "cursor":         "cursor.sh",
+    "vs code":        "code.visualstudio.com",
+    "claude cli":     "anthropic.com",
+    "claude desktop": "anthropic.com",
+    "windsurf":       "codeium.com",
 };
 const AI_ICON_POOL = [
     "claude.ai", "openai.com", "deepseek.com", "x.ai",
@@ -104,39 +109,39 @@ const expiryComp = (s) => {
 
 // ── 10 Critical Curated (all others non-critical) ──────────────────────────────
 const CRITICAL_CURATED = [
-    { identityName:"aws-cursor-key",     agent:"Cursor Prod",     type:"API Key",      access:"Admin",       violCrit:3, violHigh:0, violMed:0, lastUsed:"2h ago",  expiryStatus:"2d left",                owner:"Evelyn Carter"     },
-    { identityName:"hr-slack-token",     agent:"HR Assistant",    type:"Bearer Token", access:"Write",      violCrit:1, violHigh:3, violMed:0, lastUsed:"45m ago", expiryStatus:"Rotation Due in 2 days", owner:"John Matthews"     },
-    { identityName:"aws-env-sa",         agent:"New Env Agent",   type:"Bearer Token", access:"Write",      violCrit:2, violHigh:1, violMed:0, lastUsed:"1d ago",  expiryStatus:"Rotation due today",     owner:"Adam Brooks"       },
-    { identityName:"github-oauth-456",   agent:"Code Reviewer",   type:"Bearer Token", access:"Read/Write", violCrit:1, violHigh:3, violMed:2, lastUsed:"3h ago",  expiryStatus:"60d left",               owner:"Sarah Williams"    },
-    { identityName:"jira-token",         agent:"My Assistant",    type:"API Key",      access:"Read",       violCrit:2, violHigh:4, violMed:1, lastUsed:"Never",   expiryStatus:"15d left",               owner:"Noah Bennett"      },
-    { identityName:"internal-api-token", agent:"Connector",       type:"Bearer Token", access:"Read",       violCrit:1, violHigh:0, violMed:1, lastUsed:"2d ago",  expiryStatus:"60d left",               owner:"Theodore Collins"  },
-    { identityName:"entra-service",      agent:"Entra Bot",       type:"Bearer Token", access:"Read",       violCrit:2, violHigh:5, violMed:0, lastUsed:"6h ago",  expiryStatus:"7d left",                owner:"Michael Alvarez"   },
-    { identityName:"vscode-oauth",       agent:"Agent Studio",    type:"API Key",      access:"Write",      violCrit:1, violHigh:2, violMed:1, lastUsed:"Never",   expiryStatus:"No expiry",              owner:"Nina Nolan"        },
-    { identityName:"stripe-key",         agent:"Finance Bot",     type:"API Key",      access:"Admin",      violCrit:3, violHigh:0, violMed:2, lastUsed:"5h ago",  expiryStatus:"Rotation due today",     owner:"Lisa Wong"         },
-    { identityName:"github-actions-key", agent:"CI Bot",          type:"Bearer Token", access:"Write",      violCrit:1, violHigh:1, violMed:0, lastUsed:"10m ago", expiryStatus:"Expired 1d ago",         owner:"Kevin O'Connor"    },
+    { identityName:"aws-cursor-key",     agent:"Cursor",         type:"API Key",      access:"Admin",       violCrit:3, violHigh:0, violMed:0, lastUsed:"2h ago",  expiryStatus:"2d left",                owner:"Evelyn Carter"     },
+    { identityName:"hr-slack-token",     agent:"Claude CLI",        type:"Bearer Token", access:"Write",      violCrit:1, violHigh:3, violMed:0, lastUsed:"45m ago", expiryStatus:"Rotation Due in 2 days", owner:"John Matthews"     },
+    { identityName:"aws-env-sa",         agent:"Windsurf",       type:"Bearer Token", access:"Write",      violCrit:2, violHigh:1, violMed:0, lastUsed:"1d ago",  expiryStatus:"Rotation due today",     owner:"Adam Brooks"       },
+    { identityName:"github-oauth-456",   agent:"VS Code",        type:"Bearer Token", access:"Read/Write", violCrit:1, violHigh:3, violMed:2, lastUsed:"3h ago",  expiryStatus:"60d left",               owner:"Sarah Williams"    },
+    { identityName:"jira-token",         agent:"Claude Desktop",  type:"API Key",      access:"Read",       violCrit:2, violHigh:4, violMed:1, lastUsed:"Never",   expiryStatus:"15d left",               owner:"Noah Bennett"      },
+    { identityName:"internal-api-token", agent:"Claude CLI",           type:"Bearer Token", access:"Read",       violCrit:1, violHigh:0, violMed:1, lastUsed:"2d ago",  expiryStatus:"60d left",               owner:"Theodore Collins"  },
+    { identityName:"airbnb-api-key",      agent:"Antigravity",   type:"Bearer Token", access:"Read",       violCrit:2, violHigh:5, violMed:0, lastUsed:"6h ago",  expiryStatus:"7d left",                owner:"Michael Alvarez"   },
+    { identityName:"vscode-oauth",       agent:"VS Code",     type:"API Key",      access:"Write",      violCrit:1, violHigh:2, violMed:1, lastUsed:"Never",   expiryStatus:"No expiry",              owner:"Nina Nolan"        },
+    { identityName:"docker-registry-key",         agent:"Cursor",     type:"API Key",      access:"Admin",      violCrit:3, violHigh:0, violMed:2, lastUsed:"5h ago",  expiryStatus:"Rotation due today",     owner:"Lisa Wong"         },
+    { identityName:"github-actions-key", agent:"VS Code",          type:"Bearer Token", access:"Write",      violCrit:1, violHigh:1, violMed:0, lastUsed:"10m ago", expiryStatus:"Expired 1d ago",         owner:"Kevin O'Connor"    },
 ];
 
 // ── Non-critical curated (high/medium/low violations) ──────────────────────────
 const NON_CRITICAL_CURATED = [
-    { identityName:"zendesk-api-key",    agent:"Support Bot",     type:"Bearer Token", access:"Write",      violCrit:0, violHigh:1, violMed:0, lastUsed:"3h ago",  expiryStatus:"15d left",  owner:"Sarah Williams"  },
-    { identityName:"gcp-service-key",    agent:"Infra Agent",     type:"API Key",      access:"Admin",      violCrit:0, violHigh:1, violMed:1, lastUsed:"6h ago",  expiryStatus:"5d left",   owner:"Adam Brooks"     },
-    { identityName:"notion-token",       agent:"Docs Assistant",  type:"API Key",      access:"Read",       violCrit:0, violHigh:1, violMed:0, lastUsed:"1d ago",  expiryStatus:"1d left",   owner:"Noah Bennett"    },
-    { identityName:"hubspot-oauth",      agent:"Marketing Bot",   type:"Bearer Token", access:"Write",      violCrit:0, violHigh:1, violMed:0, lastUsed:"10m ago", expiryStatus:"No expiry", owner:"Evelyn Carter"   },
-    { identityName:"snowflake-key",      agent:"Data Agent",      type:"API Key",      access:"Read/Write", violCrit:0, violHigh:3, violMed:1, lastUsed:"3h ago",  expiryStatus:"No expiry", owner:"John Matthews"   },
+    { identityName:"playwright-token",    agent:"Claude Desktop",     type:"Bearer Token", access:"Write",      violCrit:0, violHigh:1, violMed:0, lastUsed:"3h ago",  expiryStatus:"15d left",  owner:"Sarah Williams"  },
+    { identityName:"filesystem-token",    agent:"Windsurf",     type:"API Key",      access:"Admin",      violCrit:0, violHigh:1, violMed:1, lastUsed:"6h ago",  expiryStatus:"5d left",   owner:"Adam Brooks"     },
+    { identityName:"notion-token",       agent:"Claude CLI",  type:"API Key",      access:"Read",       violCrit:0, violHigh:1, violMed:0, lastUsed:"1d ago",  expiryStatus:"1d left",   owner:"Noah Bennett"    },
+    { identityName:"anthropic-api-key",      agent:"Claude CLI",   type:"Bearer Token", access:"Write",      violCrit:0, violHigh:1, violMed:0, lastUsed:"10m ago", expiryStatus:"No expiry", owner:"Evelyn Carter"   },
+    { identityName:"github-copilot-key",      agent:"Cursor",      type:"API Key",      access:"Read/Write", violCrit:0, violHigh:3, violMed:1, lastUsed:"3h ago",  expiryStatus:"No expiry", owner:"John Matthews"   },
 ];
 
 // ── Generation pools ───────────────────────────────────────────────────────────
 const AGENTS_POOL = [
-    "Cursor Prod","HR Assistant","Code Reviewer","CI Bot","Finance Bot",
-    "Deploy Bot","Analytics Agent","Support Agent","Data Sync","Notify Bot",
-    "Log Monitor","Docs Assistant","Infra Agent","Marketing Bot","Test Runner",
-    "Audit Agent","Compliance Bot","Security Scanner","Backup Agent","Report Bot",
-    "API Gateway","Payment Proc","Auth Service","Cache Manager","Queue Worker",
-    "ML Pipeline","Data Crawler","Ops Assistant","Identity Broker","Policy Engine",
+    "Cursor","Claude CLI","VS Code","Claude Desktop","Windsurf",
+    "Antigravity","Cursor","VS Code","Claude CLI","Claude Desktop",
+    "Windsurf","Cursor","Claude CLI","VS Code","Antigravity",
+    "Claude Desktop","Windsurf","Cursor","VS Code","Claude CLI",
+    "Antigravity","Cursor","Claude Desktop","VS Code","Windsurf",
+    "Claude CLI","Cursor","Antigravity","VS Code","Claude Desktop",
 ];
 const IDENTITY_POOL = [
     "aws-prod-key","gcp-svc-account","azure-sp-token","github-actions-sa","okta-api-key",
-    "twilio-auth-token","hubspot-oauth","salesforce-jwt","mongo-atlas-key","redis-cloud-sa",
+    "twilio-auth-token","anthropic-api-key","salesforce-jwt","mongo-atlas-key","redis-cloud-sa",
     "elastic-api-key","vault-approle","argo-cd-token","terraform-sa","jenkins-cred",
     "splunk-hec-token","pagerduty-key","opsgenie-token","linear-api-key","notion-oauth",
     "zoom-jwt","box-oauth","dropbox-token","figma-pat","cloudflare-api-key",

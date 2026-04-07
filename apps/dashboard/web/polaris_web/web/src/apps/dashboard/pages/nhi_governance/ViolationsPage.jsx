@@ -19,23 +19,16 @@ import ViolationDetailsPanel from "./ViolationDetailsPanel";
 const definedTableTabs = ["All", "Open", "Fixed"];
 const resourceName = { singular: "violation", plural: "violations" };
 
-// ── Chart data ─────────────────────────────────────────────────────────────────
-const severityDonutData = {
-    Critical: { text: 31,  color: "#DF2909" },
-    High:     { text: 48,  color: "#FED3D1" },
-    Medium:   { text: 44,  color: "#FFD79D" },
-    Low:      { text: 25,  color: "#E4E5E7" },
-};
-
+// ── Chart data (line chart — static trend ending at current total ~169) ────────
 const violationsOverTimeData = [{
     data: [
-        [Date.UTC(2026, 2, 28), 182],
-        [Date.UTC(2026, 3,  0), 158],
-        [Date.UTC(2026, 3,  1), 104],
-        [Date.UTC(2026, 3,  2), 78],
-        [Date.UTC(2026, 3,  3), 96],
-        [Date.UTC(2026, 3,  4), 108],
-        [Date.UTC(2026, 3,  5), 98],
+        [Date.UTC(2026, 3,  1), 178],
+        [Date.UTC(2026, 3,  2), 182],
+        [Date.UTC(2026, 3,  3), 176],
+        [Date.UTC(2026, 3,  4), 171],
+        [Date.UTC(2026, 3,  5), 174],
+        [Date.UTC(2026, 3,  6), 172],
+        [Date.UTC(2026, 3,  7), 169],
     ],
     color: "#EF4444",
     name: "Violations",
@@ -78,6 +71,20 @@ const violationsPageTitle = (
 
 export default function ViolationsPage() {
     const { tabsInfo } = useTable();
+
+    // Compute donut from actual violations data so chart always matches the table
+    const severityDonutData = useMemo(() => {
+        const counts = violationsTableData.reduce((acc, v) => {
+            acc[v.severity] = (acc[v.severity] || 0) + 1;
+            return acc;
+        }, {});
+        return {
+            Critical: { text: counts.Critical || 0, color: "#DF2909" },
+            High:     { text: counts.High || 0,     color: "#FED3D1" },
+            Medium:   { text: counts.Medium || 0,   color: "#FFD79D" },
+            Low:      { text: counts.Low || 0,      color: "#E4E5E7" },
+        };
+    }, []);
     const tableSelectedTab    = PersistStore((state) => state.tableSelectedTab);
     const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
     const initialSelectedTab  = tableSelectedTab[window.location.pathname] || "open";

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ActionList, Badge, Box, Button, Divider, HorizontalStack, Popover, Text, VerticalStack } from "@shopify/polaris";
 import FlyLayout from "../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
-import { IdentityIcon, AgentIcon, getViolationDetail } from "./nhiViolationsData";
+import { IdentityIcon, AgentIcon, getViolationDetail, resolvePolicyName } from "./nhiViolationsData";
 import func from "@/util/func";
 
 export default function ViolationDetailsPanel({ row, show, setShow }) {
@@ -70,7 +70,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                         <VerticalStack gap="1">
                             <Text variant="headingSm" color="subdued">Policy Triggered</Text>
                             <Text variant="bodyMd" fontWeight="semibold">
-                                {typeof row.policy === "object" ? row.policy.primary : row.policy}
+                                {resolvePolicyName(typeof row.policy === "object" ? row.policy.primary : row.policy)}
                             </Text>
                         </VerticalStack>
                         <VerticalStack gap="1">

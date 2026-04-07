@@ -20,9 +20,10 @@ const IDENTITY_DOMAIN_MAP = {
     amplitude: "amplitude.com", segment: "segment.io", intercom: "intercom.com",
     zendesk: "zendesk.com", stripe: "stripe.com", jira: "atlassian.com",
     slack: "slack.com", vscode: "code.visualstudio.com", entra: "microsoft.com",
-    snowflake: "snowflake.com",
+    snowflake: "snowflake.com", docker: "docker.com", airbnb: "airbnb.com",
+    playwright: "playwright.dev", huggingface: "huggingface.co", anthropic: "anthropic.com",
 };
-const INTERNAL_KEYWORDS = new Set(["internal", "connector"]);
+const INTERNAL_KEYWORDS = new Set(["internal", "connector", "filesystem"]);
 export function IdentityIcon({ name }) {
     const parts = (name || "").toLowerCase().split(/[-_\d]+/).filter(p => p.length > 2);
     if (parts.some(p => INTERNAL_KEYWORDS.has(p)))
@@ -33,7 +34,14 @@ export function IdentityIcon({ name }) {
 }
 
 // ── Agent icon ─────────────────────────────────────────────────────────────────
-const AGENT_SPECIFIC_DOMAIN = { "cursor prod": "cursor.sh", "cursor": "cursor.sh" };
+const AGENT_SPECIFIC_DOMAIN = {
+    "cursor prod":    "cursor.sh",
+    "cursor":         "cursor.sh",
+    "vs code":        "code.visualstudio.com",
+    "claude cli":     "anthropic.com",
+    "claude desktop": "anthropic.com",
+    "windsurf":       "codeium.com",
+};
 const AI_ICON_POOL = ["claude.ai","openai.com","deepseek.com","x.ai","gemini.google.com","mistral.ai","perplexity.ai","cohere.com"];
 export function AgentIcon({ name }) {
     const key = (name || "").toLowerCase().trim();
@@ -50,16 +58,38 @@ export const sevBadge = (s) => (
     </div>
 );
 
+// ── Policy name resolution (handles renames persisted in localStorage) ────────
+// Forward: original violation-stored name → current display name
+export function resolvePolicyName(name) {
+    if (!name) return name;
+    try {
+        const map = JSON.parse(localStorage.getItem("nhi_policy_name_map") || "{}");
+        return map[name] || name;
+    } catch (_) { return name; }
+}
+
+// Reverse: current display name → original name stored in violation data
+export function unresolvedPolicyName(displayName) {
+    if (!displayName) return displayName;
+    try {
+        const map = JSON.parse(localStorage.getItem("nhi_policy_name_map") || "{}");
+        const entry = Object.entries(map).find(([, v]) => v === displayName);
+        return entry ? entry[0] : displayName;
+    } catch (_) { return displayName; }
+}
+
 // ── Policy cell ────────────────────────────────────────────────────────────────
 export function PolicyCell({ policy }) {
     if (!policy) return null;
-    if (typeof policy === "string") return <Text variant="bodyMd">{policy}</Text>;
-    const tooltipContent = policy.extras && policy.extras.length > 0
-        ? <VerticalStack gap="1">{policy.extras.map((p, i) => <Text key={p} variant="bodyMd" color="subdued">{`${i + 2}. ${p}`}</Text>)}</VerticalStack>
+    if (typeof policy === "string") return <Text variant="bodyMd">{resolvePolicyName(policy)}</Text>;
+    const resolvedPrimary = resolvePolicyName(policy.primary);
+    const resolvedExtras  = (policy.extras || []).map(resolvePolicyName);
+    const tooltipContent  = resolvedExtras.length > 0
+        ? <VerticalStack gap="1">{resolvedExtras.map((p, i) => <Text key={p} variant="bodyMd" color="subdued">{`${i + 2}. ${p}`}</Text>)}</VerticalStack>
         : null;
     return (
         <HorizontalStack gap="1" blockAlign="center" wrap={false}>
-            <Text variant="bodyMd">{policy.primary}</Text>
+            <Text variant="bodyMd">{resolvedPrimary}</Text>
             {policy.extra > 0 && tooltipContent && (
                 <Tooltip content={tooltipContent} dismissOnMouseOut>
                     <span><Badge>{`+${policy.extra}`}</Badge></span>
@@ -72,61 +102,61 @@ export function PolicyCell({ policy }) {
 
 // ── Raw data ───────────────────────────────────────────────────────────────────
 const CURATED = [
-    { severity:"Critical", violation:"Admin credential exposed to agent runtime",                    identity:"aws-cursor-key",     agent:"Cursor Prod",     policy:{primary:"No Admin Keys for Agents"},           discovered:"2h ago",  status:"Open"  },
-    { severity:"Critical", violation:"Credential exceeds intended permission scope",                 identity:"aws-cursor-key",     agent:"Cursor Prod",     policy:{primary:"Enforce Least Privilege"},            discovered:"1h ago",  status:"Open"  },
-    { severity:"Critical", violation:"Unusual LLM access spike detected",                           identity:"aws-cursor-key",     agent:"Cursor Prod",     policy:{primary:"Detect LLM Usage Spikes"},           discovered:"Now",     status:"Open"  },
-    { severity:"Critical", violation:"Token used outside trusted network boundary",                 identity:"hr-slack-token",     agent:"HR Assistant",    policy:{primary:"Restrict Token by Source", extra:2, extras:["Rotate API Keys Every 30 Days","Detect LLM Usage Spikes"]},  discovered:"6h ago",  status:"Open"  },
-    { severity:"High",     violation:"Messaging token triggering bulk automated sends",             identity:"hr-slack-token",     agent:"HR Assistant",    policy:{primary:"Limit Messaging Actions"},            discovered:"3h ago",  status:"Fixed" },
-    { severity:"High",     violation:"Token scope broader than required for task",                  identity:"hr-slack-token",     agent:"HR Assistant",    policy:{primary:"Enforce Least Privilege"},            discovered:"4h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"Bulk API calls detected from single token",                   identity:"hr-slack-token",     agent:"HR Assistant",    policy:{primary:"Monitor Slack Abuse"},                discovered:"5h ago",  status:"Open"  },
-    { severity:"High",     violation:"Dormant credential retains write access",                     identity:"aws-env-sa",         agent:"New Env Agent",   policy:{primary:"Disable Dormant Credentials", extra:2, extras:["Expire Unused Tokens","Block Cross-Environment Token Reuse"]}, discovered:"1h ago", status:"Fixed" },
-    { severity:"High",     violation:"Provisioning access without approval controls",               identity:"aws-env-sa",         agent:"New Env Agent",   policy:{primary:"Restrict Infra Provisioning", extra:2, extras:["No Admin Keys for Agents","Enforce Least Privilege"]},      discovered:"2h ago", status:"Open"  },
-    { severity:"Medium",   violation:"Service account key expired 90+ days ago",                   identity:"aws-env-sa",         agent:"New Env Agent",   policy:{primary:"Enforce Token Expiry < 90d"},         discovered:"3h ago",  status:"Open"  },
-    { severity:"High",     violation:"Repository token has admin-level permissions",                identity:"github-oauth-456",   agent:"Code Reviewer",   policy:{primary:"Enforce Least Privilege"},            discovered:"45m ago", status:"Open"  },
-    { severity:"High",     violation:"Token accessing repositories beyond expiry date",             identity:"github-oauth-456",   agent:"Code Reviewer",   policy:{primary:"Restrict Repo Scope"},                discovered:"45m ago", status:"Fixed" },
-    { severity:"Medium",   violation:"OAuth scope exceeds minimum required permissions",            identity:"github-oauth-456",   agent:"Code Reviewer",   policy:{primary:"Enforce Least Privilege"},            discovered:"1h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"Access to restricted ticketing projects detected",            identity:"jira-token",         agent:"My Assistant",    policy:{primary:"Restrict Project Access", extra:2, extras:["Expire Unused Tokens","Enforce Least Privilege"]},   discovered:"1h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"Idle credential remains active without usage",                identity:"jira-token",         agent:"My Assistant",    policy:{primary:"Expire Unused Tokens"},               discovered:"30m ago", status:"Open"  },
-    { severity:"Critical", violation:"Service account with unrestricted API access",                identity:"internal-api-token", agent:"Connector",       policy:{primary:"Restrict Infra Provisioning"},        discovered:"2d ago",  status:"Open"  },
-    { severity:"Medium",   violation:"MCP token missing expiry configuration",                      identity:"internal-api-token", agent:"Connector",       policy:{primary:"Enforce Token Expiry < 90d"},         discovered:"3d ago",  status:"Open"  },
-    { severity:"Critical", violation:"Outbound token used without destination binding",             identity:"entra-service",      agent:"Entra Bot",       policy:{primary:"Restrict Token by Source"},           discovered:"5h ago",  status:"Fixed" },
-    { severity:"High",     violation:"Write permission granted without MFA binding",                identity:"entra-service",      agent:"Entra Bot",       policy:{primary:"Enforce Least Privilege"},            discovered:"6h ago",  status:"Open"  },
-    { severity:"High",     violation:"Bulk API calls detected from single token",                   identity:"entra-service",      agent:"Entra Bot",       policy:{primary:"Monitor Slack Abuse"},                discovered:"7h ago",  status:"Open"  },
-    { severity:"High",     violation:"Token scope broader than required for task",                  identity:"entra-service",      agent:"Entra Bot",       policy:{primary:"Enforce Least Privilege"},            discovered:"8h ago",  status:"Open"  },
-    { severity:"High",     violation:"Identity inactive but retains write access",                  identity:"entra-service",      agent:"Entra Bot",       policy:{primary:"Disable Dormant Credentials"},        discovered:"9h ago",  status:"Open"  },
-    { severity:"High",     violation:"Agent sending external messages via shared token",            identity:"vscode-oauth",       agent:"Agent Studio",    policy:{primary:"Limit Messaging Actions"},            discovered:"6h ago",  status:"Open"  },
-    { severity:"High",     violation:"OAuth scope exceeds minimum required permissions",            identity:"vscode-oauth",       agent:"Agent Studio",    policy:{primary:"Enforce Least Privilege"},            discovered:"7h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"MCP token missing expiry configuration",                      identity:"vscode-oauth",       agent:"Agent Studio",    policy:{primary:"Enforce Token Expiry < 90d"},         discovered:"8h ago",  status:"Fixed" },
-    { severity:"Critical", violation:"Admin credential exposed to agent runtime",                   identity:"stripe-key",         agent:"Finance Bot",     policy:{primary:"No Admin Keys for Agents"},           discovered:"5h ago",  status:"Open"  },
-    { severity:"Critical", violation:"Excessive permissions granted at agent setup",                identity:"stripe-key",         agent:"Finance Bot",     policy:{primary:"Enforce Least Privilege"},            discovered:"6h ago",  status:"Open"  },
-    { severity:"Critical", violation:"Credential reused across staging and production",             identity:"stripe-key",         agent:"Finance Bot",     policy:{primary:"Block Cross-Environment Token Reuse"},discovered:"7h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"Token rotation overdue by 14 days",                          identity:"stripe-key",         agent:"Finance Bot",     policy:{primary:"Rotate API Keys Every 30 Days"},      discovered:"1d ago",  status:"Fixed" },
-    { severity:"Medium",   violation:"Agent accessing prod resources from dev token",               identity:"stripe-key",         agent:"Finance Bot",     policy:{primary:"Block Cross-Environment Token Reuse"},discovered:"2d ago",  status:"Fixed" },
-    { severity:"High",     violation:"Production credential active in test environment",            identity:"github-actions-key", agent:"CI Bot",          policy:{primary:"Block Cross-Environment Token Reuse"},discovered:"12h ago", status:"Fixed" },
-    { severity:"Medium",   violation:"Service account key expired 90+ days ago",                   identity:"github-actions-key", agent:"CI Bot",          policy:{primary:"Enforce Token Expiry < 90d"},         discovered:"1d ago",  status:"Open"  },
-    { severity:"High",     violation:"Write credential exposed to read-only agent",                 identity:"zendesk-api-key",    agent:"Support Bot",     policy:{primary:"Read Token Scope Enforcement"},       discovered:"8h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"Service account accessing non-authorized endpoint",           identity:"gcp-service-key",    agent:"Infra Agent",     policy:{primary:"Restrict Infra Provisioning"},        discovered:"3h ago",  status:"Fixed" },
-    { severity:"Medium",   violation:"MCP token missing expiry configuration",                      identity:"gcp-service-key",    agent:"Infra Agent",     policy:{primary:"Enforce Token Expiry < 90d"},         discovered:"4h ago",  status:"Open"  },
-    { severity:"High",     violation:"API token with administrative scope for read ops",            identity:"notion-token",       agent:"Docs Assistant",  policy:{primary:"Enforce Least Privilege"},            discovered:"2h ago",  status:"Fixed" },
-    { severity:"Medium",   violation:"OAuth scope exceeds minimum required permissions",            identity:"salesforce-token",   agent:"CRM Agent",       policy:{primary:"Enforce Least Privilege"},            discovered:"4h ago",  status:"Fixed" },
-    { severity:"High",     violation:"API token with administrative scope for read ops",            identity:"snowflake-key",      agent:"Data Agent",      policy:{primary:"Enforce Least Privilege"},            discovered:"2h ago",  status:"Fixed" },
-    { severity:"High",     violation:"Write credential exposed to read-only agent",                 identity:"snowflake-key",      agent:"Data Agent",      policy:{primary:"Read Token Scope Enforcement"},       discovered:"3h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"Token shared across multiple agent instances",                identity:"snowflake-key",      agent:"Data Agent",      policy:{primary:"Enforce Least Privilege"},            discovered:"4h ago",  status:"Fixed" },
-    { severity:"High",     violation:"Write credential exposed to read-only agent",                 identity:"hubspot-oauth",      agent:"Marketing Bot",   policy:{primary:"Read Token Scope Enforcement"},       discovered:"2h ago",  status:"Open"  },
-    { severity:"High",     violation:"OAuth scope exceeds minimum required permissions",            identity:"zendesk-api-key",    agent:"Support Bot",     policy:{primary:"Enforce Least Privilege"},            discovered:"9h ago",  status:"Fixed" },
+    { severity:"Critical", violation:"Admin credential exposed to agent runtime",                    identity:"aws-cursor-key",     agent:"Cursor",     policy:{primary:"No Admin Credentials for Agent Identities"},           discovered:"2h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Credential exceeds intended permission scope",                 identity:"aws-cursor-key",     agent:"Cursor",     policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"1h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Unusual LLM access spike detected",                           identity:"aws-cursor-key",     agent:"Cursor",     policy:{primary:"Detect Unusual Usage Patterns"},           discovered:"Now",     status:"Open"  },
+    { severity:"Critical", violation:"Token used outside trusted network boundary",                 identity:"hr-slack-token",     agent:"Claude CLI",    policy:{primary:"Restrict Access to Sensitive Resources", extra:2, extras:["Rotate API Keys Every 30 Days","Detect Unusual Usage Patterns"]},  discovered:"6h ago",  status:"Open"  },
+    { severity:"High",     violation:"Messaging token triggering bulk automated sends",             identity:"hr-slack-token",     agent:"Claude CLI",    policy:{primary:"Limit Automation Without Approval"},            discovered:"3h ago",  status:"Fixed" },
+    { severity:"High",     violation:"Token scope broader than required for task",                  identity:"hr-slack-token",     agent:"Claude CLI",    policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"4h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"Bulk API calls detected from single token",                   identity:"hr-slack-token",     agent:"Claude CLI",    policy:{primary:"Detect Unusual Usage Patterns"},                discovered:"5h ago",  status:"Open"  },
+    { severity:"High",     violation:"Dormant credential retains write access",                     identity:"aws-env-sa",         agent:"Windsurf",   policy:{primary:"Disable Dormant Credentials (30+ days)", extra:2, extras:["Disable Dormant Credentials (30+ days)","Prevent Cross-Service Credential Usage"]}, discovered:"1h ago", status:"Fixed" },
+    { severity:"High",     violation:"Provisioning access without approval controls",               identity:"aws-env-sa",         agent:"Windsurf",   policy:{primary:"Restrict Access to Sensitive Resources", extra:2, extras:["No Admin Credentials for Agent Identities","Enforce Least Privilege on Credentials"]},      discovered:"2h ago", status:"Open"  },
+    { severity:"Medium",   violation:"Service account key expired 90+ days ago",                   identity:"aws-env-sa",         agent:"Windsurf",   policy:{primary:"Disable Dormant Credentials (30+ days)"},         discovered:"3h ago",  status:"Open"  },
+    { severity:"High",     violation:"Repository token has admin-level permissions",                identity:"github-oauth-456",   agent:"VS Code",          policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"45m ago", status:"Open"  },
+    { severity:"High",     violation:"Token accessing repositories beyond expiry date",             identity:"github-oauth-456",   agent:"VS Code",          policy:{primary:"Restrict Access to Sensitive Resources"},                discovered:"45m ago", status:"Fixed" },
+    { severity:"Medium",   violation:"OAuth scope exceeds minimum required permissions",            identity:"github-oauth-456",   agent:"VS Code",          policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"1h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"Access to restricted ticketing projects detected",            identity:"jira-token",         agent:"Claude Desktop",    policy:{primary:"Restrict Access to Sensitive Resources", extra:2, extras:["Disable Dormant Credentials (30+ days)","Enforce Least Privilege on Credentials"]},   discovered:"1h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"Idle credential remains active without usage",                identity:"jira-token",         agent:"Claude Desktop",    policy:{primary:"Disable Dormant Credentials (30+ days)"},               discovered:"30m ago", status:"Open"  },
+    { severity:"Critical", violation:"Service account with unrestricted API access",                identity:"internal-api-token", agent:"Claude CLI",       policy:{primary:"Restrict Access to Sensitive Resources"},        discovered:"2d ago",  status:"Open"  },
+    { severity:"Medium",   violation:"MCP token missing expiry configuration",                      identity:"internal-api-token", agent:"Claude CLI",       policy:{primary:"Disable Dormant Credentials (30+ days)"},         discovered:"3d ago",  status:"Open"  },
+    { severity:"Critical", violation:"Outbound token used without destination binding",             identity:"airbnb-api-key",      agent:"Antigravity",     policy:{primary:"Restrict Access to Sensitive Resources"},           discovered:"5h ago",  status:"Fixed" },
+    { severity:"High",     violation:"Write permission granted without MFA binding",                identity:"airbnb-api-key",      agent:"Antigravity",     policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"6h ago",  status:"Open"  },
+    { severity:"High",     violation:"Bulk API calls detected from single token",                   identity:"airbnb-api-key",      agent:"Antigravity",     policy:{primary:"Detect Unusual Usage Patterns"},                discovered:"7h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token scope broader than required for task",                  identity:"airbnb-api-key",      agent:"Antigravity",     policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"8h ago",  status:"Open"  },
+    { severity:"High",     violation:"Identity inactive but retains write access",                  identity:"airbnb-api-key",      agent:"Antigravity",     policy:{primary:"Disable Dormant Credentials (30+ days)"},        discovered:"9h ago",  status:"Open"  },
+    { severity:"High",     violation:"Agent sending external messages via shared token",            identity:"vscode-oauth",       agent:"VS Code",       policy:{primary:"Limit Automation Without Approval"},            discovered:"6h ago",  status:"Open"  },
+    { severity:"High",     violation:"OAuth scope exceeds minimum required permissions",            identity:"vscode-oauth",       agent:"VS Code",       policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"7h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"MCP token missing expiry configuration",                      identity:"vscode-oauth",       agent:"VS Code",       policy:{primary:"Disable Dormant Credentials (30+ days)"},         discovered:"8h ago",  status:"Fixed" },
+    { severity:"Critical", violation:"Admin credential exposed to agent runtime",                   identity:"docker-registry-key",         agent:"Cursor",     policy:{primary:"No Admin Credentials for Agent Identities"},           discovered:"5h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Excessive permissions granted at agent setup",                identity:"docker-registry-key",         agent:"Cursor",     policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"6h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Credential reused across staging and production",             identity:"docker-registry-key",         agent:"Cursor",     policy:{primary:"Prevent Cross-Service Credential Usage"},discovered:"7h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"Token rotation overdue by 14 days",                          identity:"docker-registry-key",         agent:"Cursor",     policy:{primary:"Rotate API Keys Every 30 Days"},      discovered:"1d ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"Agent accessing prod resources from dev token",               identity:"docker-registry-key",         agent:"Cursor",     policy:{primary:"Prevent Cross-Service Credential Usage"},discovered:"2d ago",  status:"Fixed" },
+    { severity:"High",     violation:"Production credential active in test environment",            identity:"github-actions-key", agent:"VS Code",          policy:{primary:"Prevent Cross-Service Credential Usage"},discovered:"12h ago", status:"Fixed" },
+    { severity:"Medium",   violation:"Service account key expired 90+ days ago",                   identity:"github-actions-key", agent:"VS Code",          policy:{primary:"Disable Dormant Credentials (30+ days)"},         discovered:"1d ago",  status:"Open"  },
+    { severity:"High",     violation:"Write credential exposed to read-only agent",                 identity:"playwright-token",    agent:"Claude Desktop",     policy:{primary:"Enforce Scoped Access for OAuth Tokens"},       discovered:"8h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"Service account accessing non-authorized endpoint",           identity:"filesystem-token",    agent:"Windsurf",     policy:{primary:"Restrict Access to Sensitive Resources"},        discovered:"3h ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"MCP token missing expiry configuration",                      identity:"filesystem-token",    agent:"Windsurf",     policy:{primary:"Disable Dormant Credentials (30+ days)"},         discovered:"4h ago",  status:"Open"  },
+    { severity:"High",     violation:"API token with administrative scope for read ops",            identity:"notion-token",       agent:"Claude CLI",  policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"2h ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"OAuth scope exceeds minimum required permissions",            identity:"huggingface-token",   agent:"Claude Desktop",       policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"4h ago",  status:"Fixed" },
+    { severity:"High",     violation:"API token with administrative scope for read ops",            identity:"github-copilot-key",      agent:"Cursor",      policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"2h ago",  status:"Fixed" },
+    { severity:"High",     violation:"Write credential exposed to read-only agent",                 identity:"github-copilot-key",      agent:"Cursor",      policy:{primary:"Enforce Scoped Access for OAuth Tokens"},       discovered:"3h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"Token shared across multiple agent instances",                identity:"github-copilot-key",      agent:"Cursor",      policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"4h ago",  status:"Fixed" },
+    { severity:"High",     violation:"Write credential exposed to read-only agent",                 identity:"anthropic-api-key",      agent:"Claude CLI",   policy:{primary:"Enforce Scoped Access for OAuth Tokens"},       discovered:"2h ago",  status:"Open"  },
+    { severity:"High",     violation:"OAuth scope exceeds minimum required permissions",            identity:"playwright-token",    agent:"Claude Desktop",     policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"9h ago",  status:"Fixed" },
 ];
 
 const AGENTS_POOL = [
-    "Cursor Prod","HR Assistant","Code Reviewer","CI Bot","Finance Bot",
-    "Deploy Bot","Analytics Agent","Support Agent","Data Sync","Notify Bot",
-    "Log Monitor","Docs Assistant","Infra Agent","Marketing Bot","Test Runner",
-    "Audit Agent","Compliance Bot","Security Scanner","Backup Agent","Report Bot",
-    "API Gateway","Payment Proc","Auth Service","Cache Manager","Queue Worker",
-    "ML Pipeline","Data Crawler","Ops Assistant","Identity Broker","Policy Engine",
+    "Cursor","Claude CLI","VS Code","Claude Desktop","Windsurf",
+    "Antigravity","Cursor","VS Code","Claude CLI","Claude Desktop",
+    "Windsurf","Cursor","Claude CLI","VS Code","Antigravity",
+    "Claude Desktop","Windsurf","Cursor","VS Code","Claude CLI",
+    "Antigravity","Cursor","Claude Desktop","VS Code","Windsurf",
+    "Claude CLI","Cursor","Antigravity","VS Code","Claude Desktop",
 ];
 const IDENTITY_POOL = [
     "aws-prod-key","gcp-svc-account","azure-sp-token","github-actions-sa","okta-api-key",
-    "twilio-auth-token","hubspot-oauth","salesforce-jwt","mongo-atlas-key","redis-cloud-sa",
+    "twilio-auth-token","anthropic-api-key","salesforce-jwt","mongo-atlas-key","redis-cloud-sa",
     "elastic-api-key","vault-approle","argo-cd-token","terraform-sa","jenkins-cred",
     "splunk-hec-token","pagerduty-key","opsgenie-token","linear-api-key","notion-oauth",
     "zoom-jwt","box-oauth","dropbox-token","figma-pat","cloudflare-api-key",
@@ -165,12 +195,12 @@ const VIOLATION_DESCS = [
     "Token used by multiple unrelated agents simultaneously",
 ];
 const POLICIES_POOL = [
-    "No Admin Keys for Agents","Enforce Least Privilege","Detect LLM Usage Spikes",
-    "Restrict Token by Source","Disable Dormant Credentials","Restrict Infra Provisioning",
-    "Rotate API Keys Every 30 Days","Block Cross-Environment Token Reuse",
-    "Read Token Scope Enforcement","Limit Messaging Actions","Expire Unused Tokens",
-    "Restrict Project Access","Restrict Repo Scope","Monitor Slack Abuse",
-    "Detect Off-Hours API Usage","Enforce Token Expiry < 90d",
+    "No Admin Credentials for Agent Identities","Enforce Least Privilege on Credentials","Detect Unusual Usage Patterns",
+    "Restrict Access to Sensitive Resources","Disable Dormant Credentials (30+ days)","Restrict Access to Sensitive Resources",
+    "Rotate API Keys Every 30 Days","Prevent Cross-Service Credential Usage",
+    "Enforce Scoped Access for OAuth Tokens","Limit Automation Without Approval","Disable Dormant Credentials (30+ days)",
+    "Restrict Access to Sensitive Resources","Restrict Access to Sensitive Resources","Detect Unusual Usage Patterns",
+    "Detect Unusual Usage Patterns","Disable Dormant Credentials (30+ days)",
 ];
 const TIME_AGO = [
     "10m ago","30m ago","1h ago","2h ago","4h ago","6h ago","12h ago",
@@ -229,7 +259,7 @@ const VIOLATION_DETAIL_MAP = {
     "Admin credential exposed to agent runtime": {
         description: "An admin-level credential is directly accessible within the agent's runtime environment. This grants the agent unrestricted access to perform privileged operations across connected services without any additional authorization controls, significantly increasing the risk of accidental or malicious misuse.",
         affectedResources: "S3, EC2, Bedrock, IAM",
-        whyTriggered: "Policy 'No Admin Keys for Agents' requires all agent credentials to operate with scoped, least-privilege permissions. Admin credentials exposed in runtime environments create a direct path for privilege escalation and cannot be audited at the operation level.",
+        whyTriggered: "Policy 'No Admin Credentials for Agent Identities' requires all agent credentials to operate with scoped, least-privilege permissions. Admin credentials exposed in runtime environments create a direct path for privilege escalation and cannot be audited at the operation level.",
         blastRadius: [
             "Full administrative control over connected cloud resources",
             "Ability to create or modify IAM roles — privilege escalation risk",
@@ -255,7 +285,7 @@ const VIOLATION_DETAIL_MAP = {
     "Credential exceeds intended permission scope": {
         description: "The credential assigned to this agent has permissions that go beyond what is required for its designated tasks. Overly broad permissions increase the attack surface and risk of unintended data access or service modifications.",
         affectedResources: "IAM Policies, Resource Endpoints",
-        whyTriggered: "The 'Enforce Least Privilege' policy requires each credential to have only the minimum permissions necessary. This identity's permission set includes access to resources and operations outside its documented use case.",
+        whyTriggered: "The 'Enforce Least Privilege on Credentials' policy requires each credential to have only the minimum permissions necessary. This identity's permission set includes access to resources and operations outside its documented use case.",
         blastRadius: [
             "Access to resources outside the agent's functional scope",
             "Risk of accidental data modification or deletion",
@@ -279,7 +309,7 @@ const VIOLATION_DETAIL_MAP = {
     "Unusual LLM access spike detected": {
         description: "A significant spike in LLM API calls was detected from this identity, deviating from its established baseline usage patterns. This may indicate prompt injection, runaway agent loops, or unauthorized use of the credential by an external actor.",
         affectedResources: "Bedrock, LLM Gateway, Model APIs",
-        whyTriggered: "The 'Detect LLM Usage Spikes' policy monitors for access volume anomalies. This identity's call rate exceeded the configured threshold by more than 3x within a 1-hour window.",
+        whyTriggered: "The 'Detect Unusual Usage Patterns' policy monitors for access volume anomalies. This identity's call rate exceeded the configured threshold by more than 3x within a 1-hour window.",
         blastRadius: [
             "Significant AI compute cost overrun",
             "Potential data exfiltration via LLM prompts",
@@ -303,7 +333,7 @@ const VIOLATION_DETAIL_MAP = {
     "Token used outside trusted network boundary": {
         description: "This token was used from an IP address or network range outside the defined trusted boundaries. Access from untrusted networks significantly increases the risk of credential interception or misuse by an external actor.",
         affectedResources: "Slack API, Network Gateway",
-        whyTriggered: "The 'Restrict Token by Source' policy enforces that tokens are only used from within approved IP ranges or VPN-connected networks. An access event was logged from an address outside these boundaries.",
+        whyTriggered: "The 'Restrict Access to Sensitive Resources' policy enforces that tokens are only used from within approved IP ranges or VPN-connected networks. An access event was logged from an address outside these boundaries.",
         blastRadius: [
             "Potential token use by an unauthorized external party",
             "Risk of data exfiltration through the token's API access",
@@ -327,7 +357,7 @@ const VIOLATION_DETAIL_MAP = {
     "Messaging token triggering bulk automated sends": {
         description: "This messaging token has been used to send an unusually high volume of messages in a short time window. Bulk automated sends via agent tokens can be used for spam, data exfiltration, or social engineering at scale.",
         affectedResources: "Slack API, Messaging Channels",
-        whyTriggered: "The 'Limit Messaging Actions' policy detects tokens that exceed normal message-send thresholds. This token's send rate exceeded the allowed limit, suggesting automated bulk messaging behavior.",
+        whyTriggered: "The 'Limit Automation Without Approval' policy detects tokens that exceed normal message-send thresholds. This token's send rate exceeded the allowed limit, suggesting automated bulk messaging behavior.",
         blastRadius: [
             "Mass distribution of potentially harmful or misleading content",
             "Risk of workspace members being targeted through legitimate channels",
@@ -351,7 +381,7 @@ const VIOLATION_DETAIL_MAP = {
     "Token scope broader than required for task": {
         description: "This token has been granted access scopes that exceed what is necessary for the agent's defined function. Unused but active scopes expand the token's potential for misuse without providing any functional benefit.",
         affectedResources: "API Scopes, Resource Endpoints",
-        whyTriggered: "The 'Enforce Least Privilege' policy requires each token to include only the scopes directly used by its associated agent. Analysis shows this token holds scopes for operations the agent has never performed.",
+        whyTriggered: "The 'Enforce Least Privilege on Credentials' policy requires each token to include only the scopes directly used by its associated agent. Analysis shows this token holds scopes for operations the agent has never performed.",
         blastRadius: [
             "Exposure of resources and operations outside the agent's role",
             "Higher impact if the token is exfiltrated",
@@ -394,7 +424,7 @@ const VIOLATION_DETAIL_MAP = {
     "Dormant credential retains write access": {
         description: "This credential has not been used for an extended period but still holds write-level permissions. Dormant credentials with active write access are a common vector for lateral movement and unauthorized changes.",
         affectedResources: "Cloud Storage, Compute Resources",
-        whyTriggered: "The 'Disable Dormant Credentials' policy flags credentials inactive for 30+ days that still retain write or higher permissions. This credential has exceeded the inactivity threshold.",
+        whyTriggered: "The 'Disable Dormant Credentials (30+ days)' policy flags credentials inactive for 30+ days that still retain write or higher permissions. This credential has exceeded the inactivity threshold.",
         blastRadius: [
             "Undetected unauthorized writes to storage or configuration",
             "Potential use as a persistent backdoor after initial compromise",
@@ -415,7 +445,7 @@ const VIOLATION_DETAIL_MAP = {
     "Provisioning access without approval controls": {
         description: "This identity has been used to provision infrastructure resources without going through the required approval workflow. Uncontrolled provisioning bypasses change management, cost controls, and security review processes.",
         affectedResources: "Infrastructure, Terraform State, Cloud Accounts",
-        whyTriggered: "The 'Restrict Infra Provisioning' policy requires all infrastructure changes via agent identities to be pre-approved through the change management system. This identity triggered provisioning actions with no corresponding approval record.",
+        whyTriggered: "The 'Restrict Access to Sensitive Resources' policy requires all infrastructure changes via agent identities to be pre-approved through the change management system. This identity triggered provisioning actions with no corresponding approval record.",
         blastRadius: [
             "Unauthorized infrastructure changes that are difficult to roll back",
             "Potential security misconfiguration of new resources",
@@ -439,7 +469,7 @@ const VIOLATION_DETAIL_MAP = {
     "Service account key expired 90+ days ago": {
         description: "The service account key associated with this identity has exceeded its maximum allowed age of 90 days. Expired keys that remain active represent a long-lived credential risk and indicate a gap in the key rotation process.",
         affectedResources: "Service Account, Cloud APIs",
-        whyTriggered: "The 'Enforce Token Expiry < 90d' policy requires all service account keys to be rotated within 90 days of issuance. This key has not been rotated within the required window.",
+        whyTriggered: "The 'Disable Dormant Credentials (30+ days)' policy requires all service account keys to be rotated within 90 days of issuance. This key has not been rotated within the required window.",
         blastRadius: [
             "Long-lived credentials are higher-value targets for attackers",
             "Extended window of unauthorized access if key was exfiltrated",
@@ -462,7 +492,7 @@ const VIOLATION_DETAIL_MAP = {
     "Repository token has admin-level permissions": {
         description: "The GitHub token assigned to this agent has admin-level permissions on the repository, including the ability to modify settings, manage webhooks, and delete branches. Code review and automation operations require only scoped read access.",
         affectedResources: "GitHub Repositories, Branch Protection Rules",
-        whyTriggered: "The 'Enforce Least Privilege' policy requires repository tokens to be scoped to the minimum permissions needed. Admin tokens grant full repository control, which is unnecessary for automated workflows.",
+        whyTriggered: "The 'Enforce Least Privilege on Credentials' policy requires repository tokens to be scoped to the minimum permissions needed. Admin tokens grant full repository control, which is unnecessary for automated workflows.",
         blastRadius: [
             "Ability to modify or disable branch protection rules",
             "Risk of unintended or malicious force-pushes to main branches",
@@ -484,7 +514,7 @@ const VIOLATION_DETAIL_MAP = {
     "Token accessing repositories beyond expiry date": {
         description: "This token is continuing to access repositories despite its configured expiry date having passed. Expired tokens that remain functional indicate a failure in the token lifecycle management process.",
         affectedResources: "GitHub Repositories, Code Assets",
-        whyTriggered: "The 'Restrict Repo Scope' policy enforces token expiry dates. This token's expiry date has passed but it remains active and in use, suggesting that expiry was not enforced at the service level.",
+        whyTriggered: "The 'Restrict Access to Sensitive Resources' policy enforces token expiry dates. This token's expiry date has passed but it remains active and in use, suggesting that expiry was not enforced at the service level.",
         blastRadius: [
             "Unauthorized repository access beyond the intended time window",
             "Breach of time-bound access agreements or contractor offboarding",
@@ -506,7 +536,7 @@ const VIOLATION_DETAIL_MAP = {
     "OAuth scope exceeds minimum required permissions": {
         description: "This OAuth token has been granted scopes beyond what the agent's current tasks require. Unused but active OAuth scopes expose unnecessary API capabilities and increase the potential blast radius of a token compromise.",
         affectedResources: "OAuth-protected APIs, User Data",
-        whyTriggered: "The 'Enforce Least Privilege' policy requires OAuth tokens to include only the scopes actively used by the agent. Periodic scope audits identified permissions that have never been exercised.",
+        whyTriggered: "The 'Enforce Least Privilege on Credentials' policy requires OAuth tokens to include only the scopes actively used by the agent. Periodic scope audits identified permissions that have never been exercised.",
         blastRadius: [
             "Access to API endpoints and user data outside the agent's purpose",
             "Higher-value target for attackers if token is exfiltrated",
@@ -528,7 +558,7 @@ const VIOLATION_DETAIL_MAP = {
     "Access to restricted ticketing projects detected": {
         description: "This identity accessed Jira projects marked as restricted, which require explicit authorization. Restricted projects may contain sensitive HR, legal, or security information not intended for automated agent access.",
         affectedResources: "Jira Projects, Ticket Data",
-        whyTriggered: "The 'Restrict Project Access' policy monitors for agent access to projects flagged as sensitive or restricted. This identity accessed one or more restricted projects without an approved exception on record.",
+        whyTriggered: "The 'Restrict Access to Sensitive Resources' policy monitors for agent access to projects flagged as sensitive or restricted. This identity accessed one or more restricted projects without an approved exception on record.",
         blastRadius: [
             "Exposure of sensitive ticket data to an automated agent",
             "Risk of confidential information leaking via LLM context windows",
@@ -549,7 +579,7 @@ const VIOLATION_DETAIL_MAP = {
     "Idle credential remains active without usage": {
         description: "This credential has been active but unused for an extended period. Idle credentials represent unnecessary attack surface and may indicate an orphaned or forgotten identity that is no longer actively managed.",
         affectedResources: "API Endpoints, Data Resources",
-        whyTriggered: "The 'Expire Unused Tokens' policy flags credentials with no recorded usage activity over the defined idle threshold. This identity has exceeded the allowed inactivity period.",
+        whyTriggered: "The 'Disable Dormant Credentials (30+ days)' policy flags credentials with no recorded usage activity over the defined idle threshold. This identity has exceeded the allowed inactivity period.",
         blastRadius: [
             "Unmonitored access path that could be exploited without detection",
             "Orphaned credentials are often excluded from regular security reviews",
@@ -570,7 +600,7 @@ const VIOLATION_DETAIL_MAP = {
     "Service account with unrestricted API access": {
         description: "This service account has been granted unrestricted access across the full API surface, allowing it to call any endpoint without scope or resource constraints. Unrestricted API access is a high-risk configuration for automated service accounts.",
         affectedResources: "All API Endpoints, Internal Services",
-        whyTriggered: "The 'Restrict Infra Provisioning' policy and broader access governance require service accounts to be scoped to specific APIs. This account's permissions were found to have no API scope restrictions configured.",
+        whyTriggered: "The 'Restrict Access to Sensitive Resources' policy and broader access governance require service accounts to be scoped to specific APIs. This account's permissions were found to have no API scope restrictions configured.",
         blastRadius: [
             "Access to all internal service endpoints, including admin APIs",
             "Ability to read, write, or delete data across all services",
@@ -593,7 +623,7 @@ const VIOLATION_DETAIL_MAP = {
     "MCP token missing expiry configuration": {
         description: "This MCP (Model Context Protocol) token has been issued without an expiry date or TTL configuration. Tokens without expiry never automatically invalidate, creating a permanent credential that remains valid indefinitely unless manually revoked.",
         affectedResources: "MCP Server, Agent Context Sessions",
-        whyTriggered: "The 'Enforce Token Expiry < 90d' policy requires all tokens, including MCP tokens, to have an explicit expiry date configured. This token was issued without a TTL and will not expire on its own.",
+        whyTriggered: "The 'Disable Dormant Credentials (30+ days)' policy requires all tokens, including MCP tokens, to have an explicit expiry date configured. This token was issued without a TTL and will not expire on its own.",
         blastRadius: [
             "Permanent credential risk — token never expires automatically",
             "Extended window of unauthorized access if the token is leaked",
@@ -614,7 +644,7 @@ const VIOLATION_DETAIL_MAP = {
     "Outbound token used without destination binding": {
         description: "This token is making outbound API calls to destinations not in its approved allowlist. Tokens without destination binding can be used to exfiltrate data or interact with unauthorized external services.",
         affectedResources: "External APIs, Outbound Connections",
-        whyTriggered: "The 'Restrict Token by Source' policy requires outbound tokens to have explicit destination binding. This token was detected making calls to endpoints outside its configured allowlist.",
+        whyTriggered: "The 'Restrict Access to Sensitive Resources' policy requires outbound tokens to have explicit destination binding. This token was detected making calls to endpoints outside its configured allowlist.",
         blastRadius: [
             "Data exfiltration risk via unauthorized external API calls",
             "Risk of the agent being used as a proxy to attack external services",
@@ -656,7 +686,7 @@ const VIOLATION_DETAIL_MAP = {
     "Identity inactive but retains write access": {
         description: "This identity has not performed any authenticated actions for a significant period, yet it retains write-level access permissions. Inactive identities with active write access represent a dormant but dangerous attack surface.",
         affectedResources: "Data Stores, Configuration Services",
-        whyTriggered: "The 'Disable Dormant Credentials' policy flags identities that have been inactive beyond the threshold period while retaining write or higher access levels. This identity has exceeded the inactivity window.",
+        whyTriggered: "The 'Disable Dormant Credentials (30+ days)' policy flags identities that have been inactive beyond the threshold period while retaining write or higher access levels. This identity has exceeded the inactivity window.",
         blastRadius: [
             "Dormant write access that could be activated without detection",
             "Risk of use by former team members or offboarded agents",
@@ -677,7 +707,7 @@ const VIOLATION_DETAIL_MAP = {
     "Agent sending external messages via shared token": {
         description: "An agent is using a shared token to send messages to external parties. Shared tokens make it impossible to attribute individual message sends to a specific agent or user, increasing the risk of impersonation or data leakage.",
         affectedResources: "Messaging APIs, External Contacts",
-        whyTriggered: "The 'Limit Messaging Actions' policy detects when a single token is used by multiple agents or is sending messages to external recipients. This token was found doing both simultaneously.",
+        whyTriggered: "The 'Limit Automation Without Approval' policy detects when a single token is used by multiple agents or is sending messages to external recipients. This token was found doing both simultaneously.",
         blastRadius: [
             "Risk of external parties receiving messages impersonating the organization",
             "Inability to attribute or audit specific outbound message events",
@@ -698,7 +728,7 @@ const VIOLATION_DETAIL_MAP = {
     "Excessive permissions granted at agent setup": {
         description: "During the initial setup of this agent, it was provisioned with a broad permission set that exceeds its documented operational requirements. Over-provisioned setup permissions are a common security debt that rarely gets cleaned up.",
         affectedResources: "IAM Roles, Service APIs",
-        whyTriggered: "The 'Enforce Least Privilege' policy audits all agent identities against their documented scope. This agent's permissions were found to exceed its registered operational requirements by a significant margin.",
+        whyTriggered: "The 'Enforce Least Privilege on Credentials' policy audits all agent identities against their documented scope. This agent's permissions were found to exceed its registered operational requirements by a significant margin.",
         blastRadius: [
             "Wide access surface across all connected services",
             "Elevated impact if the agent is compromised or misbehaves",
@@ -719,7 +749,7 @@ const VIOLATION_DETAIL_MAP = {
     "Credential reused across staging and production": {
         description: "The same credential is being used in both staging and production environments. Cross-environment credential reuse breaks environment isolation and creates a path for staging-environment activity to impact production systems.",
         affectedResources: "Production Services, Staging Environment",
-        whyTriggered: "The 'Block Cross-Environment Token Reuse' policy requires distinct credentials for each deployment environment. This credential was found active in both staging and production simultaneously.",
+        whyTriggered: "The 'Prevent Cross-Service Credential Usage' policy requires distinct credentials for each deployment environment. This credential was found active in both staging and production simultaneously.",
         blastRadius: [
             "Staging compromise could directly enable production access",
             "Production data may be inadvertently accessed from staging workflows",
@@ -763,7 +793,7 @@ const VIOLATION_DETAIL_MAP = {
     "Agent accessing prod resources from dev token": {
         description: "A development environment token is being used to access production resources. Dev tokens typically have fewer security controls and logging requirements, making their use in production a significant security and audit risk.",
         affectedResources: "Production Databases, Production APIs",
-        whyTriggered: "The 'Block Cross-Environment Token Reuse' policy detects when tokens issued for development environments are used to access resources tagged as production. This token was issued as a dev token but has active production access.",
+        whyTriggered: "The 'Prevent Cross-Service Credential Usage' policy detects when tokens issued for development environments are used to access resources tagged as production. This token was issued as a dev token but has active production access.",
         blastRadius: [
             "Production data accessible through a less-secured dev credential",
             "Actions in production attributed to dev environment — audit confusion",
@@ -785,7 +815,7 @@ const VIOLATION_DETAIL_MAP = {
     "Production credential active in test environment": {
         description: "A production credential has been deployed in the test environment. Production credentials in test environments create a risk of test activity affecting production systems and expose production secrets in a less-controlled environment.",
         affectedResources: "Production APIs, Production Data",
-        whyTriggered: "The 'Block Cross-Environment Token Reuse' policy requires strict separation between production and test credentials. This credential is tagged as production but was detected in active use in a test environment.",
+        whyTriggered: "The 'Prevent Cross-Service Credential Usage' policy requires strict separation between production and test credentials. This credential is tagged as production but was detected in active use in a test environment.",
         blastRadius: [
             "Test workflows could inadvertently modify production data",
             "Production credentials exposed in test environment logs or configs",
@@ -806,7 +836,7 @@ const VIOLATION_DETAIL_MAP = {
     "Write credential exposed to read-only agent": {
         description: "A credential with write permissions has been assigned to an agent designated as read-only. This is a clear over-provisioning violation — the agent has capabilities far beyond its intended scope.",
         affectedResources: "Data Stores, APIs",
-        whyTriggered: "The 'Read Token Scope Enforcement' policy validates that read-only agents are assigned credentials scoped to read operations only. This agent's assigned credential was found to include write and delete permissions.",
+        whyTriggered: "The 'Enforce Scoped Access for OAuth Tokens' policy validates that read-only agents are assigned credentials scoped to read operations only. This agent's assigned credential was found to include write and delete permissions.",
         blastRadius: [
             "Agent can perform unintended writes or deletions",
             "Data integrity risk if the agent behaves unexpectedly",
@@ -827,7 +857,7 @@ const VIOLATION_DETAIL_MAP = {
     "Service account accessing non-authorized endpoint": {
         description: "This service account made an API call to an endpoint it is not authorized to access. Either the account's permission set is too broad, or the agent is attempting to access resources outside its defined scope.",
         affectedResources: "Unauthorized API Endpoints, Internal Services",
-        whyTriggered: "The 'Restrict Infra Provisioning' policy monitors service account access against an approved endpoint list. An access event was logged for an endpoint not on this account's approved allowlist.",
+        whyTriggered: "The 'Restrict Access to Sensitive Resources' policy monitors service account access against an approved endpoint list. An access event was logged for an endpoint not on this account's approved allowlist.",
         blastRadius: [
             "Potential access to sensitive internal endpoints",
             "Risk of data exfiltration from non-authorized services",
@@ -848,7 +878,7 @@ const VIOLATION_DETAIL_MAP = {
     "API token with administrative scope for read ops": {
         description: "An API token with admin-level scope is being used for operations that only require read access. The admin scope is unnecessary for the task and represents significant over-provisioning.",
         affectedResources: "Admin APIs, Configuration Endpoints",
-        whyTriggered: "The 'Enforce Least Privilege' policy detected that this token's admin scope is not required for any of its recent operations. All recent API calls were read operations satisfiable by a read-only token.",
+        whyTriggered: "The 'Enforce Least Privilege on Credentials' policy detected that this token's admin scope is not required for any of its recent operations. All recent API calls were read operations satisfiable by a read-only token.",
         blastRadius: [
             "Admin token can perform writes, deletes, and configuration changes",
             "Higher-value target for attackers than a read-only token",
