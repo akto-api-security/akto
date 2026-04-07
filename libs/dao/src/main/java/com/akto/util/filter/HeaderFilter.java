@@ -38,7 +38,21 @@ public class HeaderFilter {
         "apc-source-service-nam",
         "source_service_version",
         "source_service_name",
-        "x-agoda-ssot-name"
+        "x-agoda-ssot-name",
+        "true-client-ip",
+        "destination_service_version",
+        "destination_service_name",
+        "apc-source-service-ip",
+        "content-type",
+        "x-forwarded-for",
+        "ag-correlation-id",
+        "server",
+        "set-cookie",
+        "x-content-type-options",
+        "strict-transport-security",
+        "request-context",
+        "x-forwarded-gateways",
+        "x-ua-compatible"
     ));
 
     // Header prefixes to ignore - Akto and Envoy specific headers
@@ -46,7 +60,8 @@ public class HeaderFilter {
         "x-akto-k8s",
         "x-envoy",
         "zz-client",
-        "x-akamai"
+        "x-akamai",
+        "access-control-"
     };
 
     /**
