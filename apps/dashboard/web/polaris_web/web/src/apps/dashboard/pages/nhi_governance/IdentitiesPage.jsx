@@ -15,6 +15,7 @@ import func from "@/util/func";
 import values from "@/util/values";
 import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 import IdentityDetailsPanel from "./IdentityDetailsPanel";
+import { violationsTableData } from "./nhiViolationsData";
 
 // ── Identity icon via Google favicon API ───────────────────────────────────────
 const IDENTITY_DOMAIN_MAP = {
@@ -49,10 +50,9 @@ function IdentityIcon({ name }) {
 const AGENT_SPECIFIC_DOMAIN = {
     "cursor prod": "cursor.sh",
     "cursor":      "cursor.sh",
-    "entra bot":   "microsoft.com",
 };
 const AI_ICON_POOL = [
-    "claude.ai", "openai.com", "deepseek.com", "azure.microsoft.com",
+    "claude.ai", "openai.com", "deepseek.com", "x.ai",
     "gemini.google.com", "mistral.ai", "perplexity.ai", "cohere.com",
 ];
 function AgentIcon({ name }) {
@@ -179,11 +179,22 @@ const GENERATED = Array.from({ length: 109 }, (_, i) => {
     };
 });
 
+// ── Violation counts derived from violations data (single source of truth) ────
+const VIOL_INDEX = violationsTableData.reduce((acc, v) => {
+    if (!acc[v.identity]) acc[v.identity] = { violCrit: 0, violHigh: 0, violMed: 0 };
+    if (v.severity === "Critical")     acc[v.identity].violCrit++;
+    else if (v.severity === "High")    acc[v.identity].violHigh++;
+    else if (v.severity === "Medium")  acc[v.identity].violMed++;
+    return acc;
+}, {});
+
 const ALL_RAW = [...CRITICAL_CURATED, ...NON_CRITICAL_CURATED, ...GENERATED]
+    .map((r) => {
+        const v = VIOL_INDEX[r.identityName] || { violCrit: 0, violHigh: 0, violMed: 0 };
+        return { ...r, violCrit: v.violCrit, violHigh: v.violHigh, violMed: v.violMed };
+    })
     .sort((a, b) => {
-        // Primary: critical violations (most first)
         if (b.violCrit !== a.violCrit) return b.violCrit - a.violCrit;
-        // Secondary: total violations (most first)
         return (b.violCrit + b.violHigh + b.violMed) - (a.violCrit + a.violHigh + a.violMed);
     });
 
@@ -191,7 +202,6 @@ const tableData = ALL_RAW.map((r, i) => ({
     ...r,
     id:             i + 1,
     totalViolations: r.violCrit + r.violHigh + r.violMed,
-    // priorityScore ensures critical violations always rank above high/medium-only ones
     priorityScore:  r.violCrit * 1000 + (r.violCrit + r.violHigh + r.violMed),
     identityComp:  <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identityName} /><Text variant="bodyMd" fontWeight="medium">{r.identityName}</Text></HorizontalStack>,
     agentComp:     <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
