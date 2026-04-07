@@ -75,7 +75,10 @@ public class GuardrailPolicies {
     private List<SelectedServer> selectedAgentServersV2;
     private boolean applyOnResponse;
     private boolean applyOnRequest;
-    
+
+    /** Policy-wide rule behaviour: {@code "block"}, {@code "warn"}, or {@code "alert"}. */
+    private String behaviour;
+
     // Step 7: URL and Confidence Score
     private String url;
     private double confidenceScore;
@@ -192,7 +195,7 @@ public class GuardrailPolicies {
     @NoArgsConstructor
     public static class PiiType {
         private String type;
-        private String behavior; // "Block" or "Mask"
+        private String behavior; // "Block" or "Mask" or "Warn"
 
         public PiiType(String type, String behavior) {
             this.type = type;
@@ -205,7 +208,7 @@ public class GuardrailPolicies {
     @NoArgsConstructor
     public static class RegexPattern {
         private String pattern;
-        private String behavior; // "Block" or "Mask"
+        private String behavior; // "Block" or "Mask" or "Warn"
 
         public RegexPattern(String pattern, String behavior) {
             this.pattern = pattern;

@@ -180,6 +180,7 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		zap.String("sessionID", sessionID),
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
+		zap.String("behaviour", result.Behaviour),
 		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
 
 	if resultJSON, err := json.Marshal(result); err == nil {
@@ -318,6 +319,7 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		zap.String("sessionID", sessionID),
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
+		zap.String("behaviour", result.Behaviour),
 		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
 
 	if resultJSON, err := json.Marshal(result); err == nil {
