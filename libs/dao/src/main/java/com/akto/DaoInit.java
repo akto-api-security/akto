@@ -81,6 +81,9 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.dto.usage.UsageSync;
+import com.akto.dto.wiz_integration.WizEndpointAsset;
+import com.akto.dto.wiz_integration.WizFinding;
+import com.akto.dto.wiz_integration.WizIntegration;
 import com.akto.types.CappedList;
 import com.akto.types.CappedSet;
 import com.akto.util.DbMode;
@@ -337,6 +340,9 @@ public class DaoInit {
         ClassModel<Span.ToolDefinition> toolDefinitionClassModel = ClassModel.builder(Span.ToolDefinition.class).enableDiscriminator(true).build();
         ClassModel<UserAnalysisData.UserAnalysisDataKey> userAnalysisDataKeyClassModel = ClassModel.builder(UserAnalysisData.UserAnalysisDataKey.class).enableDiscriminator(true).build();
         ClassModel<AccountSettings.ProxyPatternInfo> proxyPatternInfoClassModel = ClassModel.builder(AccountSettings.ProxyPatternInfo.class).enableDiscriminator(true).build();
+        ClassModel<WizIntegration> wizIntegrationClassModel = ClassModel.builder(WizIntegration.class).enableDiscriminator(true).build();
+        ClassModel<WizEndpointAsset> wizEndpointAssetClassModel = ClassModel.builder(WizEndpointAsset.class).enableDiscriminator(true).build();
+        ClassModel<WizFinding> wizFindingClassModel = ClassModel.builder(WizFinding.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -379,7 +385,8 @@ public class DaoInit {
                 jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, testingIssueTicketsModel, tlsAuthClassModel,
                 ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
-                traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel)
+                traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
+                wizIntegrationClassModel, wizFindingClassModel, wizEndpointAssetClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -436,7 +443,8 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.CONTEXT_SOURCE.class),
                 new EnumCodec<>(ReputationSource.class),
                 new EnumCodec<>(ReputationScore.class),
-                new EnumCodec<>(JiraIntegration.JiraType.class)
+                new EnumCodec<>(JiraIntegration.JiraType.class),
+                new EnumCodec<>(WizFinding.Status.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,

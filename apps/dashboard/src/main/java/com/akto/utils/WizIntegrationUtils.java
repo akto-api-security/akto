@@ -31,6 +31,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.Remediation;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.wiz_integration.WizEndpointAsset;
 import com.akto.dto.wiz_integration.WizFinding;
 import com.akto.dto.wiz_integration.WizIntegration;
 import com.akto.log.LoggerMaker;
@@ -40,6 +41,7 @@ import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.Api;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -290,28 +292,17 @@ public class WizIntegrationUtils {
         return new ObjectMapper().readValue(json, TestingIssuesId.class);
     }
 
-    public static BasicDBObject buildAssetDetails(ApiInfoKey apiInfoKey) throws Exception {
+    public static BasicDBObject buildAssetDetails(WizEndpointAsset endpointAsset) {
         BasicDBObject endpoint = new BasicDBObject();
-        if (apiInfoKey != null) {
-            try {
-                int apiCollectionId = apiInfoKey.getApiCollectionId();
-                String url = apiInfoKey.getUrl();
-                URLMethods.Method method = apiInfoKey.getMethod();
 
-                URL richUrl = new URL(url);
-                String protocol = richUrl.getProtocol();
-                String host = richUrl.getHost();
-                String path = richUrl.getPath();
-                int port = (richUrl.getPort() == -1) ? richUrl.getDefaultPort() : richUrl.getPort(); 
-            
-                endpoint.put("assetId", WizIntegrationUtils.fetchWizAssetId(apiInfoKey));
-                endpoint.put("assetName", String.format("%s %s", method.toString(), path));
-                endpoint.put("host", host);
-                endpoint.put("port", port);
-                endpoint.put("protocol", protocol.toUpperCase());
-            } catch (Exception e) {
-                throw new Exception("Error building asset details: " + e.getMessage());
-            }
+        if (endpointAsset != null) {
+            String host = endpointAsset.getHost();
+
+            endpoint.put("assetId", host);
+            endpoint.put("assetName", host);
+            endpoint.put("host", host);
+            endpoint.put("port", endpointAsset.getPort());
+            endpoint.put("protocol", endpointAsset.getProtocol());
         }
         
         BasicDBObject assetDetails = new BasicDBObject("endpoint", endpoint);
@@ -326,7 +317,14 @@ public class WizIntegrationUtils {
                 
                 assetAttackSurfaceFinding.put("id", WizIntegrationUtils.fetchWizFindingId(testingIssuesId));
 
-                assetAttackSurfaceFinding.put("name", testInfo.getName());
+                ApiInfoKey apiInfoKey = testingIssuesId.getApiInfoKey();
+                URLMethods.Method method = apiInfoKey.getMethod(); 
+
+                String url = apiInfoKey.getUrl();
+                URL richUrl = new URL(url);
+                String path = richUrl.getPath();
+                
+                assetAttackSurfaceFinding.put("name", String.format("%s %s - %s", method.toString(), path, testInfo.getName()));
                 assetAttackSurfaceFinding.put("description", testInfo.getDescription());
 
                 String severity = testingRunIssues.getSeverity() != null ? testingRunIssues.getSeverity().toString() : "None";
@@ -434,7 +432,7 @@ public class WizIntegrationUtils {
         List<TestingIssuesId> testingIssuesIdList = new ArrayList<>(testingRunIssuesMap.keySet());
 
         Set<String> testSubCategorySet = new HashSet<>();
-        Map<ApiInfoKey, Set<TestingIssuesId>> apiTestingIssuesIdMap = new HashMap<>();
+        Map<WizEndpointAsset, Set<TestingIssuesId>> endpointAssetTestingIssuesIdMap = new HashMap<>();
 
         for (TestingIssuesId testingIssuesId: testingIssuesIdList) {
             try {
@@ -442,14 +440,22 @@ public class WizIntegrationUtils {
                 testSubCategorySet.add(testSubCategory);
 
                 ApiInfoKey apiInfoKey = testingIssuesId.getApiInfoKey();
-                Set<TestingIssuesId> apiTestingIssuesIdSet;
-                if (!apiTestingIssuesIdMap.containsKey(apiInfoKey)) {
-                    apiTestingIssuesIdSet = new HashSet<>();
-                    apiTestingIssuesIdMap.put(apiInfoKey, apiTestingIssuesIdSet);
+                String url = apiInfoKey.getUrl();
+                URL richUrl = new URL(url);
+
+                String protocol = richUrl.getProtocol();
+                String host = richUrl.getHost();
+                int port = (richUrl.getPort() == -1) ? richUrl.getDefaultPort() : richUrl.getPort();
+                WizEndpointAsset endpointAsset = new WizEndpointAsset(host, protocol.toUpperCase(), port);
+
+                Set<TestingIssuesId> testingIssuesIdSet;
+                if (!endpointAssetTestingIssuesIdMap.containsKey(endpointAsset)) {
+                    testingIssuesIdSet = new HashSet<>();
+                    endpointAssetTestingIssuesIdMap.put(endpointAsset, testingIssuesIdSet);
                 } else {
-                    apiTestingIssuesIdSet = apiTestingIssuesIdMap.get(apiInfoKey);
+                    testingIssuesIdSet = endpointAssetTestingIssuesIdMap.get(endpointAsset);
                 }
-                apiTestingIssuesIdSet.add(testingIssuesId);
+                testingIssuesIdSet.add(testingIssuesId);
             } catch (Exception e) {
                 // do nothing
             }
@@ -459,14 +465,14 @@ public class WizIntegrationUtils {
         Map<String, YamlTemplate> yamlTemplateMap = fetchYamlTemplateMap(testSubCategorySet);
         Map<String, Remediation> remediationMap = fetchRemediationMap(testSubCategorySet);
 
-        Map<ApiInfoKey, List<BasicDBObject>> attackSurfaceFindingMap = new HashMap<>();
-        for (Map.Entry<ApiInfoKey, Set<TestingIssuesId>> entry : apiTestingIssuesIdMap.entrySet()) {
-            ApiInfoKey apiInfoKey = entry.getKey();
-            Set<TestingIssuesId> apiTestingIssuesIdSet = entry.getValue();
+        Map<WizEndpointAsset, List<BasicDBObject>> attackSurfaceFindingMap = new HashMap<>();
+        for (Map.Entry<WizEndpointAsset, Set<TestingIssuesId>> entry : endpointAssetTestingIssuesIdMap.entrySet()) {
+            WizEndpointAsset endpointAsset = entry.getKey();
+            Set<TestingIssuesId> testingIssuesIdSet = entry.getValue();
 
             List<BasicDBObject> findingList = new ArrayList<>();
 
-            for (TestingIssuesId testingIssuesId: apiTestingIssuesIdSet) {
+            for (TestingIssuesId testingIssuesId: testingIssuesIdSet) {
                 try {
                     TestingRunIssues testingRunIssues = testingRunIssuesMap.get(testingIssuesId);
                     TestingRunResult testingRunResult = testingRunResultMap.get(testingIssuesId);
@@ -480,17 +486,17 @@ public class WizIntegrationUtils {
             }
 
             if (!findingList.isEmpty()) {
-                attackSurfaceFindingMap.put(apiInfoKey, findingList);
+                attackSurfaceFindingMap.put(endpointAsset, findingList);
             }
         }
 
         List<BasicDBObject> assetList = new ArrayList<>();
-        for (Map.Entry<ApiInfoKey, List<BasicDBObject>> entry : attackSurfaceFindingMap.entrySet()) {
-            ApiInfoKey apiInfoKey = entry.getKey();
+        for (Map.Entry<WizEndpointAsset, List<BasicDBObject>> entry : attackSurfaceFindingMap.entrySet()) {
+            WizEndpointAsset endpointAsset = entry.getKey();
             List<BasicDBObject> findingList = entry.getValue();
 
             try {
-                BasicDBObject assetDetails = WizIntegrationUtils.buildAssetDetails(apiInfoKey);
+                BasicDBObject assetDetails = WizIntegrationUtils.buildAssetDetails(endpointAsset);
 
                 BasicDBObject asset = new BasicDBObject();
                 asset.put("details", assetDetails);
@@ -498,7 +504,7 @@ public class WizIntegrationUtils {
 
                 assetList.add(asset);
             } catch (Exception e) {
-                loggerMaker.error("Error building asset details for API info key: " + apiInfoKey.toString() + " - " + e.getMessage());
+                loggerMaker.error("Error building asset details for API info key: " + endpointAsset.toString() + " - " + e.getMessage());
             }
         }
 
