@@ -930,6 +930,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                             if (stdoutContent != null && !stdoutContent.isEmpty()) {
                                 loggerMaker.info("Processing stdout for agentId=" + agentId, LogDb.DASHBOARD);
                                 try {
+                                    // Strip control characters (e.g. 0x1A Ctrl+Z from PowerShell) that Jackson rejects
+                                    stdoutContent = stdoutContent.replaceAll("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]", "");
                                     JsonNode output = OBJECT_MAPPER.readTree(stdoutContent);
                                     if (agentId != null) {
                                         outputs.put(agentId, output);
@@ -1036,17 +1038,17 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         }
         
         // TODO: re-enable when Windows agents are online
-        // // Windows agents with .ps1 script
-        // if (!windowsAgentIds.isEmpty()) {
-        //     if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
-        //     String mcpScriptIdPs1 = uploadScriptFromClasspath("scan_mcp_configs.ps1", apiToken, consoleUrl);
-        //     if (mcpScriptIdPs1 != null) {
-        //         Map<String, JsonNode> windowsMcpOutputs = executeBatchedDiscovery(
-        //             mcpScriptIdPs1, windowsAgentIds, batchSize, timeoutMs,
-        //             "MCP Config (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, true, jobId);
-        //         allMcpOutputs.putAll(windowsMcpOutputs);
-        //     }
-        // }
+        //Windows agents with .ps1 script
+        if (!windowsAgentIds.isEmpty()) {
+            if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
+            String mcpScriptIdPs1 = uploadScriptFromClasspath("scan_mcp_configs.ps1", apiToken, consoleUrl);
+            if (mcpScriptIdPs1 != null) {
+                Map<String, JsonNode> windowsMcpOutputs = executeBatchedDiscovery(
+                    mcpScriptIdPs1, windowsAgentIds, batchSize, timeoutMs,
+                    "MCP Config (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, true, jobId);
+                allMcpOutputs.putAll(windowsMcpOutputs);
+            }
+        }
         
         if (!allMcpOutputs.isEmpty()) {
             ingestMCPDiscoveries(allMcpOutputs, ingestUrl, consoleDomain, agentNames);
@@ -1070,17 +1072,17 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         }
         
         // TODO: re-enable when Windows agents are online
-        // // Windows agents with .ps1 script
-        // if (!windowsAgentIds.isEmpty()) {
-        //     if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
-        //     String skillScriptIdPs1 = uploadScriptFromClasspath("scan_skills.ps1", apiToken, consoleUrl);
-        //     if (skillScriptIdPs1 != null) {
-        //         Map<String, JsonNode> windowsSkillOutputs = executeBatchedDiscovery(
-        //             skillScriptIdPs1, windowsAgentIds, batchSize, timeoutMs,
-        //             "Skills (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, false, jobId);
-        //         allSkillOutputs.putAll(windowsSkillOutputs);
-        //     }
-        // }
+        // Windows agents with .ps1 script
+        if (!windowsAgentIds.isEmpty()) {
+            if (jobId != null) { try { CyborgApiClient.updateJobHeartbeat(jobId); } catch (Exception ignored) {} }
+            String skillScriptIdPs1 = uploadScriptFromClasspath("scan_skills.ps1", apiToken, consoleUrl);
+            if (skillScriptIdPs1 != null) {
+                Map<String, JsonNode> windowsSkillOutputs = executeBatchedDiscovery(
+                    skillScriptIdPs1, windowsAgentIds, batchSize, timeoutMs,
+                    "Skills (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, false, jobId);
+                allSkillOutputs.putAll(windowsSkillOutputs);
+            }
+        }
         
         if (!allSkillOutputs.isEmpty()) {
             ingestSkillDiscoveries(allSkillOutputs, ingestUrl, consoleDomain, agentNames);
@@ -1439,6 +1441,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                 tagMap.put("bot-name", computerName);
                 tagMap.put("mcp-server", "MCP Server");
                 tagMap.put("mcp-client", agent);
+                tagMap.put("skill", skillName);
                 
                 try {
                     String reqHeadersJson = OBJECT_MAPPER.writeValueAsString(reqHeaders);
@@ -1449,7 +1452,10 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                     batch.put("requestHeaders", reqHeadersJson);
                     batch.put("responseHeaders", "{}");
                     batch.put("method", "POST");
-                    batch.put("requestPayload", skillContent.isEmpty() ? "Skill file discovered at: " + path : skillContent);
+                    Map<String, Object> reqPayload = new HashMap<>();
+                    reqPayload.put("path", path);
+                    reqPayload.put("skill_content", skillContent);
+                    batch.put("requestPayload", OBJECT_MAPPER.writeValueAsString(reqPayload));
                     batch.put("responsePayload", "{\"status\":\"ok\"}");
                     batch.put("ip", "127.0.0.1");
                     batch.put("time", String.valueOf(System.currentTimeMillis() / 1000));
