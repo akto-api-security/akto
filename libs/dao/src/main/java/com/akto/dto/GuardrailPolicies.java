@@ -74,6 +74,9 @@ public class GuardrailPolicies {
     private String url;
     private double confidenceScore;
     
+    /** Policy-wide rule behaviour: {@code "block"}, {@code "warn"}, or {@code "alert"}. */
+    private String behaviour;
+
     // Step 8: Review and Finish
     private boolean active;
 
