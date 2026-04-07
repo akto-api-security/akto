@@ -80,12 +80,12 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	requestHeaders := strings.TrimSpace(c.PostForm("requestHeaders"))
 	if requestHeaders == "" {
 		if hostname := strings.TrimSpace(c.PostForm("hostname")); hostname != "" {
-			requestHeaders = `{"Host":"` + hostname + `"}`
+			if b, err := json.Marshal(map[string]string{"Host": hostname}); err == nil {
+				requestHeaders = string(b)
+			}
 		}
 	}
 
-	// Collect optional request-metadata form fields so they are reflected in the
-	// threat dashboard exactly as they are for validate/request JSON calls.
 	meta := &models.ValidateRequestParams{
 		ContextSource:  contextSource,
 		Path:           strings.TrimSpace(c.PostForm("path")),
@@ -94,6 +94,11 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		AktoVxlanID:    strings.TrimSpace(c.PostForm("akto_vxlan_id")),
 		IP:             strings.TrimSpace(c.PostForm("ip")),
 		RequestHeaders: requestHeaders,
+		Time:           strings.TrimSpace(c.PostForm("time")),
+		StatusCode:     strings.TrimSpace(c.PostForm("statusCode")),
+		Status:         strings.TrimSpace(c.PostForm("status")),
+		Tag:            strings.TrimSpace(c.PostForm("tag")),
+		Metadata:       strings.TrimSpace(c.PostForm("metadata")),
 		Source:         "file",
 	}
 
@@ -397,17 +402,8 @@ func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string,
 }
 
 func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload string, meta *models.ValidateRequestParams, sessionID, requestID string) *chunkResult {
-	params := &models.ValidateRequestParams{
-		RequestPayload: payload,
-		ContextSource:  meta.ContextSource,
-		Path:           meta.Path,
-		Method:         meta.Method,
-		AktoAccountID:  meta.AktoAccountID,
-		AktoVxlanID:    meta.AktoVxlanID,
-		IP:             meta.IP,
-		RequestHeaders: meta.RequestHeaders,
-		Source:         meta.Source,
-	}
+	params := *meta
+	params.RequestPayload = payload
 	maxRetries := h.cfg.File.MaxRetries
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -420,7 +416,7 @@ func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload strin
 				return &chunkResult{Err: ctx.Err()}
 			}
 		}
-		result, err := h.validatorService.ValidateRequest(ctx, params, sessionID, requestID)
+		result, err := h.validatorService.ValidateRequest(ctx, &params, sessionID, requestID)
 		if err != nil {
 			lastErr = err
 			continue
