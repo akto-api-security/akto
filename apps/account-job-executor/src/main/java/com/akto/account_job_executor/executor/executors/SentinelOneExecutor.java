@@ -1017,7 +1017,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             windowsAgentIds.size() + " Windows agents", LogDb.DASHBOARD);
         
         // 3 minute timeout per script execution
-        int timeoutMs = 3 * 60 * 1000;
+        int timeoutMs = 30 * 60 * 1000;
         
         // Batch size for large fleets
         int batchSize = 150;
