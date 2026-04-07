@@ -209,11 +209,23 @@ def build_validation_request(prompt: str, attachments: list) -> dict:
     }
 
 
-def call_guardrails(prompt: str, attachments: list) -> Tuple[bool, str, bool]:
+def _guardrails_behaviour_value(behaviour: Any) -> str:
+    return str(behaviour or "").strip().lower()
+
+
+def _is_warn_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "warn"
+
+
+def _is_alert_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "alert"
+
+
+def call_guardrails(prompt: str, attachments: list) -> Tuple[bool, str, str]:
     """Call guardrails API to validate the prompt."""
     if not AKTO_DATA_INGESTION_URL:
         logger.warning("AKTO_DATA_INGESTION_URL not set, allowing prompt")
-        return True, "", False
+        return True, "", ""
 
     logger.info(f"Validating chat prompt (length: {len(prompt)}, attachments: {len(attachments)})")
     if LOG_PAYLOADS:
@@ -235,19 +247,19 @@ def call_guardrails(prompt: str, attachments: list) -> Tuple[bool, str, bool]:
         guardrails_result = data.get("guardrailsResult", {})
         allowed = guardrails_result.get("Allowed", True)
         reason = guardrails_result.get("Reason", "")
-        isWarn = guardrails_result.get("IsWarn", False)
+        behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get("Behaviour", "")
 
         if not allowed:
             logger.warning(f"Prompt BLOCKED: {reason}")
-            return False, reason, isWarn
+            return False, reason, behaviour
 
         logger.info("Prompt ALLOWED")
-        return True, "", isWarn
+        return True, "", behaviour
 
     except Exception as e:
         logger.error(f"Guardrails validation error: {e}")
         # Fail open: allow on error
-        return True, "", False
+        return True, "", ""
 
 
 def prompt_fingerprint(prompt: str, attachments: List[Any]) -> str:
@@ -286,13 +298,19 @@ def save_warn_pending(hashes: Set[str]) -> None:
 def apply_warn_resubmit_flow(
     gr_allowed: bool,
     reason: str,
-    is_warn: bool,
+    behaviour: str,
     fingerprint: str,
 ) -> Tuple[bool, str]:
     if gr_allowed:
         return True, ""
 
-    if not is_warn:
+    if _is_alert_behaviour(behaviour):
+        logger.info(
+            "Alert behaviour: allowing prompt despite violation (server-side alert only)"
+        )
+        return True, ""
+
+    if not _is_warn_behaviour(behaviour):
         return False, reason
 
     pending = load_warn_pending()
@@ -326,14 +344,14 @@ def main():
         sys.exit(0)
 
     # Call guardrails validation
-    gr_allowed, gr_reason, is_warn = call_guardrails(prompt, attachments)
+    gr_allowed, gr_reason, behaviour = call_guardrails(prompt, attachments)
     fingerprint = prompt_fingerprint(prompt, attachments)
-    allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, is_warn, fingerprint)
+    allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
 
     # Return response
     response = {"continue": allowed}
     if not allowed:
-        if is_warn:
+        if _is_warn_behaviour(behaviour):
             response["user_message"] = (
                 "Warning!!, prompt blocked, please review it. Send again to bypass. "
                 f"Reason for blocking: {gr_reason}"
