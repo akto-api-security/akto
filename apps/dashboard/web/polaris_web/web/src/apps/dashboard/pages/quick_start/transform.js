@@ -1057,7 +1057,7 @@ const databricksImportObj = {
     icon: '/public/databricks.svg',
     label: "Databricks",
     text: "Import Databricks agents seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/databrics',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/databricks',
     key: "DATABRICKS_IMPORT",
     component: <AIAgentConnectorImport
         connectorType={CONNECTOR_TYPE_DATABRICKS}
