@@ -57,7 +57,18 @@ add_skill() {
         local size=$(stat -f%z "$path" 2>/dev/null || stat -c%s "$path" 2>/dev/null || echo "0")
         local mtime=$(stat -f%m "$path" 2>/dev/null || stat -c%Y "$path" 2>/dev/null || echo "0")
         
-        echo "    {\"path\":\"$path\",\"agent\":\"$agent\",\"size\":$size,\"modified\":$mtime}"
+        # Extract skill_name from parent directory (e.g. ~/.claude/skills/mcp-gateway-dev/SKILL.md -> mcp-gateway-dev)
+        local skill_name
+        skill_name=$(basename "$(dirname "$path")" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
+        
+        # Use python3 -c to safely read file content and encode as JSON (no heredoc to avoid stdin conflict)
+        if command -v python3 >/dev/null 2>&1; then
+            python3 -c "import json,sys; p,a,s,m,n=sys.argv[1],sys.argv[2],int(sys.argv[3]),int(sys.argv[4]),sys.argv[5]; c=open(p,'r',encoding='utf-8',errors='replace').read(); print('    '+json.dumps({'path':p,'agent':a,'size':s,'modified':m,'skill_name':n,'skill_content':c}),end='')" "$path" "$agent" "$size" "$mtime" "$skill_name" 2>/dev/null || \
+            echo -n "    {\"path\":\"$path\",\"agent\":\"$agent\",\"size\":$size,\"modified\":$mtime,\"skill_name\":\"$skill_name\",\"skill_content\":\"\"}"
+        else
+            # Fallback: no content (python3 not available)
+            echo -n "    {\"path\":\"$path\",\"agent\":\"$agent\",\"size\":$size,\"modified\":$mtime,\"skill_name\":\"$skill_name\",\"skill_content\":\"\"}"
+        fi
     fi
 }
 
