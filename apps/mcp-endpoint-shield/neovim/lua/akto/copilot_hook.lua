@@ -1,5 +1,7 @@
 -- Intercepts copilot.lua requests by wrapping copilot.api.request().
 
+local http = require("akto.http")
+
 local M = {}
 
 local _orig_request = nil
@@ -22,24 +24,23 @@ local function hook(api_mod)
       return _orig_request(client, method, params, callback)
     end
 
-    local helpers = require("akto.plenary_hook")
     local doc = (params and params.doc) or {}
     local summary = vim.fn.json_encode({
       method = method,
       uri = doc.uri or (params.textDocument and params.textDocument.uri) or "",
       position = doc.position or params.position or {},
     })
-    local payload = helpers._build_payload("https://copilot.github.com/copilot/" .. method, summary, "{}", 200)
-    helpers._akto_post_async({ akto_connector = "neovim", ingest_data = "true" }, payload)
+    local payload = http.build_payload("https://copilot.github.com/copilot/" .. method, summary, "{}", 200)
+    http.post_async({ akto_connector = "neovim", ingest_data = "true" }, payload)
 
-    -- Wrap callback to capture response
     local orig_cb = callback
     local wrapped_cb = orig_cb and function(err, data, ctx)
-      if data then
-        local count = #(data.completions or data.items or {})
+      if type(data) == "table" then
+        local items = data.completions or data.items
+        local count = (type(items) == "table") and #items or 0
         local resp = vim.fn.json_encode({ method = method, completion_count = count })
-        local p = helpers._build_payload("https://copilot.github.com/copilot/" .. method, summary, resp, 200)
-        helpers._akto_post_async({ akto_connector = "neovim", ingest_data = "true" }, p)
+        local p = http.build_payload("https://copilot.github.com/copilot/" .. method, summary, resp, 200)
+        http.post_async({ akto_connector = "neovim", ingest_data = "true" }, p)
       end
       return orig_cb(err, data, ctx)
     end

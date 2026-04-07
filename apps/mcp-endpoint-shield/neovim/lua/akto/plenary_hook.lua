@@ -1,19 +1,18 @@
 -- Intercepts plenary.curl and plenary.job calls to LLM APIs.
 -- Covers: avante, codecompanion, CopilotChat (plenary.curl), ChatGPT (plenary.job).
 
+local http = require("akto.http")
+
 local M = {}
 
-local _akto_url = ""
 local _sync_mode = true
-local _timeout = 5
 local _orig_curl = nil
 local _orig_job = nil
 local _curl_wrapped = false
 local _job_wrapped = false
 local _original_require = nil
 local _deferred_hooks = {}
-
-local CONNECTOR = "neovim"
+local _wrapped_fns = {}
 
 local LLM_HOSTS = {
   "api.openai.com",
@@ -33,89 +32,6 @@ local function is_llm_url(url)
   return false
 end
 
-local function extract_host(url) return url:match("https?://([^/]+)") or "unknown" end
-local function extract_path(url) return url:match("https?://[^/]+(/.*)") or "/" end
-
--- Build the Akto /api/http-proxy payload (same format as Claude CLI hooks).
-local function build_payload(url, req_body, resp_body, status_code)
-  local tags = vim.fn.json_encode({ ["gen-ai"] = "Gen AI", ["ai-agent"] = "neovim" })
-  return vim.fn.json_encode({
-    path = extract_path(url),
-    requestHeaders = vim.fn.json_encode({ host = extract_host(url), ["content-type"] = "application/json", ["x-akto-hook"] = "neovim" }),
-    responseHeaders = vim.fn.json_encode({ ["content-type"] = "application/json" }),
-    method = "POST",
-    requestPayload = req_body or "{}",
-    responsePayload = resp_body or "{}",
-    ip = os.getenv("USER") or "0.0.0.0",
-    destIp = "127.0.0.1",
-    time = tostring(math.floor(vim.loop.now())),
-    statusCode = tostring(status_code or 200),
-    status = tostring(status_code or 200),
-    akto_account_id = "1000000",
-    akto_vxlan_id = "0",
-    is_pending = "false",
-    source = "MIRRORING",
-    tag = tags,
-    metadata = tags,
-    contextSource = "ENDPOINT",
-  })
-end
-
--- Sync POST to Akto backend.
-local function akto_post_sync(params, payload)
-  local qs = {}
-  for k, v in pairs(params) do qs[#qs + 1] = k .. "=" .. v end
-  local url = _akto_url .. "/api/http-proxy?" .. table.concat(qs, "&")
-  local result = vim.fn.system({
-    "curl", "-s", "-X", "POST", url,
-    "-H", "Content-Type: application/json",
-    "--max-time", tostring(_timeout),
-    "-d", payload,
-  })
-  if result and result ~= "" then
-    local ok, data = pcall(vim.fn.json_decode, result)
-    if ok then return data end
-  end
-  return nil
-end
-
--- Async POST to Akto backend (fire-and-forget).
-local function akto_post_async(params, payload)
-  local qs = {}
-  for k, v in pairs(params) do qs[#qs + 1] = k .. "=" .. v end
-  local url = _akto_url .. "/api/http-proxy?" .. table.concat(qs, "&")
-  vim.fn.jobstart({
-    "curl", "-s", "-X", "POST", url,
-    "-H", "Content-Type: application/json",
-    "--max-time", tostring(_timeout),
-    "-d", payload,
-  }, { detach = true })
-end
-
-local function parse_guardrails(resp)
-  if not resp then return true, "" end
-  local gr = ((resp.data or {}).guardrailsResult) or {}
-  local allowed = gr.Allowed
-  if allowed == nil then allowed = true end
-  return allowed, gr.Reason or ""
-end
-
-local function check_guardrails(url, body)
-  if _akto_url == "" then return true, "" end
-  local resp = akto_post_sync({ guardrails = "true", akto_connector = CONNECTOR }, build_payload(url, body))
-  return parse_guardrails(resp)
-end
-
-local function ingest_async(url, req_body, resp_body, status)
-  if _akto_url == "" then return end
-  akto_post_async({ akto_connector = CONNECTOR, ingest_data = "true" }, build_payload(url, req_body, resp_body, status))
-end
-
-local function guardrails_and_ingest_async(url, req_body, resp_body, status)
-  if _akto_url == "" then return end
-  akto_post_async({ guardrails = "true", ingest_data = "true", akto_connector = CONNECTOR }, build_payload(url, req_body, resp_body, status))
-end
-
 local function notify_blocked(reason)
   local msg = reason ~= "" and ("Blocked by Akto: " .. reason) or "Blocked by Akto"
   vim.schedule(function() vim.notify("[akto] " .. msg, vim.log.levels.WARN) end)
@@ -128,34 +44,36 @@ local function wrap_curl_fn(orig_fn)
     if not is_llm_url(url) then return orig_fn(url, opts, ...) end
     local body = (opts and (opts.body or opts.data)) or "{}"
     if _sync_mode then
-      local allowed, reason = check_guardrails(url, body)
+      local allowed, reason = http.check_guardrails(url, body)
       if not allowed then
         local msg = notify_blocked(reason)
         local blocked = { status = 403, body = vim.fn.json_encode({ error = { message = msg } }) }
-        ingest_async(url, body, blocked.body, 403)
+        http.ingest_async(url, body, blocked.body, 403)
         return blocked
       end
       local response = orig_fn(url, opts, ...)
-      ingest_async(url, body, (response and response.body) or "{}", (response and response.status) or 200)
+      http.ingest_async(url, body, (response and response.body) or "{}", (response and response.status) or 200)
       return response
     else
       local response = orig_fn(url, opts, ...)
-      guardrails_and_ingest_async(url, body, (response and response.body) or "{}", (response and response.status) or 200)
+      http.guardrails_and_ingest_async(url, body, (response and response.body) or "{}", (response and response.status) or 200)
       return response
     end
   end
 end
 
+-- Wrap in-place on the original module table so cached references are also intercepted.
 local function do_wrap_curl(original)
   if _curl_wrapped then return end
   _orig_curl = original
   _curl_wrapped = true
-  package.loaded["plenary.curl"] = setmetatable({}, {
-    __index = function(_, key)
-      local val = _orig_curl[key]
-      return type(val) == "function" and wrap_curl_fn(val) or val
-    end,
-  })
+  for _, method in ipairs({ "post", "get", "put", "delete", "patch", "head", "request" }) do
+    local orig_fn = original[method]
+    if type(orig_fn) == "function" then
+      _wrapped_fns[method] = orig_fn
+      original[method] = wrap_curl_fn(orig_fn)
+    end
+  end
 end
 
 -- plenary.job wrapper (ChatGPT.nvim: job:new({ command="curl", args={url,...} }))
@@ -195,10 +113,10 @@ local function do_wrap_job(original)
     if not url or not is_llm_url(url) then return orig_new(self, opts, ...) end
 
     if _sync_mode then
-      local allowed, reason = check_guardrails(url, body or "{}")
+      local allowed, reason = http.check_guardrails(url, body or "{}")
       if not allowed then
         local msg = notify_blocked(reason)
-        ingest_async(url, body or "{}", vim.fn.json_encode({ error = { message = msg } }), 403)
+        http.ingest_async(url, body or "{}", vim.fn.json_encode({ error = { message = msg } }), 403)
         local orig_on_exit = opts.on_exit
         local dummy = vim.tbl_extend("force", opts, { command = "echo", args = { msg } })
         dummy.on_exit = function(j, code) if orig_on_exit then orig_on_exit(j, 1) end end
@@ -212,9 +130,9 @@ local function do_wrap_job(original)
         local resp_body = table.concat(j:result() or {}, "\n")
         local status = exit_code == 0 and 200 or 500
         if _sync_mode then
-          ingest_async(url, body or "{}", resp_body, status)
+          http.ingest_async(url, body or "{}", resp_body, status)
         else
-          guardrails_and_ingest_async(url, body or "{}", resp_body, status)
+          http.guardrails_and_ingest_async(url, body or "{}", resp_body, status)
         end
         if orig_on_exit then orig_on_exit(j, exit_code, ...) end
       end,
@@ -225,7 +143,7 @@ local function do_wrap_job(original)
   package.loaded["plenary.job"] = proxy_job
 end
 
--- Single require() hook for deferred loading of all modules.
+-- Single require() hook for deferred loading.
 local function hook_require()
   if _original_require then return end
   _original_require = require
@@ -234,7 +152,6 @@ local function hook_require()
     local result = _original_require(mod, ...)
     if mod == "plenary.curl" and not _curl_wrapped and result then
       do_wrap_curl(result)
-      return package.loaded["plenary.curl"]
     end
     if mod == "plenary.job" and not _job_wrapped and result then
       do_wrap_job(result)
@@ -253,22 +170,15 @@ local function unhook_require()
   _original_require = nil
 end
 
--- Shared: other hook modules register deferred callbacks here.
+-- Other hook modules register deferred callbacks here.
 function M._add_deferred(mod_name, callback)
   _deferred_hooks[mod_name] = callback
   local existing = package.loaded[mod_name]
   if existing then callback(existing) end
 end
 
--- Shared: async POST for use by copilot/windsurf hooks.
-M._akto_post_async = akto_post_async
-M._build_payload = build_payload
-
 function M.enable(cfg)
-  _akto_url = cfg.akto_url or ""
   _sync_mode = cfg.sync_mode
-  _timeout = cfg.timeout or 5
-
   local curl = package.loaded["plenary.curl"]
   if curl then do_wrap_curl(curl) end
   local job = package.loaded["plenary.job"]
@@ -278,8 +188,19 @@ end
 
 function M.disable()
   unhook_require()
-  if _orig_curl then package.loaded["plenary.curl"] = _orig_curl; _orig_curl = nil; _curl_wrapped = false end
-  if _orig_job then package.loaded["plenary.job"] = _orig_job; _orig_job = nil; _job_wrapped = false end
+  if _orig_curl then
+    for method, orig_fn in pairs(_wrapped_fns) do
+      _orig_curl[method] = orig_fn
+    end
+    _wrapped_fns = {}
+    _orig_curl = nil
+    _curl_wrapped = false
+  end
+  if _orig_job then
+    package.loaded["plenary.job"] = _orig_job
+    _orig_job = nil
+    _job_wrapped = false
+  end
 end
 
 return M

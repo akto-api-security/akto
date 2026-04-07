@@ -54,4 +54,10 @@ function M.enable(url)
   register()
 end
 
+function M.disable()
+  if not _registered then return end
+  vim.api.nvim_create_augroup("AktoEvents", { clear = true })
+  _registered = false
+end
+
 return M

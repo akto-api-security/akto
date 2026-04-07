@@ -1,12 +1,14 @@
 -- Intercepts windsurf.vim (Codeium) by wrapping vim.fn.jobstart + chansend.
 -- Codeium uses: jobstart(["curl","-L",url,...]) + chansend(id, json_data)
 
+local http = require("akto.http")
+
 local M = {}
 
 local _orig_jobstart = nil
 local _orig_chansend = nil
 local _hooked = false
-local _job_data = {} -- job_id → request data from chansend
+local _job_data = {}
 
 local function is_codeium_curl(args)
   if type(args) ~= "table" or #args < 3 or args[1] ~= "curl" then return false end
@@ -26,14 +28,13 @@ local function extract_method(args)
 end
 
 local function ingest(method, req_data, resp_data)
-  local helpers = require("akto.plenary_hook")
-  local payload = helpers._build_payload(
+  local payload = http.build_payload(
     "https://codeium.local/windsurf/" .. method,
     req_data or "{}",
     resp_data or "{}",
     200
   )
-  helpers._akto_post_async({ akto_connector = "neovim", ingest_data = "true" }, payload)
+  http.post_async({ akto_connector = "neovim", ingest_data = "true" }, payload)
 end
 
 function M.enable(cfg)
@@ -59,14 +60,18 @@ function M.enable(cfg)
       })
       local orig_on_exit = opts.on_exit
       opts.on_exit = function(job, status, event)
-        ingest(method, _job_data[job] or "", table.concat(chunks, ""))
-        _job_data[job] = nil
+        if _job_data[job] ~= nil then
+          ingest(method, _job_data[job] or "", table.concat(chunks, ""))
+          _job_data[job] = nil
+        end
         if orig_on_exit then orig_on_exit(job, status, event) end
       end
     end
 
     local job_id = _orig_jobstart(args, opts, ...)
-    _job_data[job_id] = ""
+    if type(job_id) == "number" and job_id > 0 then
+      _job_data[job_id] = ""
+    end
     return job_id
   end
 

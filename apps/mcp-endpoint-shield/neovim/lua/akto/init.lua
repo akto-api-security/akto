@@ -39,6 +39,10 @@ end
 
 function M.enable()
   if _config.akto_url == "" then return end
+
+  -- Initialize shared HTTP helpers first (all hooks depend on this)
+  require("akto.http").configure({ akto_url = _config.akto_url, timeout = _config.timeout })
+
   local cfg = { akto_url = _config.akto_url, sync_mode = _config.sync_mode, timeout = _config.timeout }
 
   if _config.plenary_hook     then require("akto.plenary_hook").enable(cfg) end
@@ -57,6 +61,7 @@ function M.disable()
   if _config.copilot_hook     then require("akto.copilot_hook").disable() end
   if _config.copilot_vim_hook then require("akto.copilot_vim_hook").disable() end
   if _config.windsurf_hook    then require("akto.windsurf_hook").disable() end
+  if _config.events           then require("akto.events").disable() end
 
   _enabled = false
   vim.notify("[akto] disabled")

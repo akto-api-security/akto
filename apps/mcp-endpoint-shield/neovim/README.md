@@ -98,6 +98,7 @@ require("akto").setup({
 ```
 lua/akto/
 ├── init.lua              — setup, enable/disable, commands
+├── http.lua              — shared HTTP helpers (payload builder, Akto API calls)
 ├── plenary_hook.lua      — wraps plenary.curl + plenary.job
 ├── copilot_hook.lua      — wraps copilot.lua API
 ├── copilot_vim_hook.lua  — wraps copilot.vim LSP bridge

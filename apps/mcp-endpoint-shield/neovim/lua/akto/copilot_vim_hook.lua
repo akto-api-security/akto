@@ -1,5 +1,7 @@
 -- Intercepts copilot.vim requests by wrapping _copilot.lsp_request().
 
+local http = require("akto.http")
+
 local M = {}
 
 local _orig_lsp_request = nil
@@ -18,10 +20,9 @@ local function hook(mod)
 
   mod.lsp_request = function(client_id, method, params, bufnr)
     if COMPLETION_METHODS[method] then
-      local helpers = require("akto.plenary_hook")
       local summary = vim.fn.json_encode({ method = method, bufnr = bufnr, client_id = client_id })
-      local payload = helpers._build_payload("https://copilot.github.com/copilot-vim/" .. method, summary, "{}", 200)
-      helpers._akto_post_async({ akto_connector = "neovim", ingest_data = "true" }, payload)
+      local payload = http.build_payload("https://copilot.github.com/copilot-vim/" .. method, summary, "{}", 200)
+      http.post_async({ akto_connector = "neovim", ingest_data = "true" }, payload)
     end
     return _orig_lsp_request(client_id, method, params, bufnr)
   end
