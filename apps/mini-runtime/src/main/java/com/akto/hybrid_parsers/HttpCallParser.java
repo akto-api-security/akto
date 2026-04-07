@@ -654,6 +654,28 @@ public class HttpCallParser {
         }
     }
 
+    private boolean isAtlasTraffic(HttpResponseParams httpResponseParam) {
+        try {
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) {
+                return false;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return false;
+            }
+
+            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            return Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking if traffic is Atlas: " + e.getMessage());
+            return false;
+        }
+    }
+
     /**
      * Builds and updates service graph edges for Arcade traffic.
      * Extracts tool metadata from Arcade-specific request headers.
@@ -1344,33 +1366,44 @@ public class HttpCallParser {
                         + httpResponseParam.getRequestParams().getURL());
             }
 
-            Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
-            HttpResponseParams param = temp.getFirst();
-            if(param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)){
-                if(param == null && httpResponseParam != null && httpResponseParam.getRequestParams() != null){
-                    loggerMaker.infoAndAddToDb("blocked api " + httpResponseParam.getRequestParams().getURL() + " " + httpResponseParam.getRequestParams().getApiCollectionId() + " " + httpResponseParam.getRequestParams().getMethod());
-                    if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                        loggerMaker.infoAndAddToDb(
-                                "Found debug url in filterHttpResponseParams advanced filters, skipping "
-                                        + httpResponseParam.getRequestParams().getURL() + " filterType "
-                                        + temp.getSecond());
-                    }
-                    if(Utils.printDebugHostLog(httpResponseParam) != null){
-                        Utils.printDebugHostLog(" in filterHttpResponseParams advanced filters, skipping "
-                                + httpResponseParam.getRequestParams().getURL() + " filterType "
-                                + temp.getSecond());
-                    }
-                }
-                continue;
-            }else{
-                httpResponseParam = param;
+            if (isAtlasTraffic(httpResponseParam)) {
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams advanced filters, adding "
-                            + httpResponseParam.getRequestParams().getURL() + " filterType " + temp.getSecond());
+                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams skipping advanced filters for atlas traffic "
+                            + httpResponseParam.getRequestParams().getURL());
                 }
                 if(Utils.printDebugHostLog(httpResponseParam) != null){
-                    Utils.printDebugHostLog(" in filterHttpResponseParams advanced filters, adding "
-                            + httpResponseParam.getRequestParams().getURL() + " filterType " + temp.getSecond());
+                    Utils.printDebugHostLog(" in filterHttpResponseParams skipping advanced filters for atlas traffic "
+                            + httpResponseParam.getRequestParams().getURL());
+                }
+            } else {
+                Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
+                HttpResponseParams param = temp.getFirst();
+                if(param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)){
+                    if(param == null && httpResponseParam != null && httpResponseParam.getRequestParams() != null){
+                        loggerMaker.infoAndAddToDb("blocked api " + httpResponseParam.getRequestParams().getURL() + " " + httpResponseParam.getRequestParams().getApiCollectionId() + " " + httpResponseParam.getRequestParams().getMethod());
+                        if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                            loggerMaker.infoAndAddToDb(
+                                    "Found debug url in filterHttpResponseParams advanced filters, skipping "
+                                            + httpResponseParam.getRequestParams().getURL() + " filterType "
+                                            + temp.getSecond());
+                        }
+                        if(Utils.printDebugHostLog(httpResponseParam) != null){
+                            Utils.printDebugHostLog(" in filterHttpResponseParams advanced filters, skipping "
+                                    + httpResponseParam.getRequestParams().getURL() + " filterType "
+                                    + temp.getSecond());
+                        }
+                    }
+                    continue;
+                }else{
+                    httpResponseParam = param;
+                    if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                        loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams advanced filters, adding "
+                                + httpResponseParam.getRequestParams().getURL() + " filterType " + temp.getSecond());
+                    }
+                    if(Utils.printDebugHostLog(httpResponseParam) != null){
+                        Utils.printDebugHostLog(" in filterHttpResponseParams advanced filters, adding "
+                                + httpResponseParam.getRequestParams().getURL() + " filterType " + temp.getSecond());
+                    }
                 }
             }
 
