@@ -173,6 +173,7 @@ public class StartTestAction extends UserAction {
     private boolean sendSlackAlert = false;
     private boolean sendMsTeamsAlert = false;
     private boolean doNotMarkIssuesAsFixed = false;
+    private boolean runAutomatedTests = false;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName, int selectedSlackChannelId) {
         User user = getSUser();
@@ -241,12 +242,13 @@ public class StartTestAction extends UserAction {
 
         // Get dashboard context from Context.contextSource (set by UserDetailsFilter from x-context-source header)
         CONTEXT_SOURCE dashboardContext = Context.contextSource.get();
-        
+
         TestingRun testingRun = new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
                 this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId, dashboardContext);
         testingRun.setDoNotMarkIssuesAsFixed(this.doNotMarkIssuesAsFixed);
         testingRun.setMaxAgentTokens(this.maxAgentTokens);
+        testingRun.setRunAutomatedTests(this.runAutomatedTests);
         return testingRun;
     }
 
@@ -2143,6 +2145,14 @@ public class StartTestAction extends UserAction {
 
     public boolean getDoNotMarkIssuesAsFixed() {
         return doNotMarkIssuesAsFixed;
+    }
+
+    public void setRunAutomatedTests(boolean runAutomatedTests) {
+        this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public boolean getRunAutomatedTests() {
+        return runAutomatedTests;
     }
 
     public void setRecurringWeekly(boolean recurringWeekly) {
