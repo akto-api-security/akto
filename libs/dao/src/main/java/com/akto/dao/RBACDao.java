@@ -58,6 +58,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
      * This method should be used everywhere to access user role.
      * Because we update the userRole from the custom roles here.
      * There is no context of custom roles anywhere else.
+     * Now also supports scope-based roles via scopeRoleMapping.
      */
     public static Role getCurrentRoleForUser(int userId, int accountId){
         Pair<Integer, Integer> key = new Pair<>(userId, accountId);
@@ -65,13 +66,27 @@ public class RBACDao extends CommonContextDao<RBAC> {
         String currentRole;
         Role actualRole = Role.MEMBER;
         if (userRoleEntry == null || (Context.now() - userRoleEntry.getSecond() > EXPIRY_TIME)) {
-            Bson filterRbac = Filters.and(
-                    Filters.eq(RBAC.USER_ID, userId),
-                    Filters.eq(RBAC.ACCOUNT_ID, accountId));
+            // Fetch RBAC object using cache (handles both old role field and new scopeRoleMapping)
+            RBAC userRbac = getCurrentRBACForUser(userId, accountId);
 
-            RBAC userRbac = RBACDao.instance.findOne(filterRbac);
             if (userRbac != null) {
                 currentRole = userRbac.getRole();
+
+                // Check if user has scope-based role mapping
+                if (userRbac.getScopeRoleMapping() != null && !userRbac.getScopeRoleMapping().isEmpty()) {
+                    try {
+                        Object contextSourceObj = Context.contextSource.get();
+                        if (contextSourceObj != null) {
+                            String currentScope = contextSourceObj.toString();
+                            String scopeRole = userRbac.getScopeRoleMapping().get(currentScope);
+                            if (scopeRole != null && !scopeRole.isEmpty()) {
+                                currentRole = scopeRole;
+                            }
+                        }
+                    } catch (Exception e) {
+                        // On any error, keep using the primary role
+                    }
+                }
             } else {
                 currentRole = Role.MEMBER.name();
             }
