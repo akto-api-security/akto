@@ -17,6 +17,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.DeleteResult;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -243,6 +244,42 @@ public class AuditDataAction extends UserAction {
         }
 
         return SUCCESS.toUpperCase();
+    }
+
+    public String deleteAuditData() {
+        if (StringUtils.isBlank(hexId)) {
+            addActionError("Audit data id cannot be empty");
+            return ERROR.toUpperCase();
+        }
+
+        if (!ObjectId.isValid(hexId)) {
+            addActionError("Invalid audit data id");
+            return ERROR.toUpperCase();
+        }
+
+        User user = getSUser();
+        String login = user == null ? null : user.getLogin();
+        if (StringUtils.isBlank(login) || !login.toLowerCase().endsWith("@akto.io")) {
+            addActionError("Only @akto.io users can delete audit data");
+            return ERROR.toUpperCase();
+        }
+
+        try {
+            DeleteResult deleteResult = McpAuditInfoDao.instance.getMCollection().deleteOne(
+                Filters.eq(Constants.ID, new ObjectId(hexId))
+            );
+
+            if (deleteResult.getDeletedCount() == 0) {
+                addActionError("Audit data not found");
+                return ERROR.toUpperCase();
+            }
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error deleting audit data", LogDb.DASHBOARD);
+            addActionError("Failed to delete audit data");
+            return ERROR.toUpperCase();
+        }
     }
 
     @Override
