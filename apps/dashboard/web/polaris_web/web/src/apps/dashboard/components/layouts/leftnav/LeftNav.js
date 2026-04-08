@@ -395,51 +395,51 @@ export default function LeftNav() {
                 ],
                 key: "5",
             }] : []),
-            ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount() ? [{
-                label: (
-                    <Text variant="bodyMd" fontWeight="medium">
-                        NHI Governance
-                    </Text>
-                ),
-                icon: SocialAdMajor,
-                onClick: () => {
-                    handleSelect("dashboard_nhi_identities");
-                    navigate("/dashboard/nhi/identities");
-                    setActive("normal");
-                },
-                selected: leftNavSelected.includes("_nhi"),
-                url: "#",
-                key: "nhi_governance",
-                subNavigationItems: [
-                    {
-                        label: "Identities",
-                        onClick: () => {
-                            navigate("/dashboard/nhi/identities");
-                            handleSelect("dashboard_nhi_identities");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_nhi_identities",
-                    },
-                    {
-                        label: "Violations",
-                        onClick: () => {
-                            navigate("/dashboard/nhi/violations");
-                            handleSelect("dashboard_nhi_violations");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_nhi_violations",
-                    },
-                    {
-                        label: "Policies",
-                        onClick: () => {
-                            navigate("/dashboard/nhi/policies");
-                            handleSelect("dashboard_nhi_policies");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_nhi_policies",
-                    },
-                ],
-            }] : []),
+            // ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount() ? [{
+            //     label: (
+            //         <Text variant="bodyMd" fontWeight="medium">
+            //             NHI Governance
+            //         </Text>
+            //     ),
+            //     icon: SocialAdMajor,
+            //     onClick: () => {
+            //         handleSelect("dashboard_nhi_identities");
+            //         navigate("/dashboard/nhi/identities");
+            //         setActive("normal");
+            //     },
+            //     selected: leftNavSelected.includes("_nhi"),
+            //     url: "#",
+            //     key: "nhi_governance",
+            //     subNavigationItems: [
+            //         {
+            //             label: "Identities",
+            //             onClick: () => {
+            //                 navigate("/dashboard/nhi/identities");
+            //                 handleSelect("dashboard_nhi_identities");
+            //                 setActive("active");
+            //             },
+            //             selected: leftNavSelected === "dashboard_nhi_identities",
+            //         },
+            //         {
+            //             label: "Violations",
+            //             onClick: () => {
+            //                 navigate("/dashboard/nhi/violations");
+            //                 handleSelect("dashboard_nhi_violations");
+            //                 setActive("active");
+            //             },
+            //             selected: leftNavSelected === "dashboard_nhi_violations",
+            //         },
+            //         {
+            //             label: "Policies",
+            //             onClick: () => {
+            //                 navigate("/dashboard/nhi/policies");
+            //                 handleSelect("dashboard_nhi_policies");
+            //                 setActive("active");
+            //             },
+            //             selected: leftNavSelected === "dashboard_nhi_policies",
+            //         },
+            //     ],
+            // }] : []),
             ...(dashboardCategory === "Agentic Security" && func.isDemoAccount() ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
