@@ -127,22 +127,6 @@ public class MaliciousEventService {
     String severity = evt.getSeverity();
     // Skip recording for specific policies on specific account.
     // TODO: Remove once policy is fixed.
-    if("1758787662".equals(accountId)){
-
-      if ("OSCommandInjection".equals(filterId) && evt.getLatestApiEndpoint().contains("api-transactions")) {
-        return;
-      }
-
-      if (("WeakAuthentication").equals(filterId)) {
-        String host = evt.getHost() != null ? evt.getHost() : "";
-        String hostWithoutPort = host.replaceAll(":\\d+$", "");
-        boolean isInternalHost = host.contains(".svc") ||
-            !hostWithoutPort.matches(".*\\.[a-zA-Z]{2,}$");
-        if (isInternalHost) {
-          severity = "LOW";
-        }
-      }
-    }
 
     String refId = UUID.randomUUID().toString();
     logger.debug("received malicious event " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
