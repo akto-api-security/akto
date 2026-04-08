@@ -1582,7 +1582,7 @@ function HomeDashboard() {
         />
     );
 
-    const showForAccount = window.ACTIVE_ACCOUNT !== 1669322524;
+    const showForAccount = func.isDemoAccount();
     const threatComponents = func.checkForFeatureSaas('THREAT_DETECTION') ? [
         ...(showForAccount ? [{id: 'threat-timeline', component: threatActorsTimelineComponent}] : []),
         {id: 'threat-severity', component: threatSeverityComponent},
