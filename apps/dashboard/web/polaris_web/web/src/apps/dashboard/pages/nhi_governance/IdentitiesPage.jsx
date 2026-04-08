@@ -26,7 +26,7 @@ const expiryComp = (s) => {
     if (s.startsWith("Expired"))
         return <Text variant="bodyMd" color="critical">{s}</Text>;
     if (s === "Rotation due today" || s.startsWith("Rotation Due in"))
-        return <Text variant="bodyMd" style={{ color: "#B7791F", fontWeight: 500 }}>{s}</Text>;
+        return <Text variant="bodyMd" color="warning" fontWeight="medium">{s}</Text>;
     return <Text variant="bodyMd">{s}</Text>;
 };
 

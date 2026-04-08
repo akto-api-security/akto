@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActionList, Badge, Box, Button, Divider, HorizontalStack, Popover, Text, VerticalStack } from "@shopify/polaris";
+import { ActionList, Badge, Box, Button, Divider, HorizontalStack, Link, Popover, Text, VerticalStack } from "@shopify/polaris";
 import FlyLayout from "../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
 import { IdentityIcon, AgentIcon, getViolationDetail, resolvePolicyName } from "./nhiViolationsData";
@@ -68,43 +68,46 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                         <Text variant="bodyMd">{detail.description}</Text>
                     </VerticalStack>
                     <Divider />
-                    <HorizontalStack gap="8" blockAlign="start">
-                        <VerticalStack gap="1">
-                            <Text variant="headingSm" color="subdued">
-                                {(() => {
-                                    const extraCount = typeof row.policy === "object" ? (row.policy.extra || 0) : 0;
-                                    return extraCount > 0 ? `Policies Triggered (${1 + extraCount})` : "Policy Triggered";
-                                })()}
-                            </Text>
+                    <HorizontalStack gap="8">
+                        <Box style={{ alignSelf: "flex-start" }}>
                             <VerticalStack gap="1">
-                                {[
-                                    typeof row.policy === "object" ? row.policy.primary : row.policy,
-                                    ...(typeof row.policy === "object" ? (row.policy.extras || []) : []),
-                                ].map((name) => {
-                                    const resolved = resolvePolicyName(name);
-                                    return (
-                                        <a
-                                            key={name}
-                                            href="/dashboard/nhi/policies"
-                                            style={{ fontWeight: 600, fontSize: "0.875rem", color: "#2C6ECB", textDecoration: "none" }}
-                                            onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
-                                            onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
-                                            onClick={() => sessionStorage.setItem("nhi_pending_policy", resolved)}
-                                        >
-                                            {resolved}
-                                        </a>
-                                    );
-                                })}
+                                <Text variant="headingSm" color="subdued">
+                                    {(() => {
+                                        const extraCount = typeof row.policy === "object" ? (row.policy.extra || 0) : 0;
+                                        return extraCount > 0 ? `Policies Triggered (${1 + extraCount})` : "Policy Triggered";
+                                    })()}
+                                </Text>
+                                <VerticalStack gap="1">
+                                    {[
+                                        typeof row.policy === "object" ? row.policy.primary : row.policy,
+                                        ...(typeof row.policy === "object" ? (row.policy.extras || []) : []),
+                                    ].map((name) => {
+                                        const resolved = resolvePolicyName(name);
+                                        return (
+                                            <Link
+                                                key={name}
+                                                url="/dashboard/nhi/policies"
+                                                onClick={() => sessionStorage.setItem("nhi_pending_policy", resolved)}
+                                            >
+                                                {resolved}
+                                            </Link>
+                                        );
+                                    })}
+                                </VerticalStack>
                             </VerticalStack>
-                        </VerticalStack>
-                        <VerticalStack gap="1">
-                            <Text variant="headingSm" color="subdued">Affected Resources</Text>
-                            <Text variant="bodyMd" fontWeight="semibold">{detail.affectedResources}</Text>
-                        </VerticalStack>
-                        <VerticalStack gap="1">
-                            <Text variant="headingSm" color="subdued">Discovered</Text>
-                            <Text variant="bodyMd" fontWeight="semibold">{row.discovered}</Text>
-                        </VerticalStack>
+                        </Box>
+                        <Box style={{ alignSelf: "flex-start" }}>
+                            <VerticalStack gap="1">
+                                <Text variant="headingSm" color="subdued">Affected Resources</Text>
+                                <Text variant="bodyMd" fontWeight="semibold">{detail.affectedResources}</Text>
+                            </VerticalStack>
+                        </Box>
+                        <Box style={{ alignSelf: "flex-start" }}>
+                            <VerticalStack gap="1">
+                                <Text variant="headingSm" color="subdued">Discovered</Text>
+                                <Text variant="bodyMd" fontWeight="semibold">{row.discovered}</Text>
+                            </VerticalStack>
+                        </Box>
                     </HorizontalStack>
                     <Divider />
                     <VerticalStack gap="2">
