@@ -20,19 +20,21 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                             <Badge status={func.getHexColorForSeverity(row.severity.toUpperCase())}>{row.severity}</Badge>
                         </Box>
                     </HorizontalStack>
-                    <HorizontalStack gap="2" blockAlign="center">
-                        <HorizontalStack gap="1" blockAlign="center">
-                            <IdentityIcon name={row.identity} />
-                            <Text variant="bodySm" color="subdued">{row.identity}</Text>
+                    <Box style={{ alignSelf: "flex-start" }}>
+                        <HorizontalStack gap="2" blockAlign="center">
+                            <Box style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                <IdentityIcon name={row.identity} />
+                                <Text variant="bodySm" color="subdued">{row.identity}</Text>
+                            </Box>
+                            <Text variant="bodySm" color="subdued">|</Text>
+                            <Box style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                <AgentIcon name={row.agent} />
+                                <Text variant="bodySm" color="subdued">{row.agent}</Text>
+                            </Box>
+                            <Text variant="bodySm" color="subdued">|</Text>
+                            <Text variant="bodySm" color="subdued">Last Seen {row.discovered}</Text>
                         </HorizontalStack>
-                        <Text variant="bodySm" color="subdued">|</Text>
-                        <HorizontalStack gap="1" blockAlign="center">
-                            <AgentIcon name={row.agent} />
-                            <Text variant="bodySm" color="subdued">{row.agent}</Text>
-                        </HorizontalStack>
-                        <Text variant="bodySm" color="subdued">|</Text>
-                        <Text variant="bodySm" color="subdued">Last Seen {row.discovered}</Text>
-                    </HorizontalStack>
+                    </Box>
                 </VerticalStack>
                 <Popover
                     active={actionActive}
