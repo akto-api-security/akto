@@ -395,7 +395,7 @@ export default function LeftNav() {
                 ],
                 key: "5",
             }] : []),
-            ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") /* && func.isDemoAccount() */ ? [{
+            ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && func.isDemoAccount() ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         NHI Governance
