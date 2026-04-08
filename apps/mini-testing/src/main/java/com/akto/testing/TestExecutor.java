@@ -1140,6 +1140,9 @@ public class TestExecutor {
         if(testSubType != null) {
             varMap.put("testSubType", testSubType);
         }
+        if (testConfig.getContent() != null) {
+            varMap.put("yaml_template_content", testConfig.getContent());
+        }
 
         String testExecutionLogId = UUID.randomUUID().toString();
         

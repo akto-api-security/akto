@@ -1,6 +1,7 @@
 package com.akto.test_editor.execution;
 
 import com.akto.agent.AgentClient;
+import com.akto.agent.AutomatedAgenticTestExecutor;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
@@ -202,6 +203,11 @@ public class Executor {
                 TestResult res = null;
                 List<TestResult> agenticResults = null;
                 if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
+                    boolean automatedAgenticTestExecute = AgentClient.isRawApiValidForAgenticTest(testReq);
+                    if (automatedAgenticTestExecute) {
+                        String yamlTemplateContent = varMap.containsKey("yaml_template_content") ? varMap.get("yaml_template_content").toString() : null;
+                        new AutomatedAgenticTestExecutor().executeAgenticTest(testReq, yamlTemplateContent);
+                    }
                     // execute agentic test here
                     requestAttempted = true;
                     agenticResults = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
