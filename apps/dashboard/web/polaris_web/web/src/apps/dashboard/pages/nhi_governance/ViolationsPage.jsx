@@ -15,24 +15,10 @@ import func from "@/util/func";
 import values from "@/util/values";
 import { violationsTableData, violationsHeaders, violationsSortOptions } from "./nhiViolationsData";
 import ViolationDetailsPanel from "./ViolationDetailsPanel";
+import { violationsOverTimeData } from "./nhiData";
 
 const definedTableTabs = ["All", "Open", "Fixed"];
 const resourceName = { singular: "violation", plural: "violations" };
-
-// ── Chart data (line chart — static trend ending at current total ~169) ────────
-const violationsOverTimeData = [{
-    data: [
-        [Date.UTC(2026, 3,  1), 178],
-        [Date.UTC(2026, 3,  2), 182],
-        [Date.UTC(2026, 3,  3), 176],
-        [Date.UTC(2026, 3,  4), 171],
-        [Date.UTC(2026, 3,  5), 174],
-        [Date.UTC(2026, 3,  6), 172],
-        [Date.UTC(2026, 3,  7), 169],
-    ],
-    color: "#EF4444",
-    name: "Violations",
-}];
 
 function ChartLegend({ items }) {
     return (
