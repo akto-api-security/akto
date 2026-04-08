@@ -1,4 +1,4 @@
-import { Badge, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import { SettingsMajor } from "@shopify/polaris-icons";
 import { CellType } from "../../components/tables/rows/GithubRow";
 import func from "@/util/func";
@@ -47,6 +47,20 @@ export function AgentIcon({ name }) {
     const key = (name || "").toLowerCase().trim();
     const domain = AGENT_SPECIFIC_DOMAIN[key] || AI_ICON_POOL[key.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % AI_ICON_POOL.length];
     return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={20} height={20} style={{borderRadius:3,flexShrink:0}} alt="" />;
+}
+
+// ── Violation severity badges ──────────────────────────────────────────────────
+export function ViolationBubbles({ critical = 0, high = 0, medium = 0, low = 0 }) {
+    if (!critical && !high && !medium && !low)
+        return <Text variant="bodyMd" color="subdued">No violations</Text>;
+    return (
+        <HorizontalStack gap="1" blockAlign="center">
+            {critical > 0 && <Box className="badge-wrapper-CRITICAL"><Badge size="small">{String(critical)}</Badge></Box>}
+            {high     > 0 && <Box className="badge-wrapper-HIGH"><Badge size="small">{String(high)}</Badge></Box>}
+            {medium   > 0 && <Box className="badge-wrapper-MEDIUM"><Badge size="small">{String(medium)}</Badge></Box>}
+            {low      > 0 && <Box className="badge-wrapper-LOW"><Badge size="small">{String(low)}</Badge></Box>}
+        </HorizontalStack>
+    );
 }
 
 // ── Severity ───────────────────────────────────────────────────────────────────
@@ -262,9 +276,9 @@ const VIOLATION_DETAIL_MAP = {
         whyTriggered: "Policy 'No Admin Credentials for Agent Identities' requires all agent credentials to operate with scoped, least-privilege permissions. Admin credentials exposed in runtime environments create a direct path for privilege escalation and cannot be audited at the operation level.",
         blastRadius: [
             "Full administrative control over connected cloud resources",
-            "Ability to create or modify IAM roles — privilege escalation risk",
+            "Ability to create or modify IAM roles  -  privilege escalation risk",
             "Access to sensitive data across all storage services",
-            "Unrestricted AI model usage — potential cost abuse",
+            "Unrestricted AI model usage  -  potential cost abuse",
             "Lateral movement risk across connected services",
         ],
         remediationSteps: [
@@ -300,7 +314,7 @@ const VIOLATION_DETAIL_MAP = {
             "Schedule a quarterly permission review for all agent identities",
         ],
         timeline: [
-            { time: "1h ago",  event: "Violation detected — permissions exceed documented scope" },
+            { time: "1h ago",  event: "Violation detected  -  permissions exceed documented scope" },
             { time: "1h ago",  event: "Policy engine flagged excess permissions" },
             { time: "7d ago",  event: "Permissions last modified" },
             { time: "45d ago", event: "Identity onboarded with initial permission set" },
@@ -324,8 +338,8 @@ const VIOLATION_DETAIL_MAP = {
             "Reset the credential if external compromise is suspected",
         ],
         timeline: [
-            { time: "Now",     event: "Spike ongoing — access rate remains elevated" },
-            { time: "30m ago", event: "Alert triggered — 3x baseline exceeded" },
+            { time: "Now",     event: "Spike ongoing  -  access rate remains elevated" },
+            { time: "30m ago", event: "Alert triggered  -  3x baseline exceeded" },
             { time: "1h ago",  event: "Anomaly first detected by usage monitor" },
             { time: "2d ago",  event: "Last baseline recalculation" },
         ],
@@ -372,7 +386,7 @@ const VIOLATION_DETAIL_MAP = {
             "Notify affected workspace members if necessary",
         ],
         timeline: [
-            { time: "3h ago", event: "Bulk send threshold exceeded — 500+ messages in 10 minutes" },
+            { time: "3h ago", event: "Bulk send threshold exceeded  -  500+ messages in 10 minutes" },
             { time: "3h ago", event: "Violation detected and token flagged" },
             { time: "4h ago", event: "Agent session initiated" },
             { time: "5d ago", event: "Token issued to agent" },
@@ -416,7 +430,7 @@ const VIOLATION_DETAIL_MAP = {
             "Rotate the token if external compromise is suspected",
         ],
         timeline: [
-            { time: "5h ago", event: "Anomalous call volume detected — 10x baseline" },
+            { time: "5h ago", event: "Anomalous call volume detected  -  10x baseline" },
             { time: "5h ago", event: "Rate monitoring policy triggered violation" },
             { time: "6h ago", event: "Agent session started" },
         ],
@@ -437,7 +451,7 @@ const VIOLATION_DETAIL_MAP = {
             "Audit recent access logs to confirm no unauthorized use occurred",
         ],
         timeline: [
-            { time: "1h ago",  event: "Dormancy threshold exceeded — flagged by policy engine" },
+            { time: "1h ago",  event: "Dormancy threshold exceeded  -  flagged by policy engine" },
             { time: "31d ago", event: "Last recorded usage of this credential" },
             { time: "90d ago", event: "Credential created with write access" },
         ],
@@ -483,8 +497,8 @@ const VIOLATION_DETAIL_MAP = {
         ],
         timeline: [
             { time: "Now",      event: "Key remains active and expired" },
-            { time: "1d ago",   event: "Second expiry alert sent — no action taken" },
-            { time: "30d ago",  event: "First expiry alert sent — no action taken" },
+            { time: "1d ago",   event: "Second expiry alert sent  -  no action taken" },
+            { time: "30d ago",  event: "First expiry alert sent  -  no action taken" },
             { time: "90d ago",  event: "Key rotation deadline reached" },
             { time: "180d ago", event: "Key originally created" },
         ],
@@ -507,7 +521,7 @@ const VIOLATION_DETAIL_MAP = {
         ],
         timeline: [
             { time: "45m ago", event: "Admin-scope token detected by privilege scanner" },
-            { time: "45m ago", event: "Violation flagged — least-privilege policy triggered" },
+            { time: "45m ago", event: "Violation flagged  -  least-privilege policy triggered" },
             { time: "7d ago",  event: "Token created with admin scope during agent setup" },
         ],
     },
@@ -529,7 +543,7 @@ const VIOLATION_DETAIL_MAP = {
         timeline: [
             { time: "45m ago", event: "Post-expiry access event detected" },
             { time: "45m ago", event: "Violation flagged by token lifecycle policy" },
-            { time: "1d ago",  event: "Token expiry date reached — expiry not enforced" },
+            { time: "1d ago",  event: "Token expiry date reached  -  expiry not enforced" },
             { time: "30d ago", event: "Token issued" },
         ],
     },
@@ -592,7 +606,7 @@ const VIOLATION_DETAIL_MAP = {
             "Enable automatic deactivation after a defined period of inactivity",
         ],
         timeline: [
-            { time: "30m ago", event: "Idle threshold exceeded — violation created" },
+            { time: "30m ago", event: "Idle threshold exceeded  -  violation created" },
             { time: "30d ago", event: "Last recorded usage of this credential" },
             { time: "60d ago", event: "Credential created and assigned" },
         ],
@@ -616,7 +630,7 @@ const VIOLATION_DETAIL_MAP = {
         ],
         timeline: [
             { time: "2d ago",  event: "Unrestricted access scope detected during audit" },
-            { time: "2d ago",  event: "Critical violation created — no API scope constraints" },
+            { time: "2d ago",  event: "Critical violation created  -  no API scope constraints" },
             { time: "14d ago", event: "Service account created with default permissions" },
         ],
     },
@@ -625,7 +639,7 @@ const VIOLATION_DETAIL_MAP = {
         affectedResources: "MCP Server, Agent Context Sessions",
         whyTriggered: "The 'Disable Dormant Credentials (30+ days)' policy requires all tokens, including MCP tokens, to have an explicit expiry date configured. This token was issued without a TTL and will not expire on its own.",
         blastRadius: [
-            "Permanent credential risk — token never expires automatically",
+            "Permanent credential risk  -  token never expires automatically",
             "Extended window of unauthorized access if the token is leaked",
             "Difficulty detecting stale or abandoned agent sessions",
         ],
@@ -637,7 +651,7 @@ const VIOLATION_DETAIL_MAP = {
         ],
         timeline: [
             { time: "3d ago", event: "Token expiry audit flagged missing TTL" },
-            { time: "3d ago", event: "Violation created — no expiry configuration found" },
+            { time: "3d ago", event: "Violation created  -  no expiry configuration found" },
             { time: "7d ago", event: "MCP token issued without expiry" },
         ],
     },
@@ -786,7 +800,7 @@ const VIOLATION_DETAIL_MAP = {
         ],
         timeline: [
             { time: "1d ago",  event: "Rotation overdue alert triggered" },
-            { time: "14d ago", event: "Rotation deadline passed — no action taken" },
+            { time: "14d ago", event: "Rotation deadline passed  -  no action taken" },
             { time: "30d ago", event: "Token originally issued" },
         ],
     },
@@ -796,7 +810,7 @@ const VIOLATION_DETAIL_MAP = {
         whyTriggered: "The 'Prevent Cross-Service Credential Usage' policy detects when tokens issued for development environments are used to access resources tagged as production. This token was issued as a dev token but has active production access.",
         blastRadius: [
             "Production data accessible through a less-secured dev credential",
-            "Actions in production attributed to dev environment — audit confusion",
+            "Actions in production attributed to dev environment  -  audit confusion",
             "Dev tokens often have weaker rotation and monitoring requirements",
             "Potential for production data to be returned to the dev environment",
         ],
@@ -834,7 +848,7 @@ const VIOLATION_DETAIL_MAP = {
         ],
     },
     "Write credential exposed to read-only agent": {
-        description: "A credential with write permissions has been assigned to an agent designated as read-only. This is a clear over-provisioning violation — the agent has capabilities far beyond its intended scope.",
+        description: "A credential with write permissions has been assigned to an agent designated as read-only. This is a clear over-provisioning violation  -  the agent has capabilities far beyond its intended scope.",
         affectedResources: "Data Stores, APIs",
         whyTriggered: "The 'Enforce Scoped Access for OAuth Tokens' policy validates that read-only agents are assigned credentials scoped to read operations only. This agent's assigned credential was found to include write and delete permissions.",
         blastRadius: [

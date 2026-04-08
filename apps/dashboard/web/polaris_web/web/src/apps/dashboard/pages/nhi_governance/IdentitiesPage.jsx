@@ -1,7 +1,6 @@
 import { useState, useMemo, useReducer } from "react";
 import { IndexFiltersMode } from "@shopify/polaris";
-import { Badge, HorizontalStack, Icon, Modal, Text } from "@shopify/polaris";
-import { SettingsMajor } from "@shopify/polaris-icons";
+import { Badge, HorizontalStack, Modal, Text } from "@shopify/polaris";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
 import { produce } from "immer";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
@@ -15,87 +14,10 @@ import func from "@/util/func";
 import values from "@/util/values";
 import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 import IdentityDetailsPanel from "./IdentityDetailsPanel";
-import { violationsTableData } from "./nhiViolationsData";
-
-// ── Identity icon via Google favicon API ───────────────────────────────────────
-const IDENTITY_DOMAIN_MAP = {
-    aws: "aws.amazon.com", gcp: "cloud.google.com", azure: "azure.microsoft.com",
-    github: "github.com", okta: "okta.com", twilio: "twilio.com",
-    hubspot: "hubspot.com", salesforce: "salesforce.com", mongo: "mongodb.com",
-    redis: "redis.com", elastic: "elastic.co", vault: "vaultproject.io",
-    argo: "argoproj.io", terraform: "hashicorp.com", jenkins: "jenkins.io",
-    splunk: "splunk.com", pagerduty: "pagerduty.com", opsgenie: "atlassian.com",
-    linear: "linear.app", notion: "notion.so", zoom: "zoom.us", box: "box.com",
-    dropbox: "dropbox.com", figma: "figma.com", cloudflare: "cloudflare.com",
-    vercel: "vercel.com", netlify: "netlify.com", heroku: "heroku.com",
-    fly: "fly.io", render: "render.com", datadog: "datadoghq.com",
-    newrelic: "newrelic.com", grafana: "grafana.com", sentry: "sentry.io",
-    launchdarkly: "launchdarkly.com", mixpanel: "mixpanel.com",
-    amplitude: "amplitude.com", segment: "segment.io", intercom: "intercom.com",
-    zendesk: "zendesk.com", stripe: "stripe.com", jira: "atlassian.com",
-    slack: "slack.com", vscode: "code.visualstudio.com", entra: "microsoft.com",
-    snowflake: "snowflake.com", docker: "docker.com", airbnb: "airbnb.com",
-    playwright: "playwright.dev", huggingface: "huggingface.co", anthropic: "anthropic.com",
-};
-const INTERNAL_KEYWORDS = new Set(["internal", "connector", "filesystem"]);
-function IdentityIcon({ name }) {
-    const parts = (name || "").toLowerCase().split(/[-_\d]+/).filter(p => p.length > 2);
-    if (parts.some(p => INTERNAL_KEYWORDS.has(p)))
-        return <div style={{width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon source={SettingsMajor} color="subdued" /></div>;
-    const domain = parts.reduce((found, p) => found || IDENTITY_DOMAIN_MAP[p] || null, null);
-    if (!domain) return null;
-    return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={20} height={20} style={{borderRadius:3,flexShrink:0}} alt="" />;
-}
-
-// ── Agent icon — named agents get specific icons, others get AI model favicons ──
-const AGENT_SPECIFIC_DOMAIN = {
-    "cursor prod":    "cursor.sh",
-    "cursor":         "cursor.sh",
-    "vs code":        "code.visualstudio.com",
-    "claude cli":     "anthropic.com",
-    "claude desktop": "anthropic.com",
-    "windsurf":       "codeium.com",
-};
-const AI_ICON_POOL = [
-    "claude.ai", "openai.com", "deepseek.com", "x.ai",
-    "gemini.google.com", "mistral.ai", "perplexity.ai", "cohere.com",
-];
-function AgentIcon({ name }) {
-    const key = (name || "").toLowerCase().trim();
-    const specific = AGENT_SPECIFIC_DOMAIN[key];
-    const domain = specific || AI_ICON_POOL[
-        key.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % AI_ICON_POOL.length
-    ];
-    return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={20} height={20} style={{borderRadius:3,flexShrink:0}} alt="" />;
-}
+import { violationsTableData, IdentityIcon, AgentIcon, ViolationBubbles } from "./nhiViolationsData";
 
 const definedTableTabs = ["All", "Expired"];
 const resourceName = { singular: "identity", plural: "identities" };
-
-// ── Violation bubble component ─────────────────────────────────────────────────
-function ViolationBubbles({ critical = 0, high = 0, medium = 0 }) {
-    if (!critical && !high && !medium)
-        return <Text variant="bodyMd" color="subdued">No violations</Text>;
-    const dot = (count, bg, fg) =>
-        count > 0 ? (
-            <span
-                key={bg}
-                style={{
-                    background: bg, color: fg, borderRadius: "50%",
-                    width: 22, height: 22, display: "inline-flex",
-                    alignItems: "center", justifyContent: "center",
-                    fontSize: 11, fontWeight: 600, flexShrink: 0,
-                }}
-            >{count}</span>
-        ) : null;
-    return (
-        <HorizontalStack gap="1" blockAlign="center">
-            {dot(critical, "#DF2909", "white")}
-            {dot(high,     "#FED3D1", "#202223")}
-            {dot(medium,   "#FFD79D", "#202223")}
-        </HorizontalStack>
-    );
-}
 
 // ── Expiry status renderer ─────────────────────────────────────────────────────
 const expiryComp = (s) => {

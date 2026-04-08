@@ -12,36 +12,10 @@ import useTable from "../../components/tables/TableContext";
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import PolicyDetailsPanel from "./PolicyDetailsPanel";
-import { violationsTableData, unresolvedPolicyName } from "./nhiViolationsData";
+import { violationsTableData, unresolvedPolicyName, ViolationBubbles } from "./nhiViolationsData";
 
 const definedTableTabs = ["All", "Active", "Inactive", "Draft"];
 const resourceName = { singular: "policy", plural: "policies" };
-
-// ── Violation bubbles — colors from API Security discovery page ────────────────
-function ViolationBubbles({ critical = 0, high = 0, medium = 0, low = 0 }) {
-    if (!critical && !high && !medium && !low)
-        return <Text variant="bodyMd" color="subdued">No Violations</Text>;
-    const dot = (count, bg, fg) =>
-        count > 0 ? (
-            <span
-                key={bg}
-                style={{
-                    background: bg, color: fg, borderRadius: "50%",
-                    width: 22, height: 22, display: "inline-flex",
-                    alignItems: "center", justifyContent: "center",
-                    fontSize: 11, fontWeight: 600, flexShrink: 0,
-                }}
-            >{count}</span>
-        ) : null;
-    return (
-        <HorizontalStack gap="1" blockAlign="center">
-            {dot(critical, "#DF2909", "white")}
-            {dot(high,     "#FED3D1", "#202223")}
-            {dot(medium,   "#FFD79D", "#202223")}
-            {dot(low,      "#E4E5E7", "#202223")}
-        </HorizontalStack>
-    );
-}
 
 // ── Scope cell with tooltip on "+N" ───────────────────────────────────────────
 function ScopeCell({ scope, agents }) {
@@ -534,6 +508,14 @@ export default function PoliciesPage() {
     }, [rawPolicies]);
 
     const tableData = useMemo(() => buildTableData(rawPolicies), [rawPolicies]);
+
+    useEffect(() => {
+        const pending = sessionStorage.getItem("nhi_pending_policy");
+        if (!pending) return;
+        sessionStorage.removeItem("nhi_pending_policy");
+        const match = tableData.find((r) => r.policyName === pending);
+        if (match) { setSelectedPolicy(match); setShowPolicyPanel(true); }
+    }, [tableData]);
 
     const summaryItems = useMemo(() => [
         { title: "Total Policies",             data: tableData.length.toLocaleString() },

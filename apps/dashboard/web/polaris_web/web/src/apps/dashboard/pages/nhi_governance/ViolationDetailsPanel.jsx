@@ -68,10 +68,32 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                     <Divider />
                     <HorizontalStack gap="8" blockAlign="start" wrap>
                         <VerticalStack gap="1">
-                            <Text variant="headingSm" color="subdued">Policy Triggered</Text>
-                            <Text variant="bodyMd" fontWeight="semibold">
-                                {resolvePolicyName(typeof row.policy === "object" ? row.policy.primary : row.policy)}
+                            <Text variant="headingSm" color="subdued">
+                                {(() => {
+                                    const extraCount = typeof row.policy === "object" ? (row.policy.extra || 0) : 0;
+                                    return extraCount > 0 ? `Policies Triggered (${1 + extraCount})` : "Policy Triggered";
+                                })()}
                             </Text>
+                            <VerticalStack gap="1">
+                                {[
+                                    typeof row.policy === "object" ? row.policy.primary : row.policy,
+                                    ...(typeof row.policy === "object" ? (row.policy.extras || []) : []),
+                                ].map((name) => {
+                                    const resolved = resolvePolicyName(name);
+                                    return (
+                                        <a
+                                            key={name}
+                                            href="/dashboard/nhi/policies"
+                                            style={{ fontWeight: 600, fontSize: "0.875rem", color: "#2C6ECB", textDecoration: "none" }}
+                                            onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
+                                            onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
+                                            onClick={() => sessionStorage.setItem("nhi_pending_policy", resolved)}
+                                        >
+                                            {resolved}
+                                        </a>
+                                    );
+                                })}
+                            </VerticalStack>
                         </VerticalStack>
                         <VerticalStack gap="1">
                             <Text variant="headingSm" color="subdued">Affected Resources</Text>

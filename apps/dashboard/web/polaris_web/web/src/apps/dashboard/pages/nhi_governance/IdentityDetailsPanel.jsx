@@ -77,7 +77,7 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
                 <VerticalStack gap="4">
                     <VerticalStack gap="2">
                         <Text variant="headingSm" color="subdued">Graph</Text>
-                        <IdentityGraph row={row} violations={totalViolations} />
+                        <IdentityGraph row={row} />
                     </VerticalStack>
                     <VerticalStack gap="2">
                         <Text variant="headingSm" color="subdued">Description</Text>
