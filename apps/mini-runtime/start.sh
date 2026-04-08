@@ -2,8 +2,8 @@
 
 LOG_FILE="/var/log/app/runtime.log"
 MAX_LOG_SIZE=${MAX_LOG_SIZE:-104857600}  # Default to 10 MB if not set (10 MB = 10 * 1024 * 1024 bytes)
-CHECK_INTERVAL=60                        # Check interval in seconds
-MEMORY_RESTART_THRESHOLD=${MEMORY_RESTART_THRESHOLD:-95}  # Restart if memory usage exceeds 95%
+CHECK_INTERVAL=30                        # Check interval in seconds
+MEMORY_RESTART_THRESHOLD=${MEMORY_RESTART_THRESHOLD:-85}  # Restart if memory usage exceeds 85%
 
 # Ensure log directory exists before first use
 mkdir -p /var/log/app
@@ -51,6 +51,7 @@ rotate_log() {
 
 # Function to monitor memory usage and restart if necessary
 monitor_memory() {
+    local pid="$1"
     while true; do
         # Get the current memory usage in bytes
         if [ -f /sys/fs/cgroup/memory.current ]; then
@@ -69,7 +70,7 @@ monitor_memory() {
 
         if (( MEM_USAGE_PERCENT >= MEMORY_RESTART_THRESHOLD )); then
             echo "Memory usage exceeded ${MEMORY_RESTART_THRESHOLD}%. Restarting application..." | tee -a "$LOG_FILE"
-            kill -9 "$JAVA_PID" 2>/dev/null
+            kill -9 "$pid" 2>/dev/null
             break
         fi
 
@@ -84,19 +85,42 @@ while true; do
     sleep "$CHECK_INTERVAL"  # Wait for the specified interval before checking again
 done &
 
-# Start Java and monitor it
 start_java() {
-    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar 2>&1 | tee -a "$LOG_FILE" &
+    FIFO="/tmp/java-stdout.fifo"
+    rm -f "$FIFO"
+    mkfifo "$FIFO"
 
+    # Start tee (FIFO → stdout + file)
+    tee -a "$LOG_FILE" < "$FIFO" &
+    TEE_PID=$!
+
+    # Start Java (stdout+stderr → FIFO)
+    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar > "$FIFO" 2>&1 &
     JAVA_PID=$!
-    echo "Started Java with PID: $JAVA_PID" | tee -a "$LOG_FILE"
 
-    monitor_memory &
+    echo "Started Java PID=$JAVA_PID, tee PID=$TEE_PID" | tee -a "$LOG_FILE"
+
+    # Start memory monitor (pass correct PID)
+    monitor_memory "$JAVA_PID" &
     MONITOR_PID=$!
 
+    # Wait for Java to exit
     wait "$JAVA_PID"
-    echo "Java process exited. Cleaning up memory monitor..." | tee -a "$LOG_FILE"
-    kill "$MONITOR_PID" 2>/dev/null
+    EXIT_CODE=$?
+
+    echo "Java exited (code=$EXIT_CODE). Cleaning up..." | tee -a "$LOG_FILE"
+
+    # Stop monitor
+    kill "$MONITOR_PID" 2>/dev/null || true
+
+    # Stop tee (important)
+    kill "$TEE_PID" 2>/dev/null || true
+    wait "$TEE_PID" 2>/dev/null || true
+
+    # Cleanup FIFO
+    rm -f "$FIFO"
+
+    return $EXIT_CODE
 }
 
 while true; do
