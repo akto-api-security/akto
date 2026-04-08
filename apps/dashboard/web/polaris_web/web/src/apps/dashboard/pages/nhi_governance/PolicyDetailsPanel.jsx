@@ -482,7 +482,7 @@ export default function PolicyDetailsPanel({ row, show, setShow, onSave }) {
     const TitleComponent = () => (
         <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
             <VerticalStack gap="1">
-                <HorizontalStack align="space-between" blockAlign="center">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <HorizontalStack gap="2" blockAlign="center">
                         <Text as="span" variant="headingMd" fontWeight="semibold">{row.policyName}</Text>
                         <Badge status={STATUS_COLOR[row.status] || ""}>{row.status}</Badge>
@@ -520,7 +520,7 @@ export default function PolicyDetailsPanel({ row, show, setShow, onSave }) {
                             ]} />
                         </Popover>
                     </HorizontalStack>
-                </HorizontalStack>
+                </div>
                 <HorizontalStack gap="0">
                     <Text variant="bodySm" color="subdued">{scopeLabel}</Text>
                     <Text variant="bodySm" color="subdued">&nbsp;|&nbsp;</Text>

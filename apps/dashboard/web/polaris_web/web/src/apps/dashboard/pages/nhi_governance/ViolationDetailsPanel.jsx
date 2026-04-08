@@ -12,7 +12,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
     // ── TitleComponent ────────────────────────────────────────────────────────
     const TitleComponent = () => (
         <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
-            <HorizontalStack align="space-between" blockAlign="start">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <VerticalStack gap="2">
                     <HorizontalStack gap="2" blockAlign="center" wrap>
                         <Text variant="headingMd" fontWeight="semibold">{row.violation}</Text>
@@ -50,7 +50,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                         { content: "Disable Identity",  destructive: true, onAction: () => setActionActive(false) },
                     ]} />
                 </Popover>
-            </HorizontalStack>
+            </div>
         </Box>
     );
 

@@ -27,7 +27,7 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
     // ── TitleComponent ────────────────────────────────────────────────────────
     const TitleComponent = () => (
         <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
-            <HorizontalStack align="space-between" blockAlign="start">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <VerticalStack gap="2">
                     <HorizontalStack gap="2" blockAlign="center" align="start">
                         <IdentityIcon name={row.identityName} />
@@ -64,7 +64,7 @@ export default function IdentityDetailsPanel({ row, show, setShow }) {
                 >
                     <ActionList items={[{ content: "Disable identity", destructive: true, onAction: () => setActionActive(false) }]} />
                 </Popover>
-            </HorizontalStack>
+            </div>
         </Box>
     );
 
