@@ -10,7 +10,7 @@ import api from '../api';
 import { v4 as uuidv4 } from 'uuid';
 import AuthParams from './AuthParams';
 
-function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
+function LoginStepBuilder({ extractInformation, showOnlyApi, setStoreData, miniTestingServiceName = '' }) {
 
     const initialStepState = {
         id: "x1",
@@ -203,7 +203,13 @@ function LoginStepBuilder({extractInformation, showOnlyApi, setStoreData}) {
                         }
                             <br />
                             <div>
-                                {steps[selectedStep].type === "LOGIN_FORM" && <LoginForm step={steps[selectedStep]} setSteps={setSteps}/>}
+                                {steps[selectedStep].type === "LOGIN_FORM" && (
+                                    <LoginForm
+                                        step={steps[selectedStep]}
+                                        setSteps={setSteps}
+                                        miniTestingServiceName={miniTestingServiceName}
+                                    />
+                                )}
                                 {steps[selectedStep].type === "OTP_VERIFICATION" && <OtpVerification step={steps[selectedStep]} setSteps={setSteps}/>}
                                 <br />
                                 <Button id={"remove-step-button"} destructive onClick={handleRemoveStep}>Remove step</Button>

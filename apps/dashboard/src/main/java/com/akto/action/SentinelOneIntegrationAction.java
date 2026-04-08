@@ -726,27 +726,11 @@ public class SentinelOneIntegrationAction extends UserAction {
                                            Map<String, String> envVars, String token, String consoleUrl) throws IOException {
         
         // Determine script extension based on OS
-        String scriptExt;
-        if (osName != null && osName.toLowerCase().contains("windows")) {
-            scriptExt = ".ps1";
-        } else {
-            scriptExt = ".sh";
-        }
+        String scriptExt = (osName != null && osName.toLowerCase().contains("windows")) ? ".ps1" : ".sh";
+        String scriptFileName = scriptBasePath + scriptExt;
         
-        String fullScriptPath = "apps/mcp-endpoint-shield/sentinelone" + scriptBasePath + scriptExt;
-        
-        // Read script content from file
-        String scriptContent;
-        try {
-            java.nio.file.Path path = java.nio.file.Paths.get(fullScriptPath);
-            scriptContent = new String(java.nio.file.Files.readAllBytes(path));
-        } catch (Exception e) {
-            loggerMaker.error("Failed to read script file: " + fullScriptPath + " - " + e.getMessage(), LogDb.DASHBOARD);
-            return false;
-        }
-
-        // Upload script
-        String uploadedScriptId = uploadScriptForGuardrails(scriptBasePath + scriptExt, scriptContent, token, consoleUrl);
+        // Upload script directly from classpath
+        String uploadedScriptId = uploadScriptFromClasspath(scriptFileName, token, consoleUrl);
         if (uploadedScriptId == null) {
             return false;
         }
@@ -763,8 +747,15 @@ public class SentinelOneIntegrationAction extends UserAction {
         return executeScriptOnAgent(uploadedScriptId, agentId, inputParams.toString().trim(), token, consoleUrl);
     }
 
-    private String uploadScriptForGuardrails(String scriptName, String scriptContent, String token, String consoleUrl) {
-        try {
+    private String uploadScriptFromClasspath(String scriptFileName, String token, String consoleUrl) {
+        String classpathResource = "/sentinelone/" + scriptFileName;
+        
+        try (java.io.InputStream scriptStream = getClass().getResourceAsStream(classpathResource)) {
+            if (scriptStream == null) {
+                loggerMaker.error("Script not found in classpath: " + classpathResource, LogDb.DASHBOARD);
+                return null;
+            }
+
             RequestConfig requestConfig = RequestConfig.custom()
                 .setConnectTimeout(CONNECT_TIMEOUT_MS)
                 .setSocketTimeout(SOCKET_TIMEOUT_MS)
@@ -778,24 +769,22 @@ public class SentinelOneIntegrationAction extends UserAction {
                 }
 
                 String osTypesValue;
-                if (scriptName.endsWith(".ps1")) {
+                if (scriptFileName.endsWith(".ps1")) {
                     osTypesValue = "windows";
-                } else if (scriptName.endsWith(".py")) {
+                } else if (scriptFileName.endsWith(".py")) {
                     osTypesValue = "linux,macos,windows";
                 } else {
                     osTypesValue = "linux,macos";
                 }
 
                 MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-                builder.addTextBody("scriptName", scriptName);
+                builder.addTextBody("scriptName", scriptFileName);
                 builder.addTextBody("scriptType", "action");
                 builder.addTextBody("scopeLevel", "site");
                 builder.addTextBody("scopeId", siteId);
                 builder.addTextBody("inputRequired", "false");
                 builder.addTextBody("osTypes", osTypesValue);
-                builder.addBinaryBody("file",
-                    scriptContent.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-                    ContentType.TEXT_PLAIN, scriptName);
+                builder.addBinaryBody("file", scriptStream, ContentType.TEXT_PLAIN, scriptFileName);
 
                 HttpPost post = new HttpPost(consoleUrl + "/web/api/v2.1/remote-scripts");
                 post.setHeader("Authorization", "ApiToken " + token);

@@ -166,6 +166,10 @@ public class AccountSettings {
     public static final String MATCHING_PATTERNS_FOR_PROXY = "matchingPatternsForProxy";
     private Map<String, ProxyPatternInfo> matchingPatternsForProxy;
 
+    @Getter
+    @Setter
+    private boolean switchProxyMode;
+
     public static class ProxyPatternInfo {
         private String pattern;
         private String addedBy;

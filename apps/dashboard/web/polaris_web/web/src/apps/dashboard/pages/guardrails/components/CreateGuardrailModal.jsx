@@ -36,7 +36,12 @@ import {
     ServerSettingsStep,
     ServerSettingsConfig
 } from './steps';
-import { SEVERITY } from '../utils';
+import {
+    SEVERITY,
+    GUARDRAIL_BEHAVIOUR,
+    normalizeBehaviourValue,
+    resolveStoredPolicyBehaviour
+} from '../utils';
 import func from "@/util/func";
 
 const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, isEditMode = false }) => {
@@ -121,7 +126,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
     const [applyOnRequest, setApplyOnRequest] = useState(false);
-    
+    const [policyBehaviour, setPolicyBehaviour] = useState(GUARDRAIL_BEHAVIOUR.BLOCK);
+
     // Collections data
     const [mcpServers, setMcpServers] = useState([]);
     const [agentServers, setAgentServers] = useState([]);
@@ -186,7 +192,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         mcpServers,
         agentServers,
         applyOnRequest,
-        applyOnResponse
+        applyOnResponse,
+        policyBehaviour
     });
 
     const getStepsWithSummary = () => {
@@ -385,15 +392,19 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setSelectedAgentServers([]);
         setApplyOnResponse(false);
         setApplyOnRequest(false);
+        setPolicyBehaviour(GUARDRAIL_BEHAVIOUR.BLOCK);
     };
 
     const populateFormForEdit = (policy) => {
+        const resolvedPolicyBehaviour = resolveStoredPolicyBehaviour(policy);
         setName(policy.name || "");
         setDescription(policy.description || "");
         setBlockedMessage(policy.blockedMessage || "");
         setSeverity(policy.severity ? policy.severity.toUpperCase() : SEVERITY.MEDIUM.value);
         setApplyToResponses(policy.applyToResponses || false);
-        
+
+        setPolicyBehaviour(resolvedPolicyBehaviour);
+
         // Content filters
         if (policy.contentFiltering) {
             if (policy.contentFiltering.harmfulCategories) {
@@ -422,23 +433,23 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 }
             }
         }
-        
+
         // Denied topics
         const hasDeniedTopics = policy.deniedTopics && policy.deniedTopics.length > 0;
         setEnableDeniedTopics(hasDeniedTopics);
         setDeniedTopics(policy.deniedTopics || []);
-        
+
         // Word filters
         setWordFilters({
             profanity: policy.wordFilters?.profanity || false,
             custom: policy.wordFilters?.custom || []
         });
-        
+
         // PII filters
         const hasPiiTypes = policy.piiTypes && policy.piiTypes.length > 0;
         setEnablePiiTypes(hasPiiTypes);
         setPiiTypes(policy.piiTypes || []);
-        
+
         // Regex patterns
         let hasRegexPatterns = false;
         if (policy.regexPatternsV2 && policy.regexPatternsV2.length > 0) {
@@ -572,12 +583,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                     };
                 });
 
+            const b = normalizeBehaviourValue(policyBehaviour);
             const guardrailData = {
                 name,
                 description,
                 blockedMessage,
                 severity,
                 applyToResponses,
+                behaviour: b,
                 contentFilters: {
                     harmfulCategories: enableHarmfulCategories ? harmfulCategoriesSettings : null,
                     promptAttacks: enablePromptAttacks ? { level: promptAttackLevel.toUpperCase() } : null,
@@ -643,7 +656,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
 
-            
             await onSave(guardrailData);
             handleClose();
         } catch (error) {
@@ -908,6 +920,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         mcpServers={mcpServers}
                         agentServers={agentServers}
                         collectionsLoading={collectionsLoading}
+                        policyBehaviour={policyBehaviour}
+                        setPolicyBehaviour={setPolicyBehaviour}
                     />
                 );
             default:

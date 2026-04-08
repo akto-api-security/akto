@@ -1,6 +1,7 @@
 import { VerticalStack, Text, FormLayout, Box, Checkbox } from "@shopify/polaris";
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
 import OwaspTag from "../OwaspTag";
+import RuleEnforcementDropdown from "../RuleEnforcementDropdown";
 
 export const ServerSettingsConfig = {
     number: 10,
@@ -10,7 +11,7 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ selectedMcpServers, selectedAgentServers, mcpServers, agentServers, applyOnRequest, applyOnResponse }) => {
+    getSummary: ({ selectedMcpServers, selectedAgentServers, mcpServers, agentServers, applyOnRequest, applyOnResponse, policyBehaviour }) => {
         if (selectedMcpServers?.length > 0 || selectedAgentServers?.length > 0) {
             const serverSummary = [];
             if (selectedMcpServers.length > 0) {
@@ -35,7 +36,11 @@ export const ServerSettingsConfig = {
             }
             const appSettings = (applyOnRequest || applyOnResponse) ?
                 ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
-            return `${serverSummary.join(", ")}${appSettings}`;
+            const behaviourSuffix = policyBehaviour ? ` — ${policyBehaviour}` : '';
+            return `${serverSummary.join(", ")}${appSettings}${behaviourSuffix}`;
+        }
+        if (policyBehaviour) {
+            return `Rule behaviour: ${policyBehaviour}`;
         }
         return null;
     }
@@ -52,7 +57,9 @@ const ServerSettingsStep = ({
     setApplyOnRequest,
     mcpServers,
     agentServers,
-    collectionsLoading
+    collectionsLoading,
+    policyBehaviour,
+    setPolicyBehaviour
 }) => {
     return (
         <VerticalStack gap="4">
@@ -83,6 +90,16 @@ const ServerSettingsStep = ({
                     showSelectAllMinOptions={1}
                     disabled={collectionsLoading}
                 />
+
+                <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
+                    <VerticalStack gap="3">
+                        <RuleEnforcementDropdown
+                            id="policy-rule-behaviour"
+                            value={policyBehaviour}
+                            onChange={setPolicyBehaviour}
+                        />
+                    </VerticalStack>
+                </Box>
 
                 <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <VerticalStack gap="3">

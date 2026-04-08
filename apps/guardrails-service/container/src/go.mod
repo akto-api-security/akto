@@ -3,7 +3,7 @@ module github.com/akto-api-security/guardrails-service
 go 1.24.2
 
 require (
-	github.com/akto-api-security/mcp-endpoint-shield v0.0.0-20260228112935-3277bb536705
+	github.com/akto-api-security/mcp-endpoint-shield v0.0.0-20260407075539-cfa4903149f8
 	github.com/gin-gonic/gin v1.11.0
 	github.com/segmentio/kafka-go v0.4.49
 	github.com/tsawler/tabula v1.6.6
@@ -74,5 +74,5 @@ require (
 	modernc.org/sqlite v1.40.1 // indirect
 )
 
-// Replace directive to point to the actual location in akto-gateway repository (feature/session_based_guardrails branch)
-replace github.com/akto-api-security/mcp-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260228112935-3277bb536705
+// Replace: akto-gateway mcp-endpoint-shield at feature/add_warn_behaviour (commit cfa4903149f8).
+replace github.com/akto-api-security/mcp-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260407075539-cfa4903149f8

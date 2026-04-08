@@ -5,6 +5,7 @@ from typing import Literal, Tuple, Optional, Any
 import httpx
 import json
 import os
+import re
 import logging
 from datetime import datetime, timezone
 from urllib.parse import urlparse
@@ -17,6 +18,8 @@ TIMEOUT = float(os.getenv("TIMEOUT", "5"))
 LITELLM_URL = os.getenv("LITELLM_URL", "http://localhost:4000")
 AKTO_CONNECTOR_NAME = "litellm"
 HTTP_PROXY_PATH = "/api/http-proxy"
+
+INVALID_AGENT_CHARS = re.compile(r"[^a-z0-9\-._]")
 
 
 class GuardrailsHandler(CustomLogger):
@@ -66,6 +69,26 @@ class GuardrailsHandler(CustomLogger):
             return fallback
         except Exception as e:
             return fallback
+
+    def sanitize_agent_name(self, name: str) -> Optional[str]:
+        name = INVALID_AGENT_CHARS.sub("-", name.strip().lower())
+        return name[:200] or None
+
+    def extract_agent_name(self, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> Optional[str]:
+        metadata = data.get("metadata") or (kwargs.get("litellm_params", {}) if kwargs else {}).get("metadata") or {}
+
+        # 1. metadata.agent_name
+        agent = metadata.get("agent_name")
+        if agent:
+            return self.sanitize_agent_name(str(agent))
+
+        # 2. user_api_key_alias / user_api_key_team_alias
+        for key in ("user_api_key_alias", "user_api_key_team_alias"):
+            value = metadata.get(key)
+            if value:
+                return self.sanitize_agent_name(str(value))
+
+        return None
 
     async def handle_validation_hook(
         self,
@@ -225,7 +248,7 @@ class GuardrailsHandler(CustomLogger):
         )
 
     def build_tags(self, call_type: str, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None) -> dict:
-        tags = {"gen-ai": "Gen AI"}
+        tags = {"gen-ai": "Gen AI", "litellm": "LiteLLM"}
         if call_type:
             tags["call_type"] = call_type
         model = data.get("model", "")
@@ -256,7 +279,11 @@ class GuardrailsHandler(CustomLogger):
         request_path = self.extract_request_path(kwargs)
         tags = self.build_tags(call_type, data, user_api_key_dict)
         parsed = urlparse(LITELLM_URL) if LITELLM_URL else None
-        host = parsed.netloc if parsed and parsed.netloc else "localhost:4000"
+        hosted_url = parsed.netloc if parsed and parsed.netloc else "localhost:4000"
+
+        agent_name = self.extract_agent_name(data, user_api_key_dict, kwargs)
+        host = agent_name if agent_name else hosted_url
+
         timestamp = str(int(datetime.now(timezone.utc).timestamp() * 1000))
         proxy_server_request = (
             data.get("proxy_server_request")

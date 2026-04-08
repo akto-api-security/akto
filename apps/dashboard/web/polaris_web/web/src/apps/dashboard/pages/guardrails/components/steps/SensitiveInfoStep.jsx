@@ -3,7 +3,6 @@ import {
     Text,
     Box,
     DataTable,
-    Select,
     Button,
     TextField,
     HorizontalStack,
@@ -13,6 +12,7 @@ import {
 } from '@shopify/polaris';
 import { DeleteMajor } from '@shopify/polaris-icons';
 import { useState, useEffect } from 'react';
+import Dropdown from "../../../../components/layouts/Dropdown";
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
 import observeApi from "../../../observe/api";
 import OwaspTag from "../OwaspTag";
@@ -229,11 +229,12 @@ const SensitiveInfoStep = ({
                                                             ({domainCount} {domainText})
                                                         </Text>
                                                     </HorizontalStack>,
-                                                    <Select
+                                                    <Dropdown
                                                         key={`behavior-${index}`}
-                                                        value={pii.behavior}
-                                                        options={behaviorOptions}
-                                                        onChange={(value) => {
+                                                        id={`pii-behavior-${index}`}
+                                                        menuItems={behaviorOptions}
+                                                        initial={pii.behavior}
+                                                        selected={(value) => {
                                                             const updatedPiiTypes = [...piiTypes];
                                                             updatedPiiTypes[index].behavior = value;
                                                             setPiiTypes(updatedPiiTypes);
@@ -298,11 +299,12 @@ const SensitiveInfoStep = ({
                                             headings={['Regex pattern', 'Guardrail behavior', 'Actions']}
                                             rows={regexPatterns.map((regex, index) => [
                                                 regex.pattern || 'Invalid pattern',
-                                                <Select
+                                                <Dropdown
                                                     key={`regex-behavior-${index}`}
-                                                    value={regex.behavior}
-                                                    options={behaviorOptions}
-                                                    onChange={(value) => {
+                                                    id={`regex-behavior-${index}`}
+                                                    menuItems={behaviorOptions}
+                                                    initial={regex.behavior}
+                                                    selected={(value) => {
                                                         const updatedRegexPatterns = [...regexPatterns];
                                                         updatedRegexPatterns[index].behavior = value;
                                                         setRegexPatterns(updatedRegexPatterns);

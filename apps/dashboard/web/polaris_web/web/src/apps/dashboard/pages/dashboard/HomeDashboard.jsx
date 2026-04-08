@@ -123,7 +123,7 @@ function HomeDashboard() {
         navigate('/dashboard/observe/audit');
     }, [navigate])
 
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[4]);
 
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
@@ -1582,15 +1582,15 @@ function HomeDashboard() {
         />
     );
 
+    const showForAccount = window.ACTIVE_ACCOUNT !== 1669322524;
     const threatComponents = func.checkForFeatureSaas('THREAT_DETECTION') ? [
-        {id: 'threat-timeline', component: threatActorsTimelineComponent},
+        ...(showForAccount ? [{id: 'threat-timeline', component: threatActorsTimelineComponent}] : []),
         {id: 'threat-severity', component: threatSeverityComponent},
         {id: 'threat-categories', component: threatCategoryComponent},
     ] : [];
-
     let gridComponents = showTestingComponents ?
         [
-            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            ...(showForAccount ? [{id: 'critical-apis', component: criticalUnsecuredAPIsOverTime}] : []),
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
             ...threatComponents,
@@ -1605,7 +1605,7 @@ function HomeDashboard() {
             {id: 'access-type', component: apisByAccessTypeComponent},
             {id: 'auth-type', component: apisByAuthTypeComponent},
             {id: 'new-domains', component: newDomainsComponent},
-            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            ...(showForAccount ? [{id: 'critical-apis', component: criticalUnsecuredAPIsOverTime}] : []),
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
             ...threatComponents,

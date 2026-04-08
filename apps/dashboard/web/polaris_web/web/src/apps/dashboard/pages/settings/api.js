@@ -6,11 +6,11 @@ const settingRequests = {
         return request({
             url: '/api/inviteUsers',
             method: 'post',
-            data: { 
+            data: {
                 inviteeName: apiSpec.inviteeName,
                 inviteeEmail: apiSpec.inviteeEmail,
                 websiteHostName: apiSpec.websiteHostName,
-                inviteeRole: apiSpec.inviteeRole,
+                scopeRoleMapping: apiSpec.scopeRoleMapping
             }
         })
     },
@@ -30,18 +30,30 @@ const settingRequests = {
             }
         })
     },
-    makeAdmin(email, roleVal) {
+    makeAdmin(email, roleVal, productScopes) {
         return request({
             url: '/api/makeAdmin',
             method: 'post',
             data: {
                 email: email,
-                userRole: roleVal
+                userRole: roleVal,
+                productScopes: productScopes || ["API"]
             }
         })
     },
 
-    
+    updateUserScopeRoleMapping(email, scopeRoleMapping) {
+        return request({
+            url: '/api/updateUserScopeRoleMapping',
+            method: 'post',
+            data: {
+                email: email,
+                scopeRoleMapping: scopeRoleMapping
+            }
+        })
+    },
+
+
     fetchApiTokens() {
         return request({
             url: '/api/fetchApiTokens',
@@ -676,6 +688,34 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchDatadogIntegration() {
+        return request({
+            url: '/api/fetchDatadogIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addDatadogIntegration(apiKey, datadogSite, enabled) {
+        return request({
+            url: '/api/addDatadogIntegration',
+            method: 'post',
+            data: { apiKey, datadogSite, enabled }
+        })
+    },
+    deleteDatadogIntegration() {
+        return request({
+            url: '/api/deleteDatadogIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    testDatadogIntegration(apiKey, datadogSite) {
+        return request({
+            url: '/api/testDatadogIntegration',
+            method: 'post',
+            data: { apiKey, datadogSite }
+        })
+    },
 
     fetchAzureBoardsIntegration() {
         return request({
@@ -963,11 +1003,11 @@ const settingRequests = {
             data: {}
         })
     },
-    addMatchingPatternForProxy(proxyPattern) {
+    addMatchingPatternForProxy(proxyPattern, switchProxyMode) {
         return request({
             url: '/api/addMatchingPatternForProxy',
             method: 'post',
-            data: {proxyPattern}
+            data: {proxyPattern, switchProxyMode}
         })
     }
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/fileprocessor"
+	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -71,11 +72,41 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		return
 	}
 
+	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
+
+	// Build request headers JSON from the hostname form field so that
+	// validationContextFromParams can extract McpServerName (Host header) and
+	// the threat dashboard shows the correct hostname — mirroring validate/request.
+	requestHeaders := strings.TrimSpace(c.PostForm("requestHeaders"))
+	if requestHeaders == "" {
+		if hostname := strings.TrimSpace(c.PostForm("hostname")); hostname != "" {
+			if b, err := json.Marshal(map[string]string{"Host": hostname}); err == nil {
+				requestHeaders = string(b)
+			}
+		}
+	}
+
+	meta := &models.ValidateRequestParams{
+		ContextSource:  contextSource,
+		Path:           strings.TrimSpace(c.PostForm("path")),
+		Method:         strings.TrimSpace(c.PostForm("method")),
+		AktoAccountID:  strings.TrimSpace(c.PostForm("akto_account_id")),
+		AktoVxlanID:    strings.TrimSpace(c.PostForm("akto_vxlan_id")),
+		IP:             strings.TrimSpace(c.PostForm("ip")),
+		RequestHeaders: requestHeaders,
+		Time:           strings.TrimSpace(c.PostForm("time")),
+		StatusCode:     strings.TrimSpace(c.PostForm("statusCode")),
+		Status:         strings.TrimSpace(c.PostForm("status")),
+		Tag:            strings.TrimSpace(c.PostForm("tag")),
+		Metadata:       strings.TrimSpace(c.PostForm("metadata")),
+		Source:         "file",
+	}
+
 	ctx := c.Request.Context()
 	var fileResults []*fileResult
 
 	for _, input := range inputs {
-		fr := h.validateSingleFile(ctx, input, contextSource)
+		fr := h.validateSingleFile(ctx, input, meta, sessionID, requestID)
 		fileResults = append(fileResults, fr)
 		input.Reader.Close()
 
@@ -91,7 +122,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	h.writeMultiFileResponse(c, fileResults, len(inputs))
 }
 
-func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileInput, contextSource string) *fileResult {
+func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileInput, meta *models.ValidateRequestParams, sessionID, requestID string) *fileResult {
 	fr := &fileResult{Filename: input.Filename, Allowed: true}
 
 	ext := fileprocessor.ExtensionFromFilename(input.Filename)
@@ -151,7 +182,7 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 			zap.Int("chunkOverlap", h.cfg.File.ChunkOverlap))
 	}
 
-	results := h.validateChunks(ctx, chunks, contextSource)
+	results := h.validateChunks(ctx, chunks, meta, sessionID, requestID)
 	fr.TotalChunks = len(chunks)
 	fr.ChunkResults = results
 
@@ -348,7 +379,7 @@ func (r *sizeLimitedReader) Read(p []byte) (int, error) {
 
 var errChunkBlocked = fmt.Errorf("chunk blocked")
 
-func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string, contextSource string) []*chunkResult {
+func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string, meta *models.ValidateRequestParams, sessionID, requestID string) []*chunkResult {
 	results := make([]*chunkResult, len(chunks))
 	g, gCtx := errgroup.WithContext(ctx)
 	g.SetLimit(h.cfg.File.MaxConcurrent)
@@ -359,7 +390,7 @@ func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string,
 				return nil
 			}
 			payload := marshalPromptPayload(chunk)
-			results[i] = h.validateWithRetry(gCtx, payload, contextSource)
+			results[i] = h.validateWithRetry(gCtx, payload, meta, sessionID, requestID)
 			if results[i].Err != nil || !results[i].Result.Allowed {
 				return errChunkBlocked
 			}
@@ -370,7 +401,9 @@ func (h *ValidationHandler) validateChunks(ctx context.Context, chunks []string,
 	return results
 }
 
-func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload, contextSource string) *chunkResult {
+func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload string, meta *models.ValidateRequestParams, sessionID, requestID string) *chunkResult {
+	params := *meta
+	params.RequestPayload = payload
 	maxRetries := h.cfg.File.MaxRetries
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -383,10 +416,7 @@ func (h *ValidationHandler) validateWithRetry(ctx context.Context, payload, cont
 				return &chunkResult{Err: ctx.Err()}
 			}
 		}
-		result, err := h.validatorService.ValidateRequest(ctx, &models.ValidateRequestParams{
-			RequestPayload: payload,
-			ContextSource:  contextSource,
-		}, "", "")
+		result, err := h.validatorService.ValidateRequest(ctx, &params, sessionID, requestID)
 		if err != nil {
 			lastErr = err
 			continue

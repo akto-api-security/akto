@@ -1,7 +1,8 @@
 const TYPE_TAG_KEYS = { MCP_SERVER: 'mcp-server', GEN_AI: 'gen-ai', BROWSER_LLM: 'browser-llm' };
 const ASSET_TAG_KEYS = { MCP_CLIENT: 'mcp-client', AI_AGENT: 'ai-agent', BROWSER_LLM_AGENT: 'browser-llm-agent' };
-const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server' };
-const ROW_TYPES = { AGENT: 'agent', SERVICE: 'service' };
+const SKILL_TAG_KEY = 'skill';
+const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server', SKILL: 'Skill' };
+const ROW_TYPES = { AGENT: 'agent', SERVICE: 'service', SKILL: 'skill' };
 const TYPE_TAG_TO_DISPLAY = {
     [TYPE_TAG_KEYS.MCP_SERVER]: CLIENT_TYPES.MCP_SERVER,
     [TYPE_TAG_KEYS.GEN_AI]: CLIENT_TYPES.AI_AGENT,
@@ -119,6 +120,11 @@ const findTypeTag = (envType) => {
     return null;
 };
 
+const findSkillTags = (envType) => {
+    if (!Array.isArray(envType)) return [];
+    return envType.filter(tag => tag.keyName === SKILL_TAG_KEY).map(tag => tag.value).filter(Boolean);
+};
+
 // Get agent type from tag value using KNOWN_CLIENTS map (for agent rows)
 const getAgentTypeFromValue = (tagValue) => {
     const info = findClientInfo(tagValue);
@@ -133,10 +139,12 @@ export {
     getTypeFromTags,
     findAssetTag,
     findTypeTag,
+    findSkillTags,
     getAgentTypeFromValue,
     CLIENT_TYPES,
     TYPE_TAG_KEYS,
     ASSET_TAG_KEYS,
+    SKILL_TAG_KEY,
     ROW_TYPES
 };
 export default formatDisplayName;

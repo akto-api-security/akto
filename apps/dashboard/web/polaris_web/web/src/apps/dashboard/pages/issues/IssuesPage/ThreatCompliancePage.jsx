@@ -19,6 +19,7 @@ import SampleDetails from "../../threat_detection/components/SampleDetails";
 import useTable from "../../../components/tables/TableContext.js";
 import TableStore from "../../../components/tables/TableStore.js";
 import transform from "../transform.js";
+import ComplianceMenu from "./ComplianceMenu.jsx";
 import useThreatReportDownload from "../../../hooks/useThreatReportDownload";
 import { updateThreatFiltersStore } from "../../threat_detection/utils/threatFilters";
 
@@ -35,13 +36,13 @@ const resourceName = {
 };
 
 const getCompliances = () => {
-    const isDemoAccount = func.isDemoAccount();
     const isMCP = isMCPSecurityCategory();
     const isGenAiSecurity = isGenAISecurityCategory();
     const isAgenticSecurity = isAgenticSecurityCategory();
+    const isEndpointSecurity = isEndpointSecurityCategory();
 
-    if (isDemoAccount && (isMCP || isAgenticSecurity || isGenAiSecurity)) {
-        return ["OWASP Agentic", "OWASP LLM", "NIST AI Risk Management Framework","MITRE ATLAS","CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];
+    if (isMCP || isAgenticSecurity || isGenAiSecurity ||  isEndpointSecurity) {
+        return ["OWASP Agentic Top 10", "OWASP LLM", "EU AI Act", "NIST AI Risk Management Framework", "CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP", "MITRE ATLAS"];
     }
 
     return ["CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];
@@ -241,12 +242,9 @@ function ThreatCompliancePage() {
     };
 
     function calcFilteredThreatFilterIds(complianceView) {
-        let ret = Object.entries(threatFiltersMap || {})
-            .filter(([_, v]) => {
-                return !!v.compliance?.mapComplianceToListClauses[complianceView]
-            })
-            .map(([k, _]) => k);
-        return ret;
+        return Object.entries(threatFiltersMap || {})
+            .filter(([_, v]) => transform.subcategoryMatchesComplianceFramework(v.compliance, complianceView))
+            .map(([k]) => k);
     }
 
     const handleDetailsVisibility = useCallback((visible) => {
@@ -857,24 +855,10 @@ function ThreatCompliancePage() {
                     >
                         <Popover.Pane fixed>
                             <Popover.Section>
-                                <VerticalStack gap={"2"}>
-                                    {allCompliances.map((compliance, idx) => (
-                                        <Button
-                                            key={idx}
-                                            textAlign="left"
-                                            plain
-                                            onClick={() => onSelectCompliance(compliance)}
-                                            removeUnderline
-                                        >
-                                            <Box>
-                                                <HorizontalStack gap={2}>
-                                                    <Avatar source={func.getComplianceIcon(compliance)} shape="square" size="extraSmall" />
-                                                    <Text>{compliance}</Text>
-                                                </HorizontalStack>
-                                            </Box>
-                                        </Button>
-                                    ))}
-                                </VerticalStack>
+                                <ComplianceMenu
+                                    items={allCompliances}
+                                    onSelect={onSelectCompliance}
+                                />
                             </Popover.Section>
                         </Popover.Pane>
                     </Popover>

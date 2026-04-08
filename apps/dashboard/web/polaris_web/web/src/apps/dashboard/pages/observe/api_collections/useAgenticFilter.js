@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PersistStore from '../../../../main/PersistStore';
 import { formatDisplayName, ASSET_TAG_KEYS } from '../agentic/mcpClientHelper';
-import { INVENTORY_FILTER_KEY, ASSET_TAG_KEY_VALUES, extractServiceName } from '../agentic/constants';
+import { INVENTORY_FILTER_KEY, ASSET_TAG_KEY_VALUES, SKILL_TAG_KEY, extractServiceName } from '../agentic/constants';
 
 /** Agent tag keys that represent the same agent (gen-ai + mcp-server for one click) */
 const AGENT_TAG_KEYS_FOR_FILTER = [ASSET_TAG_KEYS.AI_AGENT, ASSET_TAG_KEYS.MCP_CLIENT];
@@ -14,7 +14,8 @@ const FILTER_TYPES = {
     BROWSER_LLM: 'browser-llm',
     AI_AGENT: 'ai-agent',
     MCP_SERVER: 'mcp-server',
-    SERVICE: 'service'
+    SERVICE: 'service',
+    SKILL: 'skill'
 };
 
 /**
@@ -159,16 +160,19 @@ const useAgenticFilter = (normalData) => {
 
             if (!isNegated && filterValues.length === 1) {
                 const parts = filterValues[0].split('=');
-                if (parts.length === 2 && ASSET_TAG_KEY_VALUES.includes(parts[0])) {
-                    filterTitle = formatDisplayName(parts[1]);
-                    
-                    // Determine filter type from the tag key
-                    if (parts[0] === ASSET_TAG_KEYS.BROWSER_LLM_AGENT) {
-                        filterType = FILTER_TYPES.BROWSER_LLM;
-                    } else if (parts[0] === ASSET_TAG_KEYS.AI_AGENT) {
-                        filterType = FILTER_TYPES.AI_AGENT;
-                    } else if (parts[0] === ASSET_TAG_KEYS.MCP_CLIENT) {
-                        filterType = FILTER_TYPES.AI_AGENT; // mcp-client is treated as AI Agent
+                if (parts.length === 2) {
+                    if (ASSET_TAG_KEY_VALUES.includes(parts[0])) {
+                        filterTitle = formatDisplayName(parts[1]);
+                        if (parts[0] === ASSET_TAG_KEYS.BROWSER_LLM_AGENT) {
+                            filterType = FILTER_TYPES.BROWSER_LLM;
+                        } else if (parts[0] === ASSET_TAG_KEYS.AI_AGENT) {
+                            filterType = FILTER_TYPES.AI_AGENT;
+                        } else if (parts[0] === ASSET_TAG_KEYS.MCP_CLIENT) {
+                            filterType = FILTER_TYPES.AI_AGENT;
+                        }
+                    } else if (parts[0] === SKILL_TAG_KEY) {
+                        filterTitle = formatDisplayName(parts[1]);
+                        filterType = FILTER_TYPES.SKILL;
                     }
                 }
             }

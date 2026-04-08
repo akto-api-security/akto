@@ -56,12 +56,14 @@ const WelcomeBackDetailsModal = ({ isAdmin }) => {
         window.localStorage.setItem("username", username)
         window.localStorage.setItem("organization", organization)        
 
+
+        setModalToggle(false)
+
+        // Update backend - but don't block UI if it fails
         homeRequests.updateUsernameAndOrganization(username, organization).then((resp) => {
-            try {
-                setModalToggle(false)
-            } catch (error) {
-                func.setToast(true, true, "Invalid username or organization name")
-            }
+        }).catch((error) => {
+            // Fail silently - modal is already closed
+            console.error("Error updating username/organization:", error)
         })
     }
 

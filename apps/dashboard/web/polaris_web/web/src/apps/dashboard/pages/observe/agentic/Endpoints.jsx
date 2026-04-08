@@ -18,21 +18,24 @@ import {
     resourceName,
     INVENTORY_PATH,
     INVENTORY_FILTER_KEY,
+    PAGE_LIMIT,
     groupCollectionsByAgent,
     groupCollectionsByService,
+    groupCollectionsBySkill,
     createEnvTypeFilter,
     createHostnameFilter,
     extractEndpointId,
-    ROW_TYPES
+    ROW_TYPES,
+    SKILL_TAG_KEY
 } from "./constants";
 import { CLIENT_TYPES } from "./mcpClientHelper";
 
-const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs'];
+const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
 
 function Endpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
-    const [data, setData] = useState({ all: [], 'ai_agents': [], 'mcp_servers': [], llms: [] });
+    const [data, setData] = useState({ all: [], 'ai_agents': [], 'mcp_servers': [], llms: [], skills: [] });
     const [summaryData, setSummaryData] = useState({ totalAssets: 0, totalEndpoints: 0 });
 
     const { tabsInfo } = useTable();
@@ -111,12 +114,14 @@ function Endpoints() {
             const riskScoreMap = riskScoreResp?.riskScoreOfCollectionsMap || {};
             const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
 
-            // Group collections by agents (discovery sources) and services (discovered endpoints)
+            // Group collections by agents (discovery sources), services (discovered endpoints), and skills
             const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap);
             const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
+            const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap);
 
             const prettifiedAgents = prettifyGroupData(agentGroups);
             const prettifiedServices = prettifyGroupData(serviceGroups);
+            const prettifiedSkills = prettifyGroupData(skillGroups);
 
             // For AI Agent: agent row already represents both gen-ai and mcp-server for that agent.
             // Don't show a separate service row with the same key (would show as "2 columns").
@@ -146,6 +151,7 @@ function Endpoints() {
                 ai_agents: allData.filter(r => r.clientType === CLIENT_TYPES.AI_AGENT),
                 mcp_servers: allData.filter(r => r.clientType === CLIENT_TYPES.MCP_SERVER),
                 llms: allData.filter(r => r.clientType === CLIENT_TYPES.LLM),
+                skills: prettifiedSkills,
             });
             setLoading(false);
         } catch {
@@ -177,6 +183,9 @@ function Endpoints() {
             if (row.hostNames?.length > 0) {
                 updatedFiltersMap[INVENTORY_FILTER_KEY] = createHostnameFilter(row.hostNames);
             }
+        } else if (row.rowType === ROW_TYPES.SKILL) {
+            const filterValue = `${SKILL_TAG_KEY}=${row.groupKey}`;
+            updatedFiltersMap[INVENTORY_FILTER_KEY] = createEnvTypeFilter([filterValue], false);
         } else {
             delete updatedFiltersMap[INVENTORY_FILTER_KEY];
         }
@@ -207,27 +216,29 @@ function Endpoints() {
         <SummaryCardInfo summaryItems={summaryItems} key="summary" />
     ), [summaryItems]);
 
-    const tableComponent = useMemo(() => (
-        <GithubSimpleTable
-            pageLimit={100}
-            data={data[selectedTab]}
-            sortOptions={sortOptions}
-            resourceName={resourceName}
-            filters={[]}
-            headers={headers}
-            selectable={false}
-            mode={IndexFiltersMode.Default}
-            headings={headers}
-            useNewRow={true}
-            condensedHeight={true}
-            disambiguateLabel={disambiguateLabel}
-            prettifyPageData={(pageData) => pageData}
-            onRowClick={handleRowClick}
-            tableTabs={tableTabs}
-            onSelect={handleSelectedTab}
-            selected={selected}
-        />
-    ), [data, selectedTab, headers, disambiguateLabel, handleRowClick, tableTabs, selected]);
+    const tableComponent = useMemo(() => {
+        const commonTabProps = { tableTabs, onSelect: handleSelectedTab, selected };
+        return (
+            <GithubSimpleTable
+                key="table"
+                pageLimit={PAGE_LIMIT}
+                data={data[selectedTab]}
+                sortOptions={sortOptions}
+                resourceName={resourceName}
+                filters={[]}
+                headers={headers}
+                selectable={false}
+                mode={IndexFiltersMode.Default}
+                headings={headers}
+                useNewRow={true}
+                condensedHeight={true}
+                disambiguateLabel={disambiguateLabel}
+                prettifyPageData={(pageData) => pageData}
+                onRowClick={handleRowClick}
+                {...commonTabProps}
+            />
+        );
+    }, [data, selectedTab, headers, disambiguateLabel, handleRowClick, tableTabs, selected]);
 
     const pageTitle = useMemo(() => (
         <TitleWithInfo

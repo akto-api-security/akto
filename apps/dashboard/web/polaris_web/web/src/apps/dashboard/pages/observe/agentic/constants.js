@@ -3,18 +3,27 @@ import {
     ASSET_TAG_KEYS, 
     ROW_TYPES,
     TYPE_TAG_KEYS,
+    SKILL_TAG_KEY,
+    CLIENT_TYPES,
     formatDisplayName, 
     getTypeFromTags, 
     findAssetTag,
     findTypeTag,
+    findSkillTags,
     getAgentTypeFromValue 
 } from "./mcpClientHelper";
 import func from "@/util/func";
+
+// Table constants
+export const PAGE_LIMIT = 100;
 
 // Route constants
 export const INVENTORY_PATH = '/dashboard/observe/inventory';
 export const INVENTORY_FILTER_KEY = '/dashboard/observe/inventory/';
 export const ASSET_TAG_KEY_VALUES = Object.values(ASSET_TAG_KEYS);
+
+// Row ID prefixes for grouped data
+const ROW_ID_PREFIX = { AGENT: 'agent', SERVICE: 'service', SKILL: 'skill' };
 
 // Table headers with all columns
 export const getHeaders = () => {
@@ -154,7 +163,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
     
     return Object.values(agents).map(g => ({
         ...g,
-        id: `agent-${g.groupKey}`,
+        id: `${ROW_ID_PREFIX.AGENT}-${g.groupKey}`,
         endpointsCount: g.endpointIds.size,
         sensitiveInRespTypes: Array.from(g.sensitiveTypes),
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
@@ -234,13 +243,70 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
     
     return Object.values(services).map(g => ({
         ...g,
-        id: `service-${g.groupKey}`,
+        id: `${ROW_ID_PREFIX.SERVICE}-${g.groupKey}`,
         endpointsCount: g.endpointIds.size,
         sensitiveInRespTypes: Array.from(g.sensitiveTypes),
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore,
+    }));
+};
+
+// Group collections by skill tag value — one row per unique skill name
+export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveMap = {}) => {
+    const skills = {};
+
+    collections.forEach((c) => {
+        if (c.deactivated) return;
+        const skillValues = findSkillTags(c.envType);
+        if (!skillValues || skillValues.length === 0) return;
+
+        const hostName = c.hostName || c.displayName || c.name;
+        const endpointId = extractEndpointId(hostName);
+
+        skillValues.forEach((skillValue) => {
+            if (!skills[skillValue]) {
+                skills[skillValue] = {
+                    rowType: ROW_TYPES.SKILL,
+                    groupName: skillValue,
+                    groupKey: skillValue,
+                    clientType: CLIENT_TYPES.SKILL,
+                    collections: [],
+                    firstCollection: null,
+                    hostNames: [],
+                    endpointIds: new Set(),
+                    sensitiveTypes: new Set(),
+                    maxTrafficTimestamp: 0,
+                };
+            }
+
+            skills[skillValue].collections.push(c);
+            if (!skills[skillValue].firstCollection) skills[skillValue].firstCollection = c;
+            if (hostName && !skills[skillValue].hostNames.includes(hostName)) {
+                skills[skillValue].hostNames.push(hostName);
+            }
+            if (endpointId) skills[skillValue].endpointIds.add(endpointId);
+
+            const sensitive = sensitiveMap[c.id] || [];
+            sensitive.forEach(s => skills[skillValue].sensitiveTypes.add(s));
+
+            const traffic = trafficMap[c.id] || 0;
+            if (traffic > skills[skillValue].maxTrafficTimestamp) {
+                skills[skillValue].maxTrafficTimestamp = traffic;
+            }
+        });
+    });
+
+    return Object.values(skills).map(g => ({
+        ...g,
+        id: `${ROW_ID_PREFIX.SKILL}-${g.groupKey}`,
+        endpointsCount: g.endpointIds.size,
+        sensitiveInRespTypes: Array.from(g.sensitiveTypes),
+        sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
+        detectedTimestamp: g.maxTrafficTimestamp,
+        lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
+        riskScore: null,
     }));
 };
 
@@ -254,4 +320,4 @@ export const createHostnameFilter = (hostnames) => ({
     sort: []
 });
 
-export { ROW_TYPES } from "./mcpClientHelper";
+export { ROW_TYPES, SKILL_TAG_KEY } from "./mcpClientHelper";

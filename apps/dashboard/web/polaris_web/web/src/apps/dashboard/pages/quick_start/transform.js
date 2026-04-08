@@ -277,7 +277,7 @@ const fargateObj = {
     label: 'AWS Fargate',
     text: "AWS Fargate allows you to use Amazon ECS to run containers without having to manage servers or clusters of Amazon EC2 instances.", 
     docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-fargate',
-    component: <FargateSource docsUrl='https://docs.akto.io/traffic-connector/aws-services/aws-fargate' bannerTitle="Setup using Fargate" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/aws-fargate#add-akto-traffic-collector-container"/>,
+    component: <FargateSource docsUrl='https://docs.akto.io/traffic-connector/aws-services/aws-fargate' bannerTitle="Setup using Fargate" innerUrl="https://docs.akto.io/traffic-connector/aws-services/aws-fargate"/>,
     key: "FARGATE"
 }
 const burpObj = {
@@ -537,7 +537,7 @@ const agenticShieldObj = {
     icon: '/public/mcp.svg',
     label: "Agentic Shield",
     text: "Agentic Shield provides runtime protection and discovery of LLMs/AI Agents on your local environment.",
-    docsUrl: 'https://docs.akto.io/agentic-shield',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/agentic-shield',
     key: "AGENTIC_SHIELD",
     component: <AgenticShield/>
 }
@@ -626,7 +626,7 @@ const dockerObj = {
     label: "Docker",
     text: "This setup is recommended only if other setups for AWS or GCP don't work.",
     docsUrl: 'https://docs.akto.io/traffic-connector/virtual-machines/docker',
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/virtual-machines/docker" bannerTitle="Setup using Docker"innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/docker#adding-akto-docker-service"/>,
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/virtual-machines/docker" bannerTitle="Setup using Docker" innerUrl="https://docs.akto.io/traffic-connector/virtual-machines/docker"/>,
     key: "DOCKER"
 }
 
@@ -749,7 +749,7 @@ const tcpObj = {
     text: ' This setup is recommended only if other setups for AWS or GCP do not work.',
     docsUrl: 'https://docs.akto.io/traffic-connector/virtual-machines/tcp-agent',
     key: "NGINX",
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/virtual-machines/tcp-agent" bannerTitle="Setup using TCP Agent" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/tcp-agent#adding-akto-traffic-collector-container" />
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/virtual-machines/tcp-agent" bannerTitle="Setup using TCP Agent" innerUrl="https://docs.akto.io/traffic-connector/virtual-machines/tcp-agent" />
 }
 
 const hybridSaasObj = {
@@ -790,7 +790,7 @@ const ebpfMTLSObj = {
     text: 'Akto-eBPF-mTLS setup is recommended for mTLS systems where TLS termination occurs at the application.',
     docsUrl: 'https://docs.akto.io/traffic-connector/ebpf/ebpf-mtls',
     key: "EBPF_MTLS",
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/ebpf/ebpf-mtls" bannerTitle="Setup using eBPF mTLS" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf-mtls#adding-akto-traffic-collector"/>,
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/ebpf/ebpf-mtls" bannerTitle="Setup using eBPF mTLS" innerUrl="https://docs.akto.io/traffic-connector/ebpf/ebpf-mtls"/>,
 }
 
 const istioObj = {
@@ -1057,7 +1057,7 @@ const databricksImportObj = {
     icon: '/public/databricks.svg',
     label: "Databricks",
     text: "Import Databricks agents seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/databrics',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/databricks',
     key: "DATABRICKS_IMPORT",
     component: <AIAgentConnectorImport
         connectorType={CONNECTOR_TYPE_DATABRICKS}
@@ -1073,7 +1073,7 @@ const vertexAICustomDeployedModelImportObj = {
     icon: '/public/vertex_ai.svg',
     label: "Vertex AI Custom Deployed Model",
     text: "Import your Vertex AI Custom Deployed Model traffic seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/vertex-ai-custom-deployed-model',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/vertex-ai',
     key: "VERTEX_AI_CUSTOM_DEPLOYED_MODEL_IMPORT",
     component: <AIAgentConnectorImport
         connectorType={CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL}
@@ -1105,11 +1105,11 @@ const litellmImportObj = {
     icon: '/public/litellm.svg',
     label: "LiteLLM",
     text: "Import your LiteLLM proxy traffic, seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/litellm',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/litellm',
     key: "LITELLM",
     component: <BannerComponent
         content="Import your LiteLLM proxy traffic, seamlessly in AKTO."
-        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/litellm'
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/litellm'
     />
 }
 
@@ -1117,11 +1117,11 @@ const claudeCodeCliHookObj = {
     icon: '/public/claudeCodeCli.svg',
     label: "Claude Code CLI Hook",
     text: "Import your Claude Code CLI proxy traffic, seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-code-cli-hook',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-cli-hooks',
     key: "CLAUDE_CODE_CLI_HOOK",
     component: <BannerComponent
         content="Import your Claude Code CLI proxy traffic, seamlessly in AKTO."
-        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-code-cli-hook'
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-cli-hooks'
     />
 }
 
@@ -1141,11 +1141,11 @@ const githubCopilotHookObj = {
     icon: '/public/githubCopilot.svg',
     label: "GitHub Copilot CLI Hook",
     text: "Import your GitHub Copilot CLI proxy traffic, seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/github-copilot-cli-hooks',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/copilot-cli-hooks',
     key: "GITHUB_COPILOT_CLI_HOOK",
     component: <BannerComponent
         content="Import your GitHub Copilot CLI proxy traffic, seamlessly into AKTO."
-        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/github-copilot-cli-hooks'
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/copilot-cli-hooks'
     />
 }
 

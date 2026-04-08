@@ -1634,7 +1634,12 @@ updateQueryParams(searchParams, setSearchParams, key, value) {
   setSearchParams(newSearchParams);
 },
  getComplianceIcon: (complianceName) => {
-  return "/public/"+complianceName.toUpperCase()+".svg";
+  if (!complianceName || typeof complianceName !== "string") return "";
+  const trimmed = complianceName.trim();
+  if (trimmed === "OWASP Agentic Top 10") {
+    return "/public/OWASP.svg";
+  }
+  return "/public/" + trimmed.toUpperCase() + ".svg";
 },
 
  convertToDisambiguateLabel(value, convertFunc, maxAllowed){
@@ -2510,6 +2515,23 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return { error: "Invalid email format" };
     }
   },
+
+   getStiggFeatureGrants() {
+      const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
+      const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false
+      const mcpSecurityGranted = stiggFeatures?.MCP_SECURITY?.isGranted || true
+      const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
+      const endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted
+      const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true
+
+      return {
+        agenticSecurityGranted,
+        endpointSecurityGranted,
+        dastGranted,
+        mcpSecurityGranted,
+        stiggFeatures
+      }
+    }
 }
 
 export default func
