@@ -33,6 +33,8 @@ public class TestingRunConfig {
     private List<String> testSuiteIds;
 
     public static final String AUTO_TICKETING_DETAILS = "autoTicketingDetails";
+    public static final String RUN_AUTOMATED_TESTS = "runAutomatedTests";
+    private boolean runAutomatedTests = false;
 
     private AutoTicketingDetails autoTicketingDetails;
 
@@ -128,6 +130,7 @@ public class TestingRunConfig {
         }
 
         this.cleanUp = that.cleanUp;
+        this.runAutomatedTests = that.runAutomatedTests;
     }
     
     public String getTestRoleId() {
@@ -177,5 +180,13 @@ public class TestingRunConfig {
 
     public void setAutoTicketingDetails(AutoTicketingDetails autoTicketingDetails) {
         this.autoTicketingDetails = autoTicketingDetails;
+    }
+
+    public boolean getRunAutomatedTests() {
+        return runAutomatedTests;
+    }
+
+    public void setRunAutomatedTests(boolean runAutomatedTests) {
+        this.runAutomatedTests = runAutomatedTests;
     }
 }
