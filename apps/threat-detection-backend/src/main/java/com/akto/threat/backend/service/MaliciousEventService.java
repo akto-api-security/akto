@@ -128,9 +128,6 @@ public class MaliciousEventService {
     // Skip recording for specific policies on specific account.
     // TODO: Remove once policy is fixed.
     if("1758787662".equals(accountId)){
-      if (IGNORED_POLICIES_FOR_ACCOUNT.contains(filterId)) {
-        return;
-      }
 
       if ("OSCommandInjection".equals(filterId) && evt.getLatestApiEndpoint().contains("api-transactions")) {
         return;
