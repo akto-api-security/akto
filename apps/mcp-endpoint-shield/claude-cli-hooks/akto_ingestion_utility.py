@@ -126,7 +126,7 @@ def build_ingestion_payload(
         tags:             Extra key/value pairs merged into the tag/metadata dicts.
         status_code:      HTTP status code string (default "200").
     """
-    base_tags: Dict[str, str] = {"gen-ai": "Gen AI"}
+    base_tags: Dict[str, str] = {"gen-ai": "Gen AI", "hook": hook_name}
     if MODE == "atlas":
         base_tags["ai-agent"] = "claudecli"
         base_tags["source"] = CONTEXT_SOURCE
@@ -179,8 +179,8 @@ def send_ingestion_data(
     status_code: str = "200",
     guardrails: bool = False,
     logger: logging.Logger,
-) -> None:
-    """Post ingestion data to the Akto HTTP proxy."""
+) -> Optional[Union[Dict[str, Any], str]]:
+    """Post ingestion data to the Akto HTTP proxy. Returns the API response dict, or None on failure."""
     if not AKTO_DATA_INGESTION_URL:
         logger.info("AKTO_DATA_INGESTION_URL not set, skipping ingestion")
         return
@@ -197,14 +197,16 @@ def send_ingestion_data(
     )
     logger.info(f">>>>>>>>>>>>>>>>>Ingestion payload: {json.dumps(payload)}")
     try:
-        post_payload_json(
+        result = post_payload_json(
             build_http_proxy_url(guardrails=guardrails, ingest_data=True),
             payload,
             logger,
         )
         logger.info(f"Ingestion successful for hook: {hook_name}")
+        return result
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
+        return None
 
 
 # ── Transcript reading ────────────────────────────────────────────────────────
@@ -243,4 +245,16 @@ def get_last_user_prompt(transcript_path: str, logger: logging.Logger) -> str:
         return last_user
     except Exception as e:
         logger.error(f"Error reading transcript: {e}")
+        return ""
+
+
+def read_file_content(file_path: str, logger: logging.Logger) -> str:
+    """Read and return the full text content of a file. Returns empty string on failure."""
+    if not file_path or not os.path.exists(file_path):
+        return ""
+    try:
+        with open(os.path.expanduser(file_path), "r", encoding="utf-8", errors="replace") as f:
+            return f.read()
+    except Exception as e:
+        logger.error(f"Error reading file {file_path}: {e}")
         return ""

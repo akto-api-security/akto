@@ -38,7 +38,7 @@ def main():
             hook_name="SubagentStart",
             request_payload=user_prompt,
             response_payload={},
-            tags={"hook": "SubagentStart", "agent_type": agent_type},
+            tags=None,
             guardrails=not AKTO_SYNC_MODE,
             logger=logger,
         )

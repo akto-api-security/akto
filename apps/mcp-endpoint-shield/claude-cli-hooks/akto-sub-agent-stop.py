@@ -8,7 +8,6 @@ import json
 import sys
 
 from akto_ingestion_utility import (
-    AKTO_SYNC_MODE,
     MODE,
     get_last_user_prompt,
     send_ingestion_data,
@@ -36,14 +35,20 @@ def main():
             sys.exit(0)
 
         logger.info(f"Agent type: {agent_type}, Prompt: {len(user_prompt)} chars, Response: {len(response_text)} chars, Transcript: {transcript_path}")
-        send_ingestion_data(
+        result = send_ingestion_data(
             hook_name="SubagentStop",
             request_payload=user_prompt,
             response_payload=response_text,
-            tags={"hook": "SubagentStop", "agent_type": agent_type},
-            guardrails=not AKTO_SYNC_MODE,
+            tags=None,
+            guardrails=True,
             logger=logger,
         )
+
+        allowed = (result or {}).get("data", {}).get("guardrailsResult", {}).get("Allowed", True)
+        if not allowed:
+            reason = (result or {}).get("data", {}).get("guardrailsResult", {}).get("Reason", "Policy violation")
+            logger.warning(f"BLOCKING SubagentStop: {reason}")
+            print(json.dumps({"decision": "block", "reason": reason}))
 
     except Exception as e:
         logger.error(f"Main error: {e}")
