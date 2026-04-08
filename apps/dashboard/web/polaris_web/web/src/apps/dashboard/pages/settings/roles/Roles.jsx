@@ -63,19 +63,26 @@ const Roles = () => {
     }
 
     const getRoleData = async () => {
-        setLoading(true);
-        const roleResponse = await settingRequests.getCustomRoles()
-        if (roleResponse.roles) {
-            setRoles(roleResponse.roles)
-            setTempRoles(roleResponse.roles)
+        try {
+            setLoading(true);
+            const roleResponse = await settingRequests.getCustomRoles()
+            if (roleResponse && roleResponse.roles) {
+                setRoles(roleResponse.roles)
+                setTempRoles(roleResponse.roles)
+            }
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
         }
-        setLoading(false)
     };
 
     const getAllAllowedFeatures = async () => {
-        const featuresResponse = await settingRequests.getAllowedFeaturesForRBAC()
-        if (featuresResponse) {
-            setAllowedFeatures(featuresResponse);
+        try {
+            const featuresResponse = await settingRequests.getAllowedFeaturesForRBAC()
+            if (featuresResponse) {
+                setAllowedFeatures(featuresResponse);
+            }
+        } catch (error) {
         }
     }
 
