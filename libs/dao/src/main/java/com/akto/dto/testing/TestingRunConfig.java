@@ -32,8 +32,6 @@ public class TestingRunConfig {
     public static final String TEST_SUITE_IDS = "testSuiteIds";
 
     public static final String AUTO_TICKETING_DETAILS = "autoTicketingDetails";
-    public static final String RUN_AUTOMATED_TESTS = "runAutomatedTests";
-    private boolean runAutomatedTests = false;
 
     @Getter
     @Setter
@@ -127,7 +125,6 @@ public class TestingRunConfig {
         }
 
         this.cleanUp = that.cleanUp;
-        this.runAutomatedTests = that.runAutomatedTests;
     }
 
     
@@ -162,11 +159,4 @@ public class TestingRunConfig {
         this.testSuiteIds = testSuiteIds;
     }
 
-    public boolean getRunAutomatedTests() {
-        return runAutomatedTests;
-    }
-
-    public void setRunAutomatedTests(boolean runAutomatedTests) {
-        this.runAutomatedTests = runAutomatedTests;
-    }
 }

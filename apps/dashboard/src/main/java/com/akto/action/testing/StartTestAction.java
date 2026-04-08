@@ -236,19 +236,19 @@ public class StartTestAction extends UserAction {
             }
             List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
             testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
-            testingRunConfig.setRunAutomatedTests(this.runAutomatedTests);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
 
         // Get dashboard context from Context.contextSource (set by UserDetailsFilter from x-context-source header)
         CONTEXT_SOURCE dashboardContext = Context.contextSource.get();
-        
+
         TestingRun testingRun = new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
                 this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId, dashboardContext);
         testingRun.setDoNotMarkIssuesAsFixed(this.doNotMarkIssuesAsFixed);
         testingRun.setMaxAgentTokens(this.maxAgentTokens);
+        testingRun.setRunAutomatedTests(this.runAutomatedTests);
         return testingRun;
     }
 
@@ -376,7 +376,6 @@ public class StartTestAction extends UserAction {
 
                 List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
                 testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
-                testingRunConfig.setRunAutomatedTests(this.runAutomatedTests);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
             }
