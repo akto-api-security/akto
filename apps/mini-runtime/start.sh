@@ -86,7 +86,8 @@ done &
 
 # Start Java and monitor it
 start_java() {
-    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar 2>&1 | tee -a "$LOG_FILE" &
+    
+    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar > >(tee -a "$LOG_FILE") 2>&1 &
 
     JAVA_PID=$!
     echo "Started Java with PID: $JAVA_PID" | tee -a "$LOG_FILE"
