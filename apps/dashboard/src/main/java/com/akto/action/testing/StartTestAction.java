@@ -249,7 +249,6 @@ public class StartTestAction extends UserAction {
                 this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId, dashboardContext);
         testingRun.setDoNotMarkIssuesAsFixed(this.doNotMarkIssuesAsFixed);
         testingRun.setMaxAgentTokens(this.maxAgentTokens);
-        testingRun.setRunAutomatedTests(this.runAutomatedTests);
         return testingRun;
     }
 
