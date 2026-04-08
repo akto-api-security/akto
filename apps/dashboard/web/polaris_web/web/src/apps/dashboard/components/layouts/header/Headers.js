@@ -213,6 +213,10 @@ export default function Header() {
             : "/dashboard/observe/inventory";
         navigate(targetPath);
         navigate(0);
+
+        // Reload page to trigger ProfileAction with new dashboard category context
+        // This ensures window.USER_ROLE is updated based on scopeRoleMapping for the new scope
+        window.location.reload();
     }
 
     function createNewAccount() {

@@ -123,6 +123,22 @@ public class ProfileAction extends UserAction {
         Map<String, String> scopeRoleMapping = new HashMap<>();
         if (rbac != null && rbac.getScopeRoleMapping() != null) {
             scopeRoleMapping = rbac.getScopeRoleMapping();
+
+            // If user has scope-role mapping, use role from current scope instead of primary role
+            if (!scopeRoleMapping.isEmpty()) {
+                try {
+                    Object contextSourceObj = Context.contextSource.get();
+                    if (contextSourceObj != null) {
+                        String currentScope = contextSourceObj.toString();
+                        String scopeRole = scopeRoleMapping.get(currentScope);
+                        if (scopeRole != null && !scopeRole.isEmpty()) {
+                            userRole = RBAC.Role.valueOf(scopeRole.toUpperCase());
+                        }
+                    }
+                } catch (Exception e) {
+                    // On any error, keep the primary role
+                }
+            }
         }
 
         boolean jiraIntegrated = false;
