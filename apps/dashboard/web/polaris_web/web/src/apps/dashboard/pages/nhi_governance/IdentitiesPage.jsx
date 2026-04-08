@@ -14,6 +14,7 @@ import func from "@/util/func";
 import values from "@/util/values";
 import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 import IdentityDetailsPanel from "./IdentityDetailsPanel";
+import IdentityOverviewGraph from "./IdentityOverviewGraph";
 import { violationsTableData, IdentityIcon, AgentIcon, ViolationBubbles } from "./nhiViolationsData";
 
 const definedTableTabs = ["All", "Expired"];
@@ -215,6 +216,12 @@ export default function IdentitiesPage() {
             primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(d) => dispatchCurrDateRange({ type: "update", period: d.period, title: d.title, alias: d.alias })} />}
             components={[
                 <SummaryCardInfo key="summary" summaryItems={summaryItems} />,
+
+                <IdentityOverviewGraph
+                    key="overview-graph"
+                    tableData={tableData}
+                    onIdentityClick={(row) => { setSelectedRow(row); setShowDetailsPanel(true); }}
+                />,
 
                 <GithubSimpleTable
                     key="identities-table"

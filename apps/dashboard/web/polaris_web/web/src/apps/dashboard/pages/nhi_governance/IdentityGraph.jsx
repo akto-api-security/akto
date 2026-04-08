@@ -1,9 +1,10 @@
 import { useMemo } from "react";
 import ReactFlow from "react-flow-renderer";
 import { AgentNode, AgentEdge } from "../observe/api_collections/AgentDiscoverGraph";
+import { isAgenticSecurityCategory } from "../../../main/labelHelper";
 
 // ── Per-identity resource mappings ────────────────────────────────────────────
-const IDENTITY_RESOURCES = {
+export const IDENTITY_RESOURCES = {
     "aws-cursor-key":      [{ label: "Bedrock",     type: "LLM",           category: "ai-model"  }, { label: "S3",          type: "AWS Resource",  category: "ai-tool"   }, { label: "EC2",         type: "AWS Resource",  category: "ai-tool"   }],
     "hr-slack-token":      [{ label: "Slack",       type: "Messaging",     category: "ai-tool"   }, { label: "HR System",   type: "Internal DB",   category: "internal"  }],
     "aws-env-sa":          [{ label: "S3",          type: "AWS Resource",  category: "ai-tool"   }, { label: "RDS",         type: "AWS Resource",  category: "ai-tool"   }],
@@ -22,7 +23,7 @@ const IDENTITY_RESOURCES = {
     "anthropic-api-key":   [{ label: "Claude",      type: "LLM",           category: "ai-model"  }],
 };
 
-function getDefaultResources(identityName) {
+export function getDefaultResources(identityName) {
     if (identityName.includes("aws"))    return [{ label: "S3",     type: "AWS Resource", category: "ai-tool"  }];
     if (identityName.includes("github")) return [{ label: "GitHub", type: "Repository",  category: "internal" }];
     if (identityName.includes("slack"))  return [{ label: "Slack",  type: "Messaging",   category: "ai-tool"  }];
@@ -34,6 +35,7 @@ const EDGE_TYPES = { agentEdge: AgentEdge };
 
 export default function IdentityGraph({ row }) {
     const { nodes, edges, height } = useMemo(() => {
+        const isArgus = isAgenticSecurityCategory();
         const resources = IDENTITY_RESOURCES[row.identityName] || getDefaultResources(row.identityName);
         const n = resources.length;
         const SPACING = 82;
@@ -49,22 +51,30 @@ export default function IdentityGraph({ row }) {
             data: { component: { id, ...component }, onNodeClick: null },
         });
 
+        // Atlas: owner → agent → identity → resources
+        // Argus:          agent → identity → resources  (no owner)
+        const agentX    = isArgus ? 10  : 240;
+        const identityX = isArgus ? 240 : 470;
+        const resourceX = isArgus ? 470 : 700;
+
         const nodes = [
-            makeNode("owner", 10, centerY, {
-                label: row.owner || "Unknown",
-                type:  "Owner",
-                category: "internal",
-                description: `Owner of ${row.identityName}`,
-                status: "active",
-            }),
-            makeNode("agent", 240, centerY, {
+            ...(isArgus ? [] : [
+                makeNode("owner", 10, centerY, {
+                    label: row.owner || "Unknown",
+                    type:  "Owner",
+                    category: "internal",
+                    description: `Owner of ${row.identityName}`,
+                    status: "active",
+                }),
+            ]),
+            makeNode("agent", agentX, centerY, {
                 label: row.agent,
                 type:  "AI Agent",
                 category: "agent",
                 description: `Agent using ${row.identityName}`,
                 status: "active",
             }),
-            makeNode("identity", 470, centerY, {
+            makeNode("identity", identityX, centerY, {
                 label: row.identityName,
                 type:  row.type,
                 category: "mcp",
@@ -73,7 +83,7 @@ export default function IdentityGraph({ row }) {
             }),
             ...resources.map((r, i) => makeNode(
                 `res-${i}`,
-                700,
+                resourceX,
                 centerY - totalH / 2 + i * SPACING,
                 {
                     label: r.label,
@@ -86,7 +96,9 @@ export default function IdentityGraph({ row }) {
         ];
 
         const edges = [
-            { id: "e-o-a", source: "owner",    target: "agent",    type: "agentEdge", data: {} },
+            ...(isArgus ? [] : [
+                { id: "e-o-a", source: "owner", target: "agent", type: "agentEdge", data: {} },
+            ]),
             { id: "e-a-i", source: "agent",    target: "identity", type: "agentEdge", data: {} },
             ...resources.map((_, i) => ({
                 id: `e-i-r${i}`,
