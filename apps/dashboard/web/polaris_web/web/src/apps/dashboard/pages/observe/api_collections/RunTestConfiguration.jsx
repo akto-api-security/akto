@@ -331,6 +331,13 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 checked={!testRun.doNotMarkIssuesAsFixed}
                 onChange={() => setTestRun(prev => ({ ...prev, doNotMarkIssuesAsFixed: !prev.doNotMarkIssuesAsFixed }))}
             />
+            {isAgenticCategory && (
+                <Checkbox
+                    label="Run automated tests"
+                    checked={testRun.runAutomatedTests}
+                    onChange={(val) => setTestRun(prev => ({ ...prev, runAutomatedTests: val }))}
+                />
+            )}
         </VerticalStack>
     );
 };

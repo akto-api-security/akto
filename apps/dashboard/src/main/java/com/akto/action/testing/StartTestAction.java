@@ -173,6 +173,7 @@ public class StartTestAction extends UserAction {
     private boolean sendSlackAlert = false;
     private boolean sendMsTeamsAlert = false;
     private boolean doNotMarkIssuesAsFixed = false;
+    private boolean runAutomatedTests = false;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName, int selectedSlackChannelId) {
         User user = getSUser();
@@ -235,6 +236,7 @@ public class StartTestAction extends UserAction {
             }
             List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
             testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
+            testingRunConfig.setRunAutomatedTests(this.runAutomatedTests);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -247,6 +249,7 @@ public class StartTestAction extends UserAction {
                 this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId, dashboardContext);
         testingRun.setDoNotMarkIssuesAsFixed(this.doNotMarkIssuesAsFixed);
         testingRun.setMaxAgentTokens(this.maxAgentTokens);
+        testingRun.setRunAutomatedTests(this.runAutomatedTests);
         return testingRun;
     }
 
@@ -374,6 +377,7 @@ public class StartTestAction extends UserAction {
 
                 List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
                 testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
+                testingRunConfig.setRunAutomatedTests(this.runAutomatedTests);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
             }
@@ -2143,6 +2147,14 @@ public class StartTestAction extends UserAction {
 
     public boolean getDoNotMarkIssuesAsFixed() {
         return doNotMarkIssuesAsFixed;
+    }
+
+    public void setRunAutomatedTests(boolean runAutomatedTests) {
+        this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public boolean getRunAutomatedTests() {
+        return runAutomatedTests;
     }
 
     public void setRecurringWeekly(boolean recurringWeekly) {

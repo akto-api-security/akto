@@ -67,6 +67,8 @@ public class TestingRun {
     private int sendPendingTestsWebhookTimestamp;
     public static final String DO_NOT_MARK_ISSUES_AS_FIXED = "doNotMarkIssuesAsFixed";
     private boolean doNotMarkIssuesAsFixed = false;
+    public static final String RUN_AUTOMATED_TESTS = "runAutomatedTests";
+    private boolean runAutomatedTests = false;
 
     public static final String DASHBOARD_CONTEXT = "dashboardContext";
     private CONTEXT_SOURCE dashboardContext;
@@ -311,12 +313,38 @@ public class TestingRun {
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
     }
 
+    public boolean getRunAutomatedTests() {
+        return runAutomatedTests;
+    }
+
+    public void setRunAutomatedTests(boolean runAutomatedTests) {
+        this.runAutomatedTests = runAutomatedTests;
+    }
+
     public CONTEXT_SOURCE getDashboardContext() {
         return dashboardContext;
     }
 
     public void setDashboardContext(CONTEXT_SOURCE dashboardContext) {
         this.dashboardContext = dashboardContext;
+    }
+
+    /**
+     * Gets the runAutomatedTests flag with backward compatibility.
+     * If the flag is not set in TestingRun, checks TestingRunConfig.
+     * If neither exists, defaults to false.
+     */
+    public boolean isRunAutomatedTests() {
+        // Check if flag is explicitly set in TestingRun
+        if (this.runAutomatedTests) {
+            return true;
+        }
+        // Check in TestingRunConfig if available
+        if (this.testingRunConfig != null && this.testingRunConfig.getRunAutomatedTests()) {
+            return true;
+        }
+        // Default to false for backward compatibility
+        return false;
     }
 
     @Override
