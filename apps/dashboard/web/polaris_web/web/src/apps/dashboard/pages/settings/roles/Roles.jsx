@@ -72,7 +72,6 @@ const Roles = () => {
             }
             setLoading(false)
         } catch (error) {
-            console.error("Error loading roles:", error)
             setLoading(false)
         }
     };
@@ -84,7 +83,6 @@ const Roles = () => {
                 setAllowedFeatures(featuresResponse);
             }
         } catch (error) {
-            console.error("Error loading allowed features:", error)
         }
     }
 
