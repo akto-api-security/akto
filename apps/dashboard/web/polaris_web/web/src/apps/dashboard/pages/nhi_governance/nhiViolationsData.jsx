@@ -118,7 +118,7 @@ export function PolicyCell({ policy }) {
 const CURATED = [
     { severity:"Critical", violation:"Admin credential exposed to agent runtime",                    identity:"aws-cursor-key",     agent:"Cursor",     policy:{primary:"No Admin Credentials for Agent Identities"},           discovered:"2h ago",  status:"Open"  },
     { severity:"Critical", violation:"Credential exceeds intended permission scope",                 identity:"aws-cursor-key",     agent:"Cursor",     policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"1h ago",  status:"Open"  },
-    { severity:"Critical", violation:"Unusual LLM access spike detected",                           identity:"aws-cursor-key",     agent:"Cursor",     policy:{primary:"Detect Unusual Usage Patterns"},           discovered:"Now",     status:"Open"  },
+    { severity:"Critical", violation:"Unusual LLM access spike detected",                           identity:"aws-cursor-key",     agent:"Cursor",     policy:{primary:"Detect Unusual Usage Patterns"},           discovered:"15m ago", status:"Open"  },
     { severity:"Critical", violation:"Token used outside trusted network boundary",                 identity:"hr-slack-token",     agent:"Claude CLI",    policy:{primary:"Restrict Access to Sensitive Resources", extra:2, extras:["Rotate API Keys Every 30 Days","Detect Unusual Usage Patterns"]},  discovered:"6h ago",  status:"Open"  },
     { severity:"High",     violation:"Messaging token triggering bulk automated sends",             identity:"hr-slack-token",     agent:"Claude CLI",    policy:{primary:"Limit Automation Without Approval"},            discovered:"3h ago",  status:"Fixed" },
     { severity:"High",     violation:"Token scope broader than required for task",                  identity:"hr-slack-token",     agent:"Claude CLI",    policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"4h ago",  status:"Open"  },
@@ -218,7 +218,7 @@ const POLICIES_POOL = [
 ];
 const TIME_AGO = [
     "10m ago","30m ago","1h ago","2h ago","4h ago","6h ago","12h ago",
-    "1d ago","2d ago","3d ago","7d ago","Now","45m ago","8h ago","15m ago",
+    "1d ago","2d ago","3d ago","7d ago","20m ago","45m ago","8h ago","15m ago",
 ];
 const GEN_SEVS     = ["Critical","Critical","High","High","High","Medium","Medium","Medium","Low","Low"];
 const GEN_STATUSES = ["Open","Open","Open","Open","Open","Fixed","Fixed","Fixed","Fixed","Fixed","Fixed","Fixed","Fixed"];

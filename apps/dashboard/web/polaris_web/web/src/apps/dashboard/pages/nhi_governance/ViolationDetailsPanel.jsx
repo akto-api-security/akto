@@ -66,7 +66,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                         <Text variant="bodyMd">{detail.description}</Text>
                     </VerticalStack>
                     <Divider />
-                    <HorizontalStack gap="8" blockAlign="start" wrap>
+                    <div style={{ display: "flex", gap: 32, alignItems: "flex-start", flexWrap: "wrap" }}>
                         <VerticalStack gap="1">
                             <Text variant="headingSm" color="subdued">
                                 {(() => {
@@ -103,7 +103,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                             <Text variant="headingSm" color="subdued">Discovered</Text>
                             <Text variant="bodyMd" fontWeight="semibold">{row.discovered}</Text>
                         </VerticalStack>
-                    </HorizontalStack>
+                    </div>
                     <Divider />
                     <VerticalStack gap="2">
                         <Text variant="headingSm" color="subdued">Why This Triggered</Text>

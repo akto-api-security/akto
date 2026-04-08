@@ -160,9 +160,12 @@ function parseMins(discovered) {
 
 function getPolicyViolations(policyName) {
     const originalName = unresolvedPolicyName(policyName);
-    return violationsTableData.filter(
-        (v) => (typeof v.policy === "object" ? v.policy.primary : v.policy) === originalName
-    );
+    return violationsTableData.filter((v) => {
+        const names = typeof v.policy === "object"
+            ? [v.policy.primary, ...(v.policy.extras || [])]
+            : [v.policy];
+        return names.some((n) => n === originalName || n === policyName);
+    });
 }
 
 function getLastTriggered(viols) {

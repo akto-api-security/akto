@@ -446,9 +446,12 @@ export default function PolicyDetailsPanel({ row, show, setShow, onSave }) {
     // that violations still reference.
     const originalPolicyName = unresolvedPolicyName(row.policyName);
 
-    const policyViolations = violationsTableData.filter(
-        (v) => (typeof v.policy === "object" ? v.policy.primary : v.policy) === originalPolicyName
-    );
+    const policyViolations = violationsTableData.filter((v) => {
+        const names = typeof v.policy === "object"
+            ? [v.policy.primary, ...(v.policy.extras || [])]
+            : [v.policy];
+        return names.some((n) => n === originalPolicyName || n === row.policyName);
+    });
     const violCrit = policyViolations.filter((v) => v.severity === "Critical").length;
     const violHigh = policyViolations.filter((v) => v.severity === "High").length;
     const violMed  = policyViolations.filter((v) => v.severity === "Medium").length;
