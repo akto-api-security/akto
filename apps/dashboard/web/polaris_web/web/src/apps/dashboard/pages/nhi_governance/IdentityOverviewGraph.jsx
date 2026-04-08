@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Box } from "@shopify/polaris";
 import ReactFlow, { Background } from "react-flow-renderer";
 import { AgentNode, AgentEdge } from "../observe/api_collections/AgentDiscoverGraph";
 
@@ -65,7 +66,7 @@ export default function IdentityOverviewGraph({ tableData, onIdentityClick }) {
                             id: `i-${row.id}`,
                             label: row.identityName,
                             type: row.type,
-                            category: "mcp",
+                            category: totalV > 0 ? "violation" : "mcp",
                             description: totalV > 0
                                 ? `${totalV} violation${totalV !== 1 ? "s" : ""} · ${row.access}`
                                 : `${row.access} access`,
@@ -93,7 +94,7 @@ export default function IdentityOverviewGraph({ tableData, onIdentityClick }) {
     }, [tableData, onIdentityClick]);
 
     return (
-        <div
+        <Box
             style={{
                 height: 480,
                 border: "1px solid #E4E5E7",
@@ -123,6 +124,6 @@ export default function IdentityOverviewGraph({ tableData, onIdentityClick }) {
             >
                 <Background variant="dots" gap={24} size={1} color="#D1D5DB" />
             </ReactFlow>
-        </div>
+        </Box>
     );
 }

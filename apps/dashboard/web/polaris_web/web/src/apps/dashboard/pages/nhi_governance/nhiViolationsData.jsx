@@ -27,7 +27,7 @@ const INTERNAL_KEYWORDS = new Set(["internal", "connector", "filesystem"]);
 export function IdentityIcon({ name }) {
     const parts = (name || "").toLowerCase().split(/[-_\d]+/).filter(p => p.length > 2);
     if (parts.some(p => INTERNAL_KEYWORDS.has(p)))
-        return <div style={{width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon source={SettingsMajor} color="subdued" /></div>;
+        return <Box style={{width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon source={SettingsMajor} color="subdued" /></Box>;
     const domain = parts.reduce((found, p) => found || IDENTITY_DOMAIN_MAP[p] || null, null);
     if (!domain) return null;
     return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={20} height={20} style={{borderRadius:3,flexShrink:0}} alt="" />;
@@ -67,9 +67,9 @@ export function ViolationBubbles({ critical = 0, high = 0, medium = 0, low = 0 }
 export const SEV_ORD = { Critical: 4, High: 3, Medium: 2, Low: 1 };
 
 export const sevBadge = (s) => (
-    <div className={`badge-wrapper-${s.toUpperCase()}`}>
+    <Box className={`badge-wrapper-${s.toUpperCase()}`}>
         <Badge status={func.getHexColorForSeverity(s.toUpperCase())}>{s}</Badge>
-    </div>
+    </Box>
 );
 
 // ── Policy name resolution (handles renames persisted in localStorage) ────────
@@ -106,7 +106,7 @@ export function PolicyCell({ policy }) {
             <Text variant="bodyMd">{resolvedPrimary}</Text>
             {policy.extra > 0 && tooltipContent && (
                 <Tooltip content={tooltipContent} dismissOnMouseOut>
-                    <span><Badge>{`+${policy.extra}`}</Badge></span>
+                    <Box><Badge>{`+${policy.extra}`}</Badge></Box>
                 </Tooltip>
             )}
             {policy.extra > 0 && !tooltipContent && <Badge>{`+${policy.extra}`}</Badge>}

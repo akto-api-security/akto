@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Box } from "@shopify/polaris";
 import ReactFlow from "react-flow-renderer";
 import { AgentNode, AgentEdge } from "../observe/api_collections/AgentDiscoverGraph";
 import { isAgenticSecurityCategory } from "../../../main/labelHelper";
@@ -113,7 +114,7 @@ export default function IdentityGraph({ row }) {
     }, [row]);
 
     return (
-        <div style={{ height, border: "1px solid #E4E5E7", borderRadius: 8, overflow: "hidden", background: "#F6F6F7" }}>
+        <Box style={{ height, border: "1px solid #E4E5E7", borderRadius: 8, overflow: "hidden", background: "#F6F6F7" }}>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -127,6 +128,6 @@ export default function IdentityGraph({ row }) {
                 fitView
                 fitViewOptions={{ padding: 0.15 }}
             />
-        </div>
+        </Box>
     );
 }

@@ -482,7 +482,7 @@ export default function PolicyDetailsPanel({ row, show, setShow, onSave }) {
     const TitleComponent = () => (
         <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
             <VerticalStack gap="1">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <HorizontalStack align="space-between" blockAlign="start">
                     <HorizontalStack gap="2" blockAlign="center">
                         <Text as="span" variant="headingMd" fontWeight="semibold">{row.policyName}</Text>
                         <Badge status={STATUS_COLOR[row.status] || ""}>{row.status}</Badge>
@@ -492,12 +492,12 @@ export default function PolicyDetailsPanel({ row, show, setShow, onSave }) {
                             { count: violMed,  bg: "#FFD79D", fg: "#202223" },
                             { count: violLow,  bg: "#E4E5E7", fg: "#202223" },
                         ].map(({ count, bg, fg }) => count > 0 && (
-                            <span key={bg} style={{
+                            <Box key={bg} style={{
                                 background: bg, color: fg,
                                 borderRadius: "50%", width: 20, height: 20,
-                                display: "inline-flex", alignItems: "center",
+                                display: "flex", alignItems: "center",
                                 justifyContent: "center", fontSize: 11, fontWeight: 600, flexShrink: 0,
-                            }}>{count}</span>
+                            }}>{count}</Box>
                         ))}
                     </HorizontalStack>
                     <HorizontalStack gap="2" blockAlign="center">
@@ -520,12 +520,12 @@ export default function PolicyDetailsPanel({ row, show, setShow, onSave }) {
                             ]} />
                         </Popover>
                     </HorizontalStack>
-                </div>
-                <HorizontalStack gap="0">
+                </HorizontalStack>
+                <HorizontalStack gap="2">
                     <Text variant="bodySm" color="subdued">{scopeLabel}</Text>
-                    <Text variant="bodySm" color="subdued">&nbsp;|&nbsp;</Text>
+                    <Text variant="bodySm" color="subdued">|</Text>
                     <Text variant="bodySm" color="subdued">Last Triggered {row.lastTriggered}</Text>
-                    <Text variant="bodySm" color="subdued">&nbsp;|&nbsp;</Text>
+                    <Text variant="bodySm" color="subdued">|</Text>
                     <Text variant="bodySm" color="subdued">Last Modified by {row.lastModified}</Text>
                 </HorizontalStack>
             </VerticalStack>
@@ -538,7 +538,7 @@ export default function PolicyDetailsPanel({ row, show, setShow, onSave }) {
         content: "Policy",
         component: (
             <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="2" paddingBlockEnd="4">
-                <div style={{ height: "calc(100vh - 260px)", minHeight: 300 }}>
+                <Box style={{ height: "calc(100vh - 260px)", minHeight: 300 }}>
                     <SampleData
                         data={{ message: initialYaml }}
                         editorLanguage="custom_yaml"
@@ -549,7 +549,7 @@ export default function PolicyDetailsPanel({ row, show, setShow, onSave }) {
                         }}
                         minHeight="calc(100vh - 260px)"
                     />
-                </div>
+                </Box>
             </Box>
         ),
     };

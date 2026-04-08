@@ -1,6 +1,6 @@
 import { useState, useMemo, useReducer, useEffect } from "react";
 import { IndexFiltersMode } from "@shopify/polaris";
-import { HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { Box, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
 import { produce } from "immer";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
@@ -39,7 +39,7 @@ function ChartLegend({ items }) {
         <VerticalStack gap="2">
             {items.map(({ label, color, count }) => (
                 <HorizontalStack key={label} gap="2" blockAlign="center">
-                    <span style={{ display:"inline-block", width:10, height:10, borderRadius:"50%", background:color, flexShrink:0 }} />
+                    <Box style={{ width:10, height:10, borderRadius:"50%", background:color, flexShrink:0 }} />
                     <Text variant="bodyMd" color="subdued">{label}</Text>
                     <Text variant="bodyMd" fontWeight="semibold">{count.toLocaleString()}</Text>
                 </HorizontalStack>
@@ -135,7 +135,7 @@ export default function ViolationsPage() {
             isFirstPage
             primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(d) => dispatchCurrDateRange({ type: "update", period: d.period, title: d.title, alias: d.alias })} />}
             components={[
-                <div key="charts" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "16px" }}>
+                <Box key="charts" style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "16px" }}>
                     <InfoCard
                         title="Violations over time"
                         component={
@@ -165,7 +165,7 @@ export default function ViolationsPage() {
                         }
                     />
                     <DonutCard title="Violations by severity" donutData={severityDonutData} />
-                </div>,
+                </Box>,
 
                 <GithubSimpleTable
                     key="violations-table"

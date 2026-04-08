@@ -12,27 +12,27 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
     // ── TitleComponent ────────────────────────────────────────────────────────
     const TitleComponent = () => (
         <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockEnd="4">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <HorizontalStack align="space-between" blockAlign="start">
                 <VerticalStack gap="2">
                     <HorizontalStack gap="2" blockAlign="center" wrap>
                         <Text variant="headingMd" fontWeight="semibold">{row.violation}</Text>
-                        <div className={`badge-wrapper-${row.severity.toUpperCase()}`}>
+                        <Box className={`badge-wrapper-${row.severity.toUpperCase()}`}>
                             <Badge status={func.getHexColorForSeverity(row.severity.toUpperCase())}>{row.severity}</Badge>
-                        </div>
+                        </Box>
                     </HorizontalStack>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <HorizontalStack gap="2" blockAlign="center">
+                        <HorizontalStack gap="1" blockAlign="center">
                             <IdentityIcon name={row.identity} />
                             <Text variant="bodySm" color="subdued">{row.identity}</Text>
-                        </div>
+                        </HorizontalStack>
                         <Text variant="bodySm" color="subdued">|</Text>
-                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <HorizontalStack gap="1" blockAlign="center">
                             <AgentIcon name={row.agent} />
                             <Text variant="bodySm" color="subdued">{row.agent}</Text>
-                        </div>
+                        </HorizontalStack>
                         <Text variant="bodySm" color="subdued">|</Text>
                         <Text variant="bodySm" color="subdued">Last Seen {row.discovered}</Text>
-                    </div>
+                    </HorizontalStack>
                 </VerticalStack>
                 <Popover
                     active={actionActive}
@@ -50,7 +50,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                         { content: "Disable Identity",  destructive: true, onAction: () => setActionActive(false) },
                     ]} />
                 </Popover>
-            </div>
+            </HorizontalStack>
         </Box>
     );
 
@@ -66,7 +66,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                         <Text variant="bodyMd">{detail.description}</Text>
                     </VerticalStack>
                     <Divider />
-                    <div style={{ display: "flex", gap: 32, alignItems: "flex-start", flexWrap: "wrap" }}>
+                    <HorizontalStack gap="8" blockAlign="start">
                         <VerticalStack gap="1">
                             <Text variant="headingSm" color="subdued">
                                 {(() => {
@@ -103,7 +103,7 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                             <Text variant="headingSm" color="subdued">Discovered</Text>
                             <Text variant="bodyMd" fontWeight="semibold">{row.discovered}</Text>
                         </VerticalStack>
-                    </div>
+                    </HorizontalStack>
                     <Divider />
                     <VerticalStack gap="2">
                         <Text variant="headingSm" color="subdued">Why This Triggered</Text>
@@ -137,12 +137,12 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
                     <VerticalStack gap="4">
                         {detail.remediationSteps.map((step, i) => (
                             <HorizontalStack key={i} gap="3" blockAlign="start" wrap={false}>
-                                <span style={{
+                                <Box style={{
                                     background: "#F6F6F7", borderRadius: "50%",
-                                    minWidth: 24, height: 24, display: "inline-flex",
+                                    minWidth: 24, height: 24, display: "flex",
                                     alignItems: "center", justifyContent: "center",
                                     fontSize: 12, fontWeight: 600, flexShrink: 0, color: "#202223",
-                                }}>{i + 1}</span>
+                                }}>{i + 1}</Box>
                                 <Text variant="bodyMd">{step}</Text>
                             </HorizontalStack>
                         ))}
@@ -160,22 +160,22 @@ export default function ViolationDetailsPanel({ row, show, setShow }) {
             <Box padding="5">
                 <VerticalStack>
                     {detail.timeline.map((item, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-                            <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                        <HorizontalStack key={i} align="space-between" blockAlign="start" wrap={false}>
+                            <HorizontalStack gap="3" blockAlign="start" wrap={false}>
+                                <Box style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                                     <img src="/public/issues-event-icon.svg" width={20} height={20} alt="" style={{ flexShrink: 0 }} />
                                     {i < detail.timeline.length - 1 && (
-                                        <div style={{ width: 2, flex: 1, minHeight: 24, background: "var(--p-color-border-subdued, #E4E5E7)", margin: "4px 0" }} />
+                                        <Box style={{ width: 2, flex: 1, minHeight: 24, background: "var(--p-color-border-subdued, #E4E5E7)", margin: "4px 0" }} />
                                     )}
-                                </div>
-                                <div style={{ paddingTop: 1 }}>
+                                </Box>
+                                <Box paddingBlockStart="05">
                                     <Text variant="bodyMd">{item.event}</Text>
-                                </div>
-                            </div>
-                            <div style={{ whiteSpace: "nowrap", paddingInlineStart: 16, paddingTop: 2 }}>
+                                </Box>
+                            </HorizontalStack>
+                            <Box paddingInlineStart="4" paddingBlockStart="05" style={{ whiteSpace: "nowrap" }}>
                                 <Text variant="bodySm" color="subdued">{item.time}</Text>
-                            </div>
-                        </div>
+                            </Box>
+                        </HorizontalStack>
                     ))}
                 </VerticalStack>
             </Box>

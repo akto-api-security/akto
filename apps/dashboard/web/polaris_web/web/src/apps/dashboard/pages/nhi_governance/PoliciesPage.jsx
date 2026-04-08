@@ -32,7 +32,7 @@ function ScopeCell({ scope, agents }) {
             <Text variant="bodyMd">{scope.primary}</Text>
             {scope.extra > 0 && tooltipContent && (
                 <Tooltip content={tooltipContent} dismissOnMouseOut>
-                    <span><Badge>{`+${scope.extra}`}</Badge></span>
+                    <Box><Badge>{`+${scope.extra}`}</Badge></Box>
                 </Tooltip>
             )}
             {scope.extra > 0 && !tooltipContent && <Badge>{`+${scope.extra}`}</Badge>}
@@ -426,7 +426,7 @@ function CreatePolicyModal({ open, onClose, onCreatePolicy }) {
             <Modal.Section>
                 <VerticalStack gap="4">
                     <HorizontalStack gap="4" blockAlign="end" wrap={false}>
-                        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+                        <Box style={{ flex: "1 1 0", minWidth: 0 }}>
                             <TextField
                                 label="Name"
                                 value={name}
@@ -436,8 +436,8 @@ function CreatePolicyModal({ open, onClose, onCreatePolicy }) {
                                 autoComplete="off"
                                 placeholder="e.g. Enforce Least Privilege on Credentials"
                             />
-                        </div>
-                        <div style={{ flex: "0 0 220px" }}>
+                        </Box>
+                        <Box style={{ flex: "0 0 220px" }}>
                             <VerticalStack gap="1">
                                 <Text variant="bodySm" fontWeight="medium">Select Agents</Text>
                                 <DropdownSearch
@@ -450,9 +450,9 @@ function CreatePolicyModal({ open, onClose, onCreatePolicy }) {
                                     itemName="agent"
                                 />
                             </VerticalStack>
-                        </div>
+                        </Box>
                     </HorizontalStack>
-                    <div style={{ height: 420 }}>
+                    <Box style={{ height: 420 }}>
                         <SampleData
                             key={yamlKey}
                             data={{ message: yamlRef.current }}
@@ -461,7 +461,7 @@ function CreatePolicyModal({ open, onClose, onCreatePolicy }) {
                             getEditorData={(val) => { yamlRef.current = val; }}
                             minHeight="420px"
                         />
-                    </div>
+                    </Box>
                     <HorizontalStack align="space-between" blockAlign="center">
                         <Button onClick={() => buildAndCreate("Draft")}>Create Draft</Button>
                         <HorizontalStack gap="2">
