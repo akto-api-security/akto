@@ -332,9 +332,9 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 checked={!testRun.doNotMarkIssuesAsFixed}
                 onChange={() => setTestRun(prev => ({ ...prev, doNotMarkIssuesAsFixed: !prev.doNotMarkIssuesAsFixed }))}
             />
-            {isAgenticCategory && window?.STIGG_FEATURE_WISE_ALLOWED?.AUTOMATED_AGENTIC_TEST_RUN?.isGranted === true && (
+            { window?.STIGG_FEATURE_WISE_ALLOWED?.AUTOMATED_AGENTIC_TEST_RUN?.isGranted === true && (
                 <Checkbox
-                    label="AI Assisted Red Teaming"
+                    label="Smart Automated Testing"
                     checked={testRun.runAutomatedTests}
                     onChange={(val) => setTestRun(prev => ({ ...prev, runAutomatedTests: val }))}
                 />
