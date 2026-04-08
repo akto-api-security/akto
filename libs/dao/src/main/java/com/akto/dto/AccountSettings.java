@@ -160,6 +160,11 @@ public class AccountSettings {
 
     @Getter
     @Setter
+    private boolean blockNewMcpServers;
+    public static final String BLOCK_NEW_MCP_SERVERS = "blockNewMcpServers";
+
+    @Getter
+    @Setter
     private List<String> filterLogPolicy;
     public static final String FILTER_LOG_POLICY = "filterLogPolicy";
 

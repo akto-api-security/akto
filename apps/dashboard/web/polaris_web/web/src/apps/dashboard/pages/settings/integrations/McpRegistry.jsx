@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import IntegrationsLayout from './IntegrationsLayout'
-import { Box, Button, LegacyCard, TextField, Text, VerticalStack, HorizontalStack, Badge, Banner } from '@shopify/polaris'
-import { DeleteMinor } from '@shopify/polaris-icons'
+import { Box, Button, DropZone, LegacyCard, LegacyStack, Text, Thumbnail, VerticalStack, HorizontalStack, Badge, Banner, Checkbox, TextField } from '@shopify/polaris'
+import { DeleteMinor, NoteMinor } from '@shopify/polaris-icons'
 import "../settings.css"
 import func from "@/util/func"
 import api from '../api'
@@ -13,7 +13,7 @@ function McpRegistry() {
     const MAX_NAME_LENGTH = 100;
     const MAX_URL_LENGTH = 500;
     const TEST_CONNECTION_TIMEOUT = 10000; // 10 seconds
-    
+
     const [registries, setRegistries] = useState([
         { id: 'default', name: 'Official MCP Registry', url: defaultRegistryUrl, isDefault: true }
     ]);
@@ -22,35 +22,52 @@ function McpRegistry() {
     const [saving, setSaving] = useState(false);
     const [testingConnectionId, setTestingConnectionId] = useState(null);
     const [connectionStatuses, setConnectionStatuses] = useState({});
-    
+
     // New registry form state
     const [newRegistryName, setNewRegistryName] = useState('');
     const [newRegistryUrl, setNewRegistryUrl] = useState('');
     const [showAddForm, setShowAddForm] = useState(false);
 
+    // Approved MCP servers state
+    const [approvedServers, setApprovedServers] = useState([]);
+    const [originalApprovedServers, setOriginalApprovedServers] = useState([]);
+    const [csvFile, setCsvFile] = useState(null);
+    const [uploadingCsv, setUploadingCsv] = useState(false);
+
+    // Block new MCP servers toggle
+    const [blockNewMcpServers, setBlockNewMcpServers] = useState(false);
+    const [originalBlockNewMcpServers, setOriginalBlockNewMcpServers] = useState(false);
+
     async function fetchRegistrySettings() {
         setLoading(true);
         try {
-            // Call the add API with null to fetch current state from DB without modifying it
-            const response = await api.addMcpRegistryIntegration(null);
-            
+            const [registryResponse, serverResponse] = await Promise.all([
+                api.addMcpRegistryIntegration(null),
+                api.saveMcpServerSettings(null, null)
+            ]);
+
             let registriesList = [];
-            if (response && response.mcpRegistryConfig && response.mcpRegistryConfig.registries) {
-                registriesList = response.mcpRegistryConfig.registries;
+            if (registryResponse && registryResponse.mcpRegistryConfig && registryResponse.mcpRegistryConfig.registries) {
+                registriesList = registryResponse.mcpRegistryConfig.registries;
             } else {
-                // Default registry if none exists
                 registriesList = [
                     { id: 'default', name: 'Official MCP Registry', url: defaultRegistryUrl, isDefault: true }
                 ];
             }
-            
             setRegistries(registriesList);
             setOriginalRegistries(JSON.parse(JSON.stringify(registriesList)));
+
+            const serversList = serverResponse?.mcpRegistryConfig?.approvedServers || [];
+            setApprovedServers(serversList);
+            setOriginalApprovedServers(JSON.parse(JSON.stringify(serversList)));
+
+            const blockFlag = serverResponse?.blockNewMcpServers || false;
+            setBlockNewMcpServers(blockFlag);
+            setOriginalBlockNewMcpServers(blockFlag);
         } catch (error) {
             console.error("Failed to load registry settings:", error);
             const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to load registry settings";
             func.setToast(true, true, errorMsg);
-            // Set default registry on error
             const defaultList = [
                 { id: 'default', name: 'Official MCP Registry', url: defaultRegistryUrl, isDefault: true }
             ];
@@ -222,6 +239,63 @@ function McpRegistry() {
         func.setToast(true, false, "Reset to default. Click 'Save Configuration' to apply changes.");
     };
 
+    const handleCsvDrop = useCallback((_dropFiles, acceptedFiles) => {
+        if (acceptedFiles.length > 0) {
+            setCsvFile(acceptedFiles[0]);
+        }
+    }, []);
+
+    const uploadCsv = async () => {
+        if (!csvFile) {
+            func.setToast(true, true, "Please select a CSV file first");
+            return;
+        }
+
+        setUploadingCsv(true);
+        try {
+            const csvContent = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsText(csvFile);
+            });
+
+            const response = await api.uploadMcpServersCsv(csvContent);
+            const newNames = response?.parsedServerNames || [];
+
+            if (newNames.length === 0) {
+                func.setToast(true, true, "No valid server names found in CSV");
+                return;
+            }
+
+            // Merge with existing, skip duplicates
+            const existingLower = new Set(approvedServers.map(s => s.name.toLowerCase()));
+            const toAdd = newNames
+                .filter(name => !existingLower.has(name.toLowerCase()))
+                .map(name => ({ name }));
+            const skipped = newNames.length - toAdd.length;
+
+            const merged = [...approvedServers, ...toAdd];
+            setApprovedServers(merged);
+            setCsvFile(null);
+
+            const msg = skipped > 0
+                ? `Added ${toAdd.length} server(s). ${skipped} duplicate(s) skipped. Click 'Save Configuration' to apply.`
+                : `Added ${toAdd.length} server(s). Click 'Save Configuration' to apply.`;
+            func.setToast(true, false, msg);
+        } catch (error) {
+            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to parse CSV";
+            func.setToast(true, true, errorMsg);
+        } finally {
+            setUploadingCsv(false);
+        }
+    };
+
+    const deleteServer = (name) => {
+        setApprovedServers(approvedServers.filter(s => s.name !== name));
+        func.setToast(true, false, "Server removed. Click 'Save Configuration' to apply changes.");
+    };
+
     const saveAction = async () => {
         if (registries.length === 0) {
             func.setToast(true, true, "You must have at least one registry");
@@ -229,27 +303,33 @@ function McpRegistry() {
         }
 
         if (saving) {
-            return; // Prevent double-clicking
+            return;
         }
 
         setSaving(true);
         try {
-            // If only default registry exists, send empty array to delete custom config
             const dataToSend = (registries.length === 1 && registries[0].isDefault) ? [] : registries;
-            const response = await api.addMcpRegistryIntegration(dataToSend);
-            
-            // Update original registries from the response
-            if (response && response.mcpRegistryConfig && response.mcpRegistryConfig.registries) {
-                setOriginalRegistries(JSON.parse(JSON.stringify(response.mcpRegistryConfig.registries)));
-                setRegistries(response.mcpRegistryConfig.registries);
+            const [registryResponse, serverResponse] = await Promise.all([
+                api.addMcpRegistryIntegration(dataToSend),
+                api.saveMcpServerSettings(approvedServers, blockNewMcpServers)
+            ]);
+
+            if (registryResponse?.mcpRegistryConfig?.registries) {
+                setOriginalRegistries(JSON.parse(JSON.stringify(registryResponse.mcpRegistryConfig.registries)));
+                setRegistries(registryResponse.mcpRegistryConfig.registries);
             } else {
                 setOriginalRegistries(JSON.parse(JSON.stringify(registries)));
             }
-            
-            func.setToast(true, false, "MCP Registry settings updated successfully");
+
+            const savedServers = serverResponse?.mcpRegistryConfig?.approvedServers || approvedServers;
+            setOriginalApprovedServers(JSON.parse(JSON.stringify(savedServers)));
+            setApprovedServers(savedServers);
+            setOriginalBlockNewMcpServers(serverResponse?.blockNewMcpServers ?? blockNewMcpServers);
+
+            func.setToast(true, false, "MCP settings updated successfully");
         } catch (error) {
-            console.error("Failed to update registry settings:", error);
-            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to update registry settings";
+            console.error("Failed to update MCP settings:", error);
+            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to update MCP settings";
             func.setToast(true, true, errorMsg);
         } finally {
             setSaving(false);
@@ -258,15 +338,20 @@ function McpRegistry() {
 
     const discardAction = () => {
         setRegistries(JSON.parse(JSON.stringify(originalRegistries)));
+        setApprovedServers(JSON.parse(JSON.stringify(originalApprovedServers)));
+        setBlockNewMcpServers(originalBlockNewMcpServers);
         setConnectionStatuses({});
         setNewRegistryName('');
         setNewRegistryUrl('');
         setShowAddForm(false);
+        setCsvFile(null);
         func.setToast(true, true, "Changes Discarded");
     };
 
     const hasChanges = () => {
-        return JSON.stringify(registries) !== JSON.stringify(originalRegistries);
+        return JSON.stringify(registries) !== JSON.stringify(originalRegistries) ||
+            JSON.stringify(approvedServers) !== JSON.stringify(originalApprovedServers) ||
+            blockNewMcpServers !== originalBlockNewMcpServers;
     };
 
     const component = (
@@ -437,6 +522,104 @@ function McpRegistry() {
                             </Text>
                         </VerticalStack>
                     </Banner>
+                </VerticalStack>
+            </LegacyCard.Section>
+
+            <LegacyCard.Section>
+                <VerticalStack gap="4">
+                    <Text variant="headingMd" as="h3">
+                        Approved MCP Servers ({approvedServers.length})
+                    </Text>
+
+                    <Text variant="bodyMd" color="subdued">
+                        Upload a CSV file containing server names (one per row). All discovered tool calls for these servers will be automatically approved.
+                    </Text>
+
+                    <DropZone
+                        accept=".csv"
+                        type="file"
+                        allowMultiple={false}
+                        onDrop={handleCsvDrop}
+                        disabled={saving || uploadingCsv}
+                    >
+                        {csvFile ? (
+                            <LegacyStack alignment="center" spacing="tight">
+                                <Thumbnail size="small" source={NoteMinor} alt={csvFile.name} />
+                                <LegacyStack.Item fill>
+                                    <Text variant="bodyMd" fontWeight="semibold">{csvFile.name}</Text>
+                                    <Text variant="bodySm" color="subdued">{(csvFile.size / 1024).toFixed(1)} KB</Text>
+                                </LegacyStack.Item>
+                            </LegacyStack>
+                        ) : (
+                            <DropZone.FileUpload actionTitle="Upload CSV" actionHint="or drop a CSV file to add server names" />
+                        )}
+                    </DropZone>
+
+                    {csvFile && (
+                        <HorizontalStack gap="2">
+                            <Button
+                                primary
+                                onClick={uploadCsv}
+                                loading={uploadingCsv}
+                                disabled={saving}
+                            >
+                                Parse & Add Servers
+                            </Button>
+                            <Button onClick={() => setCsvFile(null)} disabled={uploadingCsv}>
+                                Clear
+                            </Button>
+                        </HorizontalStack>
+                    )}
+
+                    <Banner tone="info">
+                        <Text variant="bodyMd">
+                            CSV format: one server name per row. An optional header row (e.g. "name") is automatically skipped.
+                            Only the first column is used if multiple columns are present.
+                        </Text>
+                    </Banner>
+
+                    {approvedServers.length === 0 ? (
+                        <Box padding="4">
+                            <Text variant="bodyMd" color="subdued" alignment="center">
+                                No approved servers configured. Upload a CSV above to add servers.
+                            </Text>
+                        </Box>
+                    ) : (
+                        <VerticalStack gap="2">
+                            {approvedServers.map((server) => (
+                                <LegacyCard key={server.name} sectioned>
+                                    <HorizontalStack align="space-between">
+                                        <HorizontalStack gap="2" align="center">
+                                            <Text variant="bodyMd" fontWeight="semibold">{server.name}</Text>
+                                            <Badge tone="success">Auto-approved</Badge>
+                                        </HorizontalStack>
+                                        <Button
+                                            plain
+                                            destructive
+                                            onClick={() => deleteServer(server.name)}
+                                            icon={DeleteMinor}
+                                            disabled={saving}
+                                        >
+                                            Remove
+                                        </Button>
+                                    </HorizontalStack>
+                                </LegacyCard>
+                            ))}
+                        </VerticalStack>
+                    )}
+                </VerticalStack>
+            </LegacyCard.Section>
+
+            <LegacyCard.Section>
+                <VerticalStack gap="4">
+                    <Text variant="headingMd" as="h3">Security Settings</Text>
+                    <Checkbox
+                        label="Block new MCP servers"
+                        helpText="When enabled, MCP servers not in the approved list above will be blocked by the gateway."
+                        checked={blockNewMcpServers}
+                        onChange={setBlockNewMcpServers}
+                        disabled={saving}
+                    />
                 </VerticalStack>
             </LegacyCard.Section>
         </LegacyCard>

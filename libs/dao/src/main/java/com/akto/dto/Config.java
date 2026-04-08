@@ -1195,9 +1195,11 @@ public abstract class Config {
     public static class McpRegistryConfig extends Config {
 
         public static final String REGISTRIES = "registries";
+        public static final String APPROVED_SERVERS = "approvedServers";
         public static final String CONFIG_ID = ConfigType.MCP_REGISTRY.name();
 
         private List<McpRegistry> registries;
+        private List<ApprovedMcpServer> approvedServers;
 
         public McpRegistryConfig() {
             this.configType = ConfigType.MCP_REGISTRY;
@@ -1208,6 +1210,19 @@ public abstract class Config {
             this.registries = registries;
             this.id = accountId + "_" + CONFIG_ID;
             this.configType = ConfigType.MCP_REGISTRY;
+        }
+
+        @Getter
+        @Setter
+        public static class ApprovedMcpServer {
+            public static final String NAME = "name";
+            private String name;
+
+            public ApprovedMcpServer() {}
+
+            public ApprovedMcpServer(String name) {
+                this.name = name;
+            }
         }
 
         @Getter
