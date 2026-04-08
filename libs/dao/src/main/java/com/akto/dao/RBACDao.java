@@ -95,7 +95,10 @@ public class RBACDao extends CommonContextDao<RBAC> {
 
     public static boolean hasAccessToFeature(int userId, int accountId, String featureLabel) {
         Pair<Integer, Integer> key = new Pair<>(userId, accountId);
-        RBAC.Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, accountId);
+
+        // Get role based on current scope context
+        RBAC.Role userRoleRecord = getRoleForFeatureAccessInScope(userId, accountId);
+
         if (userRoleRecord == null) {
             userRoleRecord = RBAC.Role.MEMBER;
         }
@@ -118,6 +121,52 @@ public class RBACDao extends CommonContextDao<RBAC> {
             return false;
         }
         return allowedFeaturesEntry.getFirst().contains(featureLabel);
+    }
+
+    /**
+     * Gets the user's role for feature access based on current scope context.
+     * If user has scopeRoleMapping, returns the role for the current scope.
+     * Otherwise, falls back to the old single role field.
+     * This ensures scope-specific role access (new system),
+     * while maintaining backward compatibility for users with only role field (old system).
+     */
+    private static RBAC.Role getRoleForFeatureAccessInScope(int userId, int accountId) {
+        try {
+            // Get current scope from context (set by RoleAccessInterceptor)
+            Object contextSourceObj = Context.contextSource.get();
+            if (contextSourceObj == null) {
+                // No scope context, use old system
+                return RBACDao.getCurrentRoleForUser(userId, accountId);
+            }
+
+            String currentScope = contextSourceObj.toString();
+
+            // Fetch user's RBAC record using cache-aware method to check for scopeRoleMapping
+            RBAC userRbac = RBACDao.getCurrentRBACForUser(userId, accountId);
+
+            if (userRbac != null && userRbac.getScopeRoleMapping() != null && !userRbac.getScopeRoleMapping().isEmpty()) {
+                // User has scope-based role mapping (new system)
+                // Get the role for the current scope
+                String scopeRole = userRbac.getScopeRoleMapping().get(currentScope);
+                if (scopeRole != null && !scopeRole.isEmpty()) {
+                    try {
+                        return RBAC.Role.valueOf(scopeRole.toUpperCase());
+                    } catch (IllegalArgumentException e) {
+                        // Invalid role string, try custom role lookup
+                        CustomRole customRole = CustomRoleDao.instance.findRoleByName(scopeRole);
+                        if (customRole != null && customRole.getBaseRole() != null) {
+                            return RBAC.Role.valueOf(customRole.getBaseRole());
+                        }
+                        logger.warn("Invalid role in scopeRoleMapping for userId: " + userId + " scope: " + currentScope + " role: " + scopeRole);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("Error getting role for feature access check userId: " + userId + " accountId: " + accountId, e);
+        }
+
+        // Fallback to old single role field (backward compatibility)
+        return RBACDao.getCurrentRoleForUser(userId, accountId);
     }
 
     public List<Integer> getUserCollectionsById(int userId, int accountId) {

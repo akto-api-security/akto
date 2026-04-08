@@ -404,6 +404,30 @@ const Users = () => {
         return mappings
     }
 
+    const getRoleDisplayForSidebar = (scopeRoleMapping, oldRole) => {
+        // If scopeRoleMapping exists, show all scopes with their roles (same as left side)
+        if (scopeRoleMapping && Object.keys(scopeRoleMapping).length > 0) {
+            const rolesWithScopes = []
+            Object.entries(scopeRoleMapping).forEach(([scope, role]) => {
+                // Skip NO_ACCESS roles
+                if (role !== 'NO_ACCESS') {
+                    const scopeLabel = PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
+                    rolesWithScopes.push(`${getRoleDisplayName(role)} (${scopeLabel})`)
+                }
+            })
+            // If all are NO_ACCESS, show first one
+            if (rolesWithScopes.length === 0) {
+                const firstScope = Object.keys(scopeRoleMapping)[0]
+                const firstRole = scopeRoleMapping[firstScope]
+                const scopeLabel = PRODUCT_SCOPES.find(s => s.value === firstScope)?.label || firstScope
+                return `${getRoleDisplayName(firstRole)} (${scopeLabel})`
+            }
+            return rolesWithScopes.join(', ')
+        }
+        // Fallback to old role
+        return getRoleDisplayName(oldRole)
+    }
+
     const openEditScopeRoleModal = (userId, email, name, currentRole, currentScopeRoleMapping) => {
         const isSimpleRole = !currentScopeRoleMapping || Object.keys(currentScopeRoleMapping).length === 0
         setEditScopeRoleModal({
@@ -629,14 +653,14 @@ const Users = () => {
                                     {
                                         content: (
                                             <HorizontalStack gap={4}>
-                                                <Text color="subdued">{func.toSentenceCase(getRoleDisplayName(role))}</Text>
+                                                <Text color="subdued">{func.toSentenceCase(getRoleDisplayForSidebar(item?.scopeRoleMapping, role))}</Text>
                                                 <div onClick={() => handleRemoveInvitations(item)}><Icon source={DeleteMajor}/></div>
                                             </HorizontalStack>
                                         )
                                     }
                                 ] : [
                                     {
-                                        content: <Text color="subdued">{func.toSentenceCase(getRoleDisplayName(role))}</Text>,
+                                        content: <Text color="subdued">{func.toSentenceCase(getRoleDisplayForSidebar(item?.scopeRoleMapping, role))}</Text>,
                                         url: '#',
                                     }
                                 ]
