@@ -70,6 +70,7 @@ public class TestingRun {
 
     public static final String DASHBOARD_CONTEXT = "dashboardContext";
     private CONTEXT_SOURCE dashboardContext;
+    private boolean runAutomatedTests = false;
 
     public TestingRun() { }
 
@@ -342,6 +343,14 @@ public class TestingRun {
 
     public void setNewTestRun(boolean isNewTestRun) {
         this.isNewTestRun = isNewTestRun;
+    }
+
+    public void setRunAutomatedTests(boolean runAutomatedTests) {
+        this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public boolean getRunAutomatedTests() {
+        return runAutomatedTests;
     }
 
 }
