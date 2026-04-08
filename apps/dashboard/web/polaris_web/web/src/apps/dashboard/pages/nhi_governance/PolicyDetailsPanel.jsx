@@ -389,21 +389,21 @@ export function CodeEditor({ value, onChange, minHeight = 300 }) {
     const lineNumRef = useRef(null);
     const lines = (value || "").split("\n");
     return (
-        <div style={{
+        <Box style={{
             display: "flex",
             fontFamily: "'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace",
             fontSize: 13, border: "1px solid #E4E5E7", borderRadius: 8,
             overflow: "hidden", minHeight,
         }}>
-            <div ref={lineNumRef} style={{
+            <Box ref={lineNumRef} style={{
                 background: "#F6F6F7", color: "#8C9196",
                 padding: "12px 8px 12px 4px", textAlign: "right",
                 userSelect: "none", overflowY: "hidden",
                 lineHeight: "19.5px", minWidth: 36,
                 borderRight: "1px solid #E4E5E7", flexShrink: 0,
             }}>
-                {lines.map((_, i) => <div key={i}>{i + 1}</div>)}
-            </div>
+                {lines.map((_, i) => <Box key={i}>{i + 1}</Box>)}
+            </Box>
             <textarea
                 value={value}
                 onChange={onChange ? (e) => onChange(e.target.value) : undefined}
@@ -418,7 +418,7 @@ export function CodeEditor({ value, onChange, minHeight = 300 }) {
                 }}
                 spellCheck={false}
             />
-        </div>
+        </Box>
     );
 }
 
