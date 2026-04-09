@@ -49,6 +49,15 @@ def main():
             reason = (result or {}).get("data", {}).get("guardrailsResult", {}).get("Reason", "Policy violation")
             logger.warning(f"BLOCKING SubagentStop: {reason}")
             print(json.dumps({"decision": "block", "reason": reason}))
+            send_ingestion_data(
+                hook_name="SubagentStop",
+                request_payload=user_prompt,
+                response_payload={"reason": reason or "Policy violation", "blockedBy": "Akto Proxy"},
+                tags=None,
+                guardrails=False,
+                status_code="403",
+                logger=logger,
+            )
 
     except Exception as e:
         logger.error(f"Main error: {e}")

@@ -6,7 +6,7 @@ Blocks via decision = "block" if guardrails denies.
 import json
 import sys
 
-from akto_ingestion_utility import MODE, send_ingestion_data, setup_logger
+from akto_ingestion_utility import AKTO_SYNC_MODE, MODE, send_ingestion_data, setup_logger
 
 logger = setup_logger("config.log")
 
@@ -23,7 +23,7 @@ def main():
             request_payload=input_data,
             response_payload={},
             tags=None,
-            guardrails=True,
+            guardrails=not AKTO_SYNC_MODE,
             logger=logger,
         )
 
@@ -32,6 +32,15 @@ def main():
             reason = (result or {}).get("data", {}).get("guardrailsResult", {}).get("Reason", "Policy violation")
             logger.warning(f"BLOCKING ConfigChange: {reason}")
             print(json.dumps({"decision": "block", "reason": reason}))
+            send_ingestion_data(
+                hook_name="ConfigChange",
+                request_payload=input_data,
+                response_payload={"reason": reason or "Policy violation", "blockedBy": "Akto Proxy"},
+                tags=None,
+                guardrails=False,
+                status_code="403",
+                logger=logger,
+            )
 
     except Exception as e:
         logger.error(f"Main error: {e}")

@@ -18,12 +18,9 @@ def main():
         input_data = json.load(sys.stdin)
         logger.info("PreCompact input:\n%s", json.dumps(input_data, indent=2))
 
-        custom_instructions = input_data.get("custom_instructions")
-        request_payload = {"custom_instructions": custom_instructions} if custom_instructions else input_data
-
         send_ingestion_data(
             hook_name="PreCompact",
-            request_payload=request_payload,
+            request_payload=input_data,
             response_payload={},
             tags=None,
             guardrails=not AKTO_SYNC_MODE,

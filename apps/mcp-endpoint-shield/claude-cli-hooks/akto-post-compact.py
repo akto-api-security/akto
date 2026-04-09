@@ -18,12 +18,10 @@ def main():
         input_data = json.load(sys.stdin)
         logger.info("PostCompact input:\n%s", json.dumps(input_data, indent=2))
 
-        compact_summary = input_data.get("compact_summary", "")
-
         send_ingestion_data(
             hook_name="PostCompact",
             request_payload=input_data,
-            response_payload={"compact_summary": compact_summary},
+            response_payload={},
             tags=None,
             guardrails=not AKTO_SYNC_MODE,
             logger=logger,
