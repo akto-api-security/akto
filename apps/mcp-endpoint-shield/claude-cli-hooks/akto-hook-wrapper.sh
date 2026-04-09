@@ -4,12 +4,12 @@
 # Or invoked directly per hook via settings.json passing the script name
 
 export MODE="atlas"
-export AKTO_DATA_INGESTION_URL="http://localhost:7072"
+export AKTO_DATA_INGESTION_URL="{{AKTO_DATA_INGESTION_URL}}"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="claude_code_cli"
 export CONTEXT_SOURCE="ENDPOINT"
-export DEVICE_ID="techvirus"
+export DEVICE_ID="{{DEVICE_ID (optional)}}"
 
 # Logging Configuration
 export LOG_LEVEL="INFO"
