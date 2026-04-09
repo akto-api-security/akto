@@ -189,7 +189,7 @@ def call_guardrails(query: str) -> Tuple[bool, str, str]:
     try:
         request_body = build_validation_request(query)
         result = post_payload_json(
-            build_http_proxy_url(guardrails=True, ingest_data=False),
+            build_http_proxy_url(guardrails=True, ingest_data=True),
             request_body,
         )
 
