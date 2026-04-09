@@ -1,11 +1,16 @@
 package com.akto.gateway;
 
 import com.akto.dto.IngestDataBatch;
+import com.akto.util.JSONUtils;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 
 public class Gateway {
@@ -14,6 +19,16 @@ public class Gateway {
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
+
+    private static final Map<String, Set<String>> WHITELISTED_CLIENT_HOOKS = new HashMap<String, Set<String>>() {{
+        put("claude_code_cli", new HashSet<>(Arrays.asList(
+            "SessionStart", "SessionEnd", "InstructionsLoaded", "PermissionRequest", "PermissionDenied",
+            "PostToolUseFailure", "Stop", "StopFailure", "SubagentStart", "SubagentStop",
+            "TaskCreated", "TaskCompleted", "TeammateIdle", "Notification", "ConfigChange",
+            "CwdChanged", "FileChanged", "PreCompact", "PostCompact",
+            "Elicitation", "ElicitationResult", "WorktreeCreate", "WorktreeRemove"
+        )));
+    }};
 
     private Gateway() {
         this.guardrailsClient = new GuardrailsClient();
@@ -48,7 +63,22 @@ public class Gateway {
             boolean runRequestGuardrails = "true".equalsIgnoreCase(getStringField(requestData, "guardrails"));
             boolean runResponseGuardrails = "true".equalsIgnoreCase(getStringField(requestData, "response_guardrails"));
 
-            if (runRequestGuardrails || runResponseGuardrails) {
+            String aktoConnector = getStringField(requestData, "akto_connector");
+            String clientHook = getStringField(requestData, "client_hook");
+
+            boolean isHookWhitelisted = false;
+            if (!WHITELISTED_CLIENT_HOOKS.isEmpty() && WHITELISTED_CLIENT_HOOKS.containsKey(aktoConnector)) {
+                Set<String> hooks = WHITELISTED_CLIENT_HOOKS.get(aktoConnector);
+                if (CollectionUtils.isNotEmpty(hooks)) {
+                    isHookWhitelisted = hooks.contains(clientHook);
+                }
+            }
+
+            if (isHookWhitelisted) {
+                logger.info("skipping guardrails for connector: {}, client_hook: {}", aktoConnector, clientHook);
+            }
+
+            if (!isHookWhitelisted && (runRequestGuardrails || runResponseGuardrails)) {
                 long guardrailsStart = System.currentTimeMillis();
                 Map<String, Object> guardrailsResult = null;
 
@@ -62,6 +92,7 @@ public class Gateway {
                 logger.info("Guardrails call(s) completed - path: {}, latencyMs: {}",
                     requestData.get("path"), System.currentTimeMillis() - guardrailsStart);
                 result.put("guardrailsResult", guardrailsResult);
+                logger.info("Guardrails validation done. {}", JSONUtils.getString(guardrailsResult));
             }
 
             String ingestData = getStringField(requestData, "ingest_data");

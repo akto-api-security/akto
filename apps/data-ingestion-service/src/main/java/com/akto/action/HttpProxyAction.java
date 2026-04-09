@@ -26,6 +26,7 @@ public class HttpProxyAction extends ActionSupport {
     private String response_guardrails;
     private String akto_connector;
     private String ingest_data;
+    private String client_hook;
 
     private String path;
     private String requestHeaders;
@@ -132,6 +133,7 @@ public class HttpProxyAction extends ActionSupport {
         requestData.put("daemonset_id", daemonset_id);
         requestData.put("enabled_graph", enabled_graph);
         requestData.put("contextSource", contextSource);
+        requestData.put("client_hook", client_hook);
 
         return requestData;
     }

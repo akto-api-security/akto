@@ -60,13 +60,15 @@ def create_ssl_context() -> ssl.SSLContext:
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(*, guardrails: bool, ingest_data: bool, client_hook: str = "") -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
+    if client_hook:
+        params.append(f"client_hook={client_hook}")
     return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
 
 
@@ -198,7 +200,7 @@ def send_ingestion_data(
     logger.info(f">>>>>>>>>>>>>>>>>Ingestion payload: {json.dumps(payload)}")
     try:
         result = post_payload_json(
-            build_http_proxy_url(guardrails=guardrails, ingest_data=True),
+            build_http_proxy_url(guardrails=guardrails, ingest_data=True, client_hook=hook_name),
             payload,
             logger,
         )
