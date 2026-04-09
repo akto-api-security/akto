@@ -3,6 +3,7 @@ import { Box } from "@shopify/polaris";
 import ReactFlow from "react-flow-renderer";
 import { AgentNode, AgentEdge } from "../observe/api_collections/AgentDiscoverGraph";
 import { isAgenticSecurityCategory } from "../../../main/labelHelper";
+import { getAgentType } from "./nhiViolationsData";
 
 // ── Per-identity resource mappings ────────────────────────────────────────────
 export const IDENTITY_RESOURCES = {
@@ -70,7 +71,7 @@ export default function IdentityGraph({ row }) {
             ]),
             makeNode("agent", agentX, centerY, {
                 label: row.agent,
-                type:  "AI Agent",
+                type:  getAgentType(row.agent),
                 category: "agent",
                 description: `Agent using ${row.identityName}`,
                 status: "active",
