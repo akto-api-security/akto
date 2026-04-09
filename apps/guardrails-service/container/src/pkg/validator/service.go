@@ -246,7 +246,8 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.logger.Info("Policy cache refreshed with ALL policies",
 		zap.Int("policiesCount", len(policies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
-		zap.Time("lastFetched", s.cache.lastFetched))
+		zap.Time("lastFetched", s.cache.lastFetched),
+		zap.Any("policies", policies))
 
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
@@ -483,6 +484,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.String("contextSource", contextSource),
 		zap.Int("policiesCount", len(policies)),
 		zap.Strings("policyNames", policyNames(policies)),
+		zap.Any("policies", policies),
 		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
 	// Create validation context with full request metadata (matching batch flow)
@@ -492,6 +494,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	policies = filterPoliciesByMcpServer(policies, valCtx.McpServerName, contextSource)
 
 	s.logger.Info("ValidateRequest - calling ProcessRequest",
+		zap.String("contextSource", contextSource),
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
 		zap.String("sessionID", sessionID),
