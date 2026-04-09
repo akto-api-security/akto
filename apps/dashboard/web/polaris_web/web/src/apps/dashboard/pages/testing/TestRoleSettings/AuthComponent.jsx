@@ -42,6 +42,7 @@ const AuthComponent = ({
   setOpenAuth,
   advancedHeaderSettingsOpen,
   setAdvancedHeaderSettingsOpen,
+  roleName,
 }) => {
 
 
@@ -361,6 +362,7 @@ const AuthComponent = ({
                 extractInformation={true}
                 showOnlyApi={true}
                 setStoreData={handleLoginInfo}
+                roleName={roleName}
               />
             )}
           </Collapsible>

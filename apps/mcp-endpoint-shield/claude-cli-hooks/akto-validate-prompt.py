@@ -4,6 +4,7 @@ import logging
 import os
 import ssl
 import sys
+import time
 import urllib.request
 from typing import Any, Dict, Tuple, Union
 
@@ -37,7 +38,7 @@ MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-AKTO_CONNECTOR = "claude_code_cli"
+AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 
 # SSL Configuration
@@ -55,18 +56,6 @@ else:
 
 
 def create_ssl_context():
-    """
-    Create SSL context with graceful fallback strategy.
-
-    Attempts in order:
-    1. Custom SSL_CERT_PATH if provided
-    2. System default SSL context
-    3. Python certifi bundle (if available)
-    4. Unverified context (last resort)
-
-    Returns:
-        ssl.SSLContext or None
-    """
     return ssl._create_unverified_context()
 
 
@@ -81,8 +70,6 @@ def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
 
 
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
-    import time
-
     logger.info(f"API CALL: POST {url}")
     if LOG_PAYLOADS:
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
@@ -119,39 +106,29 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 
 
 def build_validation_request(query: str) -> dict:
-    """Build the request body for guardrails validation."""
-    import time
-
-    # Build tags based on mode
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
         tags["ai-agent"] = "claudecli"
         tags["source"] = CONTEXT_SOURCE
 
-    # Get device ID
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
 
-    # Build host from CLAUDE_API_URL
     host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
 
-    # Build request headers as JSON string
     request_headers = json.dumps({
         "host": host,
-        "x-claude-hook": "PreToolUse",
+        "x-claude-hook": "UserPromptSubmit",
         "content-type": "application/json"
     })
 
-    # Build response headers as JSON string
     response_headers = json.dumps({
-        "x-claude-hook": "PreToolUse"
+        "x-claude-hook": "UserPromptSubmit"
     })
 
-    # Build request payload as JSON string
     request_payload = json.dumps({
         "body": query.strip()
     })
 
-    # Response payload is empty for before hooks
     response_payload = json.dumps({})
 
     return {
@@ -165,7 +142,7 @@ def build_validation_request(query: str) -> dict:
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": "200",
-        "type": None,
+        "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
         "akto_vxlan_id": device_id,
@@ -184,6 +161,9 @@ def build_validation_request(query: str) -> dict:
 
 def call_guardrails(query: str) -> Tuple[bool, str]:
     if not query.strip():
+        return True, ""
+    if not AKTO_DATA_INGESTION_URL:
+        logger.warning("AKTO_DATA_INGESTION_URL not set, allowing prompt (fail-open)")
         return True, ""
 
     logger.info("Validating prompt against guardrails")
@@ -216,21 +196,26 @@ def call_guardrails(query: str) -> Tuple[bool, str]:
         return True, ""
 
 
-def ingest_blocked_request(user_prompt: str):
+def ingest_blocked_request(user_prompt: str, reason: str):
     if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
         return
 
     logger.info("Ingesting blocked request data")
     try:
-        blocked_response_payload = {
-            "body": {"x-blocked-by": "Akto Proxy"},
-            "headers": {"content-type": "application/json"},
-            "statusCode": 403,
-            "status": "forbidden"
-        }
-
         request_body = build_validation_request(user_prompt)
-        request_body["response"] = blocked_response_payload
+        request_body["responseHeaders"] = json.dumps({
+            "x-claude-hook": "UserPromptSubmit",
+            "x-blocked-by": "Akto Proxy",
+            "content-type": "application/json"
+        })
+        request_body["responsePayload"] = json.dumps({
+            "body": json.dumps({
+                "x-blocked-by": "Akto Proxy",
+                "reason": reason or "Policy violation"
+            })
+        })
+        request_body["statusCode"] = "403"
+        request_body["status"] = "403"
         post_payload_json(
             build_http_proxy_url(guardrails=False, ingest_data=True),
             request_body,
@@ -247,7 +232,7 @@ def main():
         input_data = json.load(sys.stdin)
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON input: {e}")
-        sys.exit(1)
+        sys.exit(0)
 
     prompt = input_data.get("prompt", "")
 
@@ -266,8 +251,8 @@ def main():
             }
             logger.warning(f"BLOCKING prompt - Reason: {reason}")
             print(json.dumps(output))
-            ingest_blocked_request(prompt)
-            sys.exit(1)
+            ingest_blocked_request(prompt, reason)
+            sys.exit(0)
 
     logger.info("Prompt allowed")
     sys.exit(0)

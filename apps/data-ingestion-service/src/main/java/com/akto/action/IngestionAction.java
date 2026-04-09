@@ -115,5 +115,10 @@ public class IngestionAction extends ActionSupport {
         success = true;
         return Action.SUCCESS.toUpperCase();
     }
+
+    public String authCheck() {
+        success = true;
+        return Action.SUCCESS.toUpperCase();
+    }
     
 }

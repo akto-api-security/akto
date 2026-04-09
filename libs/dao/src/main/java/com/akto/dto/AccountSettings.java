@@ -51,7 +51,7 @@ public class AccountSettings {
 
     public static final String URL_REGEX_MATCHING_ENABLED = "urlRegexMatchingEnabled";
 
-    private boolean bodyMatchEnabled = true;;
+    private boolean bodyMatchEnabled = true;
     public static final String BODY_MATCH_ENABLED = "bodyMatchEnabled";
 
     private String initStackType;
