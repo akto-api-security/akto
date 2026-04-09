@@ -18,6 +18,7 @@ Copy the following files to this directory:
 - `akto-validate-mcp-request.py`
 - `akto-validate-mcp-response.py`
 - `akto-validate-file.py`
+- `../shared/akto_validate_file_common.py` (copy next to the other hook scripts, or keep the `shared/` folder as a sibling of `hooks/`)
 - `akto-validate-prompt-wrapper.sh`
 - `akto-validate-response-wrapper.sh`
 - `akto-validate-mcp-request-wrapper.sh`

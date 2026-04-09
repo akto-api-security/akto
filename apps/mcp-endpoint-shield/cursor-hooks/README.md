@@ -21,6 +21,18 @@ Copy the following files to this directory:
 - `akto-validate-mcp-request.py` - Validates MCP tool requests before execution
 - `akto-validate-mcp-response.py` - Ingests MCP tool responses for analysis
 
+**For agent file-read tools (`preToolUse` / `postToolUse`, same guardrail as Claude file validation):**
+- `akto-validate-file-pretool.py` - Blocks `read_file` / `Read` / `glob_file_search` / `Glob` when `/api/validate/file` denies
+- `akto-validate-file-posttool.py` - Ingests those tool results to Akto (observational)
+- `akto_cursor_mirror.py` - Shared HTTP mirror helper (used by MCP response + file post hook)
+- `akto_cursor_file_read_tools.py` - Shared tool-name / path parsing
+- `../shared/akto_validate_file_common.py` - Shared `/api/validate/file` client (place in `~/.cursor/hooks/akto/` or `~/.cursor/hooks/shared/` per script path logic)
+- `akto-validate-file-pretool-wrapper.sh` / `akto-validate-file-posttool-wrapper.sh`
+
+**For IDE file reads sent to the model ([beforeReadFile](https://cursor.com/docs/hooks#beforereadfile) / [beforeTabFileRead](https://cursor.com/docs/hooks#beforetabfileread)):**
+- `akto-validate-before-read-file.py` - Same `/api/validate/file` check; resolves workspace-relative `file_path` using `workspace_roots`
+- `akto-validate-before-read-file-wrapper.sh`
+
 **Shared:**
 - `akto_machine_id.py` - Device ID generation utility
 
@@ -98,6 +110,34 @@ Edit or create `~/.cursor/hooks.json`:
         "type": "command",
         "timeout": 10
       }
+    ],
+    "preToolUse": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-validate-file-pretool-wrapper.sh",
+        "type": "command",
+        "timeout": 15
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-validate-file-posttool-wrapper.sh",
+        "type": "command",
+        "timeout": 15
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-validate-before-read-file-wrapper.sh",
+        "type": "command",
+        "timeout": 15
+      }
+    ],
+    "beforeTabFileRead": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-validate-before-read-file-wrapper.sh",
+        "type": "command",
+        "timeout": 15
+      }
     ]
   }
 }
@@ -108,6 +148,9 @@ Edit or create `~/.cursor/hooks.json`:
 - `afterAgentResponse` - Observes ALL agent chat responses after generation
 - `beforeMCPExecution` - Intercepts MCP tool calls only
 - `afterMCPExecution` - Observes MCP tool results only
+- `preToolUse` - Intercepts built-in agent tools (file-read validation via `akto-validate-file-pretool.py`)
+- `postToolUse` - Observes built-in agent tool results (`akto-validate-file-posttool.py`)
+- `beforeReadFile` / `beforeTabFileRead` - Validates workspace/editor file reads before content is sent to the LLM (`akto-validate-before-read-file.py`)
 
 ### 4. Restart Cursor
 

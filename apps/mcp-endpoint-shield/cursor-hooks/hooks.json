@@ -28,6 +28,34 @@
         "type": "command",
         "timeout": 10
       }
+    ],
+    "preToolUse": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-validate-file-pretool-wrapper.sh",
+        "type": "command",
+        "timeout": 15
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-validate-file-posttool-wrapper.sh",
+        "type": "command",
+        "timeout": 15
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-validate-before-read-file-wrapper.sh",
+        "type": "command",
+        "timeout": 15
+      }
+    ],
+    "beforeTabFileRead": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-validate-before-read-file-wrapper.sh",
+        "type": "command",
+        "timeout": 15
+      }
     ]
   }
 }
