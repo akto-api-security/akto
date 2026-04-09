@@ -109,7 +109,7 @@ def extract_mcp_server_name(tool_name: str) -> str:
 
 
 def build_validation_request(tool_name: str, tool_input: Any, mcp_server_name: str) -> Dict[str, Any]:
-    tags = {"gen-ai": "Gen AI", "mcp_server_name": mcp_server_name}
+    tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
         tags["ai-agent"] = "claudecli"
         tags["source"] = CONTEXT_SOURCE

@@ -114,7 +114,6 @@ def build_ingestion_payload(
     tags = {
         "gen-ai": "Gen AI",
         "tool-use": "Tool Execution",
-        "mcp_server_name": mcp_server_name,
     }
     if MODE == "atlas":
         tags["ai-agent"] = "claudecli"
