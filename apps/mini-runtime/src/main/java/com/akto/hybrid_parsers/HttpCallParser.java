@@ -337,14 +337,14 @@ public class HttpCallParser {
 
             // Microsoft Defender traffic: collection name is bot-name.openclaw.defender.microsoft.com
             if (source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)) {
-                return botName + ".openclaw.defender.microsoft.com";
+                return botName;
             }
 
             // ENDPOINT source with MICROSOFT_DEFENDER connector: collection name is bot-name.openclaw.defender.microsoft.com
             if (source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)) {
                 String connector = tagsMap.get(Constants.AI_AGENT_TAG_CONNECTOR);
                 if (Constants.AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER.equals(connector)) {
-                    return botName + ".openclaw.defender.microsoft.com";
+                    return botName;
                 }
             }
 
@@ -352,7 +352,7 @@ public class HttpCallParser {
                 String connector = tagsMap.get(Constants.AI_AGENT_TAG_CONNECTOR);
                 String appName = tagsMap.get(Constants.AI_AGENT_APP_NAME);
                 if(Constants.AI_AGENT_CONNECTOR_SENTINEL.equals(connector)) {
-                    return botName + "." + appName + ".sentinelone.com";
+                    return botName + "." + appName;
                 }
             }
             // Reconstruct full hostname: bot-name.base-hostname
