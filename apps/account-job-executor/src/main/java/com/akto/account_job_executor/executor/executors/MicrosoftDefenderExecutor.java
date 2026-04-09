@@ -145,7 +145,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         record.put("responsePayload", OBJECT_MAPPER.writeValueAsString(row));
 
         Map<String, String> requestHeaders = new HashMap<>();
-        requestHeaders.put("host", deviceName + ".openclaw.defender.microsoft.com");
+        requestHeaders.put("host", deviceName);
         requestHeaders.put("content-type", "application/json");
         record.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(requestHeaders));
 
