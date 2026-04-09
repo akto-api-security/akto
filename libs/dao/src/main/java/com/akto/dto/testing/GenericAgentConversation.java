@@ -22,11 +22,13 @@ public class GenericAgentConversation {
 
     private String title;
     private String conversationId;
+    public static final String _CONVERSATION_ID = "conversationId";
     private String prompt;
     private String response;
     private String finalSentPrompt;
     private int createdAt;
     private int lastUpdatedAt;
+    public static final String _LAST_UPDATED_AT = "lastUpdatedAt";
     private int tokensUsed;
     private int externalApiTokens;
     private int tokensLimit;
