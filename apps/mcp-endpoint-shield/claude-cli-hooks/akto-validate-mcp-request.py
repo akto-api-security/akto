@@ -129,7 +129,7 @@ def build_validation_request(tool_name: str, tool_input: Any, mcp_server_name: s
     response_payload = json.dumps({})
 
     return {
-        "path": "/v1/messages",
+        "path": f"/v1/hooks/PreToolUse",
         "requestHeaders": request_headers,
         "responseHeaders": response_headers,
         "method": "POST",

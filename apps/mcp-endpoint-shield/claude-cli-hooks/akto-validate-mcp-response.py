@@ -137,7 +137,7 @@ def build_ingestion_payload(
     response_payload = json.dumps({"body": {"result": tool_response}})
 
     return {
-        "path": "/v1/messages",
+        "path": "/v1/hooks/PostToolUse",
         "requestHeaders": request_headers,
         "responseHeaders": response_headers,
         "method": "POST",
