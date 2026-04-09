@@ -1737,11 +1737,14 @@ public class StartTestAction extends UserAction {
     String conversationId;
 
     public String fetchConversationsFromConversationId() {
-        if(this.conversationId == null || this.conversationId.isEmpty()){
+        if (this.conversationId == null || this.conversationId.isEmpty()) {
             addActionError("Conversation id is required");
             return ERROR.toUpperCase();
         }
-        this.conversationsList = AgentConversationResultDao.instance.findAll(Filters.eq("conversationId", this.conversationId));
+        this.conversationsList = AgentConversationResultDao.instance.findAll(
+                Filters.eq(GenericAgentConversation._CONVERSATION_ID, this.conversationId),
+                0, 100,
+                Sorts.ascending(GenericAgentConversation._LAST_UPDATED_AT));
         return SUCCESS.toUpperCase();
     }
 
