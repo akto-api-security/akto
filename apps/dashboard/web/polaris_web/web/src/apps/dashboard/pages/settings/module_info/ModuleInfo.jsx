@@ -99,10 +99,10 @@ const ModuleInfo = () => {
             ),
             module.additionalData?.tokenExpired ? (
                 <Tooltip content="Token expired. Please re-authenticate this module.">
-                    <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <Icon source={AlertMinor} color="critical" />
                         <span>{module.name || '-'}</span>
-                    </HorizontalStack>
+                    </span>
                 </Tooltip>
             ) : (module.name || '-'),
             module.currentVersion || '-',
