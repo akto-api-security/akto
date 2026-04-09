@@ -39,7 +39,7 @@ def main():
             request_payload=user_prompt,
             response_payload={},
             tags=None,
-            guardrails=not AKTO_SYNC_MODE,
+            guardrails=AKTO_SYNC_MODE,
             logger=logger,
         )
 
