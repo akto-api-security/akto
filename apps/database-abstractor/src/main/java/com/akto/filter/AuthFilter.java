@@ -20,9 +20,7 @@ public class AuthFilter implements Filter {
     private static final List<String> TARGET_ACCOUNT_IDS = Arrays.asList(
         "1728622642"
     );
-    private static final List<String> SKIP_AUTH_ACCOUNT_IDS = Arrays.asList(
-        "1721887185"
-    );
+
     private static final String NO_AUTH_API_PREFIX = "updateModuleInfo";
 
     private static final long LOG_INTERVAL_SECONDS = 5 * 60; // 5 minutes
@@ -48,7 +46,6 @@ public class AuthFilter implements Filter {
                 chain.doFilter(servletRequest, servletResponse);
                 return;
             }
-            logExpiredTokenForTargetAccount(e);
             System.out.println(e.getMessage());
             httpServletResponse.sendError(401);
             return;
@@ -70,10 +67,9 @@ public class AuthFilter implements Filter {
                     Object accountIdObj = claims.get(ACCOUNT_ID);
                     if (accountIdObj != null) {
                         String accountId = String.valueOf(accountIdObj);
-                        if (SKIP_AUTH_ACCOUNT_IDS.contains(accountId)) {
-                            Context.accountId.set(Integer.parseInt(accountId));
-                            return true;
-                        }
+                        Context.accountId.set(Integer.parseInt(accountId));
+                        Context.tokenExpired.set(true);
+                        return true;
                     }
                 }
             }
@@ -81,38 +77,6 @@ public class AuthFilter implements Filter {
             // Ignore parsing errors
         }
         return false;
-    }
-
-    private void logExpiredTokenForTargetAccount(Exception e) {
-        if (!(e instanceof ExpiredJwtException)) {
-            return;
-        }
-
-        try {
-            // ExpiredJwtException contains the claims even though the token is expired
-            ExpiredJwtException expiredEx = (ExpiredJwtException) e;
-            Claims claims = expiredEx.getClaims();
-            if (claims == null) {
-                return;
-            }
-
-            Object accountIdObj = claims.get(ACCOUNT_ID);
-            if (accountIdObj == null) {
-                return;
-            }
-
-            String accountId = String.valueOf(accountIdObj);
-
-            if (TARGET_ACCOUNT_IDS.contains(accountId)) {
-                long currentTime = Context.now();
-                if (currentTime - lastLogTime >= LOG_INTERVAL_SECONDS) {
-                    lastLogTime = currentTime;
-                    System.out.println("EXPIRED_TOKEN_ALERT: accountId=" + accountId + ", error=" + e.getMessage());
-                }
-            }
-        } catch (Exception ex) {
-            // Ignore parsing errors during logging
-        }
     }
 
     @Override
