@@ -301,7 +301,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after ensuring complete: " + this.scopeRoleMapping);
 
                 if(user != null){
-                    AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId(), pendingInviteCode.getInviteeRole());
+                    AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId(), pendingInviteCode.getInviteeRole(),this.scopeRoleMapping);
                 }
                 createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString(), pendingInviteCode.getInviteeRole());
 
@@ -1441,7 +1441,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[createUserAndRedirect] EXISTING USER path - SSO login or invited user");
                 logger.info("[createUserAndRedirect] User: " + user.getLogin() + ", accountId: " + accountId + ", invitedRole: " + invitedRole);
 
-                if(invitedRole != null && accountId != 0){
+                if((invitedRole != null || this.scopeRoleMapping!= null) && accountId != 0){
                     logger.info("[createUserAndRedirect] Processing invitation for existing user");
                     // check if the invited account exists in the user info, if not, add it
                     String accountIdStr = String.valueOf(accountId);
@@ -1465,16 +1465,23 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         String accountName = account != null ? account.getName() : "My account";
                         user = UsersDao.addAccount(user.getLogin(), accountId, accountName);
                         logger.infoAndAddToDb("[createUserAndRedirect] Successfully added account " + accountId + " to existing user " + user.getLogin());
-                    } else if (invitedRole != null) {
+                    } else if (invitedRole != null || this.scopeRoleMapping!=null) {
                         RBAC existingRbac = RBACDao.instance.findOne(
                             Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId))
                         );
-                        if (existingRbac != null && !invitedRole.equals(existingRbac.getRole())) {
+                        if (existingRbac != null) {
+                            if(invitedRole!= null && !invitedRole.equals(existingRbac.getRole())) {
                             RBACDao.instance.updateOne(
                                 Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId)),
                                 Updates.set(RBAC.ROLE, invitedRole)
                             );
                             logger.infoAndAddToDb("[createUserAndRedirect] Updated role from " + existingRbac.getRole() + " to " + invitedRole + " for user " + user.getLogin());
+                           }else if (this.scopeRoleMapping!= null && !this.scopeRoleMapping.isEmpty()){
+                                RBACDao.instance.updateOne(
+                                        Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId)),
+                                        Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping)
+                                );
+                            }
                         }
                     }
 

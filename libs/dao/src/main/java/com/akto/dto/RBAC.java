@@ -100,6 +100,13 @@ public class RBAC {
         this.allowedFeaturesForUser = new ArrayList<>();
     }
 
+    public RBAC(int userId, String role, int accountId, Map <String,String> scopeRoleMapping) {
+        this.userId = userId;
+        this.role = role;
+        this.accountId = accountId;
+        this.scopeRoleMapping = scopeRoleMapping;
+    }
+
     public RBAC() {
     }
 
