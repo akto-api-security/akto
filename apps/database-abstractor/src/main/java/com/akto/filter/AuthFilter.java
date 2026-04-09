@@ -11,20 +11,11 @@ import javax.servlet.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 
 public class AuthFilter implements Filter {
 
     private static final String ACCOUNT_ID = "accountId";
-    private static final List<String> TARGET_ACCOUNT_IDS = Arrays.asList(
-        "1728622642"
-    );
-
     private static final String NO_AUTH_API_PREFIX = "updateModuleInfo";
-
-    private static final long LOG_INTERVAL_SECONDS = 5 * 60; // 5 minutes
-    private static volatile long lastLogTime = 0;
 
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {

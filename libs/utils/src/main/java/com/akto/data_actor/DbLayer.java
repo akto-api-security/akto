@@ -199,7 +199,10 @@ public class DbLayer {
         updateOptions.upsert(true);
         updateOptions.returnDocument(ReturnDocument.AFTER);
 
-        if(Context.tokenExpired.get()){
+        if (Boolean.TRUE.equals(Context.tokenExpired.get())) {
+            if (moduleInfo.getAdditionalData() == null) {
+                moduleInfo.setAdditionalData(new HashMap<>());
+            }
             moduleInfo.getAdditionalData().put("tokenExpired", true);
         }
 
