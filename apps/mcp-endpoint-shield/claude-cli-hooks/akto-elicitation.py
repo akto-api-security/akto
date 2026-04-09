@@ -23,7 +23,7 @@ def main():
 
         result = send_ingestion_data(
             hook_name="Elicitation",
-            request_payload={"mcp_server": mcp_server, "form_fields": form_fields},
+            request_payload=input_data,
             response_payload={},
             tags=None,
             guardrails=True,

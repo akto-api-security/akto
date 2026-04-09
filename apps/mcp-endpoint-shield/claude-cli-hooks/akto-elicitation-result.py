@@ -19,11 +19,10 @@ def main():
         logger.info("ElicitationResult input:\n%s", json.dumps(input_data, indent=2))
 
         mcp_server = input_data.get("mcp_server", "")
-        form_fields = input_data.get("form_fields", [])
 
         result = send_ingestion_data(
             hook_name="ElicitationResult",
-            request_payload={"mcp_server": mcp_server, "form_fields": form_fields},
+            request_payload=input_data,
             response_payload={},
             tags=None,
             guardrails=True,
