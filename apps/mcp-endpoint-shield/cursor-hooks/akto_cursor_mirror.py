@@ -135,8 +135,6 @@ def build_mirror_ingestion_payload(
         tags["ai-agent"] = "cursor"
         tags["source"] = context_source
 
-    tags["mcp_server_name"] = server_tag
-
     host = api_url.replace("https://", "").replace("http://", "")
 
     request_headers = json.dumps({
