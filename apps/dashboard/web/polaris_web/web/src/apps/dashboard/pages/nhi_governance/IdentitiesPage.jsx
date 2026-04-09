@@ -76,7 +76,7 @@ const summaryItems = [
 // ── Headers ────────────────────────────────────────────────────────────────────
 const headers = [
     { text: "Identity",      value: "identityComp",   title: "Identity"                           },
-    { text: "Agent",         value: "agentComp",      title: "Agent"                              },
+    { text: "Agentic Asset", value: "agentComp",      title: "Agentic Asset"                      },
     ...(isEndpointSecurityCategory() ? [{ text: "Owner", value: "owner", title: "Owner", type: CellType.TEXT }] : []),
     { text: "Type",          value: "typeComp",       title: "Type"                               },
     { text: "Access",        value: "access",         title: "Access",      type: CellType.TEXT   },

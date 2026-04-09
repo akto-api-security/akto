@@ -26,11 +26,11 @@ export const NON_CRITICAL_CURATED = [
 // ── Generation pools ───────────────────────────────────────────────────────────
 export const AGENTS_POOL = [
     "Cursor","Claude CLI","VS Code","Claude Desktop","Windsurf",
-    "Antigravity","Cursor","VS Code","Claude CLI","Claude Desktop",
-    "Windsurf","Cursor","Claude CLI","VS Code","Antigravity",
-    "Claude Desktop","Windsurf","Cursor","VS Code","Claude CLI",
-    "Antigravity","Cursor","Claude Desktop","VS Code","Windsurf",
-    "Claude CLI","Cursor","Antigravity","VS Code","Claude Desktop",
+    "Antigravity","AWS","Azure","Docker","Gemini",
+    "Stripe","Playwright","Postgres","Atlassian","Filesystem",
+    "Cursor","VS Code","Claude CLI","Claude Desktop","Windsurf",
+    "AWS","Cursor","Claude CLI","VS Code","Antigravity",
+    "Claude Desktop","Windsurf","Docker","Gemini","AWS",
 ];
 export const IDENTITY_POOL = [
     "aws-prod-key","gcp-svc-account","azure-sp-token","github-actions-sa","okta-api-key",
@@ -721,6 +721,15 @@ export const AGENT_OPTIONS = [
     { label: "VS Code",        value: "VS Code" },
     { label: "Windsurf",       value: "Windsurf" },
     { label: "Antigravity",    value: "Antigravity" },
+    { label: "Gemini",         value: "Gemini" },
+    { label: "AWS",            value: "AWS" },
+    { label: "Azure",          value: "Azure" },
+    { label: "Stripe",         value: "Stripe" },
+    { label: "Playwright",     value: "Playwright" },
+    { label: "Postgres",       value: "Postgres" },
+    { label: "Atlassian",      value: "Atlassian" },
+    { label: "Docker",         value: "Docker" },
+    { label: "Filesystem",     value: "Filesystem" },
 ];
 
 // ── Chart data (line chart — static trend ending at current total ~169) ────────

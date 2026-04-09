@@ -1,5 +1,7 @@
 import { Badge, Box, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
-import { SettingsMajor } from "@shopify/polaris-icons";
+import { MagicMajor, SettingsMajor } from "@shopify/polaris-icons";
+import MCPIcon from "@/assets/MCP_Icon.svg";
+import { Avatar } from "@shopify/polaris";
 import { CellType } from "../../components/tables/rows/GithubRow";
 import func from "@/util/func";
 
@@ -35,16 +37,37 @@ export function IdentityIcon({ name }) {
 
 // ── Agent icon ─────────────────────────────────────────────────────────────────
 const AGENT_SPECIFIC_DOMAIN = {
-    "cursor prod":    "cursor.sh",
-    "cursor":         "cursor.sh",
+    "cursor prod":    "cursor.com",
+    "cursor":         "cursor.com",
     "vs code":        "code.visualstudio.com",
-    "claude cli":     "anthropic.com",
-    "claude desktop": "anthropic.com",
+    "claude cli":     "claude.ai",
+    "claude desktop": "claude.ai",
     "windsurf":       "codeium.com",
+    "antigravity":    "antigravity.google",
+    "gemini":         "gemini.google.com",
+    "aws":            "aws.amazon.com",
+    "azure":          "azure.microsoft.com",
+    "stripe":         "stripe.com",
+    "playwright":     "playwright.dev",
+    "postgres":       "postgresql.org",
+    "atlassian":      "atlassian.net",
+    "docker":         "docker.com",
 };
+const AGENT_MCP  = new Set(["aws","azure","stripe","playwright","postgres","atlassian","docker","filesystem","universal"]);
+const AGENT_LLM  = new Set(["gemini"]);
+export function getAgentType(name) {
+    const key = (name || "").toLowerCase().trim();
+    if (AGENT_MCP.has(key)) return "MCP Server";
+    if (AGENT_LLM.has(key)) return "LLM";
+    return "AI Agent";
+}
 const AI_ICON_POOL = ["claude.ai","openai.com","deepseek.com","x.ai","gemini.google.com","mistral.ai","perplexity.ai","cohere.com"];
 export function AgentIcon({ name }) {
     const key = (name || "").toLowerCase().trim();
+    if (AGENT_MCP.has(key))
+        return <Avatar source={MCPIcon} shape="square" size="extraSmall" />;
+    if (AGENT_LLM.has(key))
+        return <Box style={{width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon source={MagicMajor} color="base" /></Box>;
     const domain = AGENT_SPECIFIC_DOMAIN[key] || AI_ICON_POOL[key.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % AI_ICON_POOL.length];
     return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={20} height={20} style={{borderRadius:3,flexShrink:0}} alt="" />;
 }
@@ -257,7 +280,7 @@ export const violationsTableData = ALL_RAW.map((r, i) => ({
 export const violationsHeaders = [
     { text: "Violation",  value: "violationComp", title: "Violation"                          },
     { text: "Identity",   value: "identityComp",  title: "Identity"                           },
-    { text: "Agent",      value: "agentComp",     title: "Agent"                              },
+    { text: "Agentic Asset", value: "agentComp",  title: "Agentic Asset"                      },
     { text: "Severity",   value: "severityComp",  title: "Severity"                           },
     { text: "Policy",     value: "policyComp",    title: "Policy"                             },
     { text: "Discovered", value: "discovered",    title: "Discovered", type: CellType.TEXT    },
