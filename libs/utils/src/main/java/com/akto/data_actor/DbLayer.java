@@ -198,6 +198,11 @@ public class DbLayer {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
         updateOptions.returnDocument(ReturnDocument.AFTER);
+
+        if(Context.tokenExpired.get()){
+            moduleInfo.getAdditionalData().put("tokenExpired", true);
+        }
+
         return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Updates.combine(
                         //putting class name because findOneAndUpdate doesn't put class name by default
