@@ -1,4 +1,5 @@
-import { Button, LegacyCard, DataTable, Checkbox, Modal, Text } from "@shopify/polaris"
+import { Button, LegacyCard, DataTable, Checkbox, Modal, Text, Tooltip, Icon, HorizontalStack } from "@shopify/polaris"
+import { AlertMinor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
@@ -96,7 +97,14 @@ const ModuleInfo = () => {
             ) : (
                 module.moduleType || '-'
             ),
-            module.name || '-',
+            module.additionalData?.tokenExpired ? (
+                <Tooltip content="Token expired. Please re-authenticate this module.">
+                    <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+                        <Icon source={AlertMinor} color="critical" />
+                        <span>{module.name || '-'}</span>
+                    </HorizontalStack>
+                </Tooltip>
+            ) : (module.name || '-'),
             module.currentVersion || '-',
             func.epochToDateTime(module.startedTs),
             func.epochToDateTime(module.lastHeartbeatReceived),
