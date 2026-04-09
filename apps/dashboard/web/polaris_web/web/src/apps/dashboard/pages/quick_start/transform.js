@@ -1163,7 +1163,7 @@ const codexHookObj = {
 
 const intellijHookObj = {
     icon: '/public/intellij.svg',
-    label: "IntelliJ/JetBrains Hook",
+    label: "IntelliJ/JetBrains Hook (Coming Soon)",
     text: "IDE-level protection monitoring AI-powered code completions in JetBrains IDEs.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/intellij-hooks',
     key: "INTELLIJ_HOOK",
@@ -1175,7 +1175,7 @@ const intellijHookObj = {
 
 const antigravityObj = {
     icon: '/public/antigravity.svg',
-    label: "Antigravity Hook",
+    label: "Antigravity Hook (Coming Soon)",
     text: "Secure your Antigravity AI agent interactions with Akto guardrails.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/antigravity-hooks',
     key: "ANTIGRAVITY_HOOK",
