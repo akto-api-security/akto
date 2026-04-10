@@ -713,7 +713,7 @@ function EndpointPosture() {
             isFirstPage={true}
             title={
                 <TitleWithInfo
-                    titleText="Endpoint Security Dashboard"
+                    titleText="AI Security Dashboard"
                     tooltipContent="Monitor and manage your endpoint security from this centralized dashboard. Drag cards to reposition and hover over corners to resize."
                     docsUrl="https://docs.akto.io/endpoint-security"
                 />
