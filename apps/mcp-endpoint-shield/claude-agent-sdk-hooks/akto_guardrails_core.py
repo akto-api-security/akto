@@ -56,7 +56,6 @@ MODE = os.getenv("MODE", "argus").lower()
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_agent_sdk")
-AGENT_ID = os.getenv("AGENT_ID", "")
 AKTO_HOST = os.getenv("AKTO_HOST", "api.anthropic.com")
 
 # Read at call time so values set after import (e.g. via load_dotenv) are picked up
@@ -75,7 +74,7 @@ WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_prompt_warn_pending.json")
 
 logger.info(
     f"Akto Agent SDK hooks initialised | mode={MODE} sync={AKTO_SYNC_MODE} "
-    f"connector={AKTO_CONNECTOR} agent_id={AGENT_ID or '(not set)'}"
+    f"connector={AKTO_CONNECTOR}"
 )
 
 # ---------------------------------------------------------------------------
@@ -176,7 +175,7 @@ def _base_payload(
         "type": "HTTP/1.1",
         "status": status_code,
         "akto_account_id": "1000000",
-        "akto_vxlan_id": AGENT_ID,
+        "akto_vxlan_id": "0",
         "is_pending": "false",
         "source": "MIRRORING",
         "direction": None,
