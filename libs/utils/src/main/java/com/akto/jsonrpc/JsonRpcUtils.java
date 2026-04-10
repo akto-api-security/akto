@@ -58,7 +58,7 @@ public final class JsonRpcUtils {
 
     public static boolean isMcpPath(String url) {
         if (StringUtils.isNoneBlank(url)) {
-            return url.contains("mcp");
+            return url.contains("mcp") || url.contains("sse");
         }
         return false;
     }
