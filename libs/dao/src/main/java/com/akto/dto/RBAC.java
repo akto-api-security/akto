@@ -163,44 +163,6 @@ public class RBAC {
         return scopeRoleMapping;
     }
 
-    /**
-     * Ensures all product scopes are present in the mapping with NO_ACCESS as default.
-     * For any scope not explicitly mapped, assigns NO_ACCESS role.
-     * This enforces strict access control - users only get access to explicitly assigned scopes.
-     *
-     * Valid scopes: API, MCP (future), AGENTIC, ENDPOINT, DAST
-     *
-     * @param scopeRoleMapping the current partial or complete scope-role mapping
-     * @return the complete scope-role mapping with all scopes included (unmapped = NO_ACCESS)
-     */
-    public static Map<String, String> ensureCompleteScopeRoleMapping(Map<String, String> scopeRoleMapping) {
-        Map<String, String> completedMapping = new HashMap<>();
-
-        // Define all valid product scopes
-        List<String> allScopes = Arrays.asList("API", "AGENTIC", "ENDPOINT", "DAST");
-
-        if (scopeRoleMapping == null) {
-            scopeRoleMapping = new HashMap<>();
-        }
-
-        // Add all provided scopes
-        completedMapping.putAll(scopeRoleMapping);
-
-        // Fill in missing scopes with NO_ACCESS
-        for (String scope : allScopes) {
-            if (!completedMapping.containsKey(scope)) {
-                completedMapping.put(scope, Role.NO_ACCESS.name());
-            }
-        }
-
-        return completedMapping;
-    }
-
-    /**
-     * Get the role for a specific product scope
-     * @param scope the product scope (e.g., ENDPOINT, AGENTIC, API)
-     * @return the role for that scope, or null if no mapping exists (NO ACCESS to this scope)
-     */
     public Role getRoleForScope(CONTEXT_SOURCE scope) {
         if (scope == null) {
             return null;

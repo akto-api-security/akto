@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
@@ -242,9 +241,6 @@ public class InviteUserAction extends UserAction{
                 loggerMaker.debugAndAddToDb("scopeRoleMapping is empty, defaulting to API + NO_ACCESS");
                 scopeRoleToSave.put("API", RBAC.Role.NO_ACCESS.name());
             }
-
-            // Ensure all scopes are present - fill missing scopes with NO_ACCESS
-            scopeRoleToSave = RBAC.ensureCompleteScopeRoleMapping(scopeRoleToSave);
             loggerMaker.debugAndAddToDb("After ensuring complete mapping: " + scopeRoleToSave);
         } else if (this.inviteeRole != null && !this.inviteeRole.isEmpty()) {
             // Backward compatibility: old single role
@@ -255,9 +251,6 @@ public class InviteUserAction extends UserAction{
 
             // If any case only invitee role is present and no scope then map it to "API"
             scopeRoleToSave.put("API", this.inviteeRole);
-
-            // Ensure all scopes are present - fill missing scopes with NO_ACCESS
-            scopeRoleToSave = RBAC.ensureCompleteScopeRoleMapping(scopeRoleToSave);
 
         } else {
             addActionError("Either scopeRoleMapping or inviteeRole must be provided");

@@ -110,6 +110,8 @@ public class RBACDao extends CommonContextDao<RBAC> {
                     String scopeRole = rbac.getScopeRoleMapping().get(currentScope);
                     if (scopeRole != null && !scopeRole.isEmpty()) {
                         currentRole = scopeRole;
+                    }else{
+                        currentRole = Role.NO_ACCESS.name();
                     }
                 }
             } catch (Exception e) {
