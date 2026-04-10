@@ -2146,7 +2146,7 @@
                 <param name="featureLabel">ACTIVE_ENDPOINTS</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User imported Imperva schema</param>
             </interceptor-ref>
