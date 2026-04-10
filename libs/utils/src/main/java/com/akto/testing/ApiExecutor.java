@@ -968,7 +968,11 @@ public class ApiExecutor {
 
         String[] queryParam = session.endpoint.split("\\?");
         if (overrideMessageEndpoint) {
-            request.setUrl(host + session.endpoint);
+            if(session.endpoint.startsWith("https://")){
+                request.setUrl(session.endpoint);
+            }else{
+                request.setUrl(host + session.endpoint);
+            }
         } else {
             request.setUrl(url);
             if (queryParam.length > 1) {
