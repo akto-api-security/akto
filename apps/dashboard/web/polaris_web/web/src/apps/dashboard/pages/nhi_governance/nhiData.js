@@ -1,36 +1,69 @@
 // ── Static data shared across NHI Governance pages ────────────────────────────
 
-// ── 10 Critical Curated (all others non-critical) ──────────────────────────────
+// ── Atlas: 10 Critical Curated ────────────────────────────────────────────────
+// Agents from MongoDB (ENDPOINT-tagged mcp-clients): cursor, vscode, windsurf,
+// claude-cli, antigravity, claude-desktop. Owner from john.doe@bankone.com
 export const CRITICAL_CURATED = [
-    { identityName:"aws-cursor-key",     agent:"Cursor",         type:"API Key",      access:"Admin",       violCrit:3, violHigh:0, violMed:0, lastUsed:"2h ago",  expiryStatus:"2d left",                owner:"Evelyn Carter"     },
-    { identityName:"hr-slack-token",     agent:"Claude CLI",        type:"Bearer Token", access:"Write",      violCrit:1, violHigh:3, violMed:0, lastUsed:"45m ago", expiryStatus:"Rotation Due in 2 days", owner:"John Matthews"     },
-    { identityName:"aws-env-sa",         agent:"Windsurf",       type:"Bearer Token", access:"Write",      violCrit:2, violHigh:1, violMed:0, lastUsed:"1d ago",  expiryStatus:"Rotation due today",     owner:"Adam Brooks"       },
-    { identityName:"github-oauth-456",   agent:"VS Code",        type:"Bearer Token", access:"Read/Write", violCrit:1, violHigh:3, violMed:2, lastUsed:"3h ago",  expiryStatus:"60d left",               owner:"Sarah Williams"    },
-    { identityName:"jira-token",         agent:"Claude Desktop",  type:"API Key",      access:"Read",       violCrit:2, violHigh:4, violMed:1, lastUsed:"Never",   expiryStatus:"15d left",               owner:"Noah Bennett"      },
-    { identityName:"internal-api-token", agent:"Claude CLI",           type:"Bearer Token", access:"Read",       violCrit:1, violHigh:0, violMed:1, lastUsed:"2d ago",  expiryStatus:"60d left",               owner:"Theodore Collins"  },
-    { identityName:"airbnb-api-key",      agent:"Antigravity",   type:"Bearer Token", access:"Read",       violCrit:2, violHigh:5, violMed:0, lastUsed:"6h ago",  expiryStatus:"7d left",                owner:"Michael Alvarez"   },
-    { identityName:"vscode-oauth",       agent:"VS Code",     type:"API Key",      access:"Write",      violCrit:1, violHigh:2, violMed:1, lastUsed:"Never",   expiryStatus:"No expiry",              owner:"Nina Nolan"        },
-    { identityName:"docker-registry-key",         agent:"Cursor",     type:"API Key",      access:"Admin",      violCrit:3, violHigh:0, violMed:2, lastUsed:"5h ago",  expiryStatus:"Rotation due today",     owner:"Lisa Wong"         },
-    { identityName:"github-actions-key", agent:"VS Code",          type:"Bearer Token", access:"Write",      violCrit:1, violHigh:1, violMed:0, lastUsed:"10m ago", expiryStatus:"Expired 1d ago",         owner:"Kevin O'Connor"    },
+    { identityName:"copilot-api-key",    agent:"Windsurf",      type:"API Key",      access:"Read/Write", violCrit:3, violHigh:0, violMed:2, lastUsed:"2h ago",  expiryStatus:"2d left",                owner:"John Doe" },
+    { identityName:"slack-token",        agent:"Claude CLI",    type:"Bearer Token", access:"Write",      violCrit:1, violHigh:3, violMed:0, lastUsed:"45m ago", expiryStatus:"Rotation Due in 2 days", owner:"John Doe" },
+    { identityName:"atlassian-api-key",  agent:"Cursor",        type:"API Key",      access:"Read/Write", violCrit:1, violHigh:3, violMed:2, lastUsed:"3h ago",  expiryStatus:"60d left",               owner:"John Doe" },
+    { identityName:"github-api-key",     agent:"Claude CLI",    type:"API Key",      access:"Read/Write", violCrit:2, violHigh:1, violMed:0, lastUsed:"1d ago",  expiryStatus:"Rotation due today",     owner:"John Doe" },
+    { identityName:"notion-api-key",     agent:"Cursor",        type:"API Key",      access:"Read",       violCrit:2, violHigh:4, violMed:1, lastUsed:"Never",   expiryStatus:"15d left",               owner:"John Doe" },
+    { identityName:"filesystem-token",   agent:"Claude CLI",    type:"Bearer Token", access:"Admin",      violCrit:1, violHigh:0, violMed:1, lastUsed:"2d ago",  expiryStatus:"60d left",               owner:"John Doe" },
+    { identityName:"razorpay-token",     agent:"Antigravity",   type:"Bearer Token", access:"Read",       violCrit:2, violHigh:5, violMed:0, lastUsed:"6h ago",  expiryStatus:"7d left",                owner:"John Doe" },
+    { identityName:"docker-token",       agent:"Claude CLI",    type:"API Key",      access:"Admin",      violCrit:1, violHigh:2, violMed:1, lastUsed:"Never",   expiryStatus:"No expiry",              owner:"John Doe" },
+    { identityName:"playwright-token",   agent:"Cursor",        type:"Bearer Token", access:"Write",      violCrit:3, violHigh:0, violMed:2, lastUsed:"5h ago",  expiryStatus:"Rotation due today",     owner:"John Doe" },
+    { identityName:"kite-api-key",       agent:"Cursor",        type:"API Key",      access:"Read",       violCrit:1, violHigh:1, violMed:0, lastUsed:"10m ago", expiryStatus:"Expired 1d ago",         owner:"John Doe" },
 ];
 
-// ── Non-critical curated (high/medium/low violations) ──────────────────────────
+// ── Atlas: Non-critical curated ───────────────────────────────────────────────
 export const NON_CRITICAL_CURATED = [
-    { identityName:"playwright-token",    agent:"Claude Desktop",     type:"Bearer Token", access:"Write",      violCrit:0, violHigh:1, violMed:0, lastUsed:"3h ago",  expiryStatus:"15d left",  owner:"Sarah Williams"  },
-    { identityName:"filesystem-token",    agent:"Windsurf",     type:"API Key",      access:"Admin",      violCrit:0, violHigh:1, violMed:1, lastUsed:"6h ago",  expiryStatus:"5d left",   owner:"Adam Brooks"     },
-    { identityName:"notion-token",       agent:"Claude CLI",  type:"API Key",      access:"Read",       violCrit:0, violHigh:1, violMed:0, lastUsed:"1d ago",  expiryStatus:"1d left",   owner:"Noah Bennett"    },
-    { identityName:"anthropic-api-key",      agent:"Claude CLI",   type:"Bearer Token", access:"Write",      violCrit:0, violHigh:1, violMed:0, lastUsed:"10m ago", expiryStatus:"No expiry", owner:"Evelyn Carter"   },
-    { identityName:"github-copilot-key",      agent:"Cursor",      type:"API Key",      access:"Read/Write", violCrit:0, violHigh:3, violMed:1, lastUsed:"3h ago",  expiryStatus:"No expiry", owner:"John Matthews"   },
+    { identityName:"postgres-token",     agent:"VS Code",       type:"Bearer Token", access:"Read",       violCrit:0, violHigh:1, violMed:0, lastUsed:"3h ago",  expiryStatus:"15d left",  owner:"John Doe" },
+    { identityName:"notion-mcp-token",   agent:"VS Code",       type:"Bearer Token", access:"Read",       violCrit:0, violHigh:1, violMed:1, lastUsed:"6h ago",  expiryStatus:"5d left",   owner:"John Doe" },
+    { identityName:"jetbrains-token",    agent:"Claude Desktop",type:"API Key",      access:"Read",       violCrit:0, violHigh:1, violMed:0, lastUsed:"1d ago",  expiryStatus:"1d left",   owner:"John Doe" },
+    { identityName:"squareup-token",     agent:"Cursor",        type:"Bearer Token", access:"Read",       violCrit:0, violHigh:1, violMed:0, lastUsed:"10m ago", expiryStatus:"No expiry", owner:"John Doe" },
+    { identityName:"alphavantage-key",   agent:"VS Code",       type:"API Key",      access:"Read",       violCrit:0, violHigh:3, violMed:1, lastUsed:"3h ago",  expiryStatus:"No expiry", owner:"John Doe" },
+];
+
+// ── Argus: Critical Curated ───────────────────────────────────────────────────
+// Agents from MongoDB gen-ai tagged collections. No owner in Argus.
+export const ARGUS_CRITICAL_CURATED = [
+    // gen-ai:LLM
+    { identityName:"openai-api-key",         agent:"OpenAI",         type:"API Key",      access:"Read/Write", violCrit:2, violHigh:4, violMed:1, lastUsed:"Never",   expiryStatus:"15d left"           },
+    { identityName:"cohere-api-key",         agent:"Cohere",         type:"API Key",      access:"Admin",      violCrit:1, violHigh:2, violMed:1, lastUsed:"Never",   expiryStatus:"No expiry"          },
+    { identityName:"perplexity-api-key",     agent:"Perplexity",     type:"API Key",      access:"Read/Write", violCrit:3, violHigh:0, violMed:2, lastUsed:"4h ago",  expiryStatus:"Rotation due today" },
+    { identityName:"langchain-api-key",      agent:"LangChain",      type:"API Key",      access:"Read/Write", violCrit:1, violHigh:3, violMed:1, lastUsed:"30m ago", expiryStatus:"No expiry"          },
+    // gen-ai:MCP Server
+    { identityName:"k9s-mcp-token",          agent:"K9s Trade",      type:"Bearer Token", access:"Read/Write", violCrit:2, violHigh:3, violMed:1, lastUsed:"2h ago",  expiryStatus:"No expiry"          },
+    { identityName:"vulnerable-mcp-token",   agent:"Vulnerable MCP", type:"API Key",      access:"Admin",      violCrit:3, violHigh:2, violMed:1, lastUsed:"1h ago",  expiryStatus:"Expired 3d ago"     },
+    { identityName:"akplatform-mcp-token",   agent:"AK Platform",    type:"Bearer Token", access:"Read/Write", violCrit:1, violHigh:2, violMed:0, lastUsed:"3h ago",  expiryStatus:"5d left"            },
+    // gen-ai:AI Agent (critical)
+    { identityName:"replicate-api-key",      agent:"Replicate",      type:"API Key",      access:"Write",      violCrit:2, violHigh:5, violMed:0, lastUsed:"3h ago",  expiryStatus:"7d left"            },
+    { identityName:"n8n-api-key",            agent:"N8N",            type:"API Key",      access:"Read/Write", violCrit:2, violHigh:1, violMed:1, lastUsed:"30m ago", expiryStatus:"No expiry"          },
+    { identityName:"jasper-api-key",         agent:"Jasper",         type:"API Key",      access:"Read",       violCrit:1, violHigh:1, violMed:0, lastUsed:"8h ago",  expiryStatus:"Expired 2d ago"     },
+];
+
+// ── Argus: Non-critical curated ───────────────────────────────────────────────
+export const ARGUS_NON_CRITICAL_CURATED = [
+    // gen-ai:AI Agent (lower risk)
+    { identityName:"luma-api-key",           agent:"Luma AI",        type:"API Key",      access:"Read",       violCrit:0, violHigh:1, violMed:0, lastUsed:"2h ago",  expiryStatus:"10d left"           },
+    { identityName:"chargebee-api-key",      agent:"Chargebee AI",   type:"API Key",      access:"Read",       violCrit:0, violHigh:1, violMed:1, lastUsed:"5h ago",  expiryStatus:"5d left"            },
+    { identityName:"copy-ai-token",          agent:"Copy.AI",        type:"Bearer Token", access:"Read",       violCrit:0, violHigh:1, violMed:0, lastUsed:"1d ago",  expiryStatus:"No expiry"          },
+    { identityName:"babylon-api-key",        agent:"Babylon Health", type:"API Key",      access:"Read",       violCrit:0, violHigh:1, violMed:0, lastUsed:"3h ago",  expiryStatus:"No expiry"          },
+    { identityName:"jooksy-api-key",         agent:"Jooksy",         type:"API Key",      access:"Read",       violCrit:0, violHigh:2, violMed:1, lastUsed:"4h ago",  expiryStatus:"No expiry"          },
+    { identityName:"anthropos-api-key",      agent:"Anthropos AI",   type:"API Key",      access:"Read",       violCrit:0, violHigh:1, violMed:0, lastUsed:"6h ago",  expiryStatus:"No expiry"          },
+    { identityName:"lttc-api-key",           agent:"LTTC AI",        type:"API Key",      access:"Read",       violCrit:0, violHigh:1, violMed:1, lastUsed:"5h ago",  expiryStatus:"30d left"           },
+    { identityName:"agentai-token",          agent:"AgentAI",        type:"Bearer Token", access:"Read",       violCrit:0, violHigh:1, violMed:0, lastUsed:"8h ago",  expiryStatus:"No expiry"          },
 ];
 
 // ── Generation pools ───────────────────────────────────────────────────────────
 export const AGENTS_POOL = [
     "Cursor","Claude CLI","VS Code","Claude Desktop","Windsurf",
-    "Antigravity","AWS","Azure","Docker","Gemini",
-    "Stripe","Playwright","Postgres","Atlassian","Filesystem",
-    "Cursor","VS Code","Claude CLI","Claude Desktop","Windsurf",
-    "AWS","Cursor","Claude CLI","VS Code","Antigravity",
-    "Claude Desktop","Windsurf","Docker","Gemini","AWS",
+    "Antigravity","Cursor","VS Code","Claude CLI","Claude Desktop",
+    "Windsurf","Cursor","Claude CLI","VS Code","Antigravity",
+    "Claude Desktop","Windsurf","Cursor","VS Code","Claude CLI",
+    "Antigravity","Cursor","Claude Desktop","VS Code","Windsurf",
+    "Claude CLI","Cursor","Antigravity","VS Code","Claude Desktop",
 ];
 export const IDENTITY_POOL = [
     "aws-prod-key","gcp-svc-account","azure-sp-token","github-actions-sa","okta-api-key",
@@ -721,19 +754,129 @@ export const AGENT_OPTIONS = [
     { label: "VS Code",        value: "VS Code" },
     { label: "Windsurf",       value: "Windsurf" },
     { label: "Antigravity",    value: "Antigravity" },
-    { label: "Gemini",         value: "Gemini" },
-    { label: "AWS",            value: "AWS" },
-    { label: "Azure",          value: "Azure" },
-    { label: "Stripe",         value: "Stripe" },
-    { label: "Playwright",     value: "Playwright" },
-    { label: "Postgres",       value: "Postgres" },
-    { label: "Atlassian",      value: "Atlassian" },
-    { label: "Docker",         value: "Docker" },
-    { label: "Filesystem",     value: "Filesystem" },
 ];
 
-// ── Chart data (line chart — static trend ending at current total ~169) ────────
-export const violationsOverTimeData = [{
+export const ARGUS_AGENT_OPTIONS = [
+    // LLM
+    { label: "OpenAI",         value: "OpenAI" },
+    { label: "Cohere",         value: "Cohere" },
+    { label: "Perplexity",     value: "Perplexity" },
+    { label: "LangChain",      value: "LangChain" },
+    // MCP Server
+    { label: "K9s Trade",      value: "K9s Trade" },
+    { label: "Vulnerable MCP", value: "Vulnerable MCP" },
+    { label: "AK Platform",    value: "AK Platform" },
+    // AI Agent
+    { label: "Replicate",      value: "Replicate" },
+    { label: "N8N",            value: "N8N" },
+    { label: "Jasper",         value: "Jasper" },
+    { label: "Luma AI",        value: "Luma AI" },
+    { label: "Chargebee AI",   value: "Chargebee AI" },
+    { label: "Copy.AI",        value: "Copy.AI" },
+    { label: "Babylon Health", value: "Babylon Health" },
+    { label: "Jooksy",         value: "Jooksy" },
+    { label: "Anthropos AI",   value: "Anthropos AI" },
+    { label: "LTTC AI",        value: "LTTC AI" },
+    { label: "AgentAI",        value: "AgentAI" },
+];
+
+// ── Argus: 10 policies with Argus agent scopes ─────────────────────────────────
+export const ARGUS_INITIAL_POLICIES = [
+    {
+        policyName:    "No Admin Credentials for Agent Identities",
+        scope:         { primary: "All Agents" },
+        agents:        ["All Agents"],
+        status:        "Active",
+        lastTriggered: "1h ago",
+        lastModified:  "Ethan Carter",
+        created:       "30d ago",
+    },
+    {
+        policyName:    "Enforce Least Privilege on Credentials",
+        scope:         { primary: "All Agents" },
+        agents:        ["All Agents"],
+        status:        "Active",
+        lastTriggered: "3h ago",
+        lastModified:  "Olivia Bennett",
+        created:       "45d ago",
+    },
+    {
+        policyName:    "Rotate API Keys Every 30 Days",
+        scope:         { primary: "OpenAI", extra: 2 },
+        agents:        ["OpenAI", "Perplexity", "LangChain"],
+        status:        "Active",
+        lastTriggered: "2h ago",
+        lastModified:  "Marcus Hale",
+        created:       "60d ago",
+    },
+    {
+        policyName:    "Detect Unusual Usage Patterns",
+        scope:         { primary: "All Agents" },
+        agents:        ["All Agents"],
+        status:        "Active",
+        lastTriggered: "1h ago",
+        lastModified:  "Marcus Hale",
+        created:       "20d ago",
+    },
+    {
+        policyName:    "Restrict Access to Sensitive Resources",
+        scope:         { primary: "OpenAI", extra: 2 },
+        agents:        ["OpenAI", "Replicate", "N8N"],
+        status:        "Active",
+        lastTriggered: "4h ago",
+        lastModified:  "Marcus Hale",
+        created:       "50d ago",
+    },
+    {
+        policyName:    "Disable Dormant Credentials (30+ days)",
+        scope:         { primary: "OpenAI", extra: 5 },
+        agents:        ["OpenAI","Cohere","Perplexity","LangChain","Replicate","N8N"],
+        status:        "Active",
+        lastTriggered: "6h ago",
+        lastModified:  "Ethan Carter",
+        created:       "40d ago",
+    },
+    {
+        policyName:    "Prevent Cross-Service Credential Usage",
+        scope:         { primary: "Replicate", extra: 5 },
+        agents:        ["Replicate","N8N","Jasper","LangChain","K9s Trade","Vulnerable MCP"],
+        status:        "Active",
+        lastTriggered: "2h ago",
+        lastModified:  "Ethan Carter",
+        created:       "35d ago",
+    },
+    {
+        policyName:    "Limit Automation Without Approval",
+        scope:         { primary: "K9s Trade", extra: 2 },
+        agents:        ["K9s Trade", "Vulnerable MCP", "AK Platform"],
+        status:        "Inactive",
+        lastTriggered: "Never",
+        lastModified:  "Marcus Hale",
+        created:       "25d ago",
+    },
+    {
+        policyName:    "Restrict Code Execution Permissions",
+        scope:         { primary: "All Agents" },
+        agents:        ["All Agents"],
+        status:        "Inactive",
+        lastTriggered: "Never",
+        lastModified:  "Olivia Bennett",
+        created:       "15d ago",
+    },
+    {
+        policyName:    "Enforce Scoped Access for OAuth Tokens",
+        scope:         { primary: "All Agents" },
+        agents:        ["All Agents"],
+        status:        "Draft",
+        lastTriggered: "Never",
+        lastModified:  "Olivia Bennett",
+        created:       "1d ago",
+    },
+];
+
+// ── Chart data ─────────────────────────────────────────────────────────────────
+// Atlas: higher counts (curated + 128 generated)
+export const atlasViolationsOverTimeData = [{
     data: [
         [Date.UTC(2026, 3,  1), 178],
         [Date.UTC(2026, 3,  2), 182],
@@ -746,3 +889,19 @@ export const violationsOverTimeData = [{
     color: "#EF4444",
     name: "Violations",
 }];
+// Argus: 54 curated violations only
+export const argusViolationsOverTimeData = [{
+    data: [
+        [Date.UTC(2026, 3,  1), 61],
+        [Date.UTC(2026, 3,  2), 58],
+        [Date.UTC(2026, 3,  3), 63],
+        [Date.UTC(2026, 3,  4), 57],
+        [Date.UTC(2026, 3,  5), 60],
+        [Date.UTC(2026, 3,  6), 56],
+        [Date.UTC(2026, 3,  7), 54],
+    ],
+    color: "#EF4444",
+    name: "Violations",
+}];
+// Keep backward-compat name for any remaining imports
+export const violationsOverTimeData = atlasViolationsOverTimeData;

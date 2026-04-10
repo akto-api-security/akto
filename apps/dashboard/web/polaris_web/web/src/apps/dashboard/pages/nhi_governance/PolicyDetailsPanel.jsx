@@ -212,7 +212,7 @@ export default function PolicyDetailsPanel({ row, show, setShow, onSave }) {
                         <VerticalStack gap="2">
                             {(row.agents || []).map((agent) => (
                                 <HorizontalStack key={agent} gap="2" blockAlign="center">
-                                    <AgentIcon name={agent} />
+                                    {agent !== "All Agents" && <AgentIcon name={agent} />}
                                     <Text variant="bodyMd">{agent}</Text>
                                 </HorizontalStack>
                             ))}
