@@ -12,11 +12,11 @@ import useTable from "../../components/tables/TableContext";
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import values from "@/util/values";
-import { isEndpointSecurityCategory } from "../../../main/labelHelper";
+import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "../../../main/labelHelper";
 import IdentityDetailsPanel from "./IdentityDetailsPanel";
 import IdentityOverviewGraph from "./IdentityOverviewGraph";
 import { violationsTableData, IdentityIcon, AgentIcon, ViolationBubbles } from "./nhiViolationsData";
-import { CRITICAL_CURATED, NON_CRITICAL_CURATED, GENERATED } from "./nhiData";
+import { CRITICAL_CURATED, NON_CRITICAL_CURATED, ARGUS_CRITICAL_CURATED, ARGUS_NON_CRITICAL_CURATED, GENERATED } from "./nhiData";
 
 const definedTableTabs = ["All", "Expired"];
 const resourceName = { singular: "identity", plural: "identities" };
@@ -40,38 +40,45 @@ const VIOL_INDEX = violationsTableData.reduce((acc, v) => {
     return acc;
 }, {});
 
-const ALL_RAW = [...CRITICAL_CURATED, ...NON_CRITICAL_CURATED, ...GENERATED]
-    .map((r) => {
-        const v = VIOL_INDEX[r.identityName] || { violCrit: 0, violHigh: 0, violMed: 0 };
-        return { ...r, violCrit: v.violCrit, violHigh: v.violHigh, violMed: v.violMed };
-    })
-    .sort((a, b) => {
-        if (b.violCrit !== a.violCrit) return b.violCrit - a.violCrit;
-        return (b.violCrit + b.violHigh + b.violMed) - (a.violCrit + a.violHigh + a.violMed);
-    });
+const buildTableData = (rawRows) =>
+    rawRows
+        .map((r) => {
+            const v = VIOL_INDEX[r.identityName] || { violCrit: 0, violHigh: 0, violMed: 0 };
+            return { ...r, violCrit: v.violCrit, violHigh: v.violHigh, violMed: v.violMed };
+        })
+        .sort((a, b) => {
+            if (b.violCrit !== a.violCrit) return b.violCrit - a.violCrit;
+            return (b.violCrit + b.violHigh + b.violMed) - (a.violCrit + a.violHigh + a.violMed);
+        })
+        .map((r, i) => ({
+            ...r,
+            id:             i + 1,
+            totalViolations: r.violCrit + r.violHigh + r.violMed,
+            priorityScore:  r.violCrit * 1000 + (r.violCrit + r.violHigh + r.violMed),
+            identityComp:  <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identityName} /><Text variant="bodyMd" fontWeight="medium">{r.identityName}</Text></HorizontalStack>,
+            agentComp:     <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
+            typeComp:      <Badge>{r.type}</Badge>,
+            violationsComp: <ViolationBubbles critical={r.violCrit} high={r.violHigh} medium={r.violMed} />,
+            expiryComp:    expiryComp(r.expiryStatus),
+        }));
 
-const tableData = ALL_RAW.map((r, i) => ({
-    ...r,
-    id:             i + 1,
-    totalViolations: r.violCrit + r.violHigh + r.violMed,
-    priorityScore:  r.violCrit * 1000 + (r.violCrit + r.violHigh + r.violMed),
-    identityComp:  <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identityName} /><Text variant="bodyMd" fontWeight="medium">{r.identityName}</Text></HorizontalStack>,
-    agentComp:     <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
-    typeComp:      <Badge>{r.type}</Badge>,
-    violationsComp: <ViolationBubbles critical={r.violCrit} high={r.violHigh} medium={r.violMed} />,
-    expiryComp:    expiryComp(r.expiryStatus),
-}));
+// Atlas: AI coding agents + generated entries; Argus: browser/gen-ai LLMs only
+const atlasTableData  = buildTableData([...CRITICAL_CURATED, ...NON_CRITICAL_CURATED, ...GENERATED]);
+const argusTableData  = buildTableData([...ARGUS_CRITICAL_CURATED, ...ARGUS_NON_CRITICAL_CURATED]);
+const tableData = isAgenticSecurityCategory() ? argusTableData : atlasTableData;
 
 // ── Computed summary ───────────────────────────────────────────────────────────
-const TOTAL_I    = tableData.length;
-const EXPIRED_I  = tableData.filter((r) => r.expiryStatus && r.expiryStatus.startsWith("Expired")).length;
-const WITH_VIOL  = tableData.filter((r) => r.totalViolations > 0).length;
-
-const summaryItems = [
-    { title: "Total Identities",          data: TOTAL_I.toLocaleString()   },
-    { title: "Expired Identities",        data: EXPIRED_I.toLocaleString() },
-    { title: "Identities with Violations",data: WITH_VIOL.toLocaleString() },
-];
+const makeSummaryItems = (data) => {
+    const total   = data.length;
+    const expired = data.filter((r) => r.expiryStatus && r.expiryStatus.startsWith("Expired")).length;
+    const withV   = data.filter((r) => r.totalViolations > 0).length;
+    return [
+        { title: "Total Identities",          data: total.toLocaleString()   },
+        { title: "Expired Identities",        data: expired.toLocaleString() },
+        { title: "Identities with Violations",data: withV.toLocaleString()   },
+    ];
+};
+const summaryItems = makeSummaryItems(tableData);
 
 // ── Headers ────────────────────────────────────────────────────────────────────
 const headers = [

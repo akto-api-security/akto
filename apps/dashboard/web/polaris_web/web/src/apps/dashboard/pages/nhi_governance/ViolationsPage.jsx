@@ -13,9 +13,12 @@ import useTable from "../../components/tables/TableContext";
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
 import values from "@/util/values";
+import { isAgenticSecurityCategory } from "../../../main/labelHelper";
 import { violationsTableData, violationsHeaders, violationsSortOptions } from "./nhiViolationsData";
 import ViolationDetailsPanel from "./ViolationDetailsPanel";
-import { violationsOverTimeData } from "./nhiData";
+import { atlasViolationsOverTimeData, argusViolationsOverTimeData } from "./nhiData";
+
+const violationsOverTimeData = isAgenticSecurityCategory() ? argusViolationsOverTimeData : atlasViolationsOverTimeData;
 
 const definedTableTabs = ["All", "Open", "Fixed"];
 const resourceName = { singular: "violation", plural: "violations" };
