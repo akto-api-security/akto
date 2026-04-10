@@ -230,6 +230,7 @@ def run_observability_hook(hook_name: str, log_file: str) -> None:
             guardrails=AKTO_SYNC_MODE,
             logger=logger,
         )
+        logger.info(f"=== {hook_name} hook completed ===")
     except Exception as e:
         logger.error(f"Main error: {e}")
     print(json.dumps({}))
@@ -267,6 +268,7 @@ def run_blocking_hook(hook_name: str, log_file: str) -> None:
                 status_code="403",
                 logger=logger,
             )
+            logger.info(f"=== {hook_name} hook completed ===")
             sys.exit(0)
     except Exception as e:
         logger.error(f"Main error: {e}")

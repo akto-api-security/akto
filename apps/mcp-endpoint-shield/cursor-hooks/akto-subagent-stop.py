@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 SubagentStop hook for Cursor - logs subagent completion and ingests conversation data.
-Can block subagent from stopping via {"decision": "block", "reason": "..."}.
+Observability only - cannot block.
 """
 import json
 import sys
@@ -27,36 +27,26 @@ def main():
         response_text = get_latest_message_for_cursor(transcript_path, "assistant", logger)
         user_prompt = get_latest_message_for_cursor(transcript_path, "user", logger)
 
+        if not user_prompt or not response_text:
+            logger.info("Incomplete interaction, skipping ingestion")
+            sys.exit(0)
+
         logger.info(
             "Prompt: %d chars, Response: %d chars, Transcript: %s",
             len(user_prompt), len(response_text), transcript_path,
         )
-        result = send_ingestion_data(
+        send_ingestion_data(
             hook_name="subagentStop",
             request_payload={**input_data, "user_prompt": user_prompt},
             response_payload={"latest_assistant_message": response_text},
-            guardrails=AKTO_SYNC_MODE,
+            guardrails=not AKTO_SYNC_MODE,
             logger=logger,
         )
-
-        allowed = (result or {}).get("data", {}).get("guardrailsResult", {}).get("Allowed", True)
-        if not allowed:
-            reason = (result or {}).get("data", {}).get("guardrailsResult", {}).get("Reason", "Policy violation")
-            logger.warning(f"BLOCKING subagentStop: {reason}")
-            print(json.dumps({"decision": "block", "reason": reason}))
-            send_ingestion_data(
-                hook_name="subagentStop",
-                request_payload=user_prompt,
-                response_payload={"reason": reason, "blockedBy": "Akto Proxy"},
-                guardrails=False,
-                status_code="403",
-                logger=logger,
-            )
-            sys.exit(0)
 
     except Exception as e:
         logger.error(f"Main error: {e}")
 
+    print(json.dumps({}))
     sys.exit(0)
 
 
