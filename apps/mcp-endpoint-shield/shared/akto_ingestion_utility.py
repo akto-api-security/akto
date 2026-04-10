@@ -227,7 +227,7 @@ def run_observability_hook(hook_name: str, log_file: str) -> None:
             hook_name=hook_name,
             request_payload=input_data,
             response_payload={},
-            guardrails=not AKTO_SYNC_MODE,
+            guardrails=AKTO_SYNC_MODE,
             logger=logger,
         )
     except Exception as e:
@@ -247,7 +247,7 @@ def run_blocking_hook(hook_name: str, log_file: str) -> None:
             hook_name=hook_name,
             request_payload=input_data,
             response_payload={},
-            guardrails=True,
+            guardrails=AKTO_SYNC_MODE,
             logger=logger,
         )
         allowed = (result or {}).get("data", {}).get("guardrailsResult", {}).get("Allowed", True)
@@ -296,18 +296,43 @@ def get_last_user_prompt(transcript_path: str, logger: logging.Logger) -> str:
     if not transcript_path or not os.path.exists(transcript_path):
         return ""
     try:
-        last_user = ""
         with open(transcript_path, "r") as f:
-            for line in f:
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if entry.get("type") == "user":
-                    text = _extract_text_from_entry(entry)
-                    if text:
-                        last_user = text
-        return last_user
+            lines = f.readlines()
+        for line in reversed(lines):
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if entry.get("type") == "user":
+                text = _extract_text_from_entry(entry)
+                if text:
+                    return text
+        return ""
+    except Exception as e:
+        logger.error(f"Error reading transcript: {e}")
+        return ""
+
+def get_latest_message_for_cursor(transcript_path: str, role: str, logger: logging.Logger) -> str:
+    """Return the latest message text for the given role from a cursor JSONL transcript file.
+
+    Cursor transcript entries use {"role": "<role>", "message": {"content": ...}}
+    Reads lines in reverse so the first match is the latest.
+    """
+    if not transcript_path or not os.path.exists(transcript_path):
+        return ""
+    try:
+        with open(transcript_path, "r") as f:
+            lines = f.readlines()
+        for line in reversed(lines):
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if entry.get("role", "") == role:
+                text = _extract_text_from_entry(entry)
+                if text:
+                    return text
+        return ""
     except Exception as e:
         logger.error(f"Error reading transcript: {e}")
         return ""

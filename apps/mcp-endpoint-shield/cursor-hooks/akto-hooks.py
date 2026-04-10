@@ -8,7 +8,6 @@ _OBSERVABILITY_HOOKS = {
     "sessionEnd":          "session.log",
     "stop":                "session.log",
     "preCompact":          "session.log",
-    "subagentStop":        "subagent.log",
     "postToolUse":         "tools.log",
     "postToolUseFailure":  "tools.log",
     "afterShellExecution": "shell.log",
@@ -19,7 +18,6 @@ _OBSERVABILITY_HOOKS = {
 
 _BLOCKING_HOOKS = {
     "preToolUse":        "tools.log",
-    "subagentStart":     "subagent.log",
     "beforeShellExecution": "shell.log",
     "beforeReadFile":    "file.log",
     "beforeTabFileRead": "file.log",
