@@ -36,7 +36,7 @@ def main():
         logger.info(f"Agent type: {agent_type}, Prompt: {len(user_prompt)} chars")
         send_ingestion_data(
             hook_name="SubagentStart",
-            request_payload=user_prompt,
+            request_payload={**input_data, "user_prompt": user_prompt},
             response_payload={},
             tags=None,
             guardrails=AKTO_SYNC_MODE,

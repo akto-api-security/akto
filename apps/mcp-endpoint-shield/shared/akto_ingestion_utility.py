@@ -1,11 +1,12 @@
 """
-Common utilities for Akto Claude CLI hooks.
-Shared config, HTTP, ingestion payload building, and transcript reading.
+Common utilities for Akto AI agent hooks (Claude CLI, Cursor, and others).
+Shared config, HTTP, ingestion payload building, transcript reading, and hook runners.
 """
 import json
 import logging
 import os
 import ssl
+import sys
 import time
 import urllib.request
 from typing import Any, Dict, Optional, Union
@@ -18,18 +19,31 @@ MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
+AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
+
+# Map AKTO_CONNECTOR to a short tag name used in headers, ai-agent tag, and atlas URL suffix.
+# Add new connectors here without touching anything else.
+_CONNECTOR_TAG: Dict[str, str] = {
+    "claude_code_cli": "claudecli",
+    "cursor": "cursor",
+    "vscode": "vscode",
+    "gemini": "gemini",
+    "github": "github",
+}
+TAG_NAME = _CONNECTOR_TAG.get(AKTO_CONNECTOR, AKTO_CONNECTOR)
+
+_HOOK_HEADER = f"x-{TAG_NAME}-hook"
 
 if MODE == "atlas":
     _device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    CLAUDE_API_URL = f"https://{_device_id}.ai-agent.claudecli" if _device_id else "https://api.anthropic.com"
+    AI_AGENT_API_URL = f"https://{_device_id}.ai-agent.{TAG_NAME}" if _device_id else os.getenv("AKTO_API_URL", "")
 else:
-    CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
+    AI_AGENT_API_URL = os.getenv("AKTO_API_URL", "")
 
 # ── Logging helpers ───────────────────────────────────────────────────────────
 
-LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
+LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.akto-agent-hooks/logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 
@@ -39,7 +53,7 @@ def setup_logger(log_filename: str) -> logging.Logger:
     os.makedirs(LOG_DIR, exist_ok=True)
     logger = logging.getLogger(log_filename)
     if logger.handlers:
-        return logger  # already configured (e.g. re-import in tests)
+        return logger
     logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
     fh = logging.FileHandler(os.path.join(LOG_DIR, log_filename))
@@ -117,29 +131,18 @@ def build_ingestion_payload(
     tags: Optional[Dict[str, str]] = None,
     status_code: str = "200",
 ) -> Dict[str, Any]:
-    """
-    Build the base HTTP-proxy ingestion payload.
-
-    Args:
-        hook_name:        Value placed in x-claude-hook headers (e.g. "SubagentStop").
-        request_payload:  Arbitrary dict/value serialised as requestPayload body.
-        response_payload: Arbitrary dict/value serialised as responsePayload body.
-        extra_headers:    Additional response headers merged alongside x-claude-hook.
-        tags:             Extra key/value pairs merged into the tag/metadata dicts.
-        status_code:      HTTP status code string (default "200").
-    """
     base_tags: Dict[str, str] = {"gen-ai": "Gen AI", "hook": hook_name}
     if MODE == "atlas":
-        base_tags["ai-agent"] = "claudecli"
+        base_tags["ai-agent"] = TAG_NAME
         base_tags["source"] = CONTEXT_SOURCE
     if tags:
         base_tags.update(tags)
 
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
+    host = AI_AGENT_API_URL.replace("https://", "").replace("http://", "")
 
-    req_headers = {"host": host, "x-claude-hook": hook_name, "content-type": "application/json"}
-    resp_headers: Dict[str, str] = {"x-claude-hook": hook_name, "content-type": "application/json"}
+    req_headers = {"host": host, _HOOK_HEADER: hook_name, "content-type": "application/json"}
+    resp_headers: Dict[str, str] = {_HOOK_HEADER: hook_name, "content-type": "application/json"}
     if extra_headers:
         resp_headers.update(extra_headers)
 
@@ -209,6 +212,66 @@ def send_ingestion_data(
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
         return None
+
+
+# ── Hook runners ──────────────────────────────────────────────────────────────
+
+def run_observability_hook(hook_name: str, log_file: str) -> None:
+    """Run a fire-and-forget observability hook: ingest input_data and exit."""
+    logger = setup_logger(log_file)
+    logger.info(f"=== {hook_name} hook started ===")
+    try:
+        input_data = json.load(sys.stdin)
+        logger.info(f"{hook_name} input:\n%s", json.dumps(input_data, indent=2))
+        send_ingestion_data(
+            hook_name=hook_name,
+            request_payload=input_data,
+            response_payload={},
+            guardrails=not AKTO_SYNC_MODE,
+            logger=logger,
+        )
+    except Exception as e:
+        logger.error(f"Main error: {e}")
+    print(json.dumps({}))
+    sys.exit(0)
+
+
+def run_blocking_hook(hook_name: str, log_file: str) -> None:
+    """Run a blocking hook: ingest input_data with guardrails and deny if not allowed."""
+    logger = setup_logger(log_file)
+    logger.info(f"=== {hook_name} hook started ===")
+    try:
+        input_data = json.load(sys.stdin)
+        logger.info(f"{hook_name} input:\n%s", json.dumps(input_data, indent=2))
+        result = send_ingestion_data(
+            hook_name=hook_name,
+            request_payload=input_data,
+            response_payload={},
+            guardrails=True,
+            logger=logger,
+        )
+        allowed = (result or {}).get("data", {}).get("guardrailsResult", {}).get("Allowed", True)
+        if not allowed:
+            reason = (result or {}).get("data", {}).get("guardrailsResult", {}).get("Reason", "Policy violation")
+            logger.warning(f"BLOCKING {hook_name}: {reason}")
+            print(json.dumps({
+                "permission": "deny",
+                "user_message": f"{hook_name} blocked by Akto: {reason}",
+                "agent_message": f"Blocked by Akto Guardrails: {reason}",
+            }))
+            send_ingestion_data(
+                hook_name=hook_name,
+                request_payload=input_data,
+                response_payload={"reason": reason, "blockedBy": "Akto Proxy"},
+                guardrails=False,
+                status_code="403",
+                logger=logger,
+            )
+            sys.exit(0)
+    except Exception as e:
+        logger.error(f"Main error: {e}")
+    print(json.dumps({"permission": "allow"}))
+    sys.exit(0)
 
 
 # ── Transcript reading ────────────────────────────────────────────────────────

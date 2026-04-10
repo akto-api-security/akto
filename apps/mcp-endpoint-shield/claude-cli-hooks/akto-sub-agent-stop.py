@@ -37,8 +37,8 @@ def main():
         logger.info(f"Agent type: {agent_type}, Prompt: {len(user_prompt)} chars, Response: {len(response_text)} chars, Transcript: {transcript_path}")
         result = send_ingestion_data(
             hook_name="SubagentStop",
-            request_payload=user_prompt,
-            response_payload=response_text,
+            request_payload={**input_data, "user_prompt": user_prompt},
+            response_payload={},
             tags=None,
             guardrails=True,
             logger=logger,
