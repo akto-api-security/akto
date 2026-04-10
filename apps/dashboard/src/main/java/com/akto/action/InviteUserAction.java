@@ -208,8 +208,6 @@ public class InviteUserAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
-        Role userRole = RBACDao.getCurrentRoleForUser(user_id, Context.accountId.get());
-
         // Validate scopeRoleMapping if provided, otherwise fall back to old fields for backward compatibility
         Map<String, String> scopeRoleToSave = new HashMap<>();
 

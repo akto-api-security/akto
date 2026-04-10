@@ -30,8 +30,6 @@ import com.akto.notifications.slack.UserBlockedNoPlanAlert;
 import com.akto.notifications.slack.SlackSender;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 import com.mongodb.BasicDBList;
@@ -118,29 +116,6 @@ public class ProfileAction extends UserAction {
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
         RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
 
-        // Get full RBAC entry to extract scope-role mapping for frontend
-        RBAC rbac = RBACDao.getCurrentRBACForUser(user.getId(), Context.accountId.get());
-        Map<String, String> scopeRoleMapping = new HashMap<>();
-        if (rbac != null && rbac.getScopeRoleMapping() != null) {
-            scopeRoleMapping = rbac.getScopeRoleMapping();
-
-            // If user has scope-role mapping, use role from current scope instead of primary role
-            if (!scopeRoleMapping.isEmpty()) {
-                try {
-                    Object contextSourceObj = Context.contextSource.get();
-                    if (contextSourceObj != null) {
-                        String currentScope = contextSourceObj.toString();
-                        String scopeRole = scopeRoleMapping.get(currentScope);
-                        if (scopeRole != null && !scopeRole.isEmpty()) {
-                            userRole = RBAC.Role.valueOf(scopeRole.toUpperCase());
-                        }
-                    }
-                } catch (Exception e) {
-                    // On any error, keep the primary role
-                }
-            }
-        }
-
         boolean jiraIntegrated = false;
         try {
             JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
@@ -220,7 +195,6 @@ public class ProfileAction extends UserAction {
                 .append("servicenowIntegrated", servicenowIntegrated)
                 .append("devrevIntegrated", devrevIntegrated)
                 .append("userRole", userRole!=null ?userRole.toString().toUpperCase(): "")
-                .append("scopeRoleMapping", new BasicDBObject(scopeRoleMapping))
                 .append("currentTimeZone", timeZone)
                 .append("organizationName", orgName)
                 .append("isAwsWafIntegrated", awsWafCount != 0)
@@ -240,9 +214,6 @@ public class ProfileAction extends UserAction {
         // Derive dashboard category from scopeRoleMapping only if it's populated (for new users with scope-based access)
         // For backward compatibility with old users who only have a single role, skip this derivation if scopeRoleMapping is empty
         String dashboardCategory = null;
-        if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
-            dashboardCategory = deriveDashboardCategoryFromScopeRoleMapping(scopeRoleMapping);
-        }
 
         // Fallback to session attribute if not derived from scopeRoleMapping
         if (dashboardCategory == null) {
@@ -452,42 +423,6 @@ public class ProfileAction extends UserAction {
 
     public BasicDBList getUsers() {
         return users;
-    }
-
-    /**
-     * Derives dashboard category from scopeRoleMapping.
-     * Returns the first scope that is NOT NO_ACCESS, converted to its dashboard category.
-     * Scopes are checked in order: API, AGENTIC, ENDPOINT, DAST
-     *
-     * @param scopeRoleMapping Map of scope to role (e.g., {"API": "ADMIN", "AGENTIC": "NO_ACCESS"})
-     * @return Dashboard category name (e.g., "API Security"), or null if no accessible scope found
-     */
-    private static String deriveDashboardCategoryFromScopeRoleMapping(Map<String, String> scopeRoleMapping) {
-        if (scopeRoleMapping == null || scopeRoleMapping.isEmpty()) {
-            return null;
-        }
-
-        // Check scopes in order of priority
-        String[] scopesInOrder = {"API", "AGENTIC", "ENDPOINT", "DAST"};
-
-        for (String scope : scopesInOrder) {
-            String role = scopeRoleMapping.get(scope);
-            if (role != null && !role.equals("NO_ACCESS")) {
-                // Found an accessible scope, convert to dashboard category
-                switch (scope) {
-                    case "API":
-                        return GlobalEnums.DashboardCategory.API_SECURITY.getDashboardCategory();
-                    case "AGENTIC":
-                        return GlobalEnums.DashboardCategory.SECURITY_TYPE_AGENTIC.getDashboardCategory();
-                    case "ENDPOINT":
-                        return GlobalEnums.DashboardCategory.ENDPOINT_SECURITY.getDashboardCategory();
-                    case "DAST":
-                        return GlobalEnums.DashboardCategory.AKTO_DAST.getDashboardCategory();
-                }
-            }
-        }
-
-        return null;
     }
 
     private BasicDBObject subscription;

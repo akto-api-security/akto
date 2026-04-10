@@ -16,7 +16,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.password_reset.PasswordResetUtils;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Pair;
-import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
