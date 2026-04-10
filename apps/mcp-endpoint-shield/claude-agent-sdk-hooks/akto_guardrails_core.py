@@ -53,13 +53,18 @@ _file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(me
 logger.addHandler(_file_handler)
 
 MODE = os.getenv("MODE", "argus").lower()
-AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_agent_sdk")
-AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 AGENT_ID = os.getenv("AGENT_ID", "")
 AKTO_HOST = os.getenv("AKTO_HOST", "api.anthropic.com")
+
+# Read at call time so values set after import (e.g. via load_dotenv) are picked up
+def _data_ingestion_url() -> str:
+    return os.getenv("AKTO_DATA_INGESTION_URL", "")
+
+def _akto_token() -> str:
+    return os.getenv("AKTO_TOKEN", "")
 
 # contextSource is always AGENTIC for server-side agent deployments
 CONTEXT_SOURCE = "AGENTIC"
@@ -84,7 +89,7 @@ def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
-    return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
+    return f"{_data_ingestion_url()}/api/http-proxy?{'&'.join(params)}"
 
 
 def _create_ssl_context():
@@ -97,8 +102,9 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
-    if AKTO_TOKEN:
-        headers["authorization"] = AKTO_TOKEN
+    token = _akto_token()
+    if token:
+        headers["authorization"] = token
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -200,7 +206,7 @@ def extract_mcp_server_name(tool_name: str) -> str:
 # ---------------------------------------------------------------------------
 
 def build_prompt_validation_payload(query: str, client_ip: str) -> Dict[str, Any]:
-    tags = {"gen-ai": "Gen AI", "mcp_server_name": "claude-built-in"}
+    tags = {"gen-ai": "Gen AI", "agent-name": "claude-agent"}
     request_headers = json.dumps({
         "host": AKTO_HOST,
         "x-claude-hook": "UserPromptSubmit",
@@ -224,7 +230,7 @@ def build_prompt_validation_payload(query: str, client_ip: str) -> Dict[str, Any
 def build_mcp_request_payload(
     tool_name: str, tool_input: Any, mcp_server_name: str, client_ip: str
 ) -> Dict[str, Any]:
-    tags = {"gen-ai": "Gen AI", "mcp_server_name": mcp_server_name}
+    tags = {"gen-ai": "Gen AI", "agent-name": "claude-agent"}
     request_headers = json.dumps({
         "host": AKTO_HOST,
         "x-claude-hook": "PreToolUse",
@@ -251,7 +257,7 @@ def build_mcp_response_payload(
     tags = {
         "gen-ai": "Gen AI",
         "tool-use": "Tool Execution",
-        "mcp_server_name": mcp_server_name,
+        "agent-name": "claude-agent",
     }
     request_headers = json.dumps({
         "host": AKTO_HOST,
@@ -277,7 +283,7 @@ def build_mcp_response_payload(
 
 
 def build_stop_ingestion_payload(user_prompt: str, response_text: str, client_ip: str) -> Dict[str, Any]:
-    tags = {"gen-ai": "Gen AI", "mcp_server_name": "claude-built-in"}
+    tags = {"gen-ai": "Gen AI", "agent-name": "claude-agent"}
     request_headers = json.dumps({
         "host": AKTO_HOST,
         "x-claude-hook": "Stop",
@@ -308,7 +314,7 @@ async def call_guardrails_prompt_async(query: str, client_ip: str) -> Tuple[bool
     """Validate a user prompt. Returns (allowed, reason, behaviour)."""
     if not query.strip():
         return True, "", ""
-    if not AKTO_DATA_INGESTION_URL:
+    if not _data_ingestion_url():
         logger.warning("AKTO_DATA_INGESTION_URL not set, allowing prompt (fail-open)")
         return True, "", ""
 
@@ -335,7 +341,7 @@ async def call_guardrails_mcp_async(
     """Validate an MCP tool call. Returns (allowed, reason)."""
     if not tool_input:
         return True, ""
-    if not AKTO_DATA_INGESTION_URL:
+    if not _data_ingestion_url():
         logger.warning("AKTO_DATA_INGESTION_URL not set, allowing MCP request (fail-open)")
         return True, ""
 
@@ -363,7 +369,7 @@ async def call_guardrails_mcp_async(
 # ---------------------------------------------------------------------------
 
 async def ingest_blocked_prompt_async(user_prompt: str, reason: str, client_ip: str) -> None:
-    if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
+    if not _data_ingestion_url() or not AKTO_SYNC_MODE:
         return
     try:
         payload = build_prompt_validation_payload(user_prompt, client_ip)
@@ -388,7 +394,7 @@ async def ingest_blocked_prompt_async(user_prompt: str, reason: str, client_ip: 
 async def ingest_blocked_mcp_async(
     tool_name: str, tool_input: Any, mcp_server_name: str, reason: str, client_ip: str
 ) -> None:
-    if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
+    if not _data_ingestion_url() or not AKTO_SYNC_MODE:
         return
     try:
         payload = build_mcp_request_payload(tool_name, tool_input, mcp_server_name, client_ip)
@@ -413,7 +419,7 @@ async def ingest_blocked_mcp_async(
 async def send_mcp_response_ingestion_async(
     tool_name: str, tool_input: Any, tool_response: Any, mcp_server_name: str, client_ip: str
 ) -> None:
-    if not AKTO_DATA_INGESTION_URL:
+    if not _data_ingestion_url():
         return
     if not tool_input or not tool_response:
         return
@@ -429,7 +435,7 @@ async def send_mcp_response_ingestion_async(
 
 
 async def send_stop_ingestion_async(user_prompt: str, response_text: str, client_ip: str) -> None:
-    if not AKTO_DATA_INGESTION_URL:
+    if not _data_ingestion_url():
         return
     if not user_prompt.strip() or not response_text.strip():
         return
