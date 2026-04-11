@@ -325,7 +325,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
 
             String defaultRole = RBAC.Role.MEMBER.name();
             if (UsageMetricCalculator.isRbacFeatureAvailable(Context.accountId.get())) {
-                defaultRole = Utils.fetchDefaultInviteRole(Context.accountId.get(), Role.NO_ACCESS.name());
+                defaultRole = Utils.fetchDefaultInviteRole(Context.accountId.get(), Role.MEMBER.name());
             }
             this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, defaultRole);
         }

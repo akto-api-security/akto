@@ -293,7 +293,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping before init: " + this.scopeRoleMapping);
                 if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                    this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.NO_ACCESS.getName());
+                    this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName());
                     logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after init: " + this.scopeRoleMapping);
                 }
                 // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
@@ -317,7 +317,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
 
         }else {
-            this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.NO_ACCESS.name());
+            this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name());
             // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
             this.scopeRoleMapping = RBAC.ensureCompleteScopeRoleMapping(this.scopeRoleMapping);
         }
@@ -386,7 +386,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping before init: " + this.scopeRoleMapping);
             if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.NO_ACCESS.getName());
+                this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName());
                 logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping after init: " + this.scopeRoleMapping);
             }
             // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
@@ -587,7 +587,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping before init: " + this.scopeRoleMapping);
                     if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.NO_ACCESS.getName());
+                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName());
                         logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping after init: " + this.scopeRoleMapping);
                     }
                     // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
@@ -1251,7 +1251,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     private void createUserAndRedirectWithDefaultRole(String userEmail, String username, SignupInfo signupInfo,
                                        int invitationToAccount, String method) throws IOException {
         // For new users without explicit invitation, initialize with NO_ACCESS for all scopes
-        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.NO_ACCESS.name());
+        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name());
         this.scopeRoleMapping = RBAC.ensureCompleteScopeRoleMapping(this.scopeRoleMapping);
         logger.infoAndAddToDb("[createUserAndRedirectWithDefaultRole] Initialized scopeRoleMapping for new user: " + this.scopeRoleMapping);
         // Pass null as invitedRole so that createUserAndRedirect uses scopeRoleMapping instead of role
