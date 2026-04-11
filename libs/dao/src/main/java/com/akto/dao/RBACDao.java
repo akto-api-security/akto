@@ -81,6 +81,8 @@ public class RBACDao extends CommonContextDao<RBAC> {
                             String scopeRole = userRbac.getScopeRoleMapping().get(currentScope);
                             if (scopeRole != null && !scopeRole.isEmpty()) {
                                 currentRole = scopeRole;
+                            }else{
+                                currentRole = Role.NO_ACCESS.name();
                             }
                         }
                     } catch (Exception e) {
@@ -291,6 +293,15 @@ public class RBACDao extends CommonContextDao<RBAC> {
                 Filters.eq(RBAC.ACCOUNT_ID, accountId));
 
         rbacEntry = RBACDao.instance.findOne(filterRbac);
+
+        if(rbacEntry == null){
+            // old cases where rbac entry is not present in the database
+            rbacEntry = new RBAC();
+            rbacEntry.setUserId(userId);
+            rbacEntry.setAccountId(accountId);
+            rbacEntry.setRole(Role.MEMBER.name());
+            rbacEntry.setScopeRoleMapping(new HashMap<>());
+        }
 
         // Cache the result (even if null)
         if (rbacEntry != null || cachedEntry == null) {
