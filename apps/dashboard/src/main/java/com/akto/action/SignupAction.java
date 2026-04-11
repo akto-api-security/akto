@@ -1072,14 +1072,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
                     // Extract scope-role mapping if available (new n:n mapping approach)
                     this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
-
-                    // Default to API + No access if scopeRoleMapping is empty or null
-                    logger.infoAndAddToDb("[registerViaAzureSamlSso] scopeRoleMapping before init: " + this.scopeRoleMapping);
-                    if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
-
-                        this.scopeRoleMapping = RBAC.ensureCompleteScopeRoleMapping(this.scopeRoleMapping);
-                        logger.infoAndAddToDb("[registerViaAzureSamlSso] scopeRoleMapping after init: " + this.scopeRoleMapping);
-                    }
                 }
             }
 
@@ -1456,16 +1448,14 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
                             RBAC.ensureCompleteScopeRoleMapping(this.scopeRoleMapping);
                             rbacEntry.setScopeRoleMapping(this.scopeRoleMapping);
-                        }else {   //if no product access  while creating user then map that role to API as this is the case of new sign up without invitation
-                            RBAC.ensureCompleteScopeRoleMapping(this.scopeRoleMapping);
-                            rbacEntry.setScopeRoleMapping(this.scopeRoleMapping);
+
                         }
                         logger.info("[createUserAndRedirect] Set scope-role mapping for existing user: " + this.scopeRoleMapping);
                         RBACDao.instance.insertOne(rbacEntry);
                         String accountName = account != null ? account.getName() : "My account";
                         user = UsersDao.addAccount(user.getLogin(), accountId, accountName);
                         logger.infoAndAddToDb("[createUserAndRedirect] Successfully added account " + accountId + " to existing user " + user.getLogin());
-                    } else if (invitedRole != null || this.scopeRoleMapping!=null) {
+                    }
                         RBAC existingRbac = RBACDao.instance.findOne(
                             Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId))
                         );
@@ -1482,7 +1472,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                                         Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping)
                                 );
                             }
-                        }
                     }
 
                     servletRequest.getSession().setAttribute("accountId", accountId);
@@ -1501,7 +1490,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             if(!newOrgSetup){
                 Account oldAccount = AccountsDao.instance.findOne("_id", invitationToAccount);
                 // When user signs up without explicit invitation, use scopeRoleMapping only (no old role field)
-                if (invitedRole == null && this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
+                if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
                     logger.infoAndAddToDb("[createUserAndRedirect] New user without invitation - using scopeRoleMapping only, not setting old role field");
                     user = AccountAction.initializeAccount(userEmail, invitationToAccount, oldAccount.getName(), false, this.scopeRoleMapping);
                 } else {
@@ -1509,18 +1498,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     user = AccountAction.initializeAccount(userEmail, invitationToAccount, oldAccount.getName(),false, invitedRole == null ? RBAC.Role.MEMBER.name() : invitedRole);
                 }
             }else {
-                // For new org setup (no accountId), use the appropriate method based on whether invitation exists
-                if (invitedRole == null && this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
-                    logger.infoAndAddToDb("[createUserAndRedirect] New org setup without explicit invitation - using scopeRoleMapping only");
-                    user = AccountAction.initializeAccount(userEmail, accountId, "My account", invitationToAccount == 0, this.scopeRoleMapping);
-                } else {
-                    user = AccountAction.initializeAccount(userEmail, accountId, "My account", invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN.name() : invitedRole);
-                }
+                // For new org setup (no accountId, no roles , make first user admin), use the appropriate method based on whether invitation exists
+                this.scopeRoleMapping.put("API", RBAC.Role.ADMIN.name());
+                this.scopeRoleMapping.put("ENDPOINT", RBAC.Role.ADMIN.name());
+                this.scopeRoleMapping.put("DAST", RBAC.Role.ADMIN.name());
+                this.scopeRoleMapping.put("AGENTIC", RBAC.Role.ADMIN.name());
+                user = AccountAction.initializeAccount(userEmail, accountId, "My account", invitationToAccount == 0, this.scopeRoleMapping);
             }
             logger.infoAndAddToDb("[createUserAndRedirect] Account initialized successfully for accountId: " + accountId);
 
             // No need to update scope-role mapping separately now since it's set during account initialization
-            if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty() && invitedRole != null) {
+            if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
                 // Only update if this is an invited user (invitedRole is set) and scope-role mapping needs to be updated
                 try {
                     RBACDao.instance.getMCollection().updateOne(
@@ -1535,6 +1523,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     logger.errorAndAddToDb(e, "[createUserAndRedirect] Error setting scope-role mapping for invited user: " + e.getMessage());
                 }
             }
+            RBACDao.instance.deleteUserEntryFromCache(new Pair<>(user.getId(), accountId));
+
 
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);

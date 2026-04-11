@@ -11,7 +11,7 @@ public class ThreatEngineerRoleStrategy implements RoleStrategy {
 
     @Override
     public Role[] getRoleHierarchy() {
-        return new Role[]{Role.THREAT_ENGINEER, Role.THREAT_VIEWER};
+        return new Role[]{Role.THREAT_ENGINEER, Role.THREAT_VIEWER, Role.DEVELOPER, Role.MEMBER, Role.GUEST};
     }
 
     @Override
