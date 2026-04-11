@@ -8,6 +8,7 @@ import com.akto.dto.CustomRole;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -54,13 +55,17 @@ public class RBACDao extends CommonContextDao<RBAC> {
         if (userRbac != null) {
             if (userRbac.getScopeRoleMapping() != null && !userRbac.getScopeRoleMapping().isEmpty()) {
                 try {
-                    Object contextSourceObj = Context.contextSource.get();
-                    if (contextSourceObj != null) {
-                        String currentScope = contextSourceObj.toString();
-                        String scopeRole = userRbac.getScopeRoleMapping().get(currentScope);
-                        if (scopeRole != null && !scopeRole.isEmpty()) {
-                            currentRole = scopeRole;
-                        }
+                    CONTEXT_SOURCE contextSourceObj = Context.contextSource.get();
+                    if(contextSourceObj == null){
+                        contextSourceObj = CONTEXT_SOURCE.API;
+                    }
+                    String currentScope = contextSourceObj.name();
+                    String scopeRole = userRbac.getScopeRoleMapping().get(currentScope);
+                    if (scopeRole != null && !scopeRole.isEmpty()) {
+                        currentRole = scopeRole;
+                    }else{
+                        // as we remove complete scope role mapping, we need to return NO_ACCESS for all users for which scope role mapping is not present
+                        return Role.NO_ACCESS;
                     }
                 } catch (Exception e) {
                 }
