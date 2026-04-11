@@ -214,7 +214,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             boolean isOnboardingRequest = requestUri != null && requestUri.contains("/onboarding");
 
             // Get the role for the specific product scope (new n:n mapping approach)
-            Role userRoleRecord = rbac.getRoleForScope(contextSource);
+            Role userRoleRecord = rbac.getRoleForScope(contextSource, rbac.getRole(),rbac.getScopeRoleMapping());
             logger.debug("Found user role in: " + (Context.now() - timeNow));
 
             // For backward compatibility: if getRoleForScope returns null but user has old single role field,

@@ -1132,11 +1132,27 @@ public class ApiCollectionsAction extends UserAction {
             /*
              * Need actual role, not base role,
              * thus using direct Rbac query, not cached map.
+             * For scope-based roles, get the role for current scope context.
              */
             RBAC rbac = RBACDao.instance.findOne(Filters.and(
                     Filters.eq(RBAC.USER_ID, userId),
                     Filters.eq(RBAC.ACCOUNT_ID, accountId)));
-            String role = rbac.getRole();
+
+            // Get scope-specific role if scopeRoleMapping exists, otherwise use primary role
+            String role = null;
+            if (rbac != null) {
+                RBAC.Role scopeAwareRole = rbac.getRoleForScope(
+                    Context.contextSource.get(),
+                    rbac.getRole(),
+                    rbac.getScopeRoleMapping()
+                );
+                if (scopeAwareRole != null) {
+                    role = scopeAwareRole.name();
+                } else {
+                    role = rbac.getRole();
+                }
+            }
+
             CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
             /*
              * If the role is custom role, only update the user with the delta.

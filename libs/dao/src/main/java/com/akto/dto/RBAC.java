@@ -207,7 +207,7 @@ public class RBAC {
      * @param scope the product scope (e.g., ENDPOINT, AGENTIC, API)
      * @return the role for that scope, or null if no mapping exists (NO ACCESS to this scope)
      */
-    public Role getRoleForScope(CONTEXT_SOURCE scope) {
+    public Role getRoleForScope(CONTEXT_SOURCE scope, String oldRole, Map<String, String> scopeRoleMapping) {
         if (scope == null) {
             return null;
         }
@@ -216,9 +216,9 @@ public class RBAC {
 
         // If scopeRoleMapping exists and is NOT empty, use ONLY that mapping (explicit model)
         // Do NOT fall back to single role - this ensures strict access control
-        if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
-            if (this.scopeRoleMapping.containsKey(scopeStr)) {
-                String roleStr = this.scopeRoleMapping.get(scopeStr);
+        if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
+            if (scopeRoleMapping.containsKey(scopeStr)) {
+                String roleStr = scopeRoleMapping.get(scopeStr);
                 return resolveRoleString(roleStr);
             }
             // User has scopeRoleMapping but this scope is NOT in it - NO ACCESS
@@ -226,8 +226,8 @@ public class RBAC {
         }
 
         // Fall back to old role field ONLY if scopeRoleMapping is null/empty (backward compatibility)
-        if (this.role != null) {
-            return resolveRoleString(this.role);
+        if (oldRole != null) {
+            return resolveRoleString(oldRole);
         }
 
         return null;
