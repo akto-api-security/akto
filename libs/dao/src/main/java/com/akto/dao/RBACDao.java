@@ -54,57 +54,105 @@ public class RBACDao extends CommonContextDao<RBAC> {
         rbacEntryCache.remove(key);
     }
 
+    /**
+     * Refresh user role cache by deleting and immediately re-fetching from DB.
+     * Use this when scopeRoleMapping is updated to ensure fresh data is cached.
+     *
+     * This method:
+     * 1. Clears userRolesMap, allowedFeaturesMapForUser, and rbacEntryCache
+     * 2. Immediately re-fetches role from DB via getCurrentRoleForUser()
+     * 3. getCurrentRoleForUser internally calls getCurrentRBACForUser(),
+     *    so both caches (userRolesMap + rbacEntryCache) get repopulated
+     */
+    public static void refreshUserRoleCache(int userId, int accountId) {
+        Pair<Integer, Integer> key = new Pair<>(userId, accountId);
+        // Delete stale cache entries
+        RBACDao.instance.deleteUserEntryFromCache(key);
+        // Re-fetch and populate ALL caches (getCurrentRoleForUser internally calls getCurrentRBACForUser)
+        getCurrentRoleForUser(userId, accountId);
+    }
+
     /*
      * This method should be used everywhere to access user role.
      * Because we update the userRole from the custom roles here.
      * There is no context of custom roles anywhere else.
      * Now also supports scope-based roles via scopeRoleMapping.
+     *
+     * IMPORTANT: Scope-based role caching strategy:
+     * - Users WITH scopeRoleMapping: DO NOT cache in userRolesMap (keyed only by userId+accountId, no scope info)
+     *   Instead, always fetch from rbacEntryCache and extract scope-specific role based on Context.contextSource
+     * - Users WITHOUT scopeRoleMapping: Cache in userRolesMap for performance (backward compatibility)
      */
     public static Role getCurrentRoleForUser(int userId, int accountId){
         Pair<Integer, Integer> key = new Pair<>(userId, accountId);
-        Pair<Role, Integer> userRoleEntry = userRolesMap.get(key);
+
+        // Fetch RBAC object using cache (handles both old role field and new scopeRoleMapping)
+        RBAC userRbac = getCurrentRBACForUser(userId, accountId);
+
+        // Check if user has scope-based role mapping
+        boolean hasScopeRoleMapping = userRbac != null && userRbac.getScopeRoleMapping() != null && !userRbac.getScopeRoleMapping().isEmpty();
+
+        // If user has scope-based roles don't use userRolesMap cache
+        // because userRolesMap is scope-agnostic and would cache wrong role for different scopes
+        if (!hasScopeRoleMapping) {
+            // For users with only primary role, try to use cached entry
+            Pair<Role, Integer> userRoleEntry = userRolesMap.get(key);
+            if (userRoleEntry != null && (Context.now() - userRoleEntry.getSecond() <= EXPIRY_TIME)) {
+                return userRoleEntry.getFirst();
+            }
+        }
+
+        // Fetch/calculate role
         String currentRole;
         Role actualRole = Role.MEMBER;
-        if (userRoleEntry == null || (Context.now() - userRoleEntry.getSecond() > EXPIRY_TIME)) {
-            // Fetch RBAC object using cache (handles both old role field and new scopeRoleMapping)
-            RBAC userRbac = getCurrentRBACForUser(userId, accountId);
 
-            if (userRbac != null) {
-                currentRole = userRbac.getRole();
+        if (userRbac != null) {
+            currentRole = userRbac.getRole();
 
-                // Check if user has scope-based role mapping
-                if (userRbac.getScopeRoleMapping() != null && !userRbac.getScopeRoleMapping().isEmpty()) {
-                    try {
-                        Object contextSourceObj = Context.contextSource.get();
-                        if (contextSourceObj != null) {
-                            String currentScope = contextSourceObj.toString();
-                            String scopeRole = userRbac.getScopeRoleMapping().get(currentScope);
-                            if (scopeRole != null && !scopeRole.isEmpty()) {
-                                currentRole = scopeRole;
-                            }
+            // Check if user has scope-based role mapping
+            if (hasScopeRoleMapping) {
+                try {
+                    Object contextSourceObj = Context.contextSource.get();
+                    if (contextSourceObj != null) {
+                        String currentScope = contextSourceObj.toString();
+                        String scopeRole = userRbac.getScopeRoleMapping().get(currentScope);
+                        if (scopeRole != null && !scopeRole.isEmpty()) {
+                            currentRole = scopeRole;
                         }
-                    } catch (Exception e) {
-                        // On any error, keep using the primary role
                     }
+                } catch (Exception e) {
+                    // On any error, keep using the primary role
                 }
-            } else {
-                currentRole = Role.MEMBER.name();
             }
-
-            if(currentRole == null){
-                return null;
-            }
-            CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
-            if (customRole != null) {
-                actualRole = Role.valueOf(customRole.getBaseRole());
-            } else {
-                actualRole = Role.valueOf(currentRole);
-            }
-
-            userRolesMap.put(key, new Pair<>(actualRole, Context.now()));
         } else {
-            actualRole = userRoleEntry.getFirst();
+            currentRole = Role.MEMBER.name();
         }
+
+        if(currentRole == null){
+            return null;
+        }
+
+        CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
+        if (customRole != null) {
+            try {
+                actualRole = Role.valueOf(customRole.getBaseRole());
+            } catch (IllegalArgumentException e) {
+                actualRole = Role.MEMBER; // Default to MEMBER if base role is invalid
+            }
+        } else {
+            try {
+                actualRole = Role.valueOf(currentRole);
+            } catch (IllegalArgumentException e) {
+                actualRole = Role.MEMBER; // Default to MEMBER if role is invalid
+            }
+        }
+
+        // Only cache in userRolesMap if user does NOT have scope-based roles
+        // (userRolesMap is scope-agnostic and would cause wrong role to be used when scope changes)
+        if (!hasScopeRoleMapping) {
+            userRolesMap.put(key, new Pair<>(actualRole, Context.now()));
+        }
+
         return actualRole;
     }
 

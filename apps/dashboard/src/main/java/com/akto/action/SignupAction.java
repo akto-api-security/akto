@@ -1481,6 +1481,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                                         Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId)),
                                         Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping)
                                 );
+                                // Refresh cache: delete stale entry and immediately re-fetch from DB
+                                RBACDao.refreshUserRoleCache(user.getId(), accountId);
+                                logger.infoAndAddToDb("[createUserAndRedirect] Refreshed RBAC cache for userId: " + user.getId() + " after updating scopeRoleMapping");
                             }
                         }
                     }
@@ -1530,7 +1533,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         ),
                         Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping)
                     );
+                    // Refresh cache: delete stale entry and immediately re-fetch from DB
+                    RBACDao.refreshUserRoleCache(user.getId(), accountId);
                     logger.info("[createUserAndRedirect] Set scope-role mapping for invited user: " + this.scopeRoleMapping);
+                    logger.infoAndAddToDb("[createUserAndRedirect] Refreshed RBAC cache for userId: " + user.getId() + " after updating scopeRoleMapping");
                 } catch (Exception e) {
                     logger.errorAndAddToDb(e, "[createUserAndRedirect] Error setting scope-role mapping for invited user: " + e.getMessage());
                 }

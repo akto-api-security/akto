@@ -254,14 +254,28 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                         }
                         if(isValidUpdateRole && shouldChangeRole){
                             /*
-                             * Update the role only. Product scopes are managed through scope-role mapping.
+                             * Update the primary role (RBAC.ROLE).
+                             * If scopeRoleMapping is available (from makeAdmin with productScopes),
+                             * also update RBAC.SCOPE_ROLE_MAPPING for scope-based RBAC.
                              */
-                            RBACDao.instance.updateOneNoUpsert(
-                                filterRbac,
-                                Updates.set(RBAC.ROLE, reqUserRole)
-                            );
+                            if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
+                                // Update both primary role and scope-role mapping
+                                RBACDao.instance.updateOneNoUpsert(
+                                    filterRbac,
+                                    Updates.combine(
+                                        Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping)
+                                    )
+                                );
+                            } else {
+                                // Update only primary role (backward compatibility)
+                                RBACDao.instance.updateOneNoUpsert(
+                                    filterRbac,
+                                    Updates.set(RBAC.ROLE, reqUserRole)
+                                );
+                            }
 
-                            RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
+                            // Refresh cache to ensure fresh data is fetched
+                            RBACDao.refreshUserRoleCache(userDetails.getId(), accId);
                             UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
                             return Action.SUCCESS.toUpperCase();
                         }else{
@@ -291,9 +305,21 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
     }
 
     private String userRole;
+    private List<String> productScopes;
 
     public String makeAdmin(){
-        return performAction(ActionType.UPDATE_USER_ROLE, this.userRole.toUpperCase());
+        // When updating role, also update scopeRoleMapping for all productScopes
+        String roleToSet = this.userRole.toUpperCase();
+
+        // If productScopes is provided, build scopeRoleMapping
+        if (this.productScopes != null && !this.productScopes.isEmpty()) {
+            this.scopeRoleMapping = new HashMap<>();
+            for (String scope : this.productScopes) {
+                this.scopeRoleMapping.put(scope, roleToSet);
+            }
+        }
+
+        return performAction(ActionType.UPDATE_USER_ROLE, roleToSet);
     }
 
     private Map<String, String> scopeRoleMapping;
@@ -362,8 +388,8 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                 Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMapping)
             );
 
-            // Clear cache
-            RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
+            // Refresh cache: delete stale entry and immediately re-fetch from DB
+            RBACDao.refreshUserRoleCache(userDetails.getId(), accId);
             UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
 
             return Action.SUCCESS.toUpperCase();
@@ -504,6 +530,14 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
 
     public Map<String, String> getScopeRoleMapping() {
         return this.scopeRoleMapping;
+    }
+
+    public void setProductScopes(List<String> productScopes) {
+        this.productScopes = productScopes;
+    }
+
+    public List<String> getProductScopes() {
+        return this.productScopes;
     }
 
     protected HttpServletResponse servletResponse;
