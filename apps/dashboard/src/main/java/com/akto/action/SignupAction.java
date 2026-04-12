@@ -1473,6 +1473,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[createUserAndRedirect] EXISTING USER LOGIN COMPLETED - redirected to inventory");
                 return;
             }
+        }
 
 
             logger.infoAndAddToDb("[createUserAndRedirect] Initializing account for new user");
@@ -1535,7 +1536,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
             aktoMixpanel.sendEvent(distinct_id, "SIGNUP_SUCCEEDED", props);
             logger.infoAndAddToDb("[createUserAndRedirect] ========== USER CREATION FLOW COMPLETED SUCCESSFULLY ==========");
-        }}
+        }
     }
 
     protected HttpServletResponse servletResponse;
