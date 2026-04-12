@@ -115,6 +115,7 @@ public class ProfileAction extends UserAction {
         String[] versions = dashboardVersion.split(" - ");
         User userFromDB = UsersDao.instance.findOne(Filters.eq(Constants.ID, user.getId()));
         RBAC.Role userRole = RBACDao.getCurrentRoleForUser(user.getId(), Context.accountId.get());
+        RBAC userRbac = RBACDao.getCurrentRBACForUser(user.getId(), Context.accountId.get());
 
         boolean jiraIntegrated = false;
         try {
@@ -179,6 +180,13 @@ public class ProfileAction extends UserAction {
                 Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
         ));
 
+        BasicDBObject scopeRoleMapping = new BasicDBObject();
+        if(userRbac.getScopeRoleMapping() != null){
+            for(String key : userRbac.getScopeRoleMapping().keySet()){
+                scopeRoleMapping.append(key, userRbac.getScopeRoleMapping().get(key));
+            }
+        }
+
         userDetails.append("accounts", accounts)
                 .append("username",username)
                 .append("userFullName", userActualName)
@@ -198,7 +206,8 @@ public class ProfileAction extends UserAction {
                 .append("currentTimeZone", timeZone)
                 .append("organizationName", orgName)
                 .append("isAwsWafIntegrated", awsWafCount != 0)
-                .append("isCloudflareWafIntegrated", cloudflareWafCount != 0);
+                .append("isCloudflareWafIntegrated", cloudflareWafCount != 0)
+                .append("scopeRoleMapping", scopeRoleMapping);
 
         boolean inviteDisabledForSSO = com.akto.utils.Utils.allowNewUserInviteViaDashboard(sessionAccId, user);
         userDetails.append("inviteDisabledForSSO", inviteDisabledForSSO);
