@@ -1417,13 +1417,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[createUserAndRedirect] NEW USER CREATED SUCCESSFULLY - userId: " + user.getId() + ", accountId: " + accountId);
 
             } else if (StringUtils.isEmpty(code) && !isSSOLogin) {
-                logger.info("[createUserAndRedirect] EXISTING USER path - non-SSO login with empty code");
                 if (accountId == 0) {
                     logger.errorAndAddToDb("[createUserAndRedirect] ERROR: accountId is 0 for existing user non-SSO login. This is an invalid state.");
                     throw new IllegalStateException("The account doesn't exist.");
                 }
             } else {
-                logger.infoAndAddToDb("[createUserAndRedirect] EXISTING USER path - SSO login or invited user");
                 logger.info("[createUserAndRedirect] User: " + user.getLogin() + ", accountId: " + accountId + ", invitedRole: " + invitedRole);
 
                 if((invitedRole != null || scopeRoleMapping!= null) && accountId != 0){
@@ -1466,14 +1464,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     servletRequest.getSession().setAttribute("accountId", accountId);
                     logger.info("[createUserAndRedirect] Set session accountId to: " + accountId);
                 }
-
+                }
                 logger.info("[createUserAndRedirect] Logging in existing user and redirecting to /dashboard/observe/inventory");
                 LoginAction.loginUser(user, servletResponse, true, servletRequest, signupInfo);
                 servletResponse.sendRedirect("/dashboard/observe/inventory");
                 logger.infoAndAddToDb("[createUserAndRedirect] EXISTING USER LOGIN COMPLETED - redirected to inventory");
                 return;
             }
-        }
 
 
             logger.infoAndAddToDb("[createUserAndRedirect] Initializing account for new user");

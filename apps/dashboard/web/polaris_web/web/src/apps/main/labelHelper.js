@@ -26,6 +26,13 @@ export const shortNameToCategory = {
   'DAST': CATEGORY_DAST
 }
 
+export const categoryToShortName = {
+  [CATEGORY_API_SECURITY]: 'API',
+  [CATEGORY_AGENTIC_SECURITY]: 'AGENTIC',
+  [CATEGORY_ENDPOINT_SECURITY]: 'ENDPOINT',
+  [CATEGORY_DAST]: 'DAST'
+}
+
 
 export const getInitialDashboardCategory = () => {
   const categoryFromServer = window.DASHBOARD_CATEGORY;

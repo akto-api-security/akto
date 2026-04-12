@@ -15,7 +15,7 @@ import SessionStore from '../../../../main/SessionStore';
 import IssuesStore from '../../../pages/issues/issuesStore';
 import Dropdown from '../Dropdown';
 import Wrapped2025 from './Wrapped2025';
-import { shortNameToCategory } from '../../../../main/labelHelper';
+import { categoryToShortName, shortNameToCategory } from '../../../../main/labelHelper';
 
 function ContentWithIcon({ icon, text, isAvatar = false }) {
     return (
@@ -118,13 +118,21 @@ export default function Header() {
     const dropdownInitial = disabledDashboardCategories.includes(dashboardCategory)
         ? "API Security"
         : (dashboardCategory || "API Security");
-
+    
     useEffect(() => {
-
         if(window.SCOPE_ROLE_MAPPING && Object.keys(window.SCOPE_ROLE_MAPPING).length > 0 && window.location.pathname !== "/dashboard/onboarding"){
-            const scope = Object.keys(window.SCOPE_ROLE_MAPPING)[0];
-            const category = shortNameToCategory[scope];
-            setDashboardCategory(category);
+            if(!window.SCOPE_ROLE_MAPPING[categoryToShortName[dashboardCategory]]){
+                let scope = "";
+                Object.keys(window.SCOPE_ROLE_MAPPING).forEach(key => {
+                    const value = window.SCOPE_ROLE_MAPPING[key];
+                    if(value !== "NO ACCESS" && value !== "NO_ACCESS"){
+                        scope = key;
+                        return;
+                    }
+                });
+                const category = shortNameToCategory[scope];
+                setDashboardCategory(category);
+            }
         }else if (disabledDashboardCategories.includes(dashboardCategory) && dashboardCategory !== "API Security") {
             setDashboardCategory("API Security");
         }

@@ -83,6 +83,7 @@ function Dashboard() {
     // Monitor NO_ACCESS alert flag
     // Skip alert monitoring during onboarding since APIs may return 403 during setup
     useEffect(() => {
+        selectItems([])
         if (location.pathname.includes('/onboarding')) {
             return;
         }
@@ -95,7 +96,8 @@ function Dashboard() {
         }, 100);
 
         return () => clearInterval(checkInterval);
-    }, [location.pathname]);
+    }, [location.pathname, selectItems]);
+
     useEffect(() => {
         if(trafficAlerts == null && window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')){
             homeRequests.getTrafficAlerts().then((resp) => {
@@ -149,15 +151,6 @@ function Dashboard() {
             cleanUpLocalStorePersistSync();
         };
     }, [])
-
-    useEffect(() => {
-        selectItems([])
-        // Clear NO_ACCESS alert when leaving onboarding
-        if (!location.pathname.includes('/onboarding')) {
-            window.SHOW_NO_ACCESS_ALERT = false;
-            setShowNoAccessAlert(false);
-        }
-    },[location.pathname])
 
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
