@@ -1458,7 +1458,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         }else{
                             RBAC rbacEntry = new RBAC(user.getId(), invitedRole, accountId);
                             if(this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()){
-                            rbacEntry.setScopeRoleMapping(this.scopeRoleMapping);
+                                rbacEntry.setScopeRoleMapping(this.scopeRoleMapping);
+                            }
                             RBACDao.instance.insertOne(rbacEntry);
                         }
 
@@ -1534,7 +1535,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
             aktoMixpanel.sendEvent(distinct_id, "SIGNUP_SUCCEEDED", props);
             logger.infoAndAddToDb("[createUserAndRedirect] ========== USER CREATION FLOW COMPLETED SUCCESSFULLY ==========");
-        }
+        }}
     }
 
     protected HttpServletResponse servletResponse;
