@@ -57,7 +57,6 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.auth0.jwt.interfaces.JWTVerifier;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
 import com.onelogin.saml2.Auth;
 import com.onelogin.saml2.settings.Saml2Settings;
 import com.opensymphony.xwork2.Action;
@@ -293,7 +292,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping before init: " + this.scopeRoleMapping);
                 if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                    this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.NO_ACCESS.getName());
+                    this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName());
                     logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after init: " + this.scopeRoleMapping);
                 }
                 logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after ensuring complete: " + this.scopeRoleMapping);
@@ -315,7 +314,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
 
         }else {
-            this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.NO_ACCESS.name());
+            this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name());
             // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
         }
         createUserAndRedirect(email, name, auth0SignupInfo, 0, Config.ConfigType.AUTH0.toString());
@@ -383,7 +382,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping before init: " + this.scopeRoleMapping);
             if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.NO_ACCESS.getName());
+                this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName());
                 logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping after init: " + this.scopeRoleMapping);
             }
             // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
@@ -583,7 +582,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping before init: " + this.scopeRoleMapping);
                     if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.NO_ACCESS.getName());
+                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName());
                         logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping after init: " + this.scopeRoleMapping);
                     }
                     // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
@@ -1067,13 +1066,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
                     // Extract scope-role mapping if available (new n:n mapping approach)
                     this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
-
-                    // Default to API + No access if scopeRoleMapping is empty or null
-                    logger.infoAndAddToDb("[registerViaAzureSamlSso] scopeRoleMapping before init: " + this.scopeRoleMapping);
-                    if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
-
-                        logger.infoAndAddToDb("[registerViaAzureSamlSso] scopeRoleMapping after init: " + this.scopeRoleMapping);
-                    }
                 }
             }
 
@@ -1471,7 +1463,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                                         Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping)
                                 );
                             }
-                        }
                     }
 
                     servletRequest.getSession().setAttribute("accountId", accountId);
@@ -1498,6 +1489,24 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 user = AccountAction.initializeAccount(userEmail, accountId, "My account", invitationToAccount == 0, this.scopeRoleMapping);
             }
             logger.infoAndAddToDb("[createUserAndRedirect] Account initialized successfully for accountId: " + accountId);
+
+            // No need to update scope-role mapping separately now since it's set during account initialization
+            if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
+                // Only update if this is an invited user (invitedRole is set) and scope-role mapping needs to be updated
+                try {
+                    RBACDao.instance.getMCollection().updateOne(
+                        Filters.and(
+                            Filters.eq(RBAC.USER_ID, user.getId()),
+                            Filters.eq(RBAC.ACCOUNT_ID, accountId)
+                        ),
+                        Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping)
+                    );
+                    logger.info("[createUserAndRedirect] Set scope-role mapping for invited user: " + this.scopeRoleMapping);
+                } catch (Exception e) {
+                    logger.errorAndAddToDb(e, "[createUserAndRedirect] Error setting scope-role mapping for invited user: " + e.getMessage());
+                }
+            }
+            RBACDao.instance.deleteUserEntryFromCache(new Pair<>(user.getId(), accountId));
 
 
             servletRequest.getSession().setAttribute("user", user);
@@ -1529,6 +1538,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             aktoMixpanel.sendEvent(distinct_id, "SIGNUP_SUCCEEDED", props);
             logger.infoAndAddToDb("[createUserAndRedirect] ========== USER CREATION FLOW COMPLETED SUCCESSFULLY ==========");
         }
+    }
     }
 
     protected HttpServletResponse servletResponse;

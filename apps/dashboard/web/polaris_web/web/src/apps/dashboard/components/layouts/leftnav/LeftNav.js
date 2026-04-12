@@ -177,7 +177,7 @@ export default function LeftNav() {
                 key: "1",
             }] : []),
             ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY && window.USER_NAME.indexOf("@akto.io") !== -1 ? [{
-                label: "Endpoint Security Posture",
+                label: "AI Security Posture",
                 icon: ReportFilledMinor,
                 onClick: () => {
                     handleSelect("dashboard_endpoint_posture");

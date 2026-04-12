@@ -24,7 +24,9 @@ const createHeading = (text, value = null, sortKey = null) => ({
 
 const headings = [
     createHeading("Agent ID", "agentId"),
+    createHeading("Hostname", "hostname"),
     createHeading("Device ID", "deviceId"),
+    createHeading("Agent Version", "agentVersion"),
     createHeading("Username", "username"),
     createHeading("Last Heartbeat", "lastHeartbeatComp", "lastHeartbeat"),
     createHeading("Last Deployed", "lastDeployedComp", "lastDeployed")
@@ -41,10 +43,12 @@ const createSortOptions = (label, sortKey, columnIndex, isTimeField = false) => 
 
 const sortOptions = [
     ...createSortOptions('Agent ID', 'agentId', 1),
-    ...createSortOptions('Device ID', 'deviceId', 2),
-    ...createSortOptions('Username', 'username', 3),
-    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 4, true),
-    ...createSortOptions('Last Deployed', 'lastDeployed', 5, true)
+    ...createSortOptions('Hostname', 'hostname', 2),
+    ...createSortOptions('Device ID', 'deviceId', 3),
+    ...createSortOptions('Agent Version', 'agentVersion', 4),
+    ...createSortOptions('Username', 'username', 5),
+    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 6, true),
+    ...createSortOptions('Last Deployed', 'lastDeployed', 7, true)
 ];
 
 const createFilter = (key, label) => ({
@@ -93,6 +97,7 @@ function EndpointShieldMetadata() {
     const [endpointShieldData, setEndpointShieldData] = useState(null);
     const [filters, setFilters] = useState([
         createFilter('username', 'Username'),
+        createFilter('hostname', 'Hostname'),
         createFilter('deviceId', 'Device ID')
     ]);
 
@@ -112,7 +117,9 @@ function EndpointShieldMetadata() {
             const endpointShieldModules = response.moduleInfos || [];
             const agents = endpointShieldModules.map(module => ({
                 agentId: module.id,
-                deviceId: module.name,
+                hostname: module.name,
+                deviceId: module.additionalData?.deviceId || DEFAULT_VALUE,
+                agentVersion: module.currentVersion || DEFAULT_VALUE,
                 username: module.additionalData?.username || DEFAULT_VALUE,
                 lastHeartbeat: module.lastHeartbeatReceived || 0,
                 lastDeployed: module.startedTs || 0,
@@ -214,7 +221,7 @@ function EndpointShieldMetadata() {
         setSelectedAgent(agent);
 
         try {
-            const serversResponse = await settingRequests.getMcpServersByAgent(agent.agentId, agent.deviceId);
+            const serversResponse = await settingRequests.getMcpServersByAgent(agent.agentId, agent.hostname);
             setMcpServers(serversResponse.mcpServers || []);
         } catch (error) {
             console.error("Error fetching MCP servers:", error);
@@ -222,7 +229,7 @@ function EndpointShieldMetadata() {
         }
 
         try {
-            const analysisResponse = await settingRequests.getUserAnalysis(agent.agentId, agent.deviceId);
+            const analysisResponse = await settingRequests.getUserAnalysis(agent.agentId, agent.hostname);
             setUserAnalysis(analysisResponse || null);
         } catch (error) {
             console.error("Error fetching user analysis:", error);
@@ -263,9 +270,11 @@ function EndpointShieldMetadata() {
         if (endpointShieldData?.agents) {
             const agentsData = endpointShieldData.agents;
             const uniqueUsernames = [...new Set(agentsData.map(a => a.username).filter(Boolean))];
+            const uniqueHostnames = [...new Set(agentsData.map(a => a.hostname).filter(Boolean))];
             const uniqueDeviceIds = [...new Set(agentsData.map(a => a.deviceId).filter(Boolean))];
             setFilters([
                 { ...createFilter('username', 'Username'), choices: uniqueUsernames.map(u => ({ label: u, value: u })) },
+                { ...createFilter('hostname', 'Hostname'), choices: uniqueHostnames.map(h => ({ label: h, value: h })) },
                 { ...createFilter('deviceId', 'Device ID'), choices: uniqueDeviceIds.map(d => ({ label: d, value: d })) }
             ]);
         }
@@ -280,10 +289,12 @@ function EndpointShieldMetadata() {
             const filteredData = agentsData.filter(agent => {
                 if (agent.lastHeartbeat < startTimestamp || agent.lastHeartbeat > endTimestamp) return false;
                 if (filters.username?.length > 0 && !filters.username.includes(agent.username)) return false;
+                if (filters.hostname?.length > 0 && !filters.hostname.includes(agent.hostname)) return false;
                 if (filters.deviceId?.length > 0 && !filters.deviceId.includes(agent.deviceId)) return false;
                 if (queryValue) {
                     const q = queryValue.toLowerCase();
                     if (!agent.agentId?.toLowerCase().includes(q) &&
+                        !agent.hostname?.toLowerCase().includes(q) &&
                         !agent.deviceId?.toLowerCase().includes(q) &&
                         !agent.username?.toLowerCase().includes(q)) return false;
                 }
