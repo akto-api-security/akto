@@ -1447,23 +1447,20 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         user = UsersDao.addAccount(user.getLogin(), accountId, accountName);
                         logger.infoAndAddToDb("[createUserAndRedirect] Successfully added account " + accountId + " to existing user " + user.getLogin());
                     } else {
-                        RBAC existingRbac = RBACDao.instance.findOne(
-                            Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId))
-                        );
+                        Bson filter = Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId));
+                        RBAC existingRbac = RBACDao.instance.findOne(filter);
                         if (existingRbac != null) {
-                            if(invitedRole!= null && !invitedRole.equals(existingRbac.getRole())) {
-                            RBACDao.instance.updateOne(
-                                Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId)),
-                                Updates.set(RBAC.ROLE, invitedRole)
-                            );
-                            logger.infoAndAddToDb("[createUserAndRedirect] Updated role from " + existingRbac.getRole() + " to " + invitedRole + " for user " + user.getLogin());
-                           }else if (this.scopeRoleMapping!= null && !this.scopeRoleMapping.isEmpty()){
-                                RBACDao.instance.updateOne(
-                                        Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId)),
-                                        Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping)
-                                );
+                            Bson update = Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping);
+                            if(this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()){
+                                update = Updates.set(RBAC.ROLE, invitedRole);
                             }
-                    }
+                            RBACDao.instance.updateOne(filter, update);
+                        }else{
+                            RBAC rbacEntry = new RBAC(user.getId(), invitedRole, accountId);
+                            if(this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()){
+                            rbacEntry.setScopeRoleMapping(this.scopeRoleMapping);
+                            RBACDao.instance.insertOne(rbacEntry);
+                        }
 
                     servletRequest.getSession().setAttribute("accountId", accountId);
                     logger.info("[createUserAndRedirect] Set session accountId to: " + accountId);
@@ -1538,7 +1535,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             aktoMixpanel.sendEvent(distinct_id, "SIGNUP_SUCCEEDED", props);
             logger.infoAndAddToDb("[createUserAndRedirect] ========== USER CREATION FLOW COMPLETED SUCCESSFULLY ==========");
         }
-    }
     }
 
     protected HttpServletResponse servletResponse;
