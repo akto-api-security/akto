@@ -1433,6 +1433,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[createUserAndRedirect] EXISTING USER path - SSO login or invited user");
                 logger.info("[createUserAndRedirect] User: " + user.getLogin() + ", accountId: " + accountId + ", invitedRole: " + invitedRole);
 
+                //Existing user has RBAC so we need to fetch rbac from cache
+                RBAC rbac = RBACDao.getCurrentRBACForUser(user.getId(), Context.accountId.get());
+                this.scopeRoleMapping = rbac.getScopeRoleMapping();
+                invitedRole = rbac.getRole();
                 if((invitedRole != null || this.scopeRoleMapping!= null) && accountId != 0){
                     logger.info("[createUserAndRedirect] Processing invitation for existing user");
                     // check if the invited account exists in the user info, if not, add it
