@@ -37,6 +37,7 @@ import ReactFlow, {
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../../main/labelHelper";
 import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
+import { AGENTIC_OBSERVE_BACK_PATHS } from "../agentic/constants";
 import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
 import { sendQuery } from "../../agentic/services/agenticService";
@@ -496,18 +497,20 @@ function ApiCollections(props) {
 
     const navigate = useNavigate();
     
-    const checkIsFromEndpoints = () => {
-        if (!isEndpointSecurityCategory()) return false;
+    const getAgenticObserveBackUrl = () => {
+        if (!isEndpointSecurityCategory()) return undefined;
         try {
             const stack = JSON.parse(sessionStorage.getItem('pathnameStack') || '[]');
             if (stack.length >= 2) {
                 const previousPath = stack[stack.length - 2];
-                return previousPath === '/dashboard/observe/agentic-assets';
+                if (AGENTIC_OBSERVE_BACK_PATHS.includes(previousPath)) {
+                    return previousPath;
+                }
             }
         } catch (e) { /* ignore */ }
-        return false;
+        return undefined;
     };
-    const isFromEndpoints = checkIsFromEndpoints();
+    const agenticObserveBackUrl = getAgenticObserveBackUrl();
     
     const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'untracked': []})
     const [active, setActive] = useState(false);
@@ -1088,7 +1091,7 @@ function ApiCollections(props) {
     }
 
     // Use custom hook for Agentic filter detection and summary calculation
-    const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections } = useAgenticFilter(normalData);
+    const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle } = useAgenticFilter(normalData);
 
     useEffect(() => {
         const isMountedRef = { current: true };
@@ -1842,6 +1845,7 @@ function ApiCollections(props) {
                     collections={filteredCollections}
                     promotedBulkActions={promotedBulkActions}
                     filterType={activeFilterType}
+                    showCategoryColumn={activeFilterPlainTitle}
                 />
             );
         }
@@ -1922,7 +1926,8 @@ function ApiCollections(props) {
     // Dynamic title based on active filter and filter type
     const getFilteredPageTitle = () => {
         if (!activeFilterTitle) return mapLabel("API Collections", getDashboardCategory());
-        
+        if (activeFilterPlainTitle) return activeFilterTitle;
+
         switch (activeFilterType) {
             case FILTER_TYPES.BROWSER_LLM:
                 return `LLM - ${activeFilterTitle}`;
@@ -1951,8 +1956,8 @@ function ApiCollections(props) {
                     />
                 }
                 primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={navigateToQueryPage}>Explore mode</Button>}
-                isFirstPage={!isFromEndpoints}
-                backUrl={isFromEndpoints ? "/dashboard/observe/agentic-assets" : undefined}
+                isFirstPage={!agenticObserveBackUrl}
+                backUrl={agenticObserveBackUrl}
                 components={components}
                 secondaryActions={secondaryActionsComp}
             />

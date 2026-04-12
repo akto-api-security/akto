@@ -22,11 +22,8 @@ import {
     groupCollectionsByAgent,
     groupCollectionsByService,
     groupCollectionsBySkill,
-    createEnvTypeFilter,
-    createHostnameFilter,
     extractEndpointId,
-    ROW_TYPES,
-    SKILL_TAG_KEY
+    buildAgenticInventoryFilterForRow,
 } from "./constants";
 import { CLIENT_TYPES } from "./mcpClientHelper";
 
@@ -171,21 +168,9 @@ function Endpoints() {
 
     const handleRowClick = useCallback((row) => {
         const updatedFiltersMap = { ...filtersMap };
-
-        if (row.rowType === ROW_TYPES.AGENT) {
-            // Agent row: filter by agent tag so one click shows both gen-ai and mcp-server for that agent
-            if (row.tagKey && row.tagValue) {
-                const filterValue = `${row.tagKey}=${row.tagValue}`;
-                updatedFiltersMap[INVENTORY_FILTER_KEY] = createEnvTypeFilter([filterValue], false);
-            }
-        } else if (row.rowType === ROW_TYPES.SERVICE) {
-            // Service row (e.g. MCP server): filter by hostnames so only that service's collections open
-            if (row.hostNames?.length > 0) {
-                updatedFiltersMap[INVENTORY_FILTER_KEY] = createHostnameFilter(row.hostNames);
-            }
-        } else if (row.rowType === ROW_TYPES.SKILL) {
-            const filterValue = `${SKILL_TAG_KEY}=${row.groupKey}`;
-            updatedFiltersMap[INVENTORY_FILTER_KEY] = createEnvTypeFilter([filterValue], false);
+        const filterPayload = buildAgenticInventoryFilterForRow(row);
+        if (filterPayload) {
+            updatedFiltersMap[INVENTORY_FILTER_KEY] = filterPayload;
         } else {
             delete updatedFiltersMap[INVENTORY_FILTER_KEY];
         }

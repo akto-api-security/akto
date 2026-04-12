@@ -1785,6 +1785,22 @@ const learnMoreObject = {
                 }
             ]
         }
+    },
+    dashboard_observe_users_and_devices: {
+        endpoint_security: {
+            title: "Users and devices (Atlas)",
+            description: "See which agentic assets run per user or device, then open the same inventory view as Agentic assets.",
+            docsLink: [
+                {
+                    content: "What is Akto Atlas",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/overview"
+                },
+                {
+                    content: "Endpoint Discovery",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents"
+                }
+            ]
+        }
     }
 }
 

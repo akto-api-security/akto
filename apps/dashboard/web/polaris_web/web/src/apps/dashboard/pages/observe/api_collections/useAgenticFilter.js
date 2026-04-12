@@ -15,7 +15,7 @@ const FILTER_TYPES = {
     AI_AGENT: 'ai-agent',
     MCP_SERVER: 'mcp-server',
     SERVICE: 'service',
-    SKILL: 'skill'
+    SKILL: 'skill',
 };
 
 /**
@@ -25,13 +25,11 @@ const FILTER_TYPES = {
 const getFormattedEnvType = (collection) => {
     const envType = collection.envType || [];
     if (envType.length === 0) return [];
-    
-    // Check if already formatted (string) or raw (object)
+
     if (typeof envType[0] === 'string') {
         return envType;
     }
-    
-    // Raw data - format it
+
     return envType.map(func.formatCollectionType);
 };
 
@@ -40,12 +38,10 @@ const getFormattedEnvType = (collection) => {
  * (needed for tree view grouping)
  */
 const ensureCollectionFields = (collection) => {
-    // If already has these fields, return as-is
     if (collection.endpointId !== undefined && collection.sourceId !== undefined) {
         return collection;
     }
-    
-    // Extract from displayName using pattern: <endpoint-id>.<source-id>.<service-name>
+
     const splitResult = transform.splitCollectionNameForEndpointSecurity(collection.displayName);
     return {
         ...collection,
@@ -63,98 +59,103 @@ const ensureCollectionFields = (collection) => {
 const parseFilterFromUrl = (searchParams) => {
     const filtersParam = searchParams.get('filters');
     if (!filtersParam) return { envTypeFilter: null, hostNameFilter: null };
-    
+
     const decoded = decodeURIComponent(filtersParam);
     const pairs = decoded.split('&');
-    
+
     let envTypeFilter = null;
     let hostNameFilter = null;
-    
+
     pairs.forEach(pair => {
         const [key, valuesStr] = pair.split('__');
         if (!valuesStr) return;
-        
+
         const isNegated = valuesStr.includes('|negated');
         const cleanValuesStr = isNegated ? valuesStr.replace('|negated', '') : valuesStr;
         const values = cleanValuesStr.split(',').filter(v => v !== '');
-        
+
         if (key === 'envType') {
             envTypeFilter = { key: 'envType', value: { values, negated: isNegated } };
         } else if (key === 'hostName') {
             hostNameFilter = { key: 'hostName', value: { values, negated: isNegated } };
         }
     });
-    
+
     return { envTypeFilter, hostNameFilter };
 };
 
 /**
  * Custom hook to detect envType or hostName filter from Endpoints page navigation
  * and compute filtered summary data for Agentic Collections
- * 
+ *
  * @param {Array} normalData - The normalized collection data
- * @returns {Object} - { filteredSummaryData, activeFilterTitle, activeFilterType }
+ * @returns {Object} - { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle }
  */
 const useAgenticFilter = (normalData) => {
     const [filteredSummaryData, setFilteredSummaryData] = useState(null);
     const [activeFilterTitle, setActiveFilterTitle] = useState(null);
     const [activeFilterType, setActiveFilterType] = useState(null);
     const [filteredCollections, setFilteredCollections] = useState([]);
-    
+    const [activeFilterPlainTitle, setActiveFilterPlainTitle] = useState(false);
+
     const filtersMap = PersistStore(state => state.filtersMap);
     const [searchParams] = useSearchParams();
 
     useEffect(() => {
-        // Try to get filters from filtersMap first
         const currentPageFilters = filtersMap[INVENTORY_FILTER_KEY];
         let envTypeFilter = currentPageFilters?.filters?.find(f => f.key === 'envType');
         let hostNameFilter = currentPageFilters?.filters?.find(f => f.key === 'hostName');
-        
-        // If not found in filtersMap, parse from URL (for initial page load)
+
         if (!envTypeFilter && !hostNameFilter) {
             const urlFilters = parseFilterFromUrl(searchParams);
             envTypeFilter = urlFilters.envTypeFilter;
             hostNameFilter = urlFilters.hostNameFilter;
         }
-        
+
+        const hasHostnameFilter = Boolean(hostNameFilter?.value?.values?.length > 0);
+        const inventoryScopeLabel = currentPageFilters?.inventoryScopeLabel;
+
         if (normalData.length === 0) {
             setFilteredSummaryData(null);
             setActiveFilterTitle(null);
             setActiveFilterType(null);
+            setFilteredCollections([]);
+            setActiveFilterPlainTitle(false);
             return;
         }
 
         let filterTitle = null;
         let filterType = null;
         let filteredCollections = [];
+        let plainTitle = false;
 
-        // Handle hostname filter (for service rows - may have multiple hostnames)
-        if (hostNameFilter?.value?.values?.length > 0) {
+        if (hasHostnameFilter) {
             const hostNames = hostNameFilter.value.values;
-            // Extract service name from first hostname to show as title
-            const serviceName = extractServiceName(hostNames[0]);
-            filterTitle = serviceName || hostNames[0];
             filteredCollections = normalData.filter(collection => hostNames.includes(collection.hostName));
-            
-            // Determine service type from the first collection's tags
-            if (filteredCollections.length > 0) {
-                const firstCollection = filteredCollections[0];
-                // Get formatted envType strings (handles both raw and transformed data)
-                const envTypeArr = getFormattedEnvType(firstCollection);
-                // Check for type tags in the formatted strings
-                if (envTypeArr.some(tag => tag.startsWith('mcp-server='))) {
-                    filterType = FILTER_TYPES.MCP_SERVER;
-                } else if (envTypeArr.some(tag => tag.startsWith('gen-ai='))) {
-                    filterType = FILTER_TYPES.AI_AGENT;
-                } else if (envTypeArr.some(tag => tag.startsWith('browser-llm='))) {
-                    filterType = FILTER_TYPES.BROWSER_LLM;
-                } else {
-                    filterType = FILTER_TYPES.SERVICE;
+
+            if (inventoryScopeLabel) {
+                filterTitle = inventoryScopeLabel;
+                filterType = FILTER_TYPES.AI_AGENT;
+                plainTitle = true;
+            } else {
+                const serviceName = extractServiceName(hostNames[0]);
+                filterTitle = serviceName || hostNames[0];
+
+                if (filteredCollections.length > 0) {
+                    const firstCollection = filteredCollections[0];
+                    const envTypeArr = getFormattedEnvType(firstCollection);
+                    if (envTypeArr.some(tag => tag.startsWith('mcp-server='))) {
+                        filterType = FILTER_TYPES.MCP_SERVER;
+                    } else if (envTypeArr.some(tag => tag.startsWith('gen-ai='))) {
+                        filterType = FILTER_TYPES.AI_AGENT;
+                    } else if (envTypeArr.some(tag => tag.startsWith('browser-llm='))) {
+                        filterType = FILTER_TYPES.BROWSER_LLM;
+                    } else {
+                        filterType = FILTER_TYPES.SERVICE;
+                    }
                 }
             }
-        }
-        // Handle envType filter (for agent rows)
-        else if (envTypeFilter?.value) {
+        } else if (envTypeFilter?.value) {
             const filterValues = envTypeFilter.value.values || [];
             const isNegated = envTypeFilter.value.negated;
 
@@ -178,7 +179,6 @@ const useAgenticFilter = (normalData) => {
             }
 
             if (filterTitle && filterValues.length > 0) {
-                // Include all collections with this agent (ai-agent + mcp-client with same value) so one click shows both gen-ai and mcp-server
                 const eq = filterValues[0].indexOf('=');
                 const filterKey = eq >= 0 ? filterValues[0].slice(0, eq) : '';
                 const filterTagValue = eq >= 0 ? filterValues[0].slice(eq + 1) : '';
@@ -196,17 +196,16 @@ const useAgenticFilter = (normalData) => {
         if (filterTitle && filteredCollections.length > 0) {
             setActiveFilterTitle(filterTitle);
             setActiveFilterType(filterType);
-            
-            // Transform collections to ensure they have the required fields for tree view
+            setActiveFilterPlainTitle(plainTitle);
+
             const transformedCollections = filteredCollections.map(ensureCollectionFields);
             setFilteredCollections(transformedCollections);
 
             const filteredEndpoints = transformedCollections.reduce((sum, c) => sum + (c.urlsCount || 0), 0);
-            
-            // Count unique values from collection name: <1>.<2>.<3> = <endpoint-id>.<source-id>.<service-name>
-            const uniqueEndpointIds = new Set();   // <1> - endpoint-id
-            const uniqueSourceIds = new Set();     // <2> - source-id  
-            const uniqueServiceNames = new Set();  // <3> - service-name
+
+            const uniqueEndpointIds = new Set();
+            const uniqueSourceIds = new Set();
+            const uniqueServiceNames = new Set();
             transformedCollections.forEach(c => {
                 if (c.endpointId) {
                     uniqueEndpointIds.add(c.endpointId);
@@ -222,19 +221,20 @@ const useAgenticFilter = (normalData) => {
             setFilteredSummaryData({
                 totalEndpoints: filteredEndpoints,
                 totalCollections: transformedCollections.length,
-                uniqueEndpoints: uniqueEndpointIds.size,   // count of unique <1> (endpoint-id)
-                uniqueSources: uniqueSourceIds.size,       // count of unique <2> (source-id)
-                uniqueResources: uniqueServiceNames.size   // count of unique <3> (service-name) for AI Agent
+                uniqueEndpoints: uniqueEndpointIds.size,
+                uniqueSources: uniqueSourceIds.size,
+                uniqueResources: uniqueServiceNames.size
             });
         } else {
             setFilteredSummaryData(null);
             setActiveFilterTitle(null);
             setActiveFilterType(null);
             setFilteredCollections([]);
+            setActiveFilterPlainTitle(false);
         }
     }, [filtersMap, normalData, searchParams]);
 
-    return { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections };
+    return { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle };
 };
 
 export { FILTER_TYPES };
