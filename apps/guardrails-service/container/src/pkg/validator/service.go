@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -148,6 +149,41 @@ func (s *Service) filterPoliciesByContextSource(policies []types.Policy, context
 	return filtered
 }
 
+// filterPoliciesByMcpServer filters policies by MCP server name.
+// Mirrors the logic in PolicyManager.GetPoliciesForMcpServer from the mcp-endpoint-shield library:
+// policies with an empty server map are skipped (not configured for any server).
+// YAML policies always pass through. If mcpServerName is empty, all policies are returned unchanged.
+func filterPoliciesByMcpServer(policies []types.Policy, mcpServerName string) []types.Policy {
+	if mcpServerName == "" {
+		return policies
+	}
+	mcpServerNameLower := strings.ToLower(mcpServerName)
+	filtered := make([]types.Policy, 0, len(policies))
+	for _, policy := range policies {
+		if policy.IsYamlPolicy {
+			filtered = append(filtered, policy)
+			continue
+		}
+		combinedServers := make(map[string]struct{}, len(policy.SelectedMcpServers)+len(policy.SelectedAgentServers))
+		for k, v := range policy.SelectedMcpServers {
+			combinedServers[k] = v
+		}
+		for k, v := range policy.SelectedAgentServers {
+			combinedServers[k] = v
+		}
+		if len(combinedServers) == 0 {
+			continue // Not configured for any server — skip
+		}
+		for serverName := range combinedServers {
+			if strings.ToLower(serverName) == mcpServerNameLower {
+				filtered = append(filtered, policy)
+				break
+			}
+		}
+	}
+	return filtered
+}
+
 func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
 	refreshInterval := time.Duration(s.config.PolicyRefreshIntervalMin) * time.Minute
 
@@ -211,7 +247,8 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.logger.Info("Policy cache refreshed with ALL policies",
 		zap.Int("policiesCount", len(policies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
-		zap.Time("lastFetched", s.cache.lastFetched))
+		zap.Time("lastFetched", s.cache.lastFetched),
+		zap.Any("policies", policies))
 
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
@@ -448,17 +485,23 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.String("contextSource", contextSource),
 		zap.Int("policiesCount", len(policies)),
 		zap.Strings("policyNames", policyNames(policies)),
+		zap.Any("policies", policies),
 		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest")
 
+	// Filter policies by MCP server name — policies with no server configured are skipped
+	policies = filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+
 	s.logger.Info("ValidateRequest - calling ProcessRequest",
+		zap.String("contextSource", contextSource),
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
 		zap.String("sessionID", sessionID),
 		zap.String("mcpServerName", valCtx.McpServerName),
 		zap.Int("policiesCount", len(policies)),
+		zap.Strings("policyNames", policyNames(policies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
 		zap.Int("compiledRulesCount", len(compiledRules)),
 		zap.Bool("hasAuditRules", hasAuditRules),
@@ -573,12 +616,16 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, params.RequestPayload, responseBody, "ValidateResponse")
 
+	// Filter policies by MCP server name — policies with no server configured are skipped
+	policies = filterPoliciesByMcpServer(policies, valCtx.McpServerName)
+
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
 		zap.String("sessionID", sessionID),
 		zap.String("mcpServerName", valCtx.McpServerName),
 		zap.Int("policiesCount", len(policies)),
+		zap.Strings("policyNames", policyNames(policies)),
 		zap.Bool("skipThreat", params.EffectiveSkipThreat()),
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
@@ -826,6 +873,14 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			zap.String("method", data.Method),
 			zap.String("path", data.Path))
 
+		// Filter policies by MCP server name for this specific batch item
+		itemPolicies := filterPoliciesByMcpServer(policies, mcpServerName)
+		s.logger.Debug("ValidateBatch - applicable policies for server",
+			zap.Int("index", i),
+			zap.String("mcpServerName", mcpServerName),
+			zap.Int("policiesCount", len(itemPolicies)),
+			zap.Strings("policyNames", policyNames(itemPolicies)))
+
 		var reqResult, respResult *mcp.ValidationResult
 
 		// Validate request payload if present
@@ -836,7 +891,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.String("path", data.Path),
 				zap.String("payload", data.RequestPayload))
 
-			processResult, err := s.processor.ProcessRequest(ctx, data.RequestPayload, valCtx, policies, auditPolicies, hasAuditRules)
+			processResult, err := s.processor.ProcessRequest(ctx, data.RequestPayload, valCtx, itemPolicies, auditPolicies, hasAuditRules)
 			if err != nil {
 				s.logger.Error("Failed to validate request",
 					zap.Int("index", i),
@@ -867,7 +922,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		// Validate response payload if present
 		if data.ResponsePayload != "" {
-			processResult, err := s.processor.ProcessResponse(ctx, data.ResponsePayload, valCtx, policies)
+			processResult, err := s.processor.ProcessResponse(ctx, data.ResponsePayload, valCtx, itemPolicies)
 			if err != nil {
 				s.logger.Error("Failed to validate response", zap.Error(err))
 				result.ResponseError = err.Error()

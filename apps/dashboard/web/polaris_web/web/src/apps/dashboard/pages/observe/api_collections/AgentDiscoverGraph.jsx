@@ -86,7 +86,7 @@ const McpHoverPanel = ({ metadata }) => {
 };
 
 // Custom Node Component following ApiDependencyNode pattern - memoized to prevent re-renders
-const AgentNode = memo(function AgentNode({ data }) {
+export const AgentNode = memo(function AgentNode({ data }) {
   const { component, onNodeClick } = data;
   const [panelPos, setPanelPos] = useState(null);
   const nodeRef = useRef(null);
@@ -209,7 +209,7 @@ const AgentNode = memo(function AgentNode({ data }) {
 });
 
 // Custom Edge Component following ApiDependencyEdge pattern - memoized to prevent re-renders
-const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
+export const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
   const { edgeParam } = data || {};
   let displayData = edgeParam;
   

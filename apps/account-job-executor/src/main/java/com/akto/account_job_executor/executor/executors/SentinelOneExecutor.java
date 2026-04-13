@@ -121,7 +121,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
 
         String consoleUrl    = normalizeUrl(integration.getConsoleUrl());
         String ingestUrl     = normalizeUrl(integration.getDataIngestionUrl());
-        String consoleDomain = extractDomain(integration.getConsoleUrl());
         String apiToken      = integration.getApiToken();
 
         // Fetch agent list once — reused across the apps pass
@@ -142,8 +141,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                     loggerMaker.info("SentinelOneExecutor: no apps found for tool: " + tool, LogDb.DASHBOARD);
                     continue;
                 }
-                String toolDomain = tool.toLowerCase() + ".sentinel";
-                ingestApps(apps, tool, toolDomain, ingestUrl, consoleDomain);
+                ingestApps(apps, tool, ingestUrl);
                 loggerMaker.info("SentinelOneExecutor: ingested " + apps.size() + " app(s) for " + tool, LogDb.DASHBOARD);
             } catch (IOException e) {
                 loggerMaker.error("SentinelOneExecutor: apps error for " + tool + " — " + e.getMessage(), LogDb.DASHBOARD);
@@ -163,8 +161,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                     for (Map.Entry<String, List<Map<String, Object>>> entry : eventsByTool.entrySet()) {
                         String tool = entry.getKey();
                         List<Map<String, Object>> events = entry.getValue();
-                        String toolDomain = tool.toLowerCase() + ".sentinel";
-                        ingestDvEvents(events, tool, toolDomain, ingestUrl, consoleDomain);
+                        ingestDvEvents(events, tool, ingestUrl);
                     }
                 }
             } catch (IOException e) {
@@ -272,22 +269,18 @@ public class SentinelOneExecutor extends AccountJobExecutor {
     private static void ingestApps(
             List<Map<String, Object>> apps,
             String tool,
-            String toolDomain,
-            String ingestUrl,
-            String consoleDomain) throws IOException {
+            String ingestUrl) throws IOException {
 
         List<Map<String, Object>> batch = new ArrayList<>();
         for (Map<String, Object> app : apps) {
-            batch.add(toAppIngestionRecord(app, tool, toolDomain, consoleDomain));
+            batch.add(toAppIngestionRecord(app, tool));
         }
         sendBatch(batch, ingestUrl);
     }
 
     private static Map<String, Object> toAppIngestionRecord(
             Map<String, Object> app,
-            String tool,
-            String toolDomain,
-            String consoleDomain) throws IOException {
+            String tool) throws IOException {
 
         Map<String, Object> record = new HashMap<>();
         String computerName = getStringOrDefault(app, "computerName", null);
@@ -297,6 +290,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         String botName   = computerName != null ? computerName : (agentId != null ? agentId : "unknown-device");
         String deviceSeg = (computerName != null ? computerName : (agentId != null ? agentId : "unknown-device")).replaceAll("[^a-zA-Z0-9_\\-]+", "-");
         String appSeg    = appName.toLowerCase().replaceAll("[^a-z0-9_\\-]+", "-");
+        String hostName  = botName + "." + tool;
 
         record.put("path", "/sentinelone/apps/" + deviceSeg + "/" + appSeg);
         record.put("method", "GET");
@@ -307,7 +301,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         record.put("responsePayload", OBJECT_MAPPER.writeValueAsString(app));
 
         Map<String, String> reqH = new HashMap<>();
-        reqH.put("host", toolDomain);
+        reqH.put("host", hostName);
         reqH.put("content-type", "application/json");
         record.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(reqH));
 
@@ -474,16 +468,14 @@ public class SentinelOneExecutor extends AccountJobExecutor {
     private static void ingestDvEvents(
             List<Map<String, Object>> events,
             String tool,
-            String toolDomain,
-            String ingestUrl,
-            String consoleDomain) throws IOException {
+            String ingestUrl) throws IOException {
 
         List<Map<String, Object>> batch = new ArrayList<>();
         for (Map<String, Object> event : events) {
             // Skip non-process events
             Object objType = event.get("objectType");
             if (objType != null && !"process".equalsIgnoreCase(objType.toString())) continue;
-            batch.add(toDvIngestionRecord(event, tool, toolDomain, consoleDomain));
+            batch.add(toDvIngestionRecord(event, tool));
         }
         if (!batch.isEmpty()) {
             sendBatch(batch, ingestUrl);
@@ -495,9 +487,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
 
     private static Map<String, Object> toDvIngestionRecord(
             Map<String, Object> event,
-            String tool,
-            String toolDomain,
-            String consoleDomain) throws IOException {
+            String tool) throws IOException {
 
         Map<String, Object> record = new HashMap<>();
 
@@ -512,6 +502,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         if (agentIdVal == null) agentIdVal = getStringOrDefault(event, "id", null);
         String botName = deviceName != null ? deviceName : (agentIdVal != null ? agentIdVal : "unknown-device");
         String pathSeg = deviceName.replaceAll("[^a-zA-Z0-9_\\-]+", "-");
+        String hostName = botName + "." + tool;
 
         record.put("path", "/sentinelone/dv-events/" + pathSeg);
         record.put("method", "GET");
@@ -522,7 +513,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         record.put("responsePayload", OBJECT_MAPPER.writeValueAsString(event));
 
         Map<String, String> reqH = new HashMap<>();
-        reqH.put("host", toolDomain);
+        reqH.put("host", hostName);
         reqH.put("content-type", "application/json");
         record.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(reqH));
 
@@ -590,16 +581,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         return (url != null && url.endsWith("/")) ? url.substring(0, url.length() - 1) : url;
     }
 
-    static String extractDomain(String url) {
-        if (url == null || url.isEmpty()) return "sentinelone.com";
-        try {
-            java.net.URI uri = new java.net.URI(normalizeUrl(url));
-            String host = uri.getHost();
-            return host != null ? host : "sentinelone.com";
-        } catch (Exception e) {
-            return "sentinelone.com";
-        }
-    }
 
     private static String getStringOrDefault(Map<String, Object> map, String key, String defaultValue) {
         Object val = map.get(key);
@@ -972,7 +953,6 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         
         String consoleUrl = normalizeUrl(integration.getConsoleUrl());
         String ingestUrl = normalizeUrl(integration.getDataIngestionUrl());
-        String consoleDomain = extractDomain(integration.getConsoleUrl());
         String apiToken = integration.getApiToken();
         
         // Fetch all agents
@@ -1036,7 +1016,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             if (scriptId != null) {
                 allMcpOutputs.putAll(executeBatchedDiscovery(
                     scriptId, unixAgentIds, batchSize, timeoutMs,
-                    "MCP Config (Unix)", apiToken, consoleUrl, ingestUrl, consoleDomain, true, jobId));
+                    "MCP Config (Unix)", apiToken, consoleUrl, ingestUrl, true, jobId));
             }
         });
 
@@ -1045,7 +1025,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             if (scriptId != null) {
                 allMcpOutputs.putAll(executeBatchedDiscovery(
                     scriptId, windowsAgentIds, batchSize, timeoutMs,
-                    "MCP Config (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, true, jobId));
+                    "MCP Config (Windows)", apiToken, consoleUrl, ingestUrl, true, jobId));
             }
         });
 
@@ -1053,7 +1033,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         waitForFuture(mcpWindowsFuture, "MCP Config (Windows)");
 
         if (!allMcpOutputs.isEmpty()) {
-            ingestMCPDiscoveries(allMcpOutputs, ingestUrl, consoleDomain, agentNames);
+            ingestMCPDiscoveries(allMcpOutputs, ingestUrl, agentNames);
             results.put("mcp_configs", new ArrayList<>(allMcpOutputs.values()));
             loggerMaker.info("MCP config discovery completed: " + allMcpOutputs.size() + " total results", LogDb.DASHBOARD);
         }
@@ -1066,7 +1046,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             if (scriptId != null) {
                 allSkillOutputs.putAll(executeBatchedDiscovery(
                     scriptId, unixAgentIds, batchSize, timeoutMs,
-                    "Skills (Unix)", apiToken, consoleUrl, ingestUrl, consoleDomain, false, jobId));
+                    "Skills (Unix)", apiToken, consoleUrl, ingestUrl, false, jobId));
             }
         });
 
@@ -1075,7 +1055,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
             if (scriptId != null) {
                 allSkillOutputs.putAll(executeBatchedDiscovery(
                     scriptId, windowsAgentIds, batchSize, timeoutMs,
-                    "Skills (Windows)", apiToken, consoleUrl, ingestUrl, consoleDomain, false, jobId));
+                    "Skills (Windows)", apiToken, consoleUrl, ingestUrl, false, jobId));
             }
         });
 
@@ -1085,7 +1065,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         pool.shutdown();
 
         if (!allSkillOutputs.isEmpty()) {
-            ingestSkillDiscoveries(allSkillOutputs, ingestUrl, consoleDomain, agentNames);
+            ingestSkillDiscoveries(allSkillOutputs, ingestUrl, agentNames);
             results.put("skills", new ArrayList<>(allSkillOutputs.values()));
             loggerMaker.info("Skill discovery completed: " + allSkillOutputs.size() + " total results", LogDb.DASHBOARD);
         }
@@ -1103,15 +1083,14 @@ public class SentinelOneExecutor extends AccountJobExecutor {
     }
 
     private static Map<String, JsonNode> executeBatchedDiscovery(
-            String scriptId, 
-            List<String> agentIds, 
-            int batchSize, 
+            String scriptId,
+            List<String> agentIds,
+            int batchSize,
             int timeoutMs,
             String description,
-            String apiToken, 
+            String apiToken,
             String consoleUrl,
             String ingestUrl,
-            String consoleDomain,
             boolean isMcpConfig,
             ObjectId jobId) {
         
@@ -1158,7 +1137,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         return allOutputs;
     }
 
-    private static void ingestMCPDiscoveries(Map<String, JsonNode> discoveriesByAgent, String ingestUrl, String consoleDomain, Map<String, String> agentNames) {
+    private static void ingestMCPDiscoveries(Map<String, JsonNode> discoveriesByAgent, String ingestUrl, Map<String, String> agentNames) {
         loggerMaker.info("Starting MCP discovery ingestion for " + discoveriesByAgent.size() + " agent(s)", LogDb.DASHBOARD);
         
         List<Map<String, Object>> batchData = new ArrayList<>();
@@ -1405,7 +1384,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
         return Math.abs(hash);
     }
 
-    private static void ingestSkillDiscoveries(Map<String, JsonNode> discoveriesByAgent, String ingestUrl, String consoleDomain, Map<String, String> agentNames) {
+    private static void ingestSkillDiscoveries(Map<String, JsonNode> discoveriesByAgent, String ingestUrl, Map<String, String> agentNames) {
         List<Map<String, Object>> batchData = new ArrayList<>();
 
         loggerMaker.info("Starting skill discovery ingestion for " + discoveriesByAgent.size() + " agent(s)", LogDb.DASHBOARD);

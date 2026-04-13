@@ -15,6 +15,7 @@ import SessionStore from '../../../../main/SessionStore';
 import IssuesStore from '../../../pages/issues/issuesStore';
 import Dropdown from '../Dropdown';
 import Wrapped2025 from './Wrapped2025';
+import { categoryToShortName, shortNameToCategory } from '../../../../main/labelHelper';
 
 function ContentWithIcon({ icon, text, isAvatar = false }) {
     return (
@@ -117,9 +118,22 @@ export default function Header() {
     const dropdownInitial = disabledDashboardCategories.includes(dashboardCategory)
         ? "API Security"
         : (dashboardCategory || "API Security");
-
+    
     useEffect(() => {
-        if (disabledDashboardCategories.includes(dashboardCategory) && dashboardCategory !== "API Security") {
+        if(window.SCOPE_ROLE_MAPPING && Object.keys(window.SCOPE_ROLE_MAPPING).length > 0 && window.location.pathname !== "/dashboard/onboarding"){
+            if(!window.SCOPE_ROLE_MAPPING[categoryToShortName[dashboardCategory]]){
+                let scope = "";
+                Object.keys(window.SCOPE_ROLE_MAPPING).forEach(key => {
+                    const value = window.SCOPE_ROLE_MAPPING[key];
+                    if(value !== "NO ACCESS" && value !== "NO_ACCESS"){
+                        scope = key;
+                        return;
+                    }
+                });
+                const category = shortNameToCategory[scope];
+                setDashboardCategory(category);
+            }
+        }else if (disabledDashboardCategories.includes(dashboardCategory) && dashboardCategory !== "API Security") {
             setDashboardCategory("API Security");
         }
     }, [dashboardCategory, disabledDashboardCategories, setDashboardCategory]);
@@ -213,6 +227,10 @@ export default function Header() {
             : "/dashboard/observe/inventory";
         navigate(targetPath);
         navigate(0);
+
+        // Reload page to trigger ProfileAction with new dashboard category context
+        // This ensures window.USER_ROLE is updated based on scopeRoleMapping for the new scope
+        window.location.reload();
     }
 
     function createNewAccount() {

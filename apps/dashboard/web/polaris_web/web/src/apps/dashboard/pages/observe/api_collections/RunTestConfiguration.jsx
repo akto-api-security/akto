@@ -7,6 +7,7 @@ import DropdownSearch from '../../../components/shared/DropdownSearch';
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, generateLabelForJiraIntegration}) => {
+    console.log("isAgenticCategory in config", isAgenticCategory)
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
@@ -331,6 +332,13 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 checked={!testRun.doNotMarkIssuesAsFixed}
                 onChange={() => setTestRun(prev => ({ ...prev, doNotMarkIssuesAsFixed: !prev.doNotMarkIssuesAsFixed }))}
             />
+            { window?.STIGG_FEATURE_WISE_ALLOWED?.AUTOMATED_AGENTIC_TEST_RUN?.isGranted === true && (
+                <Checkbox
+                    label="Smart Automated Testing"
+                    checked={testRun.runAutomatedTests}
+                    onChange={(val) => setTestRun(prev => ({ ...prev, runAutomatedTests: val }))}
+                />
+            )}
         </VerticalStack>
     );
 };

@@ -5,7 +5,6 @@ import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.dto.audit_logs.ApiAuditLogs;
@@ -25,8 +24,6 @@ import com.akto.utils.AlertUtils;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.UserBlockedNoScopeAccessAlert;
 import com.akto.notifications.slack.SlackSender;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionInvocation;
@@ -36,7 +33,6 @@ import com.opensymphony.xwork2.config.entities.ActionConfig;
 import com.opensymphony.xwork2.interceptor.AbstractInterceptor;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
@@ -79,72 +75,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             throw new Exception("unable to parse account id: " + e.getMessage());
         }
     }
-
-    /**
-     * Map CONTEXT_SOURCE enum to user-friendly display names
-     * @param contextSource the CONTEXT_SOURCE enum value
-     * @return friendly display name (e.g., "Akto ATLAS", "Akto ARGUS")
-     */
-    private String getContextSourceDisplayName(CONTEXT_SOURCE contextSource) {
-        if (contextSource == null) {
-            return "API Security";
-        }
-
-        switch(contextSource) {
-            case API:
-                return "API Security";
-            case ENDPOINT:
-                return "Akto ATLAS";
-            case AGENTIC:
-                return "Akto ARGUS";
-            case DAST:
-                return "DAST";
-            default:
-                return contextSource.toString();
-        }
-    }
-
-    /**
-     * Get the list of product scopes that the user has access to.
-     * Extracts keys from scopeRoleMapping if available, otherwise defaults to API scope.
-     * Uses cached RBAC entry for performance.
-     * @param userId the user ID
-     * @param accountId the account ID
-     * @return list of product scopes (e.g., ["API", "MCP", "AGENTIC"])
-     */
-    private List<String> getUserProductScopes(int userId, int accountId) {
-        try {
-            // Use cached RBAC entry for performance (15-minute cache)
-            RBAC rbac = RBACDao.getCurrentRBACForUser(userId, accountId);
-
-            if (rbac == null) {
-                loggerMaker.debug("RBAC entry not found for userId: " + userId + ", accountId: " + accountId
-                        + ". Defaulting to API scope.");
-                return new ArrayList<>(java.util.Arrays.asList("API"));
-            }
-
-            List<String> productScopes = new ArrayList<>();
-
-            // Get scopes from scopeRoleMapping (n:n mapping)
-            Map<String, String> scopeRoleMapping = rbac.getScopeRoleMapping();
-            if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
-                productScopes.addAll(scopeRoleMapping.keySet());
-                loggerMaker.debug("User " + userId + " has scope-role mapping: " + scopeRoleMapping);
-            } else {
-                // No scope-role mapping set, use single role for all scopes (backward compatibility)
-                // getRoleForScope will fall back to single role if no mapping exists
-                loggerMaker.debug("No scope-role mapping for userId: " + userId + ". Using single role for all scopes.");
-                productScopes.add("API");
-            }
-
-            return productScopes;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error getting product scopes for userId: " + userId
-                    + ", accountId: " + accountId + ". Defaulting to API scope. Error: " + e.getMessage());
-            return new ArrayList<>(java.util.Arrays.asList("API"));
-        }
-    }
-
+    
     @Override
     public String intercept(ActionInvocation invocation) throws Exception {
         ApiAuditLogs apiAuditLogs = null;
@@ -182,71 +113,30 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 logger.debug("Time by feature label check in: " + (Context.now() - timeNow));
                 return invocation.invoke();
             }
-
-            logger.debug("Time by feature label check in: " + (Context.now() - timeNow));
             timeNow = Context.now();
-
-            logger.debug("Found user in interceptor: " + user.getLogin());
             int userId = user.getId();
 
-            // ===== PRODUCT SCOPE VALIDATION =====
-            // Check if user has access to the current product scope (context source)
             CONTEXT_SOURCE contextSource = Context.contextSource.get();
-            logger.debug("DEBUG RoleAccessInterceptor: Context.contextSource.get() returned: " + contextSource);
 
-            // Get RBAC entry using cache to support scope-specific role retrieval (n:n mapping)
-            // This uses RBACDao.getCurrentRBACForUser() which caches the RBAC entry with 15-minute expiry
-            RBAC rbac = RBACDao.getCurrentRBACForUser(userId, sessionAccId);
 
-            if (rbac == null) {
-                throw new Exception("User RBAC entry not found for userId: " + userId + ", accountId: " + sessionAccId);
-            }
-
-            // If no context source is set, default to API
-            if (contextSource == null) {
-                contextSource = CONTEXT_SOURCE.API;
-                logger.debug("DEBUG RoleAccessInterceptor: contextSource was null, defaulting to API");
-            }
-
-            // Skip product scope validation for onboarding routes
-            // Onboarding is a special setup flow where users may not have access to all scopes yet
             String requestUri = request.getRequestURI();
             boolean isOnboardingRequest = requestUri != null && requestUri.contains("/onboarding");
 
-            // Get the role for the specific product scope (new n:n mapping approach)
-            Role userRoleRecord = rbac.getRoleForScope(contextSource);
-            logger.debug("Found user role in: " + (Context.now() - timeNow));
-
-            // For backward compatibility: if getRoleForScope returns null but user has old single role field,
-            // fall back to that role. This ensures old users can still access all scopes.
-            if (userRoleRecord == null && rbac.getRole() != null) {
-                try {
-                    userRoleRecord = RBAC.Role.valueOf(rbac.getRole());
-                    logger.debug("Using fallback single role for user " + user.getLogin() + " due to backward compatibility");
-                } catch (IllegalArgumentException e) {
-                    logger.debug("Failed to parse fallback role: " + rbac.getRole() + " for user " + user.getLogin());
-                }
-            }
+            Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, sessionAccId);
 
             String userRole = null;
             if (userRoleRecord != null) {
                 userRole = userRoleRecord.getName().toUpperCase();
             }
 
-            // If getRoleForScope returns null or returns NO_ACCESS and no fallback role, user doesn't have access to this scope
-            // Skip this check for onboarding routes
-            if (!isOnboardingRequest && (userRoleRecord == null || userRoleRecord.equals(Role.NO_ACCESS))) {
-                // User doesn't have access to this product scope
-                String scopeDisplayName = getContextSourceDisplayName(contextSource);
+            if (!isOnboardingRequest && userRoleRecord.equals(Role.NO_ACCESS)) {
                 HttpServletResponse response = (HttpServletResponse) ServletActionContext.getResponse();
                 response.setHeader("X-No-Access-Error", "true");
                 ((ActionSupport) invocation.getAction()).addActionError("You do not have access to this product. Please ask Admin to grant access or navigate to accessible product");
 
-
-                List<String> userProductScopes = getUserProductScopes(userId, sessionAccId);
                 String contextSourceStr = contextSource.toString();
                 logger.debug("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr);
-                loggerMaker.infoAndAddToDb("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr + " (" + scopeDisplayName + "). User scopes: " + userProductScopes);
+                loggerMaker.infoAndAddToDb("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr);
 
                 // Send Slack alert with caching to prevent duplicate alerts
 
@@ -254,12 +144,12 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                     try {
                         SlackAlerts noScopeAccessAlert = new UserBlockedNoScopeAccessAlert(
                             user.getLogin(),
-                            scopeDisplayName,
+                            contextSourceStr,
                             contextSourceStr,
                             String.valueOf(sessionAccId)
                         );
                         SlackSender.sendAlert(sessionAccId, noScopeAccessAlert, null, true);
-                        logger.infoAndAddToDb("Sent Slack alert for NO_ACCESS denial: " + user.getLogin() + " to scope " + scopeDisplayName);
+                        logger.infoAndAddToDb("Sent Slack alert for NO_ACCESS denial: " + user.getLogin() + " to scope " + contextSourceStr);
                     } catch (Exception e) {
                         logger.errorAndAddToDb(e, "Failed to send Slack alert for NO_ACCESS denial: " + e.getMessage());
                     }
@@ -269,10 +159,6 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
                 // Block the request - return FORBIDDEN instead of invoking
                 return FORBIDDEN;
-            }
-
-            if(!isOnboardingRequest && (userRole == null || userRole.isEmpty())) {
-                throw new Exception("User role not found for scope: " + contextSource);
             }
 
             if (isOnboardingRequest) {
@@ -293,35 +179,6 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             }
             if(featureLabel.equals(Feature.ADMIN_ACTIONS.name())){
                 hasRequiredAccess = userRole.equals(Role.ADMIN.name());
-            }
-
-            if(!hasRequiredAccess && userRole.equals("NO ACCESS")){
-                HttpServletResponse response = (HttpServletResponse) ServletActionContext.getResponse();
-                response.setHeader("X-No-Access-Error", "true");
-                ((ActionSupport) invocation.getAction()).addActionError("You do not have access to this product. Please ask Admin to grant access or navigate to accessible product");
-
-                // Send Slack alert with caching to prevent duplicate alerts
-                String scopeDisplayName = getContextSourceDisplayName(contextSource);
-                String contextSourceStr = contextSource.toString();
-
-                if (AlertUtils.shouldSendNoAccessAlert(user.getLogin(), contextSourceStr, String.valueOf(sessionAccId))) {
-                    try {
-                        SlackAlerts noScopeAccessAlert = new UserBlockedNoScopeAccessAlert(
-                            user.getLogin(),
-                            scopeDisplayName,
-                            contextSourceStr,
-                            String.valueOf(sessionAccId)
-                        );
-                        SlackSender.sendAlert(sessionAccId, noScopeAccessAlert, null, true);
-                        logger.infoAndAddToDb("Sent Slack alert for NO_ACCESS denial: " + user.getLogin() + " to scope " + scopeDisplayName);
-                    } catch (Exception e) {
-                        logger.errorAndAddToDb(e, "Failed to send Slack alert for NO_ACCESS denial: " + e.getMessage());
-                    }
-                }  else {
-                    logger.infoAndAddToDb("Skipped duplicate Slack alert for user " + user.getLogin() + " (cached)");
-                }
-
-                return FORBIDDEN;
             }
 
             if(!hasRequiredAccess) {

@@ -4,6 +4,7 @@ import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
 import com.akto.utils.SlackUtils;
+import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
@@ -101,6 +102,30 @@ public class HttpProxyAction extends ActionSupport {
         SlackUtils.sendAlert(alertText);
     }
 
+    private String normalizeHostInRequestHeaders(String headers) {
+        if (headers == null || headers.isEmpty()) return headers;
+        try {
+            BasicDBObject headersObj = BasicDBObject.parse(headers);
+            String hostKey = null;
+            for (String key : headersObj.keySet()) {
+                if ("host".equalsIgnoreCase(key)) {
+                    hostKey = key;
+                    break;
+                }
+            }
+            if (hostKey != null) {
+                String hostValue = headersObj.getString(hostKey);
+                if (hostValue != null) {
+                    String normalized = hostValue.toLowerCase().replaceAll("[^a-z0-9.\\-:]", "-");
+                    headersObj.put(hostKey, normalized);
+                }
+            }
+            return headersObj.toJson();
+        } catch (Exception e) {
+            return headers;
+        }
+    }
+
     private Map<String, Object> buildRequestData() {
         Map<String, Object> requestData = new HashMap<>();
 
@@ -110,7 +135,7 @@ public class HttpProxyAction extends ActionSupport {
         requestData.put("ingest_data", ingest_data);
 
         requestData.put("path", path);
-        requestData.put("requestHeaders", requestHeaders);
+        requestData.put("requestHeaders", normalizeHostInRequestHeaders(requestHeaders));
         requestData.put("responseHeaders", responseHeaders);
         requestData.put("method", method);
         requestData.put("requestPayload", requestPayload);

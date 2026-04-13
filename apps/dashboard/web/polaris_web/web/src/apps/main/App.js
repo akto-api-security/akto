@@ -124,8 +124,12 @@ import DastProgress from "../dashboard/pages/observe/api_collections/DastProgres
 import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
 import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
+import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
+import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx";
+import ViolationsPage from "../dashboard/pages/nhi_governance/ViolationsPage.jsx";
+import PoliciesPage from "../dashboard/pages/nhi_governance/PoliciesPage.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -209,6 +213,10 @@ const router = createBrowserRouter([
                             {
                                 path: "agentic-assets",
                                 element: <Endpoints/>
+                            },
+                            {
+                                path: "users-and-devices",
+                                element: <UsersAndDevices/>
                             },
                             {
                                 path: "query_mode",
@@ -351,6 +359,23 @@ const router = createBrowserRouter([
                             {
                                 path: "policies",
                                 element: <GuardrailPolicies/>
+                            }
+                        ]
+                    },
+                    {
+                        path: "nhi",
+                        children: [
+                            {
+                                path: "identities",
+                                element: <IdentitiesPage/>
+                            },
+                            {
+                                path: "violations",
+                                element: <ViolationsPage/>
+                            },
+                            {
+                                path: "policies",
+                                element: <PoliciesPage/>
                             }
                         ]
                     }

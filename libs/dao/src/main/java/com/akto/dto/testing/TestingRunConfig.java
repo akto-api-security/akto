@@ -158,4 +158,5 @@ public class TestingRunConfig {
     public void setTestSuiteIds(List<String> testSuiteIds) {
         this.testSuiteIds = testSuiteIds;
     }
+
 }

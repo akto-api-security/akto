@@ -300,8 +300,6 @@ public class AccountAction extends UserAction {
         User user = UsersDao.addAccount(email, newAccountId, newAccountName);
         RBAC rbacEntry = new RBAC(user.getId(), null, newAccountId);  // Don't set old role field
         if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
-            // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
-            scopeRoleMapping = RBAC.ensureCompleteScopeRoleMapping(scopeRoleMapping);
             rbacEntry.setScopeRoleMapping(scopeRoleMapping);
         }
         RBACDao.instance.insertOne(rbacEntry);
@@ -334,11 +332,11 @@ public class AccountAction extends UserAction {
         return user;
     }
 
-    public static User addUserToExistingAccount(String email, int accountId, String invitedRole){
+    public static User addUserToExistingAccount(String email, int accountId, String invitedRole, Map<String,String> scopeRoleMapping){
         Account account = AccountsDao.instance.findOne(eq("_id", accountId));
         UsersDao.addNewAccount(email, account);
         User user = UsersDao.instance.findOne(eq(User.LOGIN, email));
-        RBACDao.instance.insertOne(new RBAC(user.getId(), invitedRole, accountId));
+        RBACDao.instance.insertOne(new RBAC(user.getId(), invitedRole, accountId,scopeRoleMapping));
         Context.accountId.set(accountId);
         return user;
     }
