@@ -41,7 +41,8 @@ AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
 AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
-CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
+AKTO_HOST = os.getenv("AKTO_HOST", "")
+CONTEXT_SOURCE = "ENDPOINT" if MODE == "atlas" else "AGENTIC"
 WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_prompt_warn_pending.json")
 
 # SSL Configuration
@@ -116,9 +117,7 @@ def build_validation_request(query: str) -> dict:
         tags["ai-agent"] = "claudecli"
         tags["source"] = CONTEXT_SOURCE
 
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-
-    host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
+    host = AKTO_HOST or CLAUDE_API_URL.replace("https://", "").replace("http://", "")
 
     request_headers = json.dumps({
         "host": host,
