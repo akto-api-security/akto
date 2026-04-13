@@ -140,7 +140,7 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.error(f"API CALL FAILED after {duration_ms}ms: {e}")
         raise
 
-def build_validation_request(prompt: str, attachments: list) -> dict:
+def build_validation_request(prompt: str, attachments: list, session_info: dict = None) -> dict:
     """Build the request body for guardrails validation."""
     import time
 
@@ -162,11 +162,17 @@ def build_validation_request(prompt: str, attachments: list) -> dict:
     host = API_URL.replace("https://", "").replace("http://", "")
 
     # Build request headers as JSON string
-    request_headers = json.dumps({
+    req_headers = {
         "host": host,
         "x-cursor-hook": "beforeSubmitPrompt",
         "content-type": "application/json"
-    })
+    }
+    if session_info:
+        for key, value in session_info.items():
+            if value is not None:
+                req_headers[f"x-akto-installer-{key}"] = str(value)
+
+    request_headers = json.dumps(req_headers)
 
     # Build response headers as JSON string
     response_headers = json.dumps({
@@ -221,7 +227,7 @@ def _is_alert_behaviour(behaviour: Any) -> bool:
     return _guardrails_behaviour_value(behaviour) == "alert"
 
 
-def call_guardrails(prompt: str, attachments: list) -> Tuple[bool, str, str]:
+def call_guardrails(prompt: str, attachments: list, session_info: dict = None) -> Tuple[bool, str, str]:
     """Call guardrails API to validate the prompt."""
     if not AKTO_DATA_INGESTION_URL:
         logger.warning("AKTO_DATA_INGESTION_URL not set, allowing prompt")
@@ -234,11 +240,11 @@ def call_guardrails(prompt: str, attachments: list) -> Tuple[bool, str, str]:
             logger.debug(f"Attachments: {json.dumps(attachments)[:500]}...")
 
     try:
-        request_body = build_validation_request(prompt, attachments)
+        request_body = build_validation_request(prompt, attachments, session_info)
         response = post_payload_json(
             build_http_proxy_url(
                 guardrails=AKTO_SYNC_MODE,
-                ingest_data=not AKTO_SYNC_MODE,
+                ingest_data=True,
             ),
             request_body,
         )
@@ -338,13 +344,19 @@ def main():
     prompt = input_data.get("prompt", "")
     attachments = input_data.get("attachments", [])
 
+    session_info = {}
+    for field in ("conversation_id", "generation_id", "model", "transcript_path", "user_email"):
+        value = input_data.get(field)
+        if value is not None:
+            session_info[field] = value
+
     if not prompt.strip():
         logger.warning("Empty prompt received, allowing")
         print(json.dumps({"continue": True}))
         sys.exit(0)
 
     # Call guardrails validation
-    gr_allowed, gr_reason, behaviour = call_guardrails(prompt, attachments)
+    gr_allowed, gr_reason, behaviour = call_guardrails(prompt, attachments, session_info)
     fingerprint = prompt_fingerprint(prompt, attachments)
     allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
 
