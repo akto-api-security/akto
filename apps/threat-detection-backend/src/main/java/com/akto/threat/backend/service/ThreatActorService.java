@@ -737,17 +737,20 @@ public class ThreatActorService {
 
     long methodStartTime = System.currentTimeMillis();
 
-    Document match = new Document();
-
-    // Filter by time range using lastAttackTs
+    // Build time range filter (reused for both actor_info and malicious_events queries)
+    Document tsFilter = null;
     if (startTs > 0 || endTs > 0) {
-      Document tsFilter = new Document();
+      tsFilter = new Document();
       if (startTs > 0) {
         tsFilter.append("$gte", startTs);
       }
       if (endTs > 0) {
         tsFilter.append("$lte", endTs);
       }
+    }
+
+    Document match = new Document();
+    if (tsFilter != null) {
       match.append("lastAttackTs", tsFilter);
     }
 
@@ -811,12 +814,26 @@ public class ThreatActorService {
         .setCriticalActors((int) criticalActorsCount)
         .build();
 
+    // Total analysed - estimated count from malicious events table
+    long totalAnalysed = maliciousEventDao.getCollection(accountId).estimatedDocumentCount();
+
+    // Total attacks - count successful exploits within time range
+    Document attackMatch = new Document();
+    if (tsFilter != null) {
+      attackMatch.append("detectedAt", tsFilter);
+    }
+    attackMatch.append("successfulExploit", true);
+    if (!contextFilter.isEmpty()) {
+      attackMatch.putAll(contextFilter);
+    }
+    long totalAttacks = maliciousEventDao.getCollection(accountId).countDocuments(attackMatch);
+
     return DailyActorsCountResponse.newBuilder()
         .addActorsCounts(actorsCount)  // Add single element to array
         .setTotalActive((int) activeActorsCount)
         .setCriticalActorsCount((int) criticalActorsCount)
-        .setTotalAnalysed(0)  // Not calculated from actor_info
-        .setTotalAttacks(0)   // Not calculated from actor_info
+        .setTotalAnalysed((int) totalAnalysed)
+        .setTotalAttacks((int) totalAttacks)
         .setTotalIgnored(0)
         .setTotalUnderReview(0)
         .build();
