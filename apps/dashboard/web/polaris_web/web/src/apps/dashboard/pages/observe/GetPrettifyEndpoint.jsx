@@ -15,6 +15,8 @@ export const getMethod = (url, method) => {
             return "PROMPT";
         }else if(url.includes("server")){
             return "SERVER";
+        } else if (url.includes("v1/hooks")){
+          return "HOOK"
         }
     }
     return method;
