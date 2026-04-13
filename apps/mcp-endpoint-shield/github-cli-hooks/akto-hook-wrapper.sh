@@ -8,7 +8,6 @@ export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="vscode"
 export CONTEXT_SOURCE="ENDPOINT"
-export DEVICE_ID="{{DEVICE_ID (optional)}}"
 
 export LOG_DIR="$HOME/akto/.github/akto/vscode/logs"
 export LOG_LEVEL="INFO"
