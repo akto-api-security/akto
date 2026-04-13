@@ -3393,11 +3393,17 @@ public class InitializerListener implements ServletContextListener {
             }
 
             RBAC firstUserAdminRbac = RBACDao.instance.findOne(Filters.and(
-                Filters.eq(RBAC.USER_ID, firstUser.getId()),
-                Filters.eq(RBAC.ROLE, Role.ADMIN.name())
+                Filters.eq(RBAC.USER_ID, firstUser.getId())
             ));
 
-            if(firstUserAdminRbac != null){
+            // RBAC exists - ensure it has ADMIN in scopeRoleMapping
+            Map<String, String> existingScopeRoleMapping = firstUserAdminRbac.getScopeRoleMapping();
+            boolean hasAdmin = existingScopeRoleMapping != null && existingScopeRoleMapping.containsValue(Role.ADMIN.name());
+            if(!hasAdmin){
+                hasAdmin = (firstUserAdminRbac.getRole() != null && firstUserAdminRbac.getRole().equals(Role.ADMIN.name()));
+            }
+
+            if(hasAdmin){
                 logger.debugAndAddToDb("Found admin rbac for first user: " + firstUser.getLogin() + " , thus deleting it's member role RBAC", LogDb.DASHBOARD);
                 RBACDao.instance.deleteAll(Filters.and(
                     Filters.eq(RBAC.USER_ID, firstUser.getId()),
