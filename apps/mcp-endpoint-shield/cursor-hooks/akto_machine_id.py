@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+""" 
 Machine ID generation utility for device identification.
 Mimics the Go implementation for generating unique device identifiers.
 """

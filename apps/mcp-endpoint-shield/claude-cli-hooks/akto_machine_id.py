@@ -29,7 +29,7 @@ def _generate_machine_id() -> str:
     Returns:
         Machine ID as a lowercase string without dashes
     """
-    # Try macOS ioreg first (matches Go denisbrodbeck/machineid implementation)
+    # Try macOS ioreg first (matches Go denisbrodbeck/machineid implementation) 
     try:
         result = subprocess.run(
             ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],
