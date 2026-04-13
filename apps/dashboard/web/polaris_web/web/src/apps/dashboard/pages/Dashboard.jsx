@@ -96,7 +96,7 @@ function Dashboard() {
         }, 100);
 
         return () => clearInterval(checkInterval);
-    }, [location.pathname, selectItems]);
+    }, [location.pathname]);
 
     useEffect(() => {
         if(trafficAlerts == null && window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')){
