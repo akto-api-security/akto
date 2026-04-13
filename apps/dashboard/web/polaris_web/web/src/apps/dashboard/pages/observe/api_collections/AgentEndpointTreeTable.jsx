@@ -9,6 +9,10 @@ import { useNavigate } from 'react-router-dom';
 import HeadingWithTooltip from '../../../components/shared/HeadingWithTooltip';
 import TooltipText from '../../../components/shared/TooltipText';
 import { FILTER_TYPES } from './useAgenticFilter';
+import { getAgenticCategoryLabel } from '../agentic/mcpClientHelper';
+
+/** IndexTable adds a leading selection column when `selectable` is true (see AgentEndpointTreeTable). */
+const INDEX_TABLE_SELECTION_COLUMN_COUNT = 1;
 
 // Headers for the parent rows (grouped by endpoint ID)
 const parentHeaders = [
@@ -94,16 +98,23 @@ const getChildColumnConfig = (filterType) => {
 };
 
 // Get child headers based on filter type
-const getChildHeaders = (filterType) => {
+const getChildHeaders = (filterType, showCategoryColumn) => {
     const config = getChildColumnConfig(filterType);
-    return [
-        {
-            title: config.title,
-            text: config.title,
-            value: "displayNameComp",
-            textValue: config.displayField,
-            boxWidth: '200px'
-        },
+    const nameCol = {
+        title: config.title,
+        text: config.title,
+        value: "displayNameComp",
+        textValue: config.displayField,
+        boxWidth: '200px'
+    };
+    const categoryCol = {
+        title: "Category",
+        text: "Category",
+        value: "agenticCategory",
+        textValue: "agenticCategory",
+        boxWidth: "100px"
+    };
+    const rest = [
         {
             title: "Risk score",
             text: "Risk score",
@@ -129,6 +140,7 @@ const getChildHeaders = (filterType) => {
             boxWidth: '80px'
         },
     ];
+    return showCategoryColumn ? [nameCol, categoryCol, ...rest] : [nameCol, ...rest];
 };
 
 const sortOptions = [
@@ -206,7 +218,7 @@ const groupByEndpointId = (collections) => {
 /**
  * Prettifies the grouped endpoint data for display
  */
-const prettifyGroupedData = (groupedData, filterType) => {
+const prettifyGroupedData = (groupedData, filterType, showCategoryColumn) => {
     return groupedData.map(group => {
         const childCount = group.children.length;
         const riskScore = group.riskScore || 0;
@@ -234,7 +246,13 @@ const prettifyGroupedData = (groupedData, filterType) => {
             discovered: func.prettifyEpoch(group.startTs === Infinity ? 0 : group.startTs),
             isTerminal: false,
             // Function to create expandable children row
-            collapsibleRow: <ChildrenTable children={group.children} filterType={filterType} />,
+            collapsibleRow: (
+                <ChildrenTable
+                    children={group.children}
+                    filterType={filterType}
+                    showCategoryColumn={showCategoryColumn}
+                />
+            ),
         };
     });
 };
@@ -242,9 +260,9 @@ const prettifyGroupedData = (groupedData, filterType) => {
 /**
  * Children table component for expanded rows
  */
-const ChildrenTable = ({ children, filterType }) => {
+const ChildrenTable = ({ children, filterType, showCategoryColumn }) => {
     const navigate = useNavigate();
-    const childHeaders = getChildHeaders(filterType);
+    const childHeaders = getChildHeaders(filterType, showCategoryColumn);
     const columnConfig = getChildColumnConfig(filterType);
     
     const handleChildClick = useCallback((collection) => {
@@ -260,6 +278,7 @@ const ChildrenTable = ({ children, filterType }) => {
             const childRiskScore = child.riskScore || 0;
             const prettifiedChild = {
                 ...child,
+                agenticCategory: showCategoryColumn ? getAgenticCategoryLabel(child) : undefined,
                 riskScoreComp: <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>,
                 sensitiveSubTypes: transform.prettifySubtypes(child.sensitiveInRespTypes || []),
                 lastTraffic: func.prettifyEpoch(child.detectedTimestamp || 0),
@@ -288,6 +307,16 @@ const ChildrenTable = ({ children, filterType }) => {
                             </Box>
                         </div>
                     );
+                } else if (header.value === 'agenticCategory') {
+                    cells.push(
+                        <div
+                            key={`${header.value}-${child.id}`}
+                            style={{ cursor: 'pointer', width: header.boxWidth }}
+                            onClick={() => handleChildClick(child)}
+                        >
+                            <Text variant="bodyMd" as="span">{prettifiedChild.agenticCategory || '-'}</Text>
+                        </div>
+                    );
                 } else {
                     cells.push(
                         <div 
@@ -303,16 +332,20 @@ const ChildrenTable = ({ children, filterType }) => {
             
             return cells;
         });
-    }, [children, handleChildClick, childHeaders, columnConfig]);
+    }, [children, handleChildClick, childHeaders, columnConfig, showCategoryColumn]);
     
+    const expandedColSpan = parentHeaders.length + INDEX_TABLE_SELECTION_COLUMN_COUNT;
+
     return (
-        <td colSpan={parentHeaders.length} style={{ padding: '0px !important' }} className="control-row">
-            <DataTable
-                rows={rows}
-                hasZebraStripingOnData
-                headings={[]}
-                columnContentTypes={['text', ...childHeaders.map(() => 'text')]}
-            />
+        <td colSpan={expandedColSpan} style={{ padding: '0px !important' }} className="control-row">
+            <Box width="100%">
+                <DataTable
+                    rows={rows}
+                    hasZebraStripingOnData
+                    headings={[]}
+                    columnContentTypes={['text', ...childHeaders.map(() => 'text')]}
+                />
+            </Box>
         </td>
     );
 };
@@ -321,20 +354,20 @@ const ChildrenTable = ({ children, filterType }) => {
  * AgentEndpointTreeTable component
  * Displays collections grouped by endpoint ID with expandable rows showing agentic resources
  */
-function AgentEndpointTreeTable({ collections, promotedBulkActions, filterType }) {
+function AgentEndpointTreeTable({ collections, promotedBulkActions, filterType, showCategoryColumn = false }) {
     const [groupedData, setGroupedData] = useState([]);
     
     useEffect(() => {
         if (collections && collections.length > 0) {
             const grouped = groupByEndpointId(collections);
-            const prettified = prettifyGroupedData(grouped, filterType);
+            const prettified = prettifyGroupedData(grouped, filterType, showCategoryColumn);
             // Sort by endpoint ID by default
             const sorted = func.sortFunc(prettified, 'endpointId', 1);
             setGroupedData(sorted);
         } else {
             setGroupedData([]);
         }
-    }, [collections, filterType]);
+    }, [collections, filterType, showCategoryColumn]);
     
     const disambiguateLabel = useCallback((key, value) => {
         return func.convertToDisambiguateLabelObj(value, null, 2);
