@@ -814,18 +814,21 @@ public class ThreatActorService {
         .setCriticalActors((int) criticalActorsCount)
         .build();
 
-    // Total analysed - estimated count from malicious events table
-    long totalAnalysed = maliciousEventDao.getCollection(accountId).estimatedDocumentCount();
-
-    // Total attacks - count successful exploits within time range
-    Document attackMatch = new Document();
+    // Build base filter for malicious_events queries (time range + context)
+    Document eventsMatch = new Document();
     if (tsFilter != null) {
-      attackMatch.append("detectedAt", tsFilter);
+      eventsMatch.append("detectedAt", tsFilter);
     }
-    attackMatch.append("successfulExploit", true);
     if (!contextFilter.isEmpty()) {
-      attackMatch.putAll(contextFilter);
+      eventsMatch.putAll(contextFilter);
     }
+
+    // Total analysed - all events in time range
+    long totalAnalysed = maliciousEventDao.getCollection(accountId).countDocuments(eventsMatch);
+
+    // Total attacks - successful exploits in time range
+    Document attackMatch = new Document(eventsMatch);
+    attackMatch.append("successfulExploit", true);
     long totalAttacks = maliciousEventDao.getCollection(accountId).countDocuments(attackMatch);
 
     return DailyActorsCountResponse.newBuilder()
