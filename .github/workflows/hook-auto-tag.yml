@@ -1,0 +1,134 @@
+name: Hook Auto-Tag
+
+# Creates a per-file semantic version tag (hooks/{folder}/{filename}@vX.Y.Z)
+# every time a hook script is modified in apps/mcp-endpoint-shield/.
+#
+# Tag format examples:
+#   hooks/cursor-hooks/akto-validate-chat-prompt.py@v1.0.0
+#   hooks/claude-cli-hooks/akto-validate-mcp-request.py@v2.3.1
+#
+# The mcp-endpoint-shield agent fetches hooks from the master branch via raw
+# GitHub URLs and uses SHA-256 comparison to decide whether to update a local
+# file.  These tags serve as an audit trail in Git so developers can see
+# exactly when each hook script changed and what version is deployed.
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'apps/mcp-endpoint-shield/cursor-hooks/**'
+      - 'apps/mcp-endpoint-shield/claude-cli-hooks/**'
+
+permissions:
+  contents: write  # required to push tags
+
+jobs:
+  tag-changed-hooks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # needed so `git tag --list` can see all existing tags
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute list of changed hook files
+        id: changed
+        run: |
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+
+          # On the very first push BEFORE is all zeros — diff the whole commit
+          if [[ "$BEFORE" == "0000000000000000000000000000000000000000" ]]; then
+            FILES=$(git diff-tree --no-commit-id -r --name-only "$AFTER")
+          else
+            FILES=$(git diff --name-only "$BEFORE" "$AFTER")
+          fi
+
+          echo "All changed files:"
+          echo "$FILES"
+
+          # Keep only hook scripts inside the two watched directories
+          HOOK_FILES=""
+          while IFS= read -r f; do
+            # Must be inside cursor-hooks/ or claude-cli-hooks/
+            case "$f" in
+              apps/mcp-endpoint-shield/cursor-hooks/*|\
+              apps/mcp-endpoint-shield/claude-cli-hooks/*) ;;
+              *) continue ;;
+            esac
+
+            # Must be a taggable file type
+            fname=$(basename "$f")
+            case "$fname" in
+              *.py|*.sh|settings.json|hooks.json) ;;
+              *) continue ;;
+            esac
+
+            # Skip documentation / examples / legacy subtree
+            case "$fname" in
+              README*|*.example) continue ;;
+            esac
+            case "$f" in
+              */legacy/*) continue ;;
+            esac
+
+            HOOK_FILES="${HOOK_FILES}${f}"$'\n'
+          done <<< "$FILES"
+
+          echo "Hook files to tag:"
+          echo "$HOOK_FILES"
+
+          # Pass to next step via output (newlines encoded as %0A)
+          echo "hook_files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$HOOK_FILES"     >> "$GITHUB_OUTPUT"
+          echo "EOF"             >> "$GITHUB_OUTPUT"
+
+      - name: Create per-file version tags
+        run: |
+          HOOK_FILES="${{ steps.changed.outputs.hook_files }}"
+
+          if [ -z "$HOOK_FILES" ]; then
+            echo "No hook files changed — nothing to tag."
+            exit 0
+          fi
+
+          tagged_any=false
+
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+
+            # Derive tag prefix from file path
+            # e.g. apps/mcp-endpoint-shield/cursor-hooks/akto-validate-chat-prompt.py
+            #   →  hooks/cursor-hooks/akto-validate-chat-prompt.py
+            rel="${file#apps/mcp-endpoint-shield/}"
+            tag_prefix="hooks/${rel}"
+
+            # Find the highest existing version tag for this file
+            latest=$(git tag --list "${tag_prefix}@v*" | sort -V | tail -1)
+
+            if [ -z "$latest" ]; then
+              new_version="v1.0.0"
+            else
+              ver="${latest##*@v}"
+              IFS='.' read -r major minor patch <<< "$ver"
+              patch=$((patch + 1))
+              new_version="v${major}.${minor}.${patch}"
+            fi
+
+            new_tag="${tag_prefix}@${new_version}"
+            echo "Tagging $file  →  $new_tag"
+            git tag "$new_tag"
+            tagged_any=true
+          done <<< "$HOOK_FILES"
+
+          if [ "$tagged_any" = "true" ]; then
+            git push origin --tags
+            echo "All tags pushed."
+          fi
