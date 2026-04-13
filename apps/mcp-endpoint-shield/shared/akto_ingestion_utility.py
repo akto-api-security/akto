@@ -43,7 +43,7 @@ else:
 
 # ── Logging helpers ───────────────────────────────────────────────────────────
 
-LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.akto-agent-hooks/logs"))
+LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", f"~/akto/{AKTO_CONNECTOR}-hooks/logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 
