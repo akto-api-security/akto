@@ -264,17 +264,6 @@
         ]
       }
     ],
-    "WorktreeCreate": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-worktree-create.py",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
     "WorktreeRemove": [
       {
         "hooks": [
