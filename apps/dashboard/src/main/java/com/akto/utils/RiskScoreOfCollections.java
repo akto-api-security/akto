@@ -155,6 +155,10 @@ public class RiskScoreOfCollections {
         AtomicInteger riskScoreGroupUpdateCount = new AtomicInteger(0);
         AtomicInteger apiInfoNotFoundCount = new AtomicInteger(0);
 
+        final McpApiRiskScoreUtils.McpRiskScoreContext mcpRiskScoreContext =
+                (severityScoreMap != null && !severityScoreMap.isEmpty())
+                        ? McpApiRiskScoreUtils.buildMcpRiskScoreContext()
+                        : null;
         // after getting the severityScoreMap, we write that in DB
         if(severityScoreMap != null){
             severityScoreMap.forEach((apiInfoKey, severityScore)->{
@@ -166,7 +170,11 @@ public class RiskScoreOfCollections {
                 }
 
                 boolean isSensitive = apiInfo != null ? apiInfo.getIsSensitive() : false;
-                float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, getRiskScoreValueFromSeverityScore(severityScore));
+                float severityRiskPart = Utils.getRiskScoreValueFromSeverityScore(severityScore);
+                float baseScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, severityRiskPart);
+                float riskScore = mcpRiskScoreContext == null
+                        ? baseScore
+                        : McpApiRiskScoreUtils.getRiskScoreWithMcpAdjustments(apiInfo, baseScore, mcpRiskScoreContext);
 
                 if (apiInfo != null) {
                     if (apiInfo.getRiskScore() != riskScore) {
@@ -296,7 +304,7 @@ public class RiskScoreOfCollections {
             Filters.exists(ApiInfo.LAST_CALCULATED_TIME, false),
             Filters.lte(ApiInfo.LAST_CALCULATED_TIME, timeStamp)
         );
-        Bson projection = Projections.include("_id", ApiInfo.API_ACCESS_TYPES, ApiInfo.LAST_SEEN, ApiInfo.SEVERITY_SCORE, ApiInfo.IS_SENSITIVE, ApiInfo.COLLECTION_IDS, ApiInfo.RISK_SCORE);
+        Bson projection = Projections.include("_id", ApiInfo.API_ACCESS_TYPES, ApiInfo.LAST_SEEN, ApiInfo.SEVERITY_SCORE, ApiInfo.IS_SENSITIVE, ApiInfo.COLLECTION_IDS, ApiInfo.RISK_SCORE, ApiInfo.PARENT_MCP_TOOL_NAMES);
 
         RiskScoreTestingEndpointsUtils riskScoreTestingEndpointsUtils = new RiskScoreTestingEndpointsUtils();
 
@@ -308,10 +316,16 @@ public class RiskScoreOfCollections {
         int totalBulkWrites = 0;
         int totalModifiedCount = 0;
 
+        McpApiRiskScoreUtils.McpRiskScoreContext mcpRiskScoreContext = McpApiRiskScoreUtils.buildMcpRiskScoreContext();
         while(count < 100){
             List<ApiInfo> apiInfos = ApiInfoDao.instance.getMCollection().find(filter).sort(Sorts.descending(ApiInfo.LAST_CALCULATED_TIME)).limit(limit).projection(projection).into(new ArrayList<>());
             for(ApiInfo apiInfo: apiInfos){
-                float riskScore = ApiInfoDao.getRiskScore(apiInfo, apiInfo.getIsSensitive(), getRiskScoreValueFromSeverityScore(initialSeverityScoreMap.getOrDefault(apiInfo.getId(), (float) 0)));
+                float severityRiskPart = Utils.getRiskScoreValueFromSeverityScore(
+                        initialSeverityScoreMap.getOrDefault(apiInfo.getId(), (float) 0));
+                float baseScore = ApiInfoDao.getRiskScore(apiInfo, apiInfo.getIsSensitive(), severityRiskPart);
+                float riskScore = mcpRiskScoreContext.isEmpty()
+                        ? baseScore
+                        : McpApiRiskScoreUtils.getRiskScoreWithMcpAdjustments(apiInfo, baseScore, mcpRiskScoreContext);
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.RISK_SCORE, riskScore),
                     Updates.set(ApiInfo.LAST_CALCULATED_TIME, Context.now())
