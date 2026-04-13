@@ -20,15 +20,25 @@ public class Gateway {
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
 
-    private static final Map<String, Set<String>> WHITELISTED_CLIENT_HOOKS = new HashMap<String, Set<String>>() {{
-        put("claude_code_cli", new HashSet<>(Arrays.asList(
-            "SessionStart", "SessionEnd", "InstructionsLoaded", "PermissionRequest", "PermissionDenied",
-            "PostToolUseFailure", "Stop", "StopFailure", "SubagentStart", "SubagentStop",
-            "TaskCreated", "TaskCompleted", "TeammateIdle", "Notification", "ConfigChange",
-            "CwdChanged", "FileChanged", "PreCompact", "PostCompact",
-            "Elicitation", "ElicitationResult", "WorktreeCreate", "WorktreeRemove"
-        )));
-    }};
+    private static final Map<String, Set<String>> WHITELISTED_CLIENT_HOOKS =
+            new HashMap<String, Set<String>>() {
+                {
+                    put("claude_code_cli",
+                            new HashSet<>(Arrays.asList("SessionStart", "SessionEnd",
+                                    "InstructionsLoaded", "PermissionRequest", "PermissionDenied",
+                                    "PostToolUseFailure", "Stop", "StopFailure", "SubagentStart",
+                                    "SubagentStop", "TaskCreated", "TaskCompleted", "TeammateIdle",
+                                    "Notification", "ConfigChange", "CwdChanged", "FileChanged",
+                                    "PreCompact", "PostCompact", "Elicitation", "ElicitationResult",
+                                    "WorktreeCreate", "WorktreeRemove")));
+                    put("cursor",
+                            new HashSet<>(Arrays.asList("sessionStart", "sessionEnd", "preToolUse",
+                                    "postToolUse", "postToolUseFailure", "subagentStart",
+                                    "subagentStop", "beforeShellExecution", "afterShellExecution",
+                                    "beforeReadFile", "afterFileEdit", "afterAgentThought", "stop",
+                                    "preCompact", "beforeTabFileRead", "afterTabFileEdit")));
+                }
+            };
 
     private Gateway() {
         this.guardrailsClient = new GuardrailsClient();
