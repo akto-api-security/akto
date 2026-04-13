@@ -86,6 +86,7 @@ import com.akto.utils.CustomAuthUtil;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
+import com.akto.utils.StiCountAlert;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -491,6 +492,7 @@ public class DbAction extends ActionSupport {
         try {
             moduleInfo = DbLayer.updateModuleInfo(moduleInfo);
             // TODO: in case of modules with fixed names, reset reboot value, if reboot true;
+            StiCountAlert.checkStiCount();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in updateModuleInfo " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -531,6 +533,7 @@ public class DbAction extends ActionSupport {
     public String updateModuleInfoForHeartbeatV2() {
         try {
             moduleInfo = DbLayer.updateModuleInfoForHeartbeatV2(moduleInfo);
+            StiCountAlert.checkStiCount();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in updateModuleInfoForHeartbeat " + e.toString());
             return Action.ERROR.toUpperCase();
