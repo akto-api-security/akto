@@ -12,10 +12,8 @@ import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 public class RBAC {
@@ -36,6 +34,12 @@ public class RBAC {
     @Getter
     @Setter
     private List<String> allowedFeaturesForUser;
+
+    // special features for RBAC, we can add more features here when needed
+    public static final List<String> SPECIAL_FEATURES_FOR_RBAC = Arrays.asList(
+            "THREAT_DETECTION",
+            "AI_AGENTS"
+    );
 
     public static final String SCOPE_ROLE_MAPPING = "scopeRoleMapping";
     @Getter
