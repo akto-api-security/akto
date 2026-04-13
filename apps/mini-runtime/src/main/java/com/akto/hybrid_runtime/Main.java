@@ -2,6 +2,7 @@ package com.akto.hybrid_runtime;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +35,7 @@ import com.akto.runtime.parser.SampleParser;
 import com.akto.runtime.utils.Utils;
 import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.usage.OrgUtils;
+import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
@@ -255,6 +257,7 @@ public class Main {
     }
 
     static private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private static final ExecutorService agentTrafficLogsExecutor = Executors.newSingleThreadExecutor();
 
     /**
      * Check if fast-discovery integration is enabled via environment variable.
@@ -897,21 +900,33 @@ public class Main {
                 loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId);
                 parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
                 loggerMaker.infoAndAddToDb("Sync function completed for account: " + accountId);
+                sendToCentralKafka(centralKafkaTopicName, accWiseResponse);
 
-                // Save raw agent traffic logs to MongoDB for future training (boolean feature flag)
-                try {
-                    Organization organization = OrgUtils.getOrganizationCached(Context.getActualAccountId());
-                    if (organization != null && organization.getFeatureWiseAllowed() != null) {
-                        FeatureAccess featureAccess = organization.getFeatureWiseAllowed().get("AGENT_TRAFFIC_LOGS");
-                        if (featureAccess != null && featureAccess.getIsGranted()) {
-                            saveAgentTrafficLogs(accWiseResponse);
+                Organization organization = OrgUtils.getOrganizationCached(accountIdInt);
+                if (organization != null && organization.getFeatureWiseAllowed() != null) {
+                    FeatureAccess featureAccess = organization.getFeatureWiseAllowed().get("AGENT_TRAFFIC_LOGS");
+                    if (featureAccess != null && featureAccess.getIsGranted()) {
+                        List<HttpResponseParams> endpointSourceResponses = new ArrayList<>();
+                        for (HttpResponseParams hrp : accWiseResponse) {
+                            Map<String, String> tagsMap = HttpCallParser.parseTagsMap(hrp.getTags());
+                            if (tagsMap != null && Constants.AI_AGENT_SOURCE_ENDPOINT.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))) {
+                                endpointSourceResponses.add(hrp);
+                            }
+                        }
+
+                        if (!endpointSourceResponses.isEmpty()) {
+                            final List<HttpResponseParams> logsToSave = endpointSourceResponses;
+                            agentTrafficLogsExecutor.submit(() -> {
+                                try {
+                                    saveAgentTrafficLogs(logsToSave);
+                                } catch (Exception e) {
+                                    loggerMaker.errorAndAddToDb(e, "Error saving agent traffic logs: " + e.getMessage());
+                                }
+                            });
                         }
                     }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error saving agent traffic logs: " + e.getMessage());
                 }
-
-                sendToCentralKafka(centralKafkaTopicName, accWiseResponse);
+                
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in handleResponseParams: " + e.toString());
             }

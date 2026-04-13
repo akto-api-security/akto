@@ -1,6 +1,7 @@
 package com.akto.data_actor;
 
 import com.akto.dto.*;
+import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
@@ -349,4 +350,6 @@ public abstract class DataActor {
     public abstract boolean updateServiceGraphEdges(int apiCollectionId, Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges);
 
     public abstract void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook);
+
+    public abstract void storeAgentQueryData(AgentQueryData agentQueryData);
 }
