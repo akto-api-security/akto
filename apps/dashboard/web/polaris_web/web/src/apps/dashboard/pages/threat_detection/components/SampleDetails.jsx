@@ -14,7 +14,7 @@ import settingFunctions from "../../settings/module";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal";
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
-import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN } from "../constants/guardrailDescriptions";
+import { GUARDRAIL_SECTIONS, GUARDRAIL_REMEDIATION_MARKDOWN, CLAUDE_SETTINGS_RISK_MAP } from "../constants/guardrailDescriptions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
@@ -211,11 +211,49 @@ function SampleDetails(props) {
         component: <ActivityTracker latestActivity={latestActivity} />
     }
 
+    const isClaudeSettingsRisk = moreInfoData?.templateId === 'claude_settings_risk';
+    const stripArrayIndices = (key) => key ? key.replace(/\[\d+\]/g, '') : key;
+    const extractSettingsKey = (url) => {
+        if (!url) return null;
+        const prefix = '/claude/settings/';
+        const idx = url.indexOf(prefix);
+        if (idx === -1) return null;
+        return stripArrayIndices(url.slice(idx + prefix.length));
+    };
+    const claudeSettingsRuleViolated = (isClaudeSettingsRisk && moreInfoData?.ruleViolated && moreInfoData.ruleViolated !== '-')
+        ? stripArrayIndices(moreInfoData.ruleViolated)
+        : extractSettingsKey(moreInfoData?.url);
+    const resolveClaudeSettingsEntry = (key) => {
+        if (!key) return undefined;
+        if (CLAUDE_SETTINGS_RISK_MAP[key]) return CLAUDE_SETTINGS_RISK_MAP[key];
+        // Fall back to longest prefix match (e.g. hooks.PreToolUse.hooks -> hooks)
+        const matchedKey = Object.keys(CLAUDE_SETTINGS_RISK_MAP)
+            .filter(k => key.startsWith(k))
+            .sort((a, b) => b.length - a.length)[0];
+        return matchedKey ? CLAUDE_SETTINGS_RISK_MAP[matchedKey] : undefined;
+    };
+    const claudeSettingsEntry = isClaudeSettingsRisk && claudeSettingsRuleViolated
+        ? resolveClaudeSettingsEntry(claudeSettingsRuleViolated)
+        : undefined;
+
     const ValuesTab = data.length > 0 && {
         id: 'values',
         content: "Values",
         component: (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
+                {isClaudeSettingsRisk && claudeSettingsEntry && (
+                    <Box paddingBlockEnd={3}>
+                        <Box background="bg-subdued" borderRadius="2" padding="4">
+                            <VerticalStack gap="2">
+                                <HorizontalStack gap="2" align="start">
+                                    <Badge status="warning">Misconfigured Field</Badge>
+                                    <Text variant="bodyMd" fontWeight="semibold">{claudeSettingsRuleViolated}</Text>
+                                </HorizontalStack>
+                                <Text variant="bodySm" color="subdued">{claudeSettingsEntry.description}</Text>
+                            </VerticalStack>
+                        </Box>
+                    </Box>
+                )}
                 <SampleDataList
                     key={`Sample values-${eventId || 'default'}`}
                     heading={"Attempt"}
@@ -228,15 +266,27 @@ function SampleDetails(props) {
             </Box>)
     }
 
-    const remediationTab = useGuardrailDescription ? {
-        id: "remediation",
-        content: "Remediation",
-        component: (<MarkdownViewer markdown={GUARDRAIL_REMEDIATION_MARKDOWN}></MarkdownViewer>)
-    } : (remediationText.length > 0 && {
-        id: "remediation",
-        content: "Remediation",
-        component: (<MarkdownViewer markdown={remediationText}></MarkdownViewer>)
-    })
+    const remediationTab = (() => {
+        if (isClaudeSettingsRisk) {
+            return {
+                id: "remediation",
+                content: "Remediation",
+                component: (<MarkdownViewer markdown={claudeSettingsEntry ? claudeSettingsEntry.remediation : GUARDRAIL_REMEDIATION_MARKDOWN} />)
+            };
+        }
+        if (useGuardrailDescription) {
+            return {
+                id: "remediation",
+                content: "Remediation",
+                component: (<MarkdownViewer markdown={GUARDRAIL_REMEDIATION_MARKDOWN} />)
+            };
+        }
+        return remediationText.length > 0 && {
+            id: "remediation",
+            content: "Remediation",
+            component: (<MarkdownViewer markdown={remediationText} />)
+        };
+    })()
 
     // Session Context Tab - shows prompts involved in session-based detection
     const SessionContextComponent = () => {
