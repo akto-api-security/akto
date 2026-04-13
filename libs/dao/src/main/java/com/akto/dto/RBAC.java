@@ -13,7 +13,6 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,12 +41,6 @@ public class RBAC {
     @Getter
     @Setter
     private Map<String, String> scopeRoleMapping;
-
-    // special features for RBAC, we can add more features here when needed
-    public static final List<String> SPECIAL_FEATURES_FOR_RBAC = Arrays.asList(
-        "THREAT_DETECTION",
-        "AI_AGENTS"
-    );
 
     public enum Role {
         ADMIN("ADMIN",new AdminRoleStrategy()),
@@ -169,53 +162,12 @@ public class RBAC {
         return scopeRoleMapping;
     }
 
-    /**
-     * Ensures all product scopes are present in the mapping with NO_ACCESS as default.
-     * For any scope not explicitly mapped, assigns NO_ACCESS role.
-     * This enforces strict access control - users only get access to explicitly assigned scopes.
-     *
-     * Valid scopes: API, MCP (future), AGENTIC, ENDPOINT, DAST
-     *
-     * @param scopeRoleMapping the current partial or complete scope-role mapping
-     * @return the complete scope-role mapping with all scopes included (unmapped = NO_ACCESS)
-     */
-    public static Map<String, String> ensureCompleteScopeRoleMapping(Map<String, String> scopeRoleMapping) {
-        Map<String, String> completedMapping = new HashMap<>();
-
-        // Define all valid product scopes
-        List<String> allScopes = Arrays.asList("API", "AGENTIC", "ENDPOINT", "DAST");
-
-        if (scopeRoleMapping == null) {
-            scopeRoleMapping = new HashMap<>();
-        }
-
-        // Add all provided scopes
-        completedMapping.putAll(scopeRoleMapping);
-
-        // Fill in missing scopes with NO_ACCESS
-        for (String scope : allScopes) {
-            if (!completedMapping.containsKey(scope)) {
-                completedMapping.put(scope, Role.NO_ACCESS.name());
-            }
-        }
-
-        return completedMapping;
-    }
-
-    /**
-     * Get the role for a specific product scope
-     * @param scope the product scope (e.g., ENDPOINT, AGENTIC, API)
-     * @return the role for that scope, or null if no mapping exists (NO ACCESS to this scope)
-     */
     public Role getRoleForScope(CONTEXT_SOURCE scope) {
         if (scope == null) {
             return null;
         }
 
         String scopeStr = scope.toString();
-
-        // If scopeRoleMapping exists and is NOT empty, use ONLY that mapping (explicit model)
-        // Do NOT fall back to single role - this ensures strict access control
         if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
             if (this.scopeRoleMapping.containsKey(scopeStr)) {
                 String roleStr = this.scopeRoleMapping.get(scopeStr);
@@ -233,44 +185,27 @@ public class RBAC {
         return null;
     }
 
-    /**
-     * Resolves a role string to a Role enum value.
-     * Handles both standard roles and custom roles by looking up the base role.
-     * Custom roles are stored by some name and resolved to their baseRole
-     * at access time using CustomRoleDao lookup.
-     *
-     * Fallback: If custom role is not found, defaults to GUEST for safety.
-     */
     private Role resolveRoleString(String roleStr) {
         if (roleStr == null) {
             return null;
         }
 
-        // Try standard role first (ADMIN, MEMBER, DEVELOPER, GUEST, etc.)
         try {
             return Role.valueOf(roleStr);
         } catch (IllegalArgumentException e) {
-            // Not a standard role, try custom role
         }
 
-        // Try to resolve as custom role by looking up in CustomRoleDao
         try {
             CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
             if (customRole != null && customRole.getBaseRole() != null) {
                 try {
                     return Role.valueOf(customRole.getBaseRole());
                 } catch (IllegalArgumentException e) {
-                    // BaseRole value is invalid, fallback to GUEST
                     return Role.GUEST;
                 }
             }
         } catch (Exception e) {
-            // CustomRoleDao lookup failed (e.g., DB error, timeout)
-            // Fallback to GUEST for safety - don't block user access completely
         }
-
-        // Default to GUEST if custom role not found or resolution fails
-        // This ensures user always has minimum access (read-only)
         return Role.GUEST;
     }
 }

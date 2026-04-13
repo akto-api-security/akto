@@ -300,8 +300,6 @@ public class AccountAction extends UserAction {
         User user = UsersDao.addAccount(email, newAccountId, newAccountName);
         RBAC rbacEntry = new RBAC(user.getId(), null, newAccountId);  // Don't set old role field
         if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
-            // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
-            scopeRoleMapping = RBAC.ensureCompleteScopeRoleMapping(scopeRoleMapping);
             rbacEntry.setScopeRoleMapping(scopeRoleMapping);
         }
         RBACDao.instance.insertOne(rbacEntry);

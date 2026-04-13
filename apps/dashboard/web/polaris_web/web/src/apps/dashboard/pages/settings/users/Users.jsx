@@ -1,5 +1,5 @@
-import { ActionList, Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text, Modal, TextField, Checkbox, VerticalStack } from "@shopify/polaris"
-import { DeleteMajor, TickMinor, PasskeyMajor } from "@shopify/polaris-icons"
+import {  Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, ResourceItem, ResourceList, Text, Modal, TextField, Checkbox, VerticalStack } from "@shopify/polaris"
+import { DeleteMajor, PasskeyMajor } from "@shopify/polaris-icons"
 import { useEffect, useState, useRef, useMemo } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
@@ -73,16 +73,6 @@ const Users = () => {
             [id]: items
         }));
     }
-
-    const [roleSelectionPopup, setRoleSelectionPopup] = useState({})
-    const [productScopePopup, setProductScopePopup] = useState({})
-
-    const [productScopeSelection, setProductScopeSelection] = useState({
-        selectedRole: "",
-        selectedEmail: "",
-        selectedScopes: ["API"]
-    })
-
     const [passwordResetState, setPasswordResetState] = useState({
         passwordResetLogin: "",
         confirmPasswordResetActive: false,
@@ -231,66 +221,6 @@ const Users = () => {
         })));
     }, [])
 
-    const handleRoleSelectChange = async (id, newRole, login) => {
-        if(newRole === 'REMOVE') {
-            await handleRemoveUser(login)
-            toggleRoleSelectionPopup(id)
-            setUsers(users.filter(user => user.login !== login))
-            return
-        }
-
-        if(newRole === 'RESET_PASSWORD') {
-            setPasswordResetStateHelper("confirmPasswordResetActive", true)
-            setPasswordResetStateHelper("passwordResetLogin", login)
-            toggleRoleSelectionPopup(id)
-            return
-        }
-
-        // Update role only, keep existing product scopes
-        const user = users.find(u => u.login === login)
-        const currentScopes = user?.productScopes && user.productScopes.length > 0 ? user.productScopes : ["API"]
-
-        try {
-            await updateUserRole(login, newRole, currentScopes).then(() => {
-                setUsers(users.map(u => u.login === login ? { ...u, role: newRole } : u))
-                func.setToast(true, false, "Role updated successfully")
-            })
-            await getTeamData()
-        } catch (error) {
-            func.setToast(false, true, "Failed to update role")
-        }
-
-        toggleRoleSelectionPopup(id)
-    }
-
-    const toggleRoleSelectionPopup = (id) => {
-        setRoleSelectionPopup(prevState => ({
-            ...prevState,
-            [id]: !prevState[id]
-        }));
-    }
-
-    const toggleProductScopePopup = (id, reset = false) => {
-        setProductScopePopup(prevState => ({
-            ...prevState,
-            [id]: !prevState[id]
-        }));
-        if (reset) {
-            setProductScopeSelection({ selectedRole: "", selectedEmail: "", selectedScopes: ["API"] })
-        }
-    }
-
-    const getRolesOptionsWithTick = (currentRole) => {
-        const tempArr =  rolesOptions.map(section => ({
-            ...section,
-            items: section.items.filter((c) => roleHierarchy.includes(c.role)).map(item => ({
-                ...item,
-                prefix: item.role === "REMOVE"?  <Box><Icon source={DeleteMajor}/></Box> : item.role === "RESET_PASSWORD" ? <Box><Icon source={PasskeyMajor}/></Box> : item.role === currentRole ? <Box><Icon source={TickMinor}/></Box> : <div style={{padding: "10px"}}/>
-            }))
-        }));
-        return tempArr
-    }
-
     const getRoleDisplayName = (role) => {
         for(let section of rolesOptions) {
             for(let item of section.items) {
@@ -300,18 +230,6 @@ const Users = () => {
             }
         }
         return role;
-    }
-
-    const getProductScopeOptionsWithTick = (selectedScopes) => {
-        return [{
-            items: PRODUCT_SCOPES.map(scope => ({
-                content: scope.label,
-                value: scope.value,
-                prefix: selectedScopes.includes(scope.value) ?
-                    <Box><Icon source={TickMinor}/></Box> :
-                    <div style={{padding: "10px"}}/>
-            }))
-        }];
     }
 
     const getTeamData = async () => {
@@ -339,69 +257,6 @@ const Users = () => {
     const handleRemoveUser = async (login) => {
         await settingRequests.removeUser(login)
         func.setToast(true, false, "User removed successfully")
-    }
-
-    const updateUserRole = async (login, roleVal, productScopes) => {
-        await settingRequests.makeAdmin(login, roleVal, productScopes)
-        func.setToast(true, false, "Role updated for " + login + " successfully")
-    }
-
-    const handleProductScopeToggle = async (scope) => {
-        setProductScopeSelection(prevState => {
-            const newScopes = prevState.selectedScopes.includes(scope)
-                ? prevState.selectedScopes.filter(s => s !== scope)
-                : [...prevState.selectedScopes, scope]
-            const finalScopes = newScopes.length > 0 ? newScopes : ["API"]
-
-            // save to backend
-            try {
-                updateUserRole(prevState.selectedEmail, prevState.selectedRole, finalScopes).then(() => {
-                    setUsers(users.map(user => user.login === prevState.selectedEmail ? { ...user, productScopes: finalScopes } : user))
-                })
-            } catch (error) {
-                func.setToast(false, true, "Failed to update product scopes")
-            }
-
-            return {
-                ...prevState,
-                selectedScopes: finalScopes
-            }
-        })
-    }
-
-
-    const handleEditProductScopes = (id, login, role, currentScopes) => {
-        setProductScopeSelection({
-            selectedRole: role,
-            selectedEmail: login,
-            selectedScopes: currentScopes && currentScopes.length > 0 ? currentScopes : ["API"]
-        })
-        toggleProductScopePopup(id)
-    }
-
-    const getScopeLabel = (scopes) => {
-        if(!scopes || scopes.length === 0) {
-            return "API"
-        }
-        if(scopes.length === 1) {
-            const scope = PRODUCT_SCOPES.find(s => s.value === scopes[0])
-            return scope ? scope.label : scopes[0]
-        }
-        return `${scopes.length} scopes`
-    }
-
-    const getScopeRoleMappingLabel = (scopeRoleMapping) => {
-        if (!scopeRoleMapping || Object.keys(scopeRoleMapping).length === 0) {
-            return "API: Member"
-        }
-        const mappings = Object.entries(scopeRoleMapping).map(([scope, role]) => {
-            const scopeLabel = PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
-            return `${scopeLabel}: ${getRoleDisplayName(role)}`
-        })
-        if (mappings.length === 1) {
-            return mappings[0]
-        }
-        return mappings
     }
 
     const getRoleDisplayForSidebar = (scopeRoleMapping, oldRole) => {
@@ -500,49 +355,7 @@ const Users = () => {
         }
     }
 
-    const renderScopeAccessSummary = (item) => {
-        // Display scope-role mappings (n:n mapping)
-        const scopeRoleMapping = item?.scopeRoleMapping
-
-        if (!scopeRoleMapping || Object.keys(scopeRoleMapping).length === 0) {
-            // Fallback to old behavior
-            const scopes = item?.productScopes || ["API"]
-            const scopeLabels = scopes.map(scope =>
-                PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
-            )
-
-            if (scopeLabels.length === 1) {
-                return scopeLabels[0]
-            }
-
-            return (
-                <HorizontalStack gap="200">
-                    {scopeLabels.map((label, idx) => (
-                        <Text key={idx} variant="bodySm">{label}</Text>
-                    ))}
-                </HorizontalStack>
-            )
-        }
-
-        // Display with n:n mapping: "ROLE for Scope"
-        const mappingPairs = Object.entries(scopeRoleMapping).map(([scope, role]) => {
-            const scopeLabel = PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
-            return `${role} for ${scopeLabel}`
-        })
-
-        if (mappingPairs.length === 1) {
-            return mappingPairs[0]
-        }
-
-        return (
-            <VerticalStack gap="200">
-                {mappingPairs.map((pair, idx) => (
-                    <Text key={idx} variant="bodySm">{pair}</Text>
-                ))}
-            </VerticalStack>
-        )
-    }
-    
+   
     const getUserApiCollectionIds = (userId) => {
         return usersCollection[userId] || [];
     };

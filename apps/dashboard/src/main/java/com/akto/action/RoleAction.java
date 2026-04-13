@@ -151,7 +151,6 @@ public class RoleAction extends UserAction {
 
         if(allowedFeaturesForUser != null && !allowedFeaturesForUser.isEmpty()) {
             allowedFeaturesForUser = allowedFeaturesForUser.stream()
-                .filter(feature -> RBAC.SPECIAL_FEATURES_FOR_RBAC.contains(feature))
                 .collect(Collectors.toList());
         }
 
@@ -185,7 +184,6 @@ public class RoleAction extends UserAction {
 
         if(allowedFeaturesForUser != null && !allowedFeaturesForUser.isEmpty()) {
             allowedFeaturesForUser = allowedFeaturesForUser.stream()
-                .filter(feature -> RBAC.SPECIAL_FEATURES_FOR_RBAC.contains(feature))
                 .collect(Collectors.toList());
         }
 
@@ -228,11 +226,6 @@ public class RoleAction extends UserAction {
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 
         return SUCCESS.toUpperCase();
-    }
-
-    public String allowedFeaturesForRBAC(){
-        this.allowedFeaturesForRBAC = RBAC.SPECIAL_FEATURES_FOR_RBAC;
-        return SUCCESS.toUpperCase();
-    }
+    }   
 
 }
