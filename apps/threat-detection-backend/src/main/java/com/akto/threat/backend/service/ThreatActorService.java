@@ -737,17 +737,20 @@ public class ThreatActorService {
 
     long methodStartTime = System.currentTimeMillis();
 
-    Document match = new Document();
-
-    // Filter by time range using lastAttackTs
+    // Build time range filter (reused for both actor_info and malicious_events queries)
+    Document tsFilter = null;
     if (startTs > 0 || endTs > 0) {
-      Document tsFilter = new Document();
+      tsFilter = new Document();
       if (startTs > 0) {
         tsFilter.append("$gte", startTs);
       }
       if (endTs > 0) {
         tsFilter.append("$lte", endTs);
       }
+    }
+
+    Document match = new Document();
+    if (tsFilter != null) {
       match.append("lastAttackTs", tsFilter);
     }
 
@@ -816,14 +819,7 @@ public class ThreatActorService {
 
     // Total attacks - count successful exploits within time range
     Document attackMatch = new Document();
-    if (startTs > 0 || endTs > 0) {
-      Document tsFilter = new Document();
-      if (startTs > 0) {
-        tsFilter.append("$gte", startTs);
-      }
-      if (endTs > 0) {
-        tsFilter.append("$lte", endTs);
-      }
+    if (tsFilter != null) {
       attackMatch.append("detectedAt", tsFilter);
     }
     attackMatch.append("successfulExploit", true);
