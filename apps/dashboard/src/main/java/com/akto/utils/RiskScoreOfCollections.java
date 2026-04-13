@@ -2,8 +2,8 @@ package com.akto.utils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 
 import org.bson.conversions.Bson;
 
@@ -23,6 +23,7 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.RiskScoreTestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.mcp.McpRiskScoreUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.LastCronRunInfo;
@@ -40,8 +41,20 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 import static com.akto.utils.Utils.calculateRiskValueForSeverity;
+
 public class RiskScoreOfCollections {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreOfCollections.class, LogDb.DASHBOARD);;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreOfCollections.class, LogDb.DASHBOARD);
+
+    /** Fields required by {@link com.akto.dao.ApiInfoDao#getRiskScore} when merging MCP risk overlay. */
+    private static final Bson API_INFO_PROJECTION_FOR_MCP_RISK_OVERLAY = Projections.include(
+        "_id",
+        ApiInfo.API_ACCESS_TYPES,
+        ApiInfo.SEVERITY_SCORE,
+        ApiInfo.IS_SENSITIVE,
+        ApiInfo.COLLECTION_IDS,
+        ApiInfo.RISK_SCORE
+    );
 
     private Map<ApiInfoKey, Float> getSeverityScoreMap(List<TestingRunIssues> issues){
         // Method to calculate severity Score for the apiInfo on the basis of HIGH, LOW, MEDIUM
@@ -140,6 +153,112 @@ public class RiskScoreOfCollections {
 
         return isSensitive;
     }
+
+    /**
+     * Same as {@link #applyMcpRiskScoreOverlayToApiInfos(RiskScoreTestingEndpointsUtils)} with a dedicated
+     * {@link RiskScoreTestingEndpointsUtils} and group sync (for callers that do not already hold one).
+     */
+    public void applyMcpRiskScoreOverlayToApiInfos() {
+        applyMcpRiskScoreOverlayToApiInfos(null);
+    }
+
+    /**
+     * Merges MCP audit / malicious-tag risk overlay into {@link ApiInfo#riskScore} for APIs in MCP collections.
+     * Run after base scores are written. Pass {@code null} for {@code riskUtils} to own group sync here;
+     * otherwise the caller must call {@link RiskScoreTestingEndpointsUtils#syncRiskScoreGroupApis()} after this.
+     */
+    public void applyMcpRiskScoreOverlayToApiInfos(RiskScoreTestingEndpointsUtils riskScoreTestingEndpointsUtils) {
+        boolean ownsGroupSync = riskScoreTestingEndpointsUtils == null;
+        RiskScoreTestingEndpointsUtils utils = riskScoreTestingEndpointsUtils != null
+            ? riskScoreTestingEndpointsUtils
+            : new RiskScoreTestingEndpointsUtils();
+
+        Map<Integer, Float> mcpRiskOverlaysByCollectionId = McpRiskScoreUtils.computeRiskOverlaysByApiCollectionId();
+        if (!hasAnyPositiveMcpRiskOverlay(mcpRiskOverlaysByCollectionId)) {
+            return;
+        }
+
+        List<WriteModel<ApiInfo>> bulkUpdates = collectMcpRiskOverlayBulkWrites(mcpRiskOverlaysByCollectionId, utils);
+
+        if (bulkUpdates.isEmpty()) {
+            loggerMaker.warn(
+                "MCP risk score: account={} overlay>0 on some collections but no ApiInfo bulk writes — risk_score already equals merged value or no apis in those collections",
+                Context.accountId.get()
+            );
+            return;
+        }
+        try {
+            ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
+        } catch (Exception e) {
+            loggerMaker.error(
+                "MCP risk score: account={} bulkWrite failed: {}",
+                Context.accountId.get(),
+                e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()
+            );
+            throw e;
+        }
+        if (ownsGroupSync) {
+            utils.syncRiskScoreGroupApis();
+        }
+    }
+
+    private static boolean hasAnyPositiveMcpRiskOverlay(Map<Integer, Float> mcpRiskOverlaysByCollectionId) {
+        if (mcpRiskOverlaysByCollectionId == null || mcpRiskOverlaysByCollectionId.isEmpty()) {
+            return false;
+        }
+        for (Float v : mcpRiskOverlaysByCollectionId.values()) {
+            if (v != null && v > 0f) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static float mergeBaseRiskScoreWithMcpRiskOverlay(float baseRiskScore, float mcpRiskOverlay) {
+        return Math.min(McpRiskScoreUtils.MAX_MCP_RISK_SCORE, baseRiskScore + Math.max(0f, mcpRiskOverlay));
+    }
+
+    private static List<WriteModel<ApiInfo>> collectMcpRiskOverlayBulkWrites(
+        Map<Integer, Float> mcpRiskOverlaysByCollectionId,
+        RiskScoreTestingEndpointsUtils utils
+    ) {
+        List<WriteModel<ApiInfo>> bulkUpdates = new ArrayList<>();
+        for (Map.Entry<Integer, Float> entry : mcpRiskOverlaysByCollectionId.entrySet()) {
+            float mcpRiskOverlay = entry.getValue();
+            if (mcpRiskOverlay <= 0f) {
+                continue;
+            }
+            int collectionId = entry.getKey();
+            List<ApiInfo> apisInCollection = ApiInfoDao.instance.findAll(
+                Filters.eq(ApiInfo.ID_API_COLLECTION_ID, collectionId),
+                API_INFO_PROJECTION_FOR_MCP_RISK_OVERLAY
+            );
+            if (apisInCollection == null) {
+                continue;
+            }
+            for (ApiInfo apiInfo : apisInCollection) {
+                if (apiInfo == null) {
+                    continue;
+                }
+                float baseRiskScore = ApiInfoDao.getRiskScore(
+                    apiInfo,
+                    apiInfo.getIsSensitive(),
+                    Utils.getRiskScoreValueFromSeverityScore(apiInfo.getSeverityScore())
+                );
+                float newScore = mergeBaseRiskScoreWithMcpRiskOverlay(baseRiskScore, mcpRiskOverlay);
+                if (Float.compare(apiInfo.getRiskScore(), newScore) == 0) {
+                    continue;
+                }
+                utils.updateApiRiskScoreGroup(apiInfo, newScore);
+                bulkUpdates.add(new UpdateManyModel<>(
+                    ApiInfoDao.getFilter(apiInfo.getId()),
+                    Updates.set(ApiInfo.RISK_SCORE, newScore),
+                    new UpdateOptions()
+                ));
+            }
+        }
+        return bulkUpdates;
+    }
     
     public void updateSeverityScoreInApiInfo(int timeStampFilter){ 
 
@@ -173,6 +292,7 @@ public class RiskScoreOfCollections {
             ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForApiInfo, new BulkWriteOptions().ordered(false));
         }
 
+        applyMcpRiskScoreOverlayToApiInfos(riskScoreTestingEndpointsUtils);
         riskScoreTestingEndpointsUtils.syncRiskScoreGroupApis();  
     }
 
@@ -258,6 +378,7 @@ public class RiskScoreOfCollections {
             int filterTime = Context.now() - ((cronTime + 2) * 60) ; 
             updatesForNewEndpoints(filterTime);
         }
+        applyMcpRiskScoreOverlayToApiInfos();
     }
 
     public void calculateRiskScoreForAllApis() {
@@ -270,7 +391,15 @@ public class RiskScoreOfCollections {
             Filters.exists(ApiInfo.LAST_CALCULATED_TIME, false),
             Filters.lte(ApiInfo.LAST_CALCULATED_TIME, timeStamp)
         );
-        Bson projection = Projections.include("_id", ApiInfo.API_ACCESS_TYPES, ApiInfo.LAST_SEEN, ApiInfo.SEVERITY_SCORE, ApiInfo.IS_SENSITIVE, ApiInfo.COLLECTION_IDS, ApiInfo.RISK_SCORE);
+        Bson projection = Projections.include(
+            "_id",
+            ApiInfo.API_ACCESS_TYPES,
+            ApiInfo.LAST_SEEN,
+            ApiInfo.SEVERITY_SCORE,
+            ApiInfo.IS_SENSITIVE,
+            ApiInfo.COLLECTION_IDS,
+            ApiInfo.RISK_SCORE
+        );
 
         RiskScoreTestingEndpointsUtils riskScoreTestingEndpointsUtils = new RiskScoreTestingEndpointsUtils();
 
@@ -311,6 +440,7 @@ public class RiskScoreOfCollections {
             }
         }
 
+        applyMcpRiskScoreOverlayToApiInfos(riskScoreTestingEndpointsUtils);
         riskScoreTestingEndpointsUtils.syncRiskScoreGroupApis();
     }
 }

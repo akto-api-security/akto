@@ -84,5 +84,6 @@ public class Constants {
     public static final String AKTO_MCP_SERVER = "SERVER";
     public static final String STATUS_PENDING = "Pending";
     public static final String ASTERISK = "**********************";
+    public static final String HOST_HEADER = "Host";
 
 }
