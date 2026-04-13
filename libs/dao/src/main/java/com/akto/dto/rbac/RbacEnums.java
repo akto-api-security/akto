@@ -50,7 +50,8 @@ public class RbacEnums {
         ADMIN_ACTIONS(AccessGroups.ADMIN),
         USER_ACTIONS(AccessGroups.USER),
         AI_AGENTS(AccessGroups.AI),
-        THREAT_PROTECTION(AccessGroups.THREAT_PROTECTION);
+        THREAT_PROTECTION(AccessGroups.THREAT_PROTECTION),
+        API_TOKENS(AccessGroups.SETTINGS);
 
         private final AccessGroups accessGroup;
 
