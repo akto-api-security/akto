@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+""" 
 Machine ID generation utility for device identification.
 Mimics the Go implementation for generating unique device identifiers.
 """
@@ -181,3 +181,4 @@ def get_username() -> str:
 if __name__ == "__main__":
     # Print machine ID when script is executed directly
     print(get_machine_id())
+# done
