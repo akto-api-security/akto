@@ -3,6 +3,7 @@ package com.akto.data_actor;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
@@ -754,5 +755,10 @@ public class DbActor extends DataActor {
     @Override
     public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
         DbLayer.storeTestingRunWebhook(testingRunWebhook);
+    }
+
+    @Override
+    public void storeAgentQueryData(AgentQueryData agentQueryData) {
+        DbLayer.storeAgentQueryData(agentQueryData);
     }
 }
