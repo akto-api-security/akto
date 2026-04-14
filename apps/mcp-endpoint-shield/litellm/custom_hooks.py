@@ -47,11 +47,46 @@ class GuardrailsHandler(CustomLogger):
             json=http_proxy_payload,
         )
 
-    def parse_guardrails_result(self, result: Any) -> Tuple[bool, str]:
+    def parse_guardrails_result(self, result: Any) -> Tuple[bool, str, Optional[str]]:
+        """Parse Akto guardrails response. Returns (allowed, reason, modified_payload)."""
         if not isinstance(result, dict):
-            return True, ""
+            return True, "", None
+        
         guardrails_result = result.get("data", {}).get("guardrailsResult", {}) or {}
-        return guardrails_result.get("Allowed", True), guardrails_result.get("Reason", "")
+        allowed = guardrails_result.get("Allowed", True)
+        reason = guardrails_result.get("Reason", "")
+        modified_payload = guardrails_result.get("ModifiedPayload")
+        
+        return allowed, reason, modified_payload
+    
+    def apply_redaction(self, data: dict, modified_payload: str) -> dict:
+        """Apply PII redactions from Akto's ModifiedPayload to the request data.
+        
+        Akto returns the ENTIRE redacted request body in ModifiedPayload:
+        {"body": {"messages": [...], "model": "...", "stream": false}}
+        
+        Simply replace the entire data dict with the redacted body.
+        """
+        try:
+            # Parse ModifiedPayload JSON string
+            if isinstance(modified_payload, str):
+                payload_obj = json.loads(modified_payload)
+            else:
+                payload_obj = modified_payload
+            
+            # Extract the redacted body - this is the FULL request with redactions applied
+            redacted_body = payload_obj.get("body")
+            if not redacted_body:
+                logger.info("ModifiedPayload has no 'body' field, skipping redaction")
+                return data
+            
+            # Akto returns the complete redacted request - use it directly
+            logger.info(f"Applied Akto redactions: {redacted_body.get('messages', [])}")
+            return redacted_body
+            
+        except Exception as e:
+            logger.error(f"Failed to apply redaction from ModifiedPayload: {e}", exc_info=True)
+            return data
 
     def extract_request_path(self, kwargs: Optional[dict] = None) -> str:
         fallback = "/chat/completions"
@@ -144,13 +179,19 @@ class GuardrailsHandler(CustomLogger):
 
     async def validate_and_block(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> dict:
         try:
-            allowed, reason = await self.call_guardrails_validation(data, call_type, user_api_key_dict, kwargs)
+            allowed, reason, modified_payload = await self.call_guardrails_validation(data, call_type, user_api_key_dict, kwargs)
+            
             if not allowed:
                 await self.ingest_blocked_request(data, call_type, reason, user_api_key_dict, kwargs)
                 raise HTTPException(
                     status_code=403,
                     detail=f"Blocked by Akto Guardrails: {reason}" if reason else "Blocked by Akto Guardrails",
                 )
+            
+            # If Akto returned a redacted version, apply it to the user message
+            if modified_payload:
+                data = self.apply_redaction(data, modified_payload)
+            
             return data
         except HTTPException as e:
             logger.info(f"Guardrails validation failed: {e}")
@@ -167,15 +208,15 @@ class GuardrailsHandler(CustomLogger):
             http_proxy_payload = self.build_payload(data, call_type, response_dict, user_api_key_dict, status_code=200, kwargs=kwargs)
             response = await self.post_http_proxy(guardrails=True, ingest_data=True, http_proxy_payload=http_proxy_payload)
             if response.status_code == 200:
-                allowed, reason = self.parse_guardrails_result(response.json())
+                allowed, reason, _ = self.parse_guardrails_result(response.json())
                 if not allowed:
                     logger.info(f"Response flagged by guardrails (async mode, logged only): {reason}")
         except Exception as e:
             logger.error(f"Guardrails async validation error: {e}")
 
-    async def call_guardrails_validation(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> Tuple[bool, str]:
+    async def call_guardrails_validation(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> Tuple[bool, str, Optional[str]]:
         if not DATA_INGESTION_SERVICE_URL:
-            return True, ""
+            return True, "", None
 
         http_proxy_payload = self.build_payload(data, call_type, None, user_api_key_dict, kwargs=kwargs)
 
@@ -183,15 +224,15 @@ class GuardrailsHandler(CustomLogger):
             response = await self.post_http_proxy(guardrails=True, ingest_data=False, http_proxy_payload=http_proxy_payload)
             if response.status_code != 200:
                 logger.info(f"Guardrails validation returned HTTP {response.status_code} (fail-open)")
-                return True, ""
+                return True, "", None
 
             return self.parse_guardrails_result(response.json())
         except (httpx.RequestError, httpx.TimeoutException, ValueError) as e:
             logger.info(f"Guardrails validation failed (fail-open): {e}")
-            return True, ""
+            return True, "", None
         except Exception as e:
             logger.error(f"Guardrails validation error (fail-open): {e}")
-            return True, ""
+            return True, "", None
 
     async def ingest_response(
         self,
