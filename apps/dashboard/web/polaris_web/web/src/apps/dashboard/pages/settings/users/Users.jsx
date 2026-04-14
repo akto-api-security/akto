@@ -47,6 +47,20 @@ const Users = () => {
     const PRODUCT_SCOPES = useMemo(() => getAvailableProductScopes(), [])
     const username = window.USER_NAME
     const userRole = window.USER_ROLE
+    const dashboardCategory = PersistStore(state => state.dashboardCategory)
+
+    // Map dashboard category to scope value - handles both label and value formats
+    const dashboardCategoryToScopeMap = {
+        'API Security': 'API',
+        'Akto ATLAS': 'ENDPOINT',
+        'Akto ARGUS': 'AGENTIC',
+        'DAST': 'DAST',
+        'API': 'API',
+        'ENDPOINT': 'ENDPOINT',
+        'AGENTIC': 'AGENTIC'
+    }
+
+    const currentScopeValue = dashboardCategoryToScopeMap[dashboardCategory] || 'API'
 
     const [inviteUser, setInviteUser] = useState({
         isActive: false,
@@ -597,6 +611,8 @@ const Users = () => {
                                 {PRODUCT_SCOPES.map((scope) => {
                                     const isSelected = scope.value in editScopeRoleModal.editingScopeRoleMapping
                                     const selectedRole = editScopeRoleModal.editingScopeRoleMapping[scope.value]
+                                    const isCurrentScope = scope.value === currentScopeValue
+                                    const isDisabled = !isCurrentScope
 
                                     return (
                                         <Box
@@ -607,16 +623,19 @@ const Users = () => {
                                                 paddingBottom: "12px",
                                                 display: "flex",
                                                 alignItems: "center",
-                                                gap: "16px"
+                                                gap: "16px",
+                                                opacity: isDisabled ? 0.6 : 1
                                             }}
                                         >
                                             <Checkbox
                                                 label=""
                                                 checked={isSelected}
                                                 onChange={() => handleScopesToggleInModal(scope.value)}
+                                                disabled={isDisabled}
                                             />
                                             <Text variant="bodyMd" style={{ minWidth: "120px", flexShrink: 0 }}>
                                                 {scope.label}
+                                                {isDisabled && <Text variant="bodySm" color="subdued"> (Not available)</Text>}
                                             </Text>
                                             {isSelected && (
                                                 <Box style={{ marginLeft: "80px" }}>
@@ -628,6 +647,7 @@ const Users = () => {
                                                             value: role.role
                                                         })) || []}
                                                         initial={selectedRole || "MEMBER"}
+                                                        disabled={isDisabled}
                                                     />
                                                 </Box>
                                             )}
