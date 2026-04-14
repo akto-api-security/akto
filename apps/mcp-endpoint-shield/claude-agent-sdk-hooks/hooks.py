@@ -39,10 +39,12 @@ from akto_guardrails_core import (
     apply_warn_resubmit_flow,
     call_guardrails_mcp_async,
     call_guardrails_prompt_async,
+    call_guardrails_response_async,
     extract_mcp_server_name,
     get_last_user_prompt,
     ingest_blocked_mcp_async,
     ingest_blocked_prompt_async,
+    ingest_blocked_response_async,
     _is_warn_behaviour,
     prompt_fingerprint,
     send_mcp_response_ingestion_async,
@@ -61,7 +63,9 @@ def create_hooks(client_ip: str = ""):
                    Falls back to DEFAULT_CLIENT_IP ("0.0.0.0") if empty.
 
     Returns:
-        Tuple of (akto_user_prompt_submit, akto_stop, akto_pre_tool_use, akto_post_tool_use)
+        Tuple of (akto_user_prompt_submit, akto_stop, akto_pre_tool_use, akto_post_tool_use).
+        akto_stop enforces response guardrails (SYNC_MODE=true) or ingests observationally
+        (SYNC_MODE=false), mirroring the behaviour of akto_user_prompt_submit for requests.
     """
     _ip = client_ip or DEFAULT_CLIENT_IP
 
@@ -104,9 +108,14 @@ def create_hooks(client_ip: str = ""):
 
     async def akto_stop(input_data: dict, tool_use_id, context) -> dict:
         """
-        Stop hook — ingests the completed conversation turn for observability.
+        Stop hook — validates the agent response against Akto guardrails and ingests
+        the completed conversation turn.
 
-        This hook is purely observational and never blocks the agent.
+        SYNC_MODE=true  : Blocks the response if guardrails deny it, re-entering the
+                          agent loop with a system message so it can regenerate safely.
+        SYNC_MODE=false : Allows all responses through; ingests with guardrails=true
+                          for observational tracking.
+        Fail-open: any error allows the response through.
         """
         transcript_path = input_data.get("transcript_path")
         response_text = (input_data.get("last_assistant_message") or "").strip()
@@ -117,9 +126,35 @@ def create_hooks(client_ip: str = ""):
         transcript_path = os.path.expanduser(transcript_path)
         user_prompt = get_last_user_prompt(transcript_path)
 
-        if user_prompt:
-            asyncio.create_task(send_stop_ingestion_async(user_prompt, response_text, _ip))
+        if not user_prompt:
+            return {}
 
+        if not AKTO_SYNC_MODE:
+            asyncio.create_task(send_stop_ingestion_async(user_prompt, response_text, _ip))
+            return {}
+
+        gr_allowed, gr_reason, behaviour = await call_guardrails_response_async(
+            user_prompt, response_text, _ip
+        )
+        fingerprint = prompt_fingerprint(response_text)
+        allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
+
+        if not allowed:
+            if _is_warn_behaviour(behaviour):
+                block_reason = (
+                    "Warning: response blocked, please review it. Send again to bypass. "
+                    f"Reason: {gr_reason}"
+                )
+            else:
+                block_reason = f"Response blocked by Akto Guardrails: {gr_reason}"
+
+            logger.warning(f"BLOCKING response — reason: {gr_reason}")
+            asyncio.create_task(
+                ingest_blocked_response_async(user_prompt, response_text, gr_reason, _ip)
+            )
+            return {"continue_": True, "systemMessage": block_reason}
+
+        asyncio.create_task(send_stop_ingestion_async(user_prompt, response_text, _ip))
         return {}
 
     async def akto_pre_tool_use(input_data: dict, tool_use_id, context) -> dict:
