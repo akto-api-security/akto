@@ -42,7 +42,7 @@ public class Constants {
     public static final String UNDERSCORE = "_";
 
     public static final String AGENT_BASE_URL = StringUtils.hasLength(System.getenv("AGENT_BASE_URL")) ? System.getenv("AGENT_BASE_URL") : "http://localhost:5500";
-    public static final String AUTOMATED_AGENT_BASE_URL = StringUtils.hasLength(System.getenv("AUTOMATED_AGENT_BASE_URL")) ? System.getenv("AUTOMATED_AGENT_BASE_URL") : "http://localhost:8000/pentest";
+    public static final String AUTOMATED_AGENT_BASE_URL = StringUtils.hasLength(System.getenv("AUTOMATED_AGENT_BASE_URL")) ? System.getenv("AUTOMATED_AGENT_BASE_URL") : "http://localhost:8000";
 
 
     public final static String _AKTO = "AKTO";

@@ -21,6 +21,7 @@ import com.akto.dto.testing.*;
 import com.akto.dto.testing.AuthParam.Location;
 import com.akto.testing.*;
 import com.akto.testing.ApiExecutor;
+import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.test_editor.*;
@@ -42,6 +43,11 @@ import com.akto.util.McpSseEndpointHelper;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+
 import java.net.URI;
 
 import org.json.JSONArray;
@@ -61,6 +67,7 @@ public class Executor {
     private final AgentClient agentClient = new AgentClient(
         Constants.AGENT_BASE_URL
     );
+    private static final AutomatedAgenticTestExecutor automatedAgenticTestExecutor = new AutomatedAgenticTestExecutor();
 
     public final String _HOST = "host";
 
@@ -190,6 +197,29 @@ public class Executor {
         boolean allRequestsSkippedDueToMatch = false;
         int skippedCount = 0;
 
+        boolean templateAllowsAutomated = !varMap.containsKey("agenticTestingAllowed")
+                || Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
+        boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests() && templateAllowsAutomated;
+
+
+        if (runAutomatedPentest) {
+            String testSubType = varMap.containsKey("testSubType") ? varMap.get("testSubType").toString() : "unknown";
+            List<TestResult> automatedAgenticResults = automatedAgenticTestExecutor.executeAgenticTest(origRawApi, testSubType);
+            if (automatedAgenticResults != null && !automatedAgenticResults.isEmpty()) {
+                requestAttempted = true;
+                String originalMessage = origRawApi.getOriginalMessage();
+                for (TestResult tr : automatedAgenticResults) {
+                    tr.setOriginalMessage(originalMessage);
+                    vulnerable = vulnerable || tr.getVulnerable();
+                }
+                result.addAll(automatedAgenticResults);
+                TestResult last = automatedAgenticResults.get(automatedAgenticResults.size() - 1);
+                loggerMaker.infoAndAddToDb("AutomatedAgenticTest: vulnerable=" + vulnerable + ", confidence=" + last.getConfidence() + " for testSubType=" + testSubType);
+            } else {
+                loggerMaker.infoAndAddToDb("AutomatedAgenticTest: no results returned for testSubType=" + testSubType);
+            }
+        }
+
         for (RawApi testReq: testRawApis) {
             if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
                 skippedCount++;
@@ -202,12 +232,8 @@ public class Executor {
                 // follow redirects = true for now
                 TestResult res = null;
                 List<TestResult> agenticResults = null;
+
                 if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
-                    boolean automatedAgenticTestExecute = AgentClient.isRawApiValidForAgenticTest(testReq);
-                    if (automatedAgenticTestExecute) {
-                        String yamlTemplateContent = varMap.containsKey("yaml_template_content") ? varMap.get("yaml_template_content").toString() : null;
-                        new AutomatedAgenticTestExecutor().executeAgenticTest(testReq, yamlTemplateContent);
-                    }
                     // execute agentic test here
                     requestAttempted = true;
                     agenticResults = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
