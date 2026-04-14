@@ -184,7 +184,11 @@ public class AktoJaxAction extends UserAction {
                         List<AuthParam> authParamsToUse = authMechanismForRole.getAuthParamsFromAuthMechanism();
                         AuthParam authParam = authParamsToUse.get(0);
 
-                        cookies = "Bearer " + authParam.getValue();
+                        if (authParam.getValue() != null && !authParam.getValue().isEmpty() && !authParam.getValue().startsWith("Bearer")) {
+                            cookies = "Bearer " + authParam.getValue();
+                        } else {
+                            cookies = authParam.getValue();
+                        }
                     } catch (Exception ex) {
                         addActionError(ex.getMessage());
                         loggerMaker.errorAndAddToDb("Error while fetching cookies/token from test role using loginStepBuilder. Error: " + ex.getMessage());
