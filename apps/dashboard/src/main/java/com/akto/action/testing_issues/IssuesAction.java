@@ -434,7 +434,7 @@ public class IssuesAction extends UserAction {
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
         );
         if (filterCollectionsId != null && !filterCollectionsId.isEmpty()) {
-            baseFilters = Filters.and(baseFilters, Filters.in(SingleTypeInfo._COLLECTION_IDS, filterCollectionsId));
+            baseFilters = Filters.and(baseFilters, Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, filterCollectionsId));
         }
         
         // Apply dashboard filtering (handles API Security backward compatibility internally)

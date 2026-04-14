@@ -202,7 +202,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         matchConditions.add(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"));
         matchConditions.add(Filters.lte(TestingRunIssues.LAST_SEEN, endTimeStamp));
         matchConditions.add(Filters.gte(TestingRunIssues.LAST_SEEN, startTimeStamp));
-        matchConditions.add(Filters.nin("_id.apiInfoKey.apiCollectionId", deactivatedCollections));
+        matchConditions.add(Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, deactivatedCollections));
         if (restrictToCollectionIds != null && !restrictToCollectionIds.isEmpty()) {
             matchConditions.add(Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, restrictToCollectionIds));
         }

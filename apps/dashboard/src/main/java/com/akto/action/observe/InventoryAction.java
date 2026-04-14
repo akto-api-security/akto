@@ -1292,12 +1292,10 @@ public class InventoryAction extends UserAction {
         response = new BasicDBObject();
          try {
             List<Bson> pipeLine = new ArrayList<>();
-            pipeLine.add(Aggregates.sort(
-                Sorts.descending(ApiInfo.LAST_TESTED)
-            ));
-            pipeLine.add(
-                Aggregates.match(Filters.gt(ApiInfo.LAST_TESTED, 0))
-            );
+
+            if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+                pipeLine.add(Aggregates.match(Filters.in(ApiInfo.ID_API_COLLECTION_ID, this.apiCollectionIds)));
+            }
 
             try {
                 List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
@@ -1306,10 +1304,12 @@ public class InventoryAction extends UserAction {
                 }
             } catch(Exception e){
             }
-
-            if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
-                pipeLine.add(Aggregates.match(Filters.in(ApiInfo.ID_API_COLLECTION_ID, this.apiCollectionIds)));
-            }
+            pipeLine.add(
+                Aggregates.match(Filters.gt(ApiInfo.LAST_TESTED, 0))
+            );
+            pipeLine.add(Aggregates.sort(
+                Sorts.descending(ApiInfo.LAST_TESTED)
+            ));
 
             GroupByTimeRange.groupByWeek(pipeLine, ApiInfo.LAST_TESTED, "totalApisTested", new BasicDBObject());
             MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
