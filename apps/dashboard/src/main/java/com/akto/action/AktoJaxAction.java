@@ -184,7 +184,7 @@ public class AktoJaxAction extends UserAction {
                         List<AuthParam> authParamsToUse = authMechanismForRole.getAuthParamsFromAuthMechanism();
                         AuthParam authParam = authParamsToUse.get(0);
 
-                        if (authParam.getValue() != null && !authParam.getValue().isEmpty() && !authParam.getValue().startsWith("Bearer")) {
+                        if (authParam.getValue() != null && !authParam.getValue().isEmpty() && !authParam.getValue().toLowerCase().startsWith("bearer")) {
                             cookies = "Bearer " + authParam.getValue();
                         } else {
                             cookies = authParam.getValue();
