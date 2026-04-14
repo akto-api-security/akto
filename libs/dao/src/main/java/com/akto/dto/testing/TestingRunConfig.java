@@ -128,7 +128,6 @@ public class TestingRunConfig {
         }
 
         this.cleanUp = that.cleanUp;
-        this.runAutomatedTests = that.runAutomatedTests;
     }
     
     public String getTestRoleId() {
