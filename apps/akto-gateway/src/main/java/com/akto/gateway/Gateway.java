@@ -37,6 +37,8 @@ public class Gateway {
                                     "subagentStop", "beforeShellExecution", "afterShellExecution",
                                     "beforeReadFile", "afterFileEdit", "afterAgentThought", "stop",
                                     "preCompact", "beforeTabFileRead", "afterTabFileEdit")));
+                    put("vscode", new HashSet<>(Arrays.asList("SessionStart", "Stop",
+                            "SubagentStart", "SubagentStop", "PreCompact")));
                 }
             };
 
