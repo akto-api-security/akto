@@ -674,11 +674,14 @@ function CompliancePage() {
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
         const apiCollectionId = filters.apiCollectionId || []
         let filterCollectionsId = apiCollectionId.concat(filters.collectionIds)
-        let filterSubCategory = calcFilteredTestIds(complianceView)
+        let filterSubCategory
         if (filters?.issueCategory?.length > 0) {
-            const catTestIds = [];
-            filters.issueCategory.forEach(cat => catTestIds.push(...(categoryToSubCategories[cat] || [])));
-            filterSubCategory = filterSubCategory.filter(id => catTestIds.includes(id));
+            filterSubCategory = []
+            filters.issueCategory.forEach(cat => {
+                filterSubCategory = filterSubCategory.concat(categoryToSubCategories[cat] || [])
+            })
+        } else {
+            filterSubCategory = calcFilteredTestIds(complianceView)
         }
 
         const collectionIdsArray = filterCollectionsId.map((x) => {return x.toString()})
