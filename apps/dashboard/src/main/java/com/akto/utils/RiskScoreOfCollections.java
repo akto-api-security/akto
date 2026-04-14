@@ -44,7 +44,7 @@ import com.mongodb.client.model.WriteModel;
 import static com.akto.utils.Utils.calculateRiskValueForSeverity;
 import static com.akto.jobs.utils.Utils.getRiskScoreValueFromSeverityScore;
 public class RiskScoreOfCollections {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreOfCollections.class, LogDb.DASHBOARD);;
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreOfCollections.class, LogDb.DASHBOARD);
 
     private Map<ApiInfoKey, Float> getSeverityScoreMap(List<TestingRunIssues> issues){
         // Method to calculate severity Score for the apiInfo on the basis of HIGH, LOW, MEDIUM
@@ -170,7 +170,7 @@ public class RiskScoreOfCollections {
                 }
 
                 boolean isSensitive = apiInfo != null ? apiInfo.getIsSensitive() : false;
-                float severityRiskPart = Utils.getRiskScoreValueFromSeverityScore(severityScore);
+                float severityRiskPart = getRiskScoreValueFromSeverityScore(severityScore);
                 float baseScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, severityRiskPart);
                 float riskScore = mcpRiskScoreContext == null
                         ? baseScore
@@ -320,7 +320,7 @@ public class RiskScoreOfCollections {
         while(count < 100){
             List<ApiInfo> apiInfos = ApiInfoDao.instance.getMCollection().find(filter).sort(Sorts.descending(ApiInfo.LAST_CALCULATED_TIME)).limit(limit).projection(projection).into(new ArrayList<>());
             for(ApiInfo apiInfo: apiInfos){
-                float severityRiskPart = Utils.getRiskScoreValueFromSeverityScore(
+                float severityRiskPart = getRiskScoreValueFromSeverityScore(
                         initialSeverityScoreMap.getOrDefault(apiInfo.getId(), (float) 0));
                 float baseScore = ApiInfoDao.getRiskScore(apiInfo, apiInfo.getIsSensitive(), severityRiskPart);
                 float riskScore = mcpRiskScoreContext.isEmpty()
