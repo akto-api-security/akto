@@ -96,7 +96,17 @@ public class RBACDao extends CommonContextDao<RBAC> {
             return new ArrayList<>();
         }
 
-        if (RBAC.Role.ADMIN.name().equals(rbac.getRole())) {
+        if(rbac.getScopeRoleMapping()!= null && !rbac.getScopeRoleMapping().isEmpty()){
+            String currentScope = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+            if (!currentScope.isEmpty()) {
+               if(rbac.getScopeRoleMapping().containsKey(currentScope)){
+                   rbac.getScopeRoleMapping().get(currentScope).equals(Role.ADMIN.name()) ;
+                   logger.debug(String.format("Rbac is admin from scoperolemapping userId: %d accountId: %d", userId, accountId));
+                   return null;
+               }
+            }
+        }
+         if (RBAC.Role.ADMIN.name().equals(rbac.getRole())) {
             logger.debug(String.format("Rbac is admin userId: %d accountId: %d", userId, accountId));
             return null;
         }

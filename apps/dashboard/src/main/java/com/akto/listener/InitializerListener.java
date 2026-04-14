@@ -2224,7 +2224,22 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
 
-        RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
+        RBAC rbac = null;
+        //check scopeRoleMapping for ADMIN in current scope
+        String currentScope = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+        if (!currentScope.isEmpty()) {
+            // Query for RBAC with scopeRoleMapping containing ADMIN role for current scope
+            Bson filter = Filters.and(
+                    Filters.eq(RBAC.ACCOUNT_ID, accountId),
+                    Filters.eq(RBAC.SCOPE_ROLE_MAPPING + "." + currentScope, Role.ADMIN.name())
+            );
+            rbac = RBACDao.instance.findOne(filter);
+        }
+
+        //backward compatibility of role
+        if (rbac == null) {
+            rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
+        }
 
         if (rbac == null) {
             logger.debugAndAddToDb("Admin is missing in DB", LogDb.DASHBOARD);
@@ -3485,7 +3500,23 @@ public class InitializerListener implements ServletContextListener {
                     String adminEmail = "";
                     Organization org = OrganizationsDao.instance.findOne(Filters.empty());
                     if(org == null){
-                        RBAC rbac = RBACDao.instance.findOne(Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN.name()));
+
+                        RBAC rbac = null;
+                        //check scopeRoleMapping for ADMIN in current scope
+                        String currentScope = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+                        if (!currentScope.isEmpty()) {
+                            // Query for RBAC with scopeRoleMapping containing ADMIN role for current scope
+                            Bson filter = Filters.and(
+                                    Filters.eq(RBAC.SCOPE_ROLE_MAPPING + "." + currentScope, Role.ADMIN.name())
+                            );
+                            rbac = RBACDao.instance.findOne(filter);
+                        }
+
+                        //backward compatibility of role
+                        if (rbac == null) {
+                            rbac = RBACDao.instance.findOne(Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN.name()));
+                        }
+
                         User adminUser = UsersDao.instance.findOne(Filters.eq("login", rbac.getUserId()));
                         adminEmail = adminUser.getLogin();
                     }else{
@@ -3587,6 +3618,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
+    //ROLE
     private static void cleanupRbacEntriesForDeveloperRole(BackwardCompatibility backwardCompatibility){
         if(backwardCompatibility.getCleanupRbacEntries() == 0){
             int count = (int) RBACDao.instance.count(
