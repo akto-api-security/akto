@@ -20,6 +20,7 @@ const ApisWithMostOpenIsuuesGraph = ({ issuesData}) => {
         text: observeFunc.getTruncatedUrl(apiKeyParts[1]) + ' ' + apiKeyParts[2],
         value: issuesData[apiKey],
         color: '#B692F6',
+        id: apiKeyParts[0],
       });
     });
 
@@ -52,6 +53,7 @@ const ApisWithMostOpenIsuuesGraph = ({ issuesData}) => {
             yAxisTitle="Number of Unresolved Issues"
             barWidth={30}
             defaultChartOptions={{ legend: { enabled: false } }}
+            onBarClick={(name, custom) => { if (custom?.id) window.open('/dashboard/observe/inventory/' + custom.id, '_blank'); }}
           />
         }
       />

@@ -773,6 +773,46 @@ function IssuesPage() {
 
 
 
+    const handleAgeBucketClick = (bucketLabel) => {
+        const now = Math.floor(Date.now() / 1000);
+        let since, until;
+        if      (bucketLabel === '<7 days')    { since = now - 7 * 86400;  until = now; }
+        else if (bucketLabel === '7-14 days')  { since = now - 14 * 86400; until = now - 7 * 86400; }
+        else if (bucketLabel === '15-30 days') { since = now - 30 * 86400; until = now - 14 * 86400; }
+        else                                   { since = 0;                until = now - 30 * 86400; }
+
+        const pageKey = "/dashboard/reports/issues/#" + selectedTab;
+        const prev = PersistStore.getState().filtersMap;
+        const existingFilters = (prev[pageKey]?.filters || []).filter(f => f.key !== 'severity');
+        PersistStore.getState().setFiltersMap({
+            ...prev,
+            [pageKey]: { filters: [...existingFilters, { key: 'severity', value: ['CRITICAL'] }], sort: prev[pageKey]?.sort || [] }
+        });
+
+        const sinceDate = new Date(since * 1000);
+        const untilDate = new Date(until * 1000);
+        dispatchCurrDateRange({
+            type: "update",
+            period: { since: sinceDate, until: untilDate },
+            title: sinceDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) + " - " +
+                   untilDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+            alias: "custom"
+        });
+
+        setKey(k => !k);
+    };
+
+    const handleVulnCategoryClick = (filterType, filterValue) => {
+        const pageKey = "/dashboard/reports/issues/#" + selectedTab;
+        const prev = PersistStore.getState().filtersMap;
+        const existing = (prev[pageKey]?.filters || []).filter(f => f.key !== filterType);
+        PersistStore.getState().setFiltersMap({
+            ...prev,
+            [pageKey]: { filters: [...existing, { key: filterType, value: [filterValue] }], sort: prev[pageKey]?.sort || [] }
+        });
+        setKey(k => !k);
+    };
+
     const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
         setTableLoading(true)
         let filterStatus = [selectedTab.toUpperCase()]
@@ -1024,8 +1064,8 @@ function IssuesPage() {
             <IssuesGraphsGroup heading="Issues summary">
                 {[
                     <HorizontalGrid gap={5} columns={2} key="critical-issues-graph-detail">
-                        <CriticalUnresolvedApisByAge />
-                        <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+                        <CriticalUnresolvedApisByAge onBarClick={handleAgeBucketClick} />
+                        <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} onBarClick={handleVulnCategoryClick} />
                     </HorizontalGrid>,
                     <HorizontalGrid columns={2} gap={4} key="open-issues-graphs">
                         <ApisWithMostOpenIsuuesGraph issuesData={issuesByApis} />
