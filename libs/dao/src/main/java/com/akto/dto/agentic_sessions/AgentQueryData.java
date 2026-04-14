@@ -23,47 +23,17 @@ public class AgentQueryData {
     public static final String OUTPUT_TOKENS = "outputTokens";
 
     // Request header name constants
-    public static final String HEADER_INSTALLER    = "x-akto-installer";
+    public static final String HEADER_PREFIX    = "x-akto-installer-";
     public static final String HEADER_USER_EMAIL   = "user_email";
     public static final String HEADER_SESSION_ID   = "session_id";
     public static final String HEADER_CONVERSATION_ID = "conversation_id";
     public static final String HEADER_GENERATION_ID   = "generation_id";
-    public static final String HEADER_MODEL            = "model";
-    public static final String HEADER_TRANSCRIPT_PATH  = "transcript_path";
-    public static final String HEADER_CWD              = "cwd";
-    public static final String HEADER_PERMISSION_MODE  = "permission_mode";
-    public static final String HEADER_HOOK_EVENT_NAME  = "hook_event_name";
-
-    // from x-akto-installer
+    
     private String serviceId;
-
-    // from user_email
-    private String uniqueUserId;
-
-    // from session_id
+    private String deviceId;
+    private String userName;
     private String sessionIdentifier;
-
-    // from conversation_id
     private String conversationId;
-
-    // from generation_id
-    private String generationId;
-
-    // from model
-    private String model;
-
-    // from transcript_path
-    private String transcriptPath;
-
-    // from cwd
-    private String cwd;
-
-    // from permission_mode
-    private String permissionMode;
-
-    // from hook_event_name
-    private String hookEventName;
-
     private String queryPayload;
     private String responsePayload;
     private long timeStamp;
