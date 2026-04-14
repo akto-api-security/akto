@@ -2,6 +2,7 @@ package com.akto.dao.agentic_sessions;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
+import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.mongodb.client.model.IndexOptions;
@@ -40,20 +41,14 @@ public class AgentQueryDataDao extends AccountsContextDao<AgentQueryData> {
 
         Map<String, List<String>> requestHeaders = httpResponseParam.getRequestParams().getHeaders();
 
-        agentQueryData.setServiceId(getFirstHeader(requestHeaders, AgentQueryData.HEADER_INSTALLER));
-        agentQueryData.setUniqueUserId(getFirstHeader(requestHeaders, AgentQueryData.HEADER_USER_EMAIL));
-        agentQueryData.setSessionIdentifier(getFirstHeader(requestHeaders, AgentQueryData.HEADER_SESSION_ID));
-        agentQueryData.setConversationId(getFirstHeader(requestHeaders, AgentQueryData.HEADER_CONVERSATION_ID));
-        agentQueryData.setGenerationId(getFirstHeader(requestHeaders, AgentQueryData.HEADER_GENERATION_ID));
-        agentQueryData.setModel(getFirstHeader(requestHeaders, AgentQueryData.HEADER_MODEL));
-        agentQueryData.setTranscriptPath(getFirstHeader(requestHeaders, AgentQueryData.HEADER_TRANSCRIPT_PATH));
-        agentQueryData.setCwd(getFirstHeader(requestHeaders, AgentQueryData.HEADER_CWD));
-        agentQueryData.setPermissionMode(getFirstHeader(requestHeaders, AgentQueryData.HEADER_PERMISSION_MODE));
-        agentQueryData.setHookEventName(getFirstHeader(requestHeaders, AgentQueryData.HEADER_HOOK_EVENT_NAME));
+        agentQueryData.setServiceId(getFirstHeader(requestHeaders, "host"));
+        agentQueryData.setUserName(getFirstHeader(requestHeaders, (AgentQueryData.HEADER_PREFIX + AgentQueryData.HEADER_USER_EMAIL)));
+        agentQueryData.setSessionIdentifier(getFirstHeader(requestHeaders, (AgentQueryData.HEADER_PREFIX + AgentQueryData.HEADER_SESSION_ID)));
+        agentQueryData.setConversationId(getFirstHeader(requestHeaders, (AgentQueryData.HEADER_PREFIX + AgentQueryData.HEADER_CONVERSATION_ID)));
 
         agentQueryData.setQueryPayload(httpResponseParam.getRequestParams().getPayload());
         agentQueryData.setResponsePayload(httpResponseParam.getPayload());
-        agentQueryData.setTimeStamp(httpResponseParam.getTimeOrNow());
+        agentQueryData.setTimeStamp(Context.now());
 
         return agentQueryData;
     }
