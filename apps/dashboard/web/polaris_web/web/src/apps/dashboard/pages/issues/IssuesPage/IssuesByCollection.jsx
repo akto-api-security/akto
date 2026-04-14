@@ -27,6 +27,7 @@ const IssuesByCollection = ({ collectionsData }) => {
         text: apiCollectionMap[collectionId] || `Collection ${collectionId}`,
         value: collectionIssuesCount[collectionId],
         color: '#B692F6',
+        id: collectionId,
       });
     });
     setBarData(tempBarData);
@@ -57,6 +58,7 @@ const IssuesByCollection = ({ collectionsData }) => {
             yAxisTitle="Number of Issues"
             barWidth={30}
             defaultChartOptions={{ legend: { enabled: false } }}
+            onBarClick={(name, custom) => { if (custom?.id) window.open('/dashboard/observe/inventory/' + custom.id, '_blank'); }}
           />
         }
       />

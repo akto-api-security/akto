@@ -13,7 +13,7 @@ const AGE_BUCKETS = [
   '>30 days'
 ];
 
-const CriticalUnresolvedApisByAge = () => {
+const CriticalUnresolvedApisByAge = ({ onBarClick }) => {
   const [barData, setBarData] = useState([]);
 
   useEffect(() => {
@@ -75,6 +75,7 @@ const CriticalUnresolvedApisByAge = () => {
             yAxisTitle="Number of Issues"
             barWidth={30}
             defaultChartOptions={{ legend: { enabled: false } }}
+            onBarClick={onBarClick}
           />
         }
       />
