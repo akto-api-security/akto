@@ -43,7 +43,7 @@ SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    GEMINI_API_URL = f"https://{device_id}.ai-agent.gemini" if device_id else GEMINI_API_URL
+    GEMINI_API_URL = f"https://{device_id}.ai-agent.geminicli" if device_id else GEMINI_API_URL
     logger.info(f"MODE: {MODE}, Device ID: {device_id}, GEMINI_API_URL: {GEMINI_API_URL}")
 else:
     logger.info(f"MODE: {MODE}, GEMINI_API_URL: {GEMINI_API_URL}")
@@ -118,12 +118,12 @@ def build_akto_request(
 
     request_headers = json.dumps({
         "host": host,
-        "x-gemini-hook": "BeforeModel",
+        "x-geminicli-hook": "BeforeModel",
         "content-type": "application/json"
     })
 
     response_headers = json.dumps({
-        "x-gemini-hook": "BeforeModel"
+        "x-geminicli-hook": "BeforeModel"
     })
 
     request_payload = json.dumps({
