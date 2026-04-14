@@ -829,6 +829,7 @@ function IssuesPage() {
             alias: "custom"
         });
 
+        func.setToast(true, false, "Table filtered by Critical severity - scroll down to view results");
         setKey(k => !k);
     };
 
@@ -840,6 +841,8 @@ function IssuesPage() {
             ...prev,
             [pageKey]: { filters: [...existing, { key: filterType, value: [filterValue] }], sort: prev[pageKey]?.sort || [] }
         });
+        
+        func.setToast(true, false, `Table filtered by "${filterValue}" - scroll down to view results`);
         setKey(k => !k);
     };
 
