@@ -15,7 +15,8 @@ function CategoryWiseScoreGraph({
     dataSource = 'redteaming', // 'redteaming', 'threat_detection', 'guardrails'
     title,
     apiEndpoint,
-    fallbackData
+    fallbackData,
+    apiCollectionIds,
 }) {
     const [categoryTestData, setCategoryTestData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -79,7 +80,7 @@ function CategoryWiseScoreGraph({
                 const apiCall = getApiCall();
                 
                 if (apiCall) {
-                    const response = await apiCall(startTimestamp, endTimestamp, dashboardCategory, dataSource);
+                    const response = await apiCall(startTimestamp, endTimestamp, dashboardCategory, dataSource, apiCollectionIds);
                     if (response && response.length > 0) {
                         setCategoryTestData(response);
                         return;
@@ -90,7 +91,6 @@ function CategoryWiseScoreGraph({
                 setCategoryTestData([]);
                 
             } catch (error) {
-                console.error('Error fetching category wise data:', error);
                 // On error, show empty state for non-demo accounts
                 setCategoryTestData([]);
             } finally {
@@ -99,7 +99,7 @@ function CategoryWiseScoreGraph({
         };
 
         fetchCategoryData();
-    }, [startTimestamp, endTimestamp, dataSource, apiEndpoint, dashboardCategory]);
+    }, [startTimestamp, endTimestamp, dataSource, apiEndpoint, dashboardCategory, apiCollectionIds]);
 
     // Get dynamic title and labels based on data source and dashboard category
     const getTitle = () => {
