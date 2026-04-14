@@ -10,7 +10,7 @@ import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import { getCategoriesBasedOnDashboardCategory } from '../../test_editor/tests_table/categoryUtil';
 import issuesTransform from '../transform.js';
 
-const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl, complianceMode }) => {
+const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl, complianceMode, filterCollectionsId }) => {
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
     const categoryMap = LocalStore(state => state.categoryMap);
     const dashboardCategory = getDashboardCategory();
@@ -32,7 +32,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
 
     const fetchGraphData = useCallback(async () => {
         setShowTestingComponents(false)
-        const subcategoryDataResp = await testingApi.getSummaryInfo(startTimestamp, endTimestamp)
+        const subcategoryDataResp = await testingApi.getSummaryInfo(startTimestamp, endTimestamp, filterCollectionsId)
         const allowedCategories = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMap);
         const filteredResp = Object.fromEntries(
             Object.entries(subcategoryDataResp).filter(([testId]) => {
@@ -61,7 +61,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
         }
         convertSubCategoryInfo(tempResultSubCategoryMap)
         setShowTestingComponents(true)
-    }, [startTimestamp, endTimestamp, complianceMode, subCategoryMap, categoryMap, dashboardCategory])
+    }, [startTimestamp, endTimestamp, complianceMode, subCategoryMap, categoryMap, dashboardCategory, filterCollectionsId])
 
     useEffect(() => {
         fetchGraphData()

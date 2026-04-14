@@ -82,6 +82,8 @@ public class IssuesAction extends UserAction {
     private int skip;
     private int limit;
     private List<TestRunIssueStatus> filterStatus;
+    @Getter
+    @Setter
     private List<Integer> filterCollectionsId;
     private List<Severity> filterSeverity;
     private List<String> filterCompliance;
@@ -431,6 +433,9 @@ public class IssuesAction extends UserAction {
                 Filters.gte(TestingRunIssues.CREATION_TIME, startEpoch),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
         );
+        if (filterCollectionsId != null && !filterCollectionsId.isEmpty()) {
+            baseFilters = Filters.and(baseFilters, Filters.in(SingleTypeInfo._COLLECTION_IDS, filterCollectionsId));
+        }
         
         // Apply dashboard filtering (handles API Security backward compatibility internally)
         Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilters);
@@ -489,6 +494,9 @@ public class IssuesAction extends UserAction {
                 Filters.gte("time", startEpoch),
                 Filters.lte("time", endTimeStamp)
         );
+        if (filterCollectionsId != null && !filterCollectionsId.isEmpty()) {
+            filter = Filters.and(filter, Filters.in(HistoricalData.API_COLLECTION_ID, filterCollectionsId));
+        }
 
         pipeline.add(Aggregates.match(filter));
 
@@ -1564,14 +1572,6 @@ public class IssuesAction extends UserAction {
 
     public void setFilterStatus(List<TestRunIssueStatus> filterStatus) {
         this.filterStatus = filterStatus;
-    }
-
-    public List<Integer> getFilterCollectionsId() {
-        return filterCollectionsId;
-    }
-
-    public void setFilterCollectionsId(List<Integer> filterCollectionsId) {
-        this.filterCollectionsId = filterCollectionsId;
     }
 
     public List<Severity> getFilterSeverity() {

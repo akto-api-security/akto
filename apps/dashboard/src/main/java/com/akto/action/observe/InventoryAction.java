@@ -51,6 +51,10 @@ public class InventoryAction extends UserAction {
 
     int apiCollectionId = -1;
 
+    @Getter
+    @Setter
+    private List<Integer> apiCollectionIds;
+
     BasicDBObject response;
 
     // public String fetchAPICollection() {
@@ -1301,6 +1305,10 @@ public class InventoryAction extends UserAction {
                     pipeLine.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
                 }
             } catch(Exception e){
+            }
+
+            if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+                pipeLine.add(Aggregates.match(Filters.in(ApiInfo.ID_API_COLLECTION_ID, this.apiCollectionIds)));
             }
 
             GroupByTimeRange.groupByWeek(pipeLine, ApiInfo.LAST_TESTED, "totalApisTested", new BasicDBObject());

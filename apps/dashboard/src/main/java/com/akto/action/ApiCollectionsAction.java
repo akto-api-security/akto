@@ -814,7 +814,11 @@ public class ApiCollectionsAction extends UserAction {
 
     // required to measure the count of total tested endpoints per collection.
     public String fetchCoverageInfoInCollections(){
-        this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount();
+        if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+            this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount(this.apiCollectionIds);
+        } else {
+            this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 

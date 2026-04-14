@@ -1,8 +1,10 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
-import {Text,IndexFiltersMode} from '@shopify/polaris';
+import {Text, IndexFiltersMode, Box} from '@shopify/polaris';
+import DropdownSearch from "../../../components/shared/DropdownSearch";
 import api from "../api";
 import testingApi from "../../testing/api";
 import { useEffect, useReducer, useState } from 'react';
+import { useCollectionPageScope } from '../../../hooks/useCollectionPageScope';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
@@ -118,6 +120,17 @@ function TestRunsPage(props) {
   const {showOnlyTable, scopeApiCollectionIds } = props;
 
   const apiCollectionMap = PersistStore(state => state.collectionsMap)
+  const allCollections = PersistStore(state => state.allCollections) || []
+
+  const {
+    collectionSearchOptions,
+    selectedCollectionId,
+    pageScopeApiCollectionIds,
+    collectionScopeLabel,
+    onCollectionScopeSelect,
+    collectionScopePreSelected,
+    collectionSearchPlaceholder,
+  } = useCollectionPageScope(allCollections)
 
   function disambiguateLabel(key, value) {
     switch (key) {
@@ -169,18 +182,20 @@ const [summaryLoading, setSummaryLoading] = useState(false)
     setLoading(true);
     let ret = [];
     let total = 0;
-    
+    const requestFilters = { ...filters };
     if (showOnlyTable) {
-      if(!filters["apiCollectionId"]){
-        filters["apiCollectionId"] = scopeApiCollectionIds ? scopeApiCollectionIds : []
+      if (!requestFilters["apiCollectionId"]?.length) {
+        requestFilters["apiCollectionId"] = scopeApiCollectionIds ? scopeApiCollectionIds : []
       }
+    } else if (pageScopeApiCollectionIds.length > 0) {
+      requestFilters["apiCollectionId"] = pageScopeApiCollectionIds;
     }
 
     switch (currentTab) {
 
       case "ci_cd":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CI_CD",queryValue
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, requestFilters, "CI_CD",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = transform.processData(testingRuns, latestTestingRunResultSummaries, true);
           total = testingRunsCount;
@@ -188,7 +203,7 @@ const [summaryLoading, setSummaryLoading] = useState(false)
         break;
       case "scheduled":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "RECURRING",queryValue
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, requestFilters, "RECURRING",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = transform.processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -196,7 +211,7 @@ const [summaryLoading, setSummaryLoading] = useState(false)
         break;
       case "one_time":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "ONE_TIME",queryValue
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, requestFilters, "ONE_TIME",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = transform.processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -205,7 +220,7 @@ const [summaryLoading, setSummaryLoading] = useState(false)
       case "continuous_testing":
       case "continuous_scanning":
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CONTINUOUS_TESTING",queryValue
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, requestFilters, "CONTINUOUS_TESTING",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = transform.processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -213,7 +228,7 @@ const [summaryLoading, setSummaryLoading] = useState(false)
         break;
       default:
         await api.fetchTestingDetails(
-          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, null,queryValue
+          startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, requestFilters, null,queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
           ret = transform.processData(testingRuns, latestTestingRunResultSummaries);
           total = testingRunsCount;
@@ -225,8 +240,8 @@ const [summaryLoading, setSummaryLoading] = useState(false)
     ret = ret.sort((a, b) => (b.orderPriority === 1) ?  1 : ( (a.orderPriority === 1) ? -1 : 0 ));
     // we send the test if any summary of the test is in the filter.
     ret = ret.filter((item) => {
-      if(filters.severity && filters.severity.length > 0){
-        return item.severityStatus.some(x => filters.severity.includes(x.toUpperCase()))
+      if(requestFilters.severity && requestFilters.severity.length > 0){
+        return item.severityStatus.some(x => requestFilters.severity.includes(x.toUpperCase()))
       } 
       return true
     })
@@ -247,6 +262,8 @@ const [summaryLoading, setSummaryLoading] = useState(false)
     let filters = {}
     if (showOnlyTable) {
       filters["apiCollectionId"] = scopeApiCollectionIds || []
+    } else if (pageScopeApiCollectionIds.length > 0) {
+      filters["apiCollectionId"] = pageScopeApiCollectionIds
     }
     await api.getCountsMap(startTimestamp, endTimestamp, filters).then((resp) => {
       setCountMap(resp)
@@ -254,11 +271,14 @@ const [summaryLoading, setSummaryLoading] = useState(false)
   }
 
   const fetchSummaryInfo = async()=>{
-    await api.getSummaryInfo(startTimestamp, endTimestamp).then(async (resp)=>{
+    await api.getSummaryInfo(startTimestamp, endTimestamp, pageScopeApiCollectionIds).then(async (resp)=>{
       const severityObj = await transform.convertSubIntoSubcategory(resp)
       setSubCategoryInfo(severityObj.subCategoryMap)
     })
-    await testingApi.fetchSeverityInfoForIssues({}, [], 0).then(({ severityInfo }) => {
+    const severityIssueFilters = pageScopeApiCollectionIds.length > 0
+      ? { filterCollectionsId: pageScopeApiCollectionIds }
+      : {}
+    await testingApi.fetchSeverityInfoForIssues(severityIssueFilters, [], 0).then(({ severityInfo }) => {
       const countMap = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
 
       if (severityInfo && severityInfo != undefined && severityInfo != null && severityInfo instanceof Object) {
@@ -314,7 +334,7 @@ const [summaryLoading, setSummaryLoading] = useState(false)
       setSummaryLoading(false)
     }
     fetchData()
-  },[currDateRange])
+  },[currDateRange, selectedCollectionId])
 
   const handleSelectedTab = (selectedIndex) => {
     setLoading(true)
@@ -342,7 +362,7 @@ const [summaryLoading, setSummaryLoading] = useState(false)
     ]
   };
 
-  const key = currentTab + startTimestamp + endTimestamp;
+  const key = currentTab + startTimestamp + endTimestamp + (selectedCollectionId ?? 'all');
 const coreTable = (
 <GithubServerTable
     key={key}
@@ -385,6 +405,7 @@ const components = !hasUserInitiatedTestRuns ? [
     startTimestamp={startTimestamp}
     endTimestamp={endTimestamp}
     loading={summaryLoading}
+    apiCollectionIds={pageScopeApiCollectionIds}
   />,
   <TestrunsBannerComponent key={"banner-comp"}/>, 
   coreTable
@@ -398,6 +419,7 @@ const components = !hasUserInitiatedTestRuns ? [
     startTimestamp={startTimestamp}
     endTimestamp={endTimestamp}
     loading={summaryLoading}
+    apiCollectionIds={pageScopeApiCollectionIds}
   />, 
   coreTable
 ]
@@ -412,6 +434,19 @@ const components = !hasUserInitiatedTestRuns ? [
       isFirstPage={true}
       components={components}
       primaryAction={<DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>}
+      secondaryActions={
+        <Box minWidth="240px">
+          <DropdownSearch
+            id="test-runs-api-collection-dropdown"
+            placeholder={collectionSearchPlaceholder}
+            optionsList={collectionSearchOptions}
+            value={collectionScopeLabel}
+            preSelected={collectionScopePreSelected}
+            setSelected={onCollectionScopeSelect}
+            sliceMaxVal={50}
+          />
+        </Box>
+      }
     />
   );
 }

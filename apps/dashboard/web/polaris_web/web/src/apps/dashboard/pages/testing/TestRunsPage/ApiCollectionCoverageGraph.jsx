@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Text } from '@shopify/polaris';
 import InfoCard from '../../dashboard/new_components/InfoCard';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
@@ -10,18 +10,28 @@ import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 const TESTED_COLOR = '#007F5F'; 
 const UNTESTED_COLOR = '#E4E5E7'; 
 
-const ApiCollectionCoverageGraph = () => {
+const ApiCollectionCoverageGraph = ({ apiCollectionIds }) => {
   const [chartData, setChartData] = useState([]);
   const [collectionNames, setCollectionNames] = useState([]);
   const [showTestingComponents, setShowTestingComponents] = useState(false);
-  const allCollections = PersistStore.getState().allCollections || [];
+  const allCollections = PersistStore((state) => state.allCollections) || []
+  const filterKey = useMemo(
+    () => (apiCollectionIds?.length ? apiCollectionIds.join(',') : 'all'),
+    [apiCollectionIds],
+  )
 
   const fetchCoverageData = async () => {
     setShowTestingComponents(false);
     try {
-      const coverageInfo = await api.getCoverageInfoForCollections();
+      const coverageInfo = await api.getCoverageInfoForCollections(apiCollectionIds)
 
-      const sortedCollections = allCollections.filter(col => col?.type !== "API_GROUP")
+      let baseCollections = allCollections.filter(col => col?.type !== "API_GROUP")
+      if (apiCollectionIds?.length) {
+        const idSet = new Set(apiCollectionIds)
+        baseCollections = baseCollections.filter((col) => idSet.has(col.id))
+      }
+
+      const sortedCollections = baseCollections
         .map(col => {
           const tested = Math.min(coverageInfo[col.id] || 0, col.urlsCount);
           const ratio = col.urlsCount > 0 ? tested / col.urlsCount : 0;
@@ -56,14 +66,13 @@ const ApiCollectionCoverageGraph = () => {
       ]);
       setShowTestingComponents(true);
     } catch (error) {
-      console.error('Error fetching coverage data:', error);
       setShowTestingComponents(true);
     }
   };
 
   useEffect(() => {
     fetchCoverageData();
-  }, []);
+  }, [filterKey, allCollections]);
 
   const coverageGraph = (chartData && chartData.length > 0) ? (
     <InfoCard
