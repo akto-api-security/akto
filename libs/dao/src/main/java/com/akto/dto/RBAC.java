@@ -162,6 +162,18 @@ public class RBAC {
         return scopeRoleMapping;
     }
 
+    public static Map<String, String> initializeFullScopeRoleMapping(Map<String, String> scopeRoleMapping, String defaultRole) {
+        if (scopeRoleMapping == null || scopeRoleMapping.isEmpty()) {
+            Map<String, String> initialized = new HashMap<>();
+            initialized.put("API", defaultRole);
+            initialized.put("ENDPOINT", defaultRole);
+            initialized.put("DAST", defaultRole);
+            initialized.put("AGENTIC", defaultRole);
+            return initialized;
+        }
+        return scopeRoleMapping;
+    }
+
     public Role getRoleForScope(CONTEXT_SOURCE scope) {
         if (scope == null) {
             return null;
