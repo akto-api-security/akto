@@ -594,7 +594,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             shouldLogin = "true";
             String resolvedRole = fetchOktaRole(oktaConfig, oktaUserId, accessToken);
-            RBAC.initializeFullScopeRoleMapping(this.scopeRoleMapping, resolvedRole);
+            this.scopeRoleMapping = RBAC.initializeFullScopeRoleMapping(this.scopeRoleMapping, resolvedRole);
             createUserAndRedirect(email, username, new SignupInfo.OktaSignupInfo(accessToken, username), accountId, Config.ConfigType.OKTA.toString(), resolvedRole, this.scopeRoleMapping);
             code = "";
         } catch (Exception e) {
