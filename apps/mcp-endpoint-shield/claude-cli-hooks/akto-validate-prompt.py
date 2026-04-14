@@ -110,7 +110,7 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         raise
 
 
-def build_validation_request(query: str) -> dict:
+def build_validation_request(query: str, session_info: dict = None) -> dict:
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
         tags["ai-agent"] = "claudecli"
@@ -120,11 +120,17 @@ def build_validation_request(query: str) -> dict:
 
     host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
 
-    request_headers = json.dumps({
+    req_headers = {
         "host": host,
         "x-claude-hook": "UserPromptSubmit",
         "content-type": "application/json"
-    })
+    }
+    if session_info:
+        for key, value in session_info.items():
+            if value is not None:
+                req_headers[f"x-akto-installer-{key}"] = str(value)
+
+    request_headers = json.dumps(req_headers)
 
     response_headers = json.dumps({
         "x-claude-hook": "UserPromptSubmit"
@@ -176,7 +182,7 @@ def _is_alert_behaviour(behaviour: Any) -> bool:
     return _guardrails_behaviour_value(behaviour) == "alert"
 
 
-def call_guardrails(query: str) -> Tuple[bool, str, str]:
+def call_guardrails(query: str, session_info: dict = None) -> Tuple[bool, str, str]:
     if not query.strip():
         return True, "", ""
     if not AKTO_DATA_INGESTION_URL:
@@ -190,7 +196,7 @@ def call_guardrails(query: str) -> Tuple[bool, str, str]:
         logger.info(f"Prompt preview: {query[:100]}...")
 
     try:
-        request_body = build_validation_request(query)
+        request_body = build_validation_request(query, session_info)
         result = post_payload_json(
             build_http_proxy_url(guardrails=True, ingest_data=True),
             request_body,
@@ -276,13 +282,13 @@ def apply_warn_resubmit_flow(
     save_warn_pending(pending)
     return False, reason
 
-def ingest_blocked_request(user_prompt: str, reason: str):
+def ingest_blocked_request(user_prompt: str, reason: str, session_info: dict = None):
     if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
         return
 
     logger.info("Ingesting blocked request data")
     try:
-        request_body = build_validation_request(user_prompt)
+        request_body = build_validation_request(user_prompt, session_info)
         request_body["responseHeaders"] = json.dumps({
             "x-claude-hook": "UserPromptSubmit",
             "x-blocked-by": "Akto Proxy",
@@ -316,6 +322,12 @@ def main():
 
     prompt = input_data.get("prompt", "")
 
+    session_info = {}
+    for field in ("session_id", "transcript_path", "cwd", "permission_mode", "hook_event_name"):
+        value = input_data.get(field)
+        if value is not None:
+            session_info[field] = value
+
     if not prompt.strip():
         logger.info("Empty prompt, allowing")
         sys.exit(0)
@@ -323,7 +335,7 @@ def main():
     logger.info(f"Processing prompt (length: {len(prompt)} chars)")
 
     if AKTO_SYNC_MODE:
-        gr_allowed, gr_reason, behaviour = call_guardrails(prompt)
+        gr_allowed, gr_reason, behaviour = call_guardrails(prompt, session_info)
         fingerprint = prompt_fingerprint(prompt)
         allowed, _ = apply_warn_resubmit_flow(
             gr_allowed, gr_reason, behaviour, fingerprint
@@ -344,7 +356,7 @@ def main():
             }
             logger.warning(f"BLOCKING prompt - Reason: {gr_reason}")
             print(json.dumps(output))
-            ingest_blocked_request(prompt, gr_reason)
+            ingest_blocked_request(prompt, gr_reason, session_info)
             sys.exit(0)
 
     logger.info("Prompt allowed")

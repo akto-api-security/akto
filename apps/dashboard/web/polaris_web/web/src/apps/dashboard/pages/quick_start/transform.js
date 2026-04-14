@@ -1197,6 +1197,57 @@ const neovimHookObj = {
     />
 }
 
+const ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL =
+    'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents'
+
+const sglangHookObj = {
+    icon: '/public/sglang.png',
+    label: "SGLang",
+    text: "Discover and secure locally running models on SGLang, with endpoint discovery and guardrails in Akto.",
+    docsUrl: ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL,
+    key: "SGLANG_HOOK",
+    component: <BannerComponent
+        content="Discover and secure locally running models on SGLang, with endpoint discovery and guardrails in Akto."
+        docsUrl={ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL}
+    />
+}
+
+const vllmHookObj = {
+    icon: '/public/vllm.svg',
+    label: "vLLM",
+    text: "Discover and secure locally running models on vLLM, with endpoint discovery and guardrails in Akto.",
+    docsUrl: ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL,
+    key: "VLLM_HOOK",
+    component: <BannerComponent
+        content="Discover and secure locally running models on vLLM, with endpoint discovery and guardrails in Akto."
+        docsUrl={ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL}
+    />
+}
+
+const dockerModelRunnerHookObj = {
+    icon: '/public/docker.svg',
+    label: "Docker Model Runner",
+    text: "Discover and secure locally running models on Docker Model Runner, with endpoint discovery and guardrails in Akto.",
+    docsUrl: ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL,
+    key: "DOCKER_MODEL_RUNNER_HOOK",
+    component: <BannerComponent
+        content="Discover and secure locally running models on Docker Model Runner, with endpoint discovery and guardrails in Akto."
+        docsUrl={ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL}
+    />
+}
+
+const ollamaHookObj = {
+    icon: '/public/ollama.svg',
+    label: "Ollama",
+    text: "Discover and secure locally running models on Ollama, with endpoint discovery and guardrails in Akto.",
+    docsUrl: ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL,
+    key: "OLLAMA_HOOK",
+    component: <BannerComponent
+        content="Discover and secure locally running models on Ollama, with endpoint discovery and guardrails in Akto."
+        docsUrl={ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL}
+    />
+}
+
 const dataDogConnectorObj = {
     icon: '/public/datadog-1.svg',
     label: "DataDog Connector",
@@ -1911,6 +1962,10 @@ const quickStartFunc = {
             cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, intellijHookObj, antigravityObj,
         ]
 
+        const localHostedModels = [
+            sglangHookObj, vllmHookObj, dockerModelRunnerHookObj, ollamaHookObj,
+        ]
+
         // Endpoint Management
         const endpointManagement = [
             microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
@@ -1946,6 +2001,7 @@ const quickStartFunc = {
                 "Endpoint Management": endpointManagement,
                 "Agentic Proxies": agenticProxies,
                 "Browser Extension": browserExtensions,
+                "Locally Hosted Models": localHostedModels,
                 "Secure Web Networks": secureWebNetworks,
                 "": hiddenConnectors, // Hidden category for connector lookup
             };

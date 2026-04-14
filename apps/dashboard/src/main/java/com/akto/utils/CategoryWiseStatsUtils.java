@@ -30,12 +30,22 @@ public class CategoryWiseStatsUtils {
             int endTimestamp, 
             String dashboardCategory
     ) {
+        return getCategoryWiseScores(dataSource, startTimestamp, endTimestamp, dashboardCategory, null);
+    }
+
+    public static List<Map<String, Object>> getCategoryWiseScores(
+            DataSource dataSource,
+            int startTimestamp, 
+            int endTimestamp, 
+            String dashboardCategory,
+            List<Integer> apiCollectionIds
+    ) {
         // Get relevant categories based on data source and dashboard
         List<String> relevantCategories = getRelevantCategories(dataSource, dashboardCategory);
         
         switch (dataSource) {
             case REDTEAMING:
-                return getTestingCategoryWiseScores(startTimestamp, endTimestamp, relevantCategories);
+                return getTestingCategoryWiseScores(startTimestamp, endTimestamp, relevantCategories, apiCollectionIds);
             case THREAT_DETECTION:
                 return getThreatDetectionCategoryWiseScores(startTimestamp, endTimestamp, relevantCategories);
             case GUARDRAILS:
@@ -71,9 +81,10 @@ public class CategoryWiseStatsUtils {
     private static List<Map<String, Object>> getTestingCategoryWiseScores(
             int startTimestamp, 
             int endTimestamp, 
-            List<String> relevantCategories
+            List<String> relevantCategories,
+            List<Integer> apiCollectionIds
     ) {
-        return TestingRunResultDao.instance.getCategoryWiseScores(startTimestamp, endTimestamp, relevantCategories);
+        return TestingRunResultDao.instance.getCategoryWiseScores(startTimestamp, endTimestamp, relevantCategories, apiCollectionIds);
     }
 
     /**

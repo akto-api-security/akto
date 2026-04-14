@@ -1,0 +1,58 @@
+name: Hook Auto-Tag
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'apps/mcp-endpoint-shield/cursor-hooks/**'
+      - 'apps/mcp-endpoint-shield/claude-cli-hooks/**'
+
+permissions:
+  contents: write
+
+jobs:
+  tag-hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump hook group tags
+        run: |
+          git fetch --tags
+
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+
+          if [[ "$BEFORE" == "0000000000000000000000000000000000000000" ]]; then
+            CHANGED=$(git diff-tree --no-commit-id -r --name-only "$AFTER")
+          else
+            CHANGED=$(git diff --name-only "$BEFORE" "$AFTER")
+          fi
+
+          for GROUP in cursor-hooks claude-cli-hooks; do
+            if ! echo "$CHANGED" | grep -q "apps/mcp-endpoint-shield/${GROUP}/"; then
+              continue
+            fi
+
+            LAST=$(git tag --list "${GROUP}@v*" --sort=-v:refname | head -1)
+            if [ -z "$LAST" ]; then
+              NEW="${GROUP}@v1.0.0"
+            else
+              BASE="${LAST##*@v}"
+              MAJOR=$(echo $BASE | cut -d. -f1)
+              MINOR=$(echo $BASE | cut -d. -f2)
+              PATCH=$(echo $BASE | cut -d. -f3)
+              NEW="${GROUP}@v${MAJOR}.${MINOR}.$((PATCH+1))"
+            fi
+
+            git tag "$NEW"
+            git push origin "$NEW"
+            echo "Tagged: $NEW"
+          done

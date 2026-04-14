@@ -23,7 +23,8 @@ const SummaryCardComponent = ({
   setCollapsible, 
   startTimestamp, 
   endTimestamp,
-  loading
+  loading,
+  apiCollectionIds,
 }) => {
   const totalVulnerabilities = (severityMap?.CRITICAL?.text || 0) + 
                               (severityMap?.HIGH?.text || 0) + 
@@ -81,16 +82,17 @@ const SummaryCardComponent = ({
                   startTimestamp={startTimestamp} 
                   endTimestamp={endTimestamp}
                   dataSource="redteaming"
+                  apiCollectionIds={apiCollectionIds}
                 />
               ) : null}
                 {
                   func.isDemoAccount() && !(isApiSecurityCategory() || isDastCategory()) ? <></> :
                     <VerticalStack gap={4}>
                       <HorizontalGrid columns={2} gap={4}>
-                        <MemoizedApiCollectionCoverageGraph />
-                        <MemoizedTestRunOverTimeGraph />
+                        <MemoizedApiCollectionCoverageGraph apiCollectionIds={apiCollectionIds} />
+                        <MemoizedTestRunOverTimeGraph apiCollectionIds={apiCollectionIds} />
                       </HorizontalGrid>
-                      <MemoizedApisTestedOverTimeGraph />
+                      <MemoizedApisTestedOverTimeGraph apiCollectionIds={apiCollectionIds} />
                     </VerticalStack>
                 }
             </VerticalStack>

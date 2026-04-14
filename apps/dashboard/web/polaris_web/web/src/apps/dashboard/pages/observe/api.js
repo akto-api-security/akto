@@ -815,11 +815,15 @@ export default {
         })
     },
 
-    async getCoverageInfoForCollections(){
+    async getCoverageInfoForCollections(apiCollectionIds){
+        const data = {}
+        if (apiCollectionIds && apiCollectionIds.length > 0) {
+            data.apiCollectionIds = apiCollectionIds
+        }
         return await request({
             url: '/api/getCoverageInfoForCollections',
             method: 'post',
-            data:{},
+            data,
         })
     },
 
@@ -1014,11 +1018,15 @@ export default {
             }
         })
     },
-    allApisTestedRanges() {
+    allApisTestedRanges(apiCollectionIds) {
+        const data = {}
+        if (apiCollectionIds && apiCollectionIds.length > 0) {
+            data.apiCollectionIds = apiCollectionIds
+        }
         return request({
             url: '/api/fetchTestedApisRanges',
             method: 'post',
-            data: {}
+            data
         })
     },
 

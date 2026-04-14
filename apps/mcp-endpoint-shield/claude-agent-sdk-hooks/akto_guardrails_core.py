@@ -81,10 +81,14 @@ logger.info(
 # HTTP helpers
 # ---------------------------------------------------------------------------
 
-def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(
+    *, guardrails: bool, ingest_data: bool, response_guardrails: bool = False
+) -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
@@ -334,6 +338,33 @@ async def call_guardrails_prompt_async(query: str, client_ip: str) -> Tuple[bool
         return True, "", ""
 
 
+async def call_guardrails_response_async(
+    user_prompt: str, response_text: str, client_ip: str
+) -> Tuple[bool, str, str]:
+    """Validate an agent response. Returns (allowed, reason, behaviour)."""
+    if not response_text.strip():
+        return True, "", ""
+    if not _data_ingestion_url():
+        logger.warning("AKTO_DATA_INGESTION_URL not set, allowing response (fail-open)")
+        return True, "", ""
+
+    logger.info("Validating response against guardrails")
+    try:
+        payload = build_stop_ingestion_payload(user_prompt, response_text, client_ip)
+        result = await post_payload_json_async(
+            build_http_proxy_url(guardrails=False, response_guardrails=True, ingest_data=False), payload
+        )
+        allowed, reason, behaviour = _parse_guardrails_result(result)
+        if allowed:
+            logger.info("Response ALLOWED by guardrails")
+        else:
+            logger.warning(f"Response DENIED by guardrails: {reason}")
+        return allowed, reason, behaviour
+    except Exception as e:
+        logger.error(f"Guardrails response validation error (fail-open): {e}")
+        return True, "", ""
+
+
 async def call_guardrails_mcp_async(
     tool_name: str, tool_input: Any, mcp_server_name: str, client_ip: str
 ) -> Tuple[bool, str]:
@@ -415,6 +446,31 @@ async def ingest_blocked_mcp_async(
         logger.error(f"Blocked MCP ingestion error: {e}")
 
 
+async def ingest_blocked_response_async(
+    user_prompt: str, response_text: str, reason: str, client_ip: str
+) -> None:
+    if not _data_ingestion_url() or not AKTO_SYNC_MODE:
+        return
+    try:
+        payload = build_stop_ingestion_payload(user_prompt, response_text, client_ip)
+        payload["responseHeaders"] = json.dumps({
+            "x-claude-hook": "Stop",
+            "x-blocked-by": "Akto Proxy",
+            "content-type": "application/json",
+        })
+        payload["responsePayload"] = json.dumps({
+            "body": json.dumps({"x-blocked-by": "Akto Proxy", "reason": reason or "Policy violation"})
+        })
+        payload["statusCode"] = "403"
+        payload["status"] = "403"
+        await post_payload_json_async(
+            build_http_proxy_url(guardrails=False, ingest_data=True), payload
+        )
+        logger.info("Blocked response ingestion successful")
+    except Exception as e:
+        logger.error(f"Blocked response ingestion error: {e}")
+
+
 async def send_mcp_response_ingestion_async(
     tool_name: str, tool_input: Any, tool_response: Any, mcp_server_name: str, client_ip: str
 ) -> None:
@@ -442,7 +498,11 @@ async def send_stop_ingestion_async(user_prompt: str, response_text: str, client
     try:
         payload = build_stop_ingestion_payload(user_prompt, response_text, client_ip)
         await post_payload_json_async(
-            build_http_proxy_url(guardrails=not AKTO_SYNC_MODE, ingest_data=True), payload
+            build_http_proxy_url(
+                guardrails=False,
+                response_guardrails=not AKTO_SYNC_MODE,
+                ingest_data=True,
+            ), payload
         )
         logger.info("Conversation ingestion successful")
     except Exception as e:

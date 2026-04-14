@@ -25,6 +25,11 @@ import {
 
 const definedTableTabs = ["Users", "Devices"];
 
+const usersAndDevicesCountColumnOpts = {
+    endpointsColumnLabel: "Agentic assets",
+    endpointsColumnBoxWidth: "120px",
+};
+
 function UsersAndDevices() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
@@ -54,11 +59,15 @@ function UsersAndDevices() {
                 primaryColumnTitle: selectedTab === "users" ? "User" : "Device",
                 primaryColumnText: selectedTab === "users" ? "User" : "Device",
                 includeIconColumn: false,
+                ...usersAndDevicesCountColumnOpts,
             }),
         [selectedTab],
     );
 
-    const sortOptionsNoIcon = useMemo(() => getSortOptionsWithoutIconColumn(), []);
+    const sortOptionsNoIcon = useMemo(
+        () => getSortOptionsWithoutIconColumn(usersAndDevicesCountColumnOpts),
+        [],
+    );
 
     const getRiskScoreStatus = useCallback((riskScore) => {
         if (riskScore >= 4.5) return "critical";

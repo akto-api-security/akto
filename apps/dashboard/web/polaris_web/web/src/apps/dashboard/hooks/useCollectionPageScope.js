@@ -1,0 +1,71 @@
+import { useCallback, useMemo, useState } from 'react'
+import { getDashboardCategory, isAgenticSecurityCategory, mapLabel } from '@/apps/main/labelHelper'
+
+function scopeAllCollectionsRowLabel() {
+    if (isAgenticSecurityCategory()) {
+        return 'All Agentic collections'
+    }
+    return 'All ' + mapLabel('API', getDashboardCategory()) + ' collections'
+}
+
+function buildCollectionScopeSearchOptions(allCollections) {
+    const rows = (allCollections || [])
+        .filter((c) => c?.type !== 'API_GROUP')
+        .map((c) => {
+            const name = c.displayName ?? c.name
+            const label =
+                name != null && String(name).trim() !== '' ? String(name) : `Collection ${c.id}`
+            return { label, value: c.id }
+        })
+    return [
+        { label: scopeAllCollectionsRowLabel(), value: 'all' },
+        ...rows,
+    ]
+}
+
+/**
+ * Shared page-level API collection filter (single select today; values are ids for future multi-select).
+ */
+export function useCollectionPageScope(allCollections) {
+    const collectionSearchOptions = useMemo(
+        () => buildCollectionScopeSearchOptions(allCollections),
+        [allCollections],
+    )
+
+    const [selectedCollectionId, setSelectedCollectionId] = useState(null)
+
+    const pageScopeApiCollectionIds = useMemo(
+        () => (selectedCollectionId == null ? [] : [selectedCollectionId]),
+        [selectedCollectionId],
+    )
+
+    const collectionScopeLabel = useMemo(() => {
+        if (selectedCollectionId == null) {
+            return collectionSearchOptions[0]?.label ?? ''
+        }
+        const found = collectionSearchOptions.find((o) => o.value === selectedCollectionId)
+        return found?.label ?? ''
+    }, [selectedCollectionId, collectionSearchOptions])
+
+    const onCollectionScopeSelect = useCallback((val) => {
+        setSelectedCollectionId(val === 'all' || val == null || val === '' ? null : Number(val))
+    }, [])
+
+    const collectionScopePreSelected = useMemo(
+        () => (selectedCollectionId == null ? ['all'] : [selectedCollectionId]),
+        [selectedCollectionId],
+    )
+
+    const collectionSearchPlaceholder = mapLabel('API', getDashboardCategory()) + ' collection'
+
+    return {
+        collectionSearchOptions,
+        selectedCollectionId,
+        setSelectedCollectionId,
+        pageScopeApiCollectionIds,
+        collectionScopeLabel,
+        onCollectionScopeSelect,
+        collectionScopePreSelected,
+        collectionSearchPlaceholder,
+    }
+}

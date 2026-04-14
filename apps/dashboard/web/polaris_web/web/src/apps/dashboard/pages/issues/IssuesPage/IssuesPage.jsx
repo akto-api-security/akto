@@ -1,17 +1,18 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubServerTable from "../../../components/tables/GithubServerTable"
-import { useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 import api from "../api"
 import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
 import { ActionList, Badge, Box, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, TextField, Text } from "@shopify/polaris";
+import DropdownSearch from "../../../components/shared/DropdownSearch";
+import { useCollectionPageScope } from "../../../hooks/useCollectionPageScope";
 import CompulsoryDescriptionModal from "../components/CompulsoryDescriptionModal.jsx";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import { SelectCollectionComponent } from "../../testing/TestRunsPage/TestrunsBannerComponent"
-import { useEffect } from "react";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import { useSearchParams } from "react-router-dom";
 import TestRunResultPage from "../../testing/TestRunResultPage/TestRunResultPage";
@@ -248,6 +249,32 @@ function IssuesPage() {
 
     const hostNameMap = PersistStore.getState().hostNameMap
     const tagsCollectionsMap = PersistStore.getState().tagCollectionsMap
+    const allCollections = PersistStore((state) => state.allCollections) || []
+
+    const {
+        collectionSearchOptions,
+        selectedCollectionId,
+        pageScopeApiCollectionIds,
+        collectionScopeLabel,
+        onCollectionScopeSelect,
+        collectionScopePreSelected,
+        collectionSearchPlaceholder,
+    } = useCollectionPageScope(allCollections)
+
+    const mergeFilterCollectionsId = (filters, pageScopeIds) => {
+        const norm = (v) => {
+            if (v == null) return []
+            if (Array.isArray(v)) return v
+            if (typeof v === 'object' && Array.isArray(v?.values)) return v.values
+            return []
+        }
+        const apiFromTable = norm(filters?.apiCollectionId)
+        const baseApi = pageScopeIds?.length ? pageScopeIds : apiFromTable
+        let out = [...baseApi, ...norm(filters?.collectionIds)]
+        const tagKeys = norm(filters?.tagsId)
+        const tagCollectionIds = tagKeys.flatMap((tag) => tagsCollectionsMap[tag] || [])
+        return out.concat(tagCollectionIds)
+    }
 
 
     const setToastConfig = Store(state => state.setToastConfig)
@@ -302,7 +329,7 @@ function IssuesPage() {
 
     useEffect(() => {
         setKey(!key)
-    }, [startTimestamp, endTimestamp])
+    }, [startTimestamp, endTimestamp, selectedCollectionId])
 
     useEffect(() => {
         const hash = (window.location.hash || '').replace('#', '').toLowerCase();
@@ -731,7 +758,7 @@ function IssuesPage() {
     }
 
     const fetchIssuesByApisData = async () => {
-        await api.fetchIssuesByApis().then((res) => {
+        await api.fetchIssuesByApis(pageScopeApiCollectionIds).then((res) => {
             if (res && res.countByAPIs) {
                 setIssuesByApis(res.countByAPIs)
             } else {
@@ -767,11 +794,54 @@ function IssuesPage() {
 
 
     useEffect(() => {
-        fetchIssuesByApisData()
         issuesFunctions.fetchIntegrationCustomFieldsMetadata();
-    }, [])
+    }, []);
+
+    useEffect(() => {
+        fetchIssuesByApisData()
+    }, [selectedCollectionId, startTimestamp, endTimestamp])
 
 
+
+    const handleAgeBucketClick = (bucketLabel) => {
+        const now = Math.floor(Date.now() / 1000);
+        let since, until;
+        if      (bucketLabel === '<7 days')    { since = now - 7 * 86400;  until = now; }
+        else if (bucketLabel === '7-14 days')  { since = now - 14 * 86400; until = now - 7 * 86400; }
+        else if (bucketLabel === '15-30 days') { since = now - 30 * 86400; until = now - 14 * 86400; }
+        else                                   { since = 0;                until = now - 30 * 86400; }
+
+        const pageKey = "/dashboard/reports/issues/#" + selectedTab;
+        const prev = PersistStore.getState().filtersMap;
+        const existingFilters = (prev[pageKey]?.filters || []).filter(f => f.key !== 'severity');
+        PersistStore.getState().setFiltersMap({
+            ...prev,
+            [pageKey]: { filters: [...existingFilters, { key: 'severity', value: ['CRITICAL'] }], sort: prev[pageKey]?.sort || [] }
+        });
+
+        const sinceDate = new Date(since * 1000);
+        const untilDate = new Date(until * 1000);
+        dispatchCurrDateRange({
+            type: "update",
+            period: { since: sinceDate, until: untilDate },
+            title: sinceDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) + " - " +
+                   untilDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+            alias: "custom"
+        });
+
+        setKey(k => !k);
+    };
+
+    const handleVulnCategoryClick = (filterType, filterValue) => {
+        const pageKey = "/dashboard/reports/issues/#" + selectedTab;
+        const prev = PersistStore.getState().filtersMap;
+        const existing = (prev[pageKey]?.filters || []).filter(f => f.key !== filterType);
+        PersistStore.getState().setFiltersMap({
+            ...prev,
+            [pageKey]: { filters: [...existing, { key: filterType, value: [filterValue] }], sort: prev[pageKey]?.sort || [] }
+        });
+        setKey(k => !k);
+    };
 
     const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
         setTableLoading(true)
@@ -779,16 +849,12 @@ function IssuesPage() {
         let filterSeverity = filters.severity
         let filterCompliance = filters.compliance
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
-        const apiCollectionId = filters.apiCollectionId || []
-        let filterCollectionsId = apiCollectionId.concat(filters.collectionIds)
+        const filterCollectionsId = mergeFilterCollectionsId(filters, pageScopeApiCollectionIds)
         let filterSubCategory = []
         filters?.issueCategory?.forEach((issue) => {
             filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
         })
         filterSubCategory = [...filterSubCategory, ...filters?.issueName]
-        const selectedTagsCollectionId = filters.tagsId || []
-        const tagCollectionIds = selectedTagsCollectionId.map((tag) => tagsCollectionsMap[tag]).flat()
-        filterCollectionsId = filterCollectionsId.concat(tagCollectionIds)
         const collectionIdsArray = filterCollectionsId.map((x) => { return x.toString() })
 
         let obj = {
@@ -892,8 +958,7 @@ function IssuesPage() {
         let filterSeverity = filters?.severity || []
         let filterCompliance = filters?.compliance || []
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
-        const apiCollectionId = filters?.apiCollectionId || []
-        let filterCollectionsId = (apiCollectionId || []).concat(filters?.collectionIds || [])
+        const filterCollectionsId = mergeFilterCollectionsId(filters, pageScopeApiCollectionIds)
         let filterSubCategory = []
         filters?.issueCategory?.forEach((issue) => {
             filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
@@ -950,8 +1015,7 @@ function IssuesPage() {
         let filterSeverity = filters?.severity || []
         let filterCompliance = filters?.compliance || []
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
-        const apiCollectionId = filters?.apiCollectionId || []
-        let filterCollectionsId = (apiCollectionId || []).concat(filters?.collectionIds || [])
+        const filterCollectionsId = mergeFilterCollectionsId(filters, pageScopeApiCollectionIds)
         let filterSubCategory = []
         filters?.issueCategory?.forEach((issue) => {
             filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
@@ -1019,24 +1083,25 @@ function IssuesPage() {
                 key={"issues-summary-graph-details"}
                 startTimestamp={startTimestamp}
                 endTimestamp={endTimestamp}
+                filterCollectionsId={pageScopeApiCollectionIds}
             />
 
             <IssuesGraphsGroup heading="Issues summary">
                 {[
                     <HorizontalGrid gap={5} columns={2} key="critical-issues-graph-detail">
-                        <CriticalUnresolvedApisByAge />
-                        <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+                        <CriticalUnresolvedApisByAge onBarClick={handleAgeBucketClick} apiCollectionIds={pageScopeApiCollectionIds} />
+                        <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} onBarClick={handleVulnCategoryClick} filterCollectionsId={pageScopeApiCollectionIds} />
                     </HorizontalGrid>,
                     <HorizontalGrid columns={2} gap={4} key="open-issues-graphs">
                         <ApisWithMostOpenIsuuesGraph issuesData={issuesByApis} />
                         <IssuesByCollection collectionsData={issuesByApis} />
                     </HorizontalGrid>,
-                    <AllUnsecuredAPIsOverTimeGraph key="unsecured-over-time" startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+                    <AllUnsecuredAPIsOverTimeGraph key="unsecured-over-time" startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} apiCollectionIds={pageScopeApiCollectionIds} />
                 ]}
             </IssuesGraphsGroup>
 
             <GithubServerTable
-                key={key}
+                key={`${key}-${selectedCollectionId ?? 'all'}`}
                 pageLimit={50}
                 fetchData={fetchTableData}
                 appliedFilters={appliedFilters}
@@ -1099,6 +1164,18 @@ function IssuesPage() {
                 primaryAction={<Button primary onClick={() => openVulnerabilityReport([], false)} disabled={showEmptyScreen}>Export results</Button>}
                 secondaryActions={
                     <HorizontalStack gap={2}>
+                        <Box minWidth="240px">
+                            <DropdownSearch
+                                id="issues-api-collection-dropdown"
+                                placeholder={collectionSearchPlaceholder}
+                                optionsList={collectionSearchOptions}
+                                value={collectionScopeLabel}
+                                preSelected={collectionScopePreSelected}
+                                setSelected={onCollectionScopeSelect}
+                                disabled={showEmptyScreen}
+                                sliceMaxVal={50}
+                            />
+                        </Box>
                         <DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />
                         <Popover
                             active={popOverActive}
