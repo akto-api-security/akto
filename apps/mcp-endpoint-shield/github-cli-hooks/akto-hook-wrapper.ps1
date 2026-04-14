@@ -7,6 +7,7 @@ $env:AKTO_SYNC_MODE = "true"
 $env:AKTO_TIMEOUT = "5"
 $env:AKTO_CONNECTOR = "vscode"
 $env:CONTEXT_SOURCE = "ENDPOINT"
+$env:AKTO_API_TOKEN = "{{AKTO_API_TOKEN}}"
 
 $env:LOG_DIR = "$env:USERPROFILE\akto\.github\akto\vscode\logs"
 $env:LOG_LEVEL = "INFO"
