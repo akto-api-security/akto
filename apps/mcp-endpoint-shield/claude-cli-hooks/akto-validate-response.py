@@ -2,11 +2,12 @@
 import json
 import logging
 import os
+import socket
 import ssl
 import sys
+import time
 import urllib.request
 from typing import Any, Dict, Union
-import time
 
 
 from akto_machine_id import get_machine_id, get_username
@@ -56,6 +57,17 @@ if MODE == "atlas":
 else:
     CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
     logger.info(f"MODE: {MODE}, CLAUDE_API_URL: {CLAUDE_API_URL}")
+
+
+def get_device_ip() -> str:
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "0.0.0.0"
 
 
 def create_ssl_context():
@@ -144,14 +156,14 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
         "method": "POST",
         "requestPayload": request_payload,
         "responsePayload": response_payload,
-        "ip": get_username(),
+        "ip": get_username() if MODE == "atlas" else get_device_ip(),
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": "200",
         "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
-        "akto_vxlan_id": device_id,
+        "akto_vxlan_id": "0",
         "is_pending": "false",
         "source": "MIRRORING",
         "direction": None,
