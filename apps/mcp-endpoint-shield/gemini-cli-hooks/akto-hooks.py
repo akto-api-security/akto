@@ -2,6 +2,7 @@
 """Single dispatch file for all Akto Cursor hooks. Usage: python3 akto-hooks.py <hookName>"""
 import os
 import sys
+import json
 
 if not os.getenv("LOG_DIR"):
     os.environ["LOG_DIR"] = os.path.expanduser("~/.gemini/akto/chat-logs")
@@ -30,6 +31,8 @@ if __name__ == "__main__":
 
     if hook in _OBSERVABILITY_HOOKS:
         run_observability_hook(hook, _OBSERVABILITY_HOOKS[hook])
+        sys.stdout.write(json.dumps({}))
+        sys.exit(0)
     elif hook in _BLOCKING_HOOKS:
         run_blocking_hook(hook, _BLOCKING_HOOKS[hook])
     else:
