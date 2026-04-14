@@ -133,20 +133,12 @@ def create_hooks(client_ip: str = ""):
             asyncio.create_task(send_stop_ingestion_async(user_prompt, response_text, _ip))
             return {}
 
-        gr_allowed, gr_reason, behaviour = await call_guardrails_response_async(
+        gr_allowed, gr_reason, _ = await call_guardrails_response_async(
             user_prompt, response_text, _ip
         )
-        fingerprint = prompt_fingerprint(response_text)
-        allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
 
-        if not allowed:
-            if _is_warn_behaviour(behaviour):
-                block_reason = (
-                    "Warning: response blocked, please review it. Send again to bypass. "
-                    f"Reason: {gr_reason}"
-                )
-            else:
-                block_reason = f"Response blocked by Akto Guardrails: {gr_reason}"
+        if not gr_allowed:
+            block_reason = f"Response blocked by Akto Guardrails: {gr_reason}"
 
             logger.warning(f"BLOCKING response — reason: {gr_reason}")
             asyncio.create_task(
