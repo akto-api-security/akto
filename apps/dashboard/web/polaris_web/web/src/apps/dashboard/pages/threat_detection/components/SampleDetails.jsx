@@ -224,6 +224,7 @@ function SampleDetails(props) {
                     sampleData={data && Array.isArray(data) && data.length > 0 ? data.map((result) => {
                         return { message: result.orig, highlightPaths: [], metadata: result.metadata }
                     }) : []}
+                    redactHeaders={window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : []}
                 />
             </Box>)
     }
