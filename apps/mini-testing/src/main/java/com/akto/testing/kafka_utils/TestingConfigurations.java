@@ -27,6 +27,7 @@ public class TestingConfigurations {
     Map<String, TestConfig> testConfigMap;
     private  Map<ApiInfoKey, RawApi> rawApiMap = new HashMap<>();
     private boolean doNotMarkIssuesAsFixed;
+    private boolean runAutomatedTests;
 
     private TestingConfigurations() {
     }
@@ -35,13 +36,14 @@ public class TestingConfigurations {
         return instance;
     }
 
-    public synchronized void init(TestingUtil testingUtil, TestingRunConfig testingRunConfig, boolean debug, Map<String, TestConfig> testConfigMap, int maxConcurrentRequests, boolean doNotMarkIssuesAsFixed) {
+    public synchronized void init(TestingUtil testingUtil, TestingRunConfig testingRunConfig, boolean debug, Map<String, TestConfig> testConfigMap, int maxConcurrentRequests, boolean doNotMarkIssuesAsFixed, boolean runAutomatedTests) {
         this.testingUtil = testingUtil;
         this.testingRunConfig = testingRunConfig;
         this.debug = debug;
         this.testConfigMap = testConfigMap;
         this.maxConcurrentRequest = maxConcurrentRequests == -1 ? 10 : maxConcurrentRequests;
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+        this.runAutomatedTests = runAutomatedTests;
     }
 
     public boolean isDebug() {
@@ -111,5 +113,13 @@ public class TestingConfigurations {
 
     public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+    }
+
+    public boolean isRunAutomatedTests() {
+        return runAutomatedTests;
+    }
+
+    public void setRunAutomatedTests(boolean runAutomatedTests) {
+        this.runAutomatedTests = runAutomatedTests;
     }
 }
