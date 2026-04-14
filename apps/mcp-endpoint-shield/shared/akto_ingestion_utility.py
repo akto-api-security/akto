@@ -216,9 +216,9 @@ def send_ingestion_data(
 
 # ── Hook runners ──────────────────────────────────────────────────────────────
 
-def run_observability_hook(hook_name: str, log_file: str) -> None:
+def run_observability_hook(hook_name: str) -> None:
     """Run a fire-and-forget observability hook: ingest input_data and exit."""
-    logger = setup_logger(log_file)
+    logger = setup_logger("hook-executions.log")
     logger.info(f"=== {hook_name} hook started ===")
     try:
         input_data = json.load(sys.stdin)
@@ -237,9 +237,9 @@ def run_observability_hook(hook_name: str, log_file: str) -> None:
     sys.exit(0)
 
 
-def run_blocking_hook(hook_name: str, log_file: str) -> None:
+def run_blocking_hook(hook_name: str) -> None:
     """Run a blocking hook: ingest input_data with guardrails and deny if not allowed."""
-    logger = setup_logger(log_file)
+    logger = setup_logger("hook-executions.log")
     logger.info(f"=== {hook_name} hook started ===")
     try:
         input_data = json.load(sys.stdin)
