@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo,useRef, useState } from 'react';
 import { Text } from '@shopify/polaris';
 import InfoCard from '../../dashboard/new_components/InfoCard';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
@@ -19,6 +19,7 @@ const ApiCollectionCoverageGraph = ({ apiCollectionIds }) => {
     () => (apiCollectionIds?.length ? apiCollectionIds.join(',') : 'all'),
     [apiCollectionIds],
   )
+  const sortedCollectionsRef = useRef([]);
 
   const fetchCoverageData = async () => {
     setShowTestingComponents(false);
@@ -44,6 +45,8 @@ const ApiCollectionCoverageGraph = ({ apiCollectionIds }) => {
           return a.ratio - b.ratio; // lower ratio first
         })
         .slice(0, 5);
+
+      sortedCollectionsRef.current = sortedCollections;
 
       const results = sortedCollections.map(col => ({
         name: col.displayName,
@@ -74,6 +77,12 @@ const ApiCollectionCoverageGraph = ({ apiCollectionIds }) => {
     fetchCoverageData();
   }, [filterKey, allCollections]);
 
+  const handleBarClick = function() {
+    const clickedName = this.category;
+    const col = sortedCollectionsRef.current?.find(c => c.displayName === clickedName);
+    if (col) window.open('/dashboard/observe/inventory/' + col.id, '_blank');
+  };
+
   const coverageGraph = (chartData && chartData.length > 0) ? (
     <InfoCard
       component={
@@ -81,6 +90,7 @@ const ApiCollectionCoverageGraph = ({ apiCollectionIds }) => {
           type="column"
           height="280px"
           data={chartData}
+          graphPointClick={handleBarClick}
           yAxisTitle={`Number of ${mapLabel("APIs", getDashboardCategory())}`}
           text={true}
           showGridLines={true}
