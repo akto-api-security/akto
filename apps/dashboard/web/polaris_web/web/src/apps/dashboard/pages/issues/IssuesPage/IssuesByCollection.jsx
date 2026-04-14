@@ -1,17 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import InfoCard from '../../dashboard/new_components/InfoCard';
 import BarGraph from '../../../components/charts/BarGraph';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import { Text } from '@shopify/polaris';
 import PersistStore from '../../../../main/PersistStore';
 
-const IssuesByCollection = ({ collectionsData }) => {
+const IssuesByCollection = ({ collectionsData, onBarClick }) => {
   const [barData, setBarData] = useState([]);
   const apiCollectionMap = PersistStore.getState().collectionsMap;  
 
   function processCollectionsData() {
     let tempBarData = [];
-    if (!collectionsData || collectionsData.length === 0) {
+    if (!collectionsData || Object.keys(collectionsData).length === 0) {
       setBarData([]);
       return;
     }
@@ -58,7 +58,7 @@ const IssuesByCollection = ({ collectionsData }) => {
             yAxisTitle="Number of Issues"
             barWidth={30}
             defaultChartOptions={{ legend: { enabled: false } }}
-            onBarClick={(name, custom) => { if (custom?.id) window.open('/dashboard/observe/inventory/' + custom.id, '_blank'); }}
+            onBarClick={onBarClick}
           />
         }
       />

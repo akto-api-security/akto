@@ -829,6 +829,7 @@ function IssuesPage() {
             alias: "custom"
         });
 
+        func.setToast(true, false, "Table filtered by Critical severity - scroll down to view results");
         setKey(k => !k);
     };
 
@@ -840,6 +841,21 @@ function IssuesPage() {
             ...prev,
             [pageKey]: { filters: [...existing, { key: filterType, value: [filterValue] }], sort: prev[pageKey]?.sort || [] }
         });
+        
+        func.setToast(true, false, `Table filtered by "${filterValue}" — scroll down to view results`);
+        setKey(k => !k);
+    };
+
+    const handleCollectionClick = (name, custom) => {
+        if (!custom?.id) return;
+        const pageKey = "/dashboard/reports/issues/#" + selectedTab;
+        const prev = PersistStore.getState().filtersMap;
+        const existing = (prev[pageKey]?.filters || []).filter(f => f.key !== 'apiCollectionId');
+        PersistStore.getState().setFiltersMap({
+            ...prev,
+            [pageKey]: { filters: [...existing, { key: 'apiCollectionId', value: [custom.id] }], sort: prev[pageKey]?.sort || [] }
+        });
+        func.setToast(true, false, `Table filtered by "${name}" - scroll down to view results`);
         setKey(k => !k);
     };
 
@@ -1094,7 +1110,7 @@ function IssuesPage() {
                     </HorizontalGrid>,
                     <HorizontalGrid columns={2} gap={4} key="open-issues-graphs">
                         <ApisWithMostOpenIsuuesGraph issuesData={issuesByApis} />
-                        <IssuesByCollection collectionsData={issuesByApis} />
+                        <IssuesByCollection collectionsData={issuesByApis} onBarClick={handleCollectionClick} />
                     </HorizontalGrid>,
                     <AllUnsecuredAPIsOverTimeGraph key="unsecured-over-time" startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} apiCollectionIds={pageScopeApiCollectionIds} />
                 ]}
