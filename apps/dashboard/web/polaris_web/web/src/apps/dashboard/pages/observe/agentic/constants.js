@@ -39,7 +39,7 @@ export const getHeaders = (options = {}) => {
     const headers = [
         { title: "", text: "", value: "iconComp", isText: CellType.TEXT, boxWidth: '24px' },
         { title: primaryTitle, text: primaryText, value: "groupName", filterKey: "groupName", textValue: "groupName", showFilter: true, sortActive: true },
-        { title: "Type", text: "Type", value: "clientType", filterKey: "clientType", textValue: "clientType", boxWidth: "120px" },
+        { title: "Type", text: "Type", value: "clientType", filterKey: "clientType", textValue: "clientType", boxWidth: "220px" },
         { 
             title: endpointsColumnLabel, 
             text: endpointsColumnLabel, 
