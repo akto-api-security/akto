@@ -8,7 +8,7 @@
             "name": "akto-validate-prompt",
             "type": "command",
             "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-validate-prompt-wrapper.sh",
-            "timeout": 10000
+            "timeout": 10000,
             "description": "Validates prompts against Akto Guardrails before sending to Gemini"
           }
         ]
@@ -22,8 +22,125 @@
             "name": "akto-validate-response",
             "type": "command",
             "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-validate-response-wrapper.sh",
-            "timeout": 10000
+            "timeout": 10000,
             "description": "Sends prompt/response pairs to Akto for ingestion"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "akto-validate-session-start",
+            "type": "command",
+            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-hook-wrapper.sh akto-hooks.py SessionStart",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "akto-validate-session-end",
+            "type": "command",
+            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-hook-wrapper.sh akto-hooks.py SessionEnd",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "BeforeAgent": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "akto-validate-before-agent",
+            "type": "command",
+            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-hook-wrapper.sh akto-hooks.py BeforeAgent",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "akto-validate-after-agent",
+            "type": "command",
+            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-hook-wrapper.sh akto-hooks.py AfterAgent",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "BeforeToolSelection": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "akto-validate-before-tool-selection",
+            "type": "command",
+            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-hook-wrapper.sh akto-hooks.py BeforeToolSelection",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "akto-validate-before-tool",
+            "type": "command",
+            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-hook-wrapper.sh akto-hooks.py BeforeTool",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "AfterTool": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "akto-validate-after-tool",
+            "type": "command",
+            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-hook-wrapper.sh akto-hooks.py AfterTool",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "PreCompress": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "akto-validate-pre-compress",
+            "type": "command",
+            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-hook-wrapper.sh akto-hooks.py PreCompress",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "akto-validate-notification",
+            "type": "command",
+            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-hook-wrapper.sh akto-hooks.py Notification",
+            "timeout": 10000
           }
         ]
       }

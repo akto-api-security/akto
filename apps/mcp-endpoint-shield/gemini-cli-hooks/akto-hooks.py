@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Single dispatch file for all Akto VSCode Copilot hooks. Usage: python3 akto-hooks.py <hookName>"""
+"""Single dispatch file for all Akto Cursor hooks. Usage: python3 akto-hooks.py <hookName>"""
 import os
 import sys
+import json
 
 if not os.getenv("LOG_DIR"):
-    os.environ["LOG_DIR"] = os.path.expanduser("~/akto/.github/akto/vscode/logs")
+    os.environ["LOG_DIR"] = os.path.expanduser("~/.gemini/akto/chat-logs")
 
 from akto_ingestion_utility import run_observability_hook, run_blocking_hook
 
 _BLOCKING_HOOKS = {
-    "Stop",
-    "SubagentStop",
+    "BeforeAgent",
+    "BeforeTool",
+    "AfterTool"
 }
 
 if __name__ == "__main__":

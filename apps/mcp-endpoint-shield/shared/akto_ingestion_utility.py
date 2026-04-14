@@ -28,8 +28,9 @@ _CONNECTOR_TAG: Dict[str, str] = {
     "claude_code_cli": "claudecli",
     "cursor": "cursor",
     "vscode": "vscode",
-    "gemini": "gemini",
+    "gemini_cli": "geminicli",
     "github": "github",
+    "codex_cli": "codexcli"
 }
 TAG_NAME = _CONNECTOR_TAG.get(AKTO_CONNECTOR, AKTO_CONNECTOR)
 
@@ -216,9 +217,9 @@ def send_ingestion_data(
 
 # ── Hook runners ──────────────────────────────────────────────────────────────
 
-def run_observability_hook(hook_name: str, log_file: str) -> None:
+def run_observability_hook(hook_name: str) -> None:
     """Run a fire-and-forget observability hook: ingest input_data and exit."""
-    logger = setup_logger(log_file)
+    logger = setup_logger("hook-executions.log")
     logger.info(f"=== {hook_name} hook started ===")
     try:
         input_data = json.load(sys.stdin)
@@ -237,9 +238,9 @@ def run_observability_hook(hook_name: str, log_file: str) -> None:
     sys.exit(0)
 
 
-def run_blocking_hook(hook_name: str, log_file: str) -> None:
+def run_blocking_hook(hook_name: str) -> None:
     """Run a blocking hook: ingest input_data with guardrails and deny if not allowed."""
-    logger = setup_logger(log_file)
+    logger = setup_logger("hook-executions.log")
     logger.info(f"=== {hook_name} hook started ===")
     try:
         input_data = json.load(sys.stdin)
