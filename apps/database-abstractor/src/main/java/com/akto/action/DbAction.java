@@ -43,6 +43,7 @@ import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.runtime_filters.RuntimeFilter;
@@ -189,6 +190,9 @@ public class DbAction extends ActionSupport {
 
     @Getter @Setter
     private List<SessionDocument> sessionDocuments;
+
+    @Getter @Setter
+    private AgentQueryData agentQueryData;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
@@ -3630,6 +3634,16 @@ public class DbAction extends ActionSupport {
             DbLayer.storeSpans(spans);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in storeSpans " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String storeAgentQueryData() {
+        try {
+            DbLayer.storeAgentQueryData(agentQueryData);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in storeAgentQueryData " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
