@@ -233,8 +233,8 @@ def run_observability_hook(hook_name: str, log_file: str) -> None:
         logger.info(f"=== {hook_name} hook completed ===")
     except Exception as e:
         logger.error(f"Main error: {e}")
-    # print(json.dumps({}))
-    # sys.exit(0)
+    print(json.dumps({}))
+    sys.exit(0)
 
 
 def run_blocking_hook(hook_name: str, log_file: str) -> None:
