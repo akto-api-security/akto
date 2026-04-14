@@ -34,17 +34,19 @@ export const getHeaders = (options = {}) => {
     const primaryTitle = options.primaryColumnTitle ?? "Agentic asset";
     const primaryText = options.primaryColumnText ?? primaryTitle;
     const includeIconColumn = options.includeIconColumn !== false;
+    const endpointsColumnLabel = options.endpointsColumnLabel ?? "Endpoints";
+    const endpointsColumnBoxWidth = options.endpointsColumnBoxWidth ?? "80px";
     const headers = [
         { title: "", text: "", value: "iconComp", isText: CellType.TEXT, boxWidth: '24px' },
         { title: primaryTitle, text: primaryText, value: "groupName", filterKey: "groupName", textValue: "groupName", showFilter: true, sortActive: true },
         { title: "Type", text: "Type", value: "clientType", filterKey: "clientType", textValue: "clientType", boxWidth: "120px" },
         { 
-            title: "Endpoints", 
-            text: "Endpoints", 
+            title: endpointsColumnLabel, 
+            text: endpointsColumnLabel, 
             value: "endpointsCount", 
             isText: CellType.TEXT, 
             sortActive: true, 
-            boxWidth: "80px",
+            boxWidth: endpointsColumnBoxWidth,
             mergeType: (a, b) => (a || 0) + (b || 0),
             shouldMerge: true
         },
@@ -101,8 +103,14 @@ export const sortOptions = [
 ];
 
 /** Same as sortOptions but column indices shifted when the icon column is omitted from headers. */
-export const getSortOptionsWithoutIconColumn = () =>
-    sortOptions.map((o) => ({ ...o, columnIndex: o.columnIndex - 1 }));
+export const getSortOptionsWithoutIconColumn = (opts = {}) => {
+    const endpointsColumnLabel = opts.endpointsColumnLabel ?? "Endpoints";
+    return sortOptions.map((o) => ({
+        ...o,
+        columnIndex: o.columnIndex - 1,
+        ...(o.sortKey === "endpointsCount" ? { label: endpointsColumnLabel } : {}),
+    }));
+};
 
 export const resourceName = { singular: "Agentic asset", plural: "Agentic assets" };
 
