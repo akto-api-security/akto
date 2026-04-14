@@ -101,9 +101,9 @@ public class RBACDao extends CommonContextDao<RBAC> {
             return new ArrayList<>();
         }
 
-        String role = fetchRole(rbac);
-        if(role != null && !role.isEmpty()){
-            if(role.equals(Role.ADMIN.getName())){
+        String currentRole = fetchRole(rbac);
+        if(currentRole != null && !currentRole.isEmpty()){
+            if(currentRole.equals(Role.ADMIN.getName())){
                 logger.debug(String.format("Rbac is admin userId: %d accountId: %d", userId, accountId));
                 return null;
             }
@@ -117,9 +117,6 @@ public class RBACDao extends CommonContextDao<RBAC> {
          * For API collectionIds, we need to merge
          * collections from the custom role and the user role.
          */
-
-        String currentRole = null;
-        currentRole = fetchRole(rbac);
 
         if(currentRole!= null && currentRole.isEmpty()){
             currentRole = rbac.getRole();
