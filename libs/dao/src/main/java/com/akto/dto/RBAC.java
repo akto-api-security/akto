@@ -162,7 +162,6 @@ public class RBAC {
         return scopeRoleMapping;
     }
 
-
     public Role getRoleForScope(CONTEXT_SOURCE scope) {
         if (scope == null) {
             return null;
