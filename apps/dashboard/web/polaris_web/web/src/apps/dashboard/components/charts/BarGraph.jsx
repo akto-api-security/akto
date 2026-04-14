@@ -15,7 +15,7 @@ function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xA
             y: x.value,
             color: x.color,
             name: x.text,
-            custom: x.id !== undefined ? { id: x.id } : (x.filterKey !== undefined ? { filterKey: x.filterKey } : {})
+            custom: { ...(x.id !== undefined ? { id: x.id } : {}), ...(x.filterKey !== undefined ? { filterKey: x.filterKey } : {}), ...(x.url !== undefined ? { url: x.url } : {}), ...(x.method !== undefined ? { method: x.method } : {}) }
         })
     })
     const chartOptions = {
