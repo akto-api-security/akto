@@ -3,6 +3,7 @@ package com.akto.dto;
 
 import org.bson.types.ObjectId;
 
+import com.akto.dao.CustomRoleDao;
 import com.akto.dto.rbac.*;
 
 import com.akto.dto.rbac.RbacEnums.Feature;
@@ -11,9 +12,9 @@ import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
+
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 public class RBAC {
 
@@ -30,21 +31,29 @@ public class RBAC {
 
     public static final String ALLOWED_FEATURES_FOR_USER = "allowedFeaturesForUser";
 
-    @Getter 
+    @Getter
     @Setter
     private List<String> allowedFeaturesForUser;
 
     // special features for RBAC, we can add more features here when needed
     public static final List<String> SPECIAL_FEATURES_FOR_RBAC = Arrays.asList(
-        "THREAT_DETECTION",
-        "AI_AGENTS"
+            "THREAT_DETECTION",
+            "AI_AGENTS"
     );
+
+    public static final String SCOPE_ROLE_MAPPING = "scopeRoleMapping";
+    @Getter
+    @Setter
+    private Map<String, String> scopeRoleMapping;
 
     public enum Role {
         ADMIN("ADMIN",new AdminRoleStrategy()),
         MEMBER("SECURITY ENGINEER", new MemberRoleStrategy()),
         DEVELOPER("DEVELOPER", new DeveloperRoleStrategy()),
-        GUEST("GUEST", new GuestRoleStrategy());
+        GUEST("GUEST", new GuestRoleStrategy()),
+        THREAT_ENGINEER("THREAT ENGINEER", new ThreatEngineerRoleStrategy()),
+        THREAT_VIEWER("THREAT VIEWER", new ThreatViewerRoleStrategy()),
+        NO_ACCESS("NO ACCESS", new NoAccessRoleStrategy());
 
         private final RoleStrategy roleStrategy;
         private String name;
@@ -86,6 +95,13 @@ public class RBAC {
         this.accountId = accountId;
         this.apiCollectionsId = new ArrayList<>();
         this.allowedFeaturesForUser = new ArrayList<>();
+    }
+
+    public RBAC(int userId, String role, int accountId, Map <String,String> scopeRoleMapping) {
+        this.userId = userId;
+        this.role = role;
+        this.accountId = accountId;
+        this.scopeRoleMapping = scopeRoleMapping;
     }
 
     public RBAC() {
