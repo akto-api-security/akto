@@ -367,7 +367,7 @@ public class TestExecutor {
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
 
         // init the singleton class here
-        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed());
+        TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getRunAutomatedTests());
         //Clear the cache for sample data
         VariableResolver.clearSampleDataCache();
         totalTestsCount.set(
@@ -1074,6 +1074,7 @@ public class TestExecutor {
                                        ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, RawApi rawApi) {
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
+        Boolean agenticTestingAllowed = testConfig.getInfo().getAgenticTestingAllowed();
         if(shouldCallClientLayerForSampleData){
             try {
                 long start = System.currentTimeMillis();
@@ -1139,6 +1140,12 @@ public class TestExecutor {
         }
         if(testSubType != null) {
             varMap.put("testSubType", testSubType);
+        }
+        if(agenticTestingAllowed != null) {
+            varMap.put("agenticTestingAllowed", agenticTestingAllowed);
+        }
+        if (testConfig.getContent() != null) {
+            varMap.put("yaml_template_content", testConfig.getContent());
         }
 
         String testExecutionLogId = UUID.randomUUID().toString();
