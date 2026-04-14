@@ -39,6 +39,11 @@ public class Gateway {
                                     "preCompact", "beforeTabFileRead", "afterTabFileEdit")));
                     put("vscode", new HashSet<>(Arrays.asList("SessionStart", "Stop",
                             "SubagentStart", "SubagentStop", "PreCompact")));
+                    put("codex_cli", new HashSet<>(Arrays.asList("SessionStart")));
+                    put("gemini_cli",
+                            new HashSet<>(Arrays.asList("SessionStart", "SessionEnd", "BeforeAgent",
+                                    "AfterAgent", "BeforeToolSelection", "BeforeTool", "AfterTool",
+                                    "PreCompress", "Notification")));
                 }
             };
 
