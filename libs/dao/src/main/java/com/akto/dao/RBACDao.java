@@ -53,27 +53,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
         Role actualRole = Role.MEMBER;
         String currentRole = null;
         if (userRbac != null) {
-            if (userRbac.getScopeRoleMapping() != null && !userRbac.getScopeRoleMapping().isEmpty()) {
-                try {
-                    CONTEXT_SOURCE contextSourceObj = Context.contextSource.get();
-                    if(contextSourceObj == null){
-                        contextSourceObj = CONTEXT_SOURCE.API;
-                    }
-                    String currentScope = contextSourceObj.name();
-                    String scopeRole = userRbac.getScopeRoleMapping().get(currentScope);
-                    if (scopeRole != null && !scopeRole.isEmpty()) {
-                        currentRole = scopeRole;
-                    }else{
-                        // as we remove complete scope role mapping, we need to return NO_ACCESS for all users for which scope role mapping is not present
-                        return Role.NO_ACCESS;
-                    }
-                } catch (Exception e) {
-                }
-            }
-            else {
-                currentRole = userRbac.getRole();
-            }
-
+            currentRole = instance.fetchRole(userRbac);
             if(currentRole == null){
                 return Role.MEMBER;
             }
@@ -87,6 +67,31 @@ public class RBACDao extends CommonContextDao<RBAC> {
         return actualRole;
     }
 
+    public String fetchRole (RBAC userRbac) {
+
+        String currentRole = null;
+        if (userRbac.getScopeRoleMapping() != null && !userRbac.getScopeRoleMapping().isEmpty()) {
+            try {
+                CONTEXT_SOURCE contextSourceObj = Context.contextSource.get();
+                if (contextSourceObj == null) {
+                    contextSourceObj = CONTEXT_SOURCE.API;
+                }
+                String currentScope = contextSourceObj.name();
+                String scopeRole = userRbac.getScopeRoleMapping().get(currentScope);
+                if (scopeRole != null && !scopeRole.isEmpty()) {
+                    currentRole = scopeRole;
+                } else {
+                    // as we remove complete scope role mapping, we need to return NO_ACCESS for all users for which scope role mapping is not present
+                    return Role.NO_ACCESS.getName();
+                }
+            } catch (Exception e) {
+            }
+        } else {
+            currentRole = userRbac.getRole();
+        }
+        return currentRole;
+    }
+
     
     public List<Integer> getUserCollectionsById(int userId, int accountId) {
         RBAC rbac = getCurrentRBACForUser(userId, accountId);
@@ -96,14 +101,11 @@ public class RBACDao extends CommonContextDao<RBAC> {
             return new ArrayList<>();
         }
 
-        if(rbac.getScopeRoleMapping()!= null && !rbac.getScopeRoleMapping().isEmpty()){
-            String currentScope = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
-            if (!currentScope.isEmpty()) {
-               if(rbac.getScopeRoleMapping().containsKey(currentScope)){
-                   rbac.getScopeRoleMapping().get(currentScope).equals(Role.ADMIN.name()) ;
-                   logger.debug(String.format("Rbac is admin from scoperolemapping userId: %d accountId: %d", userId, accountId));
-                   return null;
-               }
+        String role = fetchRole(rbac);
+        if(role != null && !role.isEmpty()){
+            if(role.equals(Role.ADMIN.getName())){
+                logger.debug(String.format("Rbac is admin userId: %d accountId: %d", userId, accountId));
+                return null;
             }
         }
          if (RBAC.Role.ADMIN.name().equals(rbac.getRole())) {
@@ -117,22 +119,9 @@ public class RBACDao extends CommonContextDao<RBAC> {
          */
 
         String currentRole = null;
-        if (rbac.getScopeRoleMapping() != null && !rbac.getScopeRoleMapping().isEmpty()) {
-            try {
-                Object contextSourceObj = Context.contextSource.get();
-                if (contextSourceObj != null) {
-                    String currentScope = contextSourceObj.toString();
-                    String scopeRole = rbac.getScopeRoleMapping().get(currentScope);
-                    if (scopeRole != null && !scopeRole.isEmpty()) {
-                        currentRole = scopeRole;
-                    }else{
-                        currentRole = Role.NO_ACCESS.name();
-                    }
-                }
-            } catch (Exception e) {
-            }
-        }
-        else {
+        currentRole = fetchRole(rbac);
+
+        if(currentRole!= null && currentRole.isEmpty()){
             currentRole = rbac.getRole();
         }
 
