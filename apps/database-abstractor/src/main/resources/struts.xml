@@ -2161,6 +2161,19 @@
             </result>
         </action>
 
+        <action name="api/fetchShouldBlockNewMCPServers" class="com.akto.action.DbAction" method="fetchShouldBlockNewMCPServers">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^blockNewMcpServers.*,^blockNewSkills.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchMcpAuditInfo" class="com.akto.action.DbAction" method="fetchMcpAuditInfo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

@@ -59,6 +59,28 @@ public class AccountSettings {
     private boolean enableDebugLogs;
     public static final String ENABLE_DEBUG_LOGS = "enableDebugLogs";
 
+    public static final String BLOCK_NEW_MCP_SERVERS = "blockNewMcpServers";
+    private boolean blockNewMcpServers;
+
+    public boolean isBlockNewMcpServers() {
+        return blockNewMcpServers;
+    }
+
+    public void setBlockNewMcpServers(boolean blockNewMcpServers) {
+        this.blockNewMcpServers = blockNewMcpServers;
+    }
+
+    public static final String BLOCK_NEW_SKILLS = "blockNewSkills";
+    private boolean blockNewSkills;
+
+    public boolean isBlockNewSkills() {
+        return blockNewSkills;
+    }
+
+    public void setBlockNewSkills(boolean blockNewSkills) {
+        this.blockNewSkills = blockNewSkills;
+    }
+
     public static final String INIT_STACK_TYPE = "initStackType";
 
     private Map<String, String> filterHeaderValueMap;

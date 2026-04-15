@@ -5507,6 +5507,29 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    // Fields for fetchShouldBlockNewMCPServers API
+    private boolean blockNewMcpServers;
+    private boolean blockNewSkills;
+
+    public boolean isBlockNewMcpServers() {
+        return blockNewMcpServers;
+    }
+
+    public boolean isBlockNewSkills() {
+        return blockNewSkills;
+    }
+
+    public String fetchShouldBlockNewMCPServers() {
+        try {
+            this.blockNewMcpServers = DbLayer.fetchShouldBlockNewMCPServers();
+            this.blockNewSkills = DbLayer.fetchShouldBlockNewSkills();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchShouldBlockNewMCPServers: " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     // Fields for fetchMcpAuditInfo API
     private List<McpAuditInfo> mcpAuditInfoList;
     private List<String> remarksList;

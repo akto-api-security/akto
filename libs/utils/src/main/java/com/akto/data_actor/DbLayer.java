@@ -2645,6 +2645,42 @@ public class DbLayer {
         }
     }
 
+    public static boolean fetchShouldBlockNewMCPServers() {
+        try {
+            Bson filter = AccountSettingsDao.generateFilter();
+            Bson projection = Projections.fields(
+                Projections.include(AccountSettings.BLOCK_NEW_MCP_SERVERS),
+                Projections.excludeId()
+            );
+            AccountSettings settings = AccountSettingsDao.instance.findOne(filter, projection);
+            if (settings != null) {
+                return settings.isBlockNewMcpServers();
+            }
+            return false;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchShouldBlockNewMCPServers: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public static boolean fetchShouldBlockNewSkills() {
+        try {
+            Bson filter = AccountSettingsDao.generateFilter();
+            Bson projection = Projections.fields(
+                Projections.include(AccountSettings.BLOCK_NEW_SKILLS),
+                Projections.excludeId()
+            );
+            AccountSettings settings = AccountSettingsDao.instance.findOne(filter, projection);
+            if (settings != null) {
+                return settings.isBlockNewSkills();
+            }
+            return false;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchShouldBlockNewSkills: " + e.getMessage());
+            return false;
+        }
+    }
+
     public static void updateMcpAuditInfo(String componentType, String componentName, String mcpHost, ComponentRiskAnalysis componentRiskAnalysis) {
         if (componentType == null || componentName == null || componentRiskAnalysis == null || mcpHost == null) {
             return;
