@@ -178,8 +178,15 @@ public class AgentClient {
             if(jsonNode.has("finalSentPrompt")) {
                 finalSentPrompt = jsonNode.get("finalSentPrompt").asText();
             }
+
+            Map<String,Object> toolsMetadata = new HashMap<>();
+            if(jsonNode.has("toolsMetadata") && jsonNode.get("toolsMetadata").isObject()) {
+                jsonNode.get("toolsMetadata").fields().forEachRemaining(entry ->
+                    toolsMetadata.put(entry.getKey(), entry.getValue().asText())
+                );
+            }
             
-            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage);
+            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage, toolsMetadata);
             
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error parsing agent response: " + e.getMessage() + ", response body: " + responseBody);
