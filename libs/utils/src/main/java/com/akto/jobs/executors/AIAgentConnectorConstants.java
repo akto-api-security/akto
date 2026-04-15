@@ -22,6 +22,8 @@ public final class AIAgentConnectorConstants {
     public static final String CONNECTOR_TYPE_SNOWFLAKE = "SNOWFLAKE";
     public static final String CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = "VERTEX_AI_CUSTOM_DEPLOYED_MODEL";
     public static final String CONNECTOR_TYPE_SALESFORCE = "SALESFORCE";
+    public static final String CONNECTOR_TYPE_ANTHROPIC = "ANTHROPIC";
+    public static final String CONNECTOR_TYPE_OPENAI = "OPENAI";
 
     // Binary Names
     public static final String BINARY_NAME_N8N = "n8n-shield";
@@ -29,6 +31,8 @@ public final class AIAgentConnectorConstants {
     public static final String BINARY_NAME_COPILOT_STUDIO = "copilot-shield";
     public static final String BINARY_NAME_DATABRICKS = "databricks-shield";
     public static final String BINARY_NAME_SNOWFLAKE = "snowflake-shield";
+    public static final String BINARY_NAME_ANTHROPIC = "anthropic-shield";
+    public static final String BINARY_NAME_OPENAI = "openai-shield";
 
     // Configuration Keys - N8N
     public static final String CONFIG_N8N_BASE_URL = "N8N_BASE_URL";
@@ -80,6 +84,16 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_SALESFORCE_CONSUMER_KEY = "SALESFORCE_CONSUMER_KEY";
     public static final String CONFIG_SALESFORCE_CONSUMER_SECRET = "SALESFORCE_CONSUMER_SECRET";
     public static final String CONFIG_INGESTION_API_KEY = "INGESTION_API_KEY";
+
+    // Configuration Keys - Anthropic
+    public static final String CONFIG_ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY";
+    public static final String CONFIG_ANTHROPIC_ORG_ID = "ANTHROPIC_ORG_ID";
+    public static final String CONFIG_ANTHROPIC_API_BASE_URL = "ANTHROPIC_API_BASE_URL";
+
+    // Configuration Keys - OpenAI
+    public static final String CONFIG_OPENAI_API_KEY = "OPENAI_API_KEY";
+    public static final String CONFIG_OPENAI_ORG_ID = "OPENAI_ORG_ID";
+    public static final String CONFIG_OPENAI_API_BASE_URL = "OPENAI_API_BASE_URL";
 
     // Salesforce API Configuration
     public static final String SALESFORCE_API_VERSION = "v66.0";
