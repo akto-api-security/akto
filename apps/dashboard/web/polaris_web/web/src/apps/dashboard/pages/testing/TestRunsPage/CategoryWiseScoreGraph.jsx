@@ -11,6 +11,20 @@ import func from "@/util/func";
 import LocalStore from "../../../../main/LocalStorageStore";
 import PersistStore from "../../../../main/PersistStore";
 
+/** Adjust pass by skip (pass counts can include skipped items from API); drop rows with no executed tests. */
+function normalizeCategoryWiseScoresForSkip(rows) {
+    if (!rows?.length) return [];
+    return rows
+        .map((cat) => {
+            const pass = cat.pass || 0;
+            const fail = cat.fail || 0;
+            const skip = cat.skip || 0;
+            const adjustedPass = pass >= skip ? pass - skip : 0;
+            return { ...cat, pass: adjustedPass, fail, skip };
+        })
+        .filter((cat) => (cat.pass || 0) + (cat.fail || 0) > 0);
+}
+
 function CategoryWiseScoreGraph({ 
     startTimestamp, 
     endTimestamp, 
@@ -85,7 +99,8 @@ function CategoryWiseScoreGraph({
                 if (apiCall) {
                     const response = await apiCall(startTimestamp, endTimestamp, dashboardCategory, dataSource, apiCollectionIds);
                     if (response && response.length > 0) {
-                        setCategoryTestData(response);
+                        const normalized = normalizeCategoryWiseScoresForSkip(response);
+                        setCategoryTestData(normalized);
                         return;
                     }
                 }
@@ -245,14 +260,12 @@ function CategoryWiseScoreGraph({
         const executedTotal = passCount + failCount; // Only executed tests
         // const grandTotal = executedTotal + skipCount; // All tests
         
-        // Calculate percentages based on executed tests only
-        const passRate = executedTotal === 0 ? 0 : Number(((passCount / executedTotal) * 100).toFixed(1));
-        const failRate = executedTotal === 0 ? 0 : Number(((failCount / executedTotal) * 100).toFixed(1));
-        
         // Determine dominant result (>= for tie-breaking towards pass)
         const passed = passCount >= failCount;
         const primaryColor = passed ? '#54b074' : '#f05352';
-        const primaryRate = passed ? passRate : failRate;
+        const primaryRate = passed
+            ? func.formatSplitSharePercent(passCount, executedTotal, failCount)
+            : func.formatSplitSharePercent(failCount, executedTotal, passCount);
         const primaryLabel = passed ? statusLabels.pass : statusLabels.fail;
 
         return [
