@@ -622,6 +622,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         put("akto_security_engineer", RBAC.Role.MEMBER.name());
         put("akto_developer", RBAC.Role.DEVELOPER.name());
         put("akto_guest", RBAC.Role.GUEST.name());
+        put("akto_threat_engineer", RBAC.Role.THREAT_ENGINEER.name());
+        put("akto_threat_viewer", RBAC.Role.THREAT_VIEWER.name());
     }};
 
     /** Normalize Okta group name for convention lookup: lowercase, spaces to underscores (e.g. "Akto Admin" -> "akto_admin"). */

@@ -2224,7 +2224,20 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
 
-        RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
+        RBAC rbac = null;
+        //check scopeRoleMapping for ADMIN in current scope
+        rbac = RBACDao.instance.findAll(
+                        Filters.eq(RBAC.ACCOUNT_ID, accountId)
+                ).stream()
+                .filter(r -> r.getScopeRoleMapping() != null &&
+                        r.getScopeRoleMapping().containsValue(Role.ADMIN.name()))
+                .findFirst()
+                .orElse(null);
+
+        //backward compatibility of role
+        if (rbac == null) {
+            rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
+        }
 
         if (rbac == null) {
             logger.debugAndAddToDb("Admin is missing in DB", LogDb.DASHBOARD);
@@ -3586,6 +3599,7 @@ public class InitializerListener implements ServletContextListener {
             );
         }
     }
+
 
     private static void cleanupRbacEntriesForDeveloperRole(BackwardCompatibility backwardCompatibility){
         if(backwardCompatibility.getCleanupRbacEntries() == 0){

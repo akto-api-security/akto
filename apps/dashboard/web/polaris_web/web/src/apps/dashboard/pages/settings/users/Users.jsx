@@ -117,6 +117,25 @@ const Users = () => {
         func.copyToClipboard(passwordResetState.passwordResetLink, ref, "Password reset link copied to clipboard")
     }
 
+    // Get the current user's accessible scopes from their scopeRoleMapping
+    const getCurrentUserAccessibleScopes = useMemo(() => {
+        if (!users || users.length === 0) {
+            return PRODUCT_SCOPES
+        }
+
+        // Find the current user from the users list
+        const currentUser = users.find(user => user.login === username)
+
+        // If current user doesn't have scopeRoleMapping, return all PRODUCT_SCOPES
+        if (!currentUser || !currentUser.scopeRoleMapping || Object.keys(currentUser.scopeRoleMapping).length === 0) {
+            return PRODUCT_SCOPES
+        }
+
+        // Filter PRODUCT_SCOPES to only include scopes the current user has access to
+        const userScopeValues = Object.keys(currentUser.scopeRoleMapping)
+        return PRODUCT_SCOPES.filter(scope => userScopeValues.includes(scope.value))
+    }, [users, PRODUCT_SCOPES, username])
+
     const [customRoles, setCustomRoles] = useState([])
     const [defaultInviteRole, setDefaultInviteRole] = useState('MEMBER')
 
@@ -176,6 +195,14 @@ const Users = () => {
             ]
         }
     ]
+
+    // Filtered role options based on roleHierarchy - for use in both Edit Access and Invite modals
+    const filteredRoleOptions = useMemo(() => {
+        return rolesOptions[0]?.items?.map((item) => ({
+            label: item?.content,
+            value: item?.role,
+        })).filter((item) => roleHierarchy.includes(item.value)) || []
+    }, [roleHierarchy, rolesOptions])
 
     const getRoleHierarchy = async() => {
         let roleHierarchyResp = await settingRequests.getRoleHierarchy()
@@ -406,6 +433,23 @@ const Users = () => {
                             const initials = func.initials(login)
                             const media = <Avatar user size="medium" name={login} initials={initials} />
 
+                            // Helper function to check if current user can edit this user based on roleHierarchy
+                            const canEditUserByRoleHierarchy = () => {
+                                // Safety check: roleHierarchy should be an array
+                                if (!roleHierarchy || !Array.isArray(roleHierarchy)) {
+                                    return false
+                                }
+
+                                // If user has scopeRoleMapping, check if any scope role is in roleHierarchy
+                                if (item?.scopeRoleMapping && Object.keys(item.scopeRoleMapping).length > 0) {
+                                    return Object.values(item.scopeRoleMapping).some(scopeRole =>
+                                        roleHierarchy.includes(scopeRole)
+                                    )
+                                }
+                                // Fallback: check old role field (backward compatibility)
+                                return role && roleHierarchy.includes(role.toUpperCase())
+                            }
+
                             const updateUsersCollection = async () => {
                                 const collectionIdList = selectedItems[id];
                                 const userCollectionMap = {
@@ -439,7 +483,7 @@ const Users = () => {
                                 </Box>
                             )
 
-                            const shortcutActions = (username !== login && roleHierarchy.includes(role.toUpperCase())) ?
+                            const shortcutActions = (username !== login && canEditUserByRoleHierarchy()) ?
                                 [
                                     {
                                         content: (
@@ -536,6 +580,8 @@ const Users = () => {
                     roleHierarchy={roleHierarchy}
                     rolesOptions={rolesOptions}
                     defaultInviteRole={defaultInviteRole}
+                    accessibleProductScopes={getCurrentUserAccessibleScopes}
+                    filteredRoleOptions={filteredRoleOptions}
                 />
 
                 {/* Edit Scope-Role Mapping Modal */}
@@ -594,7 +640,7 @@ const Users = () => {
                             </Text>
 
                             <Box padding="400">
-                                {PRODUCT_SCOPES.map((scope) => {
+                                {getCurrentUserAccessibleScopes.map((scope) => {
                                     const isSelected = scope.value in editScopeRoleModal.editingScopeRoleMapping
                                     const selectedRole = editScopeRoleModal.editingScopeRoleMapping[scope.value]
 
@@ -623,10 +669,7 @@ const Users = () => {
                                                     <Dropdown
                                                         id={`edit-role-${scope.value}`}
                                                         selected={(value) => handleScopeRoleChangeInModal(scope.value, value)}
-                                                        menuItems={rolesOptions[0]?.items?.map((role) => ({
-                                                            label: role.content,
-                                                            value: role.role
-                                                        })) || []}
+                                                        menuItems={filteredRoleOptions}
                                                         initial={selectedRole || "MEMBER"}
                                                     />
                                                 </Box>
