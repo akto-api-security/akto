@@ -6,8 +6,10 @@ import { CATEGORY_AGENTIC_SECURITY, CATEGORY_API_SECURITY, CATEGORY_GEN_AI, CATE
 import { mcpCategoryTestData, genAICategoryTestData, apiCategoryTestData } from './dummyData';
 import api from '../api';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import func from "@/util/func";
 import LocalStore from "../../../../main/LocalStorageStore";
+import PersistStore from "../../../../main/PersistStore";
 
 function CategoryWiseScoreGraph({ 
     startTimestamp, 
@@ -20,6 +22,7 @@ function CategoryWiseScoreGraph({
 }) {
     const [categoryTestData, setCategoryTestData] = useState([]);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
     // Get current dashboard category
     const dashboardCategory = getDashboardCategory();
@@ -110,10 +113,11 @@ function CategoryWiseScoreGraph({
     };
 
     const getTooltip = () => {
-        const context = dataSource === 'redteaming' ? 'results' : 
-                       dataSource === 'threat_detection' ? 'threat detection results' :
+        if (dataSource === 'redteaming') {
+            return 'Breakdown by category for the latest test result summary of each testing run scheduled in the selected time range (pass/fail counts and skipped items). Older reruns for the same run are excluded.';
+        }
+        const context = dataSource === 'threat_detection' ? 'threat detection results' :
                        dataSource === 'guardrails' ? 'policy enforcement results' : 'results';
-        
         return `Comprehensive breakdown of ${context} by category, showing pass/fail percentages, counts, and skipped items with visual indicators.`;
     };
 
@@ -185,6 +189,33 @@ function CategoryWiseScoreGraph({
     };
 
     const statusLabels = getStatusLabels();
+
+    const handlePieSegmentClick = (segmentName) => {
+        if (dataSource !== 'redteaming') {
+            return;
+        }
+        const pageKey = '/dashboard/reports/issues/#open';
+        const prev = PersistStore.getState().filtersMap;
+        let nextFilters = (prev[pageKey]?.filters || []).filter((f) => f.key !== 'apiCollectionId');
+        if (apiCollectionIds && apiCollectionIds.length > 0) {
+            nextFilters = [...nextFilters, { key: 'apiCollectionId', value: apiCollectionIds }];
+        }
+        PersistStore.getState().setFiltersMap({
+            ...prev,
+            [pageKey]: { filters: nextFilters, sort: prev[pageKey]?.sort || [] },
+        });
+        const params = new URLSearchParams();
+        if (startTimestamp > 0 && endTimestamp > 0) {
+            params.set('since', String(startTimestamp));
+            params.set('until', String(endTimestamp));
+            params.set('range', 'custom');
+        }
+        const query = params.toString();
+        navigate(query ? `/dashboard/reports/issues?${query}#open` : '/dashboard/reports/issues#open');
+        if (segmentName === statusLabels.fail) {
+            func.setToast(true, false, 'Open issues for this period (failed tests). Scroll the issues table to review.');
+        }
+    };
     
     // Build chart data - only include skip if it exists and has data
     const chartData = {
@@ -271,6 +302,7 @@ function CategoryWiseScoreGraph({
                         boxPadding={0}
                         pieInnerSize="65%"
                         chartSize={240}
+                        onSegmentClick={dataSource === 'redteaming' ? handlePieSegmentClick : undefined}
                     />
                 </Box>
 

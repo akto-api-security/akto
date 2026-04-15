@@ -20,19 +20,6 @@ public class CategoryWiseStatsUtils {
         GUARDRAILS
     }
 
-    /**
-     * Generic method to get category-wise scores for any data source
-     * Categories are automatically filtered based on dashboard context
-     */
-    public static List<Map<String, Object>> getCategoryWiseScores(
-            DataSource dataSource,
-            int startTimestamp, 
-            int endTimestamp, 
-            String dashboardCategory
-    ) {
-        return getCategoryWiseScores(dataSource, startTimestamp, endTimestamp, dashboardCategory, null);
-    }
-
     public static List<Map<String, Object>> getCategoryWiseScores(
             DataSource dataSource,
             int startTimestamp, 
@@ -128,6 +115,15 @@ public class CategoryWiseStatsUtils {
                 break;
             case "Gen AI":
                 contextSource = CONTEXT_SOURCE.GEN_AI;
+                break;
+            case "Agentic Security":
+                contextSource = CONTEXT_SOURCE.AGENTIC;
+                break;
+            case "Endpoint Security":
+                contextSource = CONTEXT_SOURCE.ENDPOINT;
+                break;
+            case "DAST":
+                contextSource = CONTEXT_SOURCE.DAST;
                 break;
             case "API Security":
             default:

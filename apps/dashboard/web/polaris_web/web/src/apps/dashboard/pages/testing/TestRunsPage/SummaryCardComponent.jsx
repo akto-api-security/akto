@@ -76,7 +76,7 @@ const SummaryCardComponent = ({
                     chartSize={190}
                 />
               </HorizontalGrid>
-              {func.isDemoAccount() && !(isApiSecurityCategory() || isDastCategory()) ? (
+              {!(isApiSecurityCategory() || isDastCategory()) ? (
                 <MemoizedCategoryWiseScoreGraph 
                   key={"category-score-graph"} 
                   startTimestamp={startTimestamp} 
@@ -86,7 +86,7 @@ const SummaryCardComponent = ({
                 />
               ) : null}
                 {
-                  func.isDemoAccount() && !(isApiSecurityCategory() || isDastCategory()) ? <></> :
+                  !(isApiSecurityCategory() || isDastCategory()) ? <></> :
                     <VerticalStack gap={4}>
                       <HorizontalGrid columns={2} gap={4}>
                         <MemoizedApiCollectionCoverageGraph apiCollectionIds={apiCollectionIds} />
