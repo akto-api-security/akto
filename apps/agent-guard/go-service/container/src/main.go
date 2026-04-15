@@ -90,6 +90,23 @@ func NewScannerClient(baseURL string) *ScannerClient {
 func (c *ScannerClient) ScanText(ctx context.Context, req ScanRequest) (*ScanResponse, error) {
 	startTime := time.Now()
 
+	// use_llm is a transport-only flag consumed in Service.ScanText. Python's
+	// scanner_service does scanner_class(**config), so any unknown key here
+	// blows up scanner instantiation (e.g. Toxicity.__init__ got unexpected
+	// keyword 'use_llm'). Strip it before forwarding. req is a value copy,
+	// but Config is a map (reference) — so allocate a new map rather than
+	// mutate the caller's.
+	if _, leaked := req.Config[ConfigKeyUseLLM]; leaked {
+		cleaned := make(map[string]interface{}, len(req.Config)-1)
+		for k, v := range req.Config {
+			if k == ConfigKeyUseLLM {
+				continue
+			}
+			cleaned[k] = v
+		}
+		req.Config = cleaned
+	}
+
 	reqBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal failed: %w", err)

@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -292,6 +296,54 @@ func TestServiceScanText_NoLLMConfigured_ReturnsErrorButFailsOpen(t *testing.T) 
 	}
 	if resp.Error == "" {
 		t.Error("expected Error to explain misconfiguration")
+	}
+}
+
+// TestScannerClient_StripsUseLLMBeforeForwarding guards against regression of
+// the Python-side "unexpected keyword argument 'use_llm'" crash. It spins up a
+// fake Python backend and asserts the flag never reaches it.
+func TestScannerClient_StripsUseLLMBeforeForwarding(t *testing.T) {
+	var forwarded ScanRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if err := json.Unmarshal(body, &forwarded); err != nil {
+			t.Fatalf("fake python got invalid JSON: %v", err)
+		}
+		_ = json.NewEncoder(w).Encode(ScanResponse{
+			ScannerName: forwarded.ScannerName, IsValid: true, SanitizedText: forwarded.Text,
+		})
+	}))
+	defer srv.Close()
+
+	client := NewScannerClient(srv.URL)
+	originalConfig := map[string]interface{}{
+		"use_llm":   true,
+		"threshold": 0.5,
+		"topics":    []string{"x"},
+	}
+	req := ScanRequest{
+		ScannerType: ScannerTypePrompt,
+		ScannerName: "Toxicity",
+		Text:        "hello",
+		Config:      originalConfig,
+	}
+
+	if _, err := client.ScanText(context.Background(), req); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if _, present := forwarded.Config[ConfigKeyUseLLM]; present {
+		t.Errorf("use_llm leaked to Python backend; config=%v", forwarded.Config)
+	}
+	if forwarded.Config["threshold"] != 0.5 {
+		t.Errorf("threshold dropped or mutated; config=%v", forwarded.Config)
+	}
+	if _, ok := forwarded.Config["topics"]; !ok {
+		t.Errorf("topics dropped; config=%v", forwarded.Config)
+	}
+	// Caller's map must not be mutated.
+	if _, ok := originalConfig[ConfigKeyUseLLM]; !ok {
+		t.Errorf("caller's config was mutated; use_llm was removed from it")
 	}
 }
 
