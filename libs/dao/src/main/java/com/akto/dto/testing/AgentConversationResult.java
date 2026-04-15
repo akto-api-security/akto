@@ -23,11 +23,6 @@ public class AgentConversationResult extends GenericAgentConversation {
     private String remediationMessage;
     private List<String> conversation;
     private List<Pair<String, String>> addedConversations;
-
-    // store the tools calls in that conversation
-    // key: tool_name/agent_name
-    // if type: agent_name, schedule job to find from traces {store trace ids for that conversation}
-    // if type: tool_name, store the metadata contains of the tool call
     private Map<String,Object> toolsMetadata;
 
     public AgentConversationResult(String conversationId, String originalPrompt, String response, List<String> conversation, int timestamp, boolean validation, String validationMessage, String finalSentPrompt, String remediationMessage, int externalApiTokens){

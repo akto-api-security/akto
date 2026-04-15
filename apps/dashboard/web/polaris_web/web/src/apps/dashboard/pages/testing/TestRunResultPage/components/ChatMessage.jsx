@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Box, VerticalStack, HorizontalStack, Text, Badge, Button, Tooltip } from '@shopify/polaris';
-import { InfoMinor } from '@shopify/polaris-icons';
+import { InfoMinor, MagicMinor } from '@shopify/polaris-icons';
 import MarkdownViewer from '../../../../components/shared/MarkdownViewer';
 import SampleDataComponent from '../../../../components/shared/SampleDataComponent';
 import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES, VULNERABILITY_BADGE } from './chatConstants';
@@ -118,7 +118,7 @@ function extractPrettyJson(content) {
     }
 }
 
-function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt }) {
+function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsList }) {
 
     const isRequest = type === MESSAGE_TYPES.REQUEST;
     // Icon
@@ -227,6 +227,24 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                         />
                                     </Tooltip>
                                 ))}
+                                {toolsList.length > 0 && (
+                                    <Tooltip content="Tools used">
+                                        <Button
+                                            plain
+                                            monochrome
+                                            icon={MagicMinor}
+                                            onClick={() => {
+                                                setInfoModalData({
+                                                    type: 'tools',
+                                                    title: 'Tools Used',
+                                                    content: toolsList,
+                                                    sampleData: null,
+                                                });
+                                                setInfoModalOpen(true);
+                                            }}
+                                        />
+                                    </Tooltip>
+                                )}
                             </HorizontalStack>
                             <Text variant="bodySm" color="subdued">{formattedTime}</Text>
                         </HorizontalStack>
