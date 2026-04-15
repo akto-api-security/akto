@@ -27,6 +27,7 @@ import com.akto.metrics.AllMetrics;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.hyperscan.HyperscanThreatMatcher;
+import com.akto.threat.detection.hyperscan.PatternUpdateService;
 import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
@@ -73,6 +74,21 @@ public class Main {
       }
     } catch (Exception e) {
       logger.warnAndAddToDb("Hyperscan initialization error (non-fatal): " + e.getMessage());
+    }
+
+    // Start PatternUpdateService for periodic pattern updates from public URL
+    try {
+      String patternFileUrl = "https://akto.blob.core.windows.net/threat-config/threat-patterns.txt";
+      String localPatternFile = System.getenv().getOrDefault("LOCAL_PATTERN_FILE", "threat-patterns-example.txt");
+
+      PatternUpdateService patternUpdateService = new PatternUpdateService(
+          localPatternFile,
+          patternFileUrl
+      );
+      patternUpdateService.startPeriodicUpdates();
+      logger.infoAndAddToDb("PatternUpdateService started - will check for pattern updates every 15 minutes from: " + patternFileUrl);
+    } catch (Exception e) {
+      logger.warnAndAddToDb("PatternUpdateService initialization error (non-fatal): " + e.getMessage());
     }
 
     int accountId = ClientActor.getAccountId();
