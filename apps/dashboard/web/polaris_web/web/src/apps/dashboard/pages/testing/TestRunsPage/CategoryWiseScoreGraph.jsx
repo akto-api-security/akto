@@ -11,6 +11,20 @@ import func from "@/util/func";
 import LocalStore from "../../../../main/LocalStorageStore";
 import PersistStore from "../../../../main/PersistStore";
 
+/** Adjust pass by skip (pass counts can include skipped items from API); drop rows with no executed tests. */
+function normalizeCategoryWiseScoresForSkip(rows) {
+    if (!rows?.length) return [];
+    return rows
+        .map((cat) => {
+            const pass = cat.pass || 0;
+            const fail = cat.fail || 0;
+            const skip = cat.skip || 0;
+            const adjustedPass = pass >= skip ? pass - skip : 0;
+            return { ...cat, pass: adjustedPass, fail, skip };
+        })
+        .filter((cat) => (cat.pass || 0) + (cat.fail || 0) > 0);
+}
+
 function CategoryWiseScoreGraph({ 
     startTimestamp, 
     endTimestamp, 
@@ -85,7 +99,8 @@ function CategoryWiseScoreGraph({
                 if (apiCall) {
                     const response = await apiCall(startTimestamp, endTimestamp, dashboardCategory, dataSource, apiCollectionIds);
                     if (response && response.length > 0) {
-                        setCategoryTestData(response);
+                        const normalized = normalizeCategoryWiseScoresForSkip(response);
+                        setCategoryTestData(normalized);
                         return;
                     }
                 }
