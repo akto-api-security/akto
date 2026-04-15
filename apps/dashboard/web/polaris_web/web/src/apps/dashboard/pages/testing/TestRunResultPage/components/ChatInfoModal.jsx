@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Modal, Box, Text, HorizontalGrid, LegacyCard } from '@shopify/polaris';
+import { Modal, Box, Text, HorizontalGrid, LegacyCard, List } from '@shopify/polaris';
 import SampleDataComponent from '../../../../components/shared/SampleDataComponent';
 
 function ChatInfoModal({ open, onClose, title, type, content, sampleData }) {
@@ -46,6 +46,27 @@ function ChatInfoModal({ open, onClose, title, type, content, sampleData }) {
                             </Box>
                         ))}
                     </HorizontalGrid>
+                </Modal.Section>
+            </Modal>
+        );
+    }
+
+    if (type === 'tools') {
+        // show in format of bulleted list inside modal
+        return ( 
+            <Modal
+                open={open}
+                onClose={onClose}
+                title={title}
+            >
+                <Modal.Section>
+                    <Box padding="4">
+                        <List type="bullet">
+                            {content.map(tool => (
+                                <List.Item key={tool}>{tool}</List.Item>
+                            ))}
+                        </List>
+                    </Box>
                 </Modal.Section>
             </Modal>
         );

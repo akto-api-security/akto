@@ -82,9 +82,11 @@ function TestRunResultPage(props) {
 
   const [conversations, setConversations] = useState([])
   const [conversationRemediationText, setConversationRemediationText] = useState(null)
-  const [validationFailed, setValidationFailed] = useState(false)
   const agenticConversationsRef = useRef([])
   const [showForbidden, setShowForbidden] = useState(false)
+
+  // store key: {mcp/agent name} -> value: {tools for that mcp/agent}
+  const [toolsCalls, setToolsCalls] = useState({})
 
   // AI Chat state
   const [aiConversationId, setAiConversationId] = useState(null)
@@ -299,7 +301,7 @@ function TestRunResultPage(props) {
             const result = transform.prepareConversationsList(res)
             setConversations(result.conversations);
             setConversationRemediationText(result.remediationText || null)
-            setValidationFailed(result.validationFailed)
+            setToolsCalls(result.toolsCalls || {})
             agenticConversationsRef.current = res;
           }
         }
@@ -477,7 +479,6 @@ function TestRunResultPage(props) {
           devrevWorkUrl={devrevWorkUrl}
           conversations={conversations}
           conversationRemediationText={conversationRemediationText}
-          validationFailed={validationFailed}
           showForbidden={showForbidden}
           aiSummary={aiSummary}
           aiSummaryLoading={aiSummaryLoading}
@@ -485,6 +486,7 @@ function TestRunResultPage(props) {
           aiLoading={aiLoading}
           onGenerateAiOverview={handleGenerateAiOverview}
           onSendFollowUp={handleSendFollowUp}
+          toolsCalls={toolsCalls}
         />
       </>
       :

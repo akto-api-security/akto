@@ -1491,6 +1491,7 @@ const transform = {
   prepareConversationsList(agentConversationResults, isGeneric = false) {
     let conversationsListCopy = []
     let extractedRemediationText = ''
+    let toolsCalls = {}
 
     agentConversationResults.forEach(conversation => {
 
@@ -1540,13 +1541,27 @@ const transform = {
         ...commonObj,
         _id: "system_" + conversation.response,
         message: systemMessage,
-        role: "system"
+        role: "system",
+        toolsList: conversation.toolsMetadata ? Object.keys(conversation.toolsMetadata) : []
       })
+
+      // toolsMetadata contains the tools calls for that conversation
+      if (conversation.toolsMetadata && Object.keys(conversation.toolsMetadata).length > 0) {
+        Object.keys(conversation.toolsMetadata).forEach(tool => {
+          // get agent name
+          const agentName = tool['parent_name'];
+          if (!toolsCalls[agentName]) {
+            toolsCalls[agentName] = []
+          }
+          toolsCalls[agentName].push(tool)
+        })
+      }
     })
 
     return {
       conversations: conversationsListCopy,
-      remediationText: extractedRemediationText
+      remediationText: extractedRemediationText,
+      toolsCalls: toolsCalls
     }
   }
 }

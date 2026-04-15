@@ -218,7 +218,17 @@ public class AgentClient {
                 loggerMaker.infoAndAddToDb("externalApiTokens field NOT FOUND in response");
             }
 
-            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage, externalApiTokens);
+            Map<String,Object> toolsMetadata = new HashMap<>();
+            if(jsonNode.has("toolsMetadata") && jsonNode.get("toolsMetadata").isObject()) {
+                jsonNode.get("toolsMetadata").fields().forEachRemaining(entry ->
+                    toolsMetadata.put(entry.getKey(), entry.getValue())
+                );
+            }
+            AgentConversationResult result = new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage, externalApiTokens);
+            if(toolsMetadata != null && !toolsMetadata.isEmpty()) {
+                result.getToolsMetadata().putAll(toolsMetadata);
+            }
+            return result;
             
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error parsing agent response: " + e.getMessage() + ", response body: " + responseBody);
