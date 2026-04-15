@@ -245,14 +245,12 @@ function CategoryWiseScoreGraph({
         const executedTotal = passCount + failCount; // Only executed tests
         // const grandTotal = executedTotal + skipCount; // All tests
         
-        // Calculate percentages based on executed tests only
-        const passRate = executedTotal === 0 ? 0 : Number(((passCount / executedTotal) * 100).toFixed(1));
-        const failRate = executedTotal === 0 ? 0 : Number(((failCount / executedTotal) * 100).toFixed(1));
-        
         // Determine dominant result (>= for tie-breaking towards pass)
         const passed = passCount >= failCount;
         const primaryColor = passed ? '#54b074' : '#f05352';
-        const primaryRate = passed ? passRate : failRate;
+        const primaryRate = passed
+            ? func.formatSplitSharePercent(passCount, executedTotal, failCount)
+            : func.formatSplitSharePercent(failCount, executedTotal, passCount);
         const primaryLabel = passed ? statusLabels.pass : statusLabels.fail;
 
         return [
