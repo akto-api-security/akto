@@ -333,12 +333,10 @@ public class ApiCollectionsAction extends UserAction {
              */
             //Role
             String currentScope = Context.contextSource.get().toString();
-            Bson adminFilter = currentScope != null && !currentScope.isEmpty()
-                ? Filters.nor(
+            Bson adminFilter =  Filters.nor(
                     Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN.getName()),
                     Filters.eq(RBAC.SCOPE_ROLE_MAPPING + "." + currentScope, RBAC.Role.ADMIN.getName())
-                )
-                : Filters.ne(RBAC.ROLE, RBAC.Role.ADMIN.getName());
+                );
 
             RBACDao.instance.getMCollection().updateOne(
                     Filters.and(
