@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -22,4 +23,5 @@ public class AgentConversationResult {
     private String validationMessage;
     private String finalSentPrompt;
     private String remediationMessage;
+    private Map<String, Object> toolsMetadata;
 }
