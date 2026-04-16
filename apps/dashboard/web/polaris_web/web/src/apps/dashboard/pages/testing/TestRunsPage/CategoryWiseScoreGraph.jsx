@@ -273,7 +273,7 @@ function CategoryWiseScoreGraph({
         const displayName = (categoryMap && categoryMap[cat.categoryName]?.displayName) || cat.categoryName;
         return [
             <span
-                style={{ cursor: dataSource === 'redteaming' ? 'pointer' : undefined, textDecoration: dataSource === 'redteaming' ? 'underline' : undefined }}
+                style={{ cursor: dataSource === 'redteaming' ? 'pointer' : undefined }}
                 onClick={dataSource === 'redteaming' ? () => handleCategoryRowClick(cat.categoryName) : undefined}
             >{displayName}</span>,
             <VerticalStack gap="2">
