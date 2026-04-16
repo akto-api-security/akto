@@ -45,7 +45,9 @@ function TestLibrary() {
     async function handleRemoveTestLibrary(repositoryUrl) {
         await api.removeTestLibrary(repositoryUrl)
         func.setToast(true, false, "Test library removed successfully")
+        if(window.USER_ROLE === 'ADMIN') {
         fetchData();
+        }
     }
 
     const commonMessage = "It may take a few minutes to sync the library, please refresh the page after sometime to see the changes."
@@ -53,13 +55,17 @@ function TestLibrary() {
     async function handleSyncTestLibrary(repositoryUrl) {
         await api.syncCustomLibrary(repositoryUrl)
         func.setToast(true, false, "Test library will be synced in the background. " + commonMessage)
+        if(window.USER_ROLE === 'ADMIN') {
         fetchData();
+        }
     }
 
     async function handleSyncAllDefaultTestLibraries() {
         await api.syncAllDefaultTestLibraries()
         func.setToast(true, false, "All default test libraries will be synced in the background. " + commonMessage)
+        if(window.USER_ROLE === 'ADMIN') {
         fetchData();
+        }
     }
 
     const [addTestLibraryModalActive, setAddTestLibraryModalActive] = useState(false)
@@ -71,7 +77,9 @@ function TestLibrary() {
     async function addTestLibrary() {
         await api.addTestLibrary(repositoryUrl)
         func.setToast(true, false, "Test library added successfully. " + commonMessage)
+        if(window.USER_ROLE === 'ADMIN') {
         fetchData()
+        }
         setAddTestLibraryModalActive(false)
         setRepositoryUrl('')
     }
