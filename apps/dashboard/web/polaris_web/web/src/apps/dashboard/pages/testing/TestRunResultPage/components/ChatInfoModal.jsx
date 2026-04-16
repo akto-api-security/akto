@@ -76,11 +76,14 @@ function ChatInfoModal({ open, onClose, title, type, content, sampleData }) {
                     <VerticalStack gap="4">
                         {toolEntries.map(([toolName, toolMeta]) => {
                             const trace = parseDataTrace(toolMeta?.dataTrace);
-                            const displayName = toolMeta?.name || toolName;
+                            const serverName = toolMeta?.name;
                             return (
                                 <Box key={toolName}>
                                     <VerticalStack gap="2">
-                                        <Text variant="bodyMd" fontWeight="semibold">{displayName}</Text>
+                                        <Text variant="bodyMd" fontWeight="semibold">{toolName}</Text>
+                                        {serverName && (
+                                            <Text variant="bodySm" color="subdued">{serverName}</Text>
+                                        )}
                                         {trace ? (
                                             trace.type === 'json' ? (
                                                 <SampleDataComponent
