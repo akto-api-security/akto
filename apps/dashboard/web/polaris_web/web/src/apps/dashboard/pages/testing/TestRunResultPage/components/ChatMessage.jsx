@@ -230,9 +230,10 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                 {Object.keys(toolsMetadata).length > 0 && (
                                     <Tooltip content="Tools used">
                                         <Button
-                                            plain
                                             monochrome
+                                            removeUnderline
                                             icon={MagicMinor}
+                                            size="slim"
                                             onClick={() => {
                                                 setInfoModalData({
                                                     type: 'tools',
@@ -242,7 +243,9 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                                 });
                                                 setInfoModalOpen(true);
                                             }}
-                                        />
+                                        >
+                                            Tools used
+                                        </Button>
                                     </Tooltip>
                                 )}
                             </HorizontalStack>
