@@ -116,7 +116,6 @@ def build_ingestion_payload(
     tags = {
         "gen-ai": "Gen AI",
         "tool-use": "Tool Execution",
-        "mcp_server_name": mcp_server_name,
     }
     if MODE == "atlas":
         tags["ai-agent"] = "claudecli"
@@ -139,7 +138,7 @@ def build_ingestion_payload(
     response_payload = json.dumps({"body": {"result": tool_response}})
 
     return {
-        "path": "/v1/messages",
+        "path": "/v1/hooks/PostToolUse",
         "requestHeaders": request_headers,
         "responseHeaders": response_headers,
         "method": "POST",

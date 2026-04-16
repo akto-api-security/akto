@@ -70,6 +70,7 @@ const onFunc = {
             case "RESOURCE": return `var(--color-resource)`;
             case "PROMPT": return `var(--color-prompt)`;
             case "SERVER": return `var(--color-server)`;
+            case "HOOK": return `var(--color-put)`;
             default:
                 return "";
         }

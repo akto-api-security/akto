@@ -14,6 +14,7 @@ except ImportError:
     pwd = None
 
 
+
 _machine_id = None
 
 

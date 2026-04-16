@@ -111,7 +111,7 @@ def extract_mcp_server_name(tool_name: str) -> str:
 
 
 def build_validation_request(tool_name: str, tool_input: Any, mcp_server_name: str) -> Dict[str, Any]:
-    tags = {"gen-ai": "Gen AI", "mcp_server_name": mcp_server_name}
+    tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
         tags["ai-agent"] = "claudecli"
         tags["source"] = CONTEXT_SOURCE
@@ -131,7 +131,7 @@ def build_validation_request(tool_name: str, tool_input: Any, mcp_server_name: s
     response_payload = json.dumps({})
 
     return {
-        "path": "/v1/messages",
+        "path": f"/v1/hooks/PreToolUse",
         "requestHeaders": request_headers,
         "responseHeaders": response_headers,
         "method": "POST",
@@ -173,7 +173,7 @@ def call_guardrails(tool_name: str, tool_input: Any, mcp_server_name: str) -> Tu
     try:
         request_body = build_validation_request(tool_name, tool_input, mcp_server_name)
         result = post_payload_json(
-            build_http_proxy_url(guardrails=True, ingest_data=False),
+            build_http_proxy_url(guardrails=True, ingest_data=True),
             request_body,
         )
 

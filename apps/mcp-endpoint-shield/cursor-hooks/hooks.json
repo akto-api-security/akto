@@ -28,6 +28,118 @@
         "type": "command",
         "timeout": 10
       }
+    ],
+    "sessionStart": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py sessionStart",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py sessionEnd",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py preToolUse",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py postToolUse",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py postToolUseFailure",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "subagentStart": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-subagent-start.py",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "subagentStop": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-subagent-stop.py",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py beforeShellExecution",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py afterShellExecution",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py beforeReadFile",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py afterFileEdit",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "afterAgentThought": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py afterAgentThought",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "stop": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py stop",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "preCompact": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py preCompact",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "beforeTabFileRead": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py beforeTabFileRead",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "afterTabFileEdit": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py afterTabFileEdit",
+        "type": "command",
+        "timeout": 10
+      }
     ]
   }
 }
