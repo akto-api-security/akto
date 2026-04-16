@@ -579,7 +579,7 @@ function TestRunResultFlyout(props) {
                         {Object.keys(toolsCalls).map(agentName => (
                             <HorizontalStack gap={1} key={agentName}>
                                 <Badge status='info'>{agentName}</Badge>
-                                <Text variant="bodySm">{toolsCalls[agentName].map(tool => tool.name).join(', ')}</Text>
+                                <Text variant="bodySm">{toolsCalls[agentName].join(', ')}</Text>
                             </HorizontalStack>
                         ))}
                     </VerticalStack>
