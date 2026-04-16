@@ -39,6 +39,102 @@ const convertToGraphData = (severityMap) => {
     return dataArr
 }
 
+/** Keys whose values are replaced with "****" in sample data (case-insensitive; nested JSON strings are parsed). */
+const REDACTED_SAMPLE_KEYWORDS = [
+    "password",
+    "passwd",
+    "secret",
+    "token",
+    "access_token",
+    "refresh_token",
+    "id_token",
+    "authorization",
+    "cookie",
+    "apiKey",
+    "api_key",
+    "apikey",
+    "ssn",
+    "phone",
+    "phoneNumber",
+    "creditCard",
+    "credit_card",
+    "cvv",
+    "pin",
+];
+
+const REDACT_PLACEHOLDER = "****";
+
+function redactSampleDataByKeywords(data, redactedKeywords = REDACTED_SAMPLE_KEYWORDS) {
+    try {
+        const keySet = new Set(redactedKeywords.map((k) => String(k).toLowerCase()));
+        const shouldRedactKey = (key) => keySet.has(String(key).toLowerCase());
+
+        function redact(value) {
+            try {
+                if (value === null || value === undefined) {
+                    return value;
+                }
+                const t = typeof value;
+                if (t === "string") {
+                    const trimmed = value.trim();
+                    if (
+                        (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+                        (trimmed.startsWith("[") && trimmed.endsWith("]"))
+                    ) {
+                        try {
+                            const parsed = JSON.parse(value);
+                            return JSON.stringify(redact(parsed));
+                        } catch {
+                            return value;
+                        }
+                    }
+                    return value;
+                }
+                if (Array.isArray(value)) {
+                    return value.map((item) => {
+                        try {
+                            return redact(item);
+                        } catch {
+                            return item;
+                        }
+                    });
+                }
+                if (t === "object") {
+                    const out = {};
+                    try {
+                        Object.keys(value).forEach((k) => {
+                            try {
+                                const v = value[k];
+                                if (shouldRedactKey(k)) {
+                                    out[k] = REDACT_PLACEHOLDER;
+                                } else {
+                                    out[k] = redact(v);
+                                }
+                            } catch {
+                                try {
+                                    out[k] = value[k];
+                                } catch {
+                                    out[k] = REDACT_PLACEHOLDER;
+                                }
+                            }
+                        });
+                    } catch {
+                        return value;
+                    }
+                    return out;
+                }
+                return value;
+            } catch {
+                return value;
+            }
+        }
+
+        return redact(data);
+    } catch {
+        return data;
+    }
+}
+
 const directionData = [
     {
         name: 'Request',
@@ -432,7 +528,12 @@ function ThreatDetectionPage() {
             const tempData = tempFunc.getSampleDataOfUrl(data.url);
             const sameRow = func.deepComparison(tempData, sampleData);
             if (!sameRow) {
-                setSampleData([{ "message": JSON.stringify(tempData), "highlightPaths": [] }]);
+                let redactedSample = tempData ;
+                try {
+                    redactedSample = redactSampleDataByKeywords(tempData);
+                } catch {
+                }
+                setSampleData([{ "message": JSON.stringify(redactedSample), "highlightPaths": [] }]);
                 setShowDetails(true);
             } else {
                 setShowDetails(!showDetails);
