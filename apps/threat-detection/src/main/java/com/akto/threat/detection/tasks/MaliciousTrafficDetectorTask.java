@@ -606,9 +606,6 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     // Run Hyperscan if enabled
     if (isHyperscanOnly) {
-      // if (!successfulExploitFilters.isEmpty()) {
-      //   successfulExploit = threatDetector.isSuccessfulExploit(successfulExploitFilters, rawApi, apiInfoKey);
-      // }
       RedactionType hsRedactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
       hyperscanEventHandler.detectAndPushEvents(
           responseParam, apiInfoKey, actor, metadata,
