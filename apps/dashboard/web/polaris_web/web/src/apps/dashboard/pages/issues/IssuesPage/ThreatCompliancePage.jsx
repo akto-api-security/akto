@@ -22,6 +22,7 @@ import transform from "../transform.js";
 import ComplianceMenu from "./ComplianceMenu.jsx";
 import useThreatReportDownload from "../../../hooks/useThreatReportDownload";
 import { updateThreatFiltersStore } from "../../threat_detection/utils/threatFilters";
+import { redactSampleDataByKeywords } from "../../threat_detection/utils/redactSampleData";
 
 const getSortOptions = (category) => [
     { label: mapLabel('Number of endpoints', category), value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 3 },
@@ -271,7 +272,11 @@ function ThreatCompliancePage() {
                 threatData.filterId
             );
 
-            const maliciousPayloads = payloadResponse?.maliciousPayloadsResponses || [];
+            const rawPayloads = payloadResponse?.maliciousPayloadsResponses || [];
+            const maliciousPayloads = rawPayloads.map((p) => ({
+                ...p,
+                orig: redactSampleDataByKeywords(p.orig),
+            }));
 
             setEventState({
                 currentRefId: threatData.refId,

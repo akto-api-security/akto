@@ -26,6 +26,7 @@ import { LABELS } from "./constants";
 import useThreatReportDownload from "../../hooks/useThreatReportDownload";
 import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
 import { updateThreatFiltersStore } from "./utils/threatFilters";
+import { redactSampleDataByKeywords } from "./utils/redactSampleData";
 const convertToGraphData = (severityMap) => {
     let dataArr = []
     Object.keys(severityMap).forEach((x) => {
@@ -37,102 +38,6 @@ const convertToGraphData = (severityMap) => {
         })
     })
     return dataArr
-}
-
-/** Keys whose values are replaced with "****" in sample data (case-insensitive; nested JSON strings are parsed). */
-const REDACTED_SAMPLE_KEYWORDS = [
-    "password",
-    "passwd",
-    "secret",
-    "token",
-    "access_token",
-    "refresh_token",
-    "id_token",
-    "authorization",
-    "cookie",
-    "apiKey",
-    "api_key",
-    "apikey",
-    "ssn",
-    "phone",
-    "phoneNumber",
-    "creditCard",
-    "credit_card",
-    "cvv",
-    "pin",
-];
-
-const REDACT_PLACEHOLDER = "****";
-
-function redactSampleDataByKeywords(data, redactedKeywords = REDACTED_SAMPLE_KEYWORDS) {
-    try {
-        const keySet = new Set(redactedKeywords.map((k) => String(k).toLowerCase()));
-        const shouldRedactKey = (key) => keySet.has(String(key).toLowerCase());
-
-        function redact(value) {
-            try {
-                if (value === null || value === undefined) {
-                    return value;
-                }
-                const t = typeof value;
-                if (t === "string") {
-                    const trimmed = value.trim();
-                    if (
-                        (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-                        (trimmed.startsWith("[") && trimmed.endsWith("]"))
-                    ) {
-                        try {
-                            const parsed = JSON.parse(value);
-                            return JSON.stringify(redact(parsed));
-                        } catch {
-                            return value;
-                        }
-                    }
-                    return value;
-                }
-                if (Array.isArray(value)) {
-                    return value.map((item) => {
-                        try {
-                            return redact(item);
-                        } catch {
-                            return item;
-                        }
-                    });
-                }
-                if (t === "object") {
-                    const out = {};
-                    try {
-                        Object.keys(value).forEach((k) => {
-                            try {
-                                const v = value[k];
-                                if (shouldRedactKey(k)) {
-                                    out[k] = REDACT_PLACEHOLDER;
-                                } else {
-                                    out[k] = redact(v);
-                                }
-                            } catch {
-                                try {
-                                    out[k] = value[k];
-                                } catch {
-                                    out[k] = REDACT_PLACEHOLDER;
-                                }
-                            }
-                        });
-                    } catch {
-                        return value;
-                    }
-                    return out;
-                }
-                return value;
-            } catch {
-                return value;
-            }
-        }
-
-        return redact(data);
-    } catch {
-        return data;
-    }
 }
 
 const directionData = [
@@ -656,7 +561,11 @@ function ThreatDetectionPage() {
           if (!isMountedRef.current) {
               return;
           }
-          const maliciousPayloads = payloadResponse?.maliciousPayloadsResponses || [];
+          const rawPayloads = payloadResponse?.maliciousPayloadsResponses || [];
+          const maliciousPayloads = rawPayloads.map((p) => ({
+            ...p,
+            orig: redactSampleDataByKeywords(p.orig),
+          }));
 
           setEventState({
             currentRefId: queryParams.refId,
@@ -791,7 +700,10 @@ function ThreatDetectionPage() {
             type: ev.type,
             refId: ev.refId,
             severity: ev.severity,
-            latestApiOrig: ev.payload || ev.latestApiOrig,
+            latestApiOrig:
+              ev.payload != null || ev.latestApiOrig != null
+                ? redactSampleDataByKeywords(ev.payload ?? ev.latestApiOrig)
+                : ev.payload ?? ev.latestApiOrig,
             metadata: ev.metadata,
         }));
 
