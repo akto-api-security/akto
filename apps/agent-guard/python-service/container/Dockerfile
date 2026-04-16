@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY src/scanner_service.py .
 COPY src/intent_analyzer.py .
+COPY src/llm_scanner.py .
 COPY src/warmup.py .
 
 # Create cache directory for HuggingFace models
