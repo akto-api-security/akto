@@ -47,7 +47,7 @@ function ConversationHistory({ conversations, isInventory = false, testResults =
                             isCode={false}
                             onOpenAttempt={hasAttemptData ? () => handleOpenAttempt(index) : null}
                             originalPrompt={msg.originalPrompt}
-                            toolsList={isUser ? [] : (msg?.toolsList || [])}
+                            toolsMetadata={isUser ? {} : (msg?.toolsMetadata || {})}
                         />
                     )
                 })}

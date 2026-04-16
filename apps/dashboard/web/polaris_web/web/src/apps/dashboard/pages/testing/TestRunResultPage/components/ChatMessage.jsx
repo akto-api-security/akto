@@ -118,7 +118,7 @@ function extractPrettyJson(content) {
     }
 }
 
-function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsList }) {
+function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsMetadata }) {
 
     const isRequest = type === MESSAGE_TYPES.REQUEST;
     // Icon
@@ -227,7 +227,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                         />
                                     </Tooltip>
                                 ))}
-                                {toolsList.length > 0 && (
+                                {Object.keys(toolsMetadata).length > 0 && (
                                     <Tooltip content="Tools used">
                                         <Button
                                             plain
@@ -237,7 +237,7 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                                 setInfoModalData({
                                                     type: 'tools',
                                                     title: 'Tools Used',
-                                                    content: toolsList,
+                                                    content: toolsMetadata,
                                                     sampleData: null,
                                                 });
                                                 setInfoModalOpen(true);
@@ -318,6 +318,7 @@ ChatMessage.propTypes = {
     isCode: PropTypes.bool,
     onOpenAttempt: PropTypes.func,
     originalPrompt: PropTypes.string,
+    toolsMetadata: PropTypes.object,
 };
 
 ChatMessage.defaultProps = {
@@ -327,6 +328,7 @@ ChatMessage.defaultProps = {
     isCode: undefined,
     onOpenAttempt: null,
     originalPrompt: null,
+    toolsMetadata: {},
 };
 
 export default ChatMessage;

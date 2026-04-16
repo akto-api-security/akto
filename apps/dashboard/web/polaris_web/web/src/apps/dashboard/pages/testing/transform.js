@@ -1542,7 +1542,7 @@ const transform = {
         _id: "system_" + conversation.response,
         message: systemMessage,
         role: "system",
-        toolsList: conversation.toolsMetadata ? Object.keys(conversation.toolsMetadata) : []
+        toolsMetadata: conversation.toolsMetadata || {}
       })
 
       // toolsMetadata contains the tools calls for that conversation
