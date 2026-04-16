@@ -190,6 +190,23 @@ function CategoryWiseScoreGraph({
 
     const statusLabels = getStatusLabels();
 
+    const handleCategoryRowClick = (categoryName) => {
+        if (dataSource !== 'redteaming') return;
+        const pageKey = '/dashboard/reports/issues/#open';
+        const prev = PersistStore.getState().filtersMap;
+        let nextFilters = (prev[pageKey]?.filters || []).filter(f => f.key !== 'issueCategory');
+        nextFilters.push({ key: 'issueCategory', value: [categoryName] });
+        PersistStore.getState().setFiltersMap({ ...prev, [pageKey]: { filters: nextFilters, sort: prev[pageKey]?.sort || [] } });
+        const params = new URLSearchParams();
+        if (startTimestamp > 0 && endTimestamp > 0) {
+            params.set('since', String(startTimestamp));
+            params.set('until', String(endTimestamp));
+            params.set('range', 'custom');
+        }
+        const query = params.toString();
+        navigate(query ? `/dashboard/reports/issues?${query}#open` : '/dashboard/reports/issues#open');
+    };
+
     const handlePieSegmentClick = (segmentName) => {
         if (dataSource !== 'redteaming') {
             return;
@@ -253,8 +270,12 @@ function CategoryWiseScoreGraph({
             : func.formatSplitSharePercent(failCount, executedTotal, passCount);
         const primaryLabel = passed ? statusLabels.pass : statusLabels.fail;
 
+        const displayName = (categoryMap && categoryMap[cat.categoryName]?.displayName) || cat.categoryName;
         return [
-            (categoryMap && categoryMap[cat.categoryName]?.displayName) || cat.categoryName,
+            <span
+                style={{ cursor: dataSource === 'redteaming' ? 'pointer' : undefined }}
+                onClick={dataSource === 'redteaming' ? () => handleCategoryRowClick(cat.categoryName) : undefined}
+            >{displayName}</span>,
             <VerticalStack gap="2">
                 {/* Main result indicator */}
                 <HorizontalStack gap="1" align="center">
