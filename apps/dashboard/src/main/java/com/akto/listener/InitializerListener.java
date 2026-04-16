@@ -439,9 +439,22 @@ public class InitializerListener implements ServletContextListener {
         List<BasicDBObject> totalEndpoints = new InventoryAction().fetchRecentEndpoints(0, now);
         List<BasicDBObject> newEndpoints  = new InventoryAction().fetchRecentEndpoints(now - 604800, now);
 
-        DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
+        DashboardMode dashboardMode = DashboardMode.getDashboardMode();
 
-        RBAC record = RBACDao.instance.findOne("role", Role.ADMIN.name());
+        RBAC record = null;
+        //check scopeRoleMapping for ADMIN in current scope
+        String currentScope = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+        if (!currentScope.isEmpty()) {
+            // Query for RBAC with scopeRoleMapping containing ADMIN role for current scope
+            Bson filter = Filters.and(
+                    Filters.eq(RBAC.SCOPE_ROLE_MAPPING + "." + currentScope, Role.ADMIN.name())
+            );
+            record = RBACDao.instance.findOne(filter);
+        }
+
+        if(record == null) {
+            record = RBACDao.instance.findOne("role", Role.ADMIN.name());
+        }
 
         if (record == null) {
             return;
