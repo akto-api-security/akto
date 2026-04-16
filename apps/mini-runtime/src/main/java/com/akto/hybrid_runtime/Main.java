@@ -18,6 +18,7 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.graphql.GraphQLUtils;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
 import com.akto.kafka.Kafka;
@@ -876,6 +877,7 @@ public class Main {
 
             try {
                 List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
+                accWiseResponse = expandGraphQL(accWiseResponse);
 
                 // send to protobuf kafka topic (separate from central kafka)
                 //loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to protobuf kafka topic");
@@ -912,6 +914,19 @@ public class Main {
         }
     }
 
+    private static List<HttpResponseParams> expandGraphQL(List<HttpResponseParams> responses) {
+        List<HttpResponseParams> result = new ArrayList<>();
+        for (HttpResponseParams response : responses) {
+            List<HttpResponseParams> graphQlParsed = GraphQLUtils.getUtils().parseGraphqlResponseParam(response);
+            if (!graphQlParsed.isEmpty()) {
+                loggerMaker.infoAndAddToDb("Adding " + graphQlParsed.size() + " new graphql endpoints in inventory");
+                result.addAll(graphQlParsed);
+            } else {
+                result.add(response);
+            }
+        }
+        return result;
+    }
 
     private static void sendToCentralKafka(String centralKafkaTopicName, List<HttpResponseParams> accWiseResponse) {
         // send to central kafka
