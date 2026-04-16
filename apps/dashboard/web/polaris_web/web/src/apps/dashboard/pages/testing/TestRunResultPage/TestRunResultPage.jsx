@@ -232,7 +232,8 @@ function TestRunResultPage(props) {
   }
 
   function buildTestResultMetadata() {
-    const tr0 = selectedTestRunResult?.testResults?.[0];
+    const testResults = selectedTestRunResult?.testResults;
+    const tr0 = testResults?.[testResults.length - 1];
     const isAgentic = Boolean(tr0?.resultTypeAgentic);
     const rawAgentic = agenticConversationsRef.current;
     const agenticText = isAgentic && rawAgentic?.length
