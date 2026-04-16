@@ -175,7 +175,7 @@ public class MaliciousTrafficDetectorTask implements Task {
           new WindowBasedThresholdNotifier.Config(100, 10 * 60));
     }
 
-    this.threatConfigEvaluator = new ThreatConfigurationEvaluator(null, dataActor, apiCacheCountLayer);
+    this.threatConfigEvaluator = new ThreatConfigurationEvaluator(dataActor, apiCacheCountLayer);
 
     // Initialize ParamEnumerationDetector with config values (or defaults)
     ParamEnumerationConfig paramEnumConfig = this.threatConfigEvaluator.getParamEnumerationConfig();

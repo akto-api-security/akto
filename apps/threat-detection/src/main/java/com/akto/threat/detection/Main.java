@@ -34,6 +34,7 @@ import com.akto.threat.detection.ip_api_counter.DistributionDataForwardLayer;
 import com.akto.threat.detection.tasks.ConfigPoller;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
+import com.akto.threat.detection.cache.AccountConfigurationCache;
 import com.akto.threat.detection.utils.Utils;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
@@ -45,7 +46,6 @@ public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
   private static final LoggerMaker logger = new LoggerMaker(Main.class, LogDb.THREAT_DETECTION);
-  private static boolean aggregationRulesEnabled = System.getenv().getOrDefault("AGGREGATION_RULES_ENABLED", "true").equals("true");
 
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -59,7 +59,6 @@ public class Main {
 
     RedisClient localRedis = null;
 
-    logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
     ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
 
     // Eagerly initialize Hyperscan so it's ready if Stigg flag switches to hyperscan mode at runtime
@@ -80,11 +79,11 @@ public class Main {
     String instanceId = ModuleInfoWorker.getModuleName(ModuleInfo.ModuleType.THREAT_DETECTION); 
     AllMetrics.instance.init(LogDb.THREAT_DETECTION, false, dataActor, accountId, instanceId, ModuleInfo.ModuleType.THREAT_DETECTION.name());
 
-    if (aggregationRulesEnabled) {
-        localRedis = createLocalRedisClient();
-        if (localRedis != null) {
-            triggerApiInfoRelayCron(localRedis);
-        }
+    
+    logger.warnAndAddToDb("aggregation rules enabled: " + AccountConfigurationCache.getInstance().getConfig(dataActor).isAggregationRulesEnabled());
+    localRedis = createLocalRedisClient();
+    if (localRedis != null) {
+        triggerApiInfoRelayCron(localRedis);
     }
 
     KafkaConfig trafficKafka = createKafkaConfig("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER", 500, 100);

@@ -12,6 +12,7 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.threat.detection.cache.AccountConfigurationCache;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.CounterCache;
 import com.akto.threat.detection.constants.RedisKeyInfo;
@@ -37,6 +38,10 @@ public class ApiCountInfoRelayCron {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run(){
                 try {
+                    if (!AccountConfigurationCache.getInstance().getConfig(dataActor).isAggregationRulesEnabled()) {
+                        logger.debugAndAddToDb("Aggregation rules disabled, skipping relayApiCountInfo", LoggerMaker.LogDb.THREAT_DETECTION);
+                        return;
+                    }
                     logger.debugAndAddToDb("relayApiCountInfo cron started at " + Context.now(), LoggerMaker.LogDb.THREAT_DETECTION);
                     long endBinId = (Context.now()/60) - 5; // pick keys which are older than at least 5 mins
 
