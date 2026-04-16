@@ -80,10 +80,11 @@ function ChatInfoModal({ open, onClose, title, type, content, sampleData }) {
                             return (
                                 <Box key={toolName}>
                                     <VerticalStack gap="2">
-                                        <Text variant="bodyMd" fontWeight="semibold">{toolName}</Text>
+                                        <Text variant="bodyMd" fontWeight="semibold">Tool: {toolName}</Text>
                                         {serverName && (
-                                            <Text variant="bodySm" color="subdued">{serverName}</Text>
+                                            <Text variant="bodySm" color="subdued">MCP Server: {serverName}</Text>
                                         )}
+                                        <Text variant="bodyMd" fontWeight="semibold">Tool Response:</Text>
                                         {trace ? (
                                             trace.type === 'json' ? (
                                                 <SampleDataComponent
