@@ -13,15 +13,15 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY src/requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY scanner_service.py .
-COPY intent_analyzer.py .
-COPY warmup.py .
+COPY src/scanner_service.py .
+COPY src/intent_analyzer.py .
+COPY src/warmup.py .
 
 # Create cache directory for HuggingFace models
 RUN mkdir -p /app/.cache/huggingface
