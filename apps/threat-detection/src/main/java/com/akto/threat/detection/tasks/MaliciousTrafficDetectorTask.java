@@ -558,9 +558,9 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     // Increment API count using template URL for proper aggregation (skip for default collection)
     String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, urlForAggregation, method.toString());
-    if (apiCollectionId != 0 && this.apiCountWindowBasedThresholdNotifier != null) {
-      this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
-    }
+    // if (apiCollectionId != 0 && this.apiCountWindowBasedThresholdNotifier != null) {
+    //   this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
+    // }
 
     List<SchemaConformanceError> errors = null;
 
