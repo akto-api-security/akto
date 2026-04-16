@@ -76,7 +76,7 @@ const SummaryCardComponent = ({
                     chartSize={190}
                 />
               </HorizontalGrid>
-              {!(isApiSecurityCategory() || isDastCategory()) ? (
+              {/* {!(isApiSecurityCategory() || isDastCategory()) ? (
                 <MemoizedCategoryWiseScoreGraph 
                   key={"category-score-graph"} 
                   startTimestamp={startTimestamp} 
@@ -84,7 +84,7 @@ const SummaryCardComponent = ({
                   dataSource="redteaming"
                   apiCollectionIds={apiCollectionIds}
                 />
-              ) : null}
+              ) : null} */}
                 {
                   !(isApiSecurityCategory() || isDastCategory()) ? <></> :
                     <VerticalStack gap={4}>
