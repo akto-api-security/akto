@@ -24,7 +24,12 @@ export class AktoAgentGuardExecutorContainer extends Container {
   envVars = {
     PYTHONUNBUFFERED: "1",
     PORT: "8092",
-    HF_HOME: "/app/.cache/huggingface"
+    HF_HOME: "/app/.cache/huggingface",
+    // LLM guardrails — FORCE_LLM_MODE routes all PromptInjection/BanTopics
+    // through the LLM without clients needing to send use_llm.
+    SCANNER_LLM_PROVIDER: "anthropic",
+    ANTHROPIC_API_KEY: "", // TODO: set before deploy
+    FORCE_LLM_MODE: "true",
   };
 
   override onStart() {
