@@ -31,6 +31,12 @@ const (
 	EnvOpenAIModel        = "OPENAI_MODEL"
 	EnvAnthropicAPIKey    = "ANTHROPIC_API_KEY"
 	EnvAnthropicModel     = "ANTHROPIC_MODEL"
+
+	// EnvForceLLMMode, when truthy ("true"/"1"/"yes"), routes ALL supported
+	// scanners (PromptInjection, BanTopics) through the LLM provider regardless
+	// of whether the client sent config.use_llm. This lets operators switch
+	// centrally without any client-side changes.
+	EnvForceLLMMode = "FORCE_LLM_MODE"
 )
 
 func getEnv(key, defaultValue string) string {
@@ -38,6 +44,16 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// isTruthyEnv reports whether the named env var holds a truthy value.
+func isTruthyEnv(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 type ScanRequest struct {
@@ -163,17 +179,18 @@ func (c *ScannerClient) HealthCheck(ctx context.Context) error {
 type Service struct {
 	scannerClient *ScannerClient
 	llmScanner    *LLMScanner // nil when no LLM provider is configured
+	forceLLM      bool        // when true, treat every supported scanner as use_llm=true
 }
 
-func NewService(scannerClient *ScannerClient, llmScanner *LLMScanner) *Service {
-	return &Service{scannerClient: scannerClient, llmScanner: llmScanner}
+func NewService(scannerClient *ScannerClient, llmScanner *LLMScanner, forceLLM bool) *Service {
+	return &Service{scannerClient: scannerClient, llmScanner: llmScanner, forceLLM: forceLLM}
 }
 
 // ScanText is the single entry point used by all HTTP handlers. It routes the
 // request to the LLM provider when the client opted in via config.use_llm and
 // the scanner is supported, otherwise it falls through to the Python backend.
 func (s *Service) ScanText(ctx context.Context, req ScanRequest) (*ScanResponse, error) {
-	if useLLMRequested(req.Config) && supportsLLM(req.ScannerName) {
+	if (s.forceLLM || useLLMRequested(req.Config)) && supportsLLM(req.ScannerName) {
 		if s.llmScanner == nil {
 			// LLM mode asked for, but the server isn't configured. Fail open
 			// (IsValid=true) and surface the condition so operators can fix
@@ -374,7 +391,11 @@ func main() {
 	// waitForPythonService(scannerClient);
 
 	llmScanner := buildLLMScanner()
-	service := NewService(scannerClient, llmScanner)
+	forceLLM := isTruthyEnv(EnvForceLLMMode)
+	if forceLLM {
+		log.Printf("[Service] %s=true — all supported scanners will use LLM path", EnvForceLLMMode)
+	}
+	service := NewService(scannerClient, llmScanner, forceLLM)
 	router := setupRouter(service)
 
 	printEnvVariables()
@@ -449,4 +470,5 @@ func printEnvVariables() {
 	log.Printf("%s: %s (default %s)", EnvAnthropicModel, os.Getenv(EnvAnthropicModel), DefaultAnthropicModel)
 	log.Printf("%s set: %t", EnvOpenAIAPIKey, os.Getenv(EnvOpenAIAPIKey) != "")
 	log.Printf("%s set: %t", EnvAnthropicAPIKey, os.Getenv(EnvAnthropicAPIKey) != "")
+	log.Printf("%s: %s", EnvForceLLMMode, os.Getenv(EnvForceLLMMode))
 }
