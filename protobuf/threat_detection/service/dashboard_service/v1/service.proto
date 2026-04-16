@@ -371,6 +371,7 @@ message ThreatConfiguration {
   int32 archival_days = 3;
   bool archival_enabled = 4;
   ParamEnumerationConfig param_enumeration_config = 5;
+  bool aggregation_rules_disabled = 6;
 }
 
 message ToggleArchivalEnabledRequest {
