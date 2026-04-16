@@ -1549,7 +1549,10 @@ const transform = {
       if (conversation.toolsMetadata && Object.keys(conversation.toolsMetadata).length > 0) {
         Object.keys(conversation.toolsMetadata).forEach(tool => {
           // get agent name
-          const agentName = tool['parent_name'];
+          let agentName = tool['agentName'];
+          if(!agentName){
+            agentName = 'agenticTools';
+          }
           if (!toolsCalls[agentName]) {
             toolsCalls[agentName] = []
           }
