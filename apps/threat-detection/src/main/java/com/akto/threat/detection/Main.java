@@ -147,7 +147,7 @@ public class Main {
     ApiCountInfoRelayCron apiCountInfoRelayCron = new ApiCountInfoRelayCron(localRedis);
     try {
         logger.info("Scheduling relayApiCountInfoCron at " + Context.now());
-        apiCountInfoRelayCron.relayApiCountInfo();
+        //apiCountInfoRelayCron.relayApiCountInfo();
     } catch (Exception e) {
         logger.errorAndAddToDb(e,"Error scheduling relayApiCountInfoCron : {} ");
     }
@@ -158,7 +158,7 @@ public class Main {
       return;
     }
     try {
-        distributionDataForwardLayer.sendLastFiveMinuteDistributionData();
+        //distributionDataForwardLayer.sendLastFiveMinuteDistributionData();
     } catch (Exception e) {
         logger.errorAndAddToDb(e,"Error scheduling relayApiCountInfoCron : {} ");
     }

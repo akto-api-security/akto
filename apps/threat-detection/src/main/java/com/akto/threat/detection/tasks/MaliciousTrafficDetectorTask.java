@@ -397,6 +397,11 @@ public class MaliciousTrafficDetectorTask implements Task {
             }
         }
     }
+
+    // Only keep aggregated filters
+    apiFilters.entrySet().removeIf(entry -> !entry.getKey().toLowerCase().contains("aggregate"));
+    logger.debugAndAddToDb("aggregated filters kept: " + apiFilters.size());
+
     return apiFilters;
   }
 
@@ -521,15 +526,11 @@ public class MaliciousTrafficDetectorTask implements Task {
       modeLogged = true;
     }
 
+    getFilters();
+
     RawApi rawApi = null;
     RawApiMetadata metadata = null;
-    if (!isHyperscanOnly) {
-      Map<String, FilterConfig> filters = this.getFilters();
-      if (filters.isEmpty()) {
-        logger.warnAndAddToDb("No filters found for account " + responseParam.getAccountId());
-        return;
-      }
-
+    if (!successfulExploitFilters.isEmpty() || !ignoredEventFilters.isEmpty()) {
       rawApi = RawApi.buildFromMessageNew(responseParam);
       metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());
       rawApi.setRawApiMetdata(metadata);
@@ -563,16 +564,10 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     List<SchemaConformanceError> errors = null;
 
-    // Skip YAML-based exploit/ignore checks for Hyperscan mode
     boolean successfulExploit = false;
     boolean isIgnoredEvent = false;
-    if (!isHyperscanOnly) {
-      if (!ignoredEventFilters.isEmpty()) {
-        isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
-      }
-      if (!successfulExploitFilters.isEmpty()) {
-        successfulExploit = threatDetector.isSuccessfulExploit(successfulExploitFilters, rawApi, apiInfoKey);
-      }
+    if (!ignoredEventFilters.isEmpty()) {
+      isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
     }
 
     if (apiDistributionEnabled && apiCollectionId != 0) {
@@ -581,7 +576,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, urlForAggregation, method.toString());
       String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, urlForAggregation, method.toString());
       long curEpochMin = responseParam.getTime() / 60;
-      this.distributionCalculator.updateFrequencyBuckets(distributionKey, curEpochMin, ipApiCmsKey);
+      //this.distributionCalculator.updateFrequencyBuckets(distributionKey, curEpochMin, ipApiCmsKey);
 
       // Check and raise alert for RateLimits
       RatelimitConfigItem ratelimitConfig = this.threatConfigEvaluator.getDefaultRateLimitConfig();
@@ -589,8 +584,10 @@ public class MaliciousTrafficDetectorTask implements Task {
       ApiInfo.ApiInfoKey templateApiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method);
       long ratelimit = this.threatConfigEvaluator.getRatelimit(templateApiInfoKey);
 
-      long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin,
-          ratelimitConfig.getPeriod());
+      long count = 0;
+
+      // long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin,
+      //     ratelimitConfig.getPeriod());
 
       if (ratelimit != Constants.RATE_LIMIT_UNLIMITED_REQUESTS && count > ratelimit
           && !this.threatConfigEvaluator.isActorInMitigationPeriod(ipApiCmsKey, ratelimitConfig)) {
@@ -607,19 +604,19 @@ public class MaliciousTrafficDetectorTask implements Task {
       }
     }
 
-    boolean skipFilterLoop = false;
-
     // Run Hyperscan if enabled
     if (isHyperscanOnly) {
+      // if (!successfulExploitFilters.isEmpty()) {
+      //   successfulExploit = threatDetector.isSuccessfulExploit(successfulExploitFilters, rawApi, apiInfoKey);
+      // }
       RedactionType hsRedactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
       hyperscanEventHandler.detectAndPushEvents(
           responseParam, apiInfoKey, actor, metadata,
           successfulExploit, isIgnoredEvent, hsRedactionType);
-      skipFilterLoop = true;
     }
 
-    // Only run filter loop if not skipped
-    if (!skipFilterLoop) {
+    // Only run filter loop if there are aggregated filters
+    if (apiFilters.size() > 0) {
       for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = false;
        // Create a fresh vulnerable list for each filter
@@ -678,8 +675,11 @@ public class MaliciousTrafficDetectorTask implements Task {
       // If a request passes the filter and ignore doesn't match, then it's a malicious request,
       // and so we push it to kafka
       if (hasPassedFilter) {
+        if (!successfulExploitFilters.isEmpty()) {
+          successfulExploit = threatDetector.isSuccessfulExploit(successfulExploitFilters, rawApi, apiInfoKey);
+        }
         logger.debugAndAddToDb("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
-        
+
         // Capture threat positions for LFI, OS Command Injection, and SSRF filters
         String filterId = apiFilter.getId();
         if (filterId.equals(ThreatDetector.LFI_FILTER_ID) || 
