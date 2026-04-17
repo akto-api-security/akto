@@ -1245,27 +1245,21 @@ public class HttpCallParser {
             }
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
-            List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
-            if (responseParamsList.isEmpty()) {
                 // Check for REST method payload structure (only for account 1758525547)
-                if (Context.getActualAccountId() == 1758525547 || Context.getActualAccountId() == 1667235738) {
-                    List<HttpResponseParams> restMethodResponseParams = RestMethodUtils.getUtils().parseRestMethodResponseParam(httpResponseParam);
-                    if (!restMethodResponseParams.isEmpty()) {
-                        filteredResponseParams.addAll(restMethodResponseParams);
-                        loggerMaker.infoAndAddToDb("Adding " + restMethodResponseParams.size() + " new REST method endpoints in inventory");
-                    } else {
-                        HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
-                        List<HttpResponseParams> mcpResponseParamsList = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
-                        filteredResponseParams.addAll(mcpResponseParamsList);
-                    }
+            if (Context.getActualAccountId() == 1758525547 || Context.getActualAccountId() == 1667235738) {
+                List<HttpResponseParams> restMethodResponseParams = RestMethodUtils.getUtils().parseRestMethodResponseParam(httpResponseParam);
+                if (!restMethodResponseParams.isEmpty()) {
+                    filteredResponseParams.addAll(restMethodResponseParams);
+                    loggerMaker.infoAndAddToDb("Adding " + restMethodResponseParams.size() + " new REST method endpoints in inventory");
                 } else {
                     HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
                     List<HttpResponseParams> mcpResponseParamsList = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
                     filteredResponseParams.addAll(mcpResponseParamsList);
                 }
             } else {
-                filteredResponseParams.addAll(responseParamsList);
-                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + " new graphql endpoints in inventory");
+                HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
+                List<HttpResponseParams> mcpResponseParamsList = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
+                filteredResponseParams.addAll(mcpResponseParamsList);
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
