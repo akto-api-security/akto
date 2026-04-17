@@ -12,7 +12,7 @@ import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import useTable from "@/apps/dashboard/components/tables/TableContext";
 import settingRequests from "../../settings/api";
-import { fetchEndpointShieldUsernameMap } from "../api_collections/endpointShieldHelper";
+import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import {
     getHeaders,
     getSortOptionsWithoutIconColumn,
@@ -108,7 +108,7 @@ function UsersAndDevices() {
                     api.getLastTrafficSeen(),
                     api.getRiskScoreInfo(),
                     api.getSensitiveInfoForCollections(),
-                    fetchEndpointShieldUsernameMap(),
+                    fetchEndpointShieldUserMetadata(),
                 ]);
 
             if (!isMountedRef.current) return;

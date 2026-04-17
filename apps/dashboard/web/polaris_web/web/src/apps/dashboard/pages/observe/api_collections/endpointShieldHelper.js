@@ -54,6 +54,38 @@ const registerDeviceKeys = (usernameMap, username, rawIds) => {
  */
 const fetchEndpointShieldUsernameMap = async () => {
     const usernameMap = {};
+
+    try {
+        const response = await settingRequests.fetchModuleInfo({ moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD });
+        const moduleInfos = response?.moduleInfos || [];
+
+        moduleInfos.forEach((module) => {
+            const username = resolveModuleUsername(module);
+            if (!username) return;
+
+            const ad = module.additionalData || {};
+            registerDeviceKeys(usernameMap, username, [
+                module.name,
+                ad.deviceId,
+                ad.endpointId,
+            ]);
+
+            const mcpServers = ad.mcpServers || {};
+            Object.values(mcpServers).forEach((server) => {
+                if (server.collectionName) {
+                    usernameMap[server.collectionName.toLowerCase()] = username;
+                }
+            });
+        });
+
+        return usernameMap;
+    } catch (e) {
+        return {};
+    }
+};
+
+const fetchEndpointShieldUserMetadata = async () => {
+    const usernameMap = {};
     const userMetadataMap = {};
 
     try {
@@ -157,6 +189,7 @@ const getResolvedUsernameForCollection = (collection, usernameMap) => {
 
 export {
     fetchEndpointShieldUsernameMap,
+    fetchEndpointShieldUserMetadata,
     getUsernameForCollection,
     getResolvedUsernameForCollection,
     MODULE_TYPE,
