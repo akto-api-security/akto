@@ -10,7 +10,7 @@ import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCard
 import GithubServerTable from "../../components/tables/GithubServerTable";
 import { MethodBox } from "./GetPrettifyEndpoint";
 import { CellType } from "../../components/tables/rows/GithubRow";
-import { CircleTickMajor, CircleCancelMajor, SettingsMajor } from "@shopify/polaris-icons";
+import { CircleTickMajor, CircleCancelMajor, SettingsMajor, DeleteMajor } from "@shopify/polaris-icons";
 import { Icon } from "@shopify/polaris";
 import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
@@ -266,13 +266,31 @@ function AuditData() {
         window.location.reload();
     }
 
+    const deleteAuditData = async (hexId) => {
+        if (!window.confirm("Are you sure you want to delete this audit data entry?")) {
+            return;
+        }
+
+        try {
+            await api.deleteAuditData(hexId)
+            func.setToast(true, false, "Audit data deleted successfully")
+            window.location.reload();
+        } catch (error) {
+            const message = error?.response?.data?.actionErrors?.[0] || "Failed to delete audit data"
+            func.setToast(true, true, message)
+        }
+    }
+
+    const isAktoUser = window.USER_NAME && window.USER_NAME.toLowerCase().endsWith("@akto.io")
+
     // Custom colored icons
     const GreenTickIcon = () => <Icon source={CircleTickMajor} tone="success" />;
     const GreenSettingsIcon = () => <Icon source={SettingsMajor} tone="success" />;
     const RedCancelIcon = () => <Icon source={CircleCancelMajor} tone="critical" />;
+    const DeleteIcon = () => <Icon source={DeleteMajor} tone="critical" />;
 
     const getActionsList = (item) => {
-        return [{title: 'Actions', items: [
+        const actionItems = [
             {
                 content: <span style={{ color: '#008060' }}>Conditional Approval</span>,
                 icon: GreenSettingsIcon,
@@ -292,7 +310,18 @@ function AuditData() {
                 onAction: () => {updateAuditData(item.hexId, "Rejected")},
                 destructive: true
             }
-        ]}]
+        ]
+
+        if (isAktoUser) {
+            actionItems.push({
+                content: <span style={{ color: '#D72C0D' }}>Delete</span>,
+                icon: DeleteIcon,
+                onAction: () => {deleteAuditData(item.hexId)},
+                destructive: true
+            })
+        }
+
+        return [{title: 'Actions', items: actionItems}]
     }
 
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){

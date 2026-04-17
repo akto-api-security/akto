@@ -47,11 +47,19 @@ export default {
         } else {
             data.remarks = remarks;
         }
-        
+
         const resp = await request({
             url: '/api/updateAuditData',
             method: 'post',
             data: data
+        });
+        return resp;
+    },
+    async deleteAuditData(hexId) {
+        const resp = await request({
+            url: '/api/deleteAuditData',
+            method: 'post',
+            data: { hexId }
         });
         return resp;
     },
