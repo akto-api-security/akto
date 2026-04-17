@@ -49,12 +49,12 @@ const registerDeviceKeys = (usernameMap, username, rawIds) => {
 
 /**
  * Fetches endpoint shield module info and builds username map from additionalData.
- * moduleInfo already contains mcpServers with collectionName under additionalData,
- * so no per-agent API calls are needed.
- * @returns {Promise<Object>} - Map of collection name (lowercase) to username
+ * Also returns a userMetadataMap with team and userRole per username.
+ * @returns {Promise<{usernameMap: Object, userMetadataMap: Object}>}
  */
 const fetchEndpointShieldUsernameMap = async () => {
     const usernameMap = {};
+    const userMetadataMap = {};
 
     try {
         const response = await settingRequests.fetchModuleInfo({ moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD });
@@ -77,11 +77,18 @@ const fetchEndpointShieldUsernameMap = async () => {
                     usernameMap[server.collectionName.toLowerCase()] = username;
                 }
             });
+
+            if (!userMetadataMap[username]) {
+                userMetadataMap[username] = {
+                    team: ad.team || '',
+                    userRole: ad.userRole || '',
+                };
+            }
         });
 
-        return usernameMap;
+        return { usernameMap, userMetadataMap };
     } catch (e) {
-        return {};
+        return { usernameMap: {}, userMetadataMap: {} };
     }
 };
 
