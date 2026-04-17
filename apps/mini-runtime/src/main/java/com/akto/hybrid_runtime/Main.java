@@ -14,6 +14,7 @@ import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
+import com.akto.dto.AccountSettings.ThreatKafkaPartitionKey;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.monitoring.ModuleInfo;
@@ -883,7 +884,7 @@ public class Main {
                 //loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to protobuf kafka topic");
                 for (HttpResponseParams httpResponseParams: accWiseResponse) {
                     try {
-                        sendToProtobufKafka(httpResponseParams);
+                        sendToProtobufKafka(httpResponseParams, accountInfo);
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error sending to protobuf kafka: " + e.getMessage());
                     }
@@ -1087,7 +1088,7 @@ public class Main {
     /**
      * Convert HttpResponseParams to protobuf format and send to akto.api.logs2 topic
      */
-    private static void sendToProtobufKafka(HttpResponseParams httpResponseParams) {
+    private static void sendToProtobufKafka(HttpResponseParams httpResponseParams, AccountInfo accountInfo) {
         if(!isProtoKafkaEnabled()){
             return;
         }
@@ -1147,7 +1148,16 @@ public class Main {
             byte[] protobufBytes = protobufMessage.toByteArray();
             
             // Send to kafka
-            ProducerRecord<String, byte[]> record = new ProducerRecord<>("akto.api.logs2", protobufBytes);
+            AccountSettings settings = accountInfo.getAccountSettings();
+            AccountSettings.ThreatKafkaPartitionKey partitionKey = (settings != null) ? settings.getThreatKafkaPartitionKey() : null;
+            String ip = protobufMessage.getIp();
+            ProducerRecord<String, byte[]> record;
+            if (partitionKey != null && partitionKey.equals(AccountSettings.ThreatKafkaPartitionKey.IP)
+                    && !ip.isEmpty()) {
+                record = new ProducerRecord<>("akto.api.logs2", ip, protobufBytes);
+            } else {
+                record = new ProducerRecord<>("akto.api.logs2", protobufBytes);
+            }
             protobufKafkaProducer.send(record, (metadata, exception) -> {
                 if (exception != null) {
                     loggerMaker.errorAndAddToDb(exception, "Error sending protobuf message to kafka: " + exception.getMessage());
