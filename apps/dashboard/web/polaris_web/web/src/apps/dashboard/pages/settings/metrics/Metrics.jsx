@@ -1,4 +1,4 @@
-import { EmptyState, LegacyCard, Page } from '@shopify/polaris'
+import { EmptyState, HorizontalStack, LegacyCard, Page, Text } from '@shopify/polaris'
 import React, { useEffect, useReducer, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
@@ -339,41 +339,44 @@ function Metrics() {
         <Page title='Metrics' divider>
             <LegacyCard >
                 <LegacyCard.Section>
-                    <LegacyCard.Header title="Metrics">
-                        <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
-                        <DropdownSearch
-                            placeholder="Timezone"
-                            optionsList={timezonesAvailable}
-                            setSelected={setSelectedTimezone}
-                            value={selectedTimezone}
-                            sliceMaxVal={10}
-                        />
-                        <Dropdown menuItems={menuItems} initial= {groupBy} selected={handleChange}
-                                    subItems={hosts.length > 0}
-                                    subContent="Group by Id"
-                                    subClick={changeItems}
-                        />
-                        <Dropdown
-                            menuItems={[
-                                { label: "All", value: "ALL" },
-                                { label: "Traffic Collectors", value: "TRAFFIC_COLLECTORS" },
-                                { label: "Threat Detection", value: "THREAT_DETECTION" },
-                                { label: "Mini Runtime", value: "MINI_RUNTIME" }
-                            ]}
-                            initial="ALL"
-                            selected={(val) => {
-                                if (val === "TRAFFIC_COLLECTORS") {
-                                    navigate("/dashboard/settings/traffic-collectors-metrics");
-                                }
-                                if (val === "THREAT_DETECTION") {
-                                    navigate("/dashboard/settings/threat-detection-metrics");
-                                }
-                                if (val === "MINI_RUNTIME") {
-                                    navigate("/dashboard/settings/mini-runtime-metrics");
-                                }
-                            }}
-                        />
-                    </LegacyCard.Header>
+                    <HorizontalStack align="space-between" blockAlign="center">
+                        <Text variant="headingMd" as="h2">Metrics</Text>
+                        <HorizontalStack gap="3" blockAlign="center">
+                            <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
+                            <DropdownSearch
+                                placeholder="Timezone"
+                                optionsList={timezonesAvailable}
+                                setSelected={setSelectedTimezone}
+                                value={selectedTimezone}
+                                sliceMaxVal={10}
+                            />
+                            <Dropdown menuItems={menuItems} initial= {groupBy} selected={handleChange}
+                                        subItems={hosts.length > 0}
+                                        subContent="Group by Id"
+                                        subClick={changeItems}
+                            />
+                            <Dropdown
+                                menuItems={[
+                                    { label: "All", value: "ALL" },
+                                    { label: "Traffic Collectors", value: "TRAFFIC_COLLECTORS" },
+                                    { label: "Threat Detection", value: "THREAT_DETECTION" },
+                                    { label: "Mini Runtime", value: "MINI_RUNTIME" }
+                                ]}
+                                initial="ALL"
+                                selected={(val) => {
+                                    if (val === "TRAFFIC_COLLECTORS") {
+                                        navigate("/dashboard/settings/traffic-collectors-metrics");
+                                    }
+                                    if (val === "THREAT_DETECTION") {
+                                        navigate("/dashboard/settings/threat-detection-metrics");
+                                    }
+                                    if (val === "MINI_RUNTIME") {
+                                        navigate("/dashboard/settings/mini-runtime-metrics");
+                                    }
+                                }}
+                            />
+                        </HorizontalStack>
+                    </HorizontalStack>
                 </LegacyCard.Section>
                 {graphContainer}
             </LegacyCard>
