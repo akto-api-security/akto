@@ -7,7 +7,9 @@ export AKTO_DATA_INGESTION_URL="{{AKTO_DATA_INGESTION_URL}}"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="claude_code_cli"
-export CONTEXT_SOURCE="ENDPOINT"
+export AKTO_HOST="{{AKTO_HOST}}"           # Optional: explicit hostname for request headers
+                                            # argus mode default: api.anthropic.com
+                                            # atlas mode default: {DEVICE_ID}.ai-agent.claudecli
 export DEVICE_ID="{{DEVICE_ID (optional)}}"
 
 # Logging Configuration
