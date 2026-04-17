@@ -57,7 +57,7 @@ def get_connector_config(connector: str) -> dict:
             "hook_header": "x-copilot-hook",
             "atlas_domain": "ai-agent.copilot",
             "log_dir_default": "~/akto/.github/akto/copilot/logs",
-            "blocked_exit_code": 1,
+            "blocked_exit_code": 0,
         }
 
 
