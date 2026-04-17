@@ -61,9 +61,16 @@ function GraphMetric(props) {
             height: `${height}px`,
             backgroundColor,
             animation: false,
+            spacingTop: 20,
+            spacingLeft: 16,
+            spacingRight: 16,
+            spacingBottom: 16,
             zooming: {
                 type: 'x',
-                mouseWheel: { enabled: true },
+                mouseWheel: {
+                    enabled: true,
+                    sensitivity: 1.5,
+                },
                 resetButton: { position: { align: 'right' } },
             },
             panning: { enabled: true, type: 'x' },
@@ -75,11 +82,13 @@ function GraphMetric(props) {
         title: {
             text: title,
             align: 'left',
-            margin: 20
+            margin: 12,
+            style: { fontSize: '16px', fontWeight: '600' },
         },
         subtitle: {
             text: subtitle,
-            align: 'left'
+            align: 'left',
+            style: { fontSize: '12px' },
         },
         tooltip: {
             shared: true,
@@ -119,11 +128,13 @@ function GraphMetric(props) {
         ...defaultChartOptions,
     };
     return (
-        <HighchartsReact 
-            highcharts={Highcharts} 
-            options={chartOptions} 
-            ref={chartComponentRef}
-        />
+        <div onWheel={(e) => e.stopPropagation()}>
+            <HighchartsReact
+                highcharts={Highcharts}
+                options={chartOptions}
+                ref={chartComponentRef}
+            />
+        </div>
     )
 }
 

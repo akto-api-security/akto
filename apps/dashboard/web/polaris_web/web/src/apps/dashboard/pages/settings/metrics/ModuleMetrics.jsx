@@ -58,14 +58,27 @@ function ModuleMetrics({ config }) {
             const response = await settingRequests.fetchModuleInfo(filter)
             const modules = response?.moduleInfos || []
 
+            const nowSec = Math.floor(Date.now() / 1000)
+            const ONLINE_THRESHOLD_SEC = 5 * 60
+
             const sorted = modules.sort((a, b) => {
+                const aOnline = (nowSec - (a.lastHeartbeatReceived || 0)) < ONLINE_THRESHOLD_SEC
+                const bOnline = (nowSec - (b.lastHeartbeatReceived || 0)) < ONLINE_THRESHOLD_SEC
+                if (aOnline !== bOnline) return bOnline ? 1 : -1
                 const aTime = a.lastHeartbeatReceived || a.startedTs || 0
                 const bTime = b.lastHeartbeatReceived || b.startedTs || 0
                 return bTime - aTime
             }).map(module => {
+                const isOnline = (nowSec - (module.lastHeartbeatReceived || 0)) < ONLINE_THRESHOLD_SEC
+                const name = module?.name || module?.id
                 return {
-                    label: module?.name || module?.id,
-                    value: module?.name || module?.id,
+                    label: (
+                        <HorizontalStack gap="1" blockAlign="center">
+                            <Text as="span" variant="bodyMd" color={isOnline ? 'success' : 'subdued'}>●</Text>
+                            <Text as="span" variant="bodyMd">{name}</Text>
+                        </HorizontalStack>
+                    ),
+                    value: name,
                 }
             })
 
@@ -207,7 +220,7 @@ function ModuleMetrics({ config }) {
                                     value={selectedTimezone}
                                     sliceMaxVal={10}
                                 />
-                                {instanceIds.length > 1 && (
+                                {instanceIds.length > 0 && (
                                     <DropdownSearch
                                         placeholder="Select module"
                                         optionsList={instanceIds}
@@ -215,6 +228,7 @@ function ModuleMetrics({ config }) {
                                         preSelected={[selectedInstanceId]}
                                         value={selectedInstanceId}
                                         sliceMaxVal={10}
+                                        dropdownSearchKey="value"
                                     />
                                 )}
                             </HorizontalStack>
