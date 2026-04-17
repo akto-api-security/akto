@@ -25,6 +25,8 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
 
 import com.akto.IPLookupClient;
 import com.akto.RawApiMetadataFactory;
@@ -113,6 +115,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static List<FilterConfig> ignoredEventFilters = new ArrayList<>();
   private final AtomicInteger applyFilterLogCount = new AtomicInteger(0);
   private static final int MAX_APPLY_FILTER_LOGS = 1000;
+  private static final int MAX_PAYLOAD_SIZE_BYTES = 50 * 1024; // 50 KB
 
   // Kafka records per minute tracking
   private int recordsReadCount = 0;
@@ -123,6 +126,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private int validHostnameCount = 0;
   private long lastValidHostnameLogTime = System.currentTimeMillis();
 
+  private boolean modeLogged = false;
   private final HyperscanEventHandler hyperscanEventHandler;
 
     public MaliciousTrafficDetectorTask(
@@ -147,6 +151,8 @@ public class MaliciousTrafficDetectorTask implements Task {
     properties.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, 100 * 1024 * 1024);
     properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
     properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+
+    KafkaConfig.addAuthenticationFromEnv(properties);
 
     logger.warnAndAddToDb(instanceId + ": Creating Kafka consumer with bootstrap servers: " + trafficConfig.getBootstrapServers() +
                           ", groupId: " + trafficConfig.getGroupId() +
@@ -216,6 +222,7 @@ public class MaliciousTrafficDetectorTask implements Task {
           }
           
           logger.warnAndAddToDb(this.instanceId + ": Starting Kafka polling loop");
+          logger.warnAndAddToDb(this.instanceId + ": Threat detection mode configured (will be determined per-account)");
           AllMetrics.instance.collectInfraMetrics();
 
           while (kafkaPollingEnabled) {
@@ -238,6 +245,21 @@ public class MaliciousTrafficDetectorTask implements Task {
                 if (kafkaConsumer.assignment().isEmpty()) {
                   logger.warnAndAddToDb(this.instanceId + ": WARNING - No partitions assigned! Consumer may not receive records.");
                 }
+                // Log committed offsets and end offsets (lag) for each assigned partition
+                try {
+                  Set<TopicPartition> assignedPartitions = kafkaConsumer.assignment();
+                  Map<TopicPartition, Long> endOffsets = kafkaConsumer.endOffsets(assignedPartitions);
+                  for (TopicPartition tp : assignedPartitions) {
+                    OffsetAndMetadata committed = kafkaConsumer.committed(tp);
+                    long committedOffset = committed != null ? committed.offset() : -1;
+                    long endOffset = endOffsets.getOrDefault(tp, -1L);
+                    long lag = (committed != null && endOffset >= 0) ? endOffset - committedOffset : -1;
+                    logger.warnAndAddToDb(this.instanceId + ": Partition " + tp + " committedOffset=" + committedOffset +
+                                          " endOffset=" + endOffset + " lag=" + lag);
+                  }
+                } catch (Exception e) {
+                  logger.errorAndAddToDb(e, this.instanceId + ": Error fetching offset info: " + e.getMessage());
+                }
                 recordsReadCount = 0;
                 lastRecordCountLogTime = currentTime;
               }
@@ -250,6 +272,9 @@ public class MaliciousTrafficDetectorTask implements Task {
               }
 
               for (ConsumerRecord<String, byte[]> record : records) {
+                if (record.value().length > MAX_PAYLOAD_SIZE_BYTES) {
+                  continue;
+                }
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
                 if(MAX_KAFKA_DEBUG_MSGS > 0){
                   MAX_KAFKA_DEBUG_MSGS--;
@@ -489,6 +514,12 @@ public class MaliciousTrafficDetectorTask implements Task {
     }
     AccountConfig accountConfig = AccountConfigurationCache.getInstance().getConfig(dataActor);
     boolean isHyperscanOnly = accountConfig != null && accountConfig.isHyperscanEnabled();
+
+    if (!modeLogged) {
+      String mode = isHyperscanOnly ? "HYPERSCAN" : "FILTER MODE";
+      logger.warnAndAddToDb(instanceId + ": Running " + mode + " detection");
+      modeLogged = true;
+    }
 
     RawApi rawApi = null;
     RawApiMetadata metadata = null;

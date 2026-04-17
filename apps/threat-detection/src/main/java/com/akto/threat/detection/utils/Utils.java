@@ -127,14 +127,14 @@ public class Utils {
         String status = ignoredEvent ? com.akto.util.ThreatDetectionConstants.IGNORED : com.akto.util.ThreatDetectionConstants.ACTIVE;
 
         String redactedPayload = responseParam.getOriginalMsg().get();
-        if (redactionType != RedactionType.NONE) {
-            // Redact sensitive data from the payload
-            try {
-                redactedPayload = getRedactedPayload(responseParam, redactionType);
-            } catch (Exception e) {
-                // If redaction fails, fall back to original message
-            }
-        }
+        // if (redactionType != RedactionType.NONE) {
+        //     // Redact sensitive data from the payload
+        //     try {
+        //         redactedPayload = getRedactedPayload(responseParam, redactionType);
+        //     } catch (Exception e) {
+        //         // If redaction fails, fall back to original message
+        //     }
+        // }
         SampleMaliciousRequest.Builder maliciousReqBuilder = SampleMaliciousRequest.newBuilder()
                 .setUrl(responseParam.getRequestParams().getURL())
                 .setMethod(responseParam.getRequestParams().getMethod())
