@@ -8,8 +8,9 @@ import GraphMetric from '../../../../components/GraphMetric'
  * @param {string} title - Chart title
  * @param {string} description - Chart description
  * @param {Function} chartOptions - Function to get chart options
+ * @param {number} timezoneOffsetMinutes - Timezone offset in minutes
  */
-function MetricChart({ metricId, data, title, description, chartOptions }) {
+function MetricChart({ metricId, data, title, description, chartOptions, timezoneOffsetMinutes }) {
     const hasData = data && data.length > 0
 
     return (
@@ -17,9 +18,7 @@ function MetricChart({ metricId, data, title, description, chartOptions }) {
             {hasData ? (
                 <GraphMetric
                     data={data}
-                    type='spline'
                     color='#6200EA'
-                    areaFillHex="true"
                     height="330"
                     title={title || metricId}
                     subtitle={description || ''}
@@ -27,6 +26,7 @@ function MetricChart({ metricId, data, title, description, chartOptions }) {
                     background-color="#000000"
                     text="true"
                     inputMetrics={[]}
+                    timezoneOffsetMinutes={timezoneOffsetMinutes}
                 />
             ) : (
                 <EmptyState

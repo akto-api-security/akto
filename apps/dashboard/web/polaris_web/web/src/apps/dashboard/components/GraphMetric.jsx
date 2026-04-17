@@ -8,7 +8,7 @@ require("highcharts/modules/accessibility")(Highcharts);
 
 function GraphMetric(props) {
 
-    const { type, height, backgroundColor, data, inputMetrics, title, text, defaultChartOptions, subtitle } = props;
+    const { height, backgroundColor, data, inputMetrics, title, text, defaultChartOptions, subtitle, timezoneOffsetMinutes } = props;
     const chartComponentRef = useRef(null)
 
     const fillColor = {
@@ -54,7 +54,7 @@ function GraphMetric(props) {
 
     const chartOptions = {
         chart: {
-            type,
+            type: 'spline',
             height: `${height}px`,
             backgroundColor,
         },
@@ -74,6 +74,9 @@ function GraphMetric(props) {
             shared: true,
         },
         series,
+        time: {
+            timezoneOffset: timezoneOffsetMinutes != null ? -timezoneOffsetMinutes : new Date().getTimezoneOffset(),
+        },
         xAxis: {
             type: 'datetime',
             dateTimeLabelFormats: {

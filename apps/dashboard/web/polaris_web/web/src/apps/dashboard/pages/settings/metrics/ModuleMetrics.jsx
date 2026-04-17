@@ -10,6 +10,19 @@ import { useChartOptions } from './hooks/useChartOptions'
 import SystemInfoBox from './components/SystemInfoBox'
 import MetricChart from './components/MetricChart'
 import DropdownSearch from "../../../components/shared/DropdownSearch"
+import { timezonesAvailable } from '../about/About'
+
+function getTimezoneOffsetMinutes(tzValue) {
+    if (!tzValue) return new Date().getTimezoneOffset() * -1;
+    try {
+        const now = new Date();
+        const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+        const tzDate = new Date(now.toLocaleString('en-US', { timeZone: tzValue }));
+        return Math.round((tzDate.getTime() - utcMs) / 60000);
+    } catch {
+        return new Date().getTimezoneOffset() * -1;
+    }
+}
 
 /**
  * Base component for displaying module metrics
@@ -20,6 +33,7 @@ function ModuleMetrics({ config }) {
     const [orderedResult, setOrderedResult] = useState([])
     const [instanceIds, setInstanceIds] = useState([])
     const [selectedInstanceId, setSelectedInstanceId] = useState(null)
+    const [selectedTimezone, setSelectedTimezone] = useState(null)
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
@@ -185,6 +199,13 @@ function ModuleMetrics({ config }) {
                                         alias: dateObj.alias
                                     })}
                                 />
+                                <DropdownSearch
+                                    placeholder="Timezone"
+                                    optionsList={timezonesAvailable}
+                                    setSelected={setSelectedTimezone}
+                                    value={selectedTimezone}
+                                    sliceMaxVal={10}
+                                />
                                 {instanceIds.length > 1 && (
                                     <DropdownSearch
                                         placeholder="Select module"
@@ -216,6 +237,7 @@ function ModuleMetrics({ config }) {
                         title={config.metricNames[element.key]?.title}
                         description={config.metricNames[element.key]?.description}
                         chartOptions={getChartOptions()}
+                        timezoneOffsetMinutes={getTimezoneOffsetMinutes(selectedTimezone)}
                     />
                 ))}
             </LegacyCard>
