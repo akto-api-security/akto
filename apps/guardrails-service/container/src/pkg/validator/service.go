@@ -30,12 +30,13 @@ type policyCache struct {
 
 // Service handles payload validation using akto-gateway library
 type Service struct {
-	config     *config.Config
-	dbClient   *dbabstractor.Client
-	processor  mcp.RequestProcessor // Default processor (skipThreat=false)
-	logger     *zap.Logger
-	cache      *policyCache
-	sessionMgr *session.SessionManager // Our session manager implementation for session tracking
+	config        *config.Config
+	dbClient      *dbabstractor.Client
+	processor     mcp.RequestProcessor // Default processor (skipThreat=false)
+	logger        *zap.Logger
+	cache         *policyCache
+	sessionMgr    *session.SessionManager // Our session manager implementation for session tracking
+	schemaFetcher *SchemaFetcher
 }
 
 // NewService creates a new validator service
@@ -90,13 +91,16 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		}
 	}
 
+	schemaFetcher := NewSchemaFetcher(dbClient, time.Duration(cfg.PolicyRefreshIntervalMin)*time.Minute, logger)
+
 	return &Service{
-		config:     cfg,
-		dbClient:   dbClient,
-		processor:  defaultProcessor,
-		logger:     logger,
-		cache:      &policyCache{},
-		sessionMgr: sessionManager,
+		config:        cfg,
+		dbClient:      dbClient,
+		processor:     defaultProcessor,
+		logger:        logger,
+		cache:         &policyCache{},
+		sessionMgr:    sessionManager,
+		schemaFetcher: schemaFetcher,
 	}, nil
 }
 
@@ -244,11 +248,11 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.cache.hasAuditRules = hasAuditRules
 	s.cache.lastFetched = time.Now()
 
-	s.logger.Info("Policy cache refreshed with ALL policies",
-		zap.Int("policiesCount", len(policies)),
-		zap.Int("auditPoliciesCount", len(auditPolicies)),
-		zap.Time("lastFetched", s.cache.lastFetched),
-		zap.Any("policies", policies))
+	// s.logger.Info("Policy cache refreshed with ALL policies",
+	// 	zap.Int("policiesCount", len(policies)),
+	// 	zap.Int("auditPoliciesCount", len(auditPolicies)),
+	// 	zap.Time("lastFetched", s.cache.lastFetched),
+	// 	zap.Any("policies", policies))
 
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
@@ -271,9 +275,9 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		return nil, nil, nil, false, fmt.Errorf("failed to fetch guardrail policies: %w", err)
 	}
 
-	s.logger.Debug("Raw guardrail policies response",
-		zap.Int("size", len(rawGuardrailPolicies)),
-		zap.String("raw", string(rawGuardrailPolicies)))
+	// s.logger.Debug("Raw guardrail policies response",
+	// 	zap.Int("size", len(rawGuardrailPolicies)),
+	// 	zap.String("raw", string(rawGuardrailPolicies)))
 
 	// Parse the wrapper object containing guardrailPolicies array
 	var response struct {
@@ -424,6 +428,46 @@ func (s *Service) validationContextFromParams(
 	}
 }
 
+// extractPayloadForValidation checks if a GuardrailSchema is configured for the endpoint.
+// If found, extracts only the configured content fields. Falls through to raw payload on any miss.
+func (s *Service) extractPayloadForValidation(payload, method, path string, isRequest bool) string {
+	key := EndpointKey(method, path)
+	gs, ok := GlobalGuardrailSchemaRegistry().Get(key)
+	schemaJSON, _ := json.Marshal(gs)
+	s.logger.Info("[SchemaExtract] extracting payload.",
+		zap.String("key", key),
+		zap.String("schema", string(schemaJSON)))
+
+	if !ok {
+		return payload
+	}
+
+	var fields []MessageFieldEntry
+	if isRequest {
+		fields = gs.RequestMessageFields
+	} else {
+		fields = gs.ResponseMessageFields
+	}
+
+	extracted := ExtractContent(payload, fields)
+	if extracted == "" {
+		return payload
+	}
+
+	s.logger.Info("[SchemaExtract] extractPayloadForValidation: extracted content via schema",
+		zap.String("endpoint", key),
+		zap.Bool("isRequest", isRequest),
+		zap.Int("fieldCount", len(fields)),
+		zap.Int("extractedLength", len(extracted)))
+
+	if !strings.HasPrefix(strings.TrimSpace(extracted), "{") {
+		if b, err := json.Marshal(map[string]string{"text": extracted}); err == nil {
+			return string(b)
+		}
+	}
+	return extracted
+}
+
 // ValidateRequest validates a request payload against guardrail policies with session tracking
 func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRequestParams, sessionID string, requestID string) (*mcp.ValidationResult, error) {
 	start := time.Now()
@@ -466,6 +510,10 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.String("sessionID", sessionID))
 	}
 
+	// Refresh schema registry if stale and extract content for configured endpoints
+	s.schemaFetcher.RefreshIfNeeded()
+	payloadToValidate = s.extractPayloadForValidation(payloadToValidate, params.Method, params.Path, true)
+
 	// Get cached policies (refreshes if stale)
 	policiesStart := time.Now()
 	policies, auditPolicies, compiledRules, hasAuditRules, err := s.getCachedPolicies(contextSource)
@@ -481,12 +529,12 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
 
-	s.logger.Info("ValidateRequest - loaded policies",
-		zap.String("contextSource", contextSource),
-		zap.Int("policiesCount", len(policies)),
-		zap.Strings("policyNames", policyNames(policies)),
-		zap.Any("policies", policies),
-		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
+	// s.logger.Info("ValidateRequest - loaded policies",
+	// 	zap.String("contextSource", contextSource),
+	// 	zap.Int("policiesCount", len(policies)),
+	// 	zap.Strings("policyNames", policyNames(policies)),
+	// 	zap.Any("policies", policies),
+	// 	zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest")
@@ -592,6 +640,9 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("aktoVxlanId", params.AktoVxlanID),
 		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
 
+	// Refresh schema registry if stale
+	s.schemaFetcher.RefreshIfNeeded()
+
 	// Get cached policies (refreshes if stale)
 	policiesStart := time.Now()
 	policies, _, _, _, err := s.getCachedPolicies(contextSource)
@@ -630,9 +681,12 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
+	// Apply schema-based content extraction if configured for this endpoint
+	responseBodyForValidation := s.extractPayloadForValidation(responseBody, params.Method, params.Path, false)
+
 	// Use processor's ProcessResponse method with external policies
 	processStart := time.Now()
-	processResult, err := s.processor.ProcessResponse(ctx, responseBody, valCtx, policies)
+	processResult, err := s.processor.ProcessResponse(ctx, responseBodyForValidation, valCtx, policies)
 	if err != nil {
 		s.logger.Error("ValidateResponse - ProcessResponse failed",
 			zap.String("path", params.Path),
@@ -812,6 +866,9 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 	s.logger.Info("Validating batch data", zap.Int("count", len(batchData)))
 
+	// Refresh schema registry if stale
+	s.schemaFetcher.RefreshIfNeeded()
+
 	// Get cached policies (refreshes if stale)
 	policies, auditPolicies, _, hasAuditRules, err := s.getCachedPolicies(string(contextSource))
 	if err != nil {
@@ -891,7 +948,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.String("path", data.Path),
 				zap.String("payload", data.RequestPayload))
 
-			processResult, err := s.processor.ProcessRequest(ctx, data.RequestPayload, valCtx, itemPolicies, auditPolicies, hasAuditRules)
+			reqPayload := s.extractPayloadForValidation(data.RequestPayload, data.Method, data.Path, true)
+			processResult, err := s.processor.ProcessRequest(ctx, reqPayload, valCtx, itemPolicies, auditPolicies, hasAuditRules)
 			if err != nil {
 				s.logger.Error("Failed to validate request",
 					zap.Int("index", i),
@@ -922,7 +980,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		// Validate response payload if present
 		if data.ResponsePayload != "" {
-			processResult, err := s.processor.ProcessResponse(ctx, data.ResponsePayload, valCtx, itemPolicies)
+			respPayload := s.extractPayloadForValidation(data.ResponsePayload, data.Method, data.Path, false)
+			processResult, err := s.processor.ProcessResponse(ctx, respPayload, valCtx, itemPolicies)
 			if err != nil {
 				s.logger.Error("Failed to validate response", zap.Error(err))
 				result.ResponseError = err.Error()
