@@ -37,12 +37,18 @@ public class FilterYamlTemplateAction extends UserAction {
             if (filterConfig.getId() == null) {
                 throw new Exception("id field cannot be empty");
             }
-            if (filterConfig.getFilter() == null) {
+            if (filterConfig.getFilter() == null && filterConfig.getSuccessFilter() == null && filterConfig.getFailureFilter() == null) {
                 throw new Exception("filter field cannot be empty");
             }
 
-            if (!filterConfig.getFilter().getIsValid()) {
+            if (filterConfig.getFilter() != null && !filterConfig.getFilter().getIsValid()) {
                 throw new Exception(filterConfig.getFilter().getErrMsg());
+            }
+            if (filterConfig.getSuccessFilter() != null && !filterConfig.getSuccessFilter().getIsValid()) {
+                throw new Exception(filterConfig.getSuccessFilter().getErrMsg());
+            }
+            if (filterConfig.getFailureFilter() != null && !filterConfig.getFailureFilter().getIsValid()) {
+                throw new Exception(filterConfig.getFailureFilter().getErrMsg());
             }
 
             List<Bson> updates = TrafficFilterUtil.getDbUpdateForTemplate(this.content, getSUser().getLogin());
