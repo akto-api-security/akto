@@ -367,11 +367,16 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                 Filters.eq(RBAC.ACCOUNT_ID, accId)
             );
 
-            // Update the scopeRoleMapping in RBAC
-            RBACDao.instance.updateOneNoUpsert(
-                filterRbac,
-                Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMapping)
-            );
+            RBAC getRbac = RBACDao.instance.findOne(filterRbac);
+            if(getRbac == null){
+                RBAC rbacEntry = new RBAC(userDetails.getId(), null, accId, scopeRoleMapping);
+                RBACDao.instance.insertOne(rbacEntry);
+            }else {
+                RBACDao.instance.updateOneNoUpsert(
+                        filterRbac,
+                        Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMapping)
+                );
+            }
 
             // Clear cache
             RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
