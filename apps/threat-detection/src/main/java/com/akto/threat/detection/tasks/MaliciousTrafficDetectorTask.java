@@ -11,6 +11,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
@@ -70,6 +71,8 @@ import com.akto.threat.detection.utils.Utils;
 import com.akto.threat.detection.hyperscan.HyperscanEventHandler;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
+import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.rules.TestPlugin;
 import com.akto.utils.GzipUtils;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
@@ -740,6 +743,21 @@ public class MaliciousTrafficDetectorTask implements Task {
           }
 
           if (shouldNotify) {
+            // If post_aggregate_condition is present, validate current payload against it
+            if (rule.getAggregationEvaluator() != null && rule.getAggregationEvaluator().getNode() != null) {
+              RawApi evalRawApi = rawApi != null ? rawApi : RawApi.buildFromMessageNew(responseParam);
+              try {
+                ValidationResult evalResult = TestPlugin.validateFilter(
+                    rule.getAggregationEvaluator().getNode(), evalRawApi, apiInfoKey, new HashMap<>(), "");
+                if (!evalResult.getIsValid()) {
+                  logger.debugAndAddToDb("post_aggregate_condition check failed for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+                  continue;
+                }
+              } catch (Exception e) {
+                logger.errorAndAddToDb(e, "Error in post_aggregate_condition check: " + e.getMessage());
+                continue;
+              }
+            }
             logger.debugAndAddToDb("aggregate condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
             generateAndPushMaliciousEventRequest(
                 apiFilter,
