@@ -1,4 +1,4 @@
-import { LegacyCard, EmptyState } from "@shopify/polaris"
+import { EmptyState } from "@shopify/polaris"
 import GraphMetric from '../../../../components/GraphMetric'
 
 /**
@@ -14,7 +14,7 @@ function MetricChart({ metricId, data, title, description, chartOptions, timezon
     const hasData = data && data.length > 0
 
     return (
-        <LegacyCard.Section key={metricId}>
+        <div style={{ borderTop: '1px solid #e1e3e5' }}>
             {hasData ? (
                 <GraphMetric
                     data={data}
@@ -29,14 +29,13 @@ function MetricChart({ metricId, data, title, description, chartOptions, timezon
                     timezoneOffsetMinutes={timezoneOffsetMinutes}
                 />
             ) : (
-                <EmptyState
-                    heading={title || metricId}
-                    footerContent="No Graph Data exist !"
-                >
-                    <p>{description || ''}</p>
-                </EmptyState>
+                <div style={{ padding: '16px' }}>
+                    <EmptyState heading={title || metricId} footerContent="No Graph Data exist !">
+                        <p>{description || ''}</p>
+                    </EmptyState>
+                </div>
             )}
-        </LegacyCard.Section>
+        </div>
     )
 }
 

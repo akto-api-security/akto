@@ -4,6 +4,8 @@ import { useRef } from "react";
 require("highcharts/modules/exporting")(Highcharts);
 require("highcharts/modules/export-data.src")(Highcharts);
 require("highcharts/modules/accessibility")(Highcharts);
+require("highcharts/modules/boost")(Highcharts);
+require("highcharts/modules/mouse-wheel-zoom")(Highcharts);
 
 
 function GraphMetric(props) {
@@ -19,12 +21,13 @@ function GraphMetric(props) {
         ],
     };
 
-    const dataForChart = data.map((x, idx) => {
+    const dataForChart = data.map((x) => {
         return {
             data: x['data'],
             color: x['color'],
             name: x['name'],
-            fillColor: props.areaFillHex ? fillColor : {},
+            fillColor: props.areaFillHex ? fillColor : 'none',
+            marker: { enabled: false },
             yAxis: 0,
         };
     });
@@ -57,6 +60,14 @@ function GraphMetric(props) {
             type: 'spline',
             height: `${height}px`,
             backgroundColor,
+            animation: false,
+            zooming: {
+                type: 'x',
+                mouseWheel: { enabled: true },
+                resetButton: { position: { align: 'right' } },
+            },
+            panning: { enabled: true, type: 'x' },
+            panKey: 'shift',
         },
         credits:{
             enabled: false,
@@ -95,8 +106,7 @@ function GraphMetric(props) {
                     text: title,
                 },
                 visible: text,
-                gridLineWidth: 0,
-                min: 0,
+                gridLineWidth: 1,
             },
             ...inputMetrics.map(() => ({
                 title: {
@@ -104,7 +114,6 @@ function GraphMetric(props) {
                 },
                 visible: true,
                 opposite: true,
-                min: 0,
             })),
         ],
         ...defaultChartOptions,

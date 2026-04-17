@@ -1,5 +1,6 @@
-import { EmptyState, HorizontalStack, LegacyCard, Page, Text } from '@shopify/polaris'
+import { HorizontalStack, LegacyCard, Page, Text } from '@shopify/polaris'
 import React, { useEffect, useReducer, useState } from 'react'
+import MetricChart from './components/MetricChart'
 import { useNavigate } from 'react-router-dom'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
 import Dropdown from '../../../components/layouts/Dropdown'
@@ -7,7 +8,6 @@ import {produce} from "immer"
 import func from '@/util/func'
 import "../settings.css"
 import settingFunctions from '../module'
-import GraphMetric from '../../../components/GraphMetric'
 import values from '@/util/values'
 import PersistStore from '../../../../main/PersistStore'
 import { timezonesAvailable } from '../about/About'
@@ -56,31 +56,15 @@ function MetricsSection({ sectionTitle, metricsToDisplay, orderedResult, nameMap
                 </LegacyCard.Section>
             )}
             {relevantElementsWithData.map((element) => (
-                element.value && element.value.length > 0 ? (
-                    <LegacyCard.Section key={element.key}>
-                        <GraphMetric
-                            data={element.value}
-                            color='#6200EA'
-                            height="330"
-                            title={nameMap.get(element.key)?.descriptionName}
-                            subtitle={nameMap.get(element.key)?.description}
-                            defaultChartOptions={defaultChartOptionsFn(showLegendForSection)}
-                            background-color="#000000"
-                            text="true"
-                            inputMetrics={[]}
-                            timezoneOffsetMinutes={timezoneOffsetMinutes}
-                        />
-                    </LegacyCard.Section>
-                ) : (
-                    <LegacyCard.Section key={element.key}>
-                        <EmptyState 
-                            heading={nameMap.get(element.key)?.descriptionName} 
-                            footerContent="No Graph Data exist !"
-                        >
-                            <p>{nameMap.get(element.key)?.description}</p>
-                        </EmptyState>
-                    </LegacyCard.Section>
-                )
+                <MetricChart
+                    key={element.key}
+                    metricId={element.key}
+                    data={element.value}
+                    title={nameMap.get(element.key)?.descriptionName}
+                    description={nameMap.get(element.key)?.description}
+                    chartOptions={defaultChartOptionsFn(showLegendForSection)}
+                    timezoneOffsetMinutes={timezoneOffsetMinutes}
+                />
             ))}
         </>
     );
@@ -336,7 +320,7 @@ function Metrics() {
     )
 
     return (
-        <Page title='Metrics' divider>
+        <Page title='Metrics' divider fullWidth>
             <LegacyCard >
                 <LegacyCard.Section>
                     <HorizontalStack align="space-between" blockAlign="center">

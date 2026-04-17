@@ -179,6 +179,7 @@ function ModuleMetrics({ config }) {
         <Page
             title={config.title}
             divider
+            fullWidth
             backAction={{
                 content: 'Back',
                 onAction: () => window.history.back()
