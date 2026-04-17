@@ -127,8 +127,8 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
 
   useEffect(() => {
     if (isEndpointSecurityCategory()) {
-      fetchEndpointShieldUsernameMap().then(map => {
-        setUsernameMap(map);
+      fetchEndpointShieldUsernameMap().then(({ usernameMap }) => {
+        setUsernameMap(usernameMap);
         setUsernameMapLoaded(true);
       });
     }

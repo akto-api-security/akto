@@ -146,8 +146,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   useEffect(() => {
     if (isEndpointSecurityCategory()) {
-      fetchEndpointShieldUsernameMap().then(map => {
-        setUsernameMap(map);
+      fetchEndpointShieldUsernameMap().then(({ usernameMap }) => {
+        setUsernameMap(usernameMap);
         setUsernameMapLoaded(true);
       });
     }

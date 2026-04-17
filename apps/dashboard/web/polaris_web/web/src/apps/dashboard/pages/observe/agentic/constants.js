@@ -34,6 +34,7 @@ export const getHeaders = (options = {}) => {
     const primaryTitle = options.primaryColumnTitle ?? "Agentic asset";
     const primaryText = options.primaryColumnText ?? primaryTitle;
     const includeIconColumn = options.includeIconColumn !== false;
+    const includeUserColumns = options.includeUserColumns === true;
     const endpointsColumnLabel = options.endpointsColumnLabel ?? "Endpoints";
     const endpointsColumnBoxWidth = options.endpointsColumnBoxWidth ?? "80px";
     const headers = [
@@ -82,26 +83,28 @@ export const getHeaders = (options = {}) => {
             mergeType: (a, b) => Math.max(a || 0, b || 0),
             shouldMerge: true
         },
-        {
-            title: "Team",
-            text: "Team",
-            value: "team",
-            filterKey: "team",
-            textValue: "team",
-            isText: CellType.TEXT,
-            showFilter: true,
-            boxWidth: "120px",
-        },
-        {
-            title: "User role",
-            text: "User role",
-            value: "userRole",
-            filterKey: "userRole",
-            textValue: "userRole",
-            isText: CellType.TEXT,
-            showFilter: true,
-            boxWidth: "120px",
-        },
+        ...(includeUserColumns ? [
+            {
+                title: "Team",
+                text: "Team",
+                value: "team",
+                filterKey: "team",
+                textValue: "team",
+                isText: CellType.TEXT,
+                showFilter: true,
+                boxWidth: "120px",
+            },
+            {
+                title: "User role",
+                text: "User role",
+                value: "userRole",
+                filterKey: "userRole",
+                textValue: "userRole",
+                isText: CellType.TEXT,
+                showFilter: true,
+                boxWidth: "120px",
+            },
+        ] : []),
     ];
     if (!includeIconColumn) {
         return headers.filter((h) => h.value !== "iconComp");

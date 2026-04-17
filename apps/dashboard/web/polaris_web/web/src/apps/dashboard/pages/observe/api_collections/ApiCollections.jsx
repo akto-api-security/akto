@@ -624,7 +624,8 @@ function ApiCollections(props) {
                     // Fetch endpoint shield usernames even when using cache (for endpoint security only)
                     let cachedUsernameMap = usernameMap || {};
                     if (isEndpointSecurityCategory() && Object.keys(cachedUsernameMap).length === 0) {
-                        cachedUsernameMap = await fetchEndpointShieldUsernameMap();
+                        const { usernameMap: fetchedMap } = await fetchEndpointShieldUsernameMap();
+                        cachedUsernameMap = fetchedMap;
                         setUsernameMap(cachedUsernameMap);
                     }
 
@@ -824,7 +825,8 @@ function ApiCollections(props) {
         // Fetch endpoint shield usernames (for endpoint security only)
         let collectionToUsernameMap = {};
         if (isEndpointSecurityCategory()) {
-            collectionToUsernameMap = await fetchEndpointShieldUsernameMap();
+            const { usernameMap: fetchedMap } = await fetchEndpointShieldUsernameMap();
+            collectionToUsernameMap = fetchedMap;
             setUsernameMap(collectionToUsernameMap);
         }
 

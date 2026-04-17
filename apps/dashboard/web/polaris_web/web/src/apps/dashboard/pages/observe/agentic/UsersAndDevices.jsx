@@ -61,6 +61,7 @@ function UsersAndDevices() {
                 primaryColumnTitle: selectedTab === "users" ? "User" : "Device",
                 primaryColumnText: selectedTab === "users" ? "User" : "Device",
                 includeIconColumn: false,
+                includeUserColumns: selectedTab === "users",
                 ...usersAndDevicesCountColumnOpts,
             }),
         [selectedTab],
