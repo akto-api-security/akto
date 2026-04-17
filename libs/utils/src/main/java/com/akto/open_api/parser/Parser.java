@@ -340,7 +340,7 @@ public class Parser {
 
                     messageObject.put(mKeys.akto_account_id, Context.accountId.get().toString());
                     if(useHost){
-                        messageObject.put(mKeys.path, path);
+                        messageObject.put(mKeys.path, urlPath);
                     } else {
                         /*
                          * In case of existing API collection, we need to check if the URL is already
