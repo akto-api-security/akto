@@ -74,6 +74,15 @@ public class AllMetrics {
             cyborgDataSize = new SumMetric("CYBORG_DATA_SIZE", 60, accountId, orgId, moduleType);
         }
 
+        // Threat detection metrics
+        if (moduleType.equals(ModuleInfo.ModuleType.THREAT_DETECTION.name())) {
+            topActors = new TopNMetric("TOP_ACTORS", 60, accountId, orgId, moduleType, 5);
+            topHosts = new TopNMetric("TOP_HOSTS", 60, accountId, orgId, moduleType, 5);
+            topPaths = new TopNMetric("TOP_PATHS", 60, accountId, orgId, moduleType, 5);
+            totalProcessed = new SumMetric("TOTAL_PROCESSED", 60, accountId, orgId, moduleType);
+            topNMetrics = Arrays.asList(topActors, topHosts, topPaths);
+        }
+
         // Infrastructure metrics - always initialized
         cpuUsagePercent = new GaugeMetric("CPU_USAGE_PERCENT", 60, accountId, orgId, moduleType);
         heapMemoryUsedMb = new GaugeMetric("HEAP_MEMORY_USED_MB", 60, accountId, orgId, moduleType);
@@ -92,7 +101,7 @@ public class AllMetrics {
                 kafkaBytesConsumedRate, cyborgNewApiCount, cyborgTotalApiCount, deltaCatalogNewCount, deltaCatalogTotalCount,
                 cyborgApiPayloadSize, multipleSampleDataFetchLatency, runtimeApiReceivedCount,
                 cpuUsagePercent, heapMemoryUsedMb, heapMemoryMaxMb, nonHeapMemoryUsedMb, threadCount,
-                availableProcessors, totalPhysicalMemoryMb);
+                availableProcessors, totalPhysicalMemoryMb, totalProcessed);
 
         AllMetrics _this = this;
         executorService.scheduleWithFixedDelay(() -> {
@@ -131,6 +140,9 @@ public class AllMetrics {
                         case GAUGE:
                             type = MetricData.MetricType.GAUGE;
                             break;
+                        case TOP_N:
+                            type = MetricData.MetricType.TOP_N;
+                            break;
                     }
                     MetricData metricData = new MetricData(
                             m.metricId,
@@ -142,7 +154,30 @@ public class AllMetrics {
                     );
                     metricDataList.add(metricData);
                 }
-                if(!list.isEmpty()) {
+
+                // Handle TopN metrics separately
+                if (topNMetrics != null) {
+                    for (TopNMetric topNMetric : topNMetrics) {
+                        if (topNMetric == null) {
+                            continue;
+                        }
+                        List<MetricData.TopNItem> topItems = topNMetric.getTopNAndReset();
+                        if (topItems != null && !topItems.isEmpty()) {
+                            MetricData metricData = new MetricData(
+                                    topNMetric.metricId,
+                                    0,
+                                    topNMetric.orgId,
+                                    instance_id,
+                                    MetricData.MetricType.TOP_N,
+                                    topNMetric.moduleType
+                            );
+                            metricData.setTopItems(topItems);
+                            metricDataList.add(metricData);
+                        }
+                    }
+                }
+
+                if(!list.isEmpty() || !metricDataList.isEmpty()) {
                     _this.sendDataToAkto(list, metricDataList);
                 }
             } catch (Exception e){
@@ -198,7 +233,14 @@ public class AllMetrics {
     private Metric availableProcessors = null;
     private Metric totalPhysicalMemoryMb = null;
 
+    // Threat detection metrics
+    private TopNMetric topActors = null;
+    private TopNMetric topHosts = null;
+    private TopNMetric topPaths = null;
+    private Metric totalProcessed = null;
+
     private List<Metric> metrics = null;
+    private List<TopNMetric> topNMetrics = null;
 
     public void setRuntimeKafkaRecordCount(float val){
         if(runtimeKafkaRecordCount != null)
@@ -355,11 +397,35 @@ public class AllMetrics {
             multipleSampleDataFetchLatency.record(val);
     }
 
+    // Threat detection metric setters
+    public void recordTopActor(String actor) {
+        if (topActors != null && actor != null) {
+            topActors.record(actor, 1);
+        }
+    }
+
+    public void recordTopHost(String host) {
+        if (topHosts != null && host != null) {
+            topHosts.record(host, 1);
+        }
+    }
+
+    public void recordTopPath(String path) {
+        if (topPaths != null && path != null) {
+            topPaths.record(path, 1);
+        }
+    }
+
+    public void incrementTotalProcessed() {
+        if (totalProcessed != null) {
+            totalProcessed.record(1);
+        }
+    }
 
     private static final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
     public enum MetricType{
-        LATENCY, SUM, MAX, GAUGE
+        LATENCY, SUM, MAX, GAUGE, TOP_N
     }
 
     public abstract class Metric{
@@ -560,6 +626,65 @@ public class AllMetrics {
             float val = getMetric();
             this.value = 0;
             return val;
+        }
+    }
+
+    class TopNMetric extends Metric {
+        private final int n;
+        private final Map<String, Float> counts = new HashMap<>();
+
+        public TopNMetric(String metricId, int periodInSecs, int n) {
+            super(metricId, periodInSecs);
+            this.n = n;
+        }
+
+        public TopNMetric(String metricId, int periodInSecs, int accountId, String orgId, int n) {
+            super(metricId, periodInSecs, accountId, orgId);
+            this.n = n;
+        }
+
+        public TopNMetric(String metricId, int periodInSecs, int accountId, String orgId, String moduleType, int n) {
+            super(metricId, periodInSecs, accountId, orgId, moduleType);
+            this.n = n;
+        }
+
+        @Override
+        public void record(float val) {
+            // Not used for TopN - use record(key, val) instead
+        }
+
+        public void record(String key, float val) {
+            counts.merge(key, val, Float::sum);
+        }
+
+        @Override
+        float getMetric() {
+            return 0; // Not applicable for TopN
+        }
+
+        @Override
+        MetricType getMetricType() {
+            return MetricType.TOP_N;
+        }
+
+        @Override
+        float getMetricAndReset() {
+            counts.clear();
+            return 0; // Not applicable - use getTopNAndReset() instead
+        }
+
+        public List<MetricData.TopNItem> getTopNAndReset() {
+            List<MetricData.TopNItem> topN = counts.entrySet().stream()
+                    .sorted((a, b) -> Float.compare(b.getValue(), a.getValue()))
+                    .limit(n)
+                    .map(e -> new MetricData.TopNItem(e.getKey(), e.getValue()))
+                    .collect(java.util.stream.Collectors.toList());
+            counts.clear();
+            return topN;
+        }
+
+        public int getN() {
+            return n;
         }
     }
 

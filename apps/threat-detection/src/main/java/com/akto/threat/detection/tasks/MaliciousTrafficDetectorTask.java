@@ -511,6 +511,13 @@ public class MaliciousTrafficDetectorTask implements Task {
     URLMethods.Method method =
         URLMethods.Method.fromString(responseParam.getRequestParams().getMethod());
 
+    // Record metrics for threat detection
+    String host = extractHostFromHeaders(responseParam.getRequestParams().getHeaders());
+    AllMetrics.instance.recordTopActor(actor);
+    AllMetrics.instance.recordTopHost(host);
+    AllMetrics.instance.recordTopPath(url);
+    AllMetrics.instance.incrementTotalProcessed();
+
     // Convert static URL to template URL once for reuse
     // This is used for: 1) API count increment, 2) Redis/CMS aggregation, 3) ParamEnumeration filter
     URLTemplate matchedTemplate = null;
