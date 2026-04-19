@@ -432,15 +432,20 @@ func (s *Service) validationContextFromParams(
 // If found, extracts only the configured content fields. Falls through to raw payload on any miss.
 func (s *Service) extractPayloadForValidation(payload, method, path string, isRequest bool) string {
 	key := EndpointKey(method, path)
-	gs, ok := GlobalGuardrailSchemaRegistry().Get(key)
-	schemaJSON, _ := json.Marshal(gs)
-	s.logger.Info("[SchemaExtract] extracting payload.",
-		zap.String("key", key),
-		zap.String("schema", string(schemaJSON)))
 
+	gs, ok := GlobalGuardrailSchemaRegistry().Get(key)
 	if !ok {
+		s.logger.Debug("[SchemaExtract] no schema found for endpoint, using raw payload",
+			zap.String("endpoint", key),
+			zap.Bool("isRequest", isRequest))
 		return payload
 	}
+
+	schemaJSON, _ := json.Marshal(gs)
+	s.logger.Info("[SchemaExtract] schema found for endpoint",
+		zap.String("endpoint", key),
+		zap.Bool("isRequest", isRequest),
+		zap.String("schema", string(schemaJSON)))
 
 	var fields []MessageFieldEntry
 	if isRequest {
@@ -449,23 +454,36 @@ func (s *Service) extractPayloadForValidation(payload, method, path string, isRe
 		fields = gs.ResponseMessageFields
 	}
 
+	s.logger.Info("[SchemaExtract] attempting field extraction",
+		zap.String("endpoint", key),
+		zap.Bool("isRequest", isRequest),
+		zap.Int("fieldCount", len(fields)))
+
 	extracted := ExtractContent(payload, fields)
 	if extracted == "" {
+		s.logger.Warn("[SchemaExtract] schema present but no fields matched payload, falling back to raw payload",
+			zap.String("endpoint", key),
+			zap.Bool("isRequest", isRequest),
+			zap.Int("fieldCount", len(fields)),
+			zap.Int("payloadLength", len(payload)))
 		return payload
 	}
 
-	s.logger.Info("[SchemaExtract] extractPayloadForValidation: extracted content via schema",
+	finalPayload := extracted
+	if !strings.HasPrefix(strings.TrimSpace(extracted), "{") {
+		if b, err := json.Marshal(map[string]string{"text": extracted}); err == nil {
+			finalPayload = string(b)
+		}
+	}
+
+	s.logger.Info("[SchemaExtract] extraction successful",
 		zap.String("endpoint", key),
 		zap.Bool("isRequest", isRequest),
 		zap.Int("fieldCount", len(fields)),
-		zap.Int("extractedLength", len(extracted)))
+		zap.Int("extractedLength", len(extracted)),
+		zap.Int("finalPayloadLength", len(finalPayload)))
 
-	if !strings.HasPrefix(strings.TrimSpace(extracted), "{") {
-		if b, err := json.Marshal(map[string]string{"text": extracted}); err == nil {
-			return string(b)
-		}
-	}
-	return extracted
+	return finalPayload
 }
 
 // ValidateRequest validates a request payload against guardrail policies with session tracking
@@ -510,8 +528,17 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.String("sessionID", sessionID))
 	}
 
-	// Refresh schema registry if stale and extract content for configured endpoints
+	// Refresh schema registry if stale
 	s.schemaFetcher.RefreshIfNeeded()
+
+	// Check if guardrails should be applied for this endpoint (dashboard-managed selection)
+	if !s.schemaFetcher.IsEndpointSelected(params.Method, params.Path) {
+		s.logger.Info("ValidateRequest - endpoint not selected for guardrails, skipping",
+			zap.String("method", params.Method),
+			zap.String("path", params.Path))
+		return &mcp.ValidationResult{Allowed: true}, nil
+	}
+
 	payloadToValidate = s.extractPayloadForValidation(payloadToValidate, params.Method, params.Path, true)
 
 	// Get cached policies (refreshes if stale)
@@ -642,6 +669,14 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Refresh schema registry if stale
 	s.schemaFetcher.RefreshIfNeeded()
+
+	// Check if guardrails should be applied for this endpoint (dashboard-managed selection)
+	if !s.schemaFetcher.IsEndpointSelected(params.Method, params.Path) {
+		s.logger.Info("ValidateResponse - endpoint not selected for guardrails, skipping",
+			zap.String("method", params.Method),
+			zap.String("path", params.Path))
+		return &mcp.ValidationResult{Allowed: true}, nil
+	}
 
 	// Get cached policies (refreshes if stale)
 	policiesStart := time.Now()
@@ -929,6 +964,18 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			zap.String("contextSource", string(valCtx.ContextSource)),
 			zap.String("method", data.Method),
 			zap.String("path", data.Path))
+
+		// Check if guardrails should be applied for this endpoint (dashboard-managed selection)
+		if !s.schemaFetcher.IsEndpointSelected(data.Method, data.Path) {
+			s.logger.Debug("ValidateBatch - endpoint not selected for guardrails, skipping",
+				zap.Int("index", i),
+				zap.String("method", data.Method),
+				zap.String("path", data.Path))
+			result.RequestAllowed = true
+			result.ResponseAllowed = true
+			results = append(results, result)
+			continue
+		}
 
 		// Filter policies by MCP server name for this specific batch item
 		itemPolicies := filterPoliciesByMcpServer(policies, mcpServerName)

@@ -2,9 +2,13 @@ package validator
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 	"sync"
 )
+
+// aktoParamPattern matches Akto-style path parameters: INTEGER, STRING, FLOAT, BOOLEAN
+var aktoParamPattern = regexp.MustCompile(`\b(INTEGER|STRING|FLOAT|BOOLEAN)\b`)
 
 // MessageFieldEntry mirrors Java's ApiInfo.GuardrailSchema.MessageFieldEntry.
 // FieldPath is a dot-notation JSON path (e.g. "messages.0.content").
@@ -34,8 +38,9 @@ func (gs *GuardrailSchema) HasResponseFields() bool {
 
 // GuardrailSchemaRegistry holds per-endpoint schemas fetched from api_info.
 type GuardrailSchemaRegistry struct {
-	mu      sync.RWMutex
-	schemas map[string]*GuardrailSchema
+	mu                sync.RWMutex
+	schemas           map[string]*GuardrailSchema
+	compiledTemplates map[string]*regexp.Regexp // storedKey → compiled regex for parameterized keys
 }
 
 var (
@@ -47,25 +52,52 @@ var (
 func GlobalGuardrailSchemaRegistry() *GuardrailSchemaRegistry {
 	globalGuardrailSchemaRegistryOnce.Do(func() {
 		globalGuardrailSchemaRegistry = &GuardrailSchemaRegistry{
-			schemas: make(map[string]*GuardrailSchema),
+			schemas:           make(map[string]*GuardrailSchema),
+			compiledTemplates: make(map[string]*regexp.Regexp),
 		}
 	})
 	return globalGuardrailSchemaRegistry
 }
 
 // Get returns the GuardrailSchema for the given endpoint key, if one is registered.
+// First tries exact match, then falls back to parameterized template matching
+// (e.g. stored key "POST:/api/conversations/INTEGER/messages" matches "POST:/api/conversations/46/messages").
 func (r *GuardrailSchemaRegistry) Get(endpointKey string) (*GuardrailSchema, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	s, ok := r.schemas[endpointKey]
-	return s, ok && s != nil
+
+	// 1. Exact match
+	if s, ok := r.schemas[endpointKey]; ok && s != nil {
+		return s, true
+	}
+
+	// 2. Parameterized template match
+	for storedKey, re := range r.compiledTemplates {
+		if re.MatchString(endpointKey) {
+			if s := r.schemas[storedKey]; s != nil {
+				return s, true
+			}
+		}
+	}
+	return nil, false
 }
 
-// Replace atomically replaces the entire registry with a freshly-fetched set of schemas.
+// Replace atomically replaces the entire registry and pre-compiles regexes for parameterized keys.
 func (r *GuardrailSchemaRegistry) Replace(newSchemas map[string]*GuardrailSchema) {
+	newTemplates := make(map[string]*regexp.Regexp)
+	for key := range newSchemas {
+		if aktoParamPattern.MatchString(key) {
+			pattern := regexp.QuoteMeta(key)
+			pattern = aktoParamPattern.ReplaceAllLiteralString(pattern, `[^/]+`)
+			if re, err := regexp.Compile("^" + pattern + "$"); err == nil {
+				newTemplates[key] = re
+			}
+		}
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.schemas = newSchemas
+	r.compiledTemplates = newTemplates
 }
 
 // EndpointKey formats method and path as "METHOD:PATH" (normalized).
