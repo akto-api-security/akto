@@ -195,6 +195,50 @@ public class DbLayer {
         );
     }
 
+    private static final int rebootThresholdSeconds = 2 * 60; // 2 minutes 
+    private static void updateModuleEnvAndReboot(ModuleInfo moduleInfo) {
+
+        try {
+            Map<String, Object> additionalData = moduleInfo.getAdditionalData();
+            if (additionalData == null || !(additionalData.get("env") instanceof Map)) {
+                return;
+            }
+            Map<?, ?> env = (Map<?, ?>) additionalData.get("env");
+            Object val = env.get("AGGREGATION_RULES_ENABLED");
+            if (!"true".equalsIgnoreCase(String.valueOf(val))) {
+                return;
+            }
+        } catch (Exception ignored) {
+            return;
+        }
+
+        try {
+            int deltaTimeForReboot = Context.now() - rebootThresholdSeconds;
+
+
+            Bson moduleFilter = Filters.and(
+                Filters.eq(ModuleInfo.NAME, moduleInfo.getName()),
+                Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTimeForReboot),
+                Filters.ne(ModuleInfo.ADDITIONAL_DATA, null),
+                Filters.eq(ModuleInfo.ADDITIONAL_DATA + ".env.AGGREGATION_RULES_ENABLED", "true")
+            );
+
+
+            List<Bson> updates = new ArrayList<>();
+            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env.AGGREGATION_RULES_ENABLED", false));
+            updates.add(Updates.set(ModuleInfo._REBOOT, true));
+
+
+            ModuleInfoDao.instance.updateMany(moduleFilter, Updates.combine(updates));
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> env = (Map<String, Object>) moduleInfo.getAdditionalData().get("env");
+            env.put("AGGREGATION_RULES_ENABLED", "false");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     public static ModuleInfo updateModuleInfo(ModuleInfo moduleInfo) {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -207,8 +251,12 @@ public class DbLayer {
             moduleInfo.getAdditionalData().put("tokenExpired", true);
         }
 
-        NewRelicUtils.forwardModuleHeartbeatEvent(moduleInfo);
+        if(Context.accountId.get() == 1758787662){
+           updateModuleEnvAndReboot(moduleInfo); 
+        }
 
+        NewRelicUtils.forwardModuleHeartbeatEvent(moduleInfo);
+        
         return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Updates.combine(
                         //putting class name because findOneAndUpdate doesn't put class name by default
