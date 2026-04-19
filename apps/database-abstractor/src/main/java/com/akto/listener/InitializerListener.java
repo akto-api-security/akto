@@ -60,6 +60,20 @@ public class InitializerListener implements ServletContextListener {
                             tagsMismatchCron.runCron();
                         }
 
+                        // Initialize New Relic forwarder if config is present in DB
+                        if (connectedToMongo) {
+                            try {
+                                Config.NewRelicForwarderConfig newRelicConfig = (Config.NewRelicForwarderConfig) ConfigsDao.instance.findOne(
+                                        "_id", Config.NewRelicForwarderConfig.CONFIG_ID);
+                                if (newRelicConfig != null && newRelicConfig.getApiKey() != null) {
+                                    NewRelicUtils.init(newRelicConfig.getApiKey(), "DatabaseAbstractor", "production");
+                                } else {
+                                    logger.warn("New Relic config not found in db, skipping telemetry init");
+                                }
+                            } catch (Exception e) {
+                                logger.error("Failed to load New Relic config from db, skipping telemetry init", e);
+                            }
+                        }
                     } catch (Exception e) {
                         logger.error("error running initializer method for db abstractor", e);
                     } finally {
@@ -89,18 +103,6 @@ public class InitializerListener implements ServletContextListener {
         if (kafkaUtils.isFastDiscoveryEnabled()) {
             logger.info("Starting fast-discovery consumer in background thread");
             kafkaUtils.startFastDiscoveryConsumer();
-        }
-        
-        try {
-            Config.NewRelicForwarderConfig newRelicConfig = (Config.NewRelicForwarderConfig) ConfigsDao.instance.findOne(
-                    "_id", Config.NewRelicForwarderConfig.CONFIG_ID);
-            if (newRelicConfig != null && newRelicConfig.getApiKey() != null) {
-                NewRelicUtils.init(newRelicConfig.getApiKey(), "DatabaseAbstractor", "production");
-            } else {
-                logger.warn("New Relic config not found in db, skipping telemetry init");
-            }
-        } catch (Exception e) {
-            logger.error("Failed to load New Relic config from db, skipping telemetry init", e);
         }
     }
 

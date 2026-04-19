@@ -72,7 +72,6 @@ public class NewRelicUtils {
             return cached;
         }
         try {
-            Context.accountId.set(accountId);
             Account account = Context.getAccount();
             if (account != null) {
                 accountCache.put(accountId, account);
@@ -209,6 +208,10 @@ public class NewRelicUtils {
             Attributes eventAttrs = new Attributes();
             eventAttrs.putAll(idAttrs);
             eventAttrs.putAll(moduleAttrs);
+            
+            if (commonAttributes != null) {
+                eventAttrs.putAll(commonAttributes);
+            }
 
             Event event = new Event("AktoModuleHeartbeatReceived", eventAttrs, now);
             telemetryClient.sendBatch(new EventBatch(Collections.singletonList(event)));
