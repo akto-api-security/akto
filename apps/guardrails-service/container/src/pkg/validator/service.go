@@ -15,6 +15,7 @@ import (
 	"github.com/akto-api-security/guardrails-service/pkg/session"
 	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
 	"github.com/akto-api-security/mcp-endpoint-shield/mcp/types"
+	"golang.org/x/text/unicode/norm"
 	"go.uber.org/zap"
 )
 
@@ -429,6 +430,25 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	start := time.Now()
 	payload := params.RequestPayload
 	contextSource := params.ContextSource
+	normalizationEnabled := true
+	if headerValue, present := getNormalizeInputHeaderValue(params.RequestHeaders); present {
+		normalizationEnabled = headerValue
+	}
+	
+	s.logger.Info("NORMALIZE_DEBUG - before normalization",
+		zap.Bool("normalizationEnabled", normalizationEnabled),
+		zap.Int("payloadLen", len(payload)),
+		zap.String("payloadPreview", preview(payload, 200)),
+		zap.String("requestHeaders", params.RequestHeaders))
+	
+	normalizationChanged := false
+	if normalizationEnabled {
+		payload, normalizationChanged = normalizeRequestPayload(payload)
+		s.logger.Info("NORMALIZE_DEBUG - after normalization",
+			zap.Bool("changed", normalizationChanged),
+			zap.Int("payloadLen", len(payload)),
+			zap.String("payloadPreview", preview(payload, 200)))
+	}
 
 	s.logger.Info("ValidateRequest - starting",
 		zap.String("path", params.Path),
@@ -444,6 +464,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.String("direction", params.Direction),
 		zap.String("tag", params.Tag),
 		zap.String("aktoVxlanId", params.AktoVxlanID),
+		zap.Bool("normalizeInputEnabled", normalizationEnabled),
+		zap.Bool("normalizeInputChanged", normalizationChanged),
 		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
 
 	// Check if session is already malicious
@@ -548,11 +570,14 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Convert ProcessResult to ValidationResult
 	result := &mcp.ValidationResult{
 		Allowed:         !processResult.IsBlocked,
-		Modified:        processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload,
+		Modified:        (processResult.ModifiedPayload != "" && processResult.ModifiedPayload != payload) || normalizationChanged,
 		ModifiedPayload: processResult.ModifiedPayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 		Metadata:        types.ThreatMetadata{},
 		Behaviour:       processResult.Behaviour,
+	}
+	if result.ModifiedPayload == "" && normalizationChanged {
+		result.ModifiedPayload = payload
 	}
 
 	s.logger.Info("ValidateRequest - completed",
@@ -565,10 +590,122 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Bool("modified", result.Modified),
 		zap.String("behaviour", result.Behaviour),
 		zap.String("reason", result.Reason),
+		zap.Bool("normalizeInputEnabled", normalizationEnabled),
+		zap.Bool("normalizeInputChanged", normalizationChanged),
 		zap.String("sessionID", sessionID),
 		zap.Int64("totalLatencyMs", time.Since(start).Milliseconds()))
 
 	return result, nil
+}
+
+func getNormalizeInputHeaderValue(requestHeaders string) (bool, bool) {
+	if strings.TrimSpace(requestHeaders) == "" {
+		return false, false
+	}
+
+	headers := make(map[string]any)
+	if err := json.Unmarshal([]byte(requestHeaders), &headers); err != nil {
+		return false, false
+	}
+
+	for key, value := range headers {
+		if !strings.EqualFold(key, "x-akto-normalize-input") {
+			continue
+		}
+		switch v := value.(type) {
+		case bool:
+			return v, true
+		case string:
+			normalized := strings.ToLower(strings.TrimSpace(v))
+			if normalized == "true" {
+				return true, true
+			}
+			if normalized == "false" {
+				return false, true
+			}
+			return false, true
+		default:
+			return false, true
+		}
+	}
+
+	return false, false
+}
+
+func normalizeRequestPayload(payload string) (string, bool) {
+	trimmed := strings.TrimSpace(payload)
+	if trimmed == "" {
+		return payload, false
+	}
+
+	var decoded any
+	if err := json.Unmarshal([]byte(payload), &decoded); err == nil {
+		normalizedDecoded := normalizeAny(decoded)
+		normalizedBytes, marshalErr := json.Marshal(normalizedDecoded)
+		if marshalErr != nil {
+			normalizedPlain := normalizeString(payload)
+			return normalizedPlain, normalizedPlain != payload
+		}
+		normalizedPayload := string(normalizedBytes)
+		changed := normalizedPayload != payload
+		return normalizedPayload, changed
+	}
+
+	normalizedPlain := normalizeString(payload)
+	changed := normalizedPlain != payload
+	return normalizedPlain, changed
+}
+
+func normalizeAny(value any) any {
+	switch v := value.(type) {
+	case string:
+		return normalizeString(v)
+	case []any:
+		normalized := make([]any, len(v))
+		for i := range v {
+			normalized[i] = normalizeAny(v[i])
+		}
+		return normalized
+	case map[string]any:
+		normalized := make(map[string]any, len(v))
+		for key := range v {
+			normalized[key] = normalizeAny(v[key])
+		}
+		return normalized
+	default:
+		return value
+	}
+}
+
+func normalizeString(input string) string {
+	normalized := input
+	
+	// Strip zero-width characters (actual Unicode codepoints)
+	normalized = strings.ReplaceAll(normalized, "\u200B", "")
+	normalized = strings.ReplaceAll(normalized, "\u200C", "")
+	normalized = strings.ReplaceAll(normalized, "\u200D", "")
+	normalized = strings.ReplaceAll(normalized, "\uFEFF", "")
+	
+	// Also handle escaped sequences like "\\u200B" that appear in double-encoded JSON
+	normalized = strings.ReplaceAll(normalized, "\\u200B", "")
+	normalized = strings.ReplaceAll(normalized, "\\u200C", "")
+	normalized = strings.ReplaceAll(normalized, "\\u200D", "")
+	normalized = strings.ReplaceAll(normalized, "\\uFEFF", "")
+	
+	// Apply Unicode NFKC normalization
+	normalized = norm.NFKC.String(normalized)
+	
+	// Collapse multiple whitespace to single space
+	normalized = strings.Join(strings.Fields(normalized), " ")
+	
+	return normalized
+}
+
+func preview(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 // ValidateResponse validates a response payload against guardrail policies with session tracking
