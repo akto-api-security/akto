@@ -25,13 +25,12 @@ export const getMethod = (url, method) => {
 export function MethodBox({method, methodBoxWidth, url}){
     const finalMethod = getMethod(url, method);
     // Use TOOL color for CONFIG as well
-    const colorMethod = finalMethod === "CONFIG" ? "TOOL" : finalMethod;
     return (
       <Box width={methodBoxWidth || "64px"}>
         <HorizontalStack align="end">
           <span
             style={{
-              color: transform.getTextColor(colorMethod),
+              color: transform.getTextColor(finalMethod),
               fontSize: "14px",
               fontWeight: 500,
               lineHeight: "20px",

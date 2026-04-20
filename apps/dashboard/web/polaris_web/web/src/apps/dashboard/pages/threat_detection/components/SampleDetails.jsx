@@ -212,28 +212,32 @@ function SampleDetails(props) {
     }
 
     const isClaudeSettingsRisk = moreInfoData?.templateId === 'claude_settings_risk';
-    const stripArrayIndices = (key) => key ? key.replace(/\[\d+\]/g, '') : key;
-    const extractSettingsKey = (url) => {
-        if (!url) return null;
+
+    // Resolve the specific settings key from ruleViolated or URL path (e.g. "hooks.PreToolUse" from "/claude/settings/hooks.PreToolUse[0]")
+    // This is used to look up the per-field remediation text shown in the Remediation tab.
+    const getClaudeSettingsKey = () => {
+        const stripArrayIndices = (key) => key?.replace(/\[\d+\]/g, '');
+
+        if (moreInfoData?.ruleViolated && moreInfoData.ruleViolated !== '-') {
+            return stripArrayIndices(moreInfoData.ruleViolated);
+        }
         const prefix = '/claude/settings/';
-        const idx = url.indexOf(prefix);
-        if (idx === -1) return null;
-        return stripArrayIndices(url.slice(idx + prefix.length));
+        const idx = moreInfoData?.url?.indexOf(prefix) ?? -1;
+        return idx !== -1 ? stripArrayIndices(moreInfoData.url.slice(idx + prefix.length)) : null;
     };
-    const claudeSettingsRuleViolated = (isClaudeSettingsRisk && moreInfoData?.ruleViolated && moreInfoData.ruleViolated !== '-')
-        ? stripArrayIndices(moreInfoData.ruleViolated)
-        : extractSettingsKey(moreInfoData?.url);
+
     const resolveClaudeSettingsEntry = (key) => {
         if (!key) return undefined;
         if (CLAUDE_SETTINGS_RISK_MAP[key]) return CLAUDE_SETTINGS_RISK_MAP[key];
-        // Fall back to longest prefix match (e.g. hooks.PreToolUse.hooks -> hooks)
-        const matchedKey = Object.keys(CLAUDE_SETTINGS_RISK_MAP)
+        // Longest prefix match handles nested keys like "hooks.PreToolUse.hooks" -> "hooks"
+        const bestMatch = Object.keys(CLAUDE_SETTINGS_RISK_MAP)
             .filter(k => key.startsWith(k))
             .sort((a, b) => b.length - a.length)[0];
-        return matchedKey ? CLAUDE_SETTINGS_RISK_MAP[matchedKey] : undefined;
+        return bestMatch ? CLAUDE_SETTINGS_RISK_MAP[bestMatch] : undefined;
     };
-    const claudeSettingsEntry = isClaudeSettingsRisk && claudeSettingsRuleViolated
-        ? resolveClaudeSettingsEntry(claudeSettingsRuleViolated)
+
+    const claudeSettingsEntry = isClaudeSettingsRisk
+        ? resolveClaudeSettingsEntry(getClaudeSettingsKey())
         : undefined;
 
     const ValuesTab = data.length > 0 && {
@@ -241,19 +245,6 @@ function SampleDetails(props) {
         content: "Values",
         component: (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
-                {isClaudeSettingsRisk && claudeSettingsEntry && (
-                    <Box paddingBlockEnd={3}>
-                        <Box background="bg-subdued" borderRadius="2" padding="4">
-                            <VerticalStack gap="2">
-                                <HorizontalStack gap="2" align="start">
-                                    <Badge status="warning">Misconfigured Field</Badge>
-                                    <Text variant="bodyMd" fontWeight="semibold">{claudeSettingsRuleViolated}</Text>
-                                </HorizontalStack>
-                                <Text variant="bodySm" color="subdued">{claudeSettingsEntry.description}</Text>
-                            </VerticalStack>
-                        </Box>
-                    </Box>
-                )}
                 <SampleDataList
                     key={`Sample values-${eventId || 'default'}`}
                     heading={"Attempt"}
