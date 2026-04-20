@@ -1,9 +1,17 @@
 package com.akto.dto.monitoring;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class ModuleInfoConstants {
+
+    public static final String REDACTED_PLACEHOLDER = "********";
+
+    public static final Set<String> SECRET_ENV_KEYS = new HashSet<String>() {{
+        add("AKTO_API_TOKEN");
+    }};
 
     // Whitelist of environment variables that are safe to expose/collect
     // This is the single source of truth for allowed environment variables
@@ -44,6 +52,23 @@ public class ModuleInfoConstants {
             put("AKTO_THREAT_PROTECTION_BACKEND_TOKEN", "Threat Protection Backend Token");
             put("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "Database Abstractor Token");
             put("AKTO_LOG_LEVEL", "Log Level");
+        }});
+
+        put(ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD, new java.util.LinkedHashMap<String, String>() {{
+            put("AKTO_API_TOKEN", "Akto API Token");
+            put("DATABASE_ABSTRACTOR_SERVICE_URL", "Database Abstractor Service URL");
+            put("AKTO_API_BASE_URL", "Akto API Base URL");
+            put("ENABLE_MCP_WRAP_CLAUDE", "Enable MCP Wrap for Claude");
+            put("ENABLE_MCP_WRAP_CURSOR", "Enable MCP Wrap for Cursor");
+            put("ENABLE_MCP_WRAP_VSCODE", "Enable MCP Wrap for VS Code");
+            put("ENABLE_MCP_WRAP_WINDSURF", "Enable MCP Wrap for Windsurf");
+            put("ENABLE_MCP_WRAP_CODEX", "Enable MCP Wrap for Codex");
+            put("ENABLE_MCP_WRAP_GITHUB_CLI", "Enable MCP Wrap for GitHub CLI");
+            put("ENABLE_MCP_WRAP_ANTIGRAVITY", "Enable MCP Wrap for Antigravity");
+            put("ENABLE_MCP_HOOKS_CLAUDE", "MCP Hooks path for Claude");
+            put("ENABLE_MCP_HOOKS_CURSOR", "MCP Hooks path for Cursor");
+            put("ENABLE_PROMPT_HOOKS_CLAUDE", "Prompt Hooks path for Claude");
+            put("ENABLE_PROMPT_HOOKS_CURSOR", "Prompt Hooks path for Cursor");
         }});
     }};
 

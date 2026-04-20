@@ -63,6 +63,11 @@ public class ModuleInfoAction extends UserAction {
                 filters.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleTypeStr));
             }
 
+            if (filter.containsKey("id")) {
+                String idValue = (String) filter.get("id");
+                filters.add(Filters.eq(ModuleInfoDao.ID, idValue));
+            }
+
             if (filter.containsKey(ModuleInfo.LAST_HEARTBEAT_RECEIVED)) {
                 Object heartbeatFilter = filter.get(ModuleInfo.LAST_HEARTBEAT_RECEIVED);
                 if (heartbeatFilter instanceof Map) {
@@ -116,7 +121,11 @@ public class ModuleInfoAction extends UserAction {
     }
 
     private String getFieldType(String key) {
-        if (key.equals("AKTO_IGNORE_ENVOY_PROXY_CALLS") ||
+        if (ModuleInfoConstants.SECRET_ENV_KEYS.contains(key)) {
+            return "secret";
+        }
+        if (key.startsWith("ENABLE_") ||
+                key.equals("AKTO_IGNORE_ENVOY_PROXY_CALLS") ||
                 key.equals("AKTO_IGNORE_IP_TRAFFIC") ||
                 key.equals("AKTO_K8_METADATA_CAPTURE") ||
                 key.equals("AKTO_THREAT_ENABLED") ||
@@ -156,7 +165,11 @@ public class ModuleInfoAction extends UserAction {
             if (allowedKeys != null) {
                 for (String key : allowedKeys.keySet()) {
                     if (env.containsKey(key)) {
-                        filteredEnv.put(key, env.get(key));
+                        if (ModuleInfoConstants.SECRET_ENV_KEYS.contains(key)) {
+                            filteredEnv.put(key, ModuleInfoConstants.REDACTED_PLACEHOLDER);
+                        } else {
+                            filteredEnv.put(key, env.get(key));
+                        }
                     }
                 }
             }
@@ -264,6 +277,11 @@ public class ModuleInfoAction extends UserAction {
                     .anyMatch(moduleEnvMap -> moduleEnvMap.containsKey(entry.getKey()));
 
                 if (isAllowedKey) {
+                    // Skip secret fields if the user submitted the redacted placeholder unchanged
+                    if (ModuleInfoConstants.SECRET_ENV_KEYS.contains(entry.getKey())
+                            && ModuleInfoConstants.REDACTED_PLACEHOLDER.equals(entry.getValue())) {
+                        continue;
+                    }
                     updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env." + entry.getKey(), entry.getValue()));
                 }
             }

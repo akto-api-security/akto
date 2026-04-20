@@ -95,6 +95,7 @@ function EndpointShieldMetadata() {
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState("");
     const [endpointShieldData, setEndpointShieldData] = useState(null);
+    const [allowedEnvFields, setAllowedEnvFields] = useState([]);
     const [filters, setFilters] = useState([
         createFilter('username', 'Username'),
         createFilter('hostname', 'Hostname'),
@@ -115,6 +116,7 @@ function EndpointShieldMetadata() {
                 moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD
             });
             const endpointShieldModules = response.moduleInfos || [];
+            setAllowedEnvFields(response.allowedEnvFields || []);
             const agents = endpointShieldModules.map(module => ({
                 agentId: module.id,
                 hostname: module.name,
@@ -132,6 +134,12 @@ function EndpointShieldMetadata() {
 
     useEffect(() => {
         fetchModuleInfo();
+    }, [fetchModuleInfo]);
+
+    const handleSaveEnv = useCallback(async (moduleId, moduleName, envData) => {
+        await settingRequests.updateModuleEnvAndReboot(moduleId, moduleName, envData);
+        func.setToast(true, false, "Configuration saved. Agent will pick up changes shortly.");
+        await fetchModuleInfo();
     }, [fetchModuleInfo]);
 
     const handleSaveDescription = useCallback(() => {
@@ -414,6 +422,8 @@ function EndpointShieldMetadata() {
                 setIsEditingDescription={setIsEditingDescription}
                 handleSaveDescription={handleSaveDescription}
                 allCollections={allCollections}
+                allowedEnvFields={allowedEnvFields}
+                onSaveEnv={handleSaveEnv}
             />
         </>
     );
