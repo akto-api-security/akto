@@ -143,39 +143,32 @@ public class ModuleInfoAction extends UserAction {
         }
 
         for (ModuleInfo module : modules) {
-            if (module.getAdditionalData() == null) {
-                continue;
-            }
-
-            Map<String, Object> additionalData = module.getAdditionalData();
-            Object envObj = additionalData.get("env");
-
-            if (!(envObj instanceof Map)) {
-                continue;
-            }
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> env = (Map<String, Object>) envObj;
-
-            // Create filtered env map with only allowed keys for the module's type
-            Map<String, Object> filteredEnv = new HashMap<>();
             ModuleType moduleType = module.getModuleType();
-
             Map<String, String> allowedKeys = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.get(moduleType);
-            if (allowedKeys != null) {
-                for (String key : allowedKeys.keySet()) {
-                    if (env.containsKey(key)) {
-                        if (ModuleInfoConstants.SECRET_ENV_KEYS.contains(key)) {
-                            filteredEnv.put(key, ModuleInfoConstants.REDACTED_PLACEHOLDER);
-                        } else {
-                            filteredEnv.put(key, env.get(key));
-                        }
-                    }
+            if (allowedKeys == null) {
+                continue;
+            }
+
+            // Go module writes env vars to additionalData.env once at startup (no heartbeat overwrite).
+            // Dashboard writes desired changes to the same field. Read from there directly.
+            @SuppressWarnings("unchecked")
+            Map<String, Object> actualEnv = (module.getAdditionalData() != null
+                    && module.getAdditionalData().get("env") instanceof Map)
+                    ? (Map<String, Object>) module.getAdditionalData().get("env")
+                    : null;
+
+            Map<String, Object> filteredEnv = new HashMap<>();
+            for (String key : allowedKeys.keySet()) {
+                if (actualEnv != null && actualEnv.containsKey(key)) {
+                    boolean isSecret = ModuleInfoConstants.SECRET_ENV_KEYS.contains(key);
+                    filteredEnv.put(key, isSecret ? ModuleInfoConstants.REDACTED_PLACEHOLDER : actualEnv.get(key));
                 }
             }
 
-            // Replace env with filtered version
-            additionalData.put("env", filteredEnv);
+            if (module.getAdditionalData() == null) {
+                module.setAdditionalData(new HashMap<>());
+            }
+            module.getAdditionalData().put("env", filteredEnv);
         }
     }
 
@@ -249,7 +242,7 @@ public class ModuleInfoAction extends UserAction {
     }
 
     public String updateModuleEnvAndReboot() {
-        if (moduleName == null || moduleName.isEmpty()) {
+        if (moduleId == null || moduleId.isEmpty()) {
             return ERROR.toUpperCase();
         }
 
@@ -258,20 +251,13 @@ public class ModuleInfoAction extends UserAction {
         }
 
         try {
-            int deltaTimeForReboot = Context.now() - rebootThresholdSeconds;
-
-
-            Bson moduleFilter = Filters.and(
-                Filters.eq(ModuleInfo.NAME, moduleName),
-                Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTimeForReboot),
-                Filters.ne(ModuleInfo.ADDITIONAL_DATA, null)
-            );
+            Bson moduleFilter = Filters.eq(ModuleInfoDao.ID, moduleId);
 
 
             List<Bson> updates = new ArrayList<>();
 
-            // Update each environment variable individually to preserve other env vars
-            // Only allow whitelisted keys for security
+            // Write directly to additionalData.env — same field the Go module writes at startup.
+            // Go module only writes env vars once at startup (not on every heartbeat), so no race condition.
             for (Map.Entry<String, String> entry : envData.entrySet()) {
                 boolean isAllowedKey = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.values().stream()
                     .anyMatch(moduleEnvMap -> moduleEnvMap.containsKey(entry.getKey()));
