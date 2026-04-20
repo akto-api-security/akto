@@ -166,6 +166,14 @@ public class AccountSettings {
     public static final String MATCHING_PATTERNS_FOR_PROXY = "matchingPatternsForProxy";
     private Map<String, ProxyPatternInfo> matchingPatternsForProxy;
 
+    // Used by mini-runtime to send to threat topic.
+    public static final String THREAT_KAFKA_PARTITION_KEY = "threatKafkaPartitionKey";
+    private ThreatKafkaPartitionKey threatKafkaPartitionKey;
+
+    public enum ThreatKafkaPartitionKey {
+        IP
+    }
+
     @Getter
     @Setter
     private boolean switchProxyMode;
@@ -235,6 +243,14 @@ public class AccountSettings {
 
     public enum SetupType {
         PROD, QA, STAGING, DEV
+    }
+
+    public ThreatKafkaPartitionKey getThreatKafkaPartitionKey() {
+        return threatKafkaPartitionKey;
+    }
+
+    public void setThreatKafkaPartitionKey(ThreatKafkaPartitionKey threatKafkaPartitionKey) {
+        this.threatKafkaPartitionKey = threatKafkaPartitionKey;
     }
 
     public Map<String, Map<Pattern, String>> convertApiCollectionNameMapperToRegex() {
