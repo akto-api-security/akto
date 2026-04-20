@@ -248,11 +248,11 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.cache.hasAuditRules = hasAuditRules
 	s.cache.lastFetched = time.Now()
 
-	// s.logger.Info("Policy cache refreshed with ALL policies",
-	// 	zap.Int("policiesCount", len(policies)),
-	// 	zap.Int("auditPoliciesCount", len(auditPolicies)),
-	// 	zap.Time("lastFetched", s.cache.lastFetched),
-	// 	zap.Any("policies", policies))
+	s.logger.Info("Policy cache refreshed with ALL policies",
+		zap.Int("policiesCount", len(policies)),
+		zap.Int("auditPoliciesCount", len(auditPolicies)),
+		zap.Time("lastFetched", s.cache.lastFetched),
+		zap.Any("policies", policies))
 
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
@@ -275,9 +275,9 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		return nil, nil, nil, false, fmt.Errorf("failed to fetch guardrail policies: %w", err)
 	}
 
-	// s.logger.Debug("Raw guardrail policies response",
-	// 	zap.Int("size", len(rawGuardrailPolicies)),
-	// 	zap.String("raw", string(rawGuardrailPolicies)))
+	s.logger.Debug("Raw guardrail policies response",
+		zap.Int("size", len(rawGuardrailPolicies)),
+		zap.String("raw", string(rawGuardrailPolicies)))
 
 	// Parse the wrapper object containing guardrailPolicies array
 	var response struct {
@@ -531,14 +531,11 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Refresh schema registry if stale
 	s.schemaFetcher.RefreshIfNeeded()
 
-	// Check if guardrails should be applied for this endpoint (dashboard-managed selection)
-	if !s.schemaFetcher.IsEndpointSelected(params.Method, params.Path) {
-		s.logger.Info("ValidateRequest - endpoint not selected for guardrails, skipping",
-			zap.String("method", params.Method),
-			zap.String("path", params.Path))
-	}
-
 	payloadToValidate = s.extractPayloadForValidation(payloadToValidate, params.Method, params.Path, true)
+	s.logger.Info("ValidateRequest - payload prepared for validation",
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("payloadToValidate", payloadToValidate))
 
 	// Get cached policies (refreshes if stale)
 	policiesStart := time.Now()
@@ -555,12 +552,12 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
 
-	// s.logger.Info("ValidateRequest - loaded policies",
-	// 	zap.String("contextSource", contextSource),
-	// 	zap.Int("policiesCount", len(policies)),
-	// 	zap.Strings("policyNames", policyNames(policies)),
-	// 	zap.Any("policies", policies),
-	// 	zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
+	s.logger.Info("ValidateRequest - loaded policies",
+		zap.String("contextSource", contextSource),
+		zap.Int("policiesCount", len(policies)),
+		zap.Strings("policyNames", policyNames(policies)),
+		zap.Any("policies", policies),
+		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest")
@@ -668,13 +665,6 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Refresh schema registry if stale
 	s.schemaFetcher.RefreshIfNeeded()
-
-	// Check if guardrails should be applied for this endpoint (dashboard-managed selection)
-	if !s.schemaFetcher.IsEndpointSelected(params.Method, params.Path) {
-		s.logger.Info("ValidateResponse - endpoint not selected for guardrails, skipping",
-			zap.String("method", params.Method),
-			zap.String("path", params.Path))
-	}
 
 	// Get cached policies (refreshes if stale)
 	policiesStart := time.Now()
@@ -962,18 +952,6 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			zap.String("contextSource", string(valCtx.ContextSource)),
 			zap.String("method", data.Method),
 			zap.String("path", data.Path))
-
-		// Check if guardrails should be applied for this endpoint (dashboard-managed selection)
-		if !s.schemaFetcher.IsEndpointSelected(data.Method, data.Path) {
-			s.logger.Debug("ValidateBatch - endpoint not selected for guardrails, skipping",
-				zap.Int("index", i),
-				zap.String("method", data.Method),
-				zap.String("path", data.Path))
-			// result.RequestAllowed = true
-			// result.ResponseAllowed = true
-			// results = append(results, result)
-			// continue
-		}
 
 		// Filter policies by MCP server name for this specific batch item
 		itemPolicies := filterPoliciesByMcpServer(policies, mcpServerName)
