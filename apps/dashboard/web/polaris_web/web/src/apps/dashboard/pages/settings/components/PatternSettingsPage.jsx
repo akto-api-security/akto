@@ -1,5 +1,4 @@
 import { Button, Text, TextField, VerticalStack, Card, Form } from '@shopify/polaris'
-import { DeleteMajor } from '@shopify/polaris-icons'
 import React, { useEffect, useState } from 'react'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
@@ -10,13 +9,13 @@ const HEADERS = [
     { text: 'Value', title: 'Value', value: 'patternValue', type: CellType.TEXT },
     { text: 'Created By', title: 'Created By', value: 'addedBy', type: CellType.TEXT },
     { text: 'Last Updated', title: 'Last Updated', value: 'updatedTsFormatted', type: CellType.TEXT },
-    { text: '', title: '', value: 'actions', type: CellType.ACTION },
 ]
 
 // patternKey: the field name on each info object that holds the display value (e.g. "pattern" or "host")
 export function buildPatternTableData(map, patternKey) {
     if (!map) return []
     const data = Object.entries(map).map(([key, info]) => ({
+        id: key,
         patternValue: info[patternKey] || key,
         addedBy: info.addedBy || '-',
         updatedTsFormatted: info.updatedTs ? func.prettifyEpoch(info.updatedTs) : '-',
@@ -102,30 +101,30 @@ function PatternSettingsPage({
         }
     }
 
-    function handleDelete(item) {
-        func.showConfirmationModal(
-            `Delete "${item.patternValue}"?`,
-            'Delete',
-            async () => {
-                try {
-                    const map = await onDelete(item.patternValue)
-                    setTableData(buildPatternTableData(map, patternKey))
-                    func.setToast(true, false, `${resourceName.singular.charAt(0).toUpperCase() + resourceName.singular.slice(1)} deleted successfully`)
-                } catch (e) {
-                    func.setToast(true, true, `Failed to delete ${resourceName.singular}`)
-                }
-            }
-        )
-    }
-
-    function getRowActions(item) {
+    function promotedBulkActions(selectedResources) {
+        if (!onDelete) return []
         return [{
-            items: [{
-                content: 'Delete',
-                icon: DeleteMajor,
-                destructive: true,
-                onAction: () => handleDelete(item),
-            }],
+            content: `Delete ${resourceName.singular}${selectedResources.length > 1 ? 's' : ''}`,
+            destructive: true,
+            onAction: () => {
+                func.showConfirmationModal(
+                    `Delete ${selectedResources.length} ${resourceName.singular}${selectedResources.length > 1 ? 's' : ''}?`,
+                    'Delete',
+                    async () => {
+                        try {
+                            let map
+                            for (const id of selectedResources) {
+                                const item = tableData.find(r => r.id === id)
+                                if (item) map = await onDelete(item.patternValue)
+                            }
+                            if (map !== undefined) setTableData(buildPatternTableData(map, patternKey))
+                            func.setToast(true, false, `${selectedResources.length} ${resourceName.singular}${selectedResources.length > 1 ? 's' : ''} deleted successfully`)
+                        } catch (e) {
+                            func.setToast(true, true, `Failed to delete ${resourceName.singular}`)
+                        }
+                    }
+                )
+            }
         }]
     }
 
@@ -167,8 +166,8 @@ function PatternSettingsPage({
             resourceName={resourceName}
             headers={HEADERS}
             loading={fetchingData}
-            hasRowActions={!!onDelete}
-            getActions={onDelete ? getRowActions : undefined}
+            selectable={true}
+            promotedBulkActions={promotedBulkActions}
             useNewRow={true}
             condensedHeight={true}
             headings={HEADERS}
