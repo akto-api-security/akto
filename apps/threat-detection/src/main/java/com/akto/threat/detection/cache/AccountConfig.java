@@ -4,6 +4,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -23,11 +24,13 @@ public class AccountConfig {
     private final List<ApiInfo> apiInfos;
     private final Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates;
     private final Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods;
+    private final ThreatConfiguration threatConfiguration;
 
     public AccountConfig(int accountId, boolean isRedacted, boolean isHyperscanEnabled,
                          List<ApiCollection> apiCollections,
                          List<ApiInfo> apiInfos, Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates,
-                         Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods) {
+                         Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods,
+                         ThreatConfiguration threatConfiguration) {
         this.accountId = accountId;
         this.isRedacted = isRedacted;
         this.isHyperscanEnabled = isHyperscanEnabled;
@@ -37,6 +40,7 @@ public class AccountConfig {
         this.apiInfos = apiInfos != null ? apiInfos : Collections.emptyList();
         this.apiCollectionUrlTemplates = apiCollectionUrlTemplates != null ? apiCollectionUrlTemplates : Collections.emptyMap();
         this.apiInfoUrlToMethods = apiInfoUrlToMethods != null ? apiInfoUrlToMethods : Collections.emptyMap();
+        this.threatConfiguration = threatConfiguration;
     }
 
     private void initMapApiCollectionsFromList(List<ApiCollection> apiCollections){
@@ -106,6 +110,14 @@ public class AccountConfig {
         return apiInfoUrlToMethods;
     }
 
+    public ThreatConfiguration getThreatConfiguration() {
+        return threatConfiguration;
+    }
+
+    public boolean isAggregationRulesEnabled() {
+        return threatConfiguration == null || !threatConfiguration.getAggregationRulesDisabled();
+    }
+
     @Override
     public String toString() {
         return "AccountConfig{" +
@@ -115,6 +127,7 @@ public class AccountConfig {
                 ", apiCollectionsCount=" + (apiCollections != null ? apiCollections.size() : 0) +
                 ", apiInfosCount=" + (apiInfos != null ? apiInfos.size() : 0) +
                 ", apiInfoUrlToMethodsCount=" + (apiInfoUrlToMethods != null ? apiInfoUrlToMethods.size() : 0) +
+                ", threatConfigurationPresent=" + (threatConfiguration != null) +
                 '}';
     }
 }

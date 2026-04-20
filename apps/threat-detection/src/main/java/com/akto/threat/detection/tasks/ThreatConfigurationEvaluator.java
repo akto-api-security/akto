@@ -1,18 +1,14 @@
 package com.akto.threat.detection.tasks;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import com.akto.ProtoMessageUtils;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -21,11 +17,9 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Ra
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ParamEnumerationConfig;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.RatelimitConfig.RatelimitConfigItem;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
-import com.akto.testing.ApiExecutor;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.AccountConfigurationCache;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
-import com.akto.threat.detection.utils.Utils;
 import com.akto.util.Constants;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -57,9 +51,6 @@ public class ThreatConfigurationEvaluator {
                     .build())
             .setMitigationPeriod(5).build();
 
-    private ThreatConfiguration threatConfiguration;
-    private int threatConfigurationUpdateIntervalSec = 15 * 60; // 15 minutes
-    private int threatConfigLastUpdatedAt = 0;
     private DataActor dataActor;
     private ApiCountCacheLayer apiCountCacheLayer;
     private ScheduledExecutorService scheduledExecutor;
@@ -78,17 +69,9 @@ public class ThreatConfigurationEvaluator {
         HOSTNAME,
     }
 
-    public ThreatConfigurationEvaluator(ThreatConfiguration threatConfiguration, DataActor dataActor,
-            ApiCountCacheLayer apiCountCacheLayer) {
+    public ThreatConfigurationEvaluator(DataActor dataActor, ApiCountCacheLayer apiCountCacheLayer) {
         this.dataActor = dataActor;
         this.apiCountCacheLayer = apiCountCacheLayer;
-
-        if (threatConfiguration != null) {
-            this.threatConfiguration = threatConfiguration;
-            this.threatConfigLastUpdatedAt = (int) (System.currentTimeMillis() / 1000);
-        } else {
-            this.threatConfiguration = getThreatConfiguration();
-        }
 
         resyncApiInfos();
 
@@ -130,14 +113,8 @@ public class ThreatConfigurationEvaluator {
         return rateLimit + rateLimit * rule.getAutoThreshold().getOverflowPercentage() / 100;
     }
 
-    public ThreatConfiguration getThreatConfiguration() {
-
-        int now = (int) (System.currentTimeMillis() / 1000);
-        if (this.threatConfiguration != null
-                && now - threatConfigLastUpdatedAt < threatConfigurationUpdateIntervalSec) {
-            return this.threatConfiguration;
-        }
-        return fetchThreatConfigApi(now);
+    protected ThreatConfiguration getThreatConfiguration() {
+        return AccountConfigurationCache.getInstance().getConfig(dataActor).getThreatConfiguration();
     }
 
     /**
@@ -214,39 +191,6 @@ public class ThreatConfigurationEvaluator {
         }
     }
 
-    private ThreatConfiguration fetchThreatConfigApi(int now) {
-        Map<String, List<String>> headers = Utils.buildHeaders();
-        headers.put("Content-Type", Collections.singletonList("application/json"));
-        OriginalHttpRequest request = new OriginalHttpRequest(
-                Utils.getThreatProtectionBackendUrl() + "/api/dashboard/get_threat_configuration", "", "GET", null,
-                headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                logger.errorAndAddToDb("non 2xx response in get_threat_configuration", LoggerMaker.LogDb.RUNTIME);
-                return null;
-            }
-            try {
-                threatConfiguration = ProtoMessageUtils
-                        .<ThreatConfiguration>toProtoMessage(
-                                ThreatConfiguration.class, responsePayload)
-                        .orElse(null);
-                if (this.threatConfiguration != null) {
-                    logger.debug("Fetched threat configuration" + this.threatConfiguration.toString());
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                logger.error("Error while getting threat configuration" + e.getStackTrace());
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            logger.error("Error in getThreatConfiguration " + e.getStackTrace());
-        }
-        this.threatConfigLastUpdatedAt = now;
-        return threatConfiguration;
-    }
-
     public boolean isHostNameMatching(HttpResponseParams responseParam, String pattern) {
         if (responseParam == null || pattern == null) {
             return false;
@@ -261,7 +205,7 @@ public class ThreatConfigurationEvaluator {
     }
 
     public String getActorId(HttpResponseParams responseParam) {
-        getThreatConfiguration();
+        ThreatConfiguration threatConfiguration = getThreatConfiguration();
         String actor = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
         responseParam.setSourceIP(actor);
         if (responseParam.getOriginalMsg() != null) {
@@ -299,7 +243,7 @@ public class ThreatConfigurationEvaluator {
     }
 
     public RatelimitConfigItem getDefaultRateLimitConfig() {
-        getThreatConfiguration();
+        ThreatConfiguration threatConfiguration = getThreatConfiguration();
         if (threatConfiguration == null) {
             return DEFAULT_GLOBAL_RATE_LIMIT_RULE;
         }
@@ -342,7 +286,7 @@ public class ThreatConfigurationEvaluator {
      * Returns the configured value if present, otherwise the default.
      */
     public ParamEnumerationConfig getParamEnumerationConfig() {
-        getThreatConfiguration();
+        ThreatConfiguration threatConfiguration = getThreatConfiguration();
         if (threatConfiguration == null || !threatConfiguration.hasParamEnumerationConfig()) {
             return DEFAULT_PARAM_ENUMERATION_CONFIG;
         }

@@ -1,5 +1,6 @@
 package com.akto.threat.detection.cache;
 
+import com.akto.ProtoMessageUtils;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.AccountSettings;
@@ -7,12 +8,18 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
 import com.akto.runtime.RuntimeUtil;
+import com.akto.testing.ApiExecutor;
+import com.akto.threat.detection.utils.Utils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,7 +100,8 @@ public class AccountConfigurationCache {
             new ArrayList<>(),          // empty apiCollections
             new ArrayList<>(),          // empty apiInfos
             new HashMap<>(),            // empty apiCollectionUrlTemplates
-            new HashMap<>()             // empty apiInfoUrlToMethods
+            new HashMap<>(),            // empty apiInfoUrlToMethods
+            null                        // no threatConfiguration
         );
     }
 
@@ -148,6 +156,8 @@ public class AccountConfigurationCache {
             RuntimeUtil.fillURLTemplatesMap(apiInfos, apiInfoUrlToMethods, apiCollectionUrlTemplates, null);
             // Note: Maps remain empty (not null) if apiInfos is null/empty
 
+            ThreatConfiguration threatConfiguration = fetchThreatConfiguration();
+
             this.cachedConfig = new AccountConfig(
                 accountSettings.getId(),
                 accountSettings.isRedactPayload(),
@@ -155,7 +165,8 @@ public class AccountConfigurationCache {
                 apiCollections,
                 apiInfos,
                 apiCollectionUrlTemplates,
-                apiInfoUrlToMethods
+                apiInfoUrlToMethods,
+                threatConfiguration
             );
             this.lastRefreshTime = System.currentTimeMillis();
             logger.infoAndAddToDb("Account configuration cache refreshed successfully. AccountId: " +
@@ -165,6 +176,27 @@ public class AccountConfigurationCache {
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "Error refreshing account configuration cache. Keeping old cache if available.");
             e.printStackTrace();
+        }
+    }
+
+    private ThreatConfiguration fetchThreatConfiguration() {
+        Map<String, List<String>> headers = Utils.buildHeaders();
+        headers.put("Content-Type", Collections.singletonList("application/json"));
+        OriginalHttpRequest request = new OriginalHttpRequest(
+                Utils.getThreatProtectionBackendUrl() + "/api/dashboard/get_threat_configuration", "", "GET", null,
+                headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                logger.errorAndAddToDb("non 2xx response in get_threat_configuration");
+                return null;
+            }
+            return ProtoMessageUtils.<ThreatConfiguration>toProtoMessage(ThreatConfiguration.class, responsePayload)
+                    .orElse(null);
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error fetching threat configuration");
+            return null;
         }
     }
 
