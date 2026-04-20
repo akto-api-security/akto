@@ -1016,6 +1016,13 @@ const settingRequests = {
             method: 'post',
             data: {hostPattern}
         })
+    },
+    deleteProxyPattern(patternValue, connectorType) {
+        return request({
+            url: '/api/deleteProxyPattern',
+            method: 'post',
+            data: {patternValue, connectorType}
+        })
     }
 }
 

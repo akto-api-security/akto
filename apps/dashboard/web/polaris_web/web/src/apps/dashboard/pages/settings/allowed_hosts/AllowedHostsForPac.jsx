@@ -13,6 +13,10 @@ async function addAllowedHost(value) {
     return await settingRequests.addAllowedHostForPac(value)
 }
 
+async function deleteAllowedHost(value) {
+    return await settingRequests.deleteProxyPattern(value, 'PAC')
+}
+
 function AllowedHostsForPac() {
     return (
         <PatternSettingsPage
@@ -25,6 +29,7 @@ function AllowedHostsForPac() {
             resourceName={resourceName}
             onFetch={fetchAllowedHosts}
             onAdd={addAllowedHost}
+            onDelete={deleteAllowedHost}
             patternKey="pattern"
         />
     )

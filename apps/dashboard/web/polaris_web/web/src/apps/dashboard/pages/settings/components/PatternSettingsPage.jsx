@@ -1,4 +1,5 @@
 import { Button, Text, TextField, VerticalStack, Card, Form } from '@shopify/polaris'
+import { DeleteMajor } from '@shopify/polaris-icons'
 import React, { useEffect, useState } from 'react'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
@@ -39,6 +40,7 @@ export function buildPatternTableData(map, patternKey) {
  *   resourceName  - { singular, plural } for the table
  *   onFetch       - async () => Map<string, info> — called on mount to load data
  *   onAdd         - async (value) => Map<string, info> — called when user submits
+ *   onDelete      - optional async (patternValue) => Map<string, info> — called when user deletes a row
  *   patternKey    - field name on the info object holding the display value
  */
 function PatternSettingsPage({
@@ -53,6 +55,7 @@ function PatternSettingsPage({
     resourceName,
     onFetch,
     onAdd,
+    onDelete,
     patternKey,
 }) {
     const [value, setValue] = useState('')
@@ -98,6 +101,33 @@ function PatternSettingsPage({
         }
     }
 
+    function handleDelete(item) {
+        func.showConfirmationModal(
+            `Delete "${item.patternValue}"?`,
+            'Delete',
+            async () => {
+                try {
+                    const map = await onDelete(item.patternValue)
+                    setTableData(buildPatternTableData(map, patternKey))
+                    func.setToast(true, false, `${resourceName.singular.charAt(0).toUpperCase() + resourceName.singular.slice(1)} deleted successfully`)
+                } catch (e) {
+                    func.setToast(true, true, `Failed to delete ${resourceName.singular}`)
+                }
+            }
+        )
+    }
+
+    function getRowActions(item) {
+        return [{
+            items: [{
+                content: 'Delete',
+                icon: DeleteMajor,
+                destructive: true,
+                onAction: () => handleDelete(item),
+            }],
+        }]
+    }
+
     const inputCard = (
         <Card>
             <VerticalStack gap="3">
@@ -136,7 +166,8 @@ function PatternSettingsPage({
             resourceName={resourceName}
             headers={HEADERS}
             loading={fetchingData}
-            hasRowActions={false}
+            hasRowActions={!!onDelete}
+            getActions={onDelete ? getRowActions : undefined}
             useNewRow={true}
             condensedHeight={true}
             headings={HEADERS}

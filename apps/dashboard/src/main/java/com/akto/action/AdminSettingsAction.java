@@ -780,4 +780,50 @@ public class AdminSettingsAction extends UserAction {
         this.proxyPattern = proxyPattern;
     }
 
+    public enum ConnectorType { PAC, PROXY }
+
+    @Setter
+    private String patternValue;
+    @Setter
+    private ConnectorType connectorType;
+    @Getter
+    private Map<String, AccountSettings.ProxyPatternInfo> deletedPatternResult;
+
+    public String deleteProxyPattern() {
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+
+        if (connectorType == null) {
+            addActionError("Connector type cannot be empty.");
+            return ERROR.toUpperCase();
+        }
+
+        if (StringUtils.isEmpty(patternValue)) {
+            addActionError("Pattern value cannot be empty.");
+            return ERROR.toUpperCase();
+        }
+
+        patternValue = patternValue.trim();
+        String key = patternValue.hashCode() + "";
+        String field = connectorType == ConnectorType.PAC
+            ? AccountSettings.ALLOWED_HOSTS_FOR_PAC
+            : AccountSettings.MATCHING_PATTERNS_FOR_PROXY;
+
+        try {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.unset(field + "." + key)
+            );
+            AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            this.deletedPatternResult = settings == null ? null
+                : connectorType == ConnectorType.PAC
+                    ? settings.getAllowedHostsForPac()
+                    : settings.getMatchingPatternsForProxy();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error deleting proxy pattern for connectorType={}", connectorType, e);
+            return ERROR.toUpperCase();
+        }
+    }
+
 }
