@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 DATA_INGESTION_SERVICE_URL = os.getenv("DATA_INGESTION_SERVICE_URL")
 SYNC_MODE = os.getenv("SYNC_MODE", "true").lower() == "true"
 TIMEOUT = float(os.getenv("TIMEOUT", "5"))
+AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 LITELLM_URL = os.getenv("LITELLM_URL", "http://localhost:4000")
 AKTO_CONNECTOR_NAME = "litellm"
 HTTP_PROXY_PATH = "/api/http-proxy"
@@ -41,10 +42,12 @@ class GuardrailsHandler(CustomLogger):
 
     async def post_http_proxy(self, *, guardrails: bool, ingest_data: bool, http_proxy_payload: dict) -> httpx.Response:
         endpoint = f"{DATA_INGESTION_SERVICE_URL}{HTTP_PROXY_PATH}"
+        headers = {"authorization": AKTO_TOKEN} if AKTO_TOKEN else None
         return await self.client.post(
             endpoint,
             params=self.build_http_proxy_params(guardrails=guardrails, ingest_data=ingest_data),
             json=http_proxy_payload,
+            headers=headers,
         )
 
     def parse_guardrails_result(self, result: Any) -> Tuple[bool, str, Optional[str]]:

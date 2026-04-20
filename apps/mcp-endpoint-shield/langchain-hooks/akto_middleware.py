@@ -41,6 +41,7 @@ from langgraph.runtime import Runtime
 AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL", "")
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
+AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "true").lower() == "true"
 
@@ -231,7 +232,8 @@ class AktoGuardrailsMiddleware(AgentMiddleware):
         if LOG_PAYLOADS:
             logger.debug(f"Payload: {json.dumps(payload, default=str)[:1000]}")
 
-        response = await self._client.post(url, json=payload)
+        headers = {"authorization": AKTO_TOKEN} if AKTO_TOKEN else None
+        response = await self._client.post(url, json=payload, headers=headers)
         logger.info(f"Response: {response.status_code}")
         if response.status_code == 200:
             try:

@@ -50,6 +50,7 @@ var (
 	dataIngestionURL = os.Getenv("DATA_INGESTION_URL")
 	syncMode         = strings.ToLower(getEnvDefault("SYNC_MODE", "true")) == "true"
 	timeout          = parseTimeoutSeconds(getEnvDefault("TIMEOUT", "5"))
+	aktoToken        = os.Getenv("AKTO_TOKEN")
 )
 
 const (
@@ -345,6 +346,9 @@ func postHTTPProxy(guardrails, ingestData bool, payload map[string]interface{}) 
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if aktoToken != "" {
+		req.Header.Set("authorization", aktoToken)
+	}
 
 	start := time.Now()
 	resp, doErr := httpClient.Do(req)
