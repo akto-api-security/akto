@@ -574,6 +574,39 @@ public class AdminSettingsAction extends UserAction {
         }
     }
 
+    @Setter
+    private String hostPattern;
+    @Getter
+    private Map<String, AccountSettings.ProxyPatternInfo> allowedHostsForPac;
+
+    public String addAllowedHostForTac() {
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+
+        if (StringUtils.isEmpty(hostPattern)) {
+            addActionError("Host pattern cannot be empty.");
+            return ERROR.toUpperCase();
+        }
+
+        hostPattern = hostPattern.trim();
+        String key = hostPattern.hashCode() + "";
+        AccountSettings.ProxyPatternInfo info = new AccountSettings.ProxyPatternInfo(hostPattern, user.getLogin(), Context.now());
+        Bson updates = Updates.set(AccountSettings.ALLOWED_HOSTS_FOR_PAC + "." + key, info);
+
+        try {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                updates
+            );
+            AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            this.allowedHostsForPac = settings != null ? settings.getAllowedHostsForPac() : null;
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error adding allowed host for TAC", e);
+            return ERROR.toUpperCase();
+        }
+    }
+
     private String proxyPattern;
     @Getter
     private Map<String, AccountSettings.ProxyPatternInfo> matchingPatternsForProxy;

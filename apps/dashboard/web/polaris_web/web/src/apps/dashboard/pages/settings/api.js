@@ -1009,6 +1009,13 @@ const settingRequests = {
             method: 'post',
             data: {proxyPattern, switchProxyMode}
         })
+    },
+    addAllowedHostForTac(hostPattern) {
+        return request({
+            url: '/api/addAllowedHostForTac',
+            method: 'post',
+            data: {hostPattern}
+        })
     }
 }
 
