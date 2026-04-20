@@ -6,11 +6,11 @@ const resourceName = { singular: 'host', plural: 'hosts' }
 
 async function fetchAllowedHosts() {
     const response = await settingRequests.fetchAdminSettings()
-    return response?.accountSettings?.allowedHostsForTac
+    return response?.accountSettings?.allowedHostsForPac
 }
 
 async function addAllowedHost(value) {
-    return await settingRequests.addAllowedHostForTac(value)
+    return await settingRequests.addAllowedHostForPac(value)
 }
 
 function AllowedHostsForPac() {
@@ -25,7 +25,7 @@ function AllowedHostsForPac() {
             resourceName={resourceName}
             onFetch={fetchAllowedHosts}
             onAdd={addAllowedHost}
-            patternKey="host"
+            patternKey="pattern"
         />
     )
 }

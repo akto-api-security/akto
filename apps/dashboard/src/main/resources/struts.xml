@@ -4917,7 +4917,7 @@
             </result>
         </action>
 
-        <action name="api/addAllowedHostForTac" class="com.akto.action.AdminSettingsAction" method="addAllowedHostForTac">
+        <action name="api/addAllowedHostForPac" class="com.akto.action.AdminSettingsAction" method="addAllowedHostForPac">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -4931,7 +4931,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="root">allowedHostsForTac</param>
+                <param name="root">allowedHostsForPac</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

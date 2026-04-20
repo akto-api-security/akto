@@ -579,7 +579,7 @@ public class AdminSettingsAction extends UserAction {
     @Getter
     private Map<String, AccountSettings.ProxyPatternInfo> allowedHostsForPac;
 
-    public String addAllowedHostForTac() {
+    public String addAllowedHostForPac() {
         User user = getSUser();
         if (user == null) return ERROR.toUpperCase();
 
