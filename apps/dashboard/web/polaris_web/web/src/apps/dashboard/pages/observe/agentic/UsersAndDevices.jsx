@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Badge } from "@shopify/polaris";
+import { IndexFiltersMode, Badge, Modal, TextField, FormLayout } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -11,7 +11,8 @@ import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import useTable from "@/apps/dashboard/components/tables/TableContext";
-import { fetchEndpointShieldUsernameMap } from "../api_collections/endpointShieldHelper";
+import settingRequests from "../../settings/api";
+import { fetchEndpointShieldUserMetadata } from "../api_collections/endpointShieldHelper";
 import {
     getHeaders,
     getSortOptionsWithoutIconColumn,
@@ -35,6 +36,7 @@ function UsersAndDevices() {
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState({ users: [], devices: [] });
     const [summaryData, setSummaryData] = useState({ profileCount: 0, collectionCount: 0 });
+    const [editTagModal, setEditTagModal] = useState({ active: false, usernames: [], team: '', userRole: '', saving: false });
 
     const { tabsInfo } = useTable();
     const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
@@ -59,6 +61,7 @@ function UsersAndDevices() {
                 primaryColumnTitle: selectedTab === "users" ? "User" : "Device",
                 primaryColumnText: selectedTab === "users" ? "User" : "Device",
                 includeIconColumn: false,
+                includeUserColumns: selectedTab === "users",
                 ...usersAndDevicesCountColumnOpts,
             }),
         [selectedTab],
@@ -99,13 +102,13 @@ function UsersAndDevices() {
         try {
             setLoading(true);
 
-            const [apiCollectionsResp, trafficInfoResp, riskScoreResp, sensitiveInfoResp, usernameMap] =
+            const [apiCollectionsResp, trafficInfoResp, riskScoreResp, sensitiveInfoResp, shieldResult] =
                 await Promise.all([
                     api.getAllCollectionsBasic(),
                     api.getLastTrafficSeen(),
                     api.getRiskScoreInfo(),
                     api.getSensitiveInfoForCollections(),
-                    fetchEndpointShieldUsernameMap(),
+                    fetchEndpointShieldUserMetadata(),
                 ]);
 
             if (!isMountedRef.current) return;
@@ -114,9 +117,10 @@ function UsersAndDevices() {
             const trafficMap = trafficInfoResp || {};
             const riskScoreMap = riskScoreResp?.riskScoreOfCollectionsMap || {};
             const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
+            const { usernameMap = {}, userMetadataMap = {} } = shieldResult || {};
 
             const userGroups = prettifyGroupData(
-                groupCollectionsByUser(collections, trafficMap, sensitiveMap, riskScoreMap, usernameMap || {}),
+                groupCollectionsByUser(collections, trafficMap, sensitiveMap, riskScoreMap, usernameMap, userMetadataMap),
             );
             const deviceGroups = prettifyGroupData(
                 groupCollectionsByDevice(collections, trafficMap, sensitiveMap, riskScoreMap),
@@ -153,6 +157,46 @@ function UsersAndDevices() {
     const disambiguateLabel = useCallback((key, value) => {
         return func.convertToDisambiguateLabelObj(value, null, 2);
     }, []);
+
+    const openEditTagModal = useCallback((usernames) => {
+        const firstUser = data.users.find((u) => usernames.includes(u.id));
+        setEditTagModal({
+            active: true,
+            usernames,
+            team: firstUser?.team || '',
+            userRole: firstUser?.userRole || '',
+            saving: false,
+        });
+    }, [data.users]);
+
+    const closeEditTagModal = useCallback(() => {
+        setEditTagModal({ active: false, usernames: [], team: '', userRole: '', saving: false });
+    }, []);
+
+    const saveEditTag = useCallback(async () => {
+        setEditTagModal((prev) => ({ ...prev, saving: true }));
+        try {
+            const selectedUsers = data.users.filter((u) => editTagModal.usernames.includes(u.id));
+            await Promise.all(
+                selectedUsers.map((u) =>
+                    settingRequests.updateUserDeviceTag(u.groupName, editTagModal.team, editTagModal.userRole)
+                )
+            );
+            setData((prev) => ({
+                ...prev,
+                users: prev.users.map((u) =>
+                    editTagModal.usernames.includes(u.id)
+                        ? { ...u, team: editTagModal.team, userRole: editTagModal.userRole }
+                        : u
+                ),
+            }));
+            func.setToast(true, false, "Team and role updated successfully");
+            closeEditTagModal();
+        } catch {
+            func.setToast(true, true, "Failed to update team and role");
+            setEditTagModal((prev) => ({ ...prev, saving: false }));
+        }
+    }, [editTagModal, data.users, closeEditTagModal]);
 
     const handleRowClick = useCallback(
         (row) => {
@@ -200,6 +244,14 @@ function UsersAndDevices() {
         [selectedTab],
     );
 
+    const promotedBulkActions = useCallback((selectedIds) => {
+        if (selectedTab !== 'users') return [];
+        return [{
+            content: 'Edit team & role',
+            onAction: () => openEditTagModal(selectedIds),
+        }];
+    }, [selectedTab, openEditTagModal]);
+
     const tableComponent = useMemo(() => {
         const commonTabProps = { tableTabs, onSelect: handleSelectedTab, selected };
         return (
@@ -211,7 +263,7 @@ function UsersAndDevices() {
                 resourceName={resourceName}
                 filters={[]}
                 headers={headers}
-                selectable={false}
+                selectable={selectedTab === 'users'}
                 mode={IndexFiltersMode.Default}
                 headings={headers}
                 useNewRow={true}
@@ -219,10 +271,11 @@ function UsersAndDevices() {
                 disambiguateLabel={disambiguateLabel}
                 prettifyPageData={(pageData) => pageData}
                 onRowClick={handleRowClick}
+                promotedBulkActions={promotedBulkActions}
                 {...commonTabProps}
             />
         );
-    }, [data, selectedTab, headers, disambiguateLabel, handleRowClick, tableTabs, selected, resourceName]);
+    }, [data, selectedTab, headers, disambiguateLabel, handleRowClick, promotedBulkActions, tableTabs, selected, resourceName]);
 
     const pageTitle = useMemo(
         () => (
@@ -245,12 +298,44 @@ function UsersAndDevices() {
         );
     }
 
+    const editTagModalComp = (
+        <Modal
+            open={editTagModal.active}
+            onClose={closeEditTagModal}
+            title={`Edit team & role — ${editTagModal.usernames?.length > 1 ? `${editTagModal.usernames.length} users` : (data.users.find((u) => editTagModal.usernames?.[0] === u.id)?.groupName || '')}`}
+            primaryAction={{ content: 'Save', onAction: saveEditTag, loading: editTagModal.saving }}
+            secondaryActions={[{ content: 'Cancel', onAction: closeEditTagModal }]}
+        >
+            <Modal.Section>
+                <FormLayout>
+                    <TextField
+                        label="Team"
+                        value={editTagModal.team}
+                        onChange={(v) => setEditTagModal((prev) => ({ ...prev, team: v }))}
+                        placeholder="e.g. Backend, DevOps"
+                        autoComplete="off"
+                    />
+                    <TextField
+                        label="User role"
+                        value={editTagModal.userRole}
+                        onChange={(v) => setEditTagModal((prev) => ({ ...prev, userRole: v }))}
+                        placeholder="e.g. Engineer, Architect"
+                        autoComplete="off"
+                    />
+                </FormLayout>
+            </Modal.Section>
+        </Modal>
+    );
+
     return (
-        <PageWithMultipleCards
-            title={pageTitle}
-            isFirstPage={true}
-            components={[summaryComponent, tableComponent]}
-        />
+        <>
+            <PageWithMultipleCards
+                title={pageTitle}
+                isFirstPage={true}
+                components={[summaryComponent, tableComponent]}
+            />
+            {editTagModalComp}
+        </>
     );
 }
 
