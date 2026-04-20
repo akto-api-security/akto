@@ -10,6 +10,7 @@ const HEADERS = [
     { text: 'Value', title: 'Value', value: 'patternValue', type: CellType.TEXT },
     { text: 'Created By', title: 'Created By', value: 'addedBy', type: CellType.TEXT },
     { text: 'Last Updated', title: 'Last Updated', value: 'updatedTsFormatted', type: CellType.TEXT },
+    { text: '', title: '', value: 'actions', type: CellType.ACTION },
 ]
 
 // patternKey: the field name on each info object that holds the display value (e.g. "pattern" or "host")

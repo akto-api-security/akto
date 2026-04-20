@@ -22,7 +22,7 @@ function AllowedHostsForPac() {
         <PatternSettingsPage
             title="Allowed Hosts"
             cardTitle="Add Allowed Host"
-            description="Add host patterns to ignore during traffic capture. Matching hosts will be excluded from TAC processing."
+            description="Add host patterns to ignore during traffic capture. Matching hosts will be excluded from PAC processing."
             inputLabel="Host"
             placeholder="e.g. internal.example.com"
             tableKey="allowed-hosts-table"
