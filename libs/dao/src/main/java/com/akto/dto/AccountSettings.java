@@ -139,6 +139,12 @@ public class AccountSettings {
     public static final String MATCHING_PATTERNS_FOR_PROXY = "matchingPatternsForProxy";
     private Map<String, ProxyPatternInfo> matchingPatternsForProxy;
 
+    public static final String ALLOWED_HOSTS_FOR_PAC = "allowedHostsForPac";
+
+    @Getter
+    @Setter
+    private Map<String, ProxyPatternInfo> allowedHostsForPac;
+
     @Getter
     @Setter
     private boolean switchProxyMode;
