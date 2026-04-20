@@ -49,7 +49,7 @@ public class RBAC {
         GUEST("GUEST", new GuestRoleStrategy()),
         THREAT_ENGINEER("THREAT ENGINEER", new ThreatEngineerRoleStrategy()),
         THREAT_VIEWER("THREAT VIEWER", new ThreatViewerRoleStrategy()),
-        NO_ACCESS("NO ACCESS", new NoAccessRoleStrategy());
+        NO_ACCESS("NO_ACCESS", new NoAccessRoleStrategy());
 
         private final RoleStrategy roleStrategy;
         private String name;

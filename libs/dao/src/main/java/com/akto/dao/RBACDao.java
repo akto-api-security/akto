@@ -82,7 +82,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
                     currentRole = scopeRole;
                 } else {
                     // as we remove complete scope role mapping, we need to return NO_ACCESS for all users for which scope role mapping is not present
-                    return Role.NO_ACCESS.name();
+                    return Role.NO_ACCESS.getName();
                 }
             } catch (Exception e) {
             }
