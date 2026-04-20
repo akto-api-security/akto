@@ -37,6 +37,7 @@ public class McpAuditInfo {
     private int hostCollectionId;
     private String mcpHost;
     private ComponentRiskAnalysis componentRiskAnalysis;
+    private Integer approvedAt;
 
     public String getHexId() {
         return this.id.toHexString();

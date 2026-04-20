@@ -4614,6 +4614,79 @@ public class ClientActor extends DataActor {
     }
 
     @Override
+    public List<McpAuditInfo> fetchMcpAuditInfo(Integer updatedAfter, List<String> remarksList) {
+        Map<String, List<String>> headers = buildHeaders();
+        List<McpAuditInfo> mcpAuditInfoList = new ArrayList<>();
+        BasicDBObject obj = new BasicDBObject();
+        if (updatedAfter != null) {
+            obj.put("updatedAfter", updatedAfter);
+        }
+        if (remarksList != null && !remarksList.isEmpty()) {
+            obj.put("remarksList", remarksList);
+        }
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchMcpAuditInfo", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in fetchMcpAuditInfo", LogDb.RUNTIME);
+                return mcpAuditInfoList;
+            }
+            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+            BasicDBList objList = (BasicDBList) payloadObj.get("mcpAuditInfoList");
+            for (Object obj2 : objList) {
+                BasicDBObject auditInfoObj = (BasicDBObject) obj2;
+                mcpAuditInfoList.add(objectMapper.readValue(auditInfoObj.toJson(), McpAuditInfo.class));
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchMcpAuditInfo" + e, LogDb.RUNTIME);
+        }
+        return mcpAuditInfoList;
+    }
+
+    @Override
+    public void updateMcpAuditInfo(McpAuditInfo auditInfo) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject("auditInfo", BasicDBObject.parse(gson.toJson(auditInfo)));
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateMcpAuditInfo", "", "POST", obj.toJson(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateMcpAuditInfo", LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateMcpAuditInfo" + e, LogDb.RUNTIME);
+        }
+    }
+
+    @Override
+    public List<Map<String, Object>> fetchAllowedMcpServers() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<Map<String, Object>> approvedServers = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchApprovedMcpServers", "", "POST", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in fetchAllowedMcpServers", LogDb.RUNTIME);
+                return approvedServers;
+            }
+            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+            BasicDBList serversList = (BasicDBList) payloadObj.get("approvedMcpServers");
+            if (serversList != null) {
+                for (Object obj : serversList) {
+                    if (obj instanceof Map) {
+                        approvedServers.add((Map<String, Object>) obj);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchAllowedMcpServers" + e, LogDb.RUNTIME);
+        }
+        return approvedServers;
+    }
+
+    @Override
     public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();

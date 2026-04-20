@@ -353,4 +353,10 @@ public abstract class DataActor {
     public abstract boolean updateServiceGraphEdges(int apiCollectionId, Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges);
 
     public abstract void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook);
+
+    public abstract List<Map<String, Object>> fetchAllowedMcpServers();
+
+    public abstract List<McpAuditInfo> fetchMcpAuditInfo(Integer updatedAfter, List<String> remarksList);
+
+    public abstract void updateMcpAuditInfo(McpAuditInfo auditInfo);
 }

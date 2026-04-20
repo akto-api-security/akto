@@ -2,6 +2,7 @@ package com.akto.hybrid_runtime;
 
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.McpAuditInfo;
 import com.akto.dto.APIConfig;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
@@ -111,6 +112,8 @@ public class McpToolsSyncJobExecutor {
         }
 
         logger.debug("Found {} collections for MCP server.", eligibleCollections.size());
+
+        autoApproveExistingPendingRecords();
 
         if (eligibleCollections.isEmpty()) {
             return;
@@ -319,6 +322,42 @@ public class McpToolsSyncJobExecutor {
             logger.error("Error while discovering mcp resources for hostname: {}", host, e);
         }
         return responseParamsList;
+    }
+
+    private void autoApproveExistingPendingRecords() {
+        try {
+            List<McpAuditInfo> pendingRecords = DataActorFactory.fetchInstance()
+                .fetchMcpAuditInfo(null, Collections.emptyList());
+            if (pendingRecords.isEmpty()) {
+                logger.debug("No pending MCP audit records found for auto-approval.");
+                return;
+            }
+            logger.info("Found {} MCP audit records to check for auto-approval.", pendingRecords.size());
+            int approvedCount = 0;
+            int currentTime = Context.now();
+            for (McpAuditInfo record : pendingRecords) {
+                if (StringUtils.isNotBlank(record.getRemarks())) {
+                    continue;
+                }
+                String mcpHost = record.getMcpHost();
+                if (StringUtils.isBlank(mcpHost)) {
+                    continue;
+                }
+                if ("Approved".equals(McpRequestResponseUtils.checkIfServerIsApproved(mcpHost))) {
+                    record.setRemarks("Approved");
+                    record.setMarkedBy("System (Auto-approved)");
+                    record.setUpdatedTimestamp(currentTime);
+                    record.setApprovedAt(currentTime);
+                    DataActorFactory.fetchInstance().updateMcpAuditInfo(record);
+                    approvedCount++;
+                }
+            }
+            if (approvedCount > 0) {
+                logger.info("Auto-approved {} existing MCP audit records.", approvedCount);
+            }
+        } catch (Exception e) {
+            logger.error("Error auto-approving existing MCP audit records.", e);
+        }
     }
 
     public static void processResponseParams(APIConfig apiConfig, List<HttpResponseParams> responseParamsList) {

@@ -763,4 +763,18 @@ public class DbActor extends DataActor {
     public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
         DbLayer.storeTestingRunWebhook(testingRunWebhook);
     }
+
+    @Override
+    public List<Map<String, Object>> fetchAllowedMcpServers() {
+        return new ArrayList<>();
+    }
+
+    @Override
+    public List<McpAuditInfo> fetchMcpAuditInfo(Integer updatedAfter, List<String> remarksList) {
+        return new ArrayList<>();
+    }
+
+    @Override
+    public void updateMcpAuditInfo(McpAuditInfo auditInfo) {
+    }
 }
