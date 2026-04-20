@@ -15,6 +15,8 @@ export const getMethod = (url, method) => {
             return "PROMPT";
         }else if(url.includes("server")){
             return "SERVER";
+        }else if(url.includes("settings")){
+            return "CONFIG";
         }
     }
     return method;
@@ -22,12 +24,14 @@ export const getMethod = (url, method) => {
 
 export function MethodBox({method, methodBoxWidth, url}){
     const finalMethod = getMethod(url, method);
+    // Use TOOL color for CONFIG as well
+    const colorMethod = finalMethod === "CONFIG" ? "TOOL" : finalMethod;
     return (
       <Box width={methodBoxWidth || "64px"}>
         <HorizontalStack align="end">
           <span
             style={{
-              color: transform.getTextColor(finalMethod),
+              color: transform.getTextColor(colorMethod),
               fontSize: "14px",
               fontWeight: 500,
               lineHeight: "20px",
