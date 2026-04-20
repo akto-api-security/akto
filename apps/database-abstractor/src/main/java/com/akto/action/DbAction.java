@@ -122,6 +122,7 @@ public class DbAction extends ActionSupport {
     List<CustomAuthTypeMapper> customAuthTypes;
     AccountSettings accountSettings;
     Config.DatadogForwarderConfig datadogForwarderConfig;
+    List<Map<String, Object>> approvedMcpServers;
     List<ApiInfo> apiInfos;
     APIConfig apiConfig;
     List<SingleTypeInfo> stis;
@@ -571,6 +572,23 @@ public class DbAction extends ActionSupport {
             );
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchDatadogForwarderConfig " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchApprovedMcpServers() {
+        try {
+            int accountId = Context.accountId.get();
+            String configId = accountId + "_MCP_REGISTRY";
+            Config.McpRegistryConfig mcpRegistryConfig = (Config.McpRegistryConfig) ConfigsDao.instance.findOne(
+                com.mongodb.client.model.Filters.eq("_id", configId)
+            );
+            if (mcpRegistryConfig != null) {
+                approvedMcpServers = mcpRegistryConfig.getApprovedServers();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchApprovedMcpServers " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -4050,6 +4068,14 @@ public class DbAction extends ActionSupport {
 
     public void setDatadogForwarderConfig(Config.DatadogForwarderConfig datadogForwarderConfig) {
         this.datadogForwarderConfig = datadogForwarderConfig;
+    }
+
+    public List<Map<String, Object>> getApprovedMcpServers() {
+        return approvedMcpServers;
+    }
+
+    public void setApprovedMcpServers(List<Map<String, Object>> approvedMcpServers) {
+        this.approvedMcpServers = approvedMcpServers;
     }
 
     public List<ApiInfo> getApiInfos() {
