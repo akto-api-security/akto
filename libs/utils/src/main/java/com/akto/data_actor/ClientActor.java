@@ -4388,7 +4388,7 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject("auditInfo", BasicDBObject.parse(gson.toJson(auditInfo)));
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateMcpAuditInfo", "", "POST", obj.toJson(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             if (response.getStatusCode() != 200) {
                 loggerMaker.errorAndAddToDb("non 2xx response in updateMcpAuditInfo", LoggerMaker.LogDb.RUNTIME);
             }
