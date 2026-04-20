@@ -19,6 +19,18 @@ import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
 
+function clampMinMatchCount(raw) {
+    const trimmed = String(raw ?? "").trim();
+    if (trimmed === "") {
+        return 1;
+    }
+    const n = parseInt(trimmed, 10);
+    if (!Number.isFinite(n) || n < 1) {
+        return 1;
+    }
+    return Math.min(n, 999999);
+}
+
 // Helper function to format label with domain count
 const formatPiiLabel = (name, domainCount) => {
     // Show domain count with descriptive text in brackets
@@ -35,13 +47,26 @@ export const SensitiveInfoConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ enablePiiTypes, piiTypes, enableRegexPatterns, regexPatterns, enableSecrets, enableAnonymize }) => {
+    getSummary: ({
+        enablePiiTypes,
+        piiTypes,
+        enableRegexPatterns,
+        regexPatterns,
+        enableSecrets,
+        enableAnonymize
+    }) => {
         const filters = [];
 
         if (enablePiiTypes && piiTypes?.length > 0) {
-            const piiNames = piiTypes.map(pii => pii.type).slice(0, 2);
+            const piiParts = piiTypes.slice(0, 2).map((p) => {
+                const t = p.type;
+                const m = p.minMatchCount != null && Number(p.minMatchCount) > 1
+                    ? ` (${Number(p.minMatchCount)}+)`
+                    : "";
+                return `${t}${m}`;
+            });
             const moreCount = piiTypes.length > 2 ? ` +${piiTypes.length - 2} more PII${piiTypes.length - 2 > 1 ? 's' : ''}` : '';
-            filters.push(`${piiNames.join(", ")}${moreCount}`);
+            filters.push(`${piiParts.join(", ")}${moreCount}`);
         }
 
         if (enableRegexPatterns && regexPatterns?.length > 0) {
@@ -197,7 +222,8 @@ const SensitiveInfoStep = ({
                                                     return {
                                                         type: value,
                                                         behavior: 'block',
-                                                        domainCount: option?.domainCount || 0
+                                                        domainCount: option?.domainCount || 0,
+                                                        minMatchCount: 1
                                                     };
                                                 });
                                                 setPiiTypes(newPiiTypes);
@@ -213,8 +239,8 @@ const SensitiveInfoStep = ({
                                 {piiTypes.length > 0 && (
                                     <Box style={{ border: "1px solid #d1d5db", borderRadius: "8px", overflow: "hidden" }}>
                                         <DataTable
-                                            columnContentTypes={['text', 'text', 'text']}
-                                            headings={['PII type', 'Guardrail behavior', 'Actions']}
+                                            columnContentTypes={['text', 'numeric', 'text', 'text']}
+                                            headings={['PII type', 'Min count', 'Guardrail behavior', 'Actions']}
                                             verticalAlign="middle"
                                             rows={piiTypes.map((pii, index) => {
                                                 const option = availablePiiTypes.find(p => p.value === pii.type);
@@ -222,6 +248,7 @@ const SensitiveInfoStep = ({
                                                 const domainCount = pii.domainCount ?? option?.domainCount ?? 0;
 
                                                 const domainText = domainCount <= 1 ? 'domain' : 'domains';
+                                                const minVal = pii.minMatchCount ?? 1;
                                                 return [
                                                     <HorizontalStack key={`name-${index}`} gap="1" blockAlign="center">
                                                         <Text as="span" variant="bodyMd">{displayName}</Text>
@@ -229,6 +256,24 @@ const SensitiveInfoStep = ({
                                                             ({domainCount} {domainText})
                                                         </Text>
                                                     </HorizontalStack>,
+                                                    <Box key={`min-${index}`} maxWidth="100px">
+                                                        <TextField
+                                                            label=""
+                                                            labelHidden
+                                                            type="number"
+                                                            autoComplete="off"
+                                                            min={1}
+                                                            value={String(minVal)}
+                                                            onChange={(value) => {
+                                                                const next = [...piiTypes];
+                                                                next[index] = {
+                                                                    ...next[index],
+                                                                    minMatchCount: clampMinMatchCount(value)
+                                                                };
+                                                                setPiiTypes(next);
+                                                            }}
+                                                        />
+                                                    </Box>,
                                                     <Dropdown
                                                         key={`behavior-${index}`}
                                                         id={`pii-behavior-${index}`}
