@@ -4383,8 +4383,18 @@ public class ClientActor extends DataActor {
     }
 
     @Override
-    public void updateMcpAuditInfo(String type, String resourceName, String mcpHost, ComponentRiskAnalysis componentRiskAnalysis) {
-
+    public void updateMcpAuditInfo(McpAuditInfo auditInfo) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject("auditInfo", BasicDBObject.parse(gson.toJson(auditInfo)));
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateMcpAuditInfo", "", "POST", obj.toJson(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateMcpAuditInfo", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateMcpAuditInfo" + e, LoggerMaker.LogDb.RUNTIME);
+        }
     }
 
     @Override

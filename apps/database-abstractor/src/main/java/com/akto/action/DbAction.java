@@ -3438,7 +3438,7 @@ public class DbAction extends ActionSupport {
 
     public String updateMcpAuditInfo() {
         try {
-            DbLayer.updateMcpAuditInfo(auditInfo.getType(), auditInfo.getResourceName(), auditInfo.getMcpHost(), auditInfo.getComponentRiskAnalysis());
+            DbLayer.updateMcpAuditInfo(auditInfo);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateMcpAuditInfo " + e.toString());
             return Action.ERROR.toUpperCase();

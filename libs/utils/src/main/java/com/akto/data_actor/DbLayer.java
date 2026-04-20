@@ -2637,18 +2637,29 @@ public class DbLayer {
         }
     }
 
-    public static void updateMcpAuditInfo(String componentType, String componentName, String mcpHost, ComponentRiskAnalysis componentRiskAnalysis) {
-        if (componentType == null || componentName == null || componentRiskAnalysis == null || mcpHost == null) {
+    public static void updateMcpAuditInfo(McpAuditInfo auditInfo) {
+        if (auditInfo == null || auditInfo.getType() == null || auditInfo.getResourceName() == null || auditInfo.getMcpHost() == null) {
             return;
         }
         Bson filter = Filters.and(
-                Filters.eq(McpAuditInfo.TYPE, componentType),
-                Filters.eq(McpAuditInfo.RESOURCE_NAME, componentName),
-                Filters.eq(McpAuditInfo.MCP_HOST, mcpHost)
+                Filters.eq(McpAuditInfo.TYPE, auditInfo.getType()),
+                Filters.eq(McpAuditInfo.RESOURCE_NAME, auditInfo.getResourceName()),
+                Filters.eq(McpAuditInfo.MCP_HOST, auditInfo.getMcpHost())
         );
         List<Bson> updateList = new ArrayList<>();
-        updateList.add(Updates.set(McpAuditInfo.COMPONENT_RISK_ANALYSIS, componentRiskAnalysis));
         updateList.add(Updates.set(McpAuditInfo.UPDATED_TIMESTAMP, Context.now()));
+        if (auditInfo.getComponentRiskAnalysis() != null) {
+            updateList.add(Updates.set(McpAuditInfo.COMPONENT_RISK_ANALYSIS, auditInfo.getComponentRiskAnalysis()));
+        }
+        if (StringUtils.isNotBlank(auditInfo.getRemarks())) {
+            updateList.add(Updates.set(McpAuditInfo.REMARKS, auditInfo.getRemarks()));
+        }
+        if (StringUtils.isNotBlank(auditInfo.getMarkedBy())) {
+            updateList.add(Updates.set(McpAuditInfo.MARKED_BY, auditInfo.getMarkedBy()));
+        }
+        if (auditInfo.getApprovedAt() != null && auditInfo.getApprovedAt() > 0) {
+            updateList.add(Updates.set(McpAuditInfo.APPROVED_AT, auditInfo.getApprovedAt()));
+        }
         Bson updates = Updates.combine(updateList.toArray(new Bson[0]));
         McpAuditInfoDao.instance.updateOneNoUpsert(filter, updates);
     }
