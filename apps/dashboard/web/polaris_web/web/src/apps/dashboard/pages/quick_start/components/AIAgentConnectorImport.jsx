@@ -169,6 +169,7 @@ const AIAgentConnectorImport = ({
                                 placeholder={field.placeholder}
                                 multiline={field.multiline || 4}
                                 helpText={field.helpText}
+                                requiredIndicator={field?.required ? field.required : false}
                             />
                         );
                     }
@@ -183,6 +184,7 @@ const AIAgentConnectorImport = ({
                             onChange={(value) => updateField(field.name, value)}
                             placeholder={field.placeholder}
                             helpText={field.helpText}
+                            requiredIndicator={field?.required ? field.required : false}
                         />
                     );
                 })}

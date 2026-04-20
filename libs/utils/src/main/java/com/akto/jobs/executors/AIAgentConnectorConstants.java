@@ -31,7 +31,7 @@ public final class AIAgentConnectorConstants {
     public static final String BINARY_NAME_COPILOT_STUDIO = "copilot-shield";
     public static final String BINARY_NAME_DATABRICKS = "databricks-shield";
     public static final String BINARY_NAME_SNOWFLAKE = "snowflake-shield";
-    public static final String BINARY_NAME_ANTHROPIC = "anthropic-shield";
+    public static final String BINARY_NAME_ANTHROPIC = "claude-shield";
     public static final String BINARY_NAME_OPENAI = "openai-shield";
 
     // Configuration Keys - N8N
