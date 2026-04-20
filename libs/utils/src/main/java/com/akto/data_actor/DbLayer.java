@@ -41,6 +41,7 @@ import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
+import com.akto.new_relic.NewRelicUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -253,6 +254,8 @@ public class DbLayer {
         if(Context.accountId.get() == 1758787662){
            updateModuleEnvAndReboot(moduleInfo); 
         }
+
+        NewRelicUtils.forwardModuleHeartbeatEvent(moduleInfo);
         
         return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Updates.combine(
@@ -2182,6 +2185,8 @@ public class DbLayer {
             loggerMaker.infoAndAddToDb("Deleted " + deletedCount + " old metrics records", LogDb.DASHBOARD);
         }
         MetricDataDao.instance.insertMany(metricData);
+
+        NewRelicUtils.forwardMetrics(metricData);
     }
     public static void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Integer accountId = Context.accountId.get();

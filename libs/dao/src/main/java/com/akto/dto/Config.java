@@ -26,7 +26,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, SLACK_ALERT_CYBORG, CYBORG_TOOLS_AUTH, DATADOG_FORWARDER;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, SLACK_ALERT_CYBORG, CYBORG_TOOLS_AUTH, DATADOG_FORWARDER, NEW_RELIC_FORWARDER;
     }
 
     ConfigType configType;
@@ -731,4 +731,25 @@ public abstract class Config {
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
     }
 
+    @BsonDiscriminator
+    public static class NewRelicForwarderConfig extends Config {
+        public static final String API_KEY = "apiKey";
+        private String apiKey;
+
+        public static final String CONFIG_ID = ConfigType.NEW_RELIC_FORWARDER.name() + CONFIG_SALT;
+
+        public NewRelicForwarderConfig() {
+            this.configType = ConfigType.NEW_RELIC_FORWARDER;
+            this.id = CONFIG_ID;
+        }
+
+        public NewRelicForwarderConfig(String apiKey) {
+            this.configType = ConfigType.NEW_RELIC_FORWARDER;
+            this.id = CONFIG_ID;
+            this.apiKey = apiKey;
+        }
+
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+    }
 }
