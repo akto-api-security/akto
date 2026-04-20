@@ -43,11 +43,6 @@ import com.akto.util.McpSseEndpointHelper;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-
 import java.net.URI;
 
 import org.json.JSONArray;
@@ -197,8 +192,7 @@ public class Executor {
         boolean allRequestsSkippedDueToMatch = false;
         int skippedCount = 0;
 
-        boolean templateAllowsAutomated = !varMap.containsKey("agenticTestingAllowed")
-                || Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
+        boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
         boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests() && templateAllowsAutomated;
 
 
@@ -218,62 +212,62 @@ public class Executor {
             } else {
                 loggerMaker.infoAndAddToDb("AutomatedAgenticTest: no results returned for testSubType=" + testSubType);
             }
-        }
-
-        for (RawApi testReq: testRawApis) {
-            if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
-                skippedCount++;
-                continue;
-            }
-            if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
-                break;
-            }
-            try {
-                // follow redirects = true for now
-                TestResult res = null;
-                List<TestResult> agenticResults = null;
-
-                if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
-                    // execute agentic test here
-                    requestAttempted = true;
-                    agenticResults = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
-                    if (agenticResults != null && !agenticResults.isEmpty()) {
-                        result.addAll(agenticResults);
-                        // needed to check for vulnerable 
-                        res = agenticResults.get(agenticResults.size() - 1);
-                    }
-                }else{
-                    List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
-                    String contentTypeString = "";
-                    if(!contentType.isEmpty()){
-                        contentTypeString = contentType.get(0);
-                    }
-                    if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
-                        // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
-                        // we are adding custom header here and when sending request we will remove them
-                        testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
-                        testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
-                    }
-
-                    // Add SSE endpoint header for MCP collections
-                    McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
-
-                    requestAttempted = true;
-                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
-                    requestSent = true;
-                    ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
-                    res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+        } else {
+            for (RawApi testReq: testRawApis) {
+                if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
+                    skippedCount++;
+                    continue;
                 }
-                if (res != null && agenticResults == null) {
-                    result.add(res);
+                if (vulnerable) { //todo: introduce a flag stopAtFirstMatch
+                    break;
                 }
-                if (res != null) {
-                    vulnerable = res.getVulnerable();
+                try {
+                    // follow redirects = true for now
+                    TestResult res = null;
+                    List<TestResult> agenticResults = null;
+
+                    if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
+                        // execute agentic test here
+                        requestAttempted = true;
+                        agenticResults = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
+                        if (agenticResults != null && !agenticResults.isEmpty()) {
+                            result.addAll(agenticResults);
+                            // needed to check for vulnerable 
+                            res = agenticResults.get(agenticResults.size() - 1);
+                        }
+                    }else{
+                        List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
+                        String contentTypeString = "";
+                        if(!contentType.isEmpty()){
+                            contentTypeString = contentType.get(0);
+                        }
+                        if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
+                            // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
+                            // we are adding custom header here and when sending request we will remove them
+                            testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
+                            testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
+                        }
+
+                        // Add SSE endpoint header for MCP collections
+                        McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
+
+                        requestAttempted = true;
+                        testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                        requestSent = true;
+                        ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
+                        res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                    }
+                    if (res != null && agenticResults == null) {
+                        result.add(res);
+                    }
+                    if (res != null) {
+                        vulnerable = res.getVulnerable();
+                    }
+                } catch(Exception e) {
+                    testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
+                    error_messages.add("Error executing test request: " + e.getMessage());
+                    loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
                 }
-            } catch(Exception e) {
-                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
-                error_messages.add("Error executing test request: " + e.getMessage());
-                loggerMaker.errorAndAddToDb("Error executing test request " + logId + " " + e.getMessage(), LogDb.TESTING);
             }
         }
 
