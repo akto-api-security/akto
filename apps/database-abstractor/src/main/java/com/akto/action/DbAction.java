@@ -188,6 +188,9 @@ public class DbAction extends ActionSupport {
     private String miniRuntimeName;
 
     @Getter @Setter
+    private String moduleId;
+
+    @Getter @Setter
     private List<SessionDocument> sessionDocuments;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
@@ -512,7 +515,7 @@ public class DbAction extends ActionSupport {
 
     public String fetchAndUpdateModuleForReboot() {
         try {
-            moduleInfoList = DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName);
+            moduleInfoList = DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName, moduleId);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchAndUpdateModuleForReboot " + e.toString());
             return Action.ERROR.toUpperCase();

@@ -299,12 +299,17 @@ public class DbLayer {
     }
 
     public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
+        return fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName, null);
+    }
+
+    public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName, String moduleId) {
         if (moduleType == null) {
             return new ArrayList<>();
         }
 
         if (moduleType != ModuleInfo.ModuleType.THREAT_DETECTION &&
                 moduleType != ModuleInfo.ModuleType.AKTO_AGENT_GATEWAY &&
+                moduleType != ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD &&
                 (miniRuntimeName == null || miniRuntimeName.isEmpty())) {
             return new ArrayList<>();
         }
@@ -312,10 +317,13 @@ public class DbLayer {
         List<Bson> filterConditions = new ArrayList<>();
         filterConditions.add(Filters.eq(ModuleInfo._REBOOT, true));
         filterConditions.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()));
-        
-        // Only add miniRuntimeName filter if it's not null
+
         if (miniRuntimeName != null && !miniRuntimeName.isEmpty()) {
             filterConditions.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
+        }
+
+        if (moduleId != null && !moduleId.isEmpty()) {
+            filterConditions.add(Filters.eq("_id", moduleId));
         }
 
         Bson filter = Filters.and(filterConditions);
