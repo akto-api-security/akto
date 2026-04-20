@@ -536,7 +536,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		s.logger.Info("ValidateRequest - endpoint not selected for guardrails, skipping",
 			zap.String("method", params.Method),
 			zap.String("path", params.Path))
-		return &mcp.ValidationResult{Allowed: true}, nil
 	}
 
 	payloadToValidate = s.extractPayloadForValidation(payloadToValidate, params.Method, params.Path, true)
@@ -675,7 +674,6 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		s.logger.Info("ValidateResponse - endpoint not selected for guardrails, skipping",
 			zap.String("method", params.Method),
 			zap.String("path", params.Path))
-		return &mcp.ValidationResult{Allowed: true}, nil
 	}
 
 	// Get cached policies (refreshes if stale)
@@ -971,10 +969,10 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.Int("index", i),
 				zap.String("method", data.Method),
 				zap.String("path", data.Path))
-			result.RequestAllowed = true
-			result.ResponseAllowed = true
-			results = append(results, result)
-			continue
+			// result.RequestAllowed = true
+			// result.ResponseAllowed = true
+			// results = append(results, result)
+			// continue
 		}
 
 		// Filter policies by MCP server name for this specific batch item
