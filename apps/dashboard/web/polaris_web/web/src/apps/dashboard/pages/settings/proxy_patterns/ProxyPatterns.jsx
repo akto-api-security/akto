@@ -37,6 +37,10 @@ function ProxyPatterns() {
         return await settingRequests.addMatchingPatternForProxy(value, switchProxyMode)
     }
 
+    async function onDelete(value) {
+        return await settingRequests.deleteProxyPattern(value, 'PROXY')
+    }
+
     const extraContent = (
         <>
             <ToggleComponent text="Proxy Mode" onToggle={handleToggle} initial={switchProxyMode} />
@@ -57,6 +61,7 @@ function ProxyPatterns() {
             resourceName={resourceName}
             onFetch={onFetch}
             onAdd={onAdd}
+            onDelete={onDelete}
             patternKey="pattern"
         />
     )

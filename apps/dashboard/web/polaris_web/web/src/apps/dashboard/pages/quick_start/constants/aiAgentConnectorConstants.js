@@ -44,7 +44,7 @@ export const INTERVAL_DATABRICKS = 300; // 5 minutes
 export const INTERVAL_SNOWFLAKE = 300; // 5 minutes
 export const INTERVAL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 300; // 5 minutes
 export const INTERVAL_SALESFORCE = 300; // 5 minutes
-export const INTERVAL_ANTHROPIC = 300; // 5 minutes
+export const INTERVAL_ANTHROPIC = 600; // 10 minutes
 export const INTERVAL_OPENAI = 300; // 5 minutes
 
 // Field Names
@@ -475,15 +475,6 @@ export const ANTHROPIC_FIELDS = [
         placeholder: 'sk-ant-api03-...',
         configKey: FIELD_ANTHROPIC_API_KEY,
         helpText: 'Anthropic API key with access to organization audit endpoints (x-api-key).',
-        required: true
-    },
-    {
-        name: FIELD_ANTHROPIC_ORG_ID,
-        label: 'Organization ID',
-        type: FIELD_TYPE_TEXT,
-        placeholder: 'org_xxxxxxxx',
-        configKey: FIELD_ANTHROPIC_ORG_ID,
-        helpText: 'Anthropic organization ID for scoped API calls.',
         required: true
     },
     {

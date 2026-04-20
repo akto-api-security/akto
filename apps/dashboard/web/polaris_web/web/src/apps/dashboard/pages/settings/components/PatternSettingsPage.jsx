@@ -15,6 +15,7 @@ const HEADERS = [
 export function buildPatternTableData(map, patternKey) {
     if (!map) return []
     const data = Object.entries(map).map(([key, info]) => ({
+        id: key,
         patternValue: info[patternKey] || key,
         addedBy: info.addedBy || '-',
         updatedTsFormatted: info.updatedTs ? func.prettifyEpoch(info.updatedTs) : '-',
@@ -39,6 +40,7 @@ export function buildPatternTableData(map, patternKey) {
  *   resourceName  - { singular, plural } for the table
  *   onFetch       - async () => Map<string, info> — called on mount to load data
  *   onAdd         - async (value) => Map<string, info> — called when user submits
+ *   onDelete      - optional async (patternValue) => Map<string, info> — called when user deletes a row
  *   patternKey    - field name on the info object holding the display value
  */
 function PatternSettingsPage({
@@ -53,6 +55,7 @@ function PatternSettingsPage({
     resourceName,
     onFetch,
     onAdd,
+    onDelete,
     patternKey,
 }) {
     const [value, setValue] = useState('')
@@ -98,6 +101,33 @@ function PatternSettingsPage({
         }
     }
 
+    function promotedBulkActions(selectedResources) {
+        if (!onDelete) return []
+        return [{
+            content: `Delete ${resourceName.singular}${selectedResources.length > 1 ? 's' : ''}`,
+            destructive: true,
+            onAction: () => {
+                func.showConfirmationModal(
+                    `Delete ${selectedResources.length} ${resourceName.singular}${selectedResources.length > 1 ? 's' : ''}?`,
+                    'Delete',
+                    async () => {
+                        try {
+                            let map
+                            for (const id of selectedResources) {
+                                const item = tableData.find(r => r.id === id)
+                                if (item) map = await onDelete(item.patternValue)
+                            }
+                            if (map !== undefined) setTableData(buildPatternTableData(map, patternKey))
+                            func.setToast(true, false, `${selectedResources.length} ${resourceName.singular}${selectedResources.length > 1 ? 's' : ''} deleted successfully`)
+                        } catch (e) {
+                            func.setToast(true, true, `Failed to delete ${resourceName.singular}`)
+                        }
+                    }
+                )
+            }
+        }]
+    }
+
     const inputCard = (
         <Card>
             <VerticalStack gap="3">
@@ -136,7 +166,8 @@ function PatternSettingsPage({
             resourceName={resourceName}
             headers={HEADERS}
             loading={fetchingData}
-            hasRowActions={false}
+            selectable={true}
+            promotedBulkActions={promotedBulkActions}
             useNewRow={true}
             condensedHeight={true}
             headings={HEADERS}
