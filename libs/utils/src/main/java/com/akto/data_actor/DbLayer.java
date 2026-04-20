@@ -238,6 +238,17 @@ public class DbLayer {
         }
     }
 
+    private static List<Bson> buildAdditionalDataUpdates(Map<String, Object> additionalData) {
+        List<Bson> updates = new ArrayList<>();
+        if (additionalData == null || additionalData.isEmpty()) {
+            return updates;
+        }
+        for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
+            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + "." + entry.getKey(), entry.getValue()));
+        }
+        return updates;
+    }
+
     public static ModuleInfo updateModuleInfo(ModuleInfo moduleInfo) {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -251,20 +262,22 @@ public class DbLayer {
         }
 
         if(Context.accountId.get() == 1758787662){
-           updateModuleEnvAndReboot(moduleInfo); 
+           updateModuleEnvAndReboot(moduleInfo);
         }
-        
-        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
-                Updates.combine(
-                        //putting class name because findOneAndUpdate doesn't put class name by default
-                        Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
-                        Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
-                        Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
-                        Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
-                        Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
-                        Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
-                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
-                ), updateOptions);
+
+        List<Bson> updateList = new ArrayList<>();
+        updateList.add(Updates.setOnInsert("_t", moduleInfo.getClass().getName()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()));
+        updateList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
+        updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getAdditionalData()));
+
+        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
+                Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
+                Updates.combine(updateList),
+                updateOptions);
     }
 
     public static void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
