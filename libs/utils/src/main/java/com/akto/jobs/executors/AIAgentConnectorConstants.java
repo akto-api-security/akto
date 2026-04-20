@@ -87,7 +87,6 @@ public final class AIAgentConnectorConstants {
 
     // Configuration Keys - Anthropic
     public static final String CONFIG_ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY";
-    public static final String CONFIG_ANTHROPIC_ORG_ID = "ANTHROPIC_ORG_ID";
     public static final String CONFIG_ANTHROPIC_API_BASE_URL = "ANTHROPIC_API_BASE_URL";
 
     // Configuration Keys - OpenAI

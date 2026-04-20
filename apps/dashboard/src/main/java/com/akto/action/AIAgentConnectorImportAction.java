@@ -81,7 +81,6 @@ public class AIAgentConnectorImportAction extends UserAction {
 
     // Anthropic connector parameters
     private String anthropicApiKey;
-    private String anthropicOrgId;
     private String anthropicApiBaseUrl;
 
     // OpenAI connector parameters
@@ -302,13 +301,11 @@ public class AIAgentConnectorImportAction extends UserAction {
                 break;
 
             case CONNECTOR_TYPE_ANTHROPIC:
-                if (anthropicApiKey == null || anthropicApiKey.isEmpty() ||
-                    anthropicOrgId == null || anthropicOrgId.isEmpty()) {
-                    loggerMaker.error("Missing required Anthropic configuration (API key and organization ID)", LogDb.DASHBOARD);
+                if (anthropicApiKey == null || anthropicApiKey.isEmpty()) {
+                    loggerMaker.error("Missing required Anthropic configuration (API key)", LogDb.DASHBOARD);
                     return null;
                 }
                 config.put(CONFIG_ANTHROPIC_API_KEY, anthropicApiKey);
-                config.put(CONFIG_ANTHROPIC_ORG_ID, anthropicOrgId);
                 String baseUrl = (anthropicApiBaseUrl != null && !anthropicApiBaseUrl.isEmpty())
                     ? anthropicApiBaseUrl
                     : "https://api.anthropic.com";
