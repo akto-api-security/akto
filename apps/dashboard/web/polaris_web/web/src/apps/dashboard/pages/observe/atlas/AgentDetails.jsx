@@ -9,6 +9,7 @@ import FlyLayout from "../../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
+import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig";
 import TitleWithInfo from "../../../components/shared/TitleWithInfo";
 import transform from "../transform"
 
@@ -79,6 +80,8 @@ function AgentDetails({
     setIsEditingDescription,
     handleSaveDescription,
     allCollections,
+    allowedEnvFields,
+    onSaveEnv,
 }) {
     const navigate = useNavigate();
     const copyRef = useRef(null);
@@ -241,6 +244,23 @@ function AgentDetails({
             </Box>
         ),
         panelID: 'agent-logs-panel',
+    };
+
+    const ConfigureTab = {
+        id: 'configure',
+        content: 'Configure',
+        component: (
+            <Box paddingBlockStart={"4"}>
+                <ModuleEnvConfigComponent
+                    title="Environment Variables"
+                    description="Configure environment variables for this agent. Changes will be picked up on the next poll cycle."
+                    module={selectedAgent?._moduleData}
+                    allowedEnvFields={allowedEnvFields}
+                    onSaveEnv={onSaveEnv}
+                />
+            </Box>
+        ),
+        panelID: 'configure-panel',
     };
 
     const getInputTokenLabel = (tokens) => {
@@ -434,7 +454,7 @@ function AgentDetails({
                 </HorizontalStack>,
                 <LayoutWithTabs
                     key="tabs"
-                    tabs={func.isDemoAccount() ? [UserAnalysisTab, McpServersTab, AgentLogsTab] : [McpServersTab, AgentLogsTab]}
+                    tabs={func.isDemoAccount() ? [UserAnalysisTab, McpServersTab, AgentLogsTab, ConfigureTab] : [McpServersTab, AgentLogsTab, ConfigureTab]}
                 />
             ]}
         />
