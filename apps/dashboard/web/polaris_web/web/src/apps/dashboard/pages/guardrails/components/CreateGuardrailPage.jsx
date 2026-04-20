@@ -20,6 +20,7 @@ import {
     SEVERITY,
     GUARDRAIL_BEHAVIOUR,
     normalizeBehaviourValue,
+    normalizePiiTypesFromPolicy,
     resolveStoredPolicyBehaviour
 } from '../utils';
 import func from "@/util/func";
@@ -464,7 +465,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // PII filters
         const hasPiiTypes = policy.piiTypes && policy.piiTypes.length > 0;
         setEnablePiiTypes(hasPiiTypes);
-        setPiiTypes(policy.piiTypes || []);
+        setPiiTypes(normalizePiiTypesFromPolicy(policy));
 
         // Regex patterns
         let hasRegexPatterns = false;

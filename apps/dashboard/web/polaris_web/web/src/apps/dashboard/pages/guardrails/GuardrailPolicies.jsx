@@ -291,9 +291,15 @@ function GuardrailPolicies() {
 
         // PII types
         if (policy.piiTypes?.length > 0) {
-            const piiNames = policy.piiTypes.map(pii => pii.type).slice(0, 2);
+            const piiParts = policy.piiTypes.slice(0, 2).map((pii) => {
+                const t = pii.type;
+                const m = pii.minMatchCount != null && Number(pii.minMatchCount) > 1
+                    ? ` (${Number(pii.minMatchCount)}+)`
+                    : "";
+                return `${t}${m}`;
+            });
             const moreCount = policy.piiTypes.length > 2 ? ` +${policy.piiTypes.length - 2} more PIIs` : '';
-            sensitiveInfoFilters.push(`${piiNames.join(", ")}${moreCount}`);
+            sensitiveInfoFilters.push(`${piiParts.join(", ")}${moreCount}`);
         }
 
         // Regex patterns
