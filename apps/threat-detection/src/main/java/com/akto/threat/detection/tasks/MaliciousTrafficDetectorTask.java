@@ -619,6 +619,8 @@ public class MaliciousTrafficDetectorTask implements Task {
     if (apiFilters.size() > 0) {
       for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = false;
+      boolean successFilterPassed = false;
+      boolean failureFilterPassed = false;
        // Create a fresh vulnerable list for each filter
       List<SchemaConformanceError> vulnerable = null;
 
@@ -648,14 +650,37 @@ public class MaliciousTrafficDetectorTask implements Task {
         hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
       }else {
-        // Pass pre-matched template to avoid duplicate findMatchingUrlTemplate calls
-        // (especially important for ParamEnumeration filter)
-        hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey, matchedTemplate);
+        boolean hasSuccessFailureFilters = (apiFilter.getSuccessFilter() != null || apiFilter.getFailureFilter() != null);
+
+        if (apiFilter.getFilter() != null) {
+          // filter: takes precedence — ignore success_filter/failure_filter
+          hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey, matchedTemplate);
+        } else if (hasSuccessFailureFilters) {
+          // No filter: present — evaluate success_filter and failure_filter, OR them
+          RawApi evalRawApi = rawApi != null ? rawApi : RawApi.buildFromMessageNew(responseParam);
+          successFilterPassed = false;
+          failureFilterPassed = false;
+          try {
+            if (apiFilter.getSuccessFilter() != null && apiFilter.getSuccessFilter().getNode() != null) {
+              ValidationResult sr = TestPlugin.validateFilter(
+                  apiFilter.getSuccessFilter().getNode(), evalRawApi, apiInfoKey, new HashMap<>(), "");
+              successFilterPassed = sr.getIsValid();
+            }
+            if (apiFilter.getFailureFilter() != null && apiFilter.getFailureFilter().getNode() != null) {
+              ValidationResult fr = TestPlugin.validateFilter(
+                  apiFilter.getFailureFilter().getNode(), evalRawApi, apiInfoKey, new HashMap<>(), "");
+              failureFilterPassed = fr.getIsValid();
+            }
+          } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error evaluating success/failure filters: " + e.getMessage());
+          }
+          hasPassedFilter = successFilterPassed || failureFilterPassed;
+        }
 
         if (applyFilterLogCount.get() < MAX_APPLY_FILTER_LOGS || isDebugRequest(responseParam)) {
           logger.warnAndAddToDb("applyFilter - apiInfoKey: " + apiInfoKey.toString() +
                                 ", filterId: " + apiFilter.getId() +
-                                ", result: " + hasPassedFilter + 
+                                ", result: " + hasPassedFilter +
                                 ", statusCode " + responseParam.getStatusCode());
           applyFilterLogCount.incrementAndGet();
         }
@@ -730,6 +755,23 @@ public class MaliciousTrafficDetectorTask implements Task {
         // Aggregation rules
         boolean shouldNotify = false;
         for (Rule rule : aggRules.getRule()) {
+          String incrementFilterName = rule.getCondition().getIncrementFilter();
+          String breachFilterName = rule.getCondition().getThresholdBreachFilter();
+
+          // If incrementFilter is specified, only increment counter when that named filter matched
+          boolean shouldIncrement = true;
+          if (incrementFilterName != null && !incrementFilterName.isEmpty()) {
+            shouldIncrement = ("success_filter".equals(incrementFilterName) && successFilterPassed)
+                || ("failure_filter".equals(incrementFilterName) && failureFilterPassed);
+          }
+
+          // Compute breachFilterPassed: true if no breachFilter specified, or if the named filter matched
+          boolean breachFilterPassed = true;
+          if (breachFilterName != null && !breachFilterName.isEmpty()) {
+            breachFilterPassed = ("success_filter".equals(breachFilterName) && successFilterPassed)
+                || ("failure_filter".equals(breachFilterName) && failureFilterPassed);
+          }
+
           if (apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
               if (this.apiCountWindowBasedThresholdNotifier == null) {
                 continue;
@@ -739,25 +781,10 @@ public class MaliciousTrafficDetectorTask implements Task {
                 maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType);
               }
           } else {
-              shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
+              shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule, shouldIncrement, breachFilterPassed);
           }
 
           if (shouldNotify) {
-            // If post_aggregate_condition is present, validate current payload against it
-            if (rule.getAggregationEvaluator() != null && rule.getAggregationEvaluator().getNode() != null) {
-              RawApi evalRawApi = rawApi != null ? rawApi : RawApi.buildFromMessageNew(responseParam);
-              try {
-                ValidationResult evalResult = TestPlugin.validateFilter(
-                    rule.getAggregationEvaluator().getNode(), evalRawApi, apiInfoKey, new HashMap<>(), "");
-                if (!evalResult.getIsValid()) {
-                  logger.debugAndAddToDb("post_aggregate_condition check failed for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
-                  continue;
-                }
-              } catch (Exception e) {
-                logger.errorAndAddToDb(e, "Error in post_aggregate_condition check: " + e.getMessage());
-                continue;
-              }
-            }
             logger.debugAndAddToDb("aggregate condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
             generateAndPushMaliciousEventRequest(
                 apiFilter,

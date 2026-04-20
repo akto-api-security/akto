@@ -58,10 +58,13 @@ public class WindowBasedThresholdNotifier {
     this.config = config;
   }
 
-  public boolean shouldNotify(String aggKey, SampleMaliciousRequest maliciousEvent, Rule rule) {
+  public boolean shouldNotify(String aggKey, SampleMaliciousRequest maliciousEvent, Rule rule, boolean shouldIncrement, boolean breachFilterPassed) {
     int binId = (int) maliciousEvent.getTimestamp() / 60;
     String cacheKey = aggKey + "|" + binId;
-    this.cache.increment(cacheKey);
+
+    if (shouldIncrement) {
+      this.cache.increment(cacheKey);
+    }
 
     long windowCount = 0L;
     List<Bin> bins = getBins(aggKey, binId - rule.getCondition().getWindowThreshold() + 1, binId);
@@ -71,11 +74,13 @@ public class WindowBasedThresholdNotifier {
 
     boolean thresholdBreached = windowCount >= rule.getCondition().getMatchCount();
 
-    if (thresholdBreached) {
+    // Only reset and notify if breachFilter has also passed (or no breachFilter specified)
+    if (thresholdBreached && breachFilterPassed) {
       this.cache.reset(cacheKey);
+      return true;
     }
 
-    return thresholdBreached;
+    return false;
   }
 
   public List<Bin> getBins(String aggKey, int binStart, int binEnd) {
