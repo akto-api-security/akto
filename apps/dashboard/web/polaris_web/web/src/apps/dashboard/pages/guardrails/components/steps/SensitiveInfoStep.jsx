@@ -8,9 +8,11 @@ import {
     HorizontalStack,
     Checkbox,
     RangeSlider,
-    Spinner
+    Spinner,
+    Tooltip,
+    Icon
 } from '@shopify/polaris';
-import { DeleteMajor } from '@shopify/polaris-icons';
+import { DeleteMajor, InfoMinor } from '@shopify/polaris-icons';
 import { useState, useEffect } from 'react';
 import Dropdown from "../../../../components/layouts/Dropdown";
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
@@ -18,6 +20,9 @@ import observeApi from "../../../observe/api";
 import OwaspTag from "../OwaspTag";
 import RuleLabelWithTag from "../RuleLabelWithTag";
 import { RULE_OWASP_THREATS } from "../owaspConfig";
+
+const MIN_COUNT_TOOLTIP =
+    "The guardrail applies only when the prompt has at least this many matches of this PII type. Example: 20 means 20 or more occurrences of that type.";
 
 function clampMinMatchCount(raw) {
     const trimmed = String(raw ?? "").trim();
@@ -240,7 +245,22 @@ const SensitiveInfoStep = ({
                                     <Box style={{ border: "1px solid #d1d5db", borderRadius: "8px", overflow: "hidden" }}>
                                         <DataTable
                                             columnContentTypes={['text', 'numeric', 'text', 'text']}
-                                            headings={['PII type', 'Min count', 'Guardrail behavior', 'Actions']}
+                                            headings={[
+                                                'PII type',
+                                                <HorizontalStack key="heading-min-count" gap="1" blockAlign="center" wrap={false}>
+                                                    <Text as="span">Min count</Text>
+                                                    <Tooltip content={MIN_COUNT_TOOLTIP} dismissOnMouseOut preferredPosition="above">
+                                                        <span
+                                                            style={{ display: 'inline-flex', cursor: 'help', lineHeight: 0 }}
+                                                            aria-label="What min count means"
+                                                        >
+                                                            <Icon source={InfoMinor} tone="subdued" />
+                                                        </span>
+                                                    </Tooltip>
+                                                </HorizontalStack>,
+                                                'Guardrail behavior',
+                                                'Actions'
+                                            ]}
                                             verticalAlign="middle"
                                             rows={piiTypes.map((pii, index) => {
                                                 const option = availablePiiTypes.find(p => p.value === pii.type);
