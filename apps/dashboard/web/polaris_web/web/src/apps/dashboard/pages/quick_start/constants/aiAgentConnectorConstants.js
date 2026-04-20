@@ -80,7 +80,6 @@ export const FIELD_SALESFORCE_CONSUMER_SECRET = 'salesforceConsumerSecret';
 export const FIELD_INGESTION_API_KEY = 'ingestionApiKey';
 export const FIELD_DATA_INGESTION_URL = 'dataIngestionUrl';
 export const FIELD_ANTHROPIC_API_KEY = 'anthropicApiKey';
-export const FIELD_ANTHROPIC_ORG_ID = 'anthropicOrgId';
 export const FIELD_ANTHROPIC_API_BASE_URL = 'anthropicApiBaseUrl';
 export const FIELD_OPENAI_API_KEY = 'openaiApiKey';
 export const FIELD_OPENAI_ORG_ID = 'openaiOrgId';
