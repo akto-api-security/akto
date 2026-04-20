@@ -1009,6 +1009,13 @@ const settingRequests = {
             method: 'post',
             data: {proxyPattern, switchProxyMode}
         })
+    },
+    addAllowedHostForPac(hostPattern) {
+        return request({
+            url: '/api/addAllowedHostForPac',
+            method: 'post',
+            data: {hostPattern}
+        })
     }
 }
 
