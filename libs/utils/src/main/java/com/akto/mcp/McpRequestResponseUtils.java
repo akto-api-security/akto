@@ -258,38 +258,14 @@ public final class McpRequestResponseUtils {
 
             McpAuditInfo existingRecord = McpAuditInfoDao.instance.findOne(findQuery);
 
-            // Check if this server is in the approved list - use mcpHost (server name), not resourceName (tool/skill name)
-            String approvalStatus = checkIfServerIsApproved(auditInfo.getMcpHost());
-
             if (existingRecord != null) {
                 // Update the existing record with new lastDetected timestamp
                 BasicDBObject update = new BasicDBObject();
-                BasicDBObject setFields = new BasicDBObject("lastDetected", Context.now());
-                
-                // If server is approved and not already marked, auto-approve it
-                if ("Approved".equals(approvalStatus) && 
-                    (existingRecord.getRemarks() == null || existingRecord.getRemarks().isEmpty())) {
-                    setFields.put("remarks", "Approved");
-                    setFields.put("markedBy", "System (Auto-approved)");
-                    setFields.put("approvedAt", Context.now());
-                    setFields.put("updatedTimestamp", Context.now());
-                    logger.info("Auto-approved MCP server: " + auditInfo.getMcpHost() + " (resource: " + auditInfo.getResourceName() + ")");
-                }
-                
-                update.put(MCollection.SET, setFields);
+                update.put(MCollection.SET, new BasicDBObject("lastDetected", Context.now()));
                 McpAuditInfoDao.instance.updateOne(findQuery, update);
                 logger.info("Updated existing MCP audit record for type: " + auditInfo.getType() +
                            ", resourceName: " + auditInfo.getResourceName());
             } else {
-                // If server is approved, set it as auto-approved on insertion
-                if ("Approved".equals(approvalStatus)) {
-                    auditInfo.setRemarks("Approved");
-                    auditInfo.setMarkedBy("System (Auto-approved)");
-                    auditInfo.setApprovedAt(Context.now());
-                    auditInfo.setUpdatedTimestamp(Context.now());
-                    logger.info("Auto-approved new MCP server: " + auditInfo.getMcpHost() + " (resource: " + auditInfo.getResourceName() + ")");
-                }
-                
                 // Insert new record
                 McpAuditInfoDao.instance.insertOne(auditInfo);
                 logger.info("Inserted new MCP audit record for type: " + auditInfo.getType() +
