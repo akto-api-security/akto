@@ -4,9 +4,9 @@ public class Condition {
 
     private int matchCount;
     private int windowThreshold;
-    // private String operation;
-    // private float value;
-    
+    private String incrementFilter;
+    private String thresholdBreachFilter;
+
     public Condition() {
     }
 
@@ -27,5 +27,16 @@ public class Condition {
     public void setWindowThreshold(int windowThreshold) {
         this.windowThreshold = windowThreshold;
     }
-    // private List<Action> actions;
+    public String getIncrementFilter() {
+        return incrementFilter;
+    }
+    public void setIncrementFilter(String incrementFilter) {
+        this.incrementFilter = incrementFilter;
+    }
+    public String getThresholdBreachFilter() {
+        return thresholdBreachFilter;
+    }
+    public void setThresholdBreachFilter(String thresholdBreachFilter) {
+        this.thresholdBreachFilter = thresholdBreachFilter;
+    }
 }

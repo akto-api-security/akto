@@ -37,7 +37,7 @@ public class FilterYamlTemplateAction extends UserAction {
             if (filterConfig.getId() == null) {
                 throw new Exception("id field cannot be empty");
             }
-            if (filterConfig.getFilter() == null) {
+            if (filterConfig.getFilter() == null && filterConfig.getSuccessFilter() == null && filterConfig.getFailureFilter() == null) {
                 throw new Exception("filter field cannot be empty");
             }
 

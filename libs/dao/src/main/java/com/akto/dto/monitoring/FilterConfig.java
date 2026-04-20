@@ -37,6 +37,10 @@ public class FilterConfig {
     }
 
     private ExecutorConfigParserResult executor;
+    private ConfigParserResult successFilter;
+    public static final String SUCCESS_FILTER = "success_filter";
+    private ConfigParserResult failureFilter;
+    public static final String FAILURE_FILTER = "failure_filter";
 
     public FilterConfig(String id, ConfigParserResult filter, Map<String, List<String>> wordLists, AggregationRules aggregationRules) {
         this.id = id;
@@ -144,5 +148,21 @@ public class FilterConfig {
 
     public void setIgnore(ConfigParserResult ignore) {
         this.ignore = ignore;
+    }
+
+    public ConfigParserResult getSuccessFilter() {
+        return successFilter;
+    }
+
+    public void setSuccessFilter(ConfigParserResult successFilter) {
+        this.successFilter = successFilter;
+    }
+
+    public ConfigParserResult getFailureFilter() {
+        return failureFilter;
+    }
+
+    public void setFailureFilter(ConfigParserResult failureFilter) {
+        this.failureFilter = failureFilter;
     }
 }
