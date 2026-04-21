@@ -325,11 +325,12 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		auditResponse.McpAuditInfoList = []*types.AuditPolicy{}
 	}
 
-	// Convert array to map keyed by resourceName
+	// Convert array to map keyed by (resourceName, mcpHost) so two approvals
+	// for the same tool on different MCP servers don't overwrite each other.
 	auditPolicies := make(map[string]*types.AuditPolicy)
 	for _, policy := range auditResponse.McpAuditInfoList {
 		if policy != nil && policy.ResourceName != "" {
-			auditPolicies[policy.ResourceName] = policy
+			auditPolicies[types.AuditPolicyKey(policy.ResourceName, policy.McpHost)] = policy
 		}
 	}
 
