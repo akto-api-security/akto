@@ -82,6 +82,7 @@ function AgentDetails({
     allCollections,
     allowedEnvFields,
     onSaveEnv,
+    loading
 }) {
     const navigate = useNavigate();
     const copyRef = useRef(null);
@@ -398,6 +399,7 @@ function AgentDetails({
         <FlyLayout
             show={show}
             setShow={setShow}
+            loading={loading}
             title="Agent Details"
             components={[
                 <HorizontalStack align="space-between" wrap={false} key="agent-heading">

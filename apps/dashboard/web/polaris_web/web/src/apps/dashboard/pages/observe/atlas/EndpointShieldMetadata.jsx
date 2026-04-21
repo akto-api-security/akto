@@ -248,6 +248,8 @@ function EndpointShieldMetadata() {
         // re-rendered after a data refresh. Always pull fresh _moduleData from endpointShieldData.
         const freshAgent = endpointShieldData?.agents?.find(a => a.agentId === agent.agentId) || agent;
         setSelectedAgent(freshAgent);
+        setShowFlyout(true);
+        setLoading(true);
 
         try {
             const serversResponse = await settingRequests.getMcpServersByAgent(agent.agentId, agent.hostname);
@@ -271,11 +273,12 @@ function EndpointShieldMetadata() {
             const historicalLogs = await fetchAgentLogs(agent.agentId, startTimestamp, endTimestamp);
             setAgentLogs(historicalLogs);
         }
+        setLoading(false);
         setDisplayedLogs([]);
         setDescription("");
         setEditableDescription("");
         setIsEditingDescription(false);
-        setShowFlyout(true);
+        
     }, [logMode, startLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp, endpointShieldData]);
 
     useEffect(() => {
@@ -445,6 +448,7 @@ function EndpointShieldMetadata() {
                 allCollections={allCollections}
                 allowedEnvFields={allowedEnvFields}
                 onSaveEnv={handleSaveEnv}
+                loading={loading}
             />
         </>
     );
