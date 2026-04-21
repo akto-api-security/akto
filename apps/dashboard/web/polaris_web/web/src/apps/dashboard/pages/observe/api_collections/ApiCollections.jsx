@@ -319,6 +319,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             nextUrl: "/dashboard/observe/inventory/"+ c.id,
             envTypeOriginal: c?.envType,
             envType: c?.envType?.map(func.formatCollectionType),
+            skills: c?.skills,
             displayNameComp: (
                 <HorizontalStack gap="2" align="start">
                     <Box maxWidth="30vw"><Text truncate fontWeight="medium">{displayText}</Text></Box>
@@ -418,6 +419,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         urlsCount: rawCollection.urlsCount,
         startTs: rawCollection.startTs,
         tagsList: rawCollection.tagsList,
+        skills: rawCollection.skills,
         registryStatus: rawCollection.registryStatus,
         description: rawCollection.description,
         isOutOfTestingScope: rawCollection.isOutOfTestingScope,
