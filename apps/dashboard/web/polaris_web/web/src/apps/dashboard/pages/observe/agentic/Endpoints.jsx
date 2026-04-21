@@ -125,7 +125,7 @@ function Endpoints() {
             const agentGroupKeys = new Set(prettifiedAgents.map((a) => a.groupKey));
             const servicesToShow = prettifiedServices.filter((s) => !agentGroupKeys.has(s.groupKey));
 
-            const allData = [...prettifiedAgents, ...servicesToShow];
+            const allData = [...prettifiedAgents, ...servicesToShow, ...prettifiedSkills];
 
             // Calculate unique endpoint IDs across all collections
             const uniqueEndpointIds = new Set();

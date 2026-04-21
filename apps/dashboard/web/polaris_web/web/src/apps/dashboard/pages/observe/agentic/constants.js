@@ -1,16 +1,15 @@
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import { 
-    ASSET_TAG_KEYS, 
+    ASSET_TAG_KEYS,
     ROW_TYPES,
     TYPE_TAG_KEYS,
     SKILL_TAG_KEY,
     CLIENT_TYPES,
-    formatDisplayName, 
-    getTypeFromTags, 
+    formatDisplayName,
+    getTypeFromTags,
     findAssetTag,
     findTypeTag,
-    findSkillTags,
-    getAgentTypeFromValue 
+    getAgentTypeFromValue
 } from "./mcpClientHelper";
 import func from "@/util/func";
 import { getResolvedUsernameForCollection, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
@@ -282,7 +281,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
 
     collections.forEach((c) => {
         if (c.deactivated) return;
-        const skillValues = findSkillTags(c.envType);
+        const skillValues = c.skills || [];
         if (!skillValues || skillValues.length === 0) return;
 
         const hostName = c.hostName || c.displayName || c.name;
