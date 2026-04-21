@@ -8,7 +8,7 @@ Upstream reference: [Cortex Code CLI extensibility (hooks)](https://docs.snowfla
 
 - Snowflake Cortex Code CLI installed and working.
 - Python 3 available as `python3`.
-- Akto data ingestion base URL (`AKTO_DATA_INGESTION_URL`).
+- Akto data ingestion base URL (`AKTO_DATA_INGESTION_URL`) and API token (`AKTO_API_TOKEN`) when your deployment requires auth (same model as [Copilot CLI hooks](https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/copilot-cli-hooks)).
 
 ## Install (user machine)
 
@@ -20,16 +20,24 @@ Upstream reference: [Cortex Code CLI extensibility (hooks)](https://docs.snowfla
    chmod +x ~/.snowflake/cortex/akto-hooks/*.sh
    ```
 
-2. Create `~/.snowflake/cortex/akto-hooks/.env` from [.env.example](.env.example) and set at least `AKTO_DATA_INGESTION_URL` and `MODE` (`atlas` recommended for employee endpoints).
+2. Replace placeholders in `*-wrapper.sh` (or use `.env` to override): `{{AKTO_DATA_INGESTION_URL}}`, `{{AKTO_API_TOKEN}}`, `{{DATABASE_ABSTRACTOR_SERVICE_URL}}` (use `https://cyborg.akto.io` for Akto SaaS cyborg, unless your admin says otherwise). Example:
 
-3. Merge hooks into Snowflake Cortex configuration:
+   ```bash
+   sed -i.bak "s|{{AKTO_DATA_INGESTION_URL}}|https://your-ingestion.example.com|g" ~/.snowflake/cortex/akto-hooks/*-wrapper.sh
+   sed -i.bak "s|{{AKTO_API_TOKEN}}|your-api-token|g" ~/.snowflake/cortex/akto-hooks/*-wrapper.sh
+   sed -i.bak "s|{{DATABASE_ABSTRACTOR_SERVICE_URL}}|https://cyborg.akto.io|g" ~/.snowflake/cortex/akto-hooks/*-wrapper.sh
+   ```
+
+3. Optionally create `~/.snowflake/cortex/akto-hooks/.env` from [.env.example](.env.example); values there override the wrapper `export` lines. Set at least `AKTO_DATA_INGESTION_URL`, `AKTO_API_TOKEN`, and `MODE` (`atlas` recommended for employee endpoints).
+
+4. Merge hooks into Snowflake Cortex configuration:
 
    - **Global hooks file:** `~/.snowflake/cortex/hooks.json`
    - **Project file (alternative):** `.cortex/settings.json` or `.cortex/settings.local.json` in the repo root (see Snowflake docs for precedence).
 
    Start from [hooks.json.example](hooks.json.example): replace every `INSTALL_DIR` with your install path (for example `/Users/you/.snowflake/cortex/akto-hooks`). If you already have a `hooks` object, merge the event keys (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`) so you do not remove existing hook entries.
 
-4. Set restrictive permissions on secrets and config (see Snowflake security guidance):
+5. Set restrictive permissions on secrets and config (see Snowflake security guidance):
 
    ```bash
    chmod 600 ~/.snowflake/cortex/akto-hooks/.env
@@ -41,6 +49,8 @@ Upstream reference: [Cortex Code CLI extensibility (hooks)](https://docs.snowfla
 | Variable | Description |
 |----------|-------------|
 | `AKTO_DATA_INGESTION_URL` | Required. Base URL of Akto ingestion (no trailing slash). |
+| `AKTO_API_TOKEN` | Required when ingestion/cyborg expects auth. Sent as `Authorization` on `POST .../api/http-proxy` and on cyborg heartbeat. `AKTO_TOKEN` works as an alias. |
+| `DATABASE_ABSTRACTOR_SERVICE_URL` | Cyborg URL for heartbeat; defaults to `https://cyborg.akto.io` if empty or unreplaced `{{...}}`. |
 | `MODE` | `atlas` (default for employees) or `argus`. |
 | `DEVICE_ID` | Optional Atlas device override; defaults to generated machine id. |
 | `AKTO_SYNC_MODE` | `true` to enforce guardrails where blocking is supported. |
@@ -72,8 +82,9 @@ Expect exit `0` when guardrails allow (or when `AKTO_DATA_INGESTION_URL` is unse
 
 | File | Role |
 |------|------|
-| `cortex_common.py` | Shared HTTP proxy URL builder, payload shape, logging. |
+| `cortex_common.py` | Shared HTTP proxy URL builder, payload shape, logging, optional `Authorization` on ingestion. |
 | `akto_machine_id.py` | Device id for Atlas routing. |
+| `akto_heartbeat.py` | Rate-limited cyborg heartbeat (`DATABASE_ABSTRACTOR_SERVICE_URL`, `AKTO_API_TOKEN`). |
 | `akto-validate-prompt.py` | `UserPromptSubmit`. |
 | `akto-validate-pre-tool.py` | `PreToolUse`. |
 | `akto-validate-post-tool.py` | `PostToolUse`. |

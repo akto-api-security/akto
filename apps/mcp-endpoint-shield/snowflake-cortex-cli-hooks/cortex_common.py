@@ -38,9 +38,31 @@ def get_log_dir() -> str:
     return os.path.expanduser(os.getenv("LOG_DIR", DEFAULT_LOG_DIR))
 
 
+def get_effective_log_dir() -> str:
+    """Preferred log directory, falling back to temp when the configured path cannot be created."""
+    log_dir = get_log_dir()
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+        return log_dir
+    except OSError:
+        fallback = os.path.join(tempfile.gettempdir(), "akto-cortex-cli-hooks-logs")
+        os.makedirs(fallback, exist_ok=True)
+        return fallback
+
+
 def get_akto_url() -> Optional[str]:
-    v = os.getenv("AKTO_DATA_INGESTION_URL")
-    return v if v else None
+    v = (os.getenv("AKTO_DATA_INGESTION_URL") or "").strip().rstrip("/")
+    if not v or "{{" in v:
+        return None
+    return v
+
+
+def get_ingestion_authorization_value() -> Optional[str]:
+    """Value for Authorization header on POSTs to ingestion; supports AKTO_API_TOKEN (Copilot-style) or AKTO_TOKEN (Claude-style)."""
+    t = (os.getenv("AKTO_API_TOKEN") or os.getenv("AKTO_TOKEN") or "").strip()
+    if not t or "{{" in t:
+        return None
+    return t
 
 
 def get_akto_timeout() -> float:
@@ -86,10 +108,14 @@ def post_payload_json(url: str, payload: Dict[str, Any], logger: logging.Logger)
     if not url:
         raise ValueError("empty proxy url")
     logger.info("API CALL: POST %s", url.split("?", 1)[0])
+    headers: Dict[str, str] = {"Content-Type": "application/json"}
+    auth = get_ingestion_authorization_value()
+    if auth:
+        headers["Authorization"] = auth
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
     start = time.time()
@@ -173,12 +199,7 @@ def build_proxy_payload(
 
 
 def configure_logger(log_filename: str) -> logging.Logger:
-    log_dir = get_log_dir()
-    try:
-        os.makedirs(log_dir, exist_ok=True)
-    except OSError:
-        log_dir = os.path.join(tempfile.gettempdir(), "akto-cortex-cli-hooks-logs")
-        os.makedirs(log_dir, exist_ok=True)
+    log_dir = get_effective_log_dir()
     level_name = os.getenv("LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)
     logger = logging.getLogger(log_filename)

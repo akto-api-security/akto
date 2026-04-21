@@ -4,17 +4,20 @@ import json
 import logging
 import sys
 
+from akto_heartbeat import send_heartbeat
 from cortex_common import (
     build_http_proxy_url,
     build_proxy_payload,
     configure_logger,
     extract_mcp_server_name,
     get_akto_url,
+    get_effective_log_dir,
     is_sync_mode,
     post_payload_json,
 )
 
 logger = configure_logger("validate-post-tool.log")
+send_heartbeat(get_effective_log_dir(), logger)
 
 
 def main():
