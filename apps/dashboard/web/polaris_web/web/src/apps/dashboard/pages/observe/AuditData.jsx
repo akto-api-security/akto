@@ -305,7 +305,7 @@ function AuditData() {
         delete finalFilters['collectionName']
 
         try {
-            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators)
+            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue)
             if (res && res.auditData) {
                 res.auditData.forEach((auditRecord) => {
                     // Get collection name and registry status from separate maps
