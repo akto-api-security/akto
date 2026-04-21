@@ -111,8 +111,10 @@ public class AuditDataAction extends UserAction {
             List<Integer> collectionsIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                 Context.accountId.get());
 
-            Bson filter = Filters.eq(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get().name());
-
+            Bson filter = Filters.and(
+                Filters.eq(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get().name()),
+                Filters.ne(McpAuditInfo.TYPE, "AGENT_SKILL")
+            );
             if (collectionsIds != null) {
                 Bson collectionsFilter = Filters.and(Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false),
                         Filters.in(McpAuditInfo.HOST_COLLECTION_ID, collectionsIds));
