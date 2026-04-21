@@ -140,7 +140,7 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
     })
 
     return {
-        "path": "/v1/hooks/Stop",
+        "path": "/v1/messages",
         "requestHeaders": request_headers,
         "responseHeaders": response_headers,
         "method": "POST",

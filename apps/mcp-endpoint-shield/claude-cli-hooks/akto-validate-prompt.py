@@ -144,7 +144,7 @@ def build_validation_request(query: str, session_info: dict = None) -> dict:
     response_payload = json.dumps({})
 
     return {
-        "path": "/v1/hooks/UserPromptSubmit",
+        "path": "/v1/messages",
         "requestHeaders": request_headers,
         "responseHeaders": response_headers,
         "method": "POST",

@@ -276,7 +276,7 @@ def call_guardrails(
             mcp_tool_name=mcp_tool_name,
         )
         result = post_payload_json(
-            build_http_proxy_url(guardrails=True, ingest_data=True),
+            build_http_proxy_url(guardrails=True, ingest_data=False),
             request_body,
         )
 
