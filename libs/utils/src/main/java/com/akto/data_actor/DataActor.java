@@ -282,6 +282,8 @@ public abstract class DataActor {
 
     public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType);
 
+    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType, List<String> skills);
+
     public abstract List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue);
 
     public abstract OtpTestData fetchOtpTestData(String uuid, int curTime);

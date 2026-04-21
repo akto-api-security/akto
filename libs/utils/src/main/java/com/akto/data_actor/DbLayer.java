@@ -1043,6 +1043,10 @@ public class DbLayer {
     }
 
     public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags, String accessType) {
+        createCollectionForHostAndVpc(host, id, vpcId, tags, accessType, null);
+    }
+
+    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags, String accessType, List<String> skills) {
 
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -1067,9 +1071,14 @@ public class DbLayer {
             }
         }
 
-        // Skip update for existing apiCollection if vpc and tags are same.
-        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty()) && !accessTypeChanged) {
-            loggerMaker.info("No new tags or vpcId or accessType, Updates skipped for collectionId: " + id);
+        if (skills != null) {
+            skills.removeIf(s -> s == null || s.trim().isEmpty());
+        }
+        boolean hasSkills = skills != null && !skills.isEmpty();
+
+        // Skip update for existing apiCollection if vpc, tags, skills, and accessType are same.
+        if (apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty()) && !accessTypeChanged && !hasSkills) {
+            loggerMaker.info("No new tags or vpcId or accessType or skills, Updates skipped for collectionId: " + id);
             return;
         }
 
@@ -1090,6 +1099,10 @@ public class DbLayer {
 
         if(accessType != null && !accessType.isEmpty()) {
             updates = Updates.combine(updates, Updates.set(ApiCollection.ACCESS_TYPE, accessType));
+        }
+
+        if (hasSkills) {
+            updates = Updates.combine(updates, Updates.addEachToSet(ApiCollection.SKILLS, skills));
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);

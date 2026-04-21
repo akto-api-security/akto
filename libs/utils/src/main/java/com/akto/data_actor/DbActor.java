@@ -606,6 +606,10 @@ public class DbActor extends DataActor {
         DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags, accessType);
     }
 
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType, List<String> skills) {
+        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags, accessType, skills);
+    }
+
     public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
         return DbLayer.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip, deltaPeriodValue);
     }

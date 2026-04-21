@@ -357,6 +357,9 @@ public class DbAction extends ActionSupport {
     @lombok.Setter
     List<CollectionTags> tagsList;
 
+    @lombok.Getter
+    @lombok.Setter
+    List<String> skills;
 
     @lombok.Getter
     @lombok.Setter
@@ -3043,7 +3046,7 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionForHostAndVpc() {
         try {
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, checkTagsNeedUpdates(tagsList, colId), accessType);
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, checkTagsNeedUpdates(tagsList, colId), accessType, skills);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHostAndVpc " + e.toString());
             return Action.ERROR.toUpperCase();
