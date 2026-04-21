@@ -83,6 +83,7 @@ public class GuardrailPolicies {
     private CONTEXT_SOURCE contextSource;
 
     private SecretsDetection secretsDetection;
+    private boolean applyToAllServers;
 
     public String getHexId() {
         if (this.id != null) {
