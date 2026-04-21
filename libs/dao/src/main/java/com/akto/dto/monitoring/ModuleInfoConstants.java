@@ -67,8 +67,13 @@ public class ModuleInfoConstants {
             put("ENABLE_MCP_WRAP_ANTIGRAVITY", "Enable MCP Wrap for Antigravity");
             put("ENABLE_MCP_HOOKS_CLAUDE", "MCP Hooks path for Claude");
             put("ENABLE_MCP_HOOKS_CURSOR", "MCP Hooks path for Cursor");
+            put("ENABLE_MCP_HOOKS_CODEX", "MCP Hooks path for Codex");
+            put("ENABLE_MCP_HOOKS_GITHUB_CLI", "MCP Hooks path for GitHub CLI");
             put("ENABLE_PROMPT_HOOKS_CLAUDE", "Prompt Hooks path for Claude");
             put("ENABLE_PROMPT_HOOKS_CURSOR", "Prompt Hooks path for Cursor");
+            put("ENABLE_PROMPT_HOOKS_GEMINI", "Prompt Hooks path for Gemini");
+            put("ENABLE_PROMPT_HOOKS_CODEX", "Prompt Hooks path for Codex");
+            put("ENABLE_PROMPT_HOOKS_GITHUB_CLI", "Prompt Hooks path for GitHub CLI");
         }});
     }};
 
