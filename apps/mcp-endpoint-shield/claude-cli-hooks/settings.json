@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-session-start.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py SessionStart",
             "timeout": 10
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-session-end.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py SessionEnd",
             "timeout": 10
           }
         ]
@@ -60,7 +60,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-permission-request.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py PermissionRequest",
             "timeout": 10
           }
         ]
@@ -71,7 +71,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-permission-denied.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py PermissionDenied",
             "timeout": 10
           }
         ]
@@ -93,7 +93,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-post-tool-use-failure.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py PostToolUseFailure",
             "timeout": 10
           }
         ]
@@ -115,7 +115,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-stop-failure.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py StopFailure",
             "timeout": 10
           }
         ]
@@ -148,7 +148,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-task-created.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py TaskCreated",
             "timeout": 10
           }
         ]
@@ -159,7 +159,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-task-completed.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py TaskCompleted",
             "timeout": 10
           }
         ]
@@ -170,7 +170,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-teammate-idle.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py TeammateIdle",
             "timeout": 10
           }
         ]
@@ -181,7 +181,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-notification.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py Notification",
             "timeout": 10
           }
         ]
@@ -192,7 +192,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-config-change.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py ConfigChange",
             "timeout": 10
           }
         ]
@@ -203,7 +203,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-cwd-changed.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py CwdChanged",
             "timeout": 10
           }
         ]
@@ -214,7 +214,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-file-changed.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py FileChanged",
             "timeout": 10
           }
         ]
@@ -225,7 +225,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-pre-compact.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py PreCompact",
             "timeout": 10
           }
         ]
@@ -236,7 +236,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-post-compact.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py PostCompact",
             "timeout": 10
           }
         ]
@@ -247,7 +247,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-elicitation.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py Elicitation",
             "timeout": 10
           }
         ]
@@ -258,7 +258,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-elicitation-result.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py ElicitationResult",
             "timeout": 10
           }
         ]
@@ -269,7 +269,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-worktree-remove.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py WorktreeRemove",
             "timeout": 10
           }
         ]
