@@ -95,6 +95,7 @@ function EndpointShieldMetadata() {
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState("");
     const [endpointShieldData, setEndpointShieldData] = useState(null);
+    const [allowedEnvFields, setAllowedEnvFields] = useState([]);
     const [filters, setFilters] = useState([
         createFilter('username', 'Username'),
         createFilter('hostname', 'Hostname'),
@@ -115,6 +116,7 @@ function EndpointShieldMetadata() {
                 moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD
             });
             const endpointShieldModules = response.moduleInfos || [];
+            setAllowedEnvFields(response.allowedEnvFields || []);
             const agents = endpointShieldModules.map(module => ({
                 agentId: module.id,
                 hostname: module.name,
@@ -133,6 +135,30 @@ function EndpointShieldMetadata() {
     useEffect(() => {
         fetchModuleInfo();
     }, [fetchModuleInfo]);
+
+    const handleSaveEnv = useCallback(async (moduleId, moduleName, envData) => {
+        await settingRequests.updateModuleEnvAndReboot(moduleId, moduleName, envData);
+        func.setToast(true, false, "Configuration saved. Agent will pick up changes shortly.");
+        const response = await settingRequests.fetchModuleInfo({ moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD });
+        const endpointShieldModules = response.moduleInfos || [];
+        setAllowedEnvFields(response.allowedEnvFields || []);
+        const agents = endpointShieldModules.map(module => ({
+            agentId: module.id,
+            hostname: module.name,
+            deviceId: module.additionalData?.deviceId || DEFAULT_VALUE,
+            agentVersion: module.currentVersion || DEFAULT_VALUE,
+            username: module.additionalData?.username || DEFAULT_VALUE,
+            lastHeartbeat: module.lastHeartbeatReceived || 0,
+            lastDeployed: module.startedTs || 0,
+            _moduleData: module
+        }));
+        setEndpointShieldData({ agents });
+        setSelectedAgent(prev => {
+            if (!prev) return prev;
+            const fresh = agents.find(a => a.agentId === prev.agentId);
+            return fresh || prev;
+        });
+    }, []);
 
     const handleSaveDescription = useCallback(() => {
         setDescription(editableDescription);
@@ -218,7 +244,10 @@ function EndpointShieldMetadata() {
     }, [logMode, selectedAgent, isLogsExpanded, startLiveFetching, stopLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp]);
 
     const handleRowClick = useCallback(async (agent) => {
-        setSelectedAgent(agent);
+        // GithubRow stores dataObj in useState so _moduleData may be stale if the table
+        // re-rendered after a data refresh. Always pull fresh _moduleData from endpointShieldData.
+        const freshAgent = endpointShieldData?.agents?.find(a => a.agentId === agent.agentId) || agent;
+        setSelectedAgent(freshAgent);
 
         try {
             const serversResponse = await settingRequests.getMcpServersByAgent(agent.agentId, agent.hostname);
@@ -247,7 +276,7 @@ function EndpointShieldMetadata() {
         setEditableDescription("");
         setIsEditingDescription(false);
         setShowFlyout(true);
-    }, [logMode, startLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp]);
+    }, [logMode, startLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp, endpointShieldData]);
 
     useEffect(() => {
         return () => { if (liveInterval) clearInterval(liveInterval); };
@@ -414,6 +443,8 @@ function EndpointShieldMetadata() {
                 setIsEditingDescription={setIsEditingDescription}
                 handleSaveDescription={handleSaveDescription}
                 allCollections={allCollections}
+                allowedEnvFields={allowedEnvFields}
+                onSaveEnv={handleSaveEnv}
             />
         </>
     );

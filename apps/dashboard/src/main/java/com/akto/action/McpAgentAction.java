@@ -29,6 +29,8 @@ import java.util.UUID;
 public class McpAgentAction extends UserAction {
 
     private static final Logger logger = LoggerFactory.getLogger(McpAgentAction.class);
+    /** Guardrail: very large context breaks MCP /chat or gateway limits and yields 422 (ERROR). */
+    private static final int MAX_TEST_RESULT_CONTEXT_CHARS = 120_000;
     private String message;
     private String conversationId;
     private BasicDBObject response;
@@ -127,7 +129,18 @@ public class McpAgentAction extends UserAction {
                         if(attemptMsg != null) {
                             sb.append("Test Attempt Request+Response: ").append(attemptMsg).append("\n");
                         }
+                        Object agenticCtx = dataMap.get("agenticConversationContext");
+                        if(agenticCtx != null) {
+                            String agenticStr = agenticCtx instanceof String ? (String) agenticCtx : String.valueOf(agenticCtx);
+                            if(StringUtils.isNotEmpty(agenticStr)) {
+                                sb.append("Agent / LLM Test Conversation:\n").append(agenticStr).append("\n");
+                            }
+                        }
                         contextString = sb.toString();
+                        if(contextString.length() > MAX_TEST_RESULT_CONTEXT_CHARS) {
+                            contextString = contextString.substring(0, MAX_TEST_RESULT_CONTEXT_CHARS)
+                                + "\n\n[... truncated server-side ...]";
+                        }
                         tokensLimit = 40000;
                     }
                 }

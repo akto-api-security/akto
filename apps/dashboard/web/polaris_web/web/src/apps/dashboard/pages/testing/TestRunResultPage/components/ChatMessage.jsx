@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Box, VerticalStack, HorizontalStack, Text, Badge, Button, Tooltip } from '@shopify/polaris';
-import { InfoMinor } from '@shopify/polaris-icons';
+import { InfoMinor, MagicMinor } from '@shopify/polaris-icons';
 import MarkdownViewer from '../../../../components/shared/MarkdownViewer';
 import SampleDataComponent from '../../../../components/shared/SampleDataComponent';
 import { CHAT_ASSETS, MESSAGE_LABELS, MESSAGE_TYPES, VULNERABILITY_BADGE } from './chatConstants';
@@ -118,7 +118,7 @@ function extractPrettyJson(content) {
     }
 }
 
-function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt }) {
+function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCode, onOpenAttempt, originalPrompt, toolsMetadata }) {
 
     const isRequest = type === MESSAGE_TYPES.REQUEST;
     // Icon
@@ -227,6 +227,27 @@ function ChatMessage({ type, content, timestamp, isVulnerable, customLabel, isCo
                                         />
                                     </Tooltip>
                                 ))}
+                                {Object.keys(toolsMetadata).length > 0 && (
+                                    <Tooltip content="Tools used">
+                                        <Button
+                                            monochrome
+                                            removeUnderline
+                                            icon={MagicMinor}
+                                            size="slim"
+                                            onClick={() => {
+                                                setInfoModalData({
+                                                    type: 'tools',
+                                                    title: 'Tools Used',
+                                                    content: toolsMetadata,
+                                                    sampleData: null,
+                                                });
+                                                setInfoModalOpen(true);
+                                            }}
+                                        >
+                                            Tools used
+                                        </Button>
+                                    </Tooltip>
+                                )}
                             </HorizontalStack>
                             <Text variant="bodySm" color="subdued">{formattedTime}</Text>
                         </HorizontalStack>
@@ -300,6 +321,7 @@ ChatMessage.propTypes = {
     isCode: PropTypes.bool,
     onOpenAttempt: PropTypes.func,
     originalPrompt: PropTypes.string,
+    toolsMetadata: PropTypes.object,
 };
 
 ChatMessage.defaultProps = {
@@ -309,6 +331,7 @@ ChatMessage.defaultProps = {
     isCode: undefined,
     onOpenAttempt: null,
     originalPrompt: null,
+    toolsMetadata: {},
 };
 
 export default ChatMessage;

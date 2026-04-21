@@ -23,10 +23,6 @@ const McpHoverPanel = ({ metadata }) => {
   const toolName = metadata?.toolName;
   const description = metadata?.description;
 
-  const MAX_TOOLS = 10;
-  const visibleTools = tools.slice(0, MAX_TOOLS);
-  const overflow = tools.length - MAX_TOOLS;
-
   return (
 
     <Card>
@@ -70,12 +66,9 @@ const McpHoverPanel = ({ metadata }) => {
                 Tools List({tools.length}):
               </Text>
               <HorizontalStack gap="1">
-                {visibleTools.map((tool) => (
+                {tools.map((tool) => (
                   <Text key={tool} variant="bodySm">{tool}, </Text>
                 ))}
-                {overflow > 0 && (
-                  <Text variant="bodySm" color="subdued">+{overflow} more</Text>
-                )}
               </HorizontalStack>
             </VerticalStack>
           )}

@@ -15,7 +15,7 @@ from akto_heartbeat import send_heartbeat
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 
-AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
+AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
@@ -57,7 +57,7 @@ def get_connector_config(connector: str) -> dict:
             "hook_header": "x-copilot-hook",
             "atlas_domain": "ai-agent.copilot",
             "log_dir_default": "~/akto/.github/akto/copilot/logs",
-            "blocked_exit_code": 1,
+            "blocked_exit_code": 0,
         }
 
 

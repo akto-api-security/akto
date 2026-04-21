@@ -20,6 +20,7 @@ import {
     SEVERITY,
     GUARDRAIL_BEHAVIOUR,
     normalizeBehaviourValue,
+    normalizePiiTypesFromPolicy,
     resolveStoredPolicyBehaviour
 } from '../utils';
 import func from "@/util/func";
@@ -129,6 +130,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableToolNameDescriptionMismatch, setEnableToolNameDescriptionMismatch] = useState(true);
 
     // Step 10: Server settings
+    const [applyToAllServers, setApplyToAllServers] = useState(true);
     const [selectedMcpServers, setSelectedMcpServers] = useState([]);
     const [selectedAgentServers, setSelectedAgentServers] = useState([]);
     const [applyOnResponse, setApplyOnResponse] = useState(false);
@@ -194,6 +196,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableMaliciousTools,
         enableToolNameDescriptionMismatch,
         // Step 10
+        applyToAllServers,
         selectedMcpServers,
         selectedAgentServers,
         mcpServers,
@@ -404,6 +407,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableToolMisuse(true);
         setEnableMaliciousTools(true);
         setEnableToolNameDescriptionMismatch(true);
+        setApplyToAllServers(true);
         setSelectedMcpServers([]);
         setSelectedAgentServers([]);
         setApplyOnResponse(false);
@@ -464,7 +468,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // PII filters
         const hasPiiTypes = policy.piiTypes && policy.piiTypes.length > 0;
         setEnablePiiTypes(hasPiiTypes);
-        setPiiTypes(policy.piiTypes || []);
+        setPiiTypes(normalizePiiTypesFromPolicy(policy));
 
         // Regex patterns
         let hasRegexPatterns = false;
@@ -529,6 +533,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         );
         setApplyOnResponse(policy.applyOnResponse || false);
         setApplyOnRequest(policy.applyOnRequest || false);
+        setApplyToAllServers(policy.applyToAllServers ?? true);
     };
 
     const handleClose = () => {
@@ -638,6 +643,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 },
                 url: enableExternalModel ? (url || null) : null,
                 confidenceScore: enableExternalModel ? confidenceScore : null,
+                applyToAllServers,
                 selectedMcpServers: selectedMcpServers,
                 selectedAgentServers: selectedAgentServers,
                 selectedMcpServersV2: transformedMcpServers,
@@ -798,6 +804,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             case 10:
                 return (
                     <ServerSettingsStep
+                        applyToAllServers={applyToAllServers}
+                        setApplyToAllServers={setApplyToAllServers}
                         selectedMcpServers={selectedMcpServers}
                         setSelectedMcpServers={setSelectedMcpServers}
                         selectedAgentServers={selectedAgentServers}
@@ -873,6 +881,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             tokenLimitDetection: buildDetectionConfig(enableTokenLimit, tokenLimitConfidenceScore),
             url: enableExternalModel ? (url || null) : null,
             confidenceScore: enableExternalModel ? confidenceScore : null,
+            applyToAllServers: applyToAllServers,
             selectedMcpServers: selectedMcpServers,
             selectedAgentServers: selectedAgentServers,
             applyOnResponse: applyOnResponse,

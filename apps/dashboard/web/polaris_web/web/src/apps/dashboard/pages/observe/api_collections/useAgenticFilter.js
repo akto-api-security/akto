@@ -182,14 +182,21 @@ const useAgenticFilter = (normalData) => {
                 const eq = filterValues[0].indexOf('=');
                 const filterKey = eq >= 0 ? filterValues[0].slice(0, eq) : '';
                 const filterTagValue = eq >= 0 ? filterValues[0].slice(eq + 1) : '';
-                const matchBothAgentTags = AGENT_TAG_KEYS_FOR_FILTER.includes(filterKey);
-                const matchingTags = matchBothAgentTags && filterTagValue
-                    ? AGENT_TAG_KEYS_FOR_FILTER.map(k => `${k}=${filterTagValue}`)
-                    : [filterValues[0]];
-                filteredCollections = normalData.filter(collection => {
-                    const envTypeArr = getFormattedEnvType(collection);
-                    return envTypeArr.some(tag => tag === filterValues[0] || matchingTags.includes(tag));
-                });
+
+                if (filterType === FILTER_TYPES.SKILL) {
+                    filteredCollections = normalData.filter(collection =>
+                        Array.isArray(collection.skills) && collection.skills.includes(filterTagValue)
+                    );
+                } else {
+                    const matchBothAgentTags = AGENT_TAG_KEYS_FOR_FILTER.includes(filterKey);
+                    const matchingTags = matchBothAgentTags && filterTagValue
+                        ? AGENT_TAG_KEYS_FOR_FILTER.map(k => `${k}=${filterTagValue}`)
+                        : [filterValues[0]];
+                    filteredCollections = normalData.filter(collection => {
+                        const envTypeArr = getFormattedEnvType(collection);
+                        return envTypeArr.some(tag => tag === filterValues[0] || matchingTags.includes(tag));
+                    });
+                }
             }
         }
 

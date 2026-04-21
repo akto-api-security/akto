@@ -38,7 +38,7 @@ function isSkippedTestError(errorText) {
 }
 
 function TestRunResultFlyout(props) {
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -468,6 +468,7 @@ function TestRunResultFlyout(props) {
             </Popover>
         )
     }
+
     function TitleComponent() {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : ""
         return (
@@ -573,6 +574,15 @@ function TestRunResultFlyout(props) {
                     </HorizontalStack>
 
                     <ApiGroups collectionIds={apiInfo?.collectionIds} />
+                    {/* tools call format: {mcp/agent name} -> value: {tools for that mcp/agent} */}
+                    <VerticalStack gap={1}>
+                        {Object.keys(toolsCalls).map(agentName => (
+                            <HorizontalStack gap={1} key={agentName}>
+                                <Badge status='info'>{agentName}</Badge>
+                                <Text variant="bodySm">{toolsCalls[agentName].join(', ')}</Text>
+                            </HorizontalStack>
+                        ))}
+                    </VerticalStack>
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
                     {issueDetails?.id?.apiInfoKey && (

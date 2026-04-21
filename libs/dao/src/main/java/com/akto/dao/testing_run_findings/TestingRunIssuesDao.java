@@ -189,10 +189,6 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         return resultMap;
 
     }
-  
-    public Map<String, Integer> getTotalSubcategoriesCountMap(int startTimeStamp, int endTimeStamp, Set<Integer> deactivatedCollections){
-        return getTotalSubcategoriesCountMap(startTimeStamp, endTimeStamp, deactivatedCollections, null);
-    }
 
     public Map<String, Integer> getTotalSubcategoriesCountMap(int startTimeStamp, int endTimeStamp, Set<Integer> deactivatedCollections, List<Integer> restrictToCollectionIds){
         List<Bson> pipeline = new ArrayList<>();
@@ -207,15 +203,7 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
             matchConditions.add(Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, restrictToCollectionIds));
         }
 
-        pipeline.add(Aggregates.match(Filters.and(matchConditions)));
-
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
-            }
-        } catch(Exception e){
-        }
+        pipeline.add(Aggregates.match(addCollectionsFilterForDashboard(Filters.and(matchConditions))));
 
         BasicDBObject groupedId = new BasicDBObject("subCategory", "$_id.testSubCategory");
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));

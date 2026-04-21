@@ -159,7 +159,14 @@ const SettingsLeftNav = () => {
                         icon: CodeMajor,
                         selected: page === "proxy-patterns",
                         onClick: () => navigate("/dashboard/settings/proxy-patterns")
-                    }] : []),
+                    },
+                    {
+                        label: 'Allowed Hosts',
+                        icon: GlobeMajor,
+                        selected: page === "allowed-hosts",
+                        onClick: () => navigate("/dashboard/settings/allowed-hosts")
+                    }
+                ] : []),
                     {
                         label: 'Test library',
                         icon: VocabularyMajor,

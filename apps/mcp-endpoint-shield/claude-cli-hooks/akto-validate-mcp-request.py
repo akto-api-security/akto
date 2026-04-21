@@ -3,10 +3,12 @@
 import json
 import logging
 import os
+import re
 import ssl
 import sys
 import time
 import urllib.request
+from urllib.parse import quote
 from typing import Any, Dict, Tuple, Union
 
 from akto_machine_id import get_machine_id, get_username
@@ -31,20 +33,27 @@ console_handler.setLevel(logging.ERROR)
 logger.addHandler(console_handler)
 
 MODE = os.getenv("MODE", "argus").lower()
-AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
+AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
+# Non-MCP blocked-request ingestion is off by default; set AKTO_INGEST_NON_MCP_TOOLS=true to send it.
+AKTO_INGEST_NON_MCP_TOOLS = os.getenv("AKTO_INGEST_NON_MCP_TOOLS", "false").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
+AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "claudecli")
 AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
+# Mirrored path: /mcp matches JsonRpcUtils.isMcpPath; non-MCP uses /{prefix}/{normalized-tool-name}
+MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
+# Optional: force a fixed non-MCP path (overrides tool-based path). Default: derive from tool name.
+NON_MCP_TOOL_PATH_PREFIX = os.getenv("NON_MCP_TOOL_PATH_PREFIX", "/tool")
 
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
+DEVICE_ID = os.getenv("DEVICE_ID") or get_machine_id()
 
 if MODE == "atlas":
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    CLAUDE_API_URL = f"https://{device_id}.ai-agent.claudecli" if device_id else "https://api.anthropic.com"
-    logger.info(f"MODE: {MODE}, Device ID: {device_id}, CLAUDE_API_URL: {CLAUDE_API_URL}")
+    CLAUDE_API_URL = f"https://{DEVICE_ID}.ai-agent.{AKTO_CONNECTOR_VALUE}" if DEVICE_ID else "https://api.anthropic.com"
+    logger.info(f"MODE: {MODE}, Device ID: {DEVICE_ID}, CLAUDE_API_URL: {CLAUDE_API_URL}")
 else:
     CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
     logger.info(f"MODE: {MODE}, CLAUDE_API_URL: {CLAUDE_API_URL}")
@@ -101,37 +110,115 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         raise
 
 
-def extract_mcp_server_name(tool_name: str) -> str:
+# Ref: https://code.claude.com/docs/en/hooks#match-mcp-tools
+# Ingested traffic is classified as MCP when the mirrored request is JSON-RPC with an MCP method
+# (see com.akto.mcp.McpRequestResponseUtils#isMcpRequest). Non-MCP tools must omit top-level jsonrpc.
+
+
+def normalize_tool_name_for_url_path(tool_name: str) -> str:
+    """RFC 3986 path segment: unreserved + hyphen; collapse repeats."""
+    s = (tool_name or "unknown").strip()
+    s = re.sub(r"[^a-zA-Z0-9._~-]+", "-", s)
+    s = re.sub(r"-+", "-", s).strip("-")
+    if not s:
+        s = "unknown"
+    return quote(s, safe=".-_~")
+
+
+def non_mcp_ingest_path(tool_name: str) -> str:
+    """Non-MCP mirrored path: NON_MCP_INGEST_PATH if set, else NON_MCP_TOOL_PATH_PREFIX + normalized tool name."""
+    fixed = (os.getenv("NON_MCP_INGEST_PATH") or "").strip()
+    if fixed:
+        return fixed if fixed.startswith("/") else "/" + fixed
+    prefix = (NON_MCP_TOOL_PATH_PREFIX or "/tool").strip()
+    if not prefix.startswith("/"):
+        prefix = "/" + prefix
+    prefix = prefix.rstrip("/")
+    if not prefix:
+        prefix = "/tool"
+    return f"{prefix}/{normalize_tool_name_for_url_path(tool_name)}"
+
+
+def parse_claude_tool(tool_name: str) -> Tuple[bool, str, str]:
+    """
+    Parse Claude tool_name into (is_mcp, server_name, mcp_tool_name).
+    MCP tools follow mcp__<server>__<tool> (tool segment may contain underscores).
+    """
     if not tool_name.startswith("mcp__"):
-        return "claude-built-in"
+        return False, "", ""
     parts = tool_name.split("__")
-    if len(parts) >= 3 and parts[1]:
-        return parts[1]
-    return "claude-built-in"
+    if len(parts) < 3:
+        return False, "", ""
+    server = parts[1]
+    mcp_tool = "__".join(parts[2:])
+    if not server or not mcp_tool:
+        return False, "", ""
+    return True, server, mcp_tool
 
 
-def build_validation_request(tool_name: str, tool_input: Any, mcp_server_name: str) -> Dict[str, Any]:
-    tags = {"gen-ai": "Gen AI"}
-    if MODE == "atlas":
-        tags["ai-agent"] = "claudecli"
-        tags["source"] = CONTEXT_SOURCE
+def _tool_arguments_for_jsonrpc(tool_input: Any) -> Dict[str, Any]:
+    if isinstance(tool_input, dict):
+        return tool_input
+    if tool_input is None:
+        return {}
+    return {"input": tool_input}
 
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
 
-    request_headers = json.dumps(
+def build_tools_call_jsonrpc(mcp_tool_name: str, tool_input: Any, request_id: int = 1) -> str:
+    """JSON-RPC body aligned with MCP tools/call (https://modelcontextprotocol.io)."""
+    return json.dumps(
         {
-            "host": host,
-            "x-claude-hook": "PreToolUse",
-            "content-type": "application/json",
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {"name": mcp_tool_name, "arguments": _tool_arguments_for_jsonrpc(tool_input)},
+            "id": request_id,
         }
     )
+
+def mcp_mirror_host(mcp_server_name: str) -> str:
+    return f"{DEVICE_ID}.{AKTO_CONNECTOR_VALUE}.{mcp_server_name}"
+
+def build_hook_tags(*, is_mcp: bool) -> Dict[str, str]:
+    tags: Dict[str, str] = {}
+    if is_mcp:
+        tags["mcp-server"] = "MCP Server"
+        tags["mcp-client"] = AKTO_CONNECTOR_VALUE
+    else:
+        tags["gen-ai"] = "Gen AI"
+        tags["ai-agent"] = AKTO_CONNECTOR_VALUE
+    if MODE == "atlas":
+        tags["source"] = CONTEXT_SOURCE
+    return tags
+
+def build_validation_request(
+    tool_name: str, tool_input: Any, *, is_mcp: bool, mcp_server_name: str, mcp_tool_name: str
+) -> Dict[str, Any]:
+    tags = build_hook_tags(is_mcp=is_mcp)
+
+    if is_mcp:
+        host = mcp_mirror_host(mcp_server_name)
+    else:
+        host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
+
+    req_hdr: Dict[str, str] = {
+        "host": host,
+        "x-claude-hook": "PreToolUse",
+        "content-type": "application/json",
+    }
+    if is_mcp and mcp_server_name:
+        req_hdr["x-mcp-server"] = mcp_server_name
+
+    request_headers = json.dumps(req_hdr)
     response_headers = json.dumps({"x-claude-hook": "PreToolUse"})
-    request_payload = json.dumps({"body": tool_input, "toolName": tool_name})
+    if is_mcp:
+        request_payload = build_tools_call_jsonrpc(mcp_tool_name, tool_input)
+    else:
+        request_payload = json.dumps({"body": tool_input, "toolName": tool_name})
     response_payload = json.dumps({})
 
+    path = MCP_INGEST_PATH if is_mcp else non_mcp_ingest_path(tool_name)
     return {
-        "path": f"/v1/hooks/PreToolUse",
+        "path": path,
         "requestHeaders": request_headers,
         "responseHeaders": response_headers,
         "method": "POST",
@@ -144,7 +231,7 @@ def build_validation_request(tool_name: str, tool_input: Any, mcp_server_name: s
         "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
-        "akto_vxlan_id": device_id,
+        "akto_vxlan_id": 0,
         "is_pending": "false",
         "source": "MIRRORING",
         "direction": None,
@@ -158,7 +245,14 @@ def build_validation_request(tool_name: str, tool_input: Any, mcp_server_name: s
     }
 
 
-def call_guardrails(tool_name: str, tool_input: Any, mcp_server_name: str) -> Tuple[bool, str]:
+def call_guardrails(
+    tool_name: str,
+    tool_input: Any,
+    *,
+    is_mcp: bool,
+    mcp_server_name: str,
+    mcp_tool_name: str,
+) -> Tuple[bool, str]:
     if not tool_input:
         return True, ""
 
@@ -166,12 +260,21 @@ def call_guardrails(tool_name: str, tool_input: Any, mcp_server_name: str) -> Tu
         logger.warning("AKTO_DATA_INGESTION_URL not set, allowing request (fail-open)")
         return True, ""
 
-    logger.info(f"Validating MCP request for tool: {tool_name} (server: {mcp_server_name})")
+    if is_mcp:
+        logger.info(f"Validating MCP tools/call for {mcp_tool_name} (server={mcp_server_name}, claudeTool={tool_name})")
+    else:
+        logger.info(f"Validating built-in / non-MCP tool request: {tool_name}")
     if LOG_PAYLOADS:
         logger.debug(f"Tool input payload: {json.dumps(tool_input)[:500]}...")
 
     try:
-        request_body = build_validation_request(tool_name, tool_input, mcp_server_name)
+        request_body = build_validation_request(
+            tool_name,
+            tool_input,
+            is_mcp=is_mcp,
+            mcp_server_name=mcp_server_name,
+            mcp_tool_name=mcp_tool_name,
+        )
         result = post_payload_json(
             build_http_proxy_url(guardrails=True, ingest_data=True),
             request_body,
@@ -193,12 +296,32 @@ def call_guardrails(tool_name: str, tool_input: Any, mcp_server_name: str) -> Tu
         return True, ""
 
 
-def ingest_blocked_request(tool_name: str, tool_input: Any, mcp_server_name: str, reason: str):
+def ingest_blocked_request(
+    tool_name: str,
+    tool_input: Any,
+    reason: str,
+    *,
+    is_mcp: bool,
+    mcp_server_name: str,
+    mcp_tool_name: str,
+):
     if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
         return
 
+    if not is_mcp and not AKTO_INGEST_NON_MCP_TOOLS:
+        logger.info(
+            "Skipping non-MCP blocked-request ingestion (set AKTO_INGEST_NON_MCP_TOOLS=true to re-enable)"
+        )
+        return
+
     try:
-        request_body = build_validation_request(tool_name, tool_input, mcp_server_name)
+        request_body = build_validation_request(
+            tool_name,
+            tool_input,
+            is_mcp=is_mcp,
+            mcp_server_name=mcp_server_name,
+            mcp_tool_name=mcp_tool_name,
+        )
         request_body["responseHeaders"] = json.dumps(
             {
                 "x-claude-hook": "PreToolUse",
@@ -231,24 +354,40 @@ def main():
 
     tool_name = str(input_data.get("tool_name") or "")
     tool_input = input_data.get("tool_input") or {}
-    mcp_server_name = extract_mcp_server_name(tool_name)
+    is_mcp, mcp_server_name, mcp_tool_name = parse_claude_tool(tool_name)
 
-    logger.info(f"Processing MCP tool request: {tool_name} (server: {mcp_server_name})")
+    if is_mcp:
+        logger.info(f"Processing MCP tool request: {tool_name} (server={mcp_server_name}, mcpTool={mcp_tool_name})")
+    else:
+        logger.info(f"Processing non-MCP tool request (gen-ai only): {tool_name}")
 
     if AKTO_SYNC_MODE:
-        allowed, reason = call_guardrails(tool_name, tool_input, mcp_server_name)
+        allowed, reason = call_guardrails(
+            tool_name,
+            tool_input,
+            is_mcp=is_mcp,
+            mcp_server_name=mcp_server_name,
+            mcp_tool_name=mcp_tool_name,
+        )
         if not allowed:
             block_reason = reason or "Policy violation"
             output = {
                 "decision": "block",
                 "reason": f"Blocked by Akto Guardrails: {block_reason}",
             }
-            logger.warning(f"BLOCKING MCP request - Tool: {tool_name}, Reason: {block_reason}")
+            logger.warning(f"BLOCKING tool request - Tool: {tool_name}, Reason: {block_reason}")
             print(json.dumps(output))
-            ingest_blocked_request(tool_name, tool_input, mcp_server_name, block_reason)
+            ingest_blocked_request(
+                tool_name,
+                tool_input,
+                block_reason,
+                is_mcp=is_mcp,
+                mcp_server_name=mcp_server_name,
+                mcp_tool_name=mcp_tool_name,
+            )
             sys.exit(0)
 
-    logger.info(f"MCP request allowed for {tool_name}")
+    logger.info(f"Tool request allowed for {tool_name}")
     sys.exit(0)
 
 

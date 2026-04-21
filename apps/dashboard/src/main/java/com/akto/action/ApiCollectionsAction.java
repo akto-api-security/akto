@@ -331,11 +331,18 @@ public class ApiCollectionsAction extends UserAction {
             /*
              * Since admin has all access, we don't update any collections for them.
              */
+            //Role
+            String currentScope = Context.contextSource.get().toString();
+            Bson adminFilter =  Filters.nor(
+                    Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN.getName()),
+                    Filters.eq(RBAC.SCOPE_ROLE_MAPPING + "." + currentScope, RBAC.Role.ADMIN.getName())
+                );
+
             RBACDao.instance.getMCollection().updateOne(
                     Filters.and(
                             Filters.eq(RBAC.USER_ID, userId),
                             Filters.eq(RBAC.ACCOUNT_ID, accountId),
-                            Filters.ne(RBAC.ROLE, RBAC.Role.ADMIN.getName())
+                            adminFilter
                     ),
                     Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
                     new UpdateOptions().upsert(false)

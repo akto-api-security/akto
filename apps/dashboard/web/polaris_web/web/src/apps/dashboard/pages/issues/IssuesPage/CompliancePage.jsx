@@ -657,6 +657,7 @@ function CompliancePage() {
             ...prev,
             [pageKey]: { filters: [...existing, { key: filterType, value: [filterValue] }], sort: prev[pageKey]?.sort || [] }
         });
+        func.setToast(true, false, `Table filtered by "${filterValue}" - scroll down to view results`);
         setKey(k => !k);
     };
 

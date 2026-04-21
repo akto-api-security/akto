@@ -71,7 +71,9 @@ function TestLibrary() {
     async function addTestLibrary() {
         await api.addTestLibrary(repositoryUrl)
         func.setToast(true, false, "Test library added successfully. " + commonMessage)
+        if(window.USER_ROLE === 'ADMIN') {
         fetchData()
+        }
         setAddTestLibraryModalActive(false)
         setRepositoryUrl('')
     }

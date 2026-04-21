@@ -208,7 +208,14 @@ public class RoleAction extends UserAction {
 
         List<RBAC> usersWithRole = RBACDao.instance.findAll(Filters.eq(RBAC.ROLE, roleName));
 
-        if(!usersWithRole.isEmpty()){
+        List<RBAC> newUsersWithRole = RBACDao.instance.findAll(
+                        Filters.exists(RBAC.SCOPE_ROLE_MAPPING)
+                ).stream()
+                .filter(rbac -> rbac.getScopeRoleMapping() != null &&
+                        rbac.getScopeRoleMapping().containsValue(roleName))
+                .collect(Collectors.toList());
+
+        if(!usersWithRole.isEmpty() || !newUsersWithRole.isEmpty()){
             addActionError("Role is associated with users. Cannot delete.");
             return ERROR.toUpperCase();
         }

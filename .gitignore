@@ -37,3 +37,4 @@ THREAT_DETECTION_API_CHAIN_PATTERN.md
 **/THREAT_DETECTION_API_CHAIN_PATTERN.md
 **/__pycache__/
 run-guardrails-service.sh
+.github/hooks

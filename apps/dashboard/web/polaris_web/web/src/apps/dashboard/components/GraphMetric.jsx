@@ -4,11 +4,13 @@ import { useRef } from "react";
 require("highcharts/modules/exporting")(Highcharts);
 require("highcharts/modules/export-data.src")(Highcharts);
 require("highcharts/modules/accessibility")(Highcharts);
+require("highcharts/modules/boost")(Highcharts);
+require("highcharts/modules/mouse-wheel-zoom")(Highcharts);
 
 
 function GraphMetric(props) {
 
-    const { type, height, backgroundColor, data, inputMetrics, title, text, defaultChartOptions, subtitle } = props;
+    const { height, backgroundColor, data, inputMetrics, title, text, defaultChartOptions, subtitle, timezoneOffsetMinutes } = props;
     const chartComponentRef = useRef(null)
 
     const fillColor = {
@@ -19,12 +21,13 @@ function GraphMetric(props) {
         ],
     };
 
-    const dataForChart = data.map((x, idx) => {
+    const dataForChart = data.map((x) => {
         return {
             data: x['data'],
             color: x['color'],
             name: x['name'],
-            fillColor: props.areaFillHex ? fillColor : {},
+            fillColor: props.areaFillHex ? fillColor : 'none',
+            marker: { enabled: false },
             yAxis: 0,
         };
     });
@@ -54,9 +57,24 @@ function GraphMetric(props) {
 
     const chartOptions = {
         chart: {
-            type,
+            type: 'spline',
             height: `${height}px`,
             backgroundColor,
+            animation: false,
+            spacingTop: 20,
+            spacingLeft: 16,
+            spacingRight: 16,
+            spacingBottom: 16,
+            zooming: {
+                type: 'x',
+                mouseWheel: {
+                    enabled: true,
+                    sensitivity: 1.5,
+                },
+                resetButton: { position: { align: 'right' } },
+            },
+            panning: { enabled: true, type: 'x' },
+            panKey: 'shift',
         },
         credits:{
             enabled: false,
@@ -64,16 +82,21 @@ function GraphMetric(props) {
         title: {
             text: title,
             align: 'left',
-            margin: 20
+            margin: 12,
+            style: { fontSize: '16px', fontWeight: '600' },
         },
         subtitle: {
             text: subtitle,
-            align: 'left'
+            align: 'left',
+            style: { fontSize: '12px' },
         },
         tooltip: {
             shared: true,
         },
         series,
+        time: {
+            timezoneOffset: timezoneOffsetMinutes != null ? -timezoneOffsetMinutes : new Date().getTimezoneOffset(),
+        },
         xAxis: {
             type: 'datetime',
             dateTimeLabelFormats: {
@@ -92,8 +115,7 @@ function GraphMetric(props) {
                     text: title,
                 },
                 visible: text,
-                gridLineWidth: 0,
-                min: 0,
+                gridLineWidth: 1,
             },
             ...inputMetrics.map(() => ({
                 title: {
@@ -101,17 +123,18 @@ function GraphMetric(props) {
                 },
                 visible: true,
                 opposite: true,
-                min: 0,
             })),
         ],
         ...defaultChartOptions,
     };
     return (
-        <HighchartsReact 
-            highcharts={Highcharts} 
-            options={chartOptions} 
-            ref={chartComponentRef}
-        />
+        <div onWheel={(e) => e.stopPropagation()}>
+            <HighchartsReact
+                highcharts={Highcharts}
+                options={chartOptions}
+                ref={chartComponentRef}
+            />
+        </div>
     )
 }
 

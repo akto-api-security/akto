@@ -25,6 +25,7 @@ import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -353,37 +354,27 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         this.createIndicesIfAbsent();
     }
 
-    /**
-     * Aggregates testing results by category (testSuperType) with pass/fail/skip counts
-     * OPTIMIZED VERSION: Simplified skip detection and better performance
-     * @param startTimestamp Start time filter (0 to ignore)
-     * @param endTimestamp End time filter (0 to ignore)
-     * @param relevantCategories List of categories to filter by (null/empty for all)
-     * @return List of category-wise statistics
-     */
-    public List<Map<String, Object>> getCategoryWiseScores(int startTimestamp, int endTimestamp, List<String> relevantCategories) {
-        return getCategoryWiseScores(startTimestamp, endTimestamp, relevantCategories, null);
-    }
-
     public List<Map<String, Object>> getCategoryWiseScores(int startTimestamp, int endTimestamp, List<String> relevantCategories, List<Integer> apiCollectionIds) {
+        List<ObjectId> summaryIds = TestingRunDao.instance.getSummaryIdsForCategoryWiseScores(
+                startTimestamp, endTimestamp, apiCollectionIds);
+        if (summaryIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
         List<Bson> pipeline = new ArrayList<>();
         
-        // Stage 1: Match filters for time range and category filtering (INDEXED)
+        // Stage 1: Match — summary ids from testing runs (latest per run), then category/collection/time.
         List<Bson> matchFilters = new ArrayList<>();
-        
-        // Time range filter
-        if (startTimestamp > 0 && endTimestamp > 0) {
-            matchFilters.add(Filters.gte(TestingRunResult.END_TIMESTAMP, startTimestamp));
-            matchFilters.add(Filters.lte(TestingRunResult.END_TIMESTAMP, endTimestamp));
-        }
-        
-        // Filter by relevant categories if provided (INDEXED)
+        matchFilters.add(Filters.in(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryIds));
         if (relevantCategories != null && !relevantCategories.isEmpty()) {
             matchFilters.add(Filters.in(TestingRunResult.TEST_SUPER_TYPE, relevantCategories));
         }
-
         if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
             matchFilters.add(Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.API_COLLECTION_ID, apiCollectionIds));
+        }
+        if (startTimestamp > 0 && endTimestamp > 0) {
+            matchFilters.add(Filters.gte(TestingRunResult.END_TIMESTAMP, startTimestamp));
+            matchFilters.add(Filters.lte(TestingRunResult.END_TIMESTAMP, endTimestamp));
         }
         
         if (!matchFilters.isEmpty()) {
@@ -442,6 +433,5 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         
         return results;
     }
-
 
 }

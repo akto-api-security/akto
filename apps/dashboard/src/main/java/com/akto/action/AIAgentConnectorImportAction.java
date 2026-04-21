@@ -79,12 +79,24 @@ public class AIAgentConnectorImportAction extends UserAction {
     private String salesforceConsumerSecret;
     private String ingestionApiKey;
 
+    // Anthropic connector parameters
+    private String anthropicApiKey;
+    private String anthropicApiBaseUrl;
+
+    // OpenAI connector parameters
+    private String openaiApiKey;
+    private String openaiOrgId;
+    private String openaiApiBaseUrl;
+
     /**
      * Unified method to initiate import for any AI Agent Connector.
      * The connector type is determined by the connectorType parameter.
      */
     public String initiateImport() {
         try {
+            if (connectorType != null) {
+                connectorType = connectorType.trim();
+            }
             loggerMaker.info("Initiating import for connector type: " + connectorType, LogDb.DASHBOARD);
 
             // Validate connector type
@@ -286,6 +298,32 @@ public class AIAgentConnectorImportAction extends UserAction {
                 config.put(CONFIG_SALESFORCE_CONSUMER_KEY, salesforceConsumerKey);
                 config.put(CONFIG_SALESFORCE_CONSUMER_SECRET, salesforceConsumerSecret);
                 config.put("INGESTION_API_KEY", ingestionApiKey);
+                break;
+
+            case CONNECTOR_TYPE_ANTHROPIC:
+                if (anthropicApiKey == null || anthropicApiKey.isEmpty()) {
+                    loggerMaker.error("Missing required Anthropic configuration (API key)", LogDb.DASHBOARD);
+                    return null;
+                }
+                config.put(CONFIG_ANTHROPIC_API_KEY, anthropicApiKey);
+                String baseUrl = (anthropicApiBaseUrl != null && !anthropicApiBaseUrl.isEmpty())
+                    ? anthropicApiBaseUrl
+                    : "https://api.anthropic.com";
+                config.put(CONFIG_ANTHROPIC_API_BASE_URL, baseUrl);
+                break;
+
+            case CONNECTOR_TYPE_OPENAI:
+                if (openaiApiKey == null || openaiApiKey.isEmpty() ||
+                    openaiOrgId == null || openaiOrgId.isEmpty()) {
+                    loggerMaker.error("Missing required OpenAI configuration (API key and organization ID)", LogDb.DASHBOARD);
+                    return null;
+                }
+                config.put(CONFIG_OPENAI_API_KEY, openaiApiKey);
+                config.put(CONFIG_OPENAI_ORG_ID, openaiOrgId);
+                String openaiBaseUrl = (openaiApiBaseUrl != null && !openaiApiBaseUrl.isEmpty())
+                    ? openaiApiBaseUrl
+                    : "https://api.openai.com";
+                config.put(CONFIG_OPENAI_API_BASE_URL, openaiBaseUrl);
                 break;
 
             default:
