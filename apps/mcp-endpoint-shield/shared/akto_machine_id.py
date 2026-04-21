@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
-""" 
+"""
 Machine ID generation utility for device identification.
-Mimics the Go implementation for generating unique device identifiers.
+Uses only Python standard library modules.
 """
 import os
 import platform
-import re
-import socket
 import subprocess
 import uuid
+import re
+import socket
 
 try:
     import pwd
 except ImportError:
     pwd = None
-
 
 
 _machine_id = None
@@ -59,46 +58,69 @@ def _resolve_device_name_source() -> str:
         return re.sub(r"[^a-zA-Z0-9]", "-", raw.strip()).lower()
     return ""
 
-
 def _generate_machine_id() -> str:
     """
     Generate a unique machine ID using multiple fallback methods.
 
     Priority:
-    1. macOS: IOPlatformUUID from ioreg (matches Go implementation)
-    2. Fallback: UUID-based node ID (MAC address)
+    1. macOS: IOPlatformUUID from ioreg
+    2. Linux: /etc/machine-id (or /var/lib/dbus/machine-id)
+    3. Fallback: uuid.getnode() 48-bit identifier
 
     Returns:
-        Machine ID as a lowercase string without dashes
+        Machine ID as a lowercase string without separators.
     """
-    # Try macOS ioreg first (matches Go denisbrodbeck/machineid implementation)
-    try:
-        result = subprocess.run(
-            ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        if result.returncode == 0:
-            for line in result.stdout.split('\n'):
-                if 'IOPlatformUUID' in line:
-                    # Extract UUID from line: "IOPlatformUUID" = "UUID-VALUE"
-                    parts = line.split('"')
-                    if len(parts) >= 4:
-                        uuid_val = parts[3].replace('-', '').lower()
-                        return uuid_val
-    except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
-        pass
+    system = platform.system()
 
-    # Fallback: Try uuid.getnode() - returns MAC address as integer
+    if system == "Windows":
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Cryptography"
+            )
+            guid, _ = winreg.QueryValueEx(key, "MachineGuid")
+            winreg.CloseKey(key)
+            if guid:
+                return guid.replace("-", "").lower()
+        except Exception:
+            pass
+
+    if system == "Darwin":
+        try:
+            result = subprocess.run(
+                ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            if result.returncode == 0:
+                for line in result.stdout.split("\n"):
+                    if "IOPlatformUUID" in line:
+                        # Line format: "IOPlatformUUID" = "UUID-VALUE"
+                        parts = line.split('"')
+                        if len(parts) >= 4:
+                            return parts[3].replace("-", "").lower()
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+    if system == "Linux":
+        for path in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    machine_id = f.read().strip().lower().replace("-", "")
+                    if machine_id:
+                        return machine_id
+            except OSError:
+                continue
+
+    # Fallback: uuid.getnode() returns a 48-bit identifier.
     try:
         node_id = uuid.getnode()
         if node_id != 0:
-            # Convert to MAC address format
-            mac = ':'.join(['{:02x}'.format((node_id >> i) & 0xff)
-                           for i in range(0, 48, 8)][::-1])
-            return mac.replace('-', '').replace(':', '').lower()
-    except Exception:
+            return f"{node_id:012x}"
+    except (ValueError, OSError):
         pass
 
     # Last resort: empty string
@@ -156,9 +178,10 @@ def get_username() -> str:
     current_user = None
     is_root = False
     try:
-        current_uid = os.getuid()
-        current_user = pwd.getpwuid(current_uid).pw_name
-        is_root = current_user == "root" or current_uid == 0
+        if pwd is not None and hasattr(os, "getuid"):
+            current_uid = os.getuid()
+            current_user = pwd.getpwuid(current_uid).pw_name
+            is_root = current_user == "root" or current_uid == 0
     except Exception:
         pass
 
@@ -224,4 +247,3 @@ def get_username() -> str:
 if __name__ == "__main__":
     # Print machine ID when script is executed directly
     print(get_machine_id())
-# done
