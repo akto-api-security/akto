@@ -63,10 +63,17 @@ def create_ssl_context():
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(
+    *,
+    guardrails: bool = False,
+    response_guardrails: bool = False,
+    ingest_data: bool = False,
+) -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
@@ -265,7 +272,7 @@ def apply_warn_resubmit_flow(
 
     if _is_alert_behaviour(behaviour):
         logger.info(
-            "Alert behaviour: allowing prompt despite violation (server-side alert only)"
+            "Alert behaviour: allowing despite violation (server-side alert only)"
         )
         return True, ""
 
