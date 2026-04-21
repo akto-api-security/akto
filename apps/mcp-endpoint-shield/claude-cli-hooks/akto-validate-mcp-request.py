@@ -34,7 +34,8 @@ MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claudecli")
+AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
+AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "claudecli")
 AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 # Mirrored path: /mcp matches JsonRpcUtils.isMcpPath; non-MCP stays LLM-style so it is not MCP-classified
@@ -46,7 +47,7 @@ SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 DEVICE_ID = os.getenv("DEVICE_ID") or get_machine_id()
 
 if MODE == "atlas":
-    CLAUDE_API_URL = f"https://{DEVICE_ID}.ai-agent.{AKTO_CONNECTOR}" if DEVICE_ID else "https://api.anthropic.com"
+    CLAUDE_API_URL = f"https://{DEVICE_ID}.ai-agent.{AKTO_CONNECTOR_VALUE}" if DEVICE_ID else "https://api.anthropic.com"
     logger.info(f"MODE: {MODE}, Device ID: {DEVICE_ID}, CLAUDE_API_URL: {CLAUDE_API_URL}")
 else:
     CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
@@ -146,16 +147,16 @@ def build_tools_call_jsonrpc(mcp_tool_name: str, tool_input: Any, request_id: in
     )
 
 def mcp_mirror_host(mcp_server_name: str) -> str:
-    return f"{DEVICE_ID}.{AKTO_CONNECTOR}.{mcp_server_name}"
+    return f"{DEVICE_ID}.{AKTO_CONNECTOR_VALUE}.{mcp_server_name}"
 
 def build_hook_tags(*, is_mcp: bool) -> Dict[str, str]:
     tags: Dict[str, str] = {}
     if is_mcp:
         tags["mcp-server"] = "MCP Server"
-        tags["mcp-client"] = AKTO_CONNECTOR
+        tags["mcp-client"] = AKTO_CONNECTOR_VALUE
     else:
         tags["gen-ai"] = "Gen AI"
-        tags["ai-agent"] = AKTO_CONNECTOR
+        tags["ai-agent"] = AKTO_CONNECTOR_VALUE
     if MODE == "atlas":
         tags["source"] = CONTEXT_SOURCE
     return tags
