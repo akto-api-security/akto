@@ -114,6 +114,7 @@ const ServerSettingsStep = ({
                                     allowMultiple={true}
                                     showSelectAllMinOptions={1}
                                     disabled={collectionsLoading}
+                                    value={selectedMcpServers.length > 0 ? `${selectedMcpServers.length} MCP server${selectedMcpServers.length === 1 ? "" : "s"} selected` : undefined}
                                 />
                                 <DropdownSearch
                                     label="Select Agent Servers"
@@ -124,6 +125,7 @@ const ServerSettingsStep = ({
                                     allowMultiple={true}
                                     showSelectAllMinOptions={1}
                                     disabled={collectionsLoading}
+                                    value={selectedAgentServers.length > 0 ? `${selectedAgentServers.length} agent server${selectedAgentServers.length === 1 ? "" : "s"} selected` : undefined}
                                 />
                             </VerticalStack>
                         )}
