@@ -32,11 +32,11 @@ export default {
             data: { startTimestamp, endTimestamp }
         })
     },
-    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators, searchString) {
         const resp = await request({
             url: '/api/fetchAuditData',
             method: 'post',
-            data: { sortKey, sortOrder, skip, limit, filters, filterOperators }
+            data: { sortKey, sortOrder, skip, limit, filters, filterOperators, searchString }
         });
         return resp;
     },

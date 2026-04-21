@@ -48,7 +48,9 @@ public class AuditDataAction extends UserAction {
     private Map<String, List> filters;
     @Setter
     private Map<String, String> filterOperators;
-    
+    @Setter
+    private String searchString;
+
     @Getter
     private long total;
 
@@ -119,7 +121,20 @@ public class AuditDataAction extends UserAction {
                         Filters.in(McpAuditInfo.HOST_COLLECTION_ID, collectionsIds));
                 filter = Filters.or(filter, collectionsFilter);
             }
-            
+
+            if (!StringUtils.isBlank(searchString)) {
+                Bson searchFilter = Filters.or(
+                    Filters.regex("remarks", searchString, "i"),
+                    Filters.regex("resourceName", searchString, "i")
+                );
+                filter = Filters.and(filter, searchFilter);
+            }
+
+            List<Bson> additionalFilters = prepareFilters(filters);
+            if (!additionalFilters.isEmpty()) {
+                filter = Filters.and(filter, Filters.and(additionalFilters));
+            }
+
             Bson sort = sortOrder == 1 ? Sorts.ascending(sortKey) : Sorts.descending(sortKey);
             
             this.auditData = McpAuditInfoDao.instance.findAll(filter, skip, limit, sort);   
