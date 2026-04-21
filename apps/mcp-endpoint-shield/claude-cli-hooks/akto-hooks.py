@@ -7,7 +7,7 @@ import json
 if not os.getenv("LOG_DIR"):
     os.environ["LOG_DIR"] = os.path.expanduser("~/.claude/akto/logs")
 
-from akto_ingestion_utility import run_observability_hook, run_blocking_hook
+from akto_ingestion_utility import run_observability_hook
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

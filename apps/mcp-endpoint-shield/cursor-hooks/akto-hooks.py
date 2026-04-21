@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Single dispatch file for all Akto Cursor hooks. Usage: python3 akto-hooks.py <hookName>"""
 import sys
-from akto_ingestion_utility import run_observability_hook, run_blocking_hook
+from akto_ingestion_utility import run_observability_hook
 
 _BLOCKING_HOOKS = {
     "preToolUse",
@@ -17,9 +17,6 @@ if __name__ == "__main__":
 
     hook = sys.argv[1]
 
-    if hook in _BLOCKING_HOOKS:
-        run_blocking_hook(hook)
-    else:
-        run_observability_hook(hook)
-        print("{}")
-        sys.exit(0)
+    run_observability_hook(hook)
+    print("{}")
+    sys.exit(0)
