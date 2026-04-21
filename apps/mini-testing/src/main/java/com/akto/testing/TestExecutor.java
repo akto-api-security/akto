@@ -1033,10 +1033,13 @@ public class TestExecutor {
         if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
             TestingConfigurations instance = TestingConfigurations.getInstance();
             String sampleMessage = messages.get(messages.size() - 1);
+            int currentAccountId = Context.accountId.get();
             TestingRunResult testingRunResult = null;
-            Future<TestingRunResult> future = legacyTestTimeoutExecutor.submit(() ->
-                runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
-                    instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage));
+            Future<TestingRunResult> future = legacyTestTimeoutExecutor.submit(() -> {
+                Context.accountId.set(currentAccountId);
+                return runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
+                    instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+            });
             try {
                 testingRunResult = future.get(MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
             } catch (TimeoutException e) {
