@@ -201,7 +201,7 @@ def send_ingestion_data(
         tags=tags,
         status_code=status_code,
     )
-    logger.info(f">>>>>>>>>>>>>>>>>Ingestion payload: {json.dumps(payload)}")
+    logger.debug(f">>>>>>>>>>>>>>>>>Ingestion payload: {json.dumps(payload)}")
     try:
         result = post_payload_json(
             build_http_proxy_url(guardrails=guardrails, ingest_data=True, client_hook=hook_name),
@@ -228,7 +228,7 @@ def run_observability_hook(hook_name: str) -> None:
             hook_name=hook_name,
             request_payload=input_data,
             response_payload={},
-            guardrails=AKTO_SYNC_MODE,
+            guardrails=False,
             logger=logger,
         )
         logger.info(f"=== {hook_name} hook completed ===")
