@@ -3,10 +3,12 @@
 import json
 import logging
 import os
+import re
 import ssl
 import sys
 import time
 import urllib.request
+from urllib.parse import quote
 from typing import Any, Dict, Tuple, Union
 
 from akto_machine_id import get_machine_id, get_username
@@ -38,9 +40,10 @@ AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
 AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "claudecli")
 AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
-# Mirrored path: /mcp matches JsonRpcUtils.isMcpPath; non-MCP stays LLM-style so it is not MCP-classified
+# Mirrored path: /mcp matches JsonRpcUtils.isMcpPath; non-MCP uses /{prefix}/{normalized-tool-name}
 MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
-NON_MCP_INGEST_PATH = os.getenv("NON_MCP_INGEST_PATH", "/v1/messages")
+# Optional: force a fixed non-MCP path (overrides tool-based path). Default: derive from tool name.
+NON_MCP_TOOL_PATH_PREFIX = os.getenv("NON_MCP_TOOL_PATH_PREFIX", "/tool")
 
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
@@ -108,6 +111,30 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 # Ref: https://code.claude.com/docs/en/hooks#match-mcp-tools
 # Ingested traffic is classified as MCP when the mirrored request is JSON-RPC with an MCP method
 # (see com.akto.mcp.McpRequestResponseUtils#isMcpRequest). Non-MCP tools must omit top-level jsonrpc.
+
+
+def normalize_tool_name_for_url_path(tool_name: str) -> str:
+    """RFC 3986 path segment: unreserved + hyphen; collapse repeats."""
+    s = (tool_name or "unknown").strip()
+    s = re.sub(r"[^a-zA-Z0-9._~-]+", "-", s)
+    s = re.sub(r"-+", "-", s).strip("-")
+    if not s:
+        s = "unknown"
+    return quote(s, safe=".-_~")
+
+
+def non_mcp_ingest_path(tool_name: str) -> str:
+    """Non-MCP mirrored path: NON_MCP_INGEST_PATH if set, else NON_MCP_TOOL_PATH_PREFIX + normalized tool name."""
+    fixed = (os.getenv("NON_MCP_INGEST_PATH") or "").strip()
+    if fixed:
+        return fixed if fixed.startswith("/") else "/" + fixed
+    prefix = (NON_MCP_TOOL_PATH_PREFIX or "/tool").strip()
+    if not prefix.startswith("/"):
+        prefix = "/" + prefix
+    prefix = prefix.rstrip("/")
+    if not prefix:
+        prefix = "/tool"
+    return f"{prefix}/{normalize_tool_name_for_url_path(tool_name)}"
 
 
 def parse_claude_tool(tool_name: str) -> Tuple[bool, str, str]:
@@ -187,7 +214,7 @@ def build_validation_request(
         request_payload = json.dumps({"body": tool_input, "toolName": tool_name})
     response_payload = json.dumps({})
 
-    path = MCP_INGEST_PATH if is_mcp else NON_MCP_INGEST_PATH
+    path = MCP_INGEST_PATH if is_mcp else non_mcp_ingest_path(tool_name)
     return {
         "path": path,
         "requestHeaders": request_headers,
