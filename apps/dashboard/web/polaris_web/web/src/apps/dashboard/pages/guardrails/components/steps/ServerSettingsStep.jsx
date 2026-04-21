@@ -1,8 +1,8 @@
-import { VerticalStack, Text, FormLayout, Box, Checkbox, RadioButton, HorizontalStack, Icon, Tooltip } from "@shopify/polaris";
-import { InfoMinor } from "@shopify/polaris-icons";
+import { VerticalStack, Text, FormLayout, Box, Checkbox, RadioButton } from "@shopify/polaris";
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
 import OwaspTag from "../OwaspTag";
 import RuleEnforcementDropdown from "../RuleEnforcementDropdown";
+import TitleWithInfo from "../../../../components/shared/TitleWithInfo";
 
 export const ServerSettingsConfig = {
     number: 10,
@@ -15,12 +15,8 @@ export const ServerSettingsConfig = {
     getSummary: ({ applyToAllServers, selectedMcpServers, selectedAgentServers, mcpServers, agentServers, applyOnRequest, applyOnResponse, policyBehaviour }) => {
         const appSettings = (applyOnRequest || applyOnResponse) ?
             ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
-        const behaviourSuffix = policyBehaviour ? ` — ${policyBehaviour}` : '';
-
-        if (applyToAllServers) {
-            return `All servers${appSettings}${behaviourSuffix}`;
-        }
-
+        const behaviourSuffix = policyBehaviour ? `Rule behaviour: ${policyBehaviour}` : '';
+        let summary = '';
         if (selectedMcpServers?.length > 0 || selectedAgentServers?.length > 0) {
             const serverSummary = [];
             if (selectedMcpServers.length > 0) {
@@ -43,12 +39,13 @@ export const ServerSettingsConfig = {
                 const agentMore = selectedAgentServers.length > 2 ? ` +${selectedAgentServers.length - 2}` : '';
                 serverSummary.push(`Agent: ${agentNames.join(", ")}${agentMore}`);
             }
-            return `${serverSummary.join(", ")}${appSettings}${behaviourSuffix}`;
+            summary = `${serverSummary.join(", ")}`;
         }
-        if (policyBehaviour) {
-            return `Rule behaviour: ${policyBehaviour}`;
+        summary += `${appSettings} ${behaviourSuffix}`;
+        if(applyToAllServers) {
+            summary += ` All servers:  true`;
         }
-        return null;
+        return summary;
     }
 };
 
@@ -81,32 +78,29 @@ const ServerSettingsStep = ({
                     <VerticalStack gap="3">
                         <Text variant="headingSm">Server targeting</Text>
                         <VerticalStack gap="2">
+                            <Box>
                             <RadioButton
                                 label={
-                                    <HorizontalStack gap="1" blockAlign="center">
-                                        <span>Apply to all</span>
-                                        <Tooltip
-                                            content="Policy will be applied to all servers that are currently detected and any newly detected servers."
-                                            dismissOnMouseOut
-                                        >
-                                            <span style={{ display: 'inline-flex', cursor: 'help', lineHeight: 0 }}>
-                                                <Icon source={InfoMinor} tone="subdued" />
-                                            </span>
-                                        </Tooltip>
-                                    </HorizontalStack>
+                                    <TitleWithInfo
+                                        titleComp={<Text variant="bodyMd">Apply to all</Text>}
+                                        tooltipContent="Policy will be applied to all servers that are currently detected and any newly detected servers."
+                                    />
                                 }
                                 checked={applyToAllServers === true}
                                 id="apply_to_all_servers"
                                 name="serverTargeting"
                                 onChange={() => setApplyToAllServers(true)}
                             />
-                            <RadioButton
-                                label="Edit servers"
-                                checked={applyToAllServers === false}
-                                id="edit_servers"
-                                name="serverTargeting"
-                                onChange={() => setApplyToAllServers(false)}
-                            />
+                            </Box>
+                            <Box>   
+                                <RadioButton
+                                    label="Edit servers"
+                                    checked={applyToAllServers === false}
+                                    id="edit_servers"
+                                    name="serverTargeting"
+                                    onChange={() => setApplyToAllServers(false)}
+                                />
+                            </Box>
                         </VerticalStack>
 
                         {applyToAllServers === false && (
