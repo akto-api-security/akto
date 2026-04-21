@@ -36,6 +36,8 @@ MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
+# Non-MCP PostToolUse ingestion is off by default; set AKTO_INGEST_NON_MCP_TOOLS=true to send it.
+AKTO_INGEST_NON_MCP_TOOLS = os.getenv("AKTO_INGEST_NON_MCP_TOOLS", "false").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
 AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "claudecli")
 AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
@@ -270,6 +272,12 @@ def send_ingestion_data(
 
     if not tool_response:
         logger.info("Skipping ingestion due to empty tool response")
+        return
+
+    if not is_mcp and not AKTO_INGEST_NON_MCP_TOOLS:
+        logger.info(
+            "Skipping non-MCP tool response ingestion (set AKTO_INGEST_NON_MCP_TOOLS=true to re-enable)"
+        )
         return
 
     if is_mcp:
