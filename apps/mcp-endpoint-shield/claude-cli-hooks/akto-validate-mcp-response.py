@@ -34,20 +34,20 @@ MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
-AKTO_MCP_CLIENT_TAG = os.getenv("AKTO_MCP_CLIENT_TAG", AKTO_CONNECTOR)
+AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claudecli")
 AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
+# Mirrored path: /mcp matches JsonRpcUtils.isMcpPath; non-MCP stays LLM-style so it is not MCP-classified
 MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
 NON_MCP_INGEST_PATH = os.getenv("NON_MCP_INGEST_PATH", "/v1/messages")
 
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
+DEVICE_ID = os.getenv("DEVICE_ID") or get_machine_id()
 
 if MODE == "atlas":
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    CLAUDE_API_URL = f"https://{device_id}.ai-agent.claudecli" if device_id else "https://api.anthropic.com"
-    logger.info(f"MODE: {MODE}, Device ID: {device_id}, CLAUDE_API_URL: {CLAUDE_API_URL}")
+    CLAUDE_API_URL = f"https://{DEVICE_ID}.ai-agent.{AKTO_CONNECTOR}" if DEVICE_ID else "https://api.anthropic.com"
+    logger.info(f"MODE: {MODE}, Device ID: {DEVICE_ID}, CLAUDE_API_URL: {CLAUDE_API_URL}")
 else:
     CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
     logger.info(f"MODE: {MODE}, CLAUDE_API_URL: {CLAUDE_API_URL}")
@@ -147,17 +147,20 @@ def build_tools_call_result_jsonrpc(tool_response: Any, request_id: int = 1) -> 
     return json.dumps({"jsonrpc": "2.0", "id": request_id, "result": result_body})
 
 
+def mcp_mirror_host(mcp_server_name: str) -> str:
+    return f"{DEVICE_ID}.{AKTO_CONNECTOR}.{mcp_server_name}"
+
 def build_hook_tags(*, is_mcp: bool) -> Dict[str, str]:
-    """Same tagging as akto-validate-mcp-request (mcp-client + mcp-server for MCP tool traffic)."""
-    tags: Dict[str, str] = {"gen-ai": "Gen AI", "tool-use": "Tool Execution"}
+    tags: Dict[str, str] = {}
     if is_mcp:
         tags["mcp-server"] = "MCP Server"
-        tags["mcp-client"] = AKTO_MCP_CLIENT_TAG
+        tags["mcp-client"] = AKTO_CONNECTOR
+    else:
+        tags["gen-ai"] = "Gen AI"
+        tags["ai-agent"] = AKTO_CONNECTOR
     if MODE == "atlas":
-        tags["ai-agent"] = "claudecli"
         tags["source"] = CONTEXT_SOURCE
     return tags
-
 
 def build_ingestion_payload(
     tool_name: str,
@@ -170,8 +173,10 @@ def build_ingestion_payload(
 ) -> Dict[str, Any]:
     tags = build_hook_tags(is_mcp=is_mcp)
 
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
+    if is_mcp:
+        host = mcp_mirror_host(mcp_server_name)
+    else:
+        host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
 
     req_hdr: Dict[str, str] = {
         "host": host,
@@ -207,7 +212,7 @@ def build_ingestion_payload(
         "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
-        "akto_vxlan_id": device_id,
+        "akto_vxlan_id": 0,
         "is_pending": "false",
         "source": "MIRRORING",
         "direction": None,
