@@ -164,7 +164,7 @@ func filterPoliciesByMcpServer(policies []types.Policy, mcpServerName string) []
 	mcpServerNameLower := strings.ToLower(mcpServerName)
 	filtered := make([]types.Policy, 0, len(policies))
 	for _, policy := range policies {
-		if policy.IsYamlPolicy {
+		if policy.IsYamlPolicy || policy.ApplyToAllServers {
 			filtered = append(filtered, policy)
 			continue
 		}
