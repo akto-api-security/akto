@@ -3,7 +3,8 @@ module github.com/akto-api-security/guardrails-service
 go 1.24.2
 
 require (
-	github.com/akto-api-security/mcp-endpoint-shield v0.0.0-20260421201605-ea7d367505ba
+	github.com/akto-api-security/mcp-endpoint-shield v0.0.0-20260421170812-d5ba8b0bbdbb
+	github.com/bytedance/gopkg v0.1.3
 	github.com/gin-gonic/gin v1.11.0
 	github.com/segmentio/kafka-go v0.4.49
 	github.com/tsawler/tabula v1.6.6
@@ -74,4 +75,4 @@ require (
 	modernc.org/sqlite v1.40.1 // indirect
 )
 
-replace github.com/akto-api-security/mcp-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260421201605-ea7d367505ba
+replace github.com/akto-api-security/mcp-endpoint-shield => github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260421170812-d5ba8b0bbdbb
