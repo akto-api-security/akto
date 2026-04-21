@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash INSTALL_DIR/akto-validate-prompt-wrapper.sh",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash INSTALL_DIR/akto-validate-pre-tool-wrapper.sh",
+            "timeout": 60
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash INSTALL_DIR/akto-validate-post-tool-wrapper.sh",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "session_id": "sample-session",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "ls -la"
+  },
+  "cwd": "/tmp/project",
+  "permission_mode": "default"
+}
