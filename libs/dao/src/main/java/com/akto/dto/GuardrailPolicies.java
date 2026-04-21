@@ -74,6 +74,7 @@ public class GuardrailPolicies {
     private List<SelectedServer> selectedAgentServersV2;
     private boolean applyOnResponse;
     private boolean applyOnRequest;
+    private boolean applyToAllServers;
 
     /** Policy-wide rule behaviour: {@code "block"}, {@code "warn"}, or {@code "alert"}. */
     private String behaviour;

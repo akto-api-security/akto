@@ -1,4 +1,5 @@
-import { VerticalStack, Text, FormLayout, Box, Checkbox } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, Box, Checkbox, RadioButton, HorizontalStack, Icon, Tooltip } from "@shopify/polaris";
+import { InfoMinor } from "@shopify/polaris-icons";
 import DropdownSearch from "../../../../components/shared/DropdownSearch";
 import OwaspTag from "../OwaspTag";
 import RuleEnforcementDropdown from "../RuleEnforcementDropdown";
@@ -11,7 +12,15 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ selectedMcpServers, selectedAgentServers, mcpServers, agentServers, applyOnRequest, applyOnResponse, policyBehaviour }) => {
+    getSummary: ({ applyToAllServers, selectedMcpServers, selectedAgentServers, mcpServers, agentServers, applyOnRequest, applyOnResponse, policyBehaviour }) => {
+        const appSettings = (applyOnRequest || applyOnResponse) ?
+            ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
+        const behaviourSuffix = policyBehaviour ? ` — ${policyBehaviour}` : '';
+
+        if (applyToAllServers) {
+            return `All servers${appSettings}${behaviourSuffix}`;
+        }
+
         if (selectedMcpServers?.length > 0 || selectedAgentServers?.length > 0) {
             const serverSummary = [];
             if (selectedMcpServers.length > 0) {
@@ -34,9 +43,6 @@ export const ServerSettingsConfig = {
                 const agentMore = selectedAgentServers.length > 2 ? ` +${selectedAgentServers.length - 2}` : '';
                 serverSummary.push(`Agent: ${agentNames.join(", ")}${agentMore}`);
             }
-            const appSettings = (applyOnRequest || applyOnResponse) ?
-                ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
-            const behaviourSuffix = policyBehaviour ? ` — ${policyBehaviour}` : '';
             return `${serverSummary.join(", ")}${appSettings}${behaviourSuffix}`;
         }
         if (policyBehaviour) {
@@ -47,6 +53,8 @@ export const ServerSettingsConfig = {
 };
 
 const ServerSettingsStep = ({
+    applyToAllServers,
+    setApplyToAllServers,
     selectedMcpServers,
     setSelectedMcpServers,
     selectedAgentServers,
@@ -69,27 +77,64 @@ const ServerSettingsStep = ({
             <OwaspTag stepNumber={10} />
 
             <FormLayout>
-                <DropdownSearch
-                    label="Select MCP Servers"
-                    placeholder="Choose MCP servers where guardrail should be applied"
-                    optionsList={mcpServers}
-                    setSelected={setSelectedMcpServers}
-                    preSelected={selectedMcpServers}
-                    allowMultiple={true}
-                    showSelectAllMinOptions={1}
-                    disabled={collectionsLoading}
-                />
+                <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
+                    <VerticalStack gap="3">
+                        <Text variant="headingSm">Server targeting</Text>
+                        <VerticalStack gap="2">
+                            <RadioButton
+                                label={
+                                    <HorizontalStack gap="1" blockAlign="center">
+                                        <span>Apply to all</span>
+                                        <Tooltip
+                                            content="Policy will be applied to all servers that are currently detected and any newly detected servers."
+                                            dismissOnMouseOut
+                                        >
+                                            <span style={{ display: 'inline-flex', cursor: 'help', lineHeight: 0 }}>
+                                                <Icon source={InfoMinor} tone="subdued" />
+                                            </span>
+                                        </Tooltip>
+                                    </HorizontalStack>
+                                }
+                                checked={applyToAllServers === true}
+                                id="apply_to_all_servers"
+                                name="serverTargeting"
+                                onChange={() => setApplyToAllServers(true)}
+                            />
+                            <RadioButton
+                                label="Edit servers"
+                                checked={applyToAllServers === false}
+                                id="edit_servers"
+                                name="serverTargeting"
+                                onChange={() => setApplyToAllServers(false)}
+                            />
+                        </VerticalStack>
 
-                <DropdownSearch
-                    label="Select Agent Servers"
-                    placeholder="Choose agent servers where guardrail should be applied"
-                    optionsList={agentServers}
-                    setSelected={setSelectedAgentServers}
-                    preSelected={selectedAgentServers}
-                    allowMultiple={true}
-                    showSelectAllMinOptions={1}
-                    disabled={collectionsLoading}
-                />
+                        {applyToAllServers === false && (
+                            <VerticalStack gap="3">
+                                <DropdownSearch
+                                    label="Select MCP Servers"
+                                    placeholder="Choose MCP servers where guardrail should be applied"
+                                    optionsList={mcpServers}
+                                    setSelected={setSelectedMcpServers}
+                                    preSelected={selectedMcpServers}
+                                    allowMultiple={true}
+                                    showSelectAllMinOptions={1}
+                                    disabled={collectionsLoading}
+                                />
+                                <DropdownSearch
+                                    label="Select Agent Servers"
+                                    placeholder="Choose agent servers where guardrail should be applied"
+                                    optionsList={agentServers}
+                                    setSelected={setSelectedAgentServers}
+                                    preSelected={selectedAgentServers}
+                                    allowMultiple={true}
+                                    showSelectAllMinOptions={1}
+                                    disabled={collectionsLoading}
+                                />
+                            </VerticalStack>
+                        )}
+                    </VerticalStack>
+                </Box>
 
                 <Box padding="4" borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
                     <VerticalStack gap="3">

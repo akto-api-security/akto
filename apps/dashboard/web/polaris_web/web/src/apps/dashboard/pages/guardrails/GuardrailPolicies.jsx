@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
-import CreateGuardrailModal from "./components/CreateGuardrailModal";
 import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
@@ -317,18 +316,22 @@ function GuardrailPolicies() {
         }
 
         // Server configuration details using effective methods
-        const serverDetails = [];
-        const effectiveMcpServers = getEffectiveSelectedMcpServers(policy);
-        const effectiveAgentServers = getEffectiveSelectedAgentServers(policy);
-        
-        if (effectiveMcpServers.length > 0) {
-            serverDetails.push(`${effectiveMcpServers.length} MCP Server${effectiveMcpServers.length > 1 ? 's' : ''}`);
-        }
-        if (effectiveAgentServers.length > 0) {
-            serverDetails.push(`${effectiveAgentServers.length} Agent Server${effectiveAgentServers.length > 1 ? 's' : ''}`);
-        }
-        if (serverDetails.length > 0) {
-            details.push({ label: "Target Servers", value: serverDetails.join(", ") });
+        if (policy.applyToAllServers || policy.applyToAllServers == null) {
+            details.push({ label: "Target Servers", value: "All servers" });
+        } else {
+            const serverDetails = [];
+            const effectiveMcpServers = getEffectiveSelectedMcpServers(policy);
+            const effectiveAgentServers = getEffectiveSelectedAgentServers(policy);
+
+            if (effectiveMcpServers.length > 0) {
+                serverDetails.push(`${effectiveMcpServers.length} MCP Server${effectiveMcpServers.length > 1 ? 's' : ''}`);
+            }
+            if (effectiveAgentServers.length > 0) {
+                serverDetails.push(`${effectiveAgentServers.length} Agent Server${effectiveAgentServers.length > 1 ? 's' : ''}`);
+            }
+            if (serverDetails.length > 0) {
+                details.push({ label: "Target Servers", value: serverDetails.join(", ") });
+            }
         }
 
         // Application scope
@@ -490,6 +493,7 @@ function GuardrailPolicies() {
                 ...(guardrailData.secretsDetection ? { secretsDetection: guardrailData.secretsDetection } : {}),
                 ...(guardrailData.sentimentDetection ? { sentimentDetection: guardrailData.sentimentDetection } : {}),
                 ...(guardrailData.tokenLimitDetection ? { tokenLimitDetection: guardrailData.tokenLimitDetection } : {}),
+                applyToAllServers: guardrailData.applyToAllServers ?? true,
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 behaviour: guardrailData.behaviour != null
