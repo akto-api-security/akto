@@ -40,7 +40,7 @@ def main():
             request_payload={**input_data, "user_prompt": user_prompt},
             response_payload={},
             tags=None,
-            guardrails=True,
+            guardrails=False,
             logger=logger,
         )
 

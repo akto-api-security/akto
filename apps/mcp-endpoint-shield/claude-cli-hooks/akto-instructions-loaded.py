@@ -26,7 +26,7 @@ def main():
             request_payload={**input_data, "file_content": file_content},
             response_payload={},
             tags=None,
-            guardrails=AKTO_SYNC_MODE,
+            guardrails=False,
             logger=logger,
         )
 
