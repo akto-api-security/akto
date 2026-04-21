@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import socket
 import ssl
 import sys
 import time
@@ -36,7 +37,8 @@ AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
 AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
-CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
+AKTO_HOST = os.getenv("AKTO_HOST", "")
+CONTEXT_SOURCE = "ENDPOINT" if MODE == "atlas" else "AGENTIC"
 
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
@@ -48,6 +50,17 @@ if MODE == "atlas":
 else:
     CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
     logger.info(f"MODE: {MODE}, CLAUDE_API_URL: {CLAUDE_API_URL}")
+
+
+def get_device_ip() -> str:
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "0.0.0.0"
 
 
 def create_ssl_context():
@@ -122,8 +135,7 @@ def build_ingestion_payload(
         tags["ai-agent"] = "claudecli"
         tags["source"] = CONTEXT_SOURCE
 
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
+    host = AKTO_HOST or CLAUDE_API_URL.replace("https://", "").replace("http://", "")
 
     request_headers = json.dumps(
         {
@@ -145,14 +157,14 @@ def build_ingestion_payload(
         "method": "POST",
         "requestPayload": request_payload,
         "responsePayload": response_payload,
-        "ip": get_username(),
+        "ip": get_username() if MODE == "atlas" else get_device_ip(),
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": "200",
         "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
-        "akto_vxlan_id": device_id,
+        "akto_vxlan_id": "0",
         "is_pending": "false",
         "source": "MIRRORING",
         "direction": None,
