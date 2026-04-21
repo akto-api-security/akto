@@ -37,6 +37,15 @@ public class Producer {
     public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords, AtomicInteger throttleNumber) throws Exception{
         // logging to show exactly what Kafka URL is being used
         loggerMaker.infoAndAddToDb("Environment LOCAL_KAFKA_BROKER_URL = " + (Constants.LOCAL_KAFKA_BROKER_URL != null ? Constants.LOCAL_KAFKA_BROKER_URL : "NOT SET"));
+        int currentAccountId = Context.accountId.get();
+        if (currentAccountId == 1764738582) {
+            loggerMaker.infoAndAddToDb("[DEBUG-KAFKA-1764738582] pushMessagesToKafka called."
+                + " producer null: " + (producer == null)
+                + " | producerReady: " + (producer != null ? producer.producerReady : "N/A")
+                + " | brokerUrl: " + Constants.LOCAL_KAFKA_BROKER_URL
+                + " | IS_NEW_TESTING_ENABLED: " + Constants.IS_NEW_TESTING_ENABLED
+                + " | messageCount: " + messages.size());
+        }
         for(SingleTestPayload singleTestPayload: messages){
             String messageString = singleTestPayload.toString();
             try {
@@ -243,6 +252,12 @@ public class Producer {
     }
 
     public void initProducer(TestingRun testingRun, ObjectId summaryId, boolean doInitOnly, SyncLimit syncLimit){
+        loggerMaker.infoAndAddToDb("[DEBUG-KAFKA] initProducer called."
+            + " IS_NEW_TESTING_ENABLED: " + Constants.IS_NEW_TESTING_ENABLED
+            + " | brokerUrl: " + Constants.LOCAL_KAFKA_BROKER_URL
+            + " | producerStatus: " + getProducerStatus()
+            + " | doInitOnly: " + doInitOnly
+            + " | summaryId: " + summaryId);
         TestExecutor executor = new TestExecutor();
         if(!doInitOnly){
             try {

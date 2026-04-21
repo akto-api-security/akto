@@ -997,6 +997,16 @@ public class TestExecutor {
                 Producer.pushMessagesToKafka(Arrays.asList(singleTestPayload), totalRecords, throttleNumber);
             } catch (Exception e) {
                 loggerMaker.insertImportantTestingLog("Kafka push failed. Error: " + e.getMessage());
+                if (accountId == 1764738582) {
+                    loggerMaker.errorAndAddToDb(e, "[DEBUG-KAFKA-1764738582] Kafka push failed."
+                        + " apiInfoKey: " + apiInfoKey
+                        + " | subcategory: " + testSubType
+                        + " | summaryId: " + summaryId
+                        + " | currentExecutionFallback: " + currentExecutionFallback
+                        + " | errorType: " + e.getClass().getName()
+                        + " | cause: " + (e.getCause() != null ? e.getCause().getClass().getName() + " - " + e.getCause().getMessage() : "none")
+                        + " | producerStatus: " + Producer.getProducerStatus());
+                }
                 executeLegacyTesting(apiInfoKey, summaryId, messages, testConfig, testLogs, isApiInfoTested);
                 throttleNumber.decrementAndGet();
             }
@@ -1009,6 +1019,9 @@ public class TestExecutor {
         return null;
     }
 
+    private static final ExecutorService legacyTestTimeoutExecutor = Executors.newCachedThreadPool();
+    private static final int MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS = 5 * 60;
+
     /**
      * Executes legacy testing approach (fallback mode)
      * @return TestingRunResult if test executed, null otherwise
@@ -1020,14 +1033,25 @@ public class TestExecutor {
         if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
             TestingConfigurations instance = TestingConfigurations.getInstance();
             String sampleMessage = messages.get(messages.size() - 1);
-            TestingRunResult testingRunResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig, instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+            TestingRunResult testingRunResult = null;
+            Future<TestingRunResult> future = legacyTestTimeoutExecutor.submit(() ->
+                runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
+                    instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage));
+            try {
+                testingRunResult = future.get(MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            } catch (TimeoutException e) {
+                future.cancel(true);
+                loggerMaker.errorAndAddToDb(e, "Legacy test timed out after " + MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS + "s for apiInfoKey: " + apiInfoKey);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Legacy test execution error for apiInfoKey: " + apiInfoKey);
+            }
             if (testingRunResult != null) {
                 List<String> errorList = testingRunResult.getErrorsList();
                 if (errorList == null || !errorList.contains(TestResult.API_CALL_FAILED_ERROR_STRING)) {
                     isApiInfoTested.set(true);
                 }
+                insertResultsAndMakeIssues(Collections.singletonList(testingRunResult), summaryId);
             }
-            insertResultsAndMakeIssues(Collections.singletonList(testingRunResult), summaryId);
             return testingRunResult;
         }
         return null;
