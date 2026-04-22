@@ -32,6 +32,7 @@ import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.ip_api_counter.DistributionDataForwardLayer;
+import com.akto.threat.detection.ip_api_counter.DistributionStreamConsumer;
 import com.akto.threat.detection.tasks.ConfigPoller;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
@@ -111,12 +112,21 @@ public class Main {
     initCustomDataTypeScheduler();
 
     CmsCounterLayer.initialize(localRedis);
-    DistributionCalculator distributionCalculator = new DistributionCalculator();
-    DistributionDataForwardLayer distributionDataForwardLayer = new DistributionDataForwardLayer(localRedis, distributionCalculator);
+    DistributionCalculator distributionCalculator = localRedis != null
+        ? new DistributionCalculator(CmsCounterLayer.getInstance(), localRedis)
+        : null;
+    DistributionDataForwardLayer distributionDataForwardLayer = localRedis != null
+        ? new DistributionDataForwardLayer(localRedis)
+        : null;
 
     boolean apiDistributionEnabled = Utils.apiDistributionEnabled(localRedis != null, System.getenv().getOrDefault("API_DISTRIBUTION_ENABLED", "true").equals("true"));
 
     triggerDistributionDataForwardCron(apiDistributionEnabled, distributionDataForwardLayer);
+
+    // Start distribution stream consumers (background threads)
+    if (localRedis != null && apiDistributionEnabled) {
+        startDistributionStreamConsumers(localRedis);
+    }
 
     String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss"));
     logger.warnAndAddToDb("Initialization finished starting DetectorTask at " + currentTime);
@@ -162,6 +172,17 @@ public class Main {
     } catch (Exception e) {
         logger.errorAndAddToDb(e,"Error scheduling relayApiCountInfoCron : {} ");
     }
+  }
+
+  public static void startDistributionStreamConsumers(RedisClient redisClient) {
+    int consumerCount = 2;
+    java.util.concurrent.ExecutorService streamExecutor = Executors.newFixedThreadPool(consumerCount);
+    String hostname = System.getenv().getOrDefault("HOSTNAME", "unknown");
+    for (int i = 0; i < consumerCount; i++) {
+        String consumerId = hostname + "-stream-" + i;
+        streamExecutor.submit(new DistributionStreamConsumer(redisClient, consumerId));
+    }
+    logger.infoAndAddToDb("Started " + consumerCount + " distribution stream consumers");
   }
 
   public static RedisClient createLocalRedisClient() {
