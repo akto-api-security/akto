@@ -12,6 +12,12 @@ These hooks provide the same four guardrails behaviours as `claude-cli-hooks/`, 
 | `akto_stop` | `Stop` | Ingests completed conversation turn for observability |
 | `akto_pre_tool_use` | `PreToolUse` | Validates MCP/built-in tool calls; blocks if denied |
 | `akto_post_tool_use` | `PostToolUse` | Ingests tool execution results for observability |
+| `akto_post_tool_use_failure` | `PostToolUseFailure` | Ingests tool failure data for observability |
+| `akto_subagent_start` | `SubagentStart` | Ingests subagent initialization data for observability |
+| `akto_subagent_stop` | `SubagentStop` | Ingests subagent completion data for observability |
+| `akto_pre_compact` | `PreCompact` | Ingests conversation compaction data for observability |
+| `akto_permission_request` | `PermissionRequest` | Ingests permission request data for observability |
+| `akto_notification` | `Notification` | Ingests agent status notifications for observability |
 
 ## Installation
 
@@ -29,20 +35,34 @@ claude-agent-sdk-hooks/
 ## Usage
 
 ```python
-from hooks import (
-    akto_user_prompt_submit,
-    akto_stop,
-    akto_pre_tool_use,
-    akto_post_tool_use,
-)
+from hooks import create_hooks
 from claude_agent_sdk import ClaudeAgentOptions, HookMatcher
+
+(
+    user_prompt_submit,
+    stop,
+    pre_tool_use,
+    post_tool_use,
+    post_tool_use_failure,
+    subagent_start,
+    subagent_stop,
+    pre_compact,
+    permission_request,
+    notification,
+) = create_hooks(client_ip=request.remote_addr)
 
 options = ClaudeAgentOptions(
     hooks={
-        "UserPromptSubmit": [HookMatcher(hooks=[akto_user_prompt_submit])],
-        "Stop":             [HookMatcher(hooks=[akto_stop])],
-        "PreToolUse":       [HookMatcher(hooks=[akto_pre_tool_use])],
-        "PostToolUse":      [HookMatcher(hooks=[akto_post_tool_use])],
+        "UserPromptSubmit":   [HookMatcher(hooks=[user_prompt_submit])],
+        "Stop":               [HookMatcher(hooks=[stop])],
+        "PreToolUse":         [HookMatcher(hooks=[pre_tool_use])],
+        "PostToolUse":        [HookMatcher(hooks=[post_tool_use])],
+        "PostToolUseFailure": [HookMatcher(hooks=[post_tool_use_failure])],
+        "SubagentStart":      [HookMatcher(hooks=[subagent_start])],
+        "SubagentStop":       [HookMatcher(hooks=[subagent_stop])],
+        "PreCompact":         [HookMatcher(hooks=[pre_compact])],
+        "PermissionRequest":  [HookMatcher(hooks=[permission_request])],
+        "Notification":       [HookMatcher(hooks=[notification])],
     }
 )
 ```

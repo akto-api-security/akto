@@ -47,6 +47,7 @@ from akto_guardrails_core import (
     ingest_blocked_response_async,
     _is_warn_behaviour,
     prompt_fingerprint,
+    send_generic_hook_ingestion_async,
     send_mcp_response_ingestion_async,
     send_stop_ingestion_async,
 )
@@ -56,16 +57,20 @@ logger = logging.getLogger(__name__)
 
 def create_hooks(client_ip: str = ""):
     """
-    Create the four Akto guardrails callbacks bound to a client IP.
+    Create all Akto guardrails callbacks bound to a client IP.
 
     Args:
         client_ip: IP address of the client calling the agent.
                    Falls back to DEFAULT_CLIENT_IP ("0.0.0.0") if empty.
 
     Returns:
-        Tuple of (akto_user_prompt_submit, akto_stop, akto_pre_tool_use, akto_post_tool_use).
-        akto_stop enforces response guardrails (SYNC_MODE=true) or ingests observationally
-        (SYNC_MODE=false), mirroring the behaviour of akto_user_prompt_submit for requests.
+        10-tuple of:
+        (akto_user_prompt_submit, akto_stop, akto_pre_tool_use, akto_post_tool_use,
+         akto_post_tool_use_failure, akto_subagent_start, akto_subagent_stop,
+         akto_pre_compact, akto_permission_request, akto_notification)
+
+        The first four enforce or observe guardrails. The last six are observability-only
+        hooks that log and ingest full input_data without blocking.
     """
     _ip = client_ip or DEFAULT_CLIENT_IP
 
@@ -203,4 +208,45 @@ def create_hooks(client_ip: str = ""):
 
         return {}
 
-    return akto_user_prompt_submit, akto_stop, akto_pre_tool_use, akto_post_tool_use
+    async def akto_post_tool_use_failure(input_data: dict, tool_use_id, context) -> dict:
+        logger.info(f"PostToolUseFailure hook: input_data={input_data}")
+        asyncio.create_task(send_generic_hook_ingestion_async("PostToolUseFailure", input_data, _ip))
+        return {}
+
+    async def akto_subagent_start(input_data: dict, tool_use_id, context) -> dict:
+        logger.info(f"SubagentStart hook: input_data={input_data}")
+        asyncio.create_task(send_generic_hook_ingestion_async("SubagentStart", input_data, _ip))
+        return {}
+
+    async def akto_subagent_stop(input_data: dict, tool_use_id, context) -> dict:
+        logger.info(f"SubagentStop hook: input_data={input_data}")
+        asyncio.create_task(send_generic_hook_ingestion_async("SubagentStop", input_data, _ip))
+        return {}
+
+    async def akto_pre_compact(input_data: dict, tool_use_id, context) -> dict:
+        logger.info(f"PreCompact hook: input_data={input_data}")
+        asyncio.create_task(send_generic_hook_ingestion_async("PreCompact", input_data, _ip))
+        return {}
+
+    async def akto_permission_request(input_data: dict, tool_use_id, context) -> dict:
+        logger.info(f"PermissionRequest hook: input_data={input_data}")
+        asyncio.create_task(send_generic_hook_ingestion_async("PermissionRequest", input_data, _ip))
+        return {}
+
+    async def akto_notification(input_data: dict, tool_use_id, context) -> dict:
+        logger.info(f"Notification hook: input_data={input_data}")
+        asyncio.create_task(send_generic_hook_ingestion_async("Notification", input_data, _ip))
+        return {}
+
+    return (
+        akto_user_prompt_submit,
+        akto_stop,
+        akto_pre_tool_use,
+        akto_post_tool_use,
+        akto_post_tool_use_failure,
+        akto_subagent_start,
+        akto_subagent_stop,
+        akto_pre_compact,
+        akto_permission_request,
+        akto_notification,
+    )

@@ -508,6 +508,42 @@ async def send_stop_ingestion_async(user_prompt: str, response_text: str, client
     except Exception as e:
         logger.error(f"Conversation ingestion error: {e}")
 
+
+def build_generic_hook_payload(hook_event_name: str, input_data: dict, client_ip: str) -> Dict[str, Any]:
+    tags = {"gen-ai": "Gen AI", "agent-name": "claude-agent"}
+    request_headers = json.dumps({
+        "host": AKTO_HOST,
+        "x-claude-hook": hook_event_name,
+        "content-type": "application/json",
+    })
+    response_headers = json.dumps({"x-claude-hook": hook_event_name})
+    request_payload = json.dumps({"body": input_data})
+    response_payload = json.dumps({})
+    return _base_payload(
+        "/v1/hooks/" + hook_event_name,
+        request_headers,
+        response_headers,
+        request_payload,
+        response_payload,
+        "200",
+        tags,
+        client_ip,
+    )
+
+
+async def send_generic_hook_ingestion_async(hook_event_name: str, input_data: dict, client_ip: str) -> None:
+    if not _data_ingestion_url():
+        return
+    logger.info(f"Ingesting {hook_event_name} hook data")
+    try:
+        payload = build_generic_hook_payload(hook_event_name, input_data, client_ip)
+        await post_payload_json_async(
+            build_http_proxy_url(guardrails=False, ingest_data=True), payload
+        )
+        logger.info(f"{hook_event_name} ingestion successful")
+    except Exception as e:
+        logger.error(f"{hook_event_name} ingestion error: {e}")
+
 # ---------------------------------------------------------------------------
 # Warn-flow helpers (UserPromptSubmit)
 # ---------------------------------------------------------------------------
