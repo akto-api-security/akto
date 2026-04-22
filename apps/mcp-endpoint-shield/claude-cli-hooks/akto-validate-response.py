@@ -423,6 +423,12 @@ def send_ingestion_data(
 
 
 def main():
+    # Ensure UTF-8 I/O on Windows (system locale encoding can differ)
+    if hasattr(sys.stdin, "reconfigure"):
+        sys.stdin.reconfigure(encoding="utf-8")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
     logger.info(f"=== Hook execution started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
 
     try:
@@ -494,12 +500,12 @@ def main():
                     "decision": "block",
                     "reason": block_reason,
                 }
-                logger.warning(f"BLOCKING Stop - Reason: {gr_reason}")
+                logger.warning(f"BLOCKING Stop - Reason: {block_reason}")
                 print(json.dumps(output))
                 ingest_blocked_response(
                     user_prompt, response_text, gr_reason, session_info
                 )
-                sys.exit(0)
+                sys.exit(2)
 
         send_ingestion_data(user_prompt, response_text, session_info)
 
