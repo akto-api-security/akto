@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-"""Single dispatch file for all Akto Cursor hooks. Usage: python3 akto-hooks.py <hookName>"""
+import os
 import sys
-from akto_ingestion_utility import run_observability_hook
 
-_BLOCKING_HOOKS = {
-    "preToolUse",
-    "beforeShellExecution",
-    "beforeReadFile",
-    "beforeTabFileRead",
-}
+if not os.getenv("LOG_DIR"):
+    os.environ["LOG_DIR"] = os.path.expanduser("~/.cursor/akto/chat-logs")
+
+from akto_ingestion_utility import run_observability_hook
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

@@ -10,7 +10,6 @@ export AKTO_CONNECTOR="cursor"
 export CONTEXT_SOURCE="ENDPOINT"
 export DEVICE_ID="{{DEVICE_ID (optional)}}"
 
-export LOG_DIR="$HOME/.cursor/akto/logs"
 export LOG_LEVEL="INFO"
 export LOG_PAYLOADS="false"
 # export SSL_CERT_PATH="/path/to/ca-bundle.crt"

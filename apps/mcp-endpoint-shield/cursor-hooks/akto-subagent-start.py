@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""
-SubagentStart hook for Cursor - validates the triggering user prompt before subagent creation.
-Can block subagent creation via {"decision": "block", "reason": "..."}.
-"""
+
+import os
 import json
 import sys
 
+if not os.getenv("LOG_DIR"):
+    os.environ["LOG_DIR"] = os.path.expanduser("~/.cursor/akto/chat-logs")
+
 from akto_ingestion_utility import (
-    AKTO_SYNC_MODE,
     get_latest_message_for_cursor,
     send_ingestion_data,
     setup_logger,
@@ -35,7 +35,7 @@ def main():
             hook_name="subagentStart",
             request_payload={**input_data, "user_prompt": user_prompt},
             response_payload={},
-            guardrails=AKTO_SYNC_MODE,
+            guardrails=False,
             logger=logger,
         )
 

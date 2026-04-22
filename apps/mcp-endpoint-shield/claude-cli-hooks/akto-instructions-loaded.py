@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""
-InstructionsLoaded hook - logs and ingests instruction file load events.
-Observability only, cannot block.
-"""
+
+import os
 import json
 import sys
 
-from akto_ingestion_utility import AKTO_SYNC_MODE, MODE, read_file_content, send_ingestion_data, setup_logger
+if not os.getenv("LOG_DIR"):
+    os.environ["LOG_DIR"] = os.path.expanduser("~/.claude/akto/logs")
+
+from akto_ingestion_utility import MODE, read_file_content, send_ingestion_data, setup_logger
 
 logger = setup_logger("session.log")
 

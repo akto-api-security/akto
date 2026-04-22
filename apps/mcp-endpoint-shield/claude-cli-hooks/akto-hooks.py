@@ -2,7 +2,6 @@
 """Single dispatch file for all Akto Claude hooks. Usage: python3 akto-hooks.py <hookName>"""
 import os
 import sys
-import json
 
 if not os.getenv("LOG_DIR"):
     os.environ["LOG_DIR"] = os.path.expanduser("~/.claude/akto/logs")

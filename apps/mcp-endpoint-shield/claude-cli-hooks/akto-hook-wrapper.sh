@@ -12,7 +12,6 @@ export CONTEXT_SOURCE="ENDPOINT"
 export DEVICE_ID="{{DEVICE_ID (optional)}}"
 
 # Logging Configuration
-export LOG_DIR="~/.claude/akto/logs"
 export LOG_LEVEL="INFO"
 export LOG_PAYLOADS="false"
 

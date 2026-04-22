@@ -7,7 +7,6 @@ import json
 import sys
 
 from akto_ingestion_utility import (
-    AKTO_SYNC_MODE,
     MODE,
     get_last_user_prompt,
     send_ingestion_data,

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""
-SubagentStop hook - logs subagent completion and ingests conversation data.
-Can block subagent from stopping via {"decision": "block", "reason": "..."}.
-Can stop the main session via {"continue": false, "stopReason": "..."}.
-"""
+
+import os
 import json
 import sys
+
+if not os.getenv("LOG_DIR"):
+    os.environ["LOG_DIR"] = os.path.expanduser("~/.claude/akto/logs")
 
 from akto_ingestion_utility import (
     MODE,

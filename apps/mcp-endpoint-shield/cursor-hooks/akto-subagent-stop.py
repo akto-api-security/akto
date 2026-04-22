@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""
-SubagentStop hook for Cursor - logs subagent completion and ingests conversation data.
-Observability only - cannot block.
-"""
+
+import os
 import json
 import sys
 
+if not os.getenv("LOG_DIR"):
+    os.environ["LOG_DIR"] = os.path.expanduser("~/.cursor/akto/chat-logs")
+
 from akto_ingestion_utility import (
-    AKTO_SYNC_MODE,
     get_latest_message_for_cursor,
     send_ingestion_data,
     setup_logger,
@@ -39,7 +39,7 @@ def main():
             hook_name="subagentStop",
             request_payload={**input_data, "user_prompt": user_prompt},
             response_payload={"latest_assistant_message": response_text},
-            guardrails=not AKTO_SYNC_MODE,
+            guardrails=False,
             logger=logger,
         )
 
