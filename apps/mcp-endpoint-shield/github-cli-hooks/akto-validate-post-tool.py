@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import hashlib
 import json
 import logging
 import os
@@ -7,7 +8,7 @@ import ssl
 import sys
 import time
 import urllib.request
-from typing import Any, Dict, Union
+from typing import Any, Dict, Set, Tuple, Union
 from akto_machine_id import get_machine_id, get_username
 from akto_heartbeat import send_heartbeat
 
@@ -18,6 +19,7 @@ LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
+AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 MODE = os.getenv("MODE", "argus").lower()
 
@@ -95,6 +97,8 @@ def post_to_akto(url: str, payload: Dict[str, Any], logger) -> Union[Dict[str, A
         logger.debug(f"Payload: {json.dumps(payload, default=str)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
+    if AKTO_TOKEN:
+        headers["authorization"] = AKTO_TOKEN
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -190,6 +194,156 @@ def build_akto_request(
     }
 
 
+def _guardrails_behaviour_value(behaviour: Any) -> str:
+    return str(behaviour or "").strip().lower()
+
+
+def _is_warn_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "warn"
+
+
+def _is_alert_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "alert"
+
+
+def call_guardrails(
+    tool_name: str,
+    tool_args: str,
+    result_text: str,
+    cfg: dict,
+    logger,
+) -> Tuple[bool, str, str]:
+    if not tool_args or not result_text:
+        return True, "", ""
+    if not AKTO_DATA_INGESTION_URL:
+        logger.warning("AKTO_DATA_INGESTION_URL not set, allowing request (fail-open)")
+        return True, "", ""
+
+    logger.info(f"Validating tool result against guardrails: {tool_name}")
+    try:
+        request_body = build_akto_request(tool_name, tool_args, result_text, "200", "unknown", cfg)
+        result = post_to_akto(
+            build_http_proxy_url(cfg, response_guardrails=True, ingest_data=False),
+            request_body,
+            logger,
+        )
+        data = result.get("data", {}) if isinstance(result, dict) else {}
+        guardrails_result = data.get("guardrailsResult", {})
+        allowed = guardrails_result.get("Allowed", True)
+        reason = guardrails_result.get("Reason", "")
+        behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get("Behaviour", "")
+
+        if allowed:
+            logger.info(f"Tool result ALLOWED for {tool_name}")
+        else:
+            logger.warning(f"Tool result DENIED for {tool_name}: {reason}")
+
+        return allowed, reason, behaviour
+    except Exception as e:
+        logger.error(f"Guardrails validation error: {e}")
+        return True, "", ""
+
+
+def posttool_fingerprint(tool_name: str, tool_args: str, result_text: str) -> str:
+    canonical = json.dumps(
+        {"t": tool_name, "a": tool_args, "r": result_text},
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def load_warn_pending(warn_state_path: str, logger) -> Set[str]:
+    if not os.path.exists(warn_state_path):
+        return set()
+    try:
+        with open(warn_state_path, encoding="utf-8") as f:
+            data = json.load(f)
+        return set(data.get("warn_pending", []))
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Could not read warn-pending map: {e}")
+        return set()
+
+
+def save_warn_pending(warn_state_path: str, hashes: Set[str], logger) -> None:
+    tmp_path = warn_state_path + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
+            f.write("\n")
+        os.replace(tmp_path, warn_state_path)
+    except OSError as e:
+        logger.error(f"Could not persist warn-pending map: {e}")
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
+def apply_warn_resubmit_flow(
+    gr_allowed: bool,
+    reason: str,
+    behaviour: str,
+    fingerprint: str,
+    warn_state_path: str,
+    logger,
+) -> Tuple[bool, str]:
+    if gr_allowed:
+        return True, ""
+
+    if _is_alert_behaviour(behaviour):
+        logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
+        return True, ""
+
+    if not _is_warn_behaviour(behaviour):
+        return False, reason
+
+    pending = load_warn_pending(warn_state_path, logger)
+    if fingerprint in pending:
+        pending.discard(fingerprint)
+        save_warn_pending(warn_state_path, pending, logger)
+        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
+        return True, ""
+
+    pending.add(fingerprint)
+    save_warn_pending(warn_state_path, pending, logger)
+    return False, reason
+
+
+def ingest_blocked_request(
+    tool_name: str,
+    tool_args: str,
+    result_text: str,
+    reason: str,
+    cfg: dict,
+    logger,
+):
+    if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
+        return
+
+    logger.info("Ingesting blocked tool result data")
+    try:
+        request_body = build_akto_request(tool_name, tool_args, result_text, "403", "denied", cfg)
+        request_body["responseHeaders"] = json.dumps({
+            cfg["hook_header"]: "PostToolUse",
+            "x-blocked-by": "Akto Proxy",
+            "content-type": "application/json",
+        })
+        request_body["responsePayload"] = json.dumps({
+            "body": json.dumps({
+                "x-blocked-by": "Akto Proxy",
+                "reason": reason or "Policy violation",
+            })
+        })
+        request_body["statusCode"] = "403"
+        request_body["status"] = "403"
+        post_to_akto(build_http_proxy_url(cfg, ingest_data=True), request_body, logger)
+        logger.info("Blocked tool result ingestion successful")
+    except Exception as e:
+        logger.error(f"Ingestion error: {e}")
+
+
 def ingest_tool_result(
     tool_name: str,
     tool_args: str,
@@ -197,7 +351,7 @@ def ingest_tool_result(
     status_code: str,
     result_type: str,
     cfg: dict,
-    logger
+    logger,
 ):
     """Ingest tool execution result to Akto for analytics."""
     if not AKTO_DATA_INGESTION_URL:
@@ -235,8 +389,9 @@ def main():
     log_dir = os.path.expanduser(os.getenv("LOG_DIR", cfg["log_dir_default"]))
     logger = setup_logging(log_dir)
     send_heartbeat(log_dir, logger)
+    warn_state_path = os.path.join(log_dir, "akto_posttool_warn_pending.json")
 
-    logger.info(f"=== Post-Tool Use Hook - Connector: {connector}, Mode: {MODE} ===")
+    logger.info(f"=== Post-Tool Use Hook - Connector: {connector}, Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
 
     if LOG_PAYLOADS:
         logger.debug(f"Input: {json.dumps(input_data)}")
@@ -266,6 +421,33 @@ def main():
         logger.debug(f"Result: {result_text[:500]}")
     else:
         logger.info(f"Result preview: {result_text[:100]}...")
+
+    if AKTO_SYNC_MODE:
+        gr_allowed, gr_reason, behaviour = call_guardrails(tool_name, tool_args, result_text, cfg, logger)
+        fingerprint = posttool_fingerprint(tool_name, tool_args, result_text)
+        allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint, warn_state_path, logger)
+
+        if not allowed:
+            if _is_warn_behaviour(behaviour):
+                block_reason = (
+                    "Warning!!, tool result blocked, please review it. Send again to bypass. "
+                    f"Reason for blocking: {gr_reason}"
+                )
+            else:
+                block_reason = f"Tool result blocked: {gr_reason}"
+
+            output = {
+                "decision": "block",
+                "reason": block_reason,
+                "hookSpecificOutput": {
+                    "hookEventName": "PostToolUse",
+                    "additionalContext": gr_reason or "Policy violation",
+                },
+            }
+            logger.warning(f"BLOCKING tool result - Tool: {tool_name}, Reason: {gr_reason}")
+            print(json.dumps(output))
+            ingest_blocked_request(tool_name, tool_args, result_text, gr_reason, cfg, logger)
+            sys.exit(0)
 
     ingest_tool_result(tool_name, tool_args, result_text, status_code, result_type, cfg, logger)
 
