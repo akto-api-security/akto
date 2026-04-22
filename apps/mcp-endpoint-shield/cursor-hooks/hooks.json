@@ -15,6 +15,20 @@
         "timeout": 10
       }
     ],
+    "preToolUse": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-validate-pre-tool-wrapper.sh",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "bash ~/.cursor/hooks/akto/akto-validate-post-tool-wrapper.sh",
+        "type": "command",
+        "timeout": 10
+      }
+    ],
     "beforeMCPExecution": [
       {
         "command": "bash ~/.cursor/hooks/akto/akto-validate-mcp-request-wrapper.sh",
