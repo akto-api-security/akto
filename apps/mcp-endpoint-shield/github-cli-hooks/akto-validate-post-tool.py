@@ -113,6 +113,8 @@ def post_to_akto(url: str, payload: Dict[str, Any], logger) -> Union[Dict[str, A
             duration_ms = int((time.time() - start_time) * 1000)
             raw = response.read().decode("utf-8")
             logger.info(f"Response: {response.getcode()} in {duration_ms}ms")
+            if LOG_PAYLOADS:
+                logger.debug(f"Response body: {raw[:1000]}...")
             try:
                 return json.loads(raw)
             except json.JSONDecodeError:
@@ -237,6 +239,7 @@ def call_guardrails(
         allowed = guardrails_result.get("Allowed", True)
         reason = guardrails_result.get("Reason", "")
         behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get("Behaviour", "")
+        logger.debug(f"Guardrails result — allowed={allowed}, behaviour={behaviour!r}, reason={reason!r}")
 
         if allowed:
             logger.info(f"Tool result ALLOWED for {tool_name}")
@@ -313,6 +316,7 @@ def apply_warn_resubmit_flow(
 
     pending.add(fingerprint)
     save_warn_pending(warn_state_path, pending, logger)
+    logger.info("Warn flow: first occurrence — blocked, resend same tool call to bypass")
     return False, reason
 
 
@@ -459,7 +463,7 @@ def main():
                 "reason": alert_message,
                 "output": alert_message,
             }
-            logger.warning(f"BLOCKING tool result - Tool: {tool_name}, Reason: {gr_reason}")
+            logger.warning(f"BLOCKING tool result - Tool: {tool_name}, Reason: {alert_message}")
             print(json.dumps(output))
             ingest_blocked_request(tool_name, tool_args, result_text, gr_reason, cfg, logger)
             sys.exit(0)
