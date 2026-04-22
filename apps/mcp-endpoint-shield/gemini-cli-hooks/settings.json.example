@@ -1,29 +1,57 @@
 {
   "hooks": {
-    "BeforeModel": [
+    "BeforeAgent": [
       {
         "matcher": "*",
         "hooks": [
           {
-            "name": "akto-validate-prompt",
+            "name": "akto-validate-before-agent",
             "type": "command",
-            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-validate-prompt-wrapper.sh",
-            "timeout": 10000
-            "description": "Validates prompts against Akto Guardrails before sending to Gemini"
+            "command": "bash ~/.gemini/hooks/akto-validate-before-agent-wrapper.sh",
+            "timeout": 10000,
+            "description": "Validates user prompts against Akto Guardrails before the agent plans"
           }
         ]
       }
     ],
-    "AfterModel": [
+    "BeforeTool": [
       {
         "matcher": "*",
         "hooks": [
           {
-            "name": "akto-validate-response",
+            "name": "akto-validate-before-tool",
             "type": "command",
-            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-validate-response-wrapper.sh",
-            "timeout": 10000
-            "description": "Sends prompt/response pairs to Akto for ingestion"
+            "command": "bash ~/.gemini/hooks/akto-validate-before-tool-wrapper.sh",
+            "timeout": 10000,
+            "description": "Validates tool calls against Akto Guardrails before execution"
+          }
+        ]
+      }
+    ],
+    "AfterTool": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "akto-validate-after-tool",
+            "type": "command",
+            "command": "bash ~/.gemini/hooks/akto-validate-after-tool-wrapper.sh",
+            "timeout": 10000,
+            "description": "Validates tool results and ingests traffic to Akto"
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "akto-validate-after-agent",
+            "type": "command",
+            "command": "bash ~/.gemini/hooks/akto-validate-after-agent-wrapper.sh",
+            "timeout": 10000,
+            "description": "Validates agent responses against Akto Guardrails and ingests traffic"
           }
         ]
       }
