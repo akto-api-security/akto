@@ -25,7 +25,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
 
     private static final Logger logger = LoggerFactory.getLogger(RBACDao.class);
     private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<RBAC, Integer>> rbacEntryCache = new ConcurrentHashMap<>();
-    private static final int EXPIRY_TIME = 15 * 60; // 15 minute
+    private static final int EXPIRY_TIME = 2 * 60; // 2 minute
     public void createIndicesIfAbsent() {
 
         boolean exists = false;
