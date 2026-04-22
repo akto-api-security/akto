@@ -28,8 +28,8 @@ function CategoryWiseScoreGraph({
     const dashboardCategory = getDashboardCategory();
     
     // Get category map from local storage
+    const subcategoryMap = LocalStore.getState().subCategoryMap;
     const categoryMap = LocalStore.getState().categoryMap;
-    
     // Determine the appropriate API call and fallback data
     const getApiCall = () => {
         if (apiEndpoint) {
@@ -254,8 +254,39 @@ function CategoryWiseScoreGraph({
     //     };
     // }
 
+    let finalMap = {}
+    categoryTestData.forEach(cat => {
+        const storeId = cat.categoryName
+        if(!subcategoryMap){
+           return;
+        }
+        if(!subcategoryMap[storeId]) {
+            return;
+        }
+        const categoryName = subcategoryMap[storeId]?.superCategory?.name;
+        if(!categoryMap[categoryName]) {
+            return;
+        }
+        const displayName = subcategoryMap[storeId]?.superCategory?.displayName;
+        if (!finalMap[categoryName]) {
+            finalMap[categoryName] = {
+                displayName: displayName,
+                categoryName: categoryName,
+                pass: cat.pass,
+                fail: cat.fail,
+                skip: cat.skip,
+            }
+        } else {
+            finalMap[categoryName].pass += cat.pass;
+            finalMap[categoryName].fail += cat.fail;
+            finalMap[categoryName].skip += cat.skip;
+        }
+    });
+
+    const finalTestCategoryData = Object.values(finalMap);
+
     // Prepare table rows for category breakdown with comprehensive stats
-    const tableRows = categoryTestData.map(cat => {
+    const tableRows = finalTestCategoryData.sort((a,b) => b.fail - a.fail).map(cat => {
         const passCount = cat.pass || 0;
         const failCount = cat.fail || 0;
         // const skipCount = cat.skip || 0; // Commented out for now
@@ -270,11 +301,11 @@ function CategoryWiseScoreGraph({
             : func.formatSplitSharePercent(failCount, executedTotal, passCount);
         const primaryLabel = passed ? statusLabels.pass : statusLabels.fail;
 
-        const displayName = (categoryMap && categoryMap[cat.categoryName]?.displayName) || cat.categoryName;
+        const displayName = cat.displayName;
         return [
             <span
-                style={{ cursor: dataSource === 'redteaming' ? 'pointer' : undefined }}
-                onClick={dataSource === 'redteaming' ? () => handleCategoryRowClick(cat.categoryName) : undefined}
+                style={{ cursor: dataSource === 'redteaming' && failCount > 0 ? 'pointer' : undefined }}
+                onClick={dataSource === 'redteaming' && failCount > 0 ? () => handleCategoryRowClick(cat.categoryName) : undefined}
             >{displayName}</span>,
             <VerticalStack gap="2">
                 {/* Main result indicator */}
