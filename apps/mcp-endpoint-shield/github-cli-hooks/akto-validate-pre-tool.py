@@ -284,13 +284,11 @@ def main():
     if not allowed:
         logger.warning(f"Blocking tool use: {reason}")
         denial_reason = f"Blocked by Akto Guardrails: {reason or 'Policy violation'}"
+        # GitHub Copilot preToolUse: documented stdout is only these two keys
+        # (https://docs.github.com/en/copilot/reference/hooks-configuration).
         output = {
             "permissionDecision": "deny",
             "permissionDecisionReason": denial_reason,
-            "hookSpecificOutput": {
-                "permissionDecision": "deny",
-                "permissionDecisionReason": denial_reason
-            }
         }
         sys.stdout.write(json.dumps(output))
         sys.stdout.flush()
