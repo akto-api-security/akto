@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import hashlib
 import json
 import logging
 import os
@@ -7,7 +8,7 @@ import ssl
 import sys
 import time
 import urllib.request
-from typing import Any, Dict, Union
+from typing import Any, Dict, Set, Tuple, Union
 from akto_machine_id import get_machine_id, get_username
 from akto_heartbeat import send_heartbeat
 
@@ -18,6 +19,7 @@ LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
+AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 MODE = os.getenv("MODE", "argus").lower()
 
@@ -79,11 +81,19 @@ def create_ssl_context():
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(cfg: dict, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(
+    cfg: dict,
+    *,
+    guardrails: bool = False,
+    response_guardrails: bool = False,
+    ingest_data: bool = False,
+) -> str:
     """Build Akto HTTP proxy URL with query parameters."""
     params = [f"akto_connector={cfg['connector']}"]
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     if ingest_data:
         params.append("ingest_data=true")
     return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
@@ -96,6 +106,8 @@ def post_to_akto(url: str, payload: Dict[str, Any], logger) -> Union[Dict[str, A
         logger.debug(f"Payload: {json.dumps(payload, default=str)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
+    if AKTO_TOKEN:
+        headers["authorization"] = AKTO_TOKEN
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -175,8 +187,10 @@ def build_akto_request(tool_name: str, tool_args: str, cwd: str, timestamp: int,
     }
 
 
-def validate_tool_use(tool_name: str, tool_args: str, cwd: str, timestamp: int, cfg: dict, logger) -> tuple[bool, str]:
-    """Validate tool use against Akto guardrails. Returns (allowed, reason)."""
+def validate_tool_use(
+    tool_name: str, tool_args: str, cwd: str, timestamp: int, cfg: dict, logger
+) -> Tuple[bool, str, str]:
+    """Validate tool use against Akto guardrails. Returns (allowed, reason, behaviour)."""
     logger.info(f"Validating tool use: {tool_name}")
     if LOG_PAYLOADS:
         logger.debug(f"Tool args: {tool_args}")
@@ -186,26 +200,29 @@ def validate_tool_use(tool_name: str, tool_args: str, cwd: str, timestamp: int, 
     try:
         request_body = build_akto_request(tool_name, tool_args, cwd, timestamp, cfg)
         result = post_to_akto(
-            build_http_proxy_url(cfg, guardrails=True, ingest_data=False),
+            build_http_proxy_url(cfg, guardrails=True, ingest_data=True),
             request_body,
-            logger
+            logger,
         )
 
         data = result.get("data", {}) if isinstance(result, dict) else {}
         guardrails_result = data.get("guardrailsResult", {})
         allowed = guardrails_result.get("Allowed", True)
         reason = guardrails_result.get("Reason", "")
+        behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get(
+            "Behaviour", ""
+        )
 
         if allowed:
             logger.info("✓ Tool use ALLOWED by guardrails")
         else:
             logger.warning(f"✗ Tool use DENIED by guardrails: {reason}")
 
-        return allowed, reason
+        return allowed, reason, behaviour
 
     except Exception as e:
         logger.error(f"Guardrails validation error: {e}", exc_info=True)
-        return True, ""  # Allow on error
+        return True, "", ""  # Allow on error
 
 
 def ingest_blocked_tool_use(tool_name: str, tool_args: str, cwd: str, timestamp: int, reason: str, cfg: dict, logger):
@@ -223,13 +240,93 @@ def ingest_blocked_tool_use(tool_name: str, tool_args: str, cwd: str, timestamp:
         request_body["status"] = "403"
 
         post_to_akto(
-            build_http_proxy_url(cfg, guardrails=False, ingest_data=True),
+            build_http_proxy_url(
+                cfg, guardrails=False, response_guardrails=False, ingest_data=True
+            ),
             request_body,
-            logger
+            logger,
         )
         logger.info("Blocked tool use ingested successfully")
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
+
+
+def pretool_fingerprint(tool_name: str, tool_args: str) -> str:
+    canonical = json.dumps(
+        {"a": tool_args, "n": tool_name}, sort_keys=True, ensure_ascii=False
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _guardrails_behaviour_value(behaviour: Any) -> str:
+    return str(behaviour or "").strip().lower()
+
+
+def _is_warn_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "warn"
+
+
+def _is_alert_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "alert"
+
+
+def load_warn_pending(state_path: str, logger) -> Set[str]:
+    if not os.path.exists(state_path):
+        return set()
+    try:
+        with open(state_path, encoding="utf-8") as f:
+            return set(json.load(f).get("warn_pending", []))
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Could not read warn-pending map: {e}")
+        return set()
+
+
+def save_warn_pending(state_path: str, hashes: Set[str], logger) -> None:
+    tmp = state_path + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
+            f.write("\n")
+        os.replace(tmp, state_path)
+    except OSError as e:
+        logger.error(f"Could not persist warn-pending map: {e}")
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
+
+def apply_warn_resubmit_flow(
+    gr_allowed: bool,
+    reason: str,
+    behaviour: str,
+    fingerprint: str,
+    state_path: str,
+    logger,
+) -> Tuple[bool, str]:
+    if gr_allowed:
+        return True, ""
+
+    if _is_alert_behaviour(behaviour):
+        logger.info(
+            "Alert behaviour: allowing tool use despite violation (server-side only)"
+        )
+        return True, ""
+
+    if not _is_warn_behaviour(behaviour):
+        return False, reason
+
+    pending = load_warn_pending(state_path, logger)
+    if fingerprint in pending:
+        pending.discard(fingerprint)
+        save_warn_pending(state_path, pending, logger)
+        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
+        return True, ""
+
+    pending.add(fingerprint)
+    save_warn_pending(state_path, pending, logger)
+    return False, reason
 
 
 def main():
@@ -279,11 +376,24 @@ def main():
         logger.info("Guardrails disabled (sync mode off or no URL)")
         sys.exit(0)
 
-    allowed, reason = validate_tool_use(tool_name, tool_args, cwd, timestamp, cfg, logger)
+    gr_allowed, gr_reason, behaviour = validate_tool_use(
+        tool_name, tool_args, cwd, timestamp, cfg, logger
+    )
+    warn_path = os.path.join(log_dir, "akto_github_pretool_warn_pending.json")
+    fingerprint = pretool_fingerprint(tool_name, tool_args)
+    allowed, _ = apply_warn_resubmit_flow(
+        gr_allowed, gr_reason, behaviour, fingerprint, warn_path, logger
+    )
 
     if not allowed:
-        logger.warning(f"Blocking tool use: {reason}")
-        denial_reason = f"Blocked by Akto Guardrails: {reason or 'Policy violation'}"
+        if _is_warn_behaviour(behaviour):
+            denial_reason = (
+                "Warning!!, tool request blocked — repeat the same tool call to bypass. "
+                f"Reason: {gr_reason or 'Policy violation'}"
+            )
+        else:
+            denial_reason = f"Blocked by Akto Guardrails: {gr_reason or 'Policy violation'}"
+        logger.warning(f"Blocking tool use: {gr_reason}")
         # GitHub Copilot preToolUse: documented stdout is only these two keys
         # (https://docs.github.com/en/copilot/reference/hooks-configuration).
         output = {
@@ -293,7 +403,9 @@ def main():
         sys.stdout.write(json.dumps(output))
         sys.stdout.flush()
 
-        ingest_blocked_tool_use(tool_name, tool_args, cwd, timestamp, reason, cfg, logger)
+        ingest_blocked_tool_use(
+            tool_name, tool_args, cwd, timestamp, gr_reason or "Policy violation", cfg, logger
+        )
         sys.exit(cfg["blocked_exit_code"])
 
     logger.info("Tool use allowed")

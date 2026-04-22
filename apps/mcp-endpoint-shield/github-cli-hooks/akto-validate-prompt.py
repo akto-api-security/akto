@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import hashlib
 import json
 import logging
 import os
@@ -8,7 +9,7 @@ import sys
 import time
 import urllib.request
 from datetime import datetime, timezone
-from typing import Any, Dict, Union
+from typing import Any, Dict, Set, Tuple, Union
 from akto_machine_id import get_machine_id, get_username
 from akto_heartbeat import send_heartbeat
 
@@ -19,6 +20,7 @@ LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
+AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 MODE = os.getenv("MODE", "argus").lower()
 
@@ -80,11 +82,19 @@ def create_ssl_context():
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(cfg: dict, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(
+    cfg: dict,
+    *,
+    guardrails: bool = False,
+    response_guardrails: bool = False,
+    ingest_data: bool = False,
+) -> str:
     """Build Akto HTTP proxy URL with query parameters."""
     params = [f"akto_connector={cfg['connector']}"]
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     if ingest_data:
         params.append("ingest_data=true")
     return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
@@ -97,6 +107,8 @@ def post_to_akto(url: str, payload: Dict[str, Any], logger) -> Union[Dict[str, A
         logger.debug(f"Payload: {json.dumps(payload, default=str)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
+    if AKTO_TOKEN:
+        headers["authorization"] = AKTO_TOKEN
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -177,10 +189,12 @@ def build_akto_request(prompt: str, cwd: str, timestamp: int, cfg: dict) -> Dict
     }
 
 
-def validate_prompt(prompt: str, cwd: str, timestamp: int, cfg: dict, logger) -> tuple[bool, str]:
-    """Validate prompt against Akto guardrails. Returns (allowed, reason)."""
+def validate_prompt(
+    prompt: str, cwd: str, timestamp: int, cfg: dict, logger
+) -> Tuple[bool, str, str]:
+    """Validate prompt against Akto guardrails. Returns (allowed, reason, behaviour)."""
     if not prompt.strip():
-        return True, ""
+        return True, "", ""
 
     logger.info("Validating prompt against guardrails")
     logger.info(f"Prompt preview: {prompt[:100]}...")
@@ -188,26 +202,29 @@ def validate_prompt(prompt: str, cwd: str, timestamp: int, cfg: dict, logger) ->
     try:
         request_body = build_akto_request(prompt, cwd, timestamp, cfg)
         result = post_to_akto(
-            build_http_proxy_url(cfg, guardrails=True, ingest_data=False),
+            build_http_proxy_url(cfg, guardrails=True, ingest_data=True),
             request_body,
-            logger
+            logger,
         )
 
         data = result.get("data", {}) if isinstance(result, dict) else {}
         guardrails_result = data.get("guardrailsResult", {})
         allowed = guardrails_result.get("Allowed", True)
         reason = guardrails_result.get("Reason", "")
+        behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get(
+            "Behaviour", ""
+        )
 
         if allowed:
             logger.info("✓ Prompt ALLOWED by guardrails")
         else:
             logger.warning(f"✗ Prompt DENIED by guardrails: {reason}")
 
-        return allowed, reason
+        return allowed, reason, behaviour
 
     except Exception as e:
         logger.error(f"Guardrails validation error: {e}", exc_info=True)
-        return True, ""  # Allow on error
+        return True, "", ""  # Allow on error
 
 
 def ingest_request(prompt: str, cwd: str, timestamp: int, reason: str, blocked: bool, cfg: dict, logger):
@@ -227,13 +244,91 @@ def ingest_request(prompt: str, cwd: str, timestamp: int, reason: str, blocked: 
             request_body["status"] = "403"
 
         post_to_akto(
-            build_http_proxy_url(cfg, guardrails=False, ingest_data=True),
+            build_http_proxy_url(
+                cfg, guardrails=False, response_guardrails=False, ingest_data=True
+            ),
             request_body,
-            logger
+            logger,
         )
         logger.info(f"{'Blocked' if blocked else 'Allowed'} request ingested successfully")
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
+
+
+def prompt_fingerprint(prompt: str) -> str:
+    canonical = json.dumps({"p": prompt, "a": []}, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _guardrails_behaviour_value(behaviour: Any) -> str:
+    return str(behaviour or "").strip().lower()
+
+
+def _is_warn_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "warn"
+
+
+def _is_alert_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "alert"
+
+
+def load_warn_pending(state_path: str, logger) -> Set[str]:
+    if not os.path.exists(state_path):
+        return set()
+    try:
+        with open(state_path, encoding="utf-8") as f:
+            return set(json.load(f).get("warn_pending", []))
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Could not read warn-pending map: {e}")
+        return set()
+
+
+def save_warn_pending(state_path: str, hashes: Set[str], logger) -> None:
+    tmp = state_path + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
+            f.write("\n")
+        os.replace(tmp, state_path)
+    except OSError as e:
+        logger.error(f"Could not persist warn-pending map: {e}")
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
+
+def apply_warn_resubmit_flow(
+    gr_allowed: bool,
+    reason: str,
+    behaviour: str,
+    fingerprint: str,
+    state_path: str,
+    logger,
+) -> Tuple[bool, str]:
+    if gr_allowed:
+        return True, ""
+
+    if _is_alert_behaviour(behaviour):
+        logger.info(
+            "Alert behaviour: allowing prompt despite violation (server-side only)"
+        )
+        return True, ""
+
+    if not _is_warn_behaviour(behaviour):
+        return False, reason
+
+    pending = load_warn_pending(state_path, logger)
+    if fingerprint in pending:
+        pending.discard(fingerprint)
+        save_warn_pending(state_path, pending, logger)
+        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
+        return True, ""
+
+    pending.add(fingerprint)
+    save_warn_pending(state_path, pending, logger)
+    return False, reason
 
 
 def main():
@@ -285,19 +380,54 @@ def main():
         sys.exit(0)
 
     if AKTO_SYNC_MODE and AKTO_DATA_INGESTION_URL:
-        allowed, reason = validate_prompt(prompt, cwd, timestamp, cfg, logger)
+        gr_allowed, gr_reason, behaviour = validate_prompt(
+            prompt, cwd, timestamp, cfg, logger
+        )
+        warn_path = os.path.join(log_dir, "akto_github_prompt_warn_pending.json")
+        fingerprint = prompt_fingerprint(prompt)
+        allowed, _ = apply_warn_resubmit_flow(
+            gr_allowed,
+            gr_reason,
+            behaviour,
+            fingerprint,
+            warn_path,
+            logger,
+        )
 
         if not allowed:
-            logger.warning(f"Prompt blocked: {reason}")
-            ingest_request(prompt, cwd, timestamp, reason, blocked=True, cfg=cfg, logger=logger)
-            sys.stderr.write(f"⚠️  Akto Guardrails flagged prompt: {reason or 'Policy violation'}\n")
+            if _is_warn_behaviour(behaviour):
+                human = (
+                    "Akto guardrails (warn): repeat the same prompt to bypass. "
+                    f"Reason: {gr_reason or 'Policy violation'}"
+                )
+            else:
+                human = (
+                    "Akto guardrails: policy violation on user prompt "
+                    f"(GitHub documents userPromptSubmitted hook stdout as ignored — "
+                    f"Copilot may still send this prompt). Reason: {gr_reason or 'Policy violation'}"
+                )
+            logger.warning(human)
+            sys.stderr.write(human + "\n")
             sys.stderr.flush()
-            output = {"continue": False, "stopReason": f"Blocked by Akto Guardrails: {reason or 'Policy violation'}"}
-            sys.stdout.write(json.dumps(output))
-            sys.stdout.flush()
-            sys.exit(cfg["blocked_exit_code"])
+            ingest_request(
+                prompt,
+                cwd,
+                timestamp,
+                gr_reason or "Policy violation",
+                blocked=True,
+                cfg=cfg,
+                logger=logger,
+            )
         else:
-            ingest_request(prompt, cwd, timestamp, reason, blocked=False, cfg=cfg, logger=logger)
+            ingest_request(
+                prompt,
+                cwd,
+                timestamp,
+                gr_reason,
+                blocked=False,
+                cfg=cfg,
+                logger=logger,
+            )
 
     logger.info("Hook completed")
     sys.exit(0)
