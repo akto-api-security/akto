@@ -4,11 +4,13 @@
 import json
 import logging
 import os
+import re
 import ssl
 import sys
 import time
 import urllib.request
 from typing import Any, Dict, Tuple, Union
+from urllib.parse import quote
 
 from akto_machine_id import get_machine_id, get_username
 
@@ -36,7 +38,11 @@ AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "codex_cli")
+AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
+# Built-in (e.g. Bash) tool traffic: mirror non-MCP path; blocked-request ingestion off by default (claude-cli-hooks).
+AKTO_INGEST_NON_MCP_TOOLS = os.getenv("AKTO_INGEST_NON_MCP_TOOLS", "false").lower() == "true"
+NON_MCP_TOOL_PATH_PREFIX = os.getenv("NON_MCP_TOOL_PATH_PREFIX", "/tool")
 
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
@@ -64,10 +70,39 @@ def create_ssl_context():
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
+def normalize_tool_name_for_url_path(tool_name: str) -> str:
+    s = (tool_name or "unknown").strip()
+    s = re.sub(r"[^a-zA-Z0-9._~-]+", "-", s)
+    s = re.sub(r"-+", "-", s).strip("-")
+    if not s:
+        s = "unknown"
+    return quote(s, safe=".-_~")
+
+
+def non_mcp_ingest_path(tool_name: str) -> str:
+    fixed = (os.getenv("NON_MCP_INGEST_PATH") or "").strip()
+    if fixed:
+        return fixed if fixed.startswith("/") else "/" + fixed
+    prefix = (NON_MCP_TOOL_PATH_PREFIX or "/tool").strip()
+    if not prefix.startswith("/"):
+        prefix = "/" + prefix
+    prefix = prefix.rstrip("/")
+    if not prefix:
+        prefix = "/tool"
+    return f"{prefix}/{normalize_tool_name_for_url_path(tool_name)}"
+
+
+def build_http_proxy_url(
+    *,
+    guardrails: bool = False,
+    response_guardrails: bool = False,
+    ingest_data: bool = False,
+) -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
@@ -80,6 +115,8 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
+    if AKTO_TOKEN:
+        headers["authorization"] = AKTO_TOKEN
 
     request = urllib.request.Request(
         url,
@@ -110,28 +147,33 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         raise
 
 
-def build_validation_request(tool_name: str, tool_input: Any) -> Dict[str, Any]:
+def build_validation_request(
+    tool_name: str, tool_input: Any, session_info: dict = None
+) -> Dict[str, Any]:
     tags = {"gen-ai": "Gen AI", "tool_name": tool_name}
     if MODE == "atlas":
         tags["ai-agent"] = "codexcli"
         tags["source"] = CONTEXT_SOURCE
 
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
     host = CODEX_API_HOST.replace("https://", "").replace("http://", "")
 
-    request_headers = json.dumps(
-        {
-            "host": host,
-            "x-codex-hook": "PreToolUse",
-            "content-type": "application/json",
-        }
-    )
+    req_headers: Dict[str, str] = {
+        "host": host,
+        "x-codex-hook": "PreToolUse",
+        "content-type": "application/json",
+    }
+    if session_info:
+        for key, value in session_info.items():
+            if value is not None:
+                req_headers[f"x-akto-installer-{key}"] = str(value)
+
+    request_headers = json.dumps(req_headers)
     response_headers = json.dumps({"x-codex-hook": "PreToolUse"})
     request_payload = json.dumps({"body": tool_input, "toolName": tool_name})
     response_payload = json.dumps({})
 
     return {
-        "path": CODEX_API_PATH,
+        "path": non_mcp_ingest_path(tool_name),
         "requestHeaders": request_headers,
         "responseHeaders": response_headers,
         "method": "POST",
@@ -144,7 +186,7 @@ def build_validation_request(tool_name: str, tool_input: Any) -> Dict[str, Any]:
         "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
-        "akto_vxlan_id": device_id,
+        "akto_vxlan_id": 0,
         "is_pending": "false",
         "source": "MIRRORING",
         "direction": None,
@@ -158,22 +200,24 @@ def build_validation_request(tool_name: str, tool_input: Any) -> Dict[str, Any]:
     }
 
 
-def call_guardrails(tool_name: str, tool_input: Any) -> Tuple[bool, str]:
+def call_guardrails(
+    tool_name: str, tool_input: Any, session_info: dict = None
+) -> Tuple[bool, str, str]:
     if not tool_input:
-        return True, ""
+        return True, "", ""
 
     if not AKTO_DATA_INGESTION_URL:
         logger.warning("AKTO_DATA_INGESTION_URL not set, allowing request (fail-open)")
-        return True, ""
+        return True, "", ""
 
     logger.info(f"Validating tool request for: {tool_name}")
     if LOG_PAYLOADS:
         logger.debug(f"Tool input payload: {json.dumps(tool_input)[:500]}...")
 
     try:
-        request_body = build_validation_request(tool_name, tool_input)
+        request_body = build_validation_request(tool_name, tool_input, session_info)
         result = post_payload_json(
-            build_http_proxy_url(guardrails=True, ingest_data=False),
+            build_http_proxy_url(guardrails=True, ingest_data=True),
             request_body,
         )
 
@@ -181,24 +225,35 @@ def call_guardrails(tool_name: str, tool_input: Any) -> Tuple[bool, str]:
         guardrails_result = data.get("guardrailsResult", {})
         allowed = guardrails_result.get("Allowed", True)
         reason = guardrails_result.get("Reason", "")
+        behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get(
+            "Behaviour", ""
+        )
 
         if allowed:
             logger.info(f"Request ALLOWED for {tool_name}")
         else:
             logger.warning(f"Request DENIED for {tool_name}: {reason}")
 
-        return allowed, reason
+        return allowed, reason, behaviour
     except Exception as e:
         logger.error(f"Guardrails validation error: {e}")
-        return True, ""
+        return True, "", ""
 
 
-def ingest_blocked_request(tool_name: str, tool_input: Any, reason: str):
+def ingest_blocked_request(
+    tool_name: str, tool_input: Any, reason: str, session_info: dict = None
+):
     if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
         return
 
+    if not AKTO_INGEST_NON_MCP_TOOLS:
+        logger.info(
+            "Skipping non-MCP blocked-request ingestion (set AKTO_INGEST_NON_MCP_TOOLS=true to re-enable)"
+        )
+        return
+
     try:
-        request_body = build_validation_request(tool_name, tool_input)
+        request_body = build_validation_request(tool_name, tool_input, session_info)
         request_body["responseHeaders"] = json.dumps(
             {
                 "x-codex-hook": "PreToolUse",
@@ -212,7 +267,9 @@ def ingest_blocked_request(tool_name: str, tool_input: Any, reason: str):
         request_body["statusCode"] = "403"
         request_body["status"] = "403"
         post_payload_json(
-            build_http_proxy_url(guardrails=False, ingest_data=True),
+            build_http_proxy_url(
+                guardrails=False, response_guardrails=False, ingest_data=True
+            ),
             request_body,
         )
         logger.info("Blocked tool request ingestion successful")
@@ -229,6 +286,20 @@ def main():
         logger.error(f"Invalid JSON input: {e}")
         sys.exit(0)
 
+    session_info = {}
+    for field in (
+        "session_id",
+        "transcript_path",
+        "cwd",
+        "hook_event_name",
+        "model",
+        "turn_id",
+        "tool_use_id",
+    ):
+        value = input_data.get(field)
+        if value is not None:
+            session_info[field] = value
+
     tool_name = str(input_data.get("tool_name") or "")
     tool_input = input_data.get("tool_input") or {}
     session_id = input_data.get("session_id", "")
@@ -236,7 +307,9 @@ def main():
     logger.info(f"Session: {session_id}, Processing tool request: {tool_name}")
 
     if AKTO_SYNC_MODE:
-        allowed, reason = call_guardrails(tool_name, tool_input)
+        allowed, reason, _behaviour = call_guardrails(
+            tool_name, tool_input, session_info
+        )
         if not allowed:
             block_reason = reason or "Policy violation"
             output = {
@@ -248,7 +321,7 @@ def main():
             }
             logger.warning(f"BLOCKING tool request - Tool: {tool_name}, Reason: {block_reason}")
             print(json.dumps(output))
-            ingest_blocked_request(tool_name, tool_input, block_reason)
+            ingest_blocked_request(tool_name, tool_input, block_reason, session_info)
             sys.exit(0)
 
     logger.info(f"Tool request allowed for {tool_name}")
