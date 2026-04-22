@@ -519,7 +519,7 @@ function GithubServerTable(props) {
     });
 
   useEffect(() => {
-    if (!allResourcesSelected || data.length >= total) {
+    if (!allResourcesSelected || data.length >= total || fullDataIds.length >= total || rawSelectedResources.length >= total) {
       setAllDataIds([])
       return
     }
