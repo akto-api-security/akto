@@ -16,8 +16,8 @@ from akto_machine_id import get_machine_id, get_username
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
+LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG").upper()  # Forced DEBUG for diagnostics
+LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "true").lower() == "true"  # Forced true for diagnostics
 
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -394,6 +394,7 @@ def apply_warn_resubmit_flow(
 
     pending.add(fingerprint)
     save_warn_pending(pending)
+    logger.info("Warn flow: first occurrence — blocked, resend same tool call to bypass")
     return False, reason
 
 
@@ -448,7 +449,19 @@ def ingest_blocked_request(
 
 
 def main():
-    logger.info(f"=== Hook execution started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
+    # Ensure UTF-8 I/O on Windows (system locale encoding can differ)
+    stdin_enc_before = getattr(sys.stdin, "encoding", "unknown")
+    stdout_enc_before = getattr(sys.stdout, "encoding", "unknown")
+    if hasattr(sys.stdin, "reconfigure"):
+        sys.stdin.reconfigure(encoding="utf-8")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    stdin_enc_after = getattr(sys.stdin, "encoding", "unknown")
+
+    logger.info(f"=== MCP Request Hook started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
+    logger.info(f"Platform: {sys.platform}, Python: {sys.version.split()[0]}")
+    logger.info(f"stdin encoding: {stdin_enc_before} -> {stdin_enc_after}, stdout encoding: {stdout_enc_before}")
+    logger.info(f"AKTO_DATA_INGESTION_URL set: {bool(AKTO_DATA_INGESTION_URL)}, DEVICE_ID: {DEVICE_ID or '(auto)'}, CONNECTOR: {AKTO_CONNECTOR}")
 
     try:
         input_data = json.load(sys.stdin)
@@ -505,7 +518,7 @@ def main():
                 "decision": "block",
                 "reason": block_reason,
             }
-            logger.warning(f"BLOCKING tool request - Tool: {tool_name}, Reason: {gr_reason}")
+            logger.warning(f"BLOCKING tool request - Tool: {tool_name}, Reason: {block_reason}")
             print(json.dumps(output))
             ingest_blocked_request(
                 tool_name,
@@ -516,7 +529,7 @@ def main():
                 mcp_tool_name=mcp_tool_name,
                 session_info=session_info,
             )
-            sys.exit(0)
+            sys.exit(2)
 
     logger.info(f"Tool request allowed for {tool_name}")
     sys.exit(0)
