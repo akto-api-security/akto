@@ -79,7 +79,8 @@ const initialState = {
     trafficAlerts: [],
     sendEventOnLogin: false,
     tableSelectedTab: {},
-    dashboardCategory: getInitialDashboardCategory() // Persisted across page reloads
+    dashboardCategory: getInitialDashboardCategory(), // Persisted across page reloads
+    selectedCollectionScope: null,
 };
 
 let persistStore = (set, get) => ({
@@ -256,6 +257,13 @@ let persistStore = (set, get) => ({
             console.error("Error setting tableSelectedTab:", error);
         }
     },
+    setSelectedCollectionScope: (selectedCollectionScope) => {
+        try {
+            set({ selectedCollectionScope });
+        } catch (error) {
+            console.error("Error setting selectedCollectionScope:", error);
+        }
+    },
     resetAll: () => {
         try {
             set(initialState);
@@ -294,6 +302,7 @@ persistStore = persist(persistStore, {
         sendEventOnLogin: state.sendEventOnLogin,
         tableSelectedTab: state.tableSelectedTab,
         dashboardCategory: state.dashboardCategory, // Persist dashboard category selection across page reloads
+        selectedCollectionScope: state.selectedCollectionScope,
     })
 });
 

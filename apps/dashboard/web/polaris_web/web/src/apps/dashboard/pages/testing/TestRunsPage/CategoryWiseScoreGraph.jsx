@@ -1,4 +1,4 @@
-import { Box, Text, HorizontalStack, DataTable, VerticalStack } from '@shopify/polaris';
+import { Box, Text, DataTable, VerticalStack, HorizontalGrid } from '@shopify/polaris';
 import ChartypeComponent from './ChartypeComponent';
 import observeFunc from "../../observe/transform";
 import InfoCard from '../../dashboard/new_components/InfoCard';
@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import func from "@/util/func";
 import LocalStore from "../../../../main/LocalStorageStore";
 import PersistStore from "../../../../main/PersistStore";
+import TitleWithInfo from '../../../components/shared/TitleWithInfo';
 
 function CategoryWiseScoreGraph({ 
     startTimestamp, 
@@ -309,7 +310,7 @@ function CategoryWiseScoreGraph({
             >{displayName}</span>,
             <VerticalStack gap="2">
                 {/* Main result indicator */}
-                <HorizontalStack gap="1" align="center">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ 
                         width: '8px', 
                         height: '8px', 
@@ -327,16 +328,20 @@ function CategoryWiseScoreGraph({
                     <Text variant="bodySm" color='subdued'>
                         <span style={{ color: '#f05352', fontWeight: '500' }}>✗{failCount}</span>
                     </Text>
-                </HorizontalStack>
+                </div>
             </VerticalStack>
         ];
     });
 
     return (
-        <InfoCard
-            title={getTitle()}
-            titleToolTip={getTooltip()}
-            component={<HorizontalStack gap="8" align="center" wrap={false}>
+        <VerticalStack gap={"4"} align='center'>
+            <Box padding={"3"}>
+            <TitleWithInfo
+                titleText={getTitle()}
+                tooltipContent={getTooltip()}
+                textProps={{variant: 'headingMd'}}
+            />
+            <HorizontalGrid columns={2} gap={4} alignItems='center'>
                 {/* Chart and Legend using ChartypeComponent */}
                 <Box>
                     <ChartypeComponent
@@ -376,9 +381,10 @@ function CategoryWiseScoreGraph({
                         />
                     </div>
                 </Box>
-            </HorizontalStack>}
-        />
-    );
+            </HorizontalGrid>
+            </Box>
+        </VerticalStack>
+    )
 }
 
 export default CategoryWiseScoreGraph;
