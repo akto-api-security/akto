@@ -66,7 +66,6 @@ import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.DependencyNode.ParamInfo;
 import com.akto.dto.auth.APIAuth;
-import com.akto.dto.AccountConfig;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.OrganizationFlags;
 import com.akto.util.enums.GlobalEnums;
@@ -283,6 +282,7 @@ public class DaoInit {
         ClassModel<CollectionTags> collectionTagsModel = ClassModel.builder(CollectionTags.class).enableDiscriminator(true).build();
         ClassModel<LogsEndpointShield> logsEndpointShieldClassModel = ClassModel.builder(LogsEndpointShield.class).enableDiscriminator(true).build();
         ClassModel<AccountSettings.ProxyPatternInfo> proxyPatternInfoClassModel = ClassModel.builder(AccountSettings.ProxyPatternInfo.class).enableDiscriminator(true).build();
+        ClassModel<ApiSequences> apiSequencesClassModel = ClassModel.builder(ApiSequences.class).enableDiscriminator(true).build();
 
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
@@ -315,7 +315,7 @@ public class DaoInit {
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
                 RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel,fileClassModel, tlsAuthClassModel, apiHitCountInfoClassModel, collectionTagsModel, hostRegexTestingEndpointsClassModel, tagsTestingEndpointsClassModel
-                , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel).automatic(true).build());
+                , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -428,6 +428,7 @@ public class DaoInit {
         LogsEndpointShieldDao.instance.createIndicesIfAbsent();
         AgentTrafficLogDao.instance.createIndicesIfAbsent();
         TestingRunWebhookDao.instance.createIndicesIfAbsent();
+        ApiSequencesDao.instance.createIndicesIfAbsent();
     }
 
 }
