@@ -968,6 +968,20 @@ const settingRequests = {
             data: {registries}
         })
     },
+    saveMcpServerSettings(approvedServers, blockNewMcpServers) {
+        return request({
+            url: '/api/saveMcpServerSettings',
+            method: 'post',
+            data: {approvedServers, blockNewMcpServers}
+        })
+    },
+    uploadMcpServersCsv(csvContent) {
+        return request({
+            url: '/api/uploadMcpServersCsv',
+            method: 'post',
+            data: {csvContent}
+        })
+    },
     updateBlockLogs(blockLogs) {
         return request({
             url: '/api/updateBlockLogs',
