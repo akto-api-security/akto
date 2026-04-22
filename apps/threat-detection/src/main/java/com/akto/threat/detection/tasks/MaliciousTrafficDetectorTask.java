@@ -550,7 +550,6 @@ public class MaliciousTrafficDetectorTask implements Task {
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, urlForAggregation, method.toString());
       String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, urlForAggregation, method.toString());
       long curEpochMin = responseParam.getTime() / 60;
-      this.distributionCalculator.updateFrequencyBuckets(distributionKey, curEpochMin, ipApiCmsKey);
 
       // Check and raise alert for RateLimits
       RatelimitConfigItem ratelimitConfig = this.threatConfigEvaluator.getDefaultRateLimitConfig();
@@ -558,8 +557,9 @@ public class MaliciousTrafficDetectorTask implements Task {
       ApiInfo.ApiInfoKey templateApiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method);
       long ratelimit = this.threatConfigEvaluator.getRatelimit(templateApiInfoKey);
 
-      long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin,
-          ratelimitConfig.getPeriod());
+      // Single Redis call: CMS increment + sliding window query + async XADD to distribution stream
+      long count = this.distributionCalculator.processRequest(
+          distributionKey, curEpochMin, ipApiCmsKey, ratelimitConfig.getPeriod());
 
       if (ratelimit != Constants.RATE_LIMIT_UNLIMITED_REQUESTS && count > ratelimit
           && !this.threatConfigEvaluator.isActorInMitigationPeriod(ipApiCmsKey, ratelimitConfig)) {
