@@ -300,10 +300,14 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
                     endpointIds: new Set(),
                     sensitiveTypes: new Set(),
                     maxTrafficTimestamp: 0,
+                    blockedCount: 0,
+                    totalCount: 0,
                 };
             }
 
             skills[skillValue].collections.push(c);
+            skills[skillValue].totalCount += 1;
+            if (c.isSkillBlocked) skills[skillValue].blockedCount += 1;
             if (!skills[skillValue].firstCollection) skills[skillValue].firstCollection = c;
             if (hostName && !skills[skillValue].hostNames.includes(hostName)) {
                 skills[skillValue].hostNames.push(hostName);
@@ -329,6 +333,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: null,
+        isSkillBlocked: g.blockedCount > 0 && g.blockedCount === g.totalCount,
     }));
 };
 

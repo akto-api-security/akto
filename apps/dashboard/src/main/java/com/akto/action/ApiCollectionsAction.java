@@ -970,6 +970,99 @@ public class ApiCollectionsAction extends UserAction {
     @Setter
     private boolean currentIsOutOfTestingScopeVal;
 
+    @Setter
+    private boolean isSkillBlocked;
+
+    @Setter
+    private String skillName;
+
+    public String updateSkillBlockStatus() {
+        try {
+            if (this.apiCollectionIds == null || this.apiCollectionIds.isEmpty()) {
+                addActionError("No collections provided");
+                return ERROR.toUpperCase();
+            }
+            if (this.skillName == null || this.skillName.isEmpty()) {
+                addActionError("Skill name required");
+                return ERROR.toUpperCase();
+            }
+
+            List<Integer> validCollectionIds = ApiCollectionsDao.instance
+                .findAll(
+                    Filters.and(
+                        Filters.in(ApiCollection.ID, this.apiCollectionIds),
+                        Filters.eq(ApiCollection.SKILLS, this.skillName)
+                    ),
+                    Projections.include(ApiCollection.ID)
+                )
+                .stream()
+                .map(ApiCollection::getId)
+                .collect(Collectors.toList());
+
+            if (validCollectionIds.isEmpty()) {
+                addActionError("No valid skill collections found");
+                return ERROR.toUpperCase();
+            }
+
+            SingleTypeInfoDao.instance.updateMany(
+                Filters.in(SingleTypeInfo._API_COLLECTION_ID, validCollectionIds),
+                Updates.set(SingleTypeInfo.IS_SKILL_BLOCKED, this.isSkillBlocked)
+            );
+
+            response = new BasicDBObject();
+            response.put("success", true);
+            response.put("updatedCollections", validCollectionIds.size());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error updating skill block status: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchBlockedSkillCollections() {
+        try {
+            Set<Integer> blockedIds = SingleTypeInfoDao.instance.findDistinctFields(
+                SingleTypeInfo._API_COLLECTION_ID,
+                Integer.class,
+                Filters.eq(SingleTypeInfo.IS_SKILL_BLOCKED, true)
+            );
+            response = new BasicDBObject();
+            response.put("blockedCollectionIds", new ArrayList<>(blockedIds));
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error fetching blocked skill collections");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchBlockedSkillNames() {
+        try {
+            Set<Integer> blockedCollectionIds = SingleTypeInfoDao.instance.findDistinctFields(
+                SingleTypeInfo._API_COLLECTION_ID,
+                Integer.class,
+                Filters.eq(SingleTypeInfo.IS_SKILL_BLOCKED, true)
+            );
+            Set<String> blockedSkillNames = new HashSet<>();
+            if (!blockedCollectionIds.isEmpty()) {
+                List<ApiCollection> blockedCollections = ApiCollectionsDao.instance.findAll(
+                    Filters.in(ApiCollection.ID, blockedCollectionIds),
+                    Projections.include(ApiCollection.ID, ApiCollection.SKILLS)
+                );
+                for (ApiCollection c : blockedCollections) {
+                    if (c.getSkills() != null) {
+                        blockedSkillNames.addAll(c.getSkills());
+                    }
+                }
+            }
+            response = new BasicDBObject();
+            response.put("blockedSkillNames", new ArrayList<>(blockedSkillNames));
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error fetching blocked skill names");
+            return ERROR.toUpperCase();
+        }
+    }
+
     public String toggleCollectionsOutOfTestScope(){
         try{
             if(this.apiCollectionIds ==null || this.apiCollectionIds.isEmpty()){

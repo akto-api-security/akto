@@ -2880,6 +2880,44 @@
             </result>
         </action>
 
+        <action name="api/updateSkillBlockStatus" class="com.akto.action.ApiCollectionsAction" method="updateSkillBlockStatus">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack"/>
+            <result name="SUCCESS" type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchBlockedSkillCollections" class="com.akto.action.ApiCollectionsAction" method="fetchBlockedSkillCollections">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack"/>
+            <result name="SUCCESS" type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchBlockedSkillNames" class="com.akto.action.ApiCollectionsAction" method="fetchBlockedSkillNames">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack"/>
+            <result name="SUCCESS" type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
 
         <action name="api/addApisToCustomCollection" class="com.akto.action.ApiCollectionsAction" method="addApisToCustomCollection">
             <interceptor-ref name="json"/>

@@ -555,6 +555,8 @@ public class SingleTypeInfo {
     boolean sensitive;
     public static final String _IS_URL_PARAM = "isUrlParam";
     boolean isUrlParam;
+    public static final String IS_SKILL_BLOCKED = "isSkillBlocked";
+    boolean isSkillBlocked;
     public static final String _VALUES = "values";
     public static final int VALUES_LIMIT = 50;
     CappedSet<String> values = new CappedSet<>();
@@ -907,6 +909,9 @@ public String composeKeyWithCustomSubType(SubType s) {
     public void setIsUrlParam(boolean urlParam) {
         isUrlParam = urlParam;
     }
+
+    public boolean getIsSkillBlocked() { return isSkillBlocked; }
+    public void setIsSkillBlocked(boolean isSkillBlocked) { this.isSkillBlocked = isSkillBlocked; }
 
     public void updateMinMaxValues(Object o) {
         if (subType.getSuperType() == SingleTypeInfo.SuperType.INTEGER || subType.getSuperType() == SingleTypeInfo.SuperType.FLOAT) {
