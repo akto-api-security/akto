@@ -64,13 +64,13 @@ const SummaryCardComponent = ({
         {totalVulnerabilities > 0 ? 
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
           <LegacyCard.Subsection>
-            <Box paddingBlockStart={3}><Divider/></Box>
+            <Box paddingBlockStart={3} paddingBlockEnd={3}><Divider/></Box>
             <VerticalStack gap={"5"}>
               <HorizontalGrid columns={2} gap={6}>
-                <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues"} data={subCategoryInfoCamel} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
+                <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues"} data={subCategoryInfoCamel} title={"Issue Categories"} isNormal={true} boxHeight={'250px'}/>
                 <ChartypeComponent
                     data={severityMap}
-                    navUrl={"/dashboard/issues"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
+                    navUrl={"/dashboard/issues"} title={"Issue Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
                     pieInnerSize="50%"
                     chartOnLeft={false}
                     chartSize={190}

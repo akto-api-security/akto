@@ -1789,7 +1789,7 @@ function ApiEndpoints(props) {
                 <SchemaView key="schema-view" apiCollectionId={apiCollectionId} />
             ] : [
                 dummyAgenticGraph ? <AgentDiscoverGraphWithDummyData key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} />,
-                (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
+                // (!isCategory(CATEGORY_API_SECURITY)) ? <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} /> : null,
                 // Hide "Test your Endpoints" banner for Endpoint Security
                 (!isEndpointSecurityCategory() && (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)))) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null,
                 <div className="apiEndpointsTable" key="table">
