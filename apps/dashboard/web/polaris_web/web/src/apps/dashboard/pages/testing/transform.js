@@ -937,7 +937,6 @@ const transform = {
   },
 
   getCollapsibleRow(urls, severity) {
-    console.log(urls)
     const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
     return (
       <tr style={{ background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4' }}>
