@@ -91,7 +91,16 @@ function TestRunResultFlyout(props) {
         if (value && typeof value === 'object' && typeof value.message === 'string') {
             return value.message;
         }
-        return typeof value === 'string' ? value : '';
+        if (typeof value === 'string') {
+            try {
+                const parsed = JSON.parse(value);
+                if (parsed && typeof parsed === 'object' && typeof parsed.message === 'string') {
+                    return parsed.message;
+                }
+            } catch (_) {}
+            return value;
+        }
+        return '';
     }
 
     const fetchRemediationInfo = useCallback(async (testId) => {
