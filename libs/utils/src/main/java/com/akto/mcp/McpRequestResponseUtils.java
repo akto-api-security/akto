@@ -308,6 +308,24 @@ public final class McpRequestResponseUtils {
         }
     }
 
+    public static String checkIfServerIsApproved(String serverName) {
+        if (StringUtils.isBlank(serverName)) {
+            return null;
+        }
+        try {
+            List<Map<String, Object>> approvedServers = dataActor.fetchAllowedMcpServers();
+            for (Map<String, Object> server : approvedServers) {
+                Object nameObj = server.get("name");
+                if (nameObj != null && serverName.equalsIgnoreCase(nameObj.toString())) {
+                    return "Approved";
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error checking approved servers list", e);
+        }
+        return null;
+    }
+
     public static String extractMcpHostFromResponseParams(HttpResponseParams responseParams) {
         if (responseParams == null || responseParams.getRequestParams() == null) {
             return null;
