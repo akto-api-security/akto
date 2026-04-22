@@ -20,6 +20,7 @@ import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.behaviour_modelling.SessionAnalyzer;
 import com.akto.behaviour_modelling.SequenceAnalyzerConfig;
+import com.akto.behaviour_modelling.impl.ApiSequencesFlusher;
 import com.akto.behaviour_modelling.impl.IpBasedIdentifier;
 import com.akto.behaviour_modelling.impl.RawCountAccumulator;
 import com.akto.hybrid_parsers.HttpCallParser;
@@ -891,7 +892,7 @@ public class Main {
                         10 * 60 * 1000L, // 10 minutes
                         new IpBasedIdentifier(),
                         RawCountAccumulator::new,
-                        snapshot -> loggerMaker.infoAndAddToDb("Session window flushed: " + snapshot.getApiCounts().size() + " APIs, " + snapshot.getTransitionCounts().size() + " transitions"),
+                        new ApiSequencesFlusher(),
                         parser.apiCatalogSync.aktoPolicyNew
                     )
                 );
