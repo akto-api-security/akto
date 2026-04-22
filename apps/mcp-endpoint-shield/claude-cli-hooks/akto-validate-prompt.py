@@ -363,7 +363,7 @@ def main():
                 "reason": block_reason,
             }
             logger.warning(f"BLOCKING prompt - Reason: {gr_reason}")
-            print(json.dumps(output))
+            print(json.dumps(output), flush=True)
             ingest_blocked_request(prompt, gr_reason, session_info)
             sys.exit(0)
 

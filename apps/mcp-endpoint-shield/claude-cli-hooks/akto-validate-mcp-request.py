@@ -501,12 +501,16 @@ def main():
             else:
                 block_reason = f"Tool request blocked: {gr_reason}"
 
+            # PreToolUse must use hookSpecificOutput (top-level decision/reason is deprecated).
             output = {
-                "decision": "block",
-                "reason": block_reason,
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": block_reason,
+                }
             }
             logger.warning(f"BLOCKING tool request - Tool: {tool_name}, Reason: {gr_reason}")
-            print(json.dumps(output))
+            print(json.dumps(output), flush=True)
             ingest_blocked_request(
                 tool_name,
                 tool_input,

@@ -612,7 +612,7 @@ def main():
             logger.warning(
                 f"BLOCKING tool result - Tool: {tool_name}, Reason: {gr_reason}"
             )
-            print(json.dumps(output))
+            print(json.dumps(output), flush=True)
             ingest_blocked_request(
                 tool_name,
                 tool_input,

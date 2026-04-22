@@ -495,7 +495,7 @@ def main():
                     "reason": block_reason,
                 }
                 logger.warning(f"BLOCKING Stop - Reason: {gr_reason}")
-                print(json.dumps(output))
+                print(json.dumps(output), flush=True)
                 ingest_blocked_response(
                     user_prompt, response_text, gr_reason, session_info
                 )
