@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # currently only Bash tool is supported by Codex CLI
 
+import hashlib
 import json
 import logging
 import os
@@ -9,7 +10,7 @@ import ssl
 import sys
 import time
 import urllib.request
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, Set, Tuple, Union
 from urllib.parse import quote
 
 from akto_machine_id import get_machine_id, get_username
@@ -43,6 +44,7 @@ CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 # Built-in (e.g. Bash) tool traffic: mirror non-MCP path; blocked-request ingestion off by default (claude-cli-hooks).
 AKTO_INGEST_NON_MCP_TOOLS = os.getenv("AKTO_INGEST_NON_MCP_TOOLS", "false").lower() == "true"
 NON_MCP_TOOL_PATH_PREFIX = os.getenv("NON_MCP_TOOL_PATH_PREFIX", "/tool")
+WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_pretool_warn_pending.json")
 
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
@@ -240,6 +242,85 @@ def call_guardrails(
         return True, "", ""
 
 
+def pretool_fingerprint(tool_name: str, tool_input: Any) -> str:
+    canonical = json.dumps(
+        {"t": tool_name, "i": tool_input},
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _guardrails_behaviour_value(behaviour: Any) -> str:
+    return str(behaviour or "").strip().lower()
+
+
+def _is_warn_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "warn"
+
+
+def _is_alert_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "alert"
+
+
+def load_warn_pending() -> Set[str]:
+    if not os.path.exists(WARN_STATE_PATH):
+        return set()
+    try:
+        with open(WARN_STATE_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return set(data.get("warn_pending", []))
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Could not read warn-pending map: {e}")
+        return set()
+
+
+def save_warn_pending(hashes: Set[str]) -> None:
+    tmp_path = WARN_STATE_PATH + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
+            f.write("\n")
+        os.replace(tmp_path, WARN_STATE_PATH)
+    except OSError as e:
+        logger.error(f"Could not persist warn-pending map: {e}")
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
+def apply_warn_resubmit_flow(
+    gr_allowed: bool,
+    reason: str,
+    behaviour: str,
+    fingerprint: str,
+) -> Tuple[bool, str]:
+    if gr_allowed:
+        return True, ""
+
+    if _is_alert_behaviour(behaviour):
+        logger.info(
+            "Alert behaviour: allowing despite violation (server-side alert only)"
+        )
+        return True, ""
+
+    if not _is_warn_behaviour(behaviour):
+        return False, reason
+
+    pending = load_warn_pending()
+    if fingerprint in pending:
+        pending.discard(fingerprint)
+        save_warn_pending(pending)
+        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
+        return True, ""
+
+    pending.add(fingerprint)
+    save_warn_pending(pending)
+    return False, reason
+
+
 def ingest_blocked_request(
     tool_name: str, tool_input: Any, reason: str, session_info: dict = None
 ):
@@ -307,21 +388,38 @@ def main():
     logger.info(f"Session: {session_id}, Processing tool request: {tool_name}")
 
     if AKTO_SYNC_MODE:
-        allowed, reason, _behaviour = call_guardrails(
+        gr_allowed, gr_reason, behaviour = call_guardrails(
             tool_name, tool_input, session_info
         )
+        fingerprint = pretool_fingerprint(tool_name, tool_input)
+        allowed, _ = apply_warn_resubmit_flow(
+            gr_allowed, gr_reason, behaviour, fingerprint
+        )
+
         if not allowed:
-            block_reason = reason or "Policy violation"
+            if _is_warn_behaviour(behaviour):
+                block_reason = (
+                    "Warning!!, tool request blocked, please review it. Send again to bypass. "
+                    f"Reason for blocking: {gr_reason}"
+                )
+            else:
+                block_reason = gr_reason or "Policy violation"
+
+            # PreToolUse: documented deny shape (hookSpecificOutput only; no continue/stopReason).
             output = {
                 "hookSpecificOutput": {
                     "hookEventName": "PreToolUse",
                     "permissionDecision": "deny",
-                    "permissionDecisionReason": f"Blocked by Akto Guardrails: {block_reason}",
+                    "permissionDecisionReason": block_reason,
                 }
             }
-            logger.warning(f"BLOCKING tool request - Tool: {tool_name}, Reason: {block_reason}")
+            logger.warning(
+                f"BLOCKING tool request - Tool: {tool_name}, Reason: {gr_reason}"
+            )
             print(json.dumps(output))
-            ingest_blocked_request(tool_name, tool_input, block_reason, session_info)
+            ingest_blocked_request(
+                tool_name, tool_input, gr_reason or "Policy violation", session_info
+            )
             sys.exit(0)
 
     logger.info(f"Tool request allowed for {tool_name}")
