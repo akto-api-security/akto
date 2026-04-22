@@ -2,6 +2,7 @@ package com.akto.behaviour_modelling.core;
 
 import com.akto.behaviour_modelling.model.TransitionKey;
 import com.akto.behaviour_modelling.model.WindowSnapshot;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 
 /**
  * Accumulates API call and transition counts within a single window.
@@ -13,7 +14,7 @@ import com.akto.behaviour_modelling.model.WindowSnapshot;
  * Implementations must be thread-safe.
  */
 public interface WindowAccumulator {
-    void recordApiCall(int apiId, String userId);
+    void recordApiCall(ApiInfoKey key, String userId);
     void recordTransition(TransitionKey key, String userId);
     WindowSnapshot snapshot(long windowStart, long windowEnd);
     void reset();

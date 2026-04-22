@@ -5,9 +5,10 @@ import com.akto.behaviour_modelling.model.TransitionKey;
 import com.akto.behaviour_modelling.model.UserSessionState;
 import com.akto.behaviour_modelling.model.WindowSnapshot;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.ApiInfoCatalog;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.HttpRequestParams;
-import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLStatic;
+import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 
 import java.util.Deque;
 import java.util.concurrent.CompletableFuture;
@@ -20,7 +21,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public class SessionAnalyzer {
 
     private final SequenceAnalyzerConfig config;
-    private final ApiRegistry registry;
 
     // Replaced atomically on each window flip. Volatile ensures all threads
     // see the new reference immediately without locking the hot path.
@@ -39,9 +39,8 @@ public class SessionAnalyzer {
         return t;
     });
 
-    public SessionAnalyzer(SequenceAnalyzerConfig config, ApiRegistry registry) {
+    public SessionAnalyzer(SequenceAnalyzerConfig config) {
         this.config = config;
-        this.registry = registry;
         this.currentAccumulator = config.getAccumulatorFactory().get();
 
         scheduler.scheduleAtFixedRate(
@@ -56,16 +55,21 @@ public class SessionAnalyzer {
      * Process a single HTTP record. This is the hot path — must stay low-latency.
      */
     public void process(HttpResponseParams record) {
-        HttpRequestParams req = record.getRequestParams();
-        if (req == null) return;
+        // Normalize raw URL to templatized ApiInfoKey (e.g. /users/123 → /users/INTEGER).
+        // Returns early if the URL is not yet known in the catalog.
+        AktoPolicyNew aktoPolicyNew = config.getAktoPolicyNew();
+        ApiInfoKey apiKey = AktoPolicyNew.generateFromHttpResponseParams(record, aktoPolicyNew.isMergeUrlsOnVersions());
 
-        ApiInfoKey apiKey = new ApiInfoKey(
-                req.getApiCollectionId(),
-                req.getUrl(),
-                resolveMethod(req.getMethod())
-        );
+        // Skip if this API is not yet cataloged — keeps the model bounded to known APIs.
+        // Check directly against apiInfoCatalogMap to avoid the side effect of
+        // getApiInfoFromMap(), which inserts a new entry for unknown URLs.
+        ApiInfoCatalog apiInfoCatalog = aktoPolicyNew.getApiInfoCatalogMap().get(apiKey.getApiCollectionId());
+        if (apiInfoCatalog == null) return;
+        URLStatic urlStatic = new URLStatic(apiKey.getUrl(), apiKey.getMethod());
+        boolean known = apiInfoCatalog.getStrictURLToMethods().containsKey(urlStatic)
+                || apiInfoCatalog.getTemplateURLToMethods().keySet().stream().anyMatch(t -> t.match(urlStatic));
+        if (!known) return;
 
-        int apiId = registry.resolve(apiKey);
         String userId = config.getUserIdentifier().extractUserId(record);
         long now = System.currentTimeMillis();
         long currentWindowStart = windowStart.get();
@@ -82,17 +86,17 @@ public class SessionAnalyzer {
                 state.reset(now);
             }
 
-            Deque<Integer> recentApis = state.getRecentApis();
+            Deque<ApiInfoKey> recentApis = state.getRecentApis();
 
             // Only emit a transition when we have a full context window (sequenceLength - 1 prior APIs).
             if (recentApis.size() == config.getSequenceLength() - 1) {
-                accumulator.recordTransition(buildTransitionKey(recentApis, apiId), userId);
+                accumulator.recordTransition(buildTransitionKey(recentApis, apiKey), userId);
             }
 
-            accumulator.recordApiCall(apiId, userId);
+            accumulator.recordApiCall(apiKey, userId);
 
             // Maintain deque at max size (sequenceLength - 1).
-            recentApis.addLast(apiId);
+            recentApis.addLast(apiKey);
             if (recentApis.size() >= config.getSequenceLength()) {
                 recentApis.removeFirst();
             }
@@ -124,22 +128,13 @@ public class SessionAnalyzer {
         onWindowEnd();
     }
 
-    private TransitionKey buildTransitionKey(Deque<Integer> recentApis, int currentApiId) {
-        int[] sequence = new int[recentApis.size() + 1];
+    private TransitionKey buildTransitionKey(Deque<ApiInfoKey> recentApis, ApiInfoKey currentApi) {
+        ApiInfoKey[] sequence = new ApiInfoKey[recentApis.size() + 1];
         int i = 0;
-        for (int id : recentApis) {
-            sequence[i++] = id;
+        for (ApiInfoKey key : recentApis) {
+            sequence[i++] = key;
         }
-        sequence[i] = currentApiId;
+        sequence[i] = currentApi;
         return new TransitionKey(sequence);
-    }
-
-    private static URLMethods.Method resolveMethod(String method) {
-        if (method == null || method.isEmpty()) return URLMethods.Method.OTHER;
-        try {
-            return URLMethods.Method.valueOf(method.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return URLMethods.Method.OTHER;
-        }
     }
 }

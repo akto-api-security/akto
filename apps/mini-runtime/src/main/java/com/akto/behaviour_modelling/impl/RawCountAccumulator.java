@@ -3,6 +3,7 @@ package com.akto.behaviour_modelling.impl;
 import com.akto.behaviour_modelling.core.WindowAccumulator;
 import com.akto.behaviour_modelling.model.TransitionKey;
 import com.akto.behaviour_modelling.model.WindowSnapshot;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,12 +20,12 @@ import java.util.concurrent.atomic.LongAdder;
  */
 public class RawCountAccumulator implements WindowAccumulator {
 
-    private final ConcurrentHashMap<Integer, LongAdder> apiCounts = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ApiInfoKey, LongAdder> apiCounts = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<TransitionKey, LongAdder> transitionCounts = new ConcurrentHashMap<>();
 
     @Override
-    public void recordApiCall(int apiId, String userId) {
-        apiCounts.computeIfAbsent(apiId, k -> new LongAdder()).increment();
+    public void recordApiCall(ApiInfoKey key, String userId) {
+        apiCounts.computeIfAbsent(key, k -> new LongAdder()).increment();
     }
 
     @Override
@@ -34,7 +35,7 @@ public class RawCountAccumulator implements WindowAccumulator {
 
     @Override
     public WindowSnapshot snapshot(long windowStart, long windowEnd) {
-        Map<Integer, Long> apiCountsCopy = new HashMap<>(apiCounts.size());
+        Map<ApiInfoKey, Long> apiCountsCopy = new HashMap<>(apiCounts.size());
         apiCounts.forEach((k, v) -> apiCountsCopy.put(k, v.sum()));
 
         Map<TransitionKey, Long> transitionCountsCopy = new HashMap<>(transitionCounts.size());

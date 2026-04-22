@@ -1,16 +1,18 @@
 package com.akto.behaviour_modelling.model;
 
+import com.akto.dto.ApiInfo.ApiInfoKey;
+
 import java.util.ArrayDeque;
 import java.util.Deque;
 
 /**
  * Mutable per-user state tracked within a session window.
- * Holds the last (sequenceLength - 1) API IDs seen for this user,
+ * Holds the last (sequenceLength - 1) ApiInfoKeys seen for this user,
  * used to emit transition keys on each new API call.
  */
 public class UserSessionState {
 
-    private final Deque<Integer> recentApis;
+    private final Deque<ApiInfoKey> recentApis;
     private long sessionStart;
 
     public UserSessionState(long sessionStart) {
@@ -18,7 +20,7 @@ public class UserSessionState {
         this.sessionStart = sessionStart;
     }
 
-    public Deque<Integer> getRecentApis() {
+    public Deque<ApiInfoKey> getRecentApis() {
         return recentApis;
     }
 

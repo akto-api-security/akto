@@ -1,21 +1,23 @@
 package com.akto.behaviour_modelling.model;
 
+import com.akto.dto.ApiInfo.ApiInfoKey;
+
 import java.util.Arrays;
 
 /**
- * Immutable key representing an ordered sequence of API IDs (n-gram).
- * For sequence length 2: [api1Id, api2Id]
- * For sequence length N: [api1Id, ..., apiNId]
+ * Immutable key representing an ordered sequence of ApiInfoKeys (n-gram).
+ * For sequence length 2: [api1, api2]
+ * For sequence length N: [api1, ..., apiN]
  */
 public final class TransitionKey {
 
-    private final int[] sequence;
+    private final ApiInfoKey[] sequence;
 
-    public TransitionKey(int[] sequence) {
+    public TransitionKey(ApiInfoKey[] sequence) {
         this.sequence = sequence.clone();
     }
 
-    public int[] getSequence() {
+    public ApiInfoKey[] getSequence() {
         return sequence.clone();
     }
 
