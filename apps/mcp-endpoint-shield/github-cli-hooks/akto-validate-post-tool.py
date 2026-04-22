@@ -17,6 +17,7 @@ LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
+AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 MODE = os.getenv("MODE", "argus").lower()
 
@@ -76,9 +77,12 @@ def create_ssl_context():
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(cfg: dict, ingest_data: bool = True) -> str:
+def build_http_proxy_url(cfg: dict, *, response_guardrails: bool = False, ingest_data: bool = True) -> str:
     """Build Akto HTTP proxy URL with query parameters."""
-    params = [f"akto_connector={cfg['connector']}"]
+    params = []
+    if response_guardrails:
+        params.append("response_guardrails=true")
+    params.append(f"akto_connector={cfg['connector']}")
     if ingest_data:
         params.append("ingest_data=true")
     return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
@@ -204,7 +208,7 @@ def ingest_tool_result(
 
     try:
         request_body = build_akto_request(tool_name, tool_args, result_text, status_code, result_type, cfg)
-        post_to_akto(build_http_proxy_url(cfg, ingest_data=True), request_body, logger)
+        post_to_akto(build_http_proxy_url(cfg, response_guardrails=not AKTO_SYNC_MODE, ingest_data=True), request_body, logger)
         logger.info("Tool result ingested successfully")
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
