@@ -3047,6 +3047,27 @@ public class DbAction extends ActionSupport {
     public String createCollectionForHostAndVpc() {
         try {
             DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, checkTagsNeedUpdates(tagsList, colId), accessType, skills);
+            boolean isMcpServer = tagsList != null
+                && tagsList.stream().anyMatch(t -> Constants.AKTO_MCP_SERVER_TAG.equals(t.getKeyName()));
+            if (isMcpServer) {
+                try {
+                    McpAuditInfo auditInfo = new McpAuditInfo(
+                        Context.now(),
+                        "",
+                        Constants.AKTO_MCP_SERVER_TAG,
+                        0,
+                        host,
+                        "",
+                        null,
+                        colId,
+                        null,
+                        null
+                    );
+                    DbLayer.insertMCPAuditDataLog(auditInfo);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error creating or inserting MCP audit info: " + e.toString());
+                }
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHostAndVpc " + e.toString());
             return Action.ERROR.toUpperCase();
