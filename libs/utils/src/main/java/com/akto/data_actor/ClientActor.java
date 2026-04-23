@@ -108,6 +108,31 @@ public class ClientActor extends DataActor {
         return dbAbsHost + "/api";
     }
 
+    public Config.DatadogForwarderConfig fetchDatadogForwarderConfig() {
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDatadogForwarderConfig", "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchDatadogForwarderConfig", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            try {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBObject configObj = (BasicDBObject) payloadObj.get("datadogForwarderConfig");
+                if (configObj == null) return null;
+                return objectMapper.readValue(configObj.toJson(), Config.DatadogForwarderConfig.class);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error parsing fetchDatadogForwarderConfig response: " + e, LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchDatadogForwarderConfig: " + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
     public AccountSettings fetchAccountSettings() {
         AccountSettings acc = null;
         for (int i=0; i < 5; i++) {
@@ -3848,6 +3873,25 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void persistRecordedLoginFlowScreenshots(String roleName, int userId, List<String> screenshotsBase64) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("recordedLoginScreenshotRoleName", roleName);
+        obj.put("userId", userId);
+        obj.put("recordedLoginFlowScreenshotsBase64", screenshotsBase64);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/persistRecordedLoginFlowScreenshots", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in persistRecordedLoginFlowScreenshots", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in persistRecordedLoginFlowScreenshots" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
     public Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String urlVar, String method) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
@@ -4147,18 +4191,23 @@ public class ClientActor extends DataActor {
 
     public void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
         Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("testingRunPlaygroundId", testingRunPlayground.getHexId());
-        obj.put("testingRunPlaygroundType", testingRunPlayground.getTestingRunPlaygroundType());
+        Map<String, Object> body = new HashMap<>();
+        body.put("testingRunPlayground", testingRunPlayground);
         switch (testingRunPlayground.getTestingRunPlaygroundType()) {
             case TEST_EDITOR_PLAYGROUND:
-                obj.put("testingRunResult", testingRunPlayground.getTestingRunResult());
+                body.put("testingRunPlaygroundId", testingRunPlayground.getHexId());
+                body.put("testingRunPlaygroundType", TestingRunPlayground.TestingRunPlaygroundType.TEST_EDITOR_PLAYGROUND);
+                body.put("testingRunResult", testingRunPlayground.getTestingRunResult());
                 break;
             case POSTMAN_IMPORTS:
-                obj.put("originalHttpResponse", testingRunPlayground.getOriginalHttpResponse());
+                body.put("testingRunPlaygroundId", testingRunPlayground.getHexId());
+                body.put("testingRunPlaygroundType", TestingRunPlayground.TestingRunPlaygroundType.POSTMAN_IMPORTS);
+                body.put("originalHttpResponse", testingRunPlayground.getOriginalHttpResponse());
+                break;
+            default:
                 break;
         }
-        String jsonString = gson.toJson(obj);
+        String jsonString = gson.toJson(body);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRunPlaygroundStateAndResult", "", "POST",  jsonString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);

@@ -64,6 +64,10 @@ public class DbActor extends DataActor {
         return DbLayer.fetchAccountSettings();
     }
 
+    public Config.DatadogForwarderConfig fetchDatadogForwarderConfig() {
+        return null;
+    }
+
     public long fetchEstimatedDocCount() {
         return DbLayer.fetchEstimatedDocCount();
     }
@@ -627,6 +631,10 @@ public class DbActor extends DataActor {
 
     public void updateLoginFlowStepsData(int userId, Map<String, Object> valuesMap){
         DbLayer.updateLoginFlowStepsData(userId, valuesMap);
+    }
+
+    public void persistRecordedLoginFlowScreenshots(String roleName, int userId, List<String> screenshotsBase64) {
+        DbLayer.persistRecordedLoginFlowScreenshots(roleName, userId, screenshotsBase64);
     }
 
     public Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String url, String method) {

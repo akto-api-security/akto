@@ -76,7 +76,7 @@ public class LoginRecorderAction extends UserAction {
         }
 
         try {
-            token = RecordedLoginFlowUtil.fetchToken(recordedLoginInput.getOutputFilePath(), recordedLoginInput.getErrorFilePath());
+            token = RecordedLoginFlowUtil.fetchToken(recordedLoginInput);
         } catch(Exception e) {
             addActionError(e.getMessage());
             return ERROR.toUpperCase();

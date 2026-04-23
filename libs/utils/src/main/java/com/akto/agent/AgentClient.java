@@ -178,8 +178,15 @@ public class AgentClient {
             if(jsonNode.has("finalSentPrompt")) {
                 finalSentPrompt = jsonNode.get("finalSentPrompt").asText();
             }
+
+            Map<String,Object> toolsMetadata = new HashMap<>();
+            if(jsonNode.has("toolsMetadata") && jsonNode.get("toolsMetadata").isObject()) {
+                jsonNode.get("toolsMetadata").fields().forEachRemaining(entry ->
+                    toolsMetadata.put(entry.getKey(), entry.getValue().asText())
+                );
+            }
             
-            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage);
+            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage, toolsMetadata);
             
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error parsing agent response: " + e.getMessage() + ", response body: " + responseBody);
@@ -265,11 +272,12 @@ public class AgentClient {
         initializeAgent(requestBody);
     }
 
-    public void initializeAgent(String sessionUrl, String requestHeaders, String apiRequestBody, String conversationId) {
+    public void initializeAgent(String sessionUrl, String requestHeaders, String apiRequestBody, String requestMethod, String conversationId) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("sessionUrl", sessionUrl);
         requestBody.put("requestHeaders", requestHeaders);
         requestBody.put("requestBody", apiRequestBody);
+        requestBody.put("requestMethod", requestMethod != null && !requestMethod.isEmpty() ? requestMethod : "POST");
         requestBody.put("conversationId", conversationId);
         initializeAgent(requestBody);
     }
