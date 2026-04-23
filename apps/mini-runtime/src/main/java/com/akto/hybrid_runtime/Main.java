@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import com.akto.RuntimeMode;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
@@ -901,10 +902,9 @@ public class Main {
                 loggerMaker.infoAndAddToDb("Sync function completed for account: " + accountId);
                 sendToCentralKafka(centralKafkaTopicName, accWiseResponse);
 
-                Organization organization = OrgUtils.getOrganizationCached(Context.getActualAccountId());
-                if (organization != null && organization.getFeatureWiseAllowed() != null) {
-                    FeatureAccess featureAccess = organization.getFeatureWiseAllowed().get("AGENT_TRAFFIC_LOGS");
-                    if (featureAccess != null && featureAccess.getIsGranted()) {
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(),"AGENT_TRAFFIC_LOGS");
+                boolean allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
+                if (allowAnalysis) {
                         List<HttpResponseParams> endpointSourceResponses = new ArrayList<>();
                         for (HttpResponseParams hrp : accWiseResponse) {
                             Map<String, String> tagsMap = HttpCallParser.parseTagsMap(hrp.getTags());
@@ -920,7 +920,6 @@ public class Main {
                                 loggerMaker.errorAndAddToDb(e, "Error saving agent traffic logs: " + e.getMessage());
                             }
                         }
-                    }
                 }
                 
             } catch (Exception e) {

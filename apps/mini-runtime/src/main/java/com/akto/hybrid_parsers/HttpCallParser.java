@@ -1404,13 +1404,8 @@ public class HttpCallParser {
             int apiCollectionId = createApiCollectionId(httpResponseParam, tagsMap);
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
-            boolean allowAnalysis = true;
-
-            Organization organization = OrgUtils.getOrganizationCached(Context.getActualAccountId());
-            if (organization != null && organization.getFeatureWiseAllowed() != null) {
-                FeatureAccess featureAccess = organization.getFeatureWiseAllowed().get("AGENT_TRAFFIC_LOGS");
-                allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
-            }
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(),"AGENT_TRAFFIC_LOGS");
+            boolean allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
 
             // if traffic is agentic, then send the data to cyborg
             if (isAgenticTraffic(tagsMap) && allowAnalysis) {
