@@ -7,7 +7,7 @@ import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
 import { CollectionIcon } from "../../../components/shared/CollectionIcon"
-import React, { useEffect,useState, useRef } from "react"
+import React, { useEffect, useState, useRef, useMemo } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
@@ -55,7 +55,7 @@ const COLLECTIONS_LAZY_RENDER_THRESHOLD = 100; // Collections count above which 
 const allowedAccounts = [1736798101, 1718042191];
 
 
-const headers = [
+const getBaseHeaders = (collectionAccessTypeEnabled) => [
     ...((isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory() || isApiSecurityCategory() || isDastCategory()) ? [{
         title: "",
         text: "",
@@ -181,7 +181,7 @@ const headers = [
         textValue: 'envType',
         tooltipContent: (<Text variant="bodySm">Tags for an API collection to describe collection attributes such as environment type (staging, production) and other custom attributes</Text>),
     },
-    ...(allowedAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? [{
+    ...(allowedAccounts.includes(Number(window.ACTIVE_ACCOUNT)) || collectionAccessTypeEnabled ? [{
         title: "Access Type",
         text: "Access Type",
         value: "accessType",
@@ -522,6 +522,8 @@ function ApiCollections(props) {
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
     const [usernameMap, setUsernameMap] = useState({})
+    const [collectionAccessTypeEnabled, setCollectionAccessTypeEnabled] = useState(false)
+    const headers = useMemo(() => getBaseHeaders(collectionAccessTypeEnabled), [collectionAccessTypeEnabled])
     const [refreshData, setRefreshData] = useState(false)
     const [popover,setPopover] = useState(false)
     const [teamData, setTeamData] = useState([])
@@ -1106,6 +1108,13 @@ function ApiCollections(props) {
             isMountedRef.current = false;
         };
     }, [])
+
+    useEffect(() => {
+        settingRequests.fetchAdminSettings().then(response => {
+            setCollectionAccessTypeEnabled(response?.organization?.collectionAccessTypeEnabled === true)
+        }).catch(() => {})
+    }, [])
+
     const createCollectionModalActivatorRef = useRef();
     const resetResourcesSelected = () => {
         TableStore.getState().setSelectedItems([])
