@@ -85,16 +85,14 @@ const SummaryCardComponent = ({
                   apiCollectionIds={apiCollectionIds}
                 />
               ) : null}
-                {
-                  !(isApiSecurityCategory() || isDastCategory()) ? <></> :
-                    <VerticalStack gap={4}>
-                      <HorizontalGrid columns={2} gap={4}>
-                        <MemoizedApiCollectionCoverageGraph apiCollectionIds={apiCollectionIds} />
-                        <MemoizedTestRunOverTimeGraph apiCollectionIds={apiCollectionIds} />
-                      </HorizontalGrid>
-                      <MemoizedApisTestedOverTimeGraph apiCollectionIds={apiCollectionIds} />
-                    </VerticalStack>
-                }
+                <VerticalStack gap={4}>
+                  <HorizontalGrid columns={2} gap={4}>
+                    <MemoizedApiCollectionCoverageGraph apiCollectionIds={apiCollectionIds} />
+                    <MemoizedTestRunOverTimeGraph apiCollectionIds={apiCollectionIds} />
+                  </HorizontalGrid>
+                  {!(isApiSecurityCategory() || isDastCategory()) ? <></> :<MemoizedApisTestedOverTimeGraph apiCollectionIds={apiCollectionIds} />}
+                </VerticalStack>
+                
             </VerticalStack>
           </LegacyCard.Subsection>
         </Collapsible>
