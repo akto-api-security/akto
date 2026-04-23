@@ -128,8 +128,17 @@ public class SessionAnalyzerTest {
         Assertions.assertNotNull(count, "Templatized key not found in snapshot");
         Assertions.assertEquals(2L, count, "Both numeric variants should map to count=2");
 
-        Assertions.assertTrue(snapshot.getTransitionCounts().isEmpty(),
-                "No transitions expected — only one unique API seen");
+        // Two consecutive calls to /products/INTEGER produce a self-loop transition
+        Assertions.assertEquals(1, snapshot.getTransitionCounts().size(),
+                "Exactly one self-loop transition expected");
+        TransitionKey selfLoop = transition("GET", "/products/INTEGER", "GET", "/products/INTEGER");
+        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(selfLoop),
+                "Self-loop count should be 1");
+
+        // Unknown API was dropped — not present in either map
+        ApiInfoKey unknown = key("GET", "/unknown/path");
+        Assertions.assertFalse(snapshot.getApiCounts().containsKey(unknown),
+                "Unknown API should have been dropped");
 
         analyzer.shutdown();
     }
