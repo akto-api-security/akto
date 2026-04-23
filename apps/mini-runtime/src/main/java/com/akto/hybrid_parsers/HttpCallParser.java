@@ -1389,11 +1389,11 @@ public class HttpCallParser {
 
             if (isAtlasTraffic(httpResponseParam) || isArgusTraffic(httpResponseParam)) {
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams skipping advanced filters for atlas traffic "
+                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams skipping advanced filters for agentic traffic "
                             + httpResponseParam.getRequestParams().getURL());
                 }
                 if(Utils.printDebugHostLog(httpResponseParam) != null){
-                    Utils.printDebugHostLog(" in filterHttpResponseParams skipping advanced filters for atlas traffic "
+                    Utils.printDebugHostLog(" in filterHttpResponseParams skipping advanced filters for agentic traffic "
                             + httpResponseParam.getRequestParams().getURL());
                 }
             } else {
