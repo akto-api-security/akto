@@ -9,6 +9,7 @@ local M = {}
 
 local defaults = {
   akto_url         = "",
+  akto_token       = "",
   sync_mode        = true,
   timeout          = 5,
   plenary_hook     = true,
@@ -41,7 +42,7 @@ function M.enable()
   if _config.akto_url == "" then return end
 
   -- Initialize shared HTTP helpers first (all hooks depend on this)
-  require("akto.http").configure({ akto_url = _config.akto_url, timeout = _config.timeout })
+  require("akto.http").configure({ akto_url = _config.akto_url, timeout = _config.timeout, akto_token = _config.akto_token })
 
   local cfg = { akto_url = _config.akto_url, sync_mode = _config.sync_mode, timeout = _config.timeout }
 
