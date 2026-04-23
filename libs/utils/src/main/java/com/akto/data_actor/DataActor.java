@@ -353,4 +353,6 @@ public abstract class DataActor {
     public abstract boolean updateServiceGraphEdges(int apiCollectionId, Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges);
 
     public abstract void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook);
+
+    public abstract void writeApiSequences(List<ApiSequences> sequences);
 }

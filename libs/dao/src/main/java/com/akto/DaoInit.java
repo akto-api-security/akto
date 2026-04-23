@@ -258,6 +258,7 @@ public class DaoInit {
         ClassModel<McpReconRequest> mcpReconRequestClassModel = ClassModel.builder(McpReconRequest.class).enableDiscriminator(true).build();
         ClassModel<AgentConversationResult> agentConversationResultClassModel = ClassModel.builder(AgentConversationResult.class).enableDiscriminator(true).build();
         ClassModel<AgentTrafficLog> agentTrafficLogClassModel = ClassModel.builder(AgentTrafficLog.class).enableDiscriminator(true).build();
+        ClassModel<ApiSequences> apiSequencesClassModel = ClassModel.builder(ApiSequences.class).enableDiscriminator(true).build();
 
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
@@ -289,7 +290,7 @@ public class DaoInit {
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, jobParams, tlsAuthClassModel, digestAuthParamClassModel, collectionTagsModel, mcpReconResultClassModel
-                , mcpReconRequestClassModel, agentConversationResultClassModel, agentTrafficLogClassModel).automatic(true).build());
+                , mcpReconRequestClassModel, agentConversationResultClassModel, agentTrafficLogClassModel, apiSequencesClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -394,7 +395,7 @@ public class DaoInit {
         McpReconResultDao.instance.createIndicesIfAbsent();
         AgentTrafficLogDao.instance.createIndicesIfAbsent();
         TestingRunWebhookDao.instance.createIndicesIfAbsent();
-
+        ApiSequencesDao.instance.createIndicesIfAbsent();
     }
 
 }

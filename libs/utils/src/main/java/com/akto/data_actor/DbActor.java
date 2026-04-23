@@ -1,5 +1,7 @@
 package com.akto.data_actor;
 
+import com.akto.dao.ApiSequencesDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -762,5 +764,32 @@ public class DbActor extends DataActor {
     @Override
     public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
         DbLayer.storeTestingRunWebhook(testingRunWebhook);
+    }
+
+    @Override
+    public void writeApiSequences(List<ApiSequences> sequences) {
+        if (sequences == null || sequences.isEmpty()) return;
+        List<WriteModel<ApiSequences>> writeModels = new ArrayList<>();
+        for (ApiSequences seq : sequences) {
+            float probability = seq.getPrevStateCount() > 0
+                    ? seq.getTransitionCount() / (float) seq.getPrevStateCount()
+                    : 0f;
+            Bson filter = Filters.and(
+                    Filters.eq(ApiSequences.API_COLLECTION_ID, seq.getApiCollectionId()),
+                    Filters.eq(ApiSequences.PATHS, seq.getPaths())
+            );
+            Bson update = com.mongodb.client.model.Updates.combine(
+                    com.mongodb.client.model.Updates.inc(ApiSequences.TRANSITION_COUNT, seq.getTransitionCount()),
+                    com.mongodb.client.model.Updates.inc(ApiSequences.PREV_STATE_COUNT, seq.getPrevStateCount()),
+                    com.mongodb.client.model.Updates.set(ApiSequences.PROBABILITY, probability),
+                    com.mongodb.client.model.Updates.set(ApiSequences.LAST_UPDATED_AT, Context.now()),
+                    com.mongodb.client.model.Updates.setOnInsert(ApiSequences.CREATED_AT, Context.now()),
+                    com.mongodb.client.model.Updates.setOnInsert(ApiSequences.IS_ACTIVE, true)
+            );
+            writeModels.add(new com.mongodb.client.model.UpdateOneModel<>(filter, update,
+                    new com.mongodb.client.model.UpdateOptions().upsert(true)));
+        }
+        ApiSequencesDao.instance.getMCollection().bulkWrite(writeModels,
+                new com.mongodb.client.model.BulkWriteOptions().ordered(false));
     }
 }

@@ -18,6 +18,11 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.behaviour_modelling.SessionAnalyzer;
+import com.akto.behaviour_modelling.SequenceAnalyzerConfig;
+import com.akto.behaviour_modelling.impl.ApiSequencesFlusher;
+import com.akto.behaviour_modelling.impl.IpBasedIdentifier;
+import com.akto.behaviour_modelling.impl.RawCountAccumulator;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
 import com.akto.kafka.Kafka;
@@ -554,6 +559,7 @@ public class Main {
         }, 0, 1, TimeUnit.MINUTES);
 
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
+        Map<String, SessionAnalyzer> sessionAnalyzerMap = new HashMap<>();
 
         // sync infra metrics thread
         // ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
@@ -683,7 +689,7 @@ public class Main {
             runDBMaintenanceJob(apiConfig);
         }else{
             kafkaSubscribeAndProcess(topicName, syncImmediately, fetchAllSTI, accountInfoMap, isDashboardInstance, centralKafkaTopicName,
-                    apiConfig, main, exceptionOnCommitSync, httpCallParserMap);
+                    apiConfig, main, exceptionOnCommitSync, httpCallParserMap, sessionAnalyzerMap);
         }
     }
 
@@ -697,7 +703,7 @@ public class Main {
     private static void kafkaSubscribeAndProcess(String topicName, boolean syncImmediately, boolean fetchAllSTI,
             Map<Integer, AccountInfo> accountInfoMap, boolean isDashboardInstance, String centralKafkaTopicName,
             APIConfig apiConfig, final Main main, final AtomicBoolean exceptionOnCommitSync,
-            Map<String, HttpCallParser> httpCallParserMap) {
+            Map<String, HttpCallParser> httpCallParserMap, Map<String, SessionAnalyzer> sessionAnalyzerMap) {
         long lastSyncOffset = 0;
         try {
             main.consumer.subscribe(Arrays.asList(topicName));
@@ -719,6 +725,7 @@ public class Main {
                     accountInfoMap,
                     isDashboardInstance,
                     httpCallParserMap,
+                    sessionAnalyzerMap,
                     apiConfig,
                     fetchAllSTI,
                     syncImmediately,
@@ -849,7 +856,8 @@ public class Main {
 
     public static void handleResponseParams(Map<String, List<HttpResponseParams>> responseParamsToAccountMap,
         Map<Integer, AccountInfo> accountInfoMap, boolean isDashboardInstance,
-        Map<String, HttpCallParser> httpCallParserMap, APIConfig apiConfig, boolean fetchAllSTI,
+        Map<String, HttpCallParser> httpCallParserMap, Map<String, SessionAnalyzer> sessionAnalyzerMap,
+        APIConfig apiConfig, boolean fetchAllSTI,
         boolean syncImmediately, String centralKafkaTopicName) {
         for (String accountId: responseParamsToAccountMap.keySet()) {
             int accountIdInt;
@@ -876,6 +884,19 @@ public class Main {
                 );
                 httpCallParserMap.put(accountId, parser);
                 loggerMaker.infoAndAddToDb("New parser created for account: " + accountId);
+
+                // aktoPolicyNew is fully built by the time HttpCallParser constructor returns
+                SessionAnalyzer sessionAnalyzer = new SessionAnalyzer(
+                    new SequenceAnalyzerConfig(
+                        2,
+                        10 * 60 * 1000L, // 10 minutes
+                        new IpBasedIdentifier(),
+                        RawCountAccumulator::new,
+                        new ApiSequencesFlusher(),
+                        parser.apiCatalogSync.aktoPolicyNew
+                    )
+                );
+                sessionAnalyzerMap.put(accountId, sessionAnalyzer);
             }
 
             HttpCallParser parser = httpCallParserMap.get(accountId);
@@ -897,6 +918,17 @@ public class Main {
                 loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId);
                 parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
                 loggerMaker.infoAndAddToDb("Sync function completed for account: " + accountId);
+
+                SessionAnalyzer sessionAnalyzer = sessionAnalyzerMap.get(accountId);
+                if (sessionAnalyzer != null) {
+                    for (HttpResponseParams httpResponseParams : accWiseResponse) {
+                        try {
+                            sessionAnalyzer.process(httpResponseParams);
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "Error in session analyzer: " + e.getMessage());
+                        }
+                    }
+                }
 
                 // Save raw agent traffic logs to MongoDB for future training (boolean feature flag)
                 try {
@@ -1280,6 +1312,7 @@ public class Main {
 
         }
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
+        Map<String, SessionAnalyzer> sessionAnalyzerMap = new HashMap<>();
         String configName = System.getenv("AKTO_CONFIG_NAME");
         APIConfig apiConfig = dataActor.fetchApiConfig(configName);
         if (apiConfig == null) {
@@ -1292,6 +1325,7 @@ public class Main {
                 accountInfoMap,
                 isDashboardInstance,
                 httpCallParserMap,
+                sessionAnalyzerMap,
                 apiConfig,
                 fetchAllSTI,
                 syncImmediately,

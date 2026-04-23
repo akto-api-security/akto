@@ -4631,4 +4631,38 @@ public class ClientActor extends DataActor {
             return;
         }
     }
+
+    @Override
+    public void writeApiSequences(List<ApiSequences> sequences) {
+        if (sequences == null || sequences.isEmpty()) return;
+        List<ApiSequences> batch = new ArrayList<>();
+        for (int i = 0; i < sequences.size(); i++) {
+            batch.add(sequences.get(i));
+            if (batch.size() % batchWriteLimit == 0) {
+                List<ApiSequences> finalBatch = batch;
+                threadPool.submit(() -> writeApiSequencesBatch(finalBatch));
+                batch = new ArrayList<>();
+            }
+        }
+        if (!batch.isEmpty()) {
+            List<ApiSequences> finalBatch = batch;
+            threadPool.submit(() -> writeApiSequencesBatch(finalBatch));
+        }
+    }
+
+    private void writeApiSequencesBatch(List<ApiSequences> sequences) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiSequencesList", sequences);
+        String objString = gson.toJson(obj);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/writeApiSequences", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb(null, "non 2xx response in writeApiSequences", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in writeApiSequences: " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
 }
