@@ -4638,7 +4638,8 @@ public class ClientActor extends DataActor {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("agentQueryData", agentQueryData);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeAgentQueryData", "", "POST", obj.toString(), headers, "");
+        String jsonBody = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeAgentQueryData", "", "POST", jsonBody, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
         } catch (Exception e) {
