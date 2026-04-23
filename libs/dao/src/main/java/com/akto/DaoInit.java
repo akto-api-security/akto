@@ -59,6 +59,7 @@ import com.akto.util.LastCronRunInfo;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.DependencyNode.ParamInfo;
+import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.OrganizationFlags;
@@ -258,6 +259,7 @@ public class DaoInit {
         ClassModel<McpReconRequest> mcpReconRequestClassModel = ClassModel.builder(McpReconRequest.class).enableDiscriminator(true).build();
         ClassModel<AgentConversationResult> agentConversationResultClassModel = ClassModel.builder(AgentConversationResult.class).enableDiscriminator(true).build();
         ClassModel<AgentTrafficLog> agentTrafficLogClassModel = ClassModel.builder(AgentTrafficLog.class).enableDiscriminator(true).build();
+        ClassModel<AgentQueryData> agentQueryDataClassModel = ClassModel.builder(AgentQueryData.class).enableDiscriminator(true).build();
 
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
@@ -289,7 +291,7 @@ public class DaoInit {
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, jobParams, tlsAuthClassModel, digestAuthParamClassModel, collectionTagsModel, mcpReconResultClassModel
-                , mcpReconRequestClassModel, agentConversationResultClassModel, agentTrafficLogClassModel).automatic(true).build());
+                , mcpReconRequestClassModel, agentConversationResultClassModel, agentTrafficLogClassModel, agentQueryDataClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
