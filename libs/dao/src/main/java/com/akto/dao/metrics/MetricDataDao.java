@@ -6,14 +6,17 @@ import com.akto.dao.context.Context;
 import com.akto.dto.Log;
 import com.akto.dto.metrics.MetricData;
 import com.akto.util.DbMode;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class MetricDataDao extends AccountsContextDao<MetricData> {
@@ -99,5 +102,43 @@ public class MetricDataDao extends AccountsContextDao<MetricData> {
         }
 
         return instance.findAll(Filters.and(filters), 0, 100_000, Sorts.ascending("timestamp"));
+    }
+
+    /**
+     * Aggregates Top N items across multiple metric documents within a time range.
+     * Uses $unwind -> $group -> $sort -> $limit pipeline to merge top items.
+     *
+     * @param startTime Start timestamp (inclusive)
+     * @param endTime End timestamp (inclusive)
+     * @param metricId The metric ID to filter by
+     * @param topN Number of top items to return
+     * @return List of TopNItem with aggregated values, sorted descending by value
+     */
+    public List<MetricData.TopNItem> aggregateTopN(long startTime, long endTime, String metricId, int topN) {
+        List<Bson> pipeline = Arrays.asList(
+                // Match time range and metric ID
+                Aggregates.match(Filters.and(
+                        Filters.gte("timestamp", startTime),
+                        Filters.lte("timestamp", endTime),
+                        Filters.eq("metricId", metricId)
+                )),
+                // Unwind the topItems array
+                Aggregates.unwind("$topItems"),
+                // Group by key and sum values
+                Aggregates.group("$topItems.key",
+                        Accumulators.sum("totalValue", "$topItems.value")),
+                // Sort by totalValue descending
+                Aggregates.sort(Sorts.descending("totalValue")),
+                // Limit to top N
+                Aggregates.limit(topN)
+        );
+
+        List<MetricData.TopNItem> result = new ArrayList<>();
+        for (Document doc : getMCollection().aggregate(pipeline, Document.class)) {
+            String key = doc.getString("_id");
+            Number totalValue = doc.get("totalValue", Number.class);
+            result.add(new MetricData.TopNItem(key, totalValue.floatValue()));
+        }
+        return result;
     }
 }
