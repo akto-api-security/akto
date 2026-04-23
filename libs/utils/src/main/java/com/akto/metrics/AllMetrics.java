@@ -98,6 +98,8 @@ public class AllMetrics {
             try {
                 Context.accountId.set(accountId);
 
+                ModuleInfo moduleInfo = ModuleInfoWorker.getModuleInfo();
+
                 // Collect infrastructure metrics from MXBeans
                 collectInfraMetrics();
 
@@ -129,7 +131,8 @@ public class AllMetrics {
                             m.orgId,
                             instance_id,
                             type,
-                            m.moduleType
+                            m.moduleType,
+                            moduleInfo
                     );
                     metricDataList.add(metricData);
                 }
