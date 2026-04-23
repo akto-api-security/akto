@@ -44,7 +44,7 @@ export const INTERVAL_DATABRICKS = 300; // 5 minutes
 export const INTERVAL_SNOWFLAKE = 300; // 5 minutes
 export const INTERVAL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 300; // 5 minutes
 export const INTERVAL_SALESFORCE = 300; // 5 minutes
-export const INTERVAL_ANTHROPIC = 300; // 5 minutes
+export const INTERVAL_ANTHROPIC = 600; // 10 minutes
 export const INTERVAL_OPENAI = 300; // 5 minutes
 
 // Field Names
@@ -80,7 +80,6 @@ export const FIELD_SALESFORCE_CONSUMER_SECRET = 'salesforceConsumerSecret';
 export const FIELD_INGESTION_API_KEY = 'ingestionApiKey';
 export const FIELD_DATA_INGESTION_URL = 'dataIngestionUrl';
 export const FIELD_ANTHROPIC_API_KEY = 'anthropicApiKey';
-export const FIELD_ANTHROPIC_ORG_ID = 'anthropicOrgId';
 export const FIELD_ANTHROPIC_API_BASE_URL = 'anthropicApiBaseUrl';
 export const FIELD_OPENAI_API_KEY = 'openaiApiKey';
 export const FIELD_OPENAI_ORG_ID = 'openaiOrgId';
@@ -475,15 +474,6 @@ export const ANTHROPIC_FIELDS = [
         placeholder: 'sk-ant-api03-...',
         configKey: FIELD_ANTHROPIC_API_KEY,
         helpText: 'Anthropic API key with access to organization audit endpoints (x-api-key).',
-        required: true
-    },
-    {
-        name: FIELD_ANTHROPIC_ORG_ID,
-        label: 'Organization ID',
-        type: FIELD_TYPE_TEXT,
-        placeholder: 'org_xxxxxxxx',
-        configKey: FIELD_ANTHROPIC_ORG_ID,
-        helpText: 'Anthropic organization ID for scoped API calls.',
         required: true
     },
     {

@@ -112,9 +112,9 @@ function Endpoints() {
             const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
 
             // Group collections by agents (discovery sources), services (discovered endpoints), and skills
-            const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap);
+            const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
             const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
-            const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap);
+            const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap, riskScoreMap);
 
             const prettifiedAgents = prettifyGroupData(agentGroups);
             const prettifiedServices = prettifyGroupData(serviceGroups);
@@ -125,7 +125,7 @@ function Endpoints() {
             const agentGroupKeys = new Set(prettifiedAgents.map((a) => a.groupKey));
             const servicesToShow = prettifiedServices.filter((s) => !agentGroupKeys.has(s.groupKey));
 
-            const allData = [...prettifiedAgents, ...servicesToShow];
+            const allData = [...prettifiedAgents, ...servicesToShow, ...prettifiedSkills];
 
             // Calculate unique endpoint IDs across all collections
             const uniqueEndpointIds = new Set();

@@ -386,6 +386,7 @@ const transform = {
     obj['errorsList'] = data.errorsList || []
     obj['testCategoryId'] = data.testSubType
     obj['conversationId'] = data?.conversationId
+    obj['startTimestamp'] = data?.startTimestamp
 
     let testingRunResultHexId = data.hexId;
 
@@ -959,6 +960,9 @@ const transform = {
                     <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline>
                       {transform.getUrlComp(ele.url)}
                     </Link>
+                    <HorizontalStack gap={1}>
+                      <Text color="subdued" fontWeight="semibold">Time taken: {(ele.endTimestamp - ele.startTimestamp)}ms</Text>
+                    </HorizontalStack>
                     {ele.jiraIssueUrl && <JiraTicketDisplay jiraTicketUrl={ele.jiraIssueUrl} jiraKey={jiraKey} />}
                     {ele.devrevWorkUrl && devrevKey && (
                       <Tag>
@@ -1054,7 +1058,7 @@ const transform = {
       if (testRunResultsObj.hasOwnProperty(key)) {
         let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
         let urls = testRunResultsObj[key].urls
-        urls.push({ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl })
+        urls.push({ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl, startTimestamp: test?.startTimestamp || 0, endTimestamp: test?.endTimestamp || 0 })
         let obj = {
           ...test,
           urls: urls,
@@ -1066,7 +1070,7 @@ const transform = {
         delete obj["errorsList"]
         testRunResultsObj[key] = obj
       } else {
-        let urls = [{ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl }]
+        let urls = [{ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl, startTimestamp: test?.startTimestamp || 0, endTimestamp: test?.endTimestamp || 0 }]
         let obj = {
           ...test,
           urls: urls,

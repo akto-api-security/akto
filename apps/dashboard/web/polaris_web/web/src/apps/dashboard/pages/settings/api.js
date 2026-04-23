@@ -1009,6 +1009,20 @@ const settingRequests = {
             method: 'post',
             data: {proxyPattern, switchProxyMode}
         })
+    },
+    addAllowedHostForPac(hostPattern) {
+        return request({
+            url: '/api/addAllowedHostForPac',
+            method: 'post',
+            data: {hostPattern}
+        })
+    },
+    deleteProxyPattern(patternValue, connectorType) {
+        return request({
+            url: '/api/deleteProxyPattern',
+            method: 'post',
+            data: {patternValue, connectorType}
+        })
     }
 }
 

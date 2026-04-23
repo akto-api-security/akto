@@ -87,10 +87,26 @@ function TestRunResultFlyout(props) {
 
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
 
+    const normalizeRemediationText = (value) => {
+        if (value && typeof value === 'object' && typeof value.message === 'string') {
+            return value.message;
+        }
+        if (typeof value === 'string') {
+            try {
+                const parsed = JSON.parse(value);
+                if (parsed && typeof parsed === 'object' && typeof parsed.message === 'string') {
+                    return parsed.message;
+                }
+            } catch (_) {}
+            return value;
+        }
+        return '';
+    }
+
     const fetchRemediationInfo = useCallback(async (testId) => {
         if (testId && testId.length > 0) {
             await testingApi.fetchRemediationInfo(testId).then((resp) => {
-                setRemediationText(resp)
+                setRemediationText(normalizeRemediationText(resp))
             }).catch((err) => {
                 setRemediationText("Remediations not configured for this test.")
             })
@@ -183,10 +199,10 @@ function TestRunResultFlyout(props) {
     useEffect(() => {
         if (remediationSrc) {
             // Priority 1: Use remediation from backend/subCategoryMap
-            setRemediationText(remediationSrc)
+            setRemediationText(normalizeRemediationText(remediationSrc))
         } else if (conversationRemediationText) {
             // Priority 2: Use remediation text extracted from conversations
-            setRemediationText(conversationRemediationText)
+            setRemediationText(normalizeRemediationText(conversationRemediationText))
         } else {
             // Priority 3: Fall back to fetching from file
             fetchRemediationInfo("tests-library-master/remediation/" + selectedTestRunResult.testCategoryId + ".md")

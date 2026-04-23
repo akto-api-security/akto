@@ -4917,6 +4917,29 @@
             </result>
         </action>
 
+        <action name="api/addAllowedHostForPac" class="com.akto.action.AdminSettingsAction" method="addAllowedHostForPac">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User added an allowed host for TAC</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">allowedHostsForPac</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/addMatchingPatternForProxy" class="com.akto.action.AdminSettingsAction" method="addMatchingPatternForProxy">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -4932,6 +4955,29 @@
             </result>
             <result name="SUCCESS" type="json">
                 <param name="root">matchingPatternsForProxy</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/deleteProxyPattern" class="com.akto.action.AdminSettingsAction" method="deleteProxyPattern">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted a proxy or PAC pattern</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">deletedPatternResult</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

@@ -1,5 +1,5 @@
 import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip, Avatar, List } from "@shopify/polaris"
-import { useRef, useMemo, useCallback } from "react"
+import { useRef, useMemo, useCallback, useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from 'framer-motion'
 import { CaretDownMinor, CodeMinor, DynamicSourceMinor, ClockMinor, CalendarMinor } from '@shopify/polaris-icons'
@@ -9,7 +9,9 @@ import FlyLayout from "../../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
+import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig";
 import TitleWithInfo from "../../../components/shared/TitleWithInfo";
+import settingRequests from "../../settings/api";
 import transform from "../transform"
 
 const ANIMATION_DURATION = 0.2;
@@ -21,6 +23,9 @@ const LOG_LEVEL_TONES = {
 const ICON_SIZE = { maxWidth: "1rem", maxHeight: "1rem" };
 const LOG_TIMESTAMP_WIDTH = "180px";
 const LOG_LEVEL_WIDTH = "60px";
+const MAX_LOGS_DISPLAYED = 1000;
+const MAX_LOGS_FETCHED = 5000;
+const LIVE_LOG_LIMIT = 500;
 
 export const LOG_MODES = {
     CURRENT: 'CURRENT',
@@ -64,24 +69,189 @@ function AgentDetails({
     show,
     setShow,
     selectedAgent,
-    mcpServers,
-    userAnalysis,
-    agentLogs,
-    displayedLogs,
-    logMode,
-    isLogsExpanded,
-    setIsLogsExpanded,
-    handleLogModeChange,
-    description,
-    isEditingDescription,
-    editableDescription,
-    setEditableDescription,
-    setIsEditingDescription,
-    handleSaveDescription,
     allCollections,
+    allowedEnvFields,
+    onSaveEnv,
+    startTimestamp,
+    endTimestamp,
 }) {
     const navigate = useNavigate();
     const copyRef = useRef(null);
+    const liveIntervalRef = useRef(null);
+
+    const [loading, setLoading] = useState(false);
+    const [mcpServers, setMcpServers] = useState([]);
+    const [userAnalysis, setUserAnalysis] = useState(null);
+    const [agentLogs, setAgentLogs] = useState([]);
+    const [displayedLogs, setDisplayedLogs] = useState([]);
+    const [isLogsExpanded, setIsLogsExpanded] = useState(true);
+    const [logMode, setLogMode] = useState(LOG_MODES.HISTORICAL);
+    const [description, setDescription] = useState("");
+    const [isEditingDescription, setIsEditingDescription] = useState(false);
+    const [editableDescription, setEditableDescription] = useState("");
+
+    const stopLiveFetching = useCallback(() => {
+        if (liveIntervalRef.current) {
+            clearInterval(liveIntervalRef.current);
+            liveIntervalRef.current = null;
+        }
+    }, []);
+
+    const fetchAgentLogs = useCallback(async (agentId, startTime, endTime) => {
+        try {
+            const logsResponse = await settingRequests.getAgentLogs(agentId, startTime, endTime);
+            const transformedLogs = (logsResponse.agentLogs || []).map(log => ({
+                timestamp: log.timestamp,
+                level: log.level || 'INFO',
+                message: log.log || log.message
+            }));
+            let sortedLogs = transformedLogs.sort((a, b) => b.timestamp - a.timestamp);
+            if (sortedLogs.length > MAX_LOGS_FETCHED) {
+                sortedLogs = sortedLogs.slice(0, MAX_LOGS_FETCHED);
+            }
+            return sortedLogs;
+        } catch (error) {
+            console.error("Error fetching agent logs:", error);
+            return [];
+        }
+    }, []);
+
+    const startLiveFetching = useCallback(async (agentId) => {
+        stopLiveFetching();
+
+        let lastFetchTimestamp = Math.floor(Date.now() / 1000);
+
+        liveIntervalRef.current = setInterval(async () => {
+            try {
+                const now = Math.floor(Date.now() / 1000);
+                const newLogs = await fetchAgentLogs(agentId, lastFetchTimestamp, now);
+                if (newLogs.length > 0) {
+                    setAgentLogs(prevLogs => {
+                        const updatedLogs = [...newLogs, ...prevLogs];
+                        const uniqueLogs = updatedLogs.filter((log, index, arr) =>
+                            arr.findIndex(l => l.timestamp === log.timestamp && l.message === log.message) === index
+                        );
+                        return uniqueLogs.slice(0, LIVE_LOG_LIMIT);
+                    });
+                    lastFetchTimestamp = newLogs[0].timestamp;
+                }
+            } catch (error) {
+                console.error("Error in live log fetching:", error);
+            }
+        }, 10000);
+
+        const now = Math.floor(Date.now() / 1000);
+        const oneHourAgo = now - 3600;
+        const initialLogs = await fetchAgentLogs(agentId, oneHourAgo, now);
+        setAgentLogs(initialLogs.slice(0, LIVE_LOG_LIMIT));
+        if (initialLogs.length > 0) {
+            lastFetchTimestamp = initialLogs[0].timestamp;
+        }
+    }, [stopLiveFetching, fetchAgentLogs]);
+
+    const handleLogModeChange = useCallback(async (newMode) => {
+        if (logMode === newMode) return;
+        setLogMode(newMode);
+        if (!selectedAgent) return;
+        const wasExpanded = isLogsExpanded;
+        setAgentLogs([]);
+        setDisplayedLogs([]);
+        if (newMode === LOG_MODES.CURRENT) {
+            await startLiveFetching(selectedAgent.agentId);
+        } else {
+            stopLiveFetching();
+            const historicalLogs = await fetchAgentLogs(selectedAgent.agentId, startTimestamp, endTimestamp);
+            setAgentLogs(historicalLogs);
+        }
+        setIsLogsExpanded(wasExpanded);
+    }, [logMode, selectedAgent, isLogsExpanded, startLiveFetching, stopLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp]);
+
+    const handleSaveDescription = useCallback(() => {
+        setDescription(editableDescription);
+        setIsEditingDescription(false);
+        func.setToast(true, false, "Description saved");
+    }, [editableDescription]);
+
+    // Reset state when agent changes and fetch data for the default first tab (MCP Servers).
+    useEffect(() => {
+        if (!selectedAgent || !show) return;
+
+        setMcpServers([]);
+        setUserAnalysis(null);
+        setAgentLogs([]);
+        setDisplayedLogs([]);
+        setLogMode(LOG_MODES.HISTORICAL);
+        setDescription("");
+        setEditableDescription("");
+        setIsEditingDescription(false);
+        stopLiveFetching();
+
+        setLoading(true);
+        settingRequests.getMcpServersByAgent(selectedAgent.agentId, selectedAgent.hostname)
+            .then(res => setMcpServers(res.mcpServers || []))
+            .catch(() => setMcpServers([]))
+            .finally(() => setLoading(false));
+    }, [selectedAgent, show, stopLiveFetching]);
+
+    // Stop live fetching when flyout closes.
+    useEffect(() => {
+        if (!show) stopLiveFetching();
+    }, [show, stopLiveFetching]);
+
+    // Cleanup on unmount.
+    useEffect(() => {
+        return () => stopLiveFetching();
+    }, [stopLiveFetching]);
+
+    // Sync displayedLogs from agentLogs.
+    useEffect(() => {
+        if (agentLogs.length === 0 || !show) {
+            setDisplayedLogs([]);
+            return;
+        }
+        setDisplayedLogs(agentLogs.slice(0, MAX_LOGS_DISPLAYED));
+    }, [agentLogs, show]);
+
+    const handleTabChange = useCallback(async (tab) => {
+        if (!selectedAgent) return;
+        switch (tab.id) {
+            case 'mcp-servers':
+                setLoading(true);
+                try {
+                    const res = await settingRequests.getMcpServersByAgent(selectedAgent.agentId, selectedAgent.hostname);
+                    setMcpServers(res.mcpServers || []);
+                } catch {
+                    setMcpServers([]);
+                } finally {
+                    setLoading(false);
+                }
+                break;
+            case 'user-analysis':
+                setLoading(true);
+                try {
+                    const res = await settingRequests.getUserAnalysis(selectedAgent.agentId, selectedAgent.hostname);
+                    setUserAnalysis(res || null);
+                } catch {
+                    setUserAnalysis(null);
+                } finally {
+                    setLoading(false);
+                }
+                break;
+            case 'agent-logs':
+                stopLiveFetching();
+                setAgentLogs([]);
+                setDisplayedLogs([]);
+                if (logMode === LOG_MODES.CURRENT) {
+                    await startLiveFetching(selectedAgent.agentId);
+                } else {
+                    const logs = await fetchAgentLogs(selectedAgent.agentId, startTimestamp, endTimestamp);
+                    setAgentLogs(logs);
+                }
+                break;
+            default:
+                break;
+        }
+    }, [selectedAgent, logMode, startLiveFetching, stopLiveFetching, fetchAgentLogs, startTimestamp, endTimestamp]);
 
     const mcpServersTableData = useMemo(() =>
         mcpServers.map(server => ({
@@ -243,6 +413,23 @@ function AgentDetails({
         panelID: 'agent-logs-panel',
     };
 
+    const ConfigureTab = {
+        id: 'configure',
+        content: 'Configure',
+        component: (
+            <Box paddingBlockStart={"4"}>
+                <ModuleEnvConfigComponent
+                    title="Environment Variables"
+                    description="Configure environment variables for this agent. Changes will be picked up on the next poll cycle."
+                    module={selectedAgent?._moduleData}
+                    allowedEnvFields={allowedEnvFields}
+                    onSaveEnv={onSaveEnv}
+                />
+            </Box>
+        ),
+        panelID: 'configure-panel',
+    };
+
     const getInputTokenLabel = (tokens) => {
         if (tokens < 10000) return { label: "Light user", tone: "success" };
         if (tokens < 100000) return { label: "Moderate user", tone: "attention" };
@@ -378,6 +565,7 @@ function AgentDetails({
         <FlyLayout
             show={show}
             setShow={setShow}
+            loading={loading}
             title="Agent Details"
             components={[
                 <HorizontalStack align="space-between" wrap={false} key="agent-heading">
@@ -434,7 +622,8 @@ function AgentDetails({
                 </HorizontalStack>,
                 <LayoutWithTabs
                     key="tabs"
-                    tabs={func.isDemoAccount() ? [UserAnalysisTab, McpServersTab, AgentLogsTab] : [McpServersTab, AgentLogsTab]}
+                    tabs={func.isDemoAccount() ? [UserAnalysisTab, McpServersTab, AgentLogsTab, ConfigureTab] : [McpServersTab, AgentLogsTab, ConfigureTab]}
+                    currTab={handleTabChange}
                 />
             ]}
         />

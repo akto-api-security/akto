@@ -95,7 +95,7 @@ func (c *Client) FetchMcpAuditInfo() ([]byte, error) {
 
 	// Create request body with remarksList
 	requestBody := map[string]any{
-		"remarksList": []string{"Conditionally Approved", "Rejected"},
+		"remarksList": []string{"Conditionally Approved", "Rejected", "Approved"},
 	}
 	jsonBody, err := json.Marshal(requestBody)
 	if err != nil {
@@ -134,6 +134,54 @@ func (c *Client) FetchMcpAuditInfo() ([]byte, error) {
 	}
 
 	c.logger.Info("Successfully fetched MCP audit info",
+		zap.Int("responseSize", len(body)),
+		zap.String("responsePreview", string(body[:min(len(body), 500)])))
+
+	return body, nil
+}
+
+// FetchGuardrailEndpoints fetches API info records with guardrailSchema from database-abstractor
+func (c *Client) FetchGuardrailEndpoints() ([]byte, error) {
+	url := c.baseURL + "/fetchAgentProxyGuardrailEndpoints"
+
+	requestBody := map[string]any{
+		"updatedAfter": 0,
+	}
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	token := auth.GetDatabaseAbstractorServiceToken()
+	if token == "" {
+		return nil, fmt.Errorf("DATABASE_ABSTRACTOR_SERVICE_TOKEN not set")
+	}
+	req.Header.Set("Authorization", token)
+	req.Header.Set("Content-Type", "application/json")
+
+	c.logger.Info("Fetching guardrail endpoints", zap.String("url", url))
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch guardrail endpoints: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch guardrail endpoints, status: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	c.logger.Info("Successfully fetched guardrail endpoints",
 		zap.Int("responseSize", len(body)),
 		zap.String("responsePreview", string(body[:min(len(body), 500)])))
 
