@@ -92,10 +92,10 @@ let filters = [
         label: 'Type',
         title: 'Type',
         choices: [
-            { label: "Tool", value: "TOOL" },
-            { label: "Resource", value: "RESOURCE" },
-            { label: "Prompt", value: "PROMPT" },
-            { label: "Server", value: "SERVER" }
+            { label: "Tool", value: "mcp-tool" },
+            { label: "Resource", value: "mcp-resource" },
+            { label: "Prompt", value: "mcp-prompt" },
+            { label: "Server", value: "mcp-server" }
         ],
     },
     {
