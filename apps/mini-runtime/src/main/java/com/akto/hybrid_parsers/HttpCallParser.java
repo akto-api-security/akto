@@ -676,6 +676,27 @@ public class HttpCallParser {
         }
     }
 
+    private boolean isArgusTraffic(HttpResponseParams httpResponseParam) {
+        try {
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) {
+                return false;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return false;
+            }
+
+            return tagsMap.containsKey(Constants.AKTO_GEN_AI_TAG);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking if traffic is Argus: " + e.getMessage());
+            return false;
+        }
+    }
+
     /**
      * Builds and updates service graph edges for Arcade traffic.
      * Extracts tool metadata from Arcade-specific request headers.
@@ -1366,7 +1387,7 @@ public class HttpCallParser {
                         + httpResponseParam.getRequestParams().getURL());
             }
 
-            if (isAtlasTraffic(httpResponseParam)) {
+            if (isAtlasTraffic(httpResponseParam) || isArgusTraffic(httpResponseParam)) {
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
                     loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams skipping advanced filters for atlas traffic "
                             + httpResponseParam.getRequestParams().getURL());
