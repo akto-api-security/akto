@@ -5,6 +5,8 @@ Mimics the Go implementation for generating unique device identifiers.
 """
 import os
 import platform
+import re
+import socket
 import subprocess
 import uuid
 
@@ -15,6 +17,46 @@ except ImportError:
 
 
 _machine_id = None
+
+
+def _resolve_device_name_source() -> str:
+    """
+    Match Go GetDeviceName: resolve name then ToLower + [^a-zA-Z0-9] -> '-'.
+
+    1. macOS: scutil --get ComputerName
+    2. Hostname with .local stripped
+    3. _generate_machine_id() (IOPlatformUUID / MAC fallback)
+    """
+    raw = ""
+    if platform.system() == "Darwin":
+        try:
+            result = subprocess.run(
+                ["scutil", "--get", "ComputerName"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                raw = (result.stdout or "").strip()
+        except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
+            pass
+
+    if not raw:
+        try:
+            h = socket.gethostname()
+            if h:
+                if h.endswith(".local"):
+                    h = h[: -len(".local")]
+                raw = h
+        except Exception:
+            pass
+
+    if not raw:
+        raw = _generate_machine_id()
+
+    if raw and raw.strip():
+        return re.sub(r"[^a-zA-Z0-9]", "-", raw.strip()).lower()
+    return ""
 
 
 def _generate_machine_id() -> str:
@@ -71,7 +113,7 @@ def get_machine_id() -> str:
     """
     global _machine_id
     if _machine_id is None:
-        _machine_id = _generate_machine_id().lower()
+        _machine_id = _resolve_device_name_source()
     return _machine_id
 
 

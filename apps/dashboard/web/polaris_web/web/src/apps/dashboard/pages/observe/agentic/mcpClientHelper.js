@@ -120,11 +120,6 @@ const findTypeTag = (envType) => {
     return null;
 };
 
-const findSkillTags = (envType) => {
-    if (!Array.isArray(envType)) return [];
-    return envType.filter(tag => tag.keyName === SKILL_TAG_KEY).map(tag => tag.value).filter(Boolean);
-};
-
 // Get agent type from tag value using KNOWN_CLIENTS map (for agent rows)
 const getAgentTypeFromValue = (tagValue) => {
     const info = findClientInfo(tagValue);
@@ -139,17 +134,14 @@ const getAgenticCategoryLabel = (collection) => {
     const raw = collection?.envTypeOriginal;
     if (Array.isArray(raw) && raw.length > 0) {
         if (typeof raw[0] === 'object' && raw[0]?.keyName) {
-            if (findSkillTags(raw).length > 0) {
-                return CLIENT_TYPES.SKILL;
-            }
             return getTypeFromTags(raw);
         }
     }
+    if (Array.isArray(collection?.skills) && collection.skills.length > 0) {
+        return CLIENT_TYPES.SKILL;
+    }
     const envArr = collection?.envType;
     if (Array.isArray(envArr) && envArr.length > 0 && typeof envArr[0] === 'string') {
-        if (envArr.some((t) => typeof t === 'string' && t.startsWith('skill='))) {
-            return CLIENT_TYPES.SKILL;
-        }
         if (envArr.some((t) => typeof t === 'string' && t.startsWith('mcp-server='))) {
             return TYPE_TAG_TO_DISPLAY[TYPE_TAG_KEYS.MCP_SERVER];
         }
@@ -171,7 +163,6 @@ export {
     getTypeFromTags,
     findAssetTag,
     findTypeTag,
-    findSkillTags,
     getAgentTypeFromValue,
     getAgenticCategoryLabel,
     CLIENT_TYPES,

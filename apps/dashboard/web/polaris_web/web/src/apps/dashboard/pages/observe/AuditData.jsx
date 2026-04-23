@@ -92,10 +92,10 @@ let filters = [
         label: 'Type',
         title: 'Type',
         choices: [
-            { label: "Tool", value: "TOOL" },
-            { label: "Resource", value: "RESOURCE" },
-            { label: "Prompt", value: "PROMPT" },
-            { label: "Server", value: "SERVER" }
+            { label: "Tool", value: "mcp-tool" },
+            { label: "Resource", value: "mcp-resource" },
+            { label: "Prompt", value: "mcp-prompt" },
+            { label: "Server", value: "mcp-server" }
         ],
     },
     {
@@ -305,11 +305,16 @@ function AuditData() {
         delete finalFilters['collectionName']
 
         try {
-            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators)
+            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue)
             if (res && res.auditData) {
                 res.auditData.forEach((auditRecord) => {
                     // Get collection name and registry status from separate maps
-                    const collectionName = collectionsMap[auditRecord?.hostCollectionId] || "Unknown Collection";
+                    let collectionName = "-";
+                    if(collectionsMap[auditRecord?.hostCollectionId]){
+                        collectionName = collectionsMap[auditRecord?.hostCollectionId];
+                    } else if(auditRecord?.mcpHost !== null && auditRecord?.mcpHost !== ""){
+                        collectionName = auditRecord?.mcpHost;
+                    }
                     const collectionRegistryStatus = collectionsRegistryStatusMap[auditRecord?.hostCollectionId];
                     const dataObj = convertDataIntoTableFormat(
                         auditRecord, 

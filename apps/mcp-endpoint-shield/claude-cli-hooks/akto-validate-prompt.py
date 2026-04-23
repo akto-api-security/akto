@@ -13,8 +13,8 @@ from akto_machine_id import get_machine_id, get_username
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
+LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG").upper()  # Forced DEBUG for diagnostics
+LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "true").lower() == "true"  # Forced true for diagnostics
 
 # Create log directory if it doesn't exist
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -36,10 +36,11 @@ console_handler.setLevel(logging.ERROR)  # Only show errors in console
 logger.addHandler(console_handler)
 
 MODE = os.getenv("MODE", "argus").lower()
-AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
+AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "claude_code_cli")
+AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "claudecli")
 AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_prompt_warn_pending.json")
@@ -51,7 +52,7 @@ SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 # Configure CLAUDE_API_URL based on mode
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    CLAUDE_API_URL = f"https://{device_id}.ai-agent.claudecli" if device_id else "https://api.anthropic.com"
+    CLAUDE_API_URL = f"https://{device_id}.ai-agent.{AKTO_CONNECTOR_VALUE}" if device_id else "https://api.anthropic.com"
     logger.info(f"MODE: {MODE}, Device ID: {device_id}, CLAUDE_API_URL: {CLAUDE_API_URL}")
 else:
     CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
@@ -62,10 +63,17 @@ def create_ssl_context():
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(
+    *,
+    guardrails: bool = False,
+    response_guardrails: bool = False,
+    ingest_data: bool = False,
+) -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
@@ -113,7 +121,7 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 def build_validation_request(query: str, session_info: dict = None) -> dict:
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
-        tags["ai-agent"] = "claudecli"
+        tags["ai-agent"] = AKTO_CONNECTOR_VALUE
         tags["source"] = CONTEXT_SOURCE
 
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
@@ -264,7 +272,7 @@ def apply_warn_resubmit_flow(
 
     if _is_alert_behaviour(behaviour):
         logger.info(
-            "Alert behaviour: allowing prompt despite violation (server-side alert only)"
+            "Alert behaviour: allowing despite violation (server-side alert only)"
         )
         return True, ""
 
@@ -312,7 +320,19 @@ def ingest_blocked_request(user_prompt: str, reason: str, session_info: dict = N
 
 
 def main():
-    logger.info(f"=== Hook execution started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
+    # Ensure UTF-8 I/O on Windows (system locale encoding can differ)
+    stdin_enc_before = getattr(sys.stdin, "encoding", "unknown")
+    stdout_enc_before = getattr(sys.stdout, "encoding", "unknown")
+    if hasattr(sys.stdin, "reconfigure"):
+        sys.stdin.reconfigure(encoding="utf-8")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    stdin_enc_after = getattr(sys.stdin, "encoding", "unknown")
+
+    logger.info(f"=== Prompt Hook started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
+    logger.info(f"Platform: {sys.platform}, Python: {sys.version.split()[0]}")
+    logger.info(f"stdin encoding: {stdin_enc_before} -> {stdin_enc_after}, stdout encoding: {stdout_enc_before}")
+    logger.info(f"AKTO_DATA_INGESTION_URL set: {bool(AKTO_DATA_INGESTION_URL)}, DEVICE_ID: {DEVICE_ID or '(auto)'}, CONNECTOR: {AKTO_CONNECTOR}")
 
     try:
         input_data = json.load(sys.stdin)
@@ -354,10 +374,10 @@ def main():
                 "decision": "block",
                 "reason": block_reason,
             }
-            logger.warning(f"BLOCKING prompt - Reason: {gr_reason}")
+            logger.warning(f"BLOCKING prompt - Reason: {block_reason}")
             print(json.dumps(output))
             ingest_blocked_request(prompt, gr_reason, session_info)
-            sys.exit(0)
+            sys.exit(2)
 
     logger.info("Prompt allowed")
     sys.exit(0)

@@ -1,16 +1,15 @@
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import { 
-    ASSET_TAG_KEYS, 
+    ASSET_TAG_KEYS,
     ROW_TYPES,
     TYPE_TAG_KEYS,
     SKILL_TAG_KEY,
     CLIENT_TYPES,
-    formatDisplayName, 
-    getTypeFromTags, 
+    formatDisplayName,
+    getTypeFromTags,
     findAssetTag,
     findTypeTag,
-    findSkillTags,
-    getAgentTypeFromValue 
+    getAgentTypeFromValue
 } from "./mcpClientHelper";
 import func from "@/util/func";
 import { getResolvedUsernameForCollection, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
@@ -136,7 +135,7 @@ export const extractServiceName = (hostName) => {
 // Group collections by agent identification (mcp-client, ai-agent values)
 // These are the sources that discovered the services (cursor, litellm, etc.)
 // Note: browser-llm-agent is excluded from this grouping
-export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveMap = {}) => {
+export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
     const agents = {};
     
     collections.forEach((c) => {
@@ -162,6 +161,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
                 endpointIds: new Set(),
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
+                maxRiskScore: 0,
             };
         }
         
@@ -182,6 +182,12 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         if (traffic > agents[key].maxTrafficTimestamp) {
             agents[key].maxTrafficTimestamp = traffic;
         }
+
+        // Track max risk score
+        const riskScore = riskScoreMap[c.id] || 0;
+        if (riskScore > agents[key].maxRiskScore) {
+            agents[key].maxRiskScore = riskScore;
+        }
     });
     
     return Object.values(agents).map(g => ({
@@ -192,7 +198,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
-        riskScore: null, // Agents don't have risk score
+        riskScore: g.maxRiskScore || null,
     }));
 };
 
@@ -277,12 +283,12 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
 };
 
 // Group collections by skill tag value — one row per unique skill name
-export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveMap = {}) => {
+export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
     const skills = {};
 
     collections.forEach((c) => {
         if (c.deactivated) return;
-        const skillValues = findSkillTags(c.envType);
+        const skillValues = c.skills || [];
         if (!skillValues || skillValues.length === 0) return;
 
         const hostName = c.hostName || c.displayName || c.name;
@@ -301,6 +307,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
                     endpointIds: new Set(),
                     sensitiveTypes: new Set(),
                     maxTrafficTimestamp: 0,
+                    maxRiskScore: 0,
                 };
             }
 
@@ -318,6 +325,11 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
             if (traffic > skills[skillValue].maxTrafficTimestamp) {
                 skills[skillValue].maxTrafficTimestamp = traffic;
             }
+
+            const riskScore = riskScoreMap[c.id] || 0;
+            if (riskScore > skills[skillValue].maxRiskScore) {
+                skills[skillValue].maxRiskScore = riskScore;
+            }
         });
     });
 
@@ -329,7 +341,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
-        riskScore: null,
+        riskScore: g.maxRiskScore || null,
     }));
 };
 
