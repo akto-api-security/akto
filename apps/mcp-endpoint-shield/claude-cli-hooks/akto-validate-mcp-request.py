@@ -117,7 +117,7 @@ def build_validation_request(tool_name: str, tool_input: Any, mcp_server_name: s
         tags["source"] = CONTEXT_SOURCE
 
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
+    host = os.getenv("AKTO_HOSTNAME") or CLAUDE_API_URL.replace("https://", "").replace("http://", "")
 
     request_headers = json.dumps(
         {
