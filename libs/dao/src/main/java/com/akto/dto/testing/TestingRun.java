@@ -62,6 +62,9 @@ public class TestingRun {
     public static final String DO_NOT_MARK_ISSUES_AS_FIXED = "doNotMarkIssuesAsFixed";
     private boolean doNotMarkIssuesAsFixed = false;
 
+    public static final String RUN_AUTOMATED_TESTS = "runAutomatedTests";
+    private boolean runAutomatedTests = false;
+
     public TestingRun() { }
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, String triggeredBy) {
@@ -236,6 +239,14 @@ public class TestingRun {
 
     public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+    }
+
+    public boolean getRunAutomatedTests() {
+        return runAutomatedTests;
+    }
+
+    public void setRunAutomatedTests(boolean runAutomatedTests) {
+        this.runAutomatedTests = runAutomatedTests;
     }
 
 

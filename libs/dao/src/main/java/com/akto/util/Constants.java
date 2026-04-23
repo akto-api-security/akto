@@ -42,6 +42,7 @@ public class Constants {
     public static final String UNDERSCORE = "_";
 
     public static final String AGENT_BASE_URL = StringUtils.hasLength(System.getenv("AGENT_BASE_URL")) ? System.getenv("AGENT_BASE_URL") : "http://localhost:5500";
+    public static final String AUTOMATED_AGENT_BASE_URL = StringUtils.hasLength(System.getenv("AUTOMATED_AGENT_BASE_URL")) ? System.getenv("AUTOMATED_AGENT_BASE_URL") : "http://localhost:8000";
 
 
     public final static String _AKTO = "AKTO";
@@ -77,6 +78,8 @@ public class Constants {
     public static final String AI_AGENT_TAG_SOURCE = "source";
     public static final String AI_AGENT_TAG_CONNECTOR = "connector";
     public static final String AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER = "MICROSOFT_DEFENDER";
+    public static final String AI_AGENT_CONNECTOR_SENTINEL = "SENTINELONE";
+    public static final String AI_AGENT_APP_NAME = "ai-agent";
 
     public static final String STATUS_PENDING = "Pending";
     public static final String STATUS_IN_PROGRESS = "In Progress";

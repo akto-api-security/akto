@@ -53,6 +53,8 @@ public abstract class DataActor {
 
     public abstract AccountSettings fetchAccountSettings();
 
+    public abstract Config.DatadogForwarderConfig fetchDatadogForwarderConfig();
+
     public abstract long fetchEstimatedDocCount();
 
     public abstract void updateCidrList(List<String> cidrList);
@@ -297,6 +299,8 @@ public abstract class DataActor {
     public abstract LoginFlowStepsData fetchLoginFlowStepsData(int userId);
 
     public abstract void updateLoginFlowStepsData(int userId, Map<String, Object> valuesMap);
+
+    public abstract void persistRecordedLoginFlowScreenshots(String roleName, int userId, List<String> screenshotsBase64);
 
     public abstract Node fetchDependencyFlowNodesByApiInfoKey(int apiCollectionId, String url, String method);
 
