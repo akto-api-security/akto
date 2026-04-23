@@ -96,8 +96,9 @@ public class Main {
     initCustomDataTypeScheduler();
 
     CmsCounterLayer.initialize(localRedis);
+
     DistributionCalculator distributionCalculator = localRedis != null
-        ? new DistributionCalculator(CmsCounterLayer.getInstance(), localRedis)
+        ? new DistributionCalculator(localRedis)
         : null;
     DistributionDataForwardLayer distributionDataForwardLayer = localRedis != null
         ? new DistributionDataForwardLayer(localRedis)
@@ -107,9 +108,12 @@ public class Main {
 
     triggerDistributionDataForwardCron(apiDistributionEnabled, distributionDataForwardLayer);
 
-    // Start distribution stream consumers (background threads)
-    if (localRedis != null && apiDistributionEnabled) {
-        startDistributionStreamConsumers(localRedis);
+    com.akto.threat.detection.kafka.KafkaProtoProducer internalKafkaProducer =
+        new com.akto.threat.detection.kafka.KafkaProtoProducer(internalKafka);
+
+    // Start threat stream consumers (background threads)
+    if (localRedis != null && apiDistributionEnabled && distributionCalculator != null) {
+        startDistributionStreamConsumers(localRedis, internalKafkaProducer, instanceId);
     }
 
     String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss"));
@@ -158,15 +162,12 @@ public class Main {
     }
   }
 
-  public static void startDistributionStreamConsumers(RedisClient redisClient) {
-    int consumerCount = 2;
-    java.util.concurrent.ExecutorService streamExecutor = Executors.newFixedThreadPool(consumerCount);
-    String hostname = System.getenv().getOrDefault("HOSTNAME", "unknown");
-    for (int i = 0; i < consumerCount; i++) {
-        String consumerId = hostname + "-stream-" + i;
-        streamExecutor.submit(new DistributionStreamConsumer(redisClient, consumerId));
-    }
-    logger.infoAndAddToDb("Started " + consumerCount + " distribution stream consumers");
+  public static void startDistributionStreamConsumers(RedisClient redisClient,
+      com.akto.threat.detection.kafka.KafkaProtoProducer internalKafkaProducer, String instanceId) {
+    java.util.concurrent.ExecutorService streamExecutor = Executors.newFixedThreadPool(1);
+    streamExecutor.submit(new DistributionStreamConsumer(
+        redisClient, instanceId, internalKafkaProducer));
+    logger.infoAndAddToDb("Started threat stream consumer: " + instanceId);
   }
 
   public static RedisClient createLocalRedisClient() {

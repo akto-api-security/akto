@@ -34,7 +34,7 @@ end
 
 local function getBucketLabel(count)
     for _, b in ipairs(buckets) do
-        if count >= b.min and count < b.max then
+        if count >= b.min and count <= b.max then
             return b.label
         end
     end
