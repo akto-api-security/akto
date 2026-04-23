@@ -129,26 +129,6 @@ public class CmsCounterLayer {
         }
     }
 
-    /**
-     * Fire-and-forget increment only (no query). Async.
-     */
-    public void incrementAsync(String itemKey, long currentMin) {
-        String key = keyPrefix + currentMin;
-        String[] keys = new String[]{key, key};
-        String[] argv = new String[]{
-            itemKey,
-            String.valueOf(TTL_SECONDS),
-            String.valueOf(EPSILON),
-            String.valueOf(DELTA)
-        };
-
-        try {
-            connection.async().evalsha(incrementAndQuerySha, ScriptOutputType.INTEGER, keys, argv);
-        } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Error in incrementAsync for " + itemKey);
-        }
-    }
-
     private static String loadLuaScript(String resourcePath) {
         try (InputStream is = CmsCounterLayer.class.getClassLoader().getResourceAsStream(resourcePath)) {
             if (is == null) {

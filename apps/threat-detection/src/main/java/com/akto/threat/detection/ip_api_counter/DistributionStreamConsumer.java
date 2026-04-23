@@ -43,7 +43,7 @@ public class DistributionStreamConsumer implements Runnable {
     private static final double EPSILON = 0.01;
     private static final double DELTA = 0.01;
     private static final long TRIM_INTERVAL_MS = 5 * 60 * 1000;
-    private static final long MAX_STREAM_LENGTH = 100000;
+    private static final long MAX_STREAM_LENGTH = 500000;
     private static final int FIELDS_PER_MESSAGE = 6;
 
     private static final FilterConfig IP_API_RATE_LIMIT_FILTER = Utils.getipApiRateLimitFilter();
