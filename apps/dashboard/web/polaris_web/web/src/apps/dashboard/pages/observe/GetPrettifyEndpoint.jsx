@@ -7,11 +7,11 @@ import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCat
 
 export const getMethod = (url, method) => {
     if(isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()){
-        if(url.includes("tool")){
+        if(/\/tools?\//i.test(url)){
             return "TOOL";
-        }else if(url.includes("resource")){
+        }else if(/\/resources?\//i.test(url)){
             return "RESOURCE";
-        }else if(url.includes("prompt")){
+        }else if(/\/prompts?\//i.test(url)){
             return "PROMPT";
         }else if(url.includes("server")){
             return "SERVER";
