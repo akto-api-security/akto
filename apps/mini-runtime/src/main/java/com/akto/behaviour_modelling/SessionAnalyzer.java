@@ -7,7 +7,10 @@ import com.akto.behaviour_modelling.model.WindowSnapshot;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.ApiInfoCatalog;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.URLStatic;
+import com.akto.dto.type.URLTemplate;
+import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 
 import java.util.Deque;
@@ -65,9 +68,15 @@ public class SessionAnalyzer {
         // getApiInfoFromMap(), which inserts a new entry for unknown URLs.
         ApiInfoCatalog apiInfoCatalog = aktoPolicyNew.getApiInfoCatalogMap().get(apiKey.getApiCollectionId());
         if (apiInfoCatalog == null) return;
-        URLStatic urlStatic = new URLStatic(apiKey.getUrl(), apiKey.getMethod());
-        boolean known = apiInfoCatalog.getStrictURLToMethods().containsKey(urlStatic)
-                || apiInfoCatalog.getTemplateURLToMethods().keySet().stream().anyMatch(t -> t.match(urlStatic));
+
+        boolean known;
+        if (APICatalog.isTemplateUrl(apiKey.getUrl())) {
+            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(apiKey.getUrl(), apiKey.getMethod());
+            known = apiInfoCatalog.getTemplateURLToMethods().containsKey(urlTemplate);
+        } else {
+            known = apiInfoCatalog.getStrictURLToMethods().containsKey(
+                    new URLStatic(apiKey.getUrl(), apiKey.getMethod()));
+        }
         if (!known) return;
 
         String userId = config.getUserIdentifier().extractUserId(record);

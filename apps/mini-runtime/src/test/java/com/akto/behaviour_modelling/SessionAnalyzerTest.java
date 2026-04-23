@@ -44,7 +44,7 @@ public class SessionAnalyzerTest {
         addStrict(strictUrls, "POST", "/checkout");
 
         // /products/INTEGER — registered as a template entry
-        addTemplate(templateUrls, "GET", "/products/#");
+        addTemplate(templateUrls, "GET", "/products/123");
 
         ApiInfoCatalog catalog = new ApiInfoCatalog(strictUrls, templateUrls, new ArrayList<>());
         Map<Integer, ApiInfoCatalog> catalogMap = new HashMap<>();
