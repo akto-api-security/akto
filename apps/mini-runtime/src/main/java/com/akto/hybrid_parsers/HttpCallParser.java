@@ -1408,7 +1408,7 @@ public class HttpCallParser {
 
             Organization organization = OrgUtils.getOrganizationCached(Context.getActualAccountId());
             if (organization != null && organization.getFeatureWiseAllowed() != null) {
-                FeatureAccess featureAccess = organization.getFeatureWiseAllowed().get("AGENT_TRAFFIC_ANALYSIS");
+                FeatureAccess featureAccess = organization.getFeatureWiseAllowed().get("AGENT_TRAFFIC_LOGS");
                 allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
             }
 
