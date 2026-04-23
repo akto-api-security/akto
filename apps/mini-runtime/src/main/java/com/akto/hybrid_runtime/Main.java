@@ -257,7 +257,6 @@ public class Main {
     }
 
     static private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    private static final ExecutorService agentTrafficLogsExecutor = Executors.newSingleThreadExecutor();
 
     /**
      * Check if fast-discovery integration is enabled via environment variable.
@@ -902,7 +901,7 @@ public class Main {
                 loggerMaker.infoAndAddToDb("Sync function completed for account: " + accountId);
                 sendToCentralKafka(centralKafkaTopicName, accWiseResponse);
 
-                Organization organization = OrgUtils.getOrganizationCached(accountIdInt);
+                Organization organization = OrgUtils.getOrganizationCached(Context.getActualAccountId());
                 if (organization != null && organization.getFeatureWiseAllowed() != null) {
                     FeatureAccess featureAccess = organization.getFeatureWiseAllowed().get("AGENT_TRAFFIC_LOGS");
                     if (featureAccess != null && featureAccess.getIsGranted()) {
@@ -915,14 +914,11 @@ public class Main {
                         }
 
                         if (!endpointSourceResponses.isEmpty()) {
-                            final List<HttpResponseParams> logsToSave = endpointSourceResponses;
-                            agentTrafficLogsExecutor.submit(() -> {
-                                try {
-                                    saveAgentTrafficLogs(logsToSave);
-                                } catch (Exception e) {
-                                    loggerMaker.errorAndAddToDb(e, "Error saving agent traffic logs: " + e.getMessage());
-                                }
-                            });
+                            try {
+                                saveAgentTrafficLogs(endpointSourceResponses);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error saving agent traffic logs: " + e.getMessage());
+                            }
                         }
                     }
                 }
