@@ -128,6 +128,14 @@ public class SessionAnalyzer {
         onWindowEnd();
     }
 
+    /**
+     * Forces an immediate window end. For testing only — avoids sleeping for
+     * the full window duration in integration tests.
+     */
+    void triggerWindowEnd() {
+        onWindowEnd();
+    }
+
     private TransitionKey buildTransitionKey(Deque<ApiInfoKey> recentApis, ApiInfoKey currentApi) {
         ApiInfoKey[] sequence = new ApiInfoKey[recentApis.size() + 1];
         int i = 0;
