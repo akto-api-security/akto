@@ -52,8 +52,32 @@ else:
     logger.info(f"MODE: {MODE}, API_URL: {API_URL}")
 
 
+WEB_FETCH_TOOLS = {"WebFetch", "web_fetch", "WebSearch"}
+WEB_FETCH_SIZE_LIMIT = 100 * 1024  # 100 KB
+
+
 def create_ssl_context():
     return ssl._create_unverified_context()
+
+
+def fetch_url_content(tool_name: str, tool_input: dict, tool_output_str: str) -> str:
+    """For WebFetch tool calls, fetch the actual URL content so guardrails
+    can evaluate it — Cursor only puts a status wrapper in tool_output."""
+    if tool_name not in WEB_FETCH_TOOLS:
+        return tool_output_str
+    url = tool_input.get("url") if isinstance(tool_input, dict) else None
+    if not url:
+        return tool_output_str
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        ssl_ctx = create_ssl_context()
+        with urllib.request.urlopen(req, context=ssl_ctx, timeout=AKTO_TIMEOUT) as resp:
+            raw = resp.read(WEB_FETCH_SIZE_LIMIT).decode("utf-8", errors="replace")
+        logger.info(f"Fetched URL content ({len(raw)} chars): {url}")
+        return raw
+    except Exception as e:
+        logger.warning(f"Could not fetch URL content {url}: {e}")
+        return tool_output_str
 
 
 def build_http_proxy_url(*, response_guardrails: bool = False, ingest_data: bool) -> str:
@@ -316,6 +340,10 @@ def main():
     tool_input_str = json.dumps(tool_input) if isinstance(tool_input, dict) else str(tool_input)
     tool_output = input_data.get("toolOutput") or input_data.get("tool_output", "")
     tool_output_str = tool_output if isinstance(tool_output, str) else json.dumps(tool_output)
+
+    # For WebFetch, Cursor only puts a status wrapper in tool_output.
+    # Fetch the actual URL content so guardrails can evaluate it.
+    tool_output_str = fetch_url_content(tool_name, tool_input if isinstance(tool_input, dict) else {}, tool_output_str)
 
     logger.info(f"Tool: {tool_name}, Output size: {len(tool_output_str)} chars")
     if LOG_PAYLOADS:

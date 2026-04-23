@@ -39,6 +39,7 @@ AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = "cursor"
+AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_pretool_warn_pending.json")
 
@@ -99,6 +100,8 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
+    if AKTO_TOKEN:
+        headers["authorization"] = AKTO_TOKEN
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -368,14 +371,18 @@ def main():
                 "user_message": user_msg,
                 "agent_message": agent_msg,
             }
+            output_json = json.dumps(output)
             logger.warning(f"BLOCKING tool: {tool_name} - Reason: {gr_reason}")
-            print(json.dumps(output))
+            logger.warning(f"Response to Cursor: {output_json}")
+            print(output_json)
             ingest_blocked_tool(tool_name, tool_input_str, gr_reason)
             sys.exit(0)
 
     ingest_allowed_tool(tool_name, tool_input_str, file_content)
+    allow_json = json.dumps({"permission": "allow"})
     logger.info(f"Tool ALLOWED: {tool_name}")
-    print(json.dumps({"permission": "allow"}))
+    logger.info(f"Response to Cursor: {allow_json}")
+    print(allow_json)
     sys.exit(0)
 
 
