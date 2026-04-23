@@ -55,14 +55,42 @@ def create_ssl_context():
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(*, guardrails: bool = False, ingest_data: bool) -> str:
+FILE_READ_TOOLS = {"Read", "read_file", "ReadFile"}
+FILE_READ_SIZE_LIMIT = 100 * 1024  # 100 KB
+
+
+def build_http_proxy_url(*, guardrails: bool = False, response_guardrails: bool = False, ingest_data: bool) -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
     return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
+
+
+def prefetch_file_content(tool_name: str, tool_input: dict) -> str:
+    """For Read tool calls, read the file and return its content so guardrails
+    can evaluate the actual data before it reaches the AI agent."""
+    if tool_name not in FILE_READ_TOOLS:
+        return ""
+    file_path = tool_input.get("file_path") or tool_input.get("path", "")
+    if not file_path:
+        return ""
+    try:
+        file_size = os.path.getsize(file_path)
+        if file_size > FILE_READ_SIZE_LIMIT:
+            logger.info(f"File too large to prefetch ({file_size} bytes): {file_path}")
+            return ""
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+        logger.info(f"Prefetched {len(content)} chars from: {file_path}")
+        return content
+    except (OSError, IOError) as e:
+        logger.warning(f"Could not prefetch file {file_path}: {e}")
+        return ""
 
 
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
@@ -96,7 +124,7 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         raise
 
 
-def build_ingestion_payload(tool_name: str, tool_input_str: str, status_code: str = "200") -> Dict[str, Any]:
+def build_ingestion_payload(tool_name: str, tool_input_str: str, status_code: str = "200", file_content: str = "") -> Dict[str, Any]:
     tags = {"gen-ai": "Gen AI", "tool-use": "Tool Execution"}
     if MODE == "atlas":
         tags["ai-agent"] = "cursor"
@@ -117,7 +145,7 @@ def build_ingestion_payload(tool_name: str, tool_input_str: str, status_code: st
     request_payload = json.dumps({
         "body": json.dumps({"toolName": tool_name, "toolInput": tool_input_str})
     })
-    response_payload = json.dumps({})
+    response_payload = json.dumps({"body": file_content}) if file_content else json.dumps({})
 
     return {
         "path": f"/cursor/tool/{tool_name}",
@@ -159,21 +187,22 @@ def _is_alert_behaviour(behaviour: Any) -> bool:
     return _guardrails_behaviour_value(behaviour) == "alert"
 
 
-def call_guardrails(tool_name: str, tool_input_str: str) -> Tuple[bool, str, str]:
+def call_guardrails(tool_name: str, tool_input_str: str, file_content: str = "") -> Tuple[bool, str, str]:
     if not tool_input_str.strip() or tool_input_str == "{}":
         return True, "", ""
     if not AKTO_DATA_INGESTION_URL:
         logger.warning("AKTO_DATA_INGESTION_URL not set, allowing (fail-open)")
         return True, "", ""
 
-    logger.info(f"Validating tool request: {tool_name}")
+    has_content = bool(file_content)
+    logger.info(f"Validating tool request: {tool_name} (content prefetched: {has_content})")
     if LOG_PAYLOADS:
         logger.debug(f"Tool input: {tool_input_str[:500]}")
 
     try:
-        request_body = build_ingestion_payload(tool_name, tool_input_str)
+        request_body = build_ingestion_payload(tool_name, tool_input_str, file_content=file_content)
         result = post_payload_json(
-            build_http_proxy_url(guardrails=True, ingest_data=False),
+            build_http_proxy_url(guardrails=True, response_guardrails=has_content, ingest_data=False),
             request_body,
         )
         data = result.get("data", {}) if isinstance(result, dict) else {}
@@ -275,12 +304,12 @@ def ingest_blocked_tool(tool_name: str, tool_input_str: str, reason: str):
         logger.error(f"Ingestion error: {e}")
 
 
-def ingest_allowed_tool(tool_name: str, tool_input_str: str):
+def ingest_allowed_tool(tool_name: str, tool_input_str: str, file_content: str = ""):
     if not AKTO_DATA_INGESTION_URL:
         return
     logger.info(f"Ingesting allowed tool request: {tool_name}")
     try:
-        request_body = build_ingestion_payload(tool_name, tool_input_str)
+        request_body = build_ingestion_payload(tool_name, tool_input_str, file_content=file_content)
         post_payload_json(build_http_proxy_url(ingest_data=True), request_body)
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
@@ -296,8 +325,8 @@ def main():
         print(json.dumps({"permission": "allow"}))
         sys.exit(0)
 
-    tool_name = input_data.get("tool_name", "unknown")
-    tool_input = input_data.get("tool_input", {})
+    tool_name = input_data.get("toolName") or input_data.get("tool_name", "unknown")
+    tool_input = input_data.get("toolInput") or input_data.get("tool_input", {})
     tool_input_str = json.dumps(tool_input) if isinstance(tool_input, dict) else str(tool_input)
 
     logger.info(f"Tool: {tool_name}")
@@ -306,13 +335,17 @@ def main():
     else:
         logger.info(f"Tool input preview: {tool_input_str[:100]}")
 
+    # Prefetch file content for Read tool calls so guardrails can evaluate
+    # the actual data before it reaches the AI agent.
+    file_content = prefetch_file_content(tool_name, tool_input if isinstance(tool_input, dict) else {})
+
     if not AKTO_DATA_INGESTION_URL:
         logger.warning("AKTO_DATA_INGESTION_URL not set, skipping")
         print(json.dumps({"permission": "allow"}))
         sys.exit(0)
 
     if AKTO_SYNC_MODE:
-        gr_allowed, gr_reason, behaviour = call_guardrails(tool_name, tool_input_str)
+        gr_allowed, gr_reason, behaviour = call_guardrails(tool_name, tool_input_str, file_content)
         fingerprint = tool_fingerprint(tool_name, tool_input_str)
         allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
 
@@ -340,7 +373,7 @@ def main():
             ingest_blocked_tool(tool_name, tool_input_str, gr_reason)
             sys.exit(0)
 
-    ingest_allowed_tool(tool_name, tool_input_str)
+    ingest_allowed_tool(tool_name, tool_input_str, file_content)
     logger.info(f"Tool ALLOWED: {tool_name}")
     print(json.dumps({"permission": "allow"}))
     sys.exit(0)

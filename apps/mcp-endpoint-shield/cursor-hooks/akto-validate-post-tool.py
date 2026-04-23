@@ -311,10 +311,10 @@ def main():
         print(json.dumps({}))
         sys.exit(0)
 
-    tool_name = input_data.get("tool_name", "unknown")
-    tool_input = input_data.get("tool_input", {})
+    tool_name = input_data.get("toolName") or input_data.get("tool_name", "unknown")
+    tool_input = input_data.get("toolInput") or input_data.get("tool_input", {})
     tool_input_str = json.dumps(tool_input) if isinstance(tool_input, dict) else str(tool_input)
-    tool_output = input_data.get("tool_output", "")
+    tool_output = input_data.get("toolOutput") or input_data.get("tool_output", "")
     tool_output_str = tool_output if isinstance(tool_output, str) else json.dumps(tool_output)
 
     logger.info(f"Tool: {tool_name}, Output size: {len(tool_output_str)} chars")
