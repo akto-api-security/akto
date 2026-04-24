@@ -623,7 +623,7 @@ function AgentDetails({
                 <LayoutWithTabs
                     key="tabs"
                     tabs={func.isDemoAccount() ? [McpServersTab, UserAnalysisTab, AgentLogsTab, ConfigureTab] : [McpServersTab, AgentLogsTab, ConfigureTab]}
-                    currTab={handleTabChange}
+                    currTab={(tab) => handleTabChange(tab.id)}
                 />
             ]}
         />
