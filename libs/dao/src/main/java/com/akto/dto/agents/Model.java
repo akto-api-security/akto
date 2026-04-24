@@ -21,6 +21,7 @@ public class Model {
     public final static String PARAM_AZURE_OPENAI_ENDPOINT = "azureOpenAIEndpoint";
     public final static String PARAM_OLLAMA_ENDPOINT = "ollamaAIEndpoint";
     public final static String PARAM_DATABRICKS_ENDPOINT = "databricksEndpoint";
+    public final static String PARAM_GITHUB_TOKEN = "githubToken";
 
     public final static String _PARAMS = "params";
     Map<String, String> params;
@@ -76,6 +77,10 @@ public class Model {
 
     public String getDatabricksEndpoint() {
         return params != null ? params.get(PARAM_DATABRICKS_ENDPOINT) : null;
+    }
+
+    public String getGithubToken() {
+        return params != null ? params.get(PARAM_GITHUB_TOKEN) : null;
     }
 
 }

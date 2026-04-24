@@ -6,6 +6,7 @@ public enum ModelType {
     ANTHROPIC,
     AZURE_OPENAI,
     OLLAMA,
-    DATABRICKS
+    DATABRICKS,
+    GITHUB_MODELS
 
 }

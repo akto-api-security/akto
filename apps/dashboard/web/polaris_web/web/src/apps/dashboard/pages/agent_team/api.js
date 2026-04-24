@@ -90,6 +90,13 @@ const api = {
             data: data 
         })
     },
+    fetchGithubModels: async (data) => {
+        return await request({
+            url: '/api/fetchGithubModels',
+            method: 'post',
+            data: data 
+        })
+    },
     createDiscoveryAgentRunSubprocess: async (data) => {
         return await request({
             url: '/api/createSubProcessNew',

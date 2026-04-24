@@ -10,7 +10,8 @@ const MODEL_TYPES = {
   OPENAI: "OPENAI",
   AZURE_OPENAI: "AZURE_OPENAI",
   OLLAMA: "OLLAMA",
-  DATABRICKS: "DATABRICKS"
+  DATABRICKS: "DATABRICKS",
+  GITHUB_MODELS: "GITHUB_MODELS"
 }
 
 const OPENAI_MODELS = [
@@ -46,7 +47,20 @@ const DATABRICKS_MODELS = [
   { label: "Databricks Qwen3 Next 80B A3B Instruct", value: "databricks-qwen3-next-80b-a3b-instruct" },
 ]
 
-function getModelSections(type, data, setData, isEdit=false) {
+// Fallback GitHub Models (popular models from GitHub docs)
+const GITHUB_MODELS_FALLBACK = [
+  { label: "OpenAI GPT-4o", value: "gpt-4o" },
+  { label: "OpenAI GPT-4o mini", value: "gpt-4o-mini" },
+  { label: "Anthropic Claude 3.5 Sonnet", value: "claude-3-5-sonnet-20241022" },
+  { label: "Meta Llama 3.3 70B Instruct", value: "Llama-3.3-70B-Instruct" },
+  { label: "Meta Llama 3.1 405B Instruct", value: "Meta-Llama-3.1-405B-Instruct" },
+  { label: "Mistral Large 2411", value: "Mistral-large-2411" },
+  { label: "Mistral Nemo", value: "Mistral-Nemo" },
+  { label: "Cohere Command R Plus", value: "command-r-plus" },
+  { label: "AI21 Jamba 1.5 Large", value: "Jamba-1.5-Large" },
+]
+
+function getModelSections(type, data, setData, githubModels, fetchingGithubModels, fetchGithubModelsFunc, githubTokenSaved, isEdit=false) {
   let sections = []
 
   sections.push({
@@ -54,16 +68,40 @@ function getModelSections(type, data, setData, isEdit=false) {
     type: "text",
     id: "name",
     placeholder: "Model name",
-  }, {
-    title: type === MODEL_TYPES.OLLAMA ? "API Key (Optional)" : "API Key",
-    type: "text",
-    id: "apiKey",
-    placeholder: type === MODEL_TYPES.OLLAMA ? "API Key for the model (optional)" : "API Key for the model",
-  },{
-    title: "Model",
-    type: "dropdown",
-    id: "model"
   })
+
+  // Special handling for GitHub Models token with Save button
+  if (type === MODEL_TYPES.GITHUB_MODELS) {
+    sections.push({
+      title: "GitHub Personal Access Token",
+      type: "text_with_button",
+      id: "githubToken",
+      placeholder: "Personal Access Token with models:read scope",
+      buttonText: "Save Token",
+      buttonAction: fetchGithubModelsFunc,
+      buttonLoading: fetchingGithubModels,
+      buttonDisabled: !data.githubToken || data.githubToken.trim() === ""
+    })
+  } else {
+    sections.push({
+      title: type === MODEL_TYPES.OLLAMA ? "API Key (Optional)" : "API Key",
+      type: "text",
+      id: "apiKey",
+      placeholder: type === MODEL_TYPES.OLLAMA ? "API Key for the model (optional)" : "API Key for the model",
+    })
+  }
+
+  // Only show model dropdown for GitHub Models if token is saved
+  const shouldShowModelDropdown = type !== MODEL_TYPES.GITHUB_MODELS || githubTokenSaved
+  
+  if (shouldShowModelDropdown) {
+    sections.push({
+      title: "Model",
+      type: "dropdown",
+      id: "model",
+      loading: type === MODEL_TYPES.GITHUB_MODELS && fetchingGithubModels
+    })
+  }
   switch (type) {
     case MODEL_TYPES.ANTHROPIC:
     case MODEL_TYPES.OPENAI:
@@ -111,6 +149,31 @@ function getModelSections(type, data, setData, isEdit=false) {
           }}
         />
       )
+    } else if (section.type === "text_with_button") {
+      section.component = (
+        <VerticalStack gap="2">
+          <TextField
+            label={section?.title}
+            placeholder={section?.placeholder}
+            value={data[section?.id]}
+            onChange={(value) => {
+              setData({
+                ...data,
+                [section?.id]: value
+              })
+            }}
+            connectedRight={
+              <Button
+                onClick={() => section.buttonAction()}
+                loading={section.buttonLoading}
+                disabled={section.buttonDisabled}
+              >
+                {section.buttonText}
+              </Button>
+            }
+          />
+        </VerticalStack>
+      )
     } else if (section.type === "dropdown") {
       let items = []
       if (type === MODEL_TYPES.OPENAI || type === MODEL_TYPES.AZURE_OPENAI) {
@@ -121,17 +184,20 @@ function getModelSections(type, data, setData, isEdit=false) {
         items = OLLAMA_MODELS
       } else if (type === MODEL_TYPES.DATABRICKS) {
         items = DATABRICKS_MODELS
+      } else if (type === MODEL_TYPES.GITHUB_MODELS) {
+        items = githubModels || []
       }
       section.component = (
         <VerticalStack gap="1">
           <Text>
-            {section?.title}
+            {section?.title} {section?.loading && "(Loading...)"}
           </Text>
           <Dropdown
           id={section?.id}
           key={`${section?.id}-${type}`}
           menuItems={items}
           initial={data[section?.id]}
+          disabled={section?.loading}
           selected={(value) => {
             setData((x) => {
               return {
@@ -156,6 +222,9 @@ function AgentConfig() {
   const [data, setData] = useState({})
   const [modelType, setModelType] = useState(MODEL_TYPES.OPENAI)
   const [modelList, setModelList] = useState([])
+  const [githubModels, setGithubModels] = useState([])
+  const [fetchingGithubModels, setFetchingGithubModels] = useState(false)
+  const [githubTokenSaved, setGithubTokenSaved] = useState(false)
 
   async function fetchModels() {
     await api.getAgentModels().then((res) => {
@@ -173,6 +242,36 @@ function AgentConfig() {
     await api.deleteAgentModel({ name })
     func.setToast(true, false, "Successfully deleted model")
     await fetchModels()
+  }
+
+  async function fetchGithubModelsFunc() {
+    const token = data.githubToken
+    if (!token || token.trim() === "") {
+      func.setToast(true, true, "Please enter a GitHub Personal Access Token")
+      return
+    }
+
+    setFetchingGithubModels(true)
+    try {
+      const response = await api.fetchGithubModels({ githubToken: token })
+      if (response && Array.isArray(response) && response.length > 0) {
+        setGithubModels(response)
+        setGithubTokenSaved(true)
+        func.setToast(true, false, "Token saved! Models loaded successfully.")
+      } else {
+        // Use fallback models if API returns empty or fails
+        setGithubModels(GITHUB_MODELS_FALLBACK)
+        setGithubTokenSaved(true)
+        func.setToast(true, false, "Token saved! Using popular GitHub models.")
+      }
+    } catch (error) {
+      // Use fallback models on error
+      setGithubModels(GITHUB_MODELS_FALLBACK)
+      setGithubTokenSaved(true)
+      func.setToast(true, false, "Token saved! Using popular GitHub models.")
+    } finally {
+      setFetchingGithubModels(false)
+    }
   }
 
   function renderItem(item) {
@@ -214,6 +313,8 @@ function AgentConfig() {
         open={addModelPopOverActive}
         onClose={() => {
           setData({})
+          setGithubModels([])
+          setGithubTokenSaved(false)
           setAddModelPopOverActive(false)
         }}
         title="Add model"
@@ -222,6 +323,8 @@ function AgentConfig() {
           onAction: async () => {
             await api.saveAgentModel({ type: modelType, ...data })
             setData({})
+            setGithubModels([])
+            setGithubTokenSaved(false)
             func.setToast(true, false, "Successfully added model")
             setAddModelPopOverActive(false)
           },
@@ -231,6 +334,8 @@ function AgentConfig() {
             content: 'Cancel',
             onAction: () => {
               setData({})
+              setGithubModels([])
+              setGithubTokenSaved(false)
               setAddModelPopOverActive(false)
             },
           },
@@ -259,18 +364,24 @@ function AgentConfig() {
             {
               label: 'Databricks',
               value: MODEL_TYPES.DATABRICKS
+            },
+            {
+              label: 'GitHub Models',
+              value: MODEL_TYPES.GITHUB_MODELS
             }
             ]}
             initial={modelType}
             selected={(value) => {
               setModelType(value)
               setData({})
+              setGithubModels([])
+              setGithubTokenSaved(false)
             }} />
         </Modal.Section>
         <Modal.Section>
           <VerticalStack gap="2">
             {
-              getModelSections(modelType, data, setData).map((section) => {
+              getModelSections(modelType, data, setData, githubModels, fetchingGithubModels, fetchGithubModelsFunc, githubTokenSaved).map((section) => {
                 return section.component
               })
             }
@@ -283,6 +394,8 @@ function AgentConfig() {
   const secondaryAction = (
     <Button onClick={() => {
       setData({})
+      setGithubModels([])
+      setGithubTokenSaved(false)
       setAddModelPopOverActive(true)
     }} primary>
       Add model
