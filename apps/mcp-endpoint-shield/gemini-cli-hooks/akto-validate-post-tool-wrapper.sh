@@ -7,6 +7,11 @@ export AKTO_DATA_INGESTION_URL="{{AKTO_DATA_INGESTION_URL}}"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="gemini_cli"
+export AKTO_CONNECTOR_VALUE="geminicli"
+export CONTEXT_SOURCE="ENDPOINT"
+export DEVICE_ID="{{DEVICE_ID}}"
+export LOG_LEVEL="INFO"
+export LOG_PAYLOADS="false"
 
 # Execute Python hook script
-exec python3 "$HOME/.gemini/hooks/akto-validate-prompt.py" "$@"
+exec python3 "$HOME/.gemini/hooks/akto-validate-post-tool.py" "$@"
