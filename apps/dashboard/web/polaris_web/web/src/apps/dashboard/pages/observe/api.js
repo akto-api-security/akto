@@ -860,14 +860,6 @@ export default {
         })
     },
 
-    async fetchBlockedSkillNames() {
-        return await request({
-            url: '/api/fetchBlockedSkillNames',
-            method: 'post',
-            data: {}
-        })
-    },
-
     async lastUpdatedInfo() {
         return await request({
             url: '/api/getLastCalculatedInfo',

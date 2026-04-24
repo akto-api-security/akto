@@ -30,6 +30,7 @@ import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
@@ -970,8 +971,11 @@ public class ApiCollectionsAction extends UserAction {
     @Setter
     private boolean currentIsOutOfTestingScopeVal;
 
-    @Setter
     private boolean isSkillBlocked;
+
+    public void setIsSkillBlocked(boolean isSkillBlocked) {
+        this.isSkillBlocked = isSkillBlocked;
+    }
 
     @Setter
     private String skillName;
@@ -987,26 +991,27 @@ public class ApiCollectionsAction extends UserAction {
                 return ERROR.toUpperCase();
             }
 
-            List<Integer> validCollectionIds = ApiCollectionsDao.instance
-                .findAll(
-                    Filters.and(
-                        Filters.in(ApiCollection.ID, this.apiCollectionIds),
-                        Filters.eq(ApiCollection.SKILLS, this.skillName)
-                    ),
-                    Projections.include(ApiCollection.ID)
+            String skillUrl = "/skills/" + this.skillName;
+            List<Integer> validCollectionIds = SingleTypeInfoDao.instance.findDistinctFields(
+                SingleTypeInfo._API_COLLECTION_ID,
+                Integer.class,
+                Filters.and(
+                    Filters.in(SingleTypeInfo._API_COLLECTION_ID, this.apiCollectionIds),
+                    Filters.eq(SingleTypeInfo._URL, skillUrl)
                 )
-                .stream()
-                .map(ApiCollection::getId)
-                .collect(Collectors.toList());
+            ).stream().collect(Collectors.toList());
 
             if (validCollectionIds.isEmpty()) {
                 addActionError("No valid skill collections found");
                 return ERROR.toUpperCase();
             }
 
-            SingleTypeInfoDao.instance.updateMany(
-                Filters.in(SingleTypeInfo._API_COLLECTION_ID, validCollectionIds),
-                Updates.set(SingleTypeInfo.IS_SKILL_BLOCKED, this.isSkillBlocked)
+            ApiInfoDao.instance.updateMany(
+                Filters.and(
+                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, validCollectionIds),
+                    Filters.eq(ApiInfo.ID_URL, skillUrl)
+                ),
+                Updates.set(ApiInfo.IS_SKILL_BLOCKED, this.isSkillBlocked)
             );
 
             response = new BasicDBObject();
@@ -1021,10 +1026,10 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchBlockedSkillCollections() {
         try {
-            Set<Integer> blockedIds = SingleTypeInfoDao.instance.findDistinctFields(
-                SingleTypeInfo._API_COLLECTION_ID,
+            Set<Integer> blockedIds = ApiInfoDao.instance.findDistinctFields(
+                ApiInfo.ID_API_COLLECTION_ID,
                 Integer.class,
-                Filters.eq(SingleTypeInfo.IS_SKILL_BLOCKED, true)
+                Filters.eq(ApiInfo.IS_SKILL_BLOCKED, true)
             );
             response = new BasicDBObject();
             response.put("blockedCollectionIds", new ArrayList<>(blockedIds));
@@ -1037,20 +1042,24 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchBlockedSkillNames() {
         try {
-            Set<Integer> blockedCollectionIds = SingleTypeInfoDao.instance.findDistinctFields(
-                SingleTypeInfo._API_COLLECTION_ID,
+            Set<Integer> blockedCollectionIds = ApiInfoDao.instance.findDistinctFields(
+                ApiInfo.ID_API_COLLECTION_ID,
                 Integer.class,
-                Filters.eq(SingleTypeInfo.IS_SKILL_BLOCKED, true)
+                Filters.eq(ApiInfo.IS_SKILL_BLOCKED, true)
             );
             Set<String> blockedSkillNames = new HashSet<>();
             if (!blockedCollectionIds.isEmpty()) {
-                List<ApiCollection> blockedCollections = ApiCollectionsDao.instance.findAll(
-                    Filters.in(ApiCollection.ID, blockedCollectionIds),
-                    Projections.include(ApiCollection.ID, ApiCollection.SKILLS)
-                );
-                for (ApiCollection c : blockedCollections) {
-                    if (c.getSkills() != null) {
-                        blockedSkillNames.addAll(c.getSkills());
+                List<String> skillUrls = ApiInfoDao.instance.findDistinctFields(
+                    ApiInfo.ID_URL,
+                    String.class,
+                    Filters.and(
+                        Filters.in(ApiInfo.ID_API_COLLECTION_ID, blockedCollectionIds),
+                        Filters.regex(ApiInfo.ID_URL, "^/skills/")
+                    )
+                ).stream().collect(Collectors.toList());
+                for (String url : skillUrls) {
+                    if (url.startsWith("/skills/")) {
+                        blockedSkillNames.add(url.substring("/skills/".length()));
                     }
                 }
             }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Box, Badge, HorizontalStack } from "@shopify/polaris";
+import { IndexFiltersMode, Box, Badge } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -63,7 +63,7 @@ function Endpoints() {
         return "success";
     }, []);
 
-    const prettifyGroupData = useCallback((groups, blockedSkillNamesSet = new Set()) => {
+    const prettifyGroupData = useCallback((groups) => {
         return groups.map((group) => ({
             ...group,
             iconComp: (
@@ -76,20 +76,9 @@ function Endpoints() {
                 </Box>
             ),
             sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || [], false),
-            riskScoreComp: (() => {
-                const isBlocked = group.clientType === CLIENT_TYPES.SKILL && blockedSkillNamesSet.has(group.groupKey);
-                const riskBadge = group.riskScore !== null
-                    ? <Badge status={getRiskScoreStatus(group.riskScore)} size="small">{group.riskScore}</Badge>
-                    : null;
-                const blockedBadge = isBlocked ? <Badge status="critical" size="small">Blocked</Badge> : null;
-                if (!riskBadge && !blockedBadge) return "-";
-                return (
-                    <HorizontalStack gap="1" align="center">
-                        {riskBadge}
-                        {blockedBadge}
-                    </HorizontalStack>
-                );
-            })(),
+            riskScoreComp: group.riskScore !== null
+                ? <Badge status={getRiskScoreStatus(group.riskScore)} size="small">{group.riskScore}</Badge>
+                : "-",
         }));
     }, [getRiskScoreStatus]);
 
@@ -103,13 +92,11 @@ function Endpoints() {
                 trafficInfoResp,
                 riskScoreResp,
                 sensitiveInfoResp,
-                blockedSkillNamesResp
             ] = await Promise.all([
                 api.getAllCollectionsBasic(),
                 api.getLastTrafficSeen(),
                 api.getRiskScoreInfo(),
                 api.getSensitiveInfoForCollections(),
-                api.fetchBlockedSkillNames().catch(() => ({ blockedSkillNames: [] }))
             ]);
 
             if (!isMountedRef.current) return;
@@ -121,7 +108,6 @@ function Endpoints() {
             const trafficMap = trafficInfoResp || {};
             const riskScoreMap = riskScoreResp?.riskScoreOfCollectionsMap || {};
             const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
-            const blockedSkillNamesSet = new Set(blockedSkillNamesResp?.blockedSkillNames || []);
 
             // Group collections by agents (discovery sources), services (discovered endpoints), and skills
             const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap);
@@ -130,7 +116,7 @@ function Endpoints() {
 
             const prettifiedAgents = prettifyGroupData(agentGroups);
             const prettifiedServices = prettifyGroupData(serviceGroups);
-            const prettifiedSkills = prettifyGroupData(skillGroups, blockedSkillNamesSet);
+            const prettifiedSkills = prettifyGroupData(skillGroups);
 
             // For AI Agent: agent row already represents both gen-ai and mcp-server for that agent.
             // Don't show a separate service row with the same key (would show as "2 columns").
