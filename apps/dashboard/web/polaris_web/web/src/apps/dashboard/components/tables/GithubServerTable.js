@@ -519,7 +519,10 @@ function GithubServerTable(props) {
     });
 
   useEffect(() => {
-    if (!allResourcesSelected || data.length >= total || fullDataIds.length >= total || rawSelectedResources.length >= total) {
+    if(!window.location.pathname.includes("testing")){
+      return
+    }
+    if (!allResourcesSelected || (data && data.length >= total) || (fullDataIds && fullDataIds.length >= total) || (rawSelectedResources && rawSelectedResources.length >= total)) {
       setAllDataIds([])
       return
     }
@@ -535,7 +538,7 @@ function GithubServerTable(props) {
         filters[filter.key] = value;
       }
     });
-    props.fetchData(sortKey, sortOrder === 'asc' ? -1 : 1, 0, -1, filters, filterOperators, queryValue).then((result) => {
+    props.fetchData(sortKey, sortOrder === 'asc' ? -1 : 1, 0, 1000000, filters, filterOperators, queryValue).then((result) => {
       if (result?.value) {
         setAllDataIds(result.value.map(resourceIDResolver).filter(Boolean))
       }
