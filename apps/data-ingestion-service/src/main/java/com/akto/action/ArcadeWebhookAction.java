@@ -212,7 +212,11 @@ public class ArcadeWebhookAction extends ActionSupport {
 
                 requestData.put("statusCode", String.valueOf(success != null && success ? 200 : 500));
                 requestData.put("status", success != null && success ? "SUCCESS" : "ERROR");
-                requestData.put("responsePayload", output != null ? objectMapper.writeValueAsString(output) : "{}");
+
+                String scannableText = extractScannableOutputText(output, success, execution_error);
+                Map<String, Object> responseBody = new HashMap<>();
+                responseBody.put("body", scannableText);
+                requestData.put("responsePayload", objectMapper.writeValueAsString(responseBody));
                 requestData.put("responseHeaders", "{}");
                 break;
 
@@ -342,6 +346,22 @@ public class ArcadeWebhookAction extends ActionSupport {
         }
 
         return HOOK_TYPE_PRE;
+    }
+
+    private String extractScannableOutputText(Object output, Boolean success, String executionError) throws Exception {
+        if (Boolean.FALSE.equals(success) && executionError != null && !executionError.isEmpty()) {
+            return executionError;
+        }
+        if (output == null) {
+            return "";
+        }
+        if (output instanceof String) {
+            return (String) output;
+        }
+        if (output instanceof Number || output instanceof Boolean) {
+            return String.valueOf(output);
+        }
+        return objectMapper.writeValueAsString(output);
     }
 
     private String extractToolName() {
