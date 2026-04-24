@@ -622,7 +622,7 @@ function AgentDetails({
                 </HorizontalStack>,
                 <LayoutWithTabs
                     key="tabs"
-                    tabs={func.isDemoAccount() ? [UserAnalysisTab, McpServersTab, AgentLogsTab, ConfigureTab] : [McpServersTab, AgentLogsTab, ConfigureTab]}
+                    tabs={func.isDemoAccount() ? [McpServersTab, UserAnalysisTab, AgentLogsTab, ConfigureTab] : [McpServersTab, AgentLogsTab, ConfigureTab]}
                     currTab={handleTabChange}
                 />
             ]}
