@@ -7,7 +7,7 @@ export AKTO_DATA_INGESTION_URL="{{AKTO_DATA_INGESTION_URL}}"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export CONTEXT_SOURCE="ENDPOINT"
-export AKTO_API_TOKEN="{{AKTO_API_TOKEN}}"
+export AKTO_TOKEN="{{AKTO_API_TOKEN}}"
 
 # Execute Python hook script
-exec python3 "./.github/hooks/akto-validate-post-tool.py" "$@"
+exec python3 "./.github/hooks/akto-validate-pre-tool.py" "$@"

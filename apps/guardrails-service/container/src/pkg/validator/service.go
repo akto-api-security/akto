@@ -325,12 +325,14 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		auditResponse.McpAuditInfoList = []*types.AuditPolicy{}
 	}
 
-	// Convert array to map keyed by resourceName
+	// Convert array to map keyed by (resourceName, serverIdentity). Each
+	// row is indexed under both its raw mcpHost and its device-stripped
+	// form so a single probe at validation time matches both legacy
+	// device-prefixed rows and already-canonical rows. See
+	// mcp.IndexAuditPolicy for the rationale.
 	auditPolicies := make(map[string]*types.AuditPolicy)
 	for _, policy := range auditResponse.McpAuditInfoList {
-		if policy != nil && policy.ResourceName != "" {
-			auditPolicies[policy.ResourceName] = policy
-		}
+		mcp.IndexAuditPolicy(auditPolicies, policy)
 	}
 
 	s.logger.Info("Parsed audit policies",
