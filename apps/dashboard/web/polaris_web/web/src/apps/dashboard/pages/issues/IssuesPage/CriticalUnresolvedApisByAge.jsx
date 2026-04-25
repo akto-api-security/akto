@@ -13,14 +13,14 @@ const AGE_BUCKETS = [
   '>30 days'
 ];
 
-const CriticalUnresolvedApisByAge = () => {
+const CriticalUnresolvedApisByAge = ({ onBarClick, apiCollectionIds }) => {
   const [barData, setBarData] = useState([]);
 
   useEffect(() => {
     async function fetchUnresolvedHighSeverityIssuesByAge() {
       try {
         const now = func.timeNow();
-        const trendResp = await dashboardApi.fetchCriticalIssuesTrend(0, now, ["CRITICAL"]);
+        const trendResp = await dashboardApi.fetchCriticalIssuesTrend(0, now, ["CRITICAL"], apiCollectionIds);
         const { issuesTrend, epochKey } = trendResp;
 
         let buckets = AGE_BUCKETS.reduce((acc, bucket) => {
@@ -48,11 +48,10 @@ const CriticalUnresolvedApisByAge = () => {
         setBarData(barGraphData);
       } catch (e) {
         setBarData([]);
-        console.error('Error fetching unresolved high severity issues by age:', e);
       }
     }
     fetchUnresolvedHighSeverityIssuesByAge();
-  }, []);
+  }, [apiCollectionIds]);
 
   return (
     (barData.length > 0 && barData.every(item => item.value === 0)) ? (
@@ -75,6 +74,7 @@ const CriticalUnresolvedApisByAge = () => {
             yAxisTitle="Number of Issues"
             barWidth={30}
             defaultChartOptions={{ legend: { enabled: false } }}
+            onBarClick={onBarClick}
           />
         }
       />

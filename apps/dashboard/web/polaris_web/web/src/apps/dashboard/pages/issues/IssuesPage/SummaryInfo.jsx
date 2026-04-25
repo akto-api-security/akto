@@ -5,7 +5,7 @@ import observeFunc from "../../observe/transform.js"
 import func from "@/util/func";
 import api from '../api.js'
 
-const SummaryInfo = ({ startTimestamp, endTimestamp }) => {
+const SummaryInfo = ({ startTimestamp, endTimestamp, filterCollectionsId }) => {
     const [totalIssues, setTotalIssues] = useState([])
     const [totalIssuesDelta, setTotalIssuesDelta] = useState(0)
     const [openIssues, setOpenIssues] = useState([])
@@ -16,8 +16,8 @@ const SummaryInfo = ({ startTimestamp, endTimestamp }) => {
     const [testCoverageDelta, setTestCoverageDelta] = useState(0)
 
     const getIssuesGraphData = async () => {
-        const issuesGraphDataRes = await api.findTotalIssuesByDay(startTimestamp, endTimestamp)
-        const testCoverageDataRes = await api.fetchTestCoverageData(startTimestamp, endTimestamp)
+        const issuesGraphDataRes = await api.findTotalIssuesByDay(startTimestamp, endTimestamp, filterCollectionsId)
+        const testCoverageDataRes = await api.fetchTestCoverageData(startTimestamp, endTimestamp, filterCollectionsId)
         
         const testCoverageData = testCoverageDataRes.historicalData.map(item => {
             const totalCoverageVal = (((100 * item.apisTested) / item.totalApis).toFixed(2))
@@ -38,7 +38,7 @@ const SummaryInfo = ({ startTimestamp, endTimestamp }) => {
 
     useEffect(() => {
         getIssuesGraphData()
-    }, [startTimestamp, endTimestamp])
+    }, [startTimestamp, endTimestamp, filterCollectionsId])
 
     const summaryInfo = [
         {

@@ -39,10 +39,10 @@ public class GuardrailsClient {
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, Object> callValidateRequest(Map<String, Object> request) {
+    public Map<String, Object> callValidate(Map<String, Object> request, String endpoint) {
         try {
             String jsonRequest = objectMapper.writeValueAsString(request);
-            String url = guardrailsServiceUrl + "/api/validate/request";
+            String url = guardrailsServiceUrl + endpoint;
 
             logger.info("Calling guardrails service at: {}", url);
 
@@ -77,43 +77,12 @@ public class GuardrailsClient {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    public Map<String, Object> callValidateRequest(Map<String, Object> request) {
+        return callValidate(request, "/api/validate/request");
+    }
+
     public Map<String, Object> callValidateResponse(Map<String, Object> request) {
-        try {
-            String jsonRequest = objectMapper.writeValueAsString(request);
-            String url = guardrailsServiceUrl + "/api/validate/response";
-
-            logger.info("Calling guardrails service at: {}", url);
-
-            RequestBody body = RequestBody.create(jsonRequest, JSON);
-            Request httpRequest = new Request.Builder()
-                    .url(url)
-                    .post(body)
-                    .addHeader("Content-Type", "application/json")
-                    .build();
-
-            try (Response response = httpClient.newCall(httpRequest).execute()) {
-                String responseBody = response.body() != null ? response.body().string() : "";
-
-                logger.info("Guardrails response (status {}): {}", response.code(), responseBody);
-
-                if (response.isSuccessful()) {
-                    return objectMapper.readValue(responseBody, Map.class);
-                } else {
-                    logger.warn("Guardrails service returned error status: {}", response.code());
-                    return buildErrorResponse("Guardrails service error: HTTP " + response.code());
-                }
-            }
-
-        } catch (Exception e) {
-            logger.error("Error calling guardrails service: {}", e.getMessage(), e);
-            String alertMsg = "[guardrails] validate/response call failed - path: " + request.get("path")
-                + ", method: " + request.get("method")
-                + ", account: " + request.get("akto_account_id")
-                + ", error: " + e.getMessage();
-            SlackUtils.sendAlert(alertMsg);
-            return buildErrorResponse(e.getMessage());
-        }
+        return callValidate(request, "/api/validate/response");
     }
 
     private Map<String, Object> buildErrorResponse(String errorMessage) {

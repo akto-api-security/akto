@@ -11,31 +11,47 @@ import func from "@/util/func";
 import transform from "../transform";
 import PersistStore from "../../../../main/PersistStore";
 import { CollectionIcon } from "../../../components/shared/CollectionIcon";
-import { 
-    getHeaders, 
-    sortOptions, 
-    resourceName, 
-    INVENTORY_PATH, 
-    INVENTORY_FILTER_KEY, 
-    groupCollectionsByAgent, 
+import useTable from "@/apps/dashboard/components/tables/TableContext";
+import {
+    getHeaders,
+    sortOptions,
+    resourceName,
+    INVENTORY_PATH,
+    INVENTORY_FILTER_KEY,
+    PAGE_LIMIT,
+    groupCollectionsByAgent,
     groupCollectionsByService,
-    createEnvTypeFilter,
-    createHostnameFilter,
+    groupCollectionsBySkill,
     extractEndpointId,
-    ROW_TYPES
+    buildAgenticInventoryFilterForRow,
 } from "./constants";
+import { CLIENT_TYPES } from "./mcpClientHelper";
+
+const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
 
 function Endpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
-    const [data, setData] = useState([]);
+    const [data, setData] = useState({ all: [], 'ai_agents': [], 'mcp_servers': [], llms: [], skills: [] });
     const [summaryData, setSummaryData] = useState({ totalAssets: 0, totalEndpoints: 0 });
+
+    const { tabsInfo } = useTable();
+    const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
+    const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
+    const initialSelectedTab = tableSelectedTab[window.location.pathname] || "ai_agents";
+    const [selectedTab, setSelectedTab] = useState(initialSelectedTab);
+    const [selected, setSelected] = useState(func.getTableTabIndexById(1, definedTableTabs, initialSelectedTab));
 
     const setAllCollections = PersistStore((state) => state.setAllCollections);
     const filtersMap = PersistStore((state) => state.filtersMap);
     const setFiltersMap = PersistStore((state) => state.setFiltersMap);
-    const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
-    const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
+
+    const tableCountObj = func.getTabsCount(definedTableTabs, data);
+    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo);
+
+    const handleSelectedTab = (selectedIndex) => {
+        setSelected(selectedIndex);
+    };
 
     const headers = useMemo(() => getHeaders(), []);
 
@@ -95,19 +111,21 @@ function Endpoints() {
             const riskScoreMap = riskScoreResp?.riskScoreOfCollectionsMap || {};
             const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
 
-            // Group collections by agents (discovery sources) and services (discovered endpoints)
-            const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap);
+            // Group collections by agents (discovery sources), services (discovered endpoints), and skills
+            const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
             const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
+            const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap, riskScoreMap);
 
             const prettifiedAgents = prettifyGroupData(agentGroups);
             const prettifiedServices = prettifyGroupData(serviceGroups);
+            const prettifiedSkills = prettifyGroupData(skillGroups);
 
             // For AI Agent: agent row already represents both gen-ai and mcp-server for that agent.
             // Don't show a separate service row with the same key (would show as "2 columns").
             const agentGroupKeys = new Set(prettifiedAgents.map((a) => a.groupKey));
             const servicesToShow = prettifiedServices.filter((s) => !agentGroupKeys.has(s.groupKey));
 
-            const allData = [...prettifiedAgents, ...servicesToShow];
+            const allData = [...prettifiedAgents, ...servicesToShow, ...prettifiedSkills];
 
             // Calculate unique endpoint IDs across all collections
             const uniqueEndpointIds = new Set();
@@ -123,9 +141,15 @@ function Endpoints() {
             setSummaryData({
                 totalAssets: allData.length,
                 totalEndpoints: uniqueEndpointIds.size
+            })
+    
+            setData({
+                all: allData,
+                ai_agents: allData.filter(r => r.clientType === CLIENT_TYPES.AI_AGENT),
+                mcp_servers: allData.filter(r => r.clientType === CLIENT_TYPES.MCP_SERVER),
+                llms: allData.filter(r => r.clientType === CLIENT_TYPES.LLM),
+                skills: prettifiedSkills,
             });
-
-            setData(allData);
             setLoading(false);
         } catch {
             setLoading(false);
@@ -144,18 +168,9 @@ function Endpoints() {
 
     const handleRowClick = useCallback((row) => {
         const updatedFiltersMap = { ...filtersMap };
-
-        if (row.rowType === ROW_TYPES.AGENT) {
-            // Agent row: filter by agent tag so one click shows both gen-ai and mcp-server for that agent
-            if (row.tagKey && row.tagValue) {
-                const filterValue = `${row.tagKey}=${row.tagValue}`;
-                updatedFiltersMap[INVENTORY_FILTER_KEY] = createEnvTypeFilter([filterValue], false);
-            }
-        } else if (row.rowType === ROW_TYPES.SERVICE) {
-            // Service row (e.g. MCP server): filter by hostnames so only that service's collections open
-            if (row.hostNames?.length > 0) {
-                updatedFiltersMap[INVENTORY_FILTER_KEY] = createHostnameFilter(row.hostNames);
-            }
+        const filterPayload = buildAgenticInventoryFilterForRow(row);
+        if (filterPayload) {
+            updatedFiltersMap[INVENTORY_FILTER_KEY] = filterPayload;
         } else {
             delete updatedFiltersMap[INVENTORY_FILTER_KEY];
         }
@@ -186,24 +201,29 @@ function Endpoints() {
         <SummaryCardInfo summaryItems={summaryItems} key="summary" />
     ), [summaryItems]);
 
-    const tableComponent = useMemo(() => (
-        <GithubSimpleTable
-            pageLimit={100}
-            data={data}
-            sortOptions={sortOptions}
-            resourceName={resourceName}
-            filters={[]}
-            headers={headers}
-            selectable={false}
-            mode={IndexFiltersMode.Filtering}
-            headings={headers}
-            useNewRow={true}
-            condensedHeight={true}
-            disambiguateLabel={disambiguateLabel}
-            prettifyPageData={(pageData) => pageData}
-            onRowClick={handleRowClick}
-        />
-    ), [data, headers, disambiguateLabel, handleRowClick]);
+    const tableComponent = useMemo(() => {
+        const commonTabProps = { tableTabs, onSelect: handleSelectedTab, selected };
+        return (
+            <GithubSimpleTable
+                key="table"
+                pageLimit={PAGE_LIMIT}
+                data={data[selectedTab]}
+                sortOptions={sortOptions}
+                resourceName={resourceName}
+                filters={[]}
+                headers={headers}
+                selectable={false}
+                mode={IndexFiltersMode.Default}
+                headings={headers}
+                useNewRow={true}
+                condensedHeight={true}
+                disambiguateLabel={disambiguateLabel}
+                prettifyPageData={(pageData) => pageData}
+                onRowClick={handleRowClick}
+                {...commonTabProps}
+            />
+        );
+    }, [data, selectedTab, headers, disambiguateLabel, handleRowClick, tableTabs, selected]);
 
     const pageTitle = useMemo(() => (
         <TitleWithInfo

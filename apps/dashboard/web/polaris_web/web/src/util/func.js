@@ -68,48 +68,38 @@ const categoryMapping = {
 
 const AGENTIC_ASI_URL = "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/"
 
+const ASI01 = { label: "OWASP Agentic ASI01 - Agent Goal Hijack", url: AGENTIC_ASI_URL }
+const ASI02 = { label: "OWASP Agentic ASI02 - Tool Misuse and Exploitation", url: AGENTIC_ASI_URL }
+const ASI03 = { label: "OWASP Agentic ASI03 - Identity and Privilege Abuse", url: AGENTIC_ASI_URL }
+const ASI04 = { label: "OWASP Agentic ASI04 - Agentic Supply Chain Vulnerabilities", url: AGENTIC_ASI_URL }
+const ASI05 = { label: "OWASP Agentic ASI05 - Unexpected Code Execution", url: AGENTIC_ASI_URL }
+const ASI06 = { label: "OWASP Agentic ASI06 - Memory and Context Poisoning", url: AGENTIC_ASI_URL }
+const ASI07 = { label: "OWASP Agentic ASI07 - Insecure Inter-Agent Communication", url: AGENTIC_ASI_URL }
+const ASI08 = { label: "OWASP Agentic ASI08 - Cascading Failures", url: AGENTIC_ASI_URL }
+const ASI09 = { label: "OWASP Agentic ASI09 - Human-Agent Trust Exploitation", url: AGENTIC_ASI_URL }
+const ASI10 = { label: "OWASP Agentic ASI10 - Rogue Agents", url: AGENTIC_ASI_URL }
+
+/** Keys are {@code TestCategory} / YAML {@code info.category} names; aliases cover legacy Agent Security-* categories. */
 const agenticCategoryMapping = {
-  'AGENTIC_BUSINESS_ALIGNMENT': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI09 - Human-Agent Trust Exploitation', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI10 - Rogue Agents', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI02 - Tool Misuse and Exploitation', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI06 - Memory and Context Poisoning', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI08 - Cascading Failures', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_SAFETY': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI10 - Rogue Agents', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_SECURITY_AGENT_EXPLOITATION': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI02 - Tool Misuse and Exploitation', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI03 - Identity and Privilege Abuse', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI08 - Cascading Failures', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_SECURITY_CODE_EXECUTION': [
-    { label: 'OWASP Agentic ASI05 - Unexpected Code Execution', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_SECURITY_DATA_EXPOSURE': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI02 - Tool Misuse and Exploitation', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI04 - Agentic Supply Chain Vulnerabilities', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI06 - Memory and Context Poisoning', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_SECURITY_INFRASTRUCTURE': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI03 - Identity and Privilege Abuse', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI04 - Agentic Supply Chain Vulnerabilities', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI07 - Insecure Inter-Agent Communication', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI08 - Cascading Failures', url: AGENTIC_ASI_URL }
-  ],
-  'AGENTIC_SECURITY_PROMPT_INJECTION': [
-    { label: 'OWASP Agentic ASI01 - Agent Goal Hijack', url: AGENTIC_ASI_URL },
-    { label: 'OWASP Agentic ASI06 - Memory and Context Poisoning', url: AGENTIC_ASI_URL }
-  ]
+  "AGENT_GOAL_HIJACK": ASI01,
+  "AGENTIC_SECURITY_PROMPT_INJECTION": ASI01,
+  "AGENTIC_SECURITY": ASI01,
+  "TOOL_MISUSE_AND_EXPLOITATION": ASI02,
+  "AGENTIC_SECURITY_AGENT_EXPLOITATION": ASI02,
+  "IDENTITY_AND_PRIVILEGE_ABUSE": ASI03,
+  "AGENTIC_SUPPLY_CHAIN": ASI04,
+  "AGENTIC_SECURITY_INFRASTRUCTURE": ASI04,
+  "UNEXPECTED_CODE_EXECUTION": ASI05,
+  "AGENTIC_SECURITY_CODE_EXECUTION": ASI05,
+  "MEMORY_AND_CONTEXT_POISONING": ASI06,
+  "AGENTIC_SECURITY_DATA_EXPOSURE": ASI06,
+  "INSECURE_INTER_AGENT_COMMUNICATION": ASI07,
+  "CASCADING_FAILURES": ASI08,
+  "HUMAN_AGENT_TRUST_EXPLOITATION": ASI09,
+  "AGENTIC_BUSINESS_ALIGNMENT": ASI09,
+  "AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS": ASI09,
+  "AGENTIC_SAFETY": ASI09,
+  "ROGUE_AGENTS": ASI10,
 }
 
 const func = {
@@ -224,10 +214,10 @@ prettifyEpoch(epoch) {
     if (diffMonths > 2) {
       return this.toDateStr(new Date(epoch * 1000), true)
     } else if (diffWeeks > 4) {
-      count = Math.round(diffMonths + 0.5)
+      count = Math.max(1, Math.floor(diffDays / 30))
       unit = 'month'
     } else if (diffDays > 11) {
-      count = Math.round(diffWeeks + 0.5)
+      count = Math.max(1, Math.floor(diffWeeks))
       unit = 'week'
     } else if (diffDays === 1) {
       return sign > 0 ? 'tomorrow' : 'yesterday'
@@ -1644,7 +1634,12 @@ updateQueryParams(searchParams, setSearchParams, key, value) {
   setSearchParams(newSearchParams);
 },
  getComplianceIcon: (complianceName) => {
-  return "/public/"+complianceName.toUpperCase()+".svg";
+  if (!complianceName || typeof complianceName !== "string") return "";
+  const trimmed = complianceName.trim();
+  if (trimmed === "OWASP Agentic Top 10") {
+    return "/public/OWASP.svg";
+  }
+  return "/public/" + trimmed.toUpperCase() + ".svg";
 },
 
  convertToDisambiguateLabel(value, convertFunc, maxAllowed){
@@ -2280,10 +2275,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
 
   shouldShowIpReputation() {
-    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1745303931
+    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1745303931 || window.ACTIVE_ACCOUNT === 1758787662
   },
 
-  
   isSameDateAsToday (givenDate) {
       const today = new Date();
       return (
@@ -2496,6 +2490,22 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       hour12: true
     });
   },
+  /**
+   * Share of count in total (e.g. pass rate). When oppositeCount > 0, avoids rounding
+   * to 100% at low precision (e.g. 14196/14197 → not "100.0%" with one failure shown).
+   */
+  formatSplitSharePercent(count, total, oppositeCount) {
+    if (total === 0) return 0;
+    if (oppositeCount === 0) return Number(((count / total) * 100).toFixed(1));
+    const pct = (count / total) * 100;
+    let decimals = 2;
+    let rounded = Number(pct.toFixed(decimals));
+    while (rounded >= 100 && decimals < 10) {
+      decimals += 1;
+      rounded = Number(pct.toFixed(decimals));
+    }
+    return rounded;
+  },
   extractEmailDetails(email) {
     // Define the regex pattern
     const pattern = /^(.*?)@([\w.-]+)\.[a-z]{2,}$/;
@@ -2521,9 +2531,22 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     }
   },
 
-  getASICategoriesForAgenticCategory(agenticCategory) {
-    return agenticCategoryMapping[agenticCategory] || []
-  }
+   getStiggFeatureGrants() {
+      const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
+      const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false
+      const mcpSecurityGranted = stiggFeatures?.MCP_SECURITY?.isGranted || true
+      const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
+      const endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted
+      const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true
+
+      return {
+        agenticSecurityGranted,
+        endpointSecurityGranted,
+        dastGranted,
+        mcpSecurityGranted,
+        stiggFeatures
+      }
+    }
 }
 
 export default func

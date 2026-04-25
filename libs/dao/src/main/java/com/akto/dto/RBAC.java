@@ -3,6 +3,7 @@ package com.akto.dto;
 
 import org.bson.types.ObjectId;
 
+import com.akto.dao.CustomRoleDao;
 import com.akto.dto.rbac.*;
 
 import com.akto.dto.rbac.RbacEnums.Feature;
@@ -12,8 +13,10 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 public class RBAC {
 
@@ -30,21 +33,23 @@ public class RBAC {
 
     public static final String ALLOWED_FEATURES_FOR_USER = "allowedFeaturesForUser";
 
-    @Getter 
+    @Getter
     @Setter
     private List<String> allowedFeaturesForUser;
 
-    // special features for RBAC, we can add more features here when needed
-    public static final List<String> SPECIAL_FEATURES_FOR_RBAC = Arrays.asList(
-        "THREAT_DETECTION",
-        "AI_AGENTS"
-    );
+    public static final String SCOPE_ROLE_MAPPING = "scopeRoleMapping";
+    @Getter
+    @Setter
+    private Map<String, String> scopeRoleMapping;
 
     public enum Role {
         ADMIN("ADMIN",new AdminRoleStrategy()),
         MEMBER("SECURITY ENGINEER", new MemberRoleStrategy()),
         DEVELOPER("DEVELOPER", new DeveloperRoleStrategy()),
-        GUEST("GUEST", new GuestRoleStrategy());
+        GUEST("GUEST", new GuestRoleStrategy()),
+        THREAT_ENGINEER("THREAT ENGINEER", new ThreatEngineerRoleStrategy()),
+        THREAT_VIEWER("THREAT VIEWER", new ThreatViewerRoleStrategy()),
+        NO_ACCESS("NO_ACCESS", new NoAccessRoleStrategy());
 
         private final RoleStrategy roleStrategy;
         private String name;
@@ -86,6 +91,13 @@ public class RBAC {
         this.accountId = accountId;
         this.apiCollectionsId = new ArrayList<>();
         this.allowedFeaturesForUser = new ArrayList<>();
+    }
+
+    public RBAC(int userId, String role, int accountId, Map <String,String> scopeRoleMapping) {
+        this.userId = userId;
+        this.role = role;
+        this.accountId = accountId;
+        this.scopeRoleMapping = scopeRoleMapping;
     }
 
     public RBAC() {
@@ -130,5 +142,70 @@ public class RBAC {
 
     public void setApiCollectionsId(List<Integer> apiCollectionsId) {
         this.apiCollectionsId = apiCollectionsId;
+    }
+
+    /**
+     * Initializes default scope-role mapping if empty.
+     * If scopeRoleMapping is null or empty, creates a new HashMap with API scope mapped to the provided default role.
+     * Otherwise, returns the existing scopeRoleMapping unchanged.
+     *
+     * @param scopeRoleMapping the current scope-role mapping (may be null/empty)
+     * @param defaultRole the default role to use for API scope if mapping is empty
+     * @return the initialized or existing scopeRoleMapping
+     */
+    public static Map<String, String> initializeScopeRoleMapping(Map<String, String> scopeRoleMapping, String defaultRole) {
+        if (scopeRoleMapping == null || scopeRoleMapping.isEmpty()) {
+            Map<String, String> initialized = new HashMap<>();
+            initialized.put("API", defaultRole);
+            return initialized;
+        }
+        return scopeRoleMapping;
+    }
+
+    public Role getRoleForScope(CONTEXT_SOURCE scope) {
+        if (scope == null) {
+            return null;
+        }
+
+        String scopeStr = scope.toString();
+        if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
+            if (this.scopeRoleMapping.containsKey(scopeStr)) {
+                String roleStr = this.scopeRoleMapping.get(scopeStr);
+                return resolveRoleString(roleStr);
+            }
+            // User has scopeRoleMapping but this scope is NOT in it - NO ACCESS
+            return Role.NO_ACCESS;
+        }
+
+        // Fall back to old role field ONLY if scopeRoleMapping is null/empty (backward compatibility)
+        if (this.role != null) {
+            return resolveRoleString(this.role);
+        }
+
+        return null;
+    }
+
+    private Role resolveRoleString(String roleStr) {
+        if (roleStr == null) {
+            return null;
+        }
+
+        try {
+            return Role.valueOf(roleStr);
+        } catch (IllegalArgumentException e) {
+        }
+
+        try {
+            CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
+            if (customRole != null && customRole.getBaseRole() != null) {
+                try {
+                    return Role.valueOf(customRole.getBaseRole());
+                } catch (IllegalArgumentException e) {
+                    return Role.GUEST;
+                }
+            }
+        } catch (Exception e) {
+        }
+        return Role.GUEST;
     }
 }

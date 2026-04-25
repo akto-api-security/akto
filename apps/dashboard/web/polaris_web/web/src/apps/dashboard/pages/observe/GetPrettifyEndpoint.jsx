@@ -7,14 +7,17 @@ import { isAgenticSecurityCategory, isMCPSecurityCategory, isEndpointSecurityCat
 
 export const getMethod = (url, method) => {
     if(isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()){
-        if(url.includes("tool")){
+        const segments = url.split("/").map(s => s.toLowerCase());
+        if(segments.includes("tool") || segments.includes("tools")){
             return "TOOL";
-        }else if(url.includes("resource")){
+        }else if(segments.includes("resource") || segments.includes("resources")){
             return "RESOURCE";
-        }else if(url.includes("prompt")){
+        }else if(segments.includes("prompt") || segments.includes("prompts")){
             return "PROMPT";
         }else if(url.includes("server")){
             return "SERVER";
+        }else if(url.includes("settings")){
+            return "CONFIG";
         }
     }
     return method;
@@ -22,6 +25,7 @@ export const getMethod = (url, method) => {
 
 export function MethodBox({method, methodBoxWidth, url}){
     const finalMethod = getMethod(url, method);
+    // Use TOOL color for CONFIG as well
     return (
       <Box width={methodBoxWidth || "64px"}>
         <HorizontalStack align="end">

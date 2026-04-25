@@ -19,6 +19,7 @@ import threatDetectionRequests from "./threat_detection/api";
 import SessionStore from "../../main/SessionStore";
 import { updateThreatFiltersStore } from "./threat_detection/utils/threatFilters";
 
+
 function Dashboard() {
 
     const location = useLocation();
@@ -37,7 +38,9 @@ function Dashboard() {
 
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
     const [eventForUser, setEventForUser] = useState({})
-    
+    const [showNoAccessAlert, setShowNoAccessAlert] = useState(false)
+    const [noAccessMessage, setNoAccessMessage] = useState("")
+
     const sendEventOnLogin = LocalStore(state => state.sendEventOnLogin)
     const setSendEventOnLogin = LocalStore(state => state.setSendEventOnLogin)
     const fetchAllCollections = async () => {
@@ -76,6 +79,24 @@ function Dashboard() {
             updateThreatFiltersStore(res?.templates || [])
         })
     }
+
+    // Monitor NO_ACCESS alert flag
+    // Skip alert monitoring during onboarding since APIs may return 403 during setup
+    useEffect(() => {
+        selectItems([])
+        if (location.pathname.includes('/onboarding')) {
+            return;
+        }
+
+        const checkInterval = setInterval(() => {
+            if (window.SHOW_NO_ACCESS_ALERT) {
+                setShowNoAccessAlert(true);
+                setNoAccessMessage(window.NO_ACCESS_ALERT_MESSAGE || "");
+            }
+        }, 100);
+
+        return () => clearInterval(checkInterval);
+    }, [location.pathname]);
 
     useEffect(() => {
         if(trafficAlerts == null && window.USER_NAME.length > 0 && window.USER_NAME.includes('akto.io')){
@@ -131,10 +152,6 @@ function Dashboard() {
         };
     }, [])
 
-    useEffect(() => {
-        selectItems([])
-    },[location.pathname])
-
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
 
@@ -175,9 +192,47 @@ function Dashboard() {
     const shouldShowWelcomeBackModal = window.IS_SAAS === "true" && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
 
     const isAskAiRoute = location.pathname.includes('/ask-ai')
+    const isOnboardingRoute = location.pathname.includes('/onboarding')
 
     return (
         <div className={`dashboard ${isAskAiRoute ? 'ask-ai-route' : ''}`}>
+        {showNoAccessAlert && !isOnboardingRoute && (
+            <div style={{
+                position: "fixed",
+                top: "120px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                backgroundColor: "#FED7D7",
+                border: "1px solid #FC8181",
+                borderRadius: "4px",
+                padding: "10px 16px",
+                paddingRight: "40px",
+                zIndex: 1000,
+                maxWidth: "600px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
+            }}>
+                <button onClick={() => {
+                    setShowNoAccessAlert(false);
+                    window.SHOW_NO_ACCESS_ALERT = false;
+                }} style={{
+                    position: "absolute",
+                    top: "8px",
+                    right: "8px",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "20px",
+                    color: "#AE191C",
+                    padding: "0",
+                    width: "24px",
+                    height: "24px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                }}>×</button>
+                <Text variant="bodyMd" color="critical">{noAccessMessage}</Text>
+            </div>
+        )}
         <Frame>
             <Outlet />
             {shouldShowWelcomeBackModal && <WelcomeBackDetailsModal isAdmin={window.USER_ROLE === 'ADMIN'} />}

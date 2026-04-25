@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { CircleTickMajor, ArchiveMinor, LinkMinor } from '@shopify/polaris-icons';
 import TestingStore from '../testingStore';
 import api from '../api';
@@ -82,8 +82,11 @@ function TestRunResultPage(props) {
 
   const [conversations, setConversations] = useState([])
   const [conversationRemediationText, setConversationRemediationText] = useState(null)
-  const [validationFailed, setValidationFailed] = useState(false)
+  const agenticConversationsRef = useRef([])
   const [showForbidden, setShowForbidden] = useState(false)
+
+  // store key: {mcp/agent name} -> value: {tools for that mcp/agent}
+  const [toolsCalls, setToolsCalls] = useState({})
 
   // AI Chat state
   const [aiConversationId, setAiConversationId] = useState(null)
@@ -140,28 +143,130 @@ function TestRunResultPage(props) {
     return jiraInteg.jiraTicketKey
   }
 
-  async function attachFileToIssue(origReq, testReq, issueId) {
-    let jiraInteg = await api.attachFileToIssue(origReq, testReq, issueId);
+  async function attachFileToIssue(origReq, testReq, issueId, agenticResult = false) {
+    await api.attachFileToIssue(origReq, testReq, issueId, agenticResult);
+  }
+
+  function formatHttpMessage(rawMessage) {
+    try {
+      // The message is stored with literal backslash-escaped quotes ({\"request\":...})
+      // Wrap in quotes so JSON.parse treats it as a JSON string and unescapes it
+      let parsed;
+      try {
+        parsed = JSON.parse(rawMessage);
+      } catch (_) {
+        parsed = JSON.parse('"' + rawMessage + '"');
+      }
+      // Handle double-stringified case
+      if (typeof parsed === 'string') {
+        parsed = JSON.parse(parsed);
+      }
+      const req = parsed.request || {};
+      const res = parsed.response || {};
+
+      let reqHeaders = {};
+      let resHeaders = {};
+      try { reqHeaders = typeof req.headers === 'string' ? JSON.parse(req.headers) : (req.headers || {}); } catch (_) {}
+      try { resHeaders = typeof res.headers === 'string' ? JSON.parse(res.headers) : (res.headers || {}); } catch (_) {}
+
+      let reqBody = req.body || '';
+      let resBody = res.body || '';
+      try { reqBody = JSON.stringify(JSON.parse(reqBody), null, 2); } catch (_) {}
+      try { resBody = JSON.stringify(JSON.parse(resBody), null, 2); } catch (_) {}
+
+      const formatHeaders = (headers) =>
+        Object.entries(headers).map(([k, v]) => `  ${k}: ${v}`).join('\n') || '  (none)';
+
+      return [
+        '=== REQUEST ===',
+        `${req.method || 'GET'} ${req.url || ''}`,
+        req.queryParams ? `Query Params: ${req.queryParams}` : null,
+        '\nHeaders:',
+        formatHeaders(reqHeaders),
+        '\nBody:',
+        reqBody || '(empty)',
+        '',
+        '=== RESPONSE ===',
+        `Status: ${res.statusCode || ''}`,
+        '\nHeaders:',
+        formatHeaders(resHeaders),
+        '\nBody:',
+        resBody || '(empty)',
+      ].filter(line => line !== null).join('\n');
+    } catch (_) {
+      return rawMessage;
+    }
+  }
+
+  /** Keep /api/chatAndStore + MCP /chat body small; oversized payloads return 422 (Struts ERROR). */
+  const MAX_AI_HTTP_MSG_CHARS = 20000;
+  const MAX_AI_AGENTIC_CONTEXT_CHARS = 24000;
+
+  function truncateForAiContext(text, maxChars) {
+    if (text == null || text === '') return null;
+    if (text.length <= maxChars) return text;
+    return `${text.slice(0, maxChars)}\n\n[... truncated for context size ...]`;
+  }
+
+  function toPlainMetadataScalar(val) {
+    if (val == null || val === undefined) return '';
+    if (Array.isArray(val)) return val.map(String).join(', ');
+    if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return String(val);
+    return '';
+  }
+
+  function formatHttpMessageIfPresent(raw) {
+    if (raw == null || raw === '') return null;
+    return truncateForAiContext(formatHttpMessage(raw), MAX_AI_HTTP_MSG_CHARS);
+  }
+
+  /** Same structure as Jira agentic attachment; reused for AI metadata. */
+  function buildAgenticConversationText(agenticConversations) {
+    if (!agenticConversations?.length) return '';
+    const separator = `\n\n${'='.repeat(60)}\n\n`;
+    return agenticConversations.map((conv, idx) => {
+      let turn = `Turn ${idx + 1}\n\nTested Interaction:\n${conv.finalSentPrompt}\n\nAI Agent:\n${conv.response}`;
+      if (conv.validationMessage && conv.validationMessage !== 'null') {
+        turn += `\n\nValidation Message:\n${conv.validationMessage}`;
+      }
+      return turn;
+    }).join(separator);
   }
 
   function buildTestResultMetadata() {
+    const testResults = selectedTestRunResult?.testResults;
+    const tr0 = testResults?.[testResults.length - 1];
+    const isAgentic = Boolean(tr0?.resultTypeAgentic);
+    const rawAgentic = agenticConversationsRef.current;
+    const agenticText = isAgentic && rawAgentic?.length
+      ? truncateForAiContext(buildAgenticConversationText(rawAgentic), MAX_AI_AGENTIC_CONTEXT_CHARS)
+      : null;
+
+    const data = {
+      testName: toPlainMetadataScalar(selectedTestRunResult?.name),
+      testCategory: toPlainMetadataScalar(selectedTestRunResult?.testCategory),
+      testCategoryId: toPlainMetadataScalar(selectedTestRunResult?.testCategoryId),
+      vulnerable: Boolean(selectedTestRunResult?.vulnerable),
+      severity: toPlainMetadataScalar(issueDetails?.severity),
+      url: toPlainMetadataScalar(selectedTestRunResult?.url) || '',
+      originalMessage: formatHttpMessageIfPresent(tr0?.originalMessage),
+      attemptMessage: formatHttpMessageIfPresent(tr0?.message),
+    };
+    if (agenticText) {
+      data.agenticConversationContext = agenticText;
+    }
     return {
-      type: "test_execution_result",
-      data: {
-        testName: selectedTestRunResult?.name,
-        testCategory: selectedTestRunResult?.testCategory,
-        testCategoryId: selectedTestRunResult?.testCategoryId,
-        vulnerable: selectedTestRunResult?.vulnerable,
-        severity: issueDetails?.severity,
-        url: selectedTestRunResult?.url || "",
-        originalMessage: selectedTestRunResult?.testResults?.[0]?.originalMessage || null,
-        attemptMessage: selectedTestRunResult?.testResults?.[0]?.message || null,
-      }
+      type: 'test_execution_result',
+      data,
     };
   }
 
   async function handleGenerateAiOverview() {
     if (aiSummary || aiSummaryLoading || aiSummaryChecked) return;
+    if (!selectedTestRunResult?.id || !selectedTestRunResult?.testResults?.length) {
+      setToast(true, true, "Test result is still loading. Wait for the page to finish loading, then try again.");
+      return;
+    }
     setAiSummaryLoading(true);
     setAiSummaryChecked(true);
     try {
@@ -191,7 +296,7 @@ function TestRunResultPage(props) {
     setAiMessages(prev => [...prev, userMsg]);
     setAiLoading(true);
     try {
-      const response = await sendQuery(query, aiConversationId, "TEST_EXECUTION_RESULT", null);
+      const response = await sendQuery(query, aiConversationId, "TEST_EXECUTION_RESULT", buildTestResultMetadata());
       if (response?.conversationId && !aiConversationId) {
         setAiConversationId(response.conversationId);
       }
@@ -246,11 +351,17 @@ function TestRunResultPage(props) {
           if (res && res.length > 0) {
             const result = transform.prepareConversationsList(res)
             setConversations(result.conversations);
-            // Store remediation text from conversations if available
             setConversationRemediationText(result.remediationText || null)
-            setValidationFailed(result.validationFailed)
+            setToolsCalls(result.toolsCalls || {})
+            agenticConversationsRef.current = res;
+          } else {
+            agenticConversationsRef.current = [];
           }
+        } else {
+          agenticConversationsRef.current = [];
         }
+      } else {
+        agenticConversationsRef.current = [];
       }
       setShowDetails(true)
     }
@@ -311,7 +422,20 @@ function TestRunResultPage(props) {
     }
 
     let sampleData = selectedTestRunResult.testResults[0]
-    attachFileToIssue(sampleData.originalMessage, sampleData.message, jiraTicketKey)
+    if (sampleData.resultTypeAgentic) {
+      const agenticConversations = agenticConversationsRef.current;
+      if (agenticConversations && agenticConversations.length > 0) {
+        const conversationText = buildAgenticConversationText(agenticConversations);
+        attachFileToIssue(conversationText, null, jiraTicketKey, true);
+
+        // File 2: HTTP request/response from testResults message
+        if (sampleData.message) {
+          attachFileToIssue(formatHttpMessage(sampleData.message), null, jiraTicketKey, true);
+        }
+      }
+    } else {
+      attachFileToIssue(sampleData.originalMessage, sampleData.message, jiraTicketKey)
+    }
 
   }
 
@@ -358,8 +482,8 @@ function TestRunResultPage(props) {
       setAzureBoardsWorkItemUrl(azureBoardsWorkItemUrlCopy)
       setServiceNowTicketUrl(serviceNowTicketUrlCopy)
       setDevRevWorkUrl(devrevWorkUrlCopy)
-      setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory], moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
-      setRemediation(subCategoryMap[runIssues?.id?.testSubCategory]?.remediation)
+      setInfoState(transform.fillMoreInformation(tmp[runIssues?.id?.testSubCategory], moreInfoSections, runIssuesArr, jiraIssueCopy, onClickButton))
+      setRemediation(tmp[runIssues?.id?.testSubCategory]?.remediation)
       // setJiraIssueUrl(jiraIssueUrl)
       // setInfoState(transform.fillMoreInformation(subCategoryMap[runIssues?.id?.testSubCategory],moreInfoSections, runIssuesArr))
     } else {
@@ -403,7 +527,6 @@ function TestRunResultPage(props) {
           devrevWorkUrl={devrevWorkUrl}
           conversations={conversations}
           conversationRemediationText={conversationRemediationText}
-          validationFailed={validationFailed}
           showForbidden={showForbidden}
           aiSummary={aiSummary}
           aiSummaryLoading={aiSummaryLoading}
@@ -411,6 +534,7 @@ function TestRunResultPage(props) {
           aiLoading={aiLoading}
           onGenerateAiOverview={handleGenerateAiOverview}
           onSendFollowUp={handleSendFollowUp}
+          toolsCalls={toolsCalls}
         />
       </>
       :

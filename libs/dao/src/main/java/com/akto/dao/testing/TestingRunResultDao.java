@@ -25,6 +25,7 @@ import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,9 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
     public static final int DESIRED_THRESHOLD = 50;
 
     public static final String ERRORS_KEY = TestingRunResult.TEST_RESULTS+".0."+TestResult.ERRORS+".0";
+
+    // For this account, skip message field entirely — too many results, full message causes timeouts
+    private static final int SKIP_MESSAGE_ACCOUNT_ID = 1710118493;
 
     @Override
     public String getCollName() {
@@ -71,7 +75,13 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
     }
 
     private Bson getLatestTestingRunResultProjections() {
-        return Projections.include(
+        Integer accountId = Context.accountId.get();
+        boolean includeMessage = accountId == null || accountId != SKIP_MESSAGE_ACCOUNT_ID;
+        return getLatestTestingRunResultProjections(includeMessage);
+    }
+
+    private Bson getLatestTestingRunResultProjections(boolean includeMessage) {
+        List<String> fields = new ArrayList<>(java.util.Arrays.asList(
                 TestingRunResult.TEST_RUN_ID,
                 TestingRunResult.API_INFO_KEY,
                 TestingRunResult.TEST_SUPER_TYPE,
@@ -82,9 +92,12 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 TestingRunResult.END_TIMESTAMP,
                 TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
                 TestingRunResult.TEST_RESULTS + "." + GenericTestResult._CONFIDENCE,
-                TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS,
-                TestingRunResult.TEST_RESULTS + "." + TestResult._MESSAGE
-        );
+                TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS
+        ));
+        if (includeMessage) {
+            fields.add(TestingRunResult.TEST_RESULTS + "." + TestResult._MESSAGE);
+        }
+        return Projections.include(fields);
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit) {
@@ -172,25 +185,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                         try {
                             testResult.setConfidence(Confidence.valueOf(confidence));
                             String fullMessage = genericTestResult.getString(TestResult._MESSAGE, null);
-                            String lightweightMessage = null;
-                            if (fullMessage != null) {
-                                try {
-                                    Document msgDoc = Document.parse(fullMessage);
-                                    Document response = (Document) msgDoc.get("response");
-                                    if (response != null) {
-                                        Object statusCode = response.get("statusCode");
-                                        String body = response.getString("body");
-                                        String bodyPreview = (body != null && body.length() > 50)
-                                                ? body.substring(0, 50) : body;
-                                        Document lightDoc = new Document("response",
-                                                new Document("statusCode", statusCode).append("body", bodyPreview));
-                                        lightweightMessage = lightDoc.toJson();
-                                    }
-                                } catch (Exception parseException) {
-                                    // Parsing failed; null is fine — frontend handles missing message gracefully
-                                }
-                            }
-                            testResult.setMessage(lightweightMessage);
+                            testResult.setMessage(extractLightweightMessage(fullMessage));
                         } catch(Exception e){
                         }
                         testResults.add(testResult);
@@ -214,6 +209,58 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         }
 
         return testingRunResults;
+    }
+
+    /**
+     * Extracts a lightweight message JSON containing only response.statusCode and the first 50 chars of response.body.
+     * Uses fast string search (indexOf) instead of full JSON parsing — suitable for 500k+ result sets.
+     * Returns null if message is null, malformed, or has no response section.
+     */
+    private static String extractLightweightMessage(String fullMessage) {
+        if (fullMessage == null || fullMessage.isEmpty()) return null;
+        try {
+            // Locate the "response" key; everything before it is the request section
+            int responseIdx = fullMessage.indexOf("\"response\"");
+            if (responseIdx < 0) return null;
+
+            // Extract statusCode: find "statusCode": <number> after the response key
+            Integer statusCode = null;
+            int scIdx = fullMessage.indexOf("\"statusCode\"", responseIdx);
+            if (scIdx > 0) {
+                int colon = fullMessage.indexOf(':', scIdx + 12);
+                if (colon > 0) {
+                    int start = colon + 1;
+                    while (start < fullMessage.length() && fullMessage.charAt(start) == ' ') start++;
+                    int end = start;
+                    while (end < fullMessage.length() && Character.isDigit(fullMessage.charAt(end))) end++;
+                    if (end > start) {
+                        statusCode = Integer.parseInt(fullMessage.substring(start, end));
+                    }
+                }
+            }
+
+            // Extract body preview: find "body": "<value>" after the response key
+            String bodyPreview = null;
+            int bodyIdx = fullMessage.indexOf("\"body\"", responseIdx);
+            if (bodyIdx > 0) {
+                int colon = fullMessage.indexOf(':', bodyIdx + 6);
+                if (colon > 0) {
+                    int start = colon + 1;
+                    while (start < fullMessage.length() && fullMessage.charAt(start) == ' ') start++;
+                    if (start < fullMessage.length() && fullMessage.charAt(start) == '"') {
+                        start++; // skip opening quote
+                        int end = Math.min(start + 50, fullMessage.length());
+                        bodyPreview = fullMessage.substring(start, end);
+                    }
+                }
+            }
+
+            if (statusCode == null && bodyPreview == null) return null;
+            return new Document("response",
+                    new Document("statusCode", statusCode).append("body", bodyPreview)).toJson();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public Map<ObjectId,String> mapSummaryIdToTestingResultHexId(Set<String> testingRunResultHexIds){
@@ -307,87 +354,93 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         this.createIndicesIfAbsent();
     }
 
-    /**
-     * Aggregates testing results by category (testSuperType) with pass/fail/skip counts
-     * OPTIMIZED VERSION: Simplified skip detection and better performance
-     * @param startTimestamp Start time filter (0 to ignore)
-     * @param endTimestamp End time filter (0 to ignore)
-     * @param relevantCategories List of categories to filter by (null/empty for all)
-     * @return List of category-wise statistics
-     */
-    public List<Map<String, Object>> getCategoryWiseScores(int startTimestamp, int endTimestamp, List<String> relevantCategories) {
-        List<Bson> pipeline = new ArrayList<>();
-        
-        // Stage 1: Match filters for time range and category filtering (INDEXED)
+    public List<Map<String, Object>> getCategoryWiseScores(int startTimestamp, int endTimestamp, List<String> relevantCategories, List<Integer> apiCollectionIds) {
+        List<ObjectId> summaryIds = TestingRunDao.instance.getSummaryIdsForCategoryWiseScores(
+                startTimestamp, endTimestamp, apiCollectionIds);
+        if (summaryIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
         List<Bson> matchFilters = new ArrayList<>();
-        
-        // Time range filter
+        matchFilters.add(Filters.in(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryIds));
+        if (relevantCategories != null && !relevantCategories.isEmpty()) {
+            matchFilters.add(Filters.in(TestingRunResult.TEST_SUPER_TYPE, relevantCategories));
+        }
+        if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+            matchFilters.add(Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.API_COLLECTION_ID, apiCollectionIds));
+        }
         if (startTimestamp > 0 && endTimestamp > 0) {
             matchFilters.add(Filters.gte(TestingRunResult.END_TIMESTAMP, startTimestamp));
             matchFilters.add(Filters.lte(TestingRunResult.END_TIMESTAMP, endTimestamp));
         }
-        
-        // Filter by relevant categories if provided (INDEXED)
-        if (relevantCategories != null && !relevantCategories.isEmpty()) {
-            matchFilters.add(Filters.in(TestingRunResult.TEST_SUPER_TYPE, relevantCategories));
-        }
-        
-        if (!matchFilters.isEmpty()) {
-            pipeline.add(Aggregates.match(Filters.and(matchFilters)));
-        }
-        
-        // Stage 2: Group by testSuperType - calculate all counts in one stage
-        pipeline.add(Aggregates.group(
-            "$testSuperType",
-            // Pass count: not vulnerable
-            Accumulators.sum("passCount", new BasicDBObject("$cond", Arrays.asList(
-                new BasicDBObject("$eq", Arrays.asList("$vulnerable", false)), 1, 0))),
-            // Fail count: vulnerable  
-            Accumulators.sum("failCount", new BasicDBObject("$cond", Arrays.asList(
-                new BasicDBObject("$eq", Arrays.asList("$vulnerable", true)), 1, 0))),
-            // Skip detection: check if testResults.errors exists and has elements
-            Accumulators.sum("skipCount", new BasicDBObject("$cond", Arrays.asList(
-                new BasicDBObject("$and", Arrays.asList(
-                    new BasicDBObject("$isArray", "$testResults.errors"),
-                    new BasicDBObject("$gt", Arrays.asList(new BasicDBObject("$size", "$testResults.errors"), 0))
-                )), 1, 0)))
-        ));
-        
-        // Stage 3: Project the results in the desired format
-        pipeline.add(Aggregates.project(
-            Projections.fields(
-                Projections.computed("categoryName", "$_id"),
-                Projections.include("passCount"),
-                Projections.include("failCount"), 
-                Projections.include("skipCount"),
-                Projections.exclude("_id")
-            )
-        ));
-        
-        // Stage 4: Sort by category name
-        pipeline.add(Aggregates.sort(Sorts.ascending("categoryName")));
-        
-        // Execute aggregation with optimizations
-        List<Map<String, Object>> results = new ArrayList<>();
-        try (MongoCursor<BasicDBObject> cursor = this.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class)
-                .allowDiskUse(true) // Allow disk usage for large datasets
-                .cursor()) {
-            
-            while (cursor.hasNext()) {
-                BasicDBObject result = cursor.next();
-                String categoryName = result.getString("categoryName");
-                Map<String, Object> categoryScore = new HashMap<>();
-                categoryScore.put("categoryName", categoryName);
-                categoryScore.put("pass", result.getInt("passCount", 0));
-                categoryScore.put("fail", result.getInt("failCount", 0));
-                categoryScore.put("skip", result.getInt("skipCount", 0));
-                results.add(categoryScore);
+        Bson matchStage = Aggregates.match(Filters.and(matchFilters));
+
+        // failCount from VulnerableTestingRunResultDao — all docs there are vulnerable=true
+        Map<String, Integer> failCounts = new HashMap<>();
+        {
+            List<Bson> pipeline = new ArrayList<>();
+            pipeline.add(matchStage);
+            pipeline.add(Aggregates.group("$testSubType", Accumulators.sum("failCount", 1)));
+            try (MongoCursor<BasicDBObject> cursor = VulnerableTestingRunResultDao.instance.getMCollection()
+                    .aggregate(pipeline, BasicDBObject.class)
+                    .allowDiskUse(true)
+                    .cursor()) {
+                while (cursor.hasNext()) {
+                    BasicDBObject result = cursor.next();
+                    String cat = result.getString("_id");
+                    if (cat != null) {
+                        failCounts.put(cat, result.getInt("failCount", 0));
+                    }
+                }
             }
         }
-        
+
+        // passCount + skipCount from TestingRunResultDao (capped collection)
+        Map<String, Integer> passCounts = new HashMap<>();
+        Map<String, Integer> skipCounts = new HashMap<>();
+        {
+            List<Bson> pipeline = new ArrayList<>();
+            pipeline.add(matchStage);
+            pipeline.add(Aggregates.group(
+                "$testSubType",
+                Accumulators.sum("passCount", new BasicDBObject("$cond", Arrays.asList(
+                    new BasicDBObject("$eq", Arrays.asList("$vulnerable", false)), 1, 0))),
+                Accumulators.sum("skipCount", new BasicDBObject("$cond", Arrays.asList(
+                    new BasicDBObject("$and", Arrays.asList(
+                        new BasicDBObject("$isArray", "$testResults.errors"),
+                        new BasicDBObject("$gt", Arrays.asList(new BasicDBObject("$size", "$testResults.errors"), 0))
+                    )), 1, 0)))
+            ));
+            try (MongoCursor<BasicDBObject> cursor = this.getMCollection()
+                    .aggregate(pipeline, BasicDBObject.class)
+                    .allowDiskUse(true)
+                    .cursor()) {
+                while (cursor.hasNext()) {
+                    BasicDBObject result = cursor.next();
+                    String cat = result.getString("_id");
+                    if (cat != null) {
+                        passCounts.put(cat, result.getInt("passCount", 0));
+                        skipCounts.put(cat, result.getInt("skipCount", 0));
+                    }
+                }
+            }
+        }
+
+        Set<String> allCategories = new java.util.TreeSet<>();
+        allCategories.addAll(failCounts.keySet());
+        allCategories.addAll(passCounts.keySet());
+        allCategories.addAll(skipCounts.keySet());
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        for (String cat : allCategories) {
+            Map<String, Object> categoryScore = new HashMap<>();
+            categoryScore.put("categoryName", cat);
+            categoryScore.put("pass", passCounts.getOrDefault(cat, 0));
+            categoryScore.put("fail", failCounts.getOrDefault(cat, 0));
+            categoryScore.put("skip", skipCounts.getOrDefault(cat, 0));
+            results.add(categoryScore);
+        }
         return results;
     }
-
 
 }

@@ -1,15 +1,16 @@
 import request from "@/util/request"
+import { ALL_STORED_LOG_KEYS } from "./health_logs/logKeysConstants"
 
 const settingRequests = {
     inviteUsers(apiSpec) {
         return request({
             url: '/api/inviteUsers',
             method: 'post',
-            data: { 
+            data: {
                 inviteeName: apiSpec.inviteeName,
                 inviteeEmail: apiSpec.inviteeEmail,
                 websiteHostName: apiSpec.websiteHostName,
-                inviteeRole: apiSpec.inviteeRole,
+                scopeRoleMapping: apiSpec.scopeRoleMapping
             }
         })
     },
@@ -29,18 +30,30 @@ const settingRequests = {
             }
         })
     },
-    makeAdmin(email, roleVal) {
+    makeAdmin(email, roleVal, productScopes) {
         return request({
             url: '/api/makeAdmin',
             method: 'post',
             data: {
                 email: email,
-                userRole: roleVal
+                userRole: roleVal,
+                productScopes: productScopes || ["API"]
             }
         })
     },
 
-    
+    updateUserScopeRoleMapping(email, scopeRoleMapping) {
+        return request({
+            url: '/api/updateUserScopeRoleMapping',
+            method: 'post',
+            data: {
+                email: email,
+                scopeRoleMapping: scopeRoleMapping
+            }
+        })
+    },
+
+
     fetchApiTokens() {
         return request({
             url: '/api/fetchApiTokens',
@@ -105,14 +118,16 @@ const settingRequests = {
             }
         })
     },
-    fetchLogsFromDb(startTime, endTime, logDb) {
+    fetchLogsFromDb(startTime, endTime, logDb, logKeys) {
+        const sendKeys = Array.isArray(logKeys) && logKeys.length > 0 && logKeys.length < ALL_STORED_LOG_KEYS.length
         return request({
             url: '/api/fetchLogsFromDb',
             method: 'post',
             data: {
                 startTime,
                 endTime,
-                logDb
+                logDb,
+                ...(sendKeys ? { logKeys } : {}),
             }
         })
     },
@@ -357,11 +372,13 @@ const settingRequests = {
         })
     },
 
-    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
+    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri, managementApiToken) {
+        const data = { clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri }
+        if (managementApiToken) data.managementApiToken = managementApiToken
         return request({
             url: '/api/addOktaSso',
             method: 'post',
-            data: {clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri}
+            data
         })
     },
 
@@ -370,6 +387,28 @@ const settingRequests = {
             url: '/api/deleteOktaSso',
             method: 'post',
             data: {}
+        })
+    },
+
+    fetchOktaGroups() {
+        return request({
+            url: '/api/fetchOktaGroups',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, opts = {}) {
+        const data = { oktaGroupToAktoUserRoleMap }
+        if (Object.prototype.hasOwnProperty.call(opts, 'managementApiToken')) {
+            const t = opts.managementApiToken
+            // Struts cannot distinguish JSON null from omitted String fields; send "" to mean "clear stored token".
+            data.managementApiToken = t == null || String(t).trim() === '' ? '' : t
+        }
+        return request({
+            url: '/api/saveOktaGroupRoleMapping',
+            method: 'post',
+            data
         })
     },
 
@@ -647,6 +686,34 @@ const settingRequests = {
             url: '/api/fetchSplunkIntegration',
             method: 'post',
             data: {}
+        })
+    },
+    fetchDatadogIntegration() {
+        return request({
+            url: '/api/fetchDatadogIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addDatadogIntegration(apiKey, datadogSite, enabled) {
+        return request({
+            url: '/api/addDatadogIntegration',
+            method: 'post',
+            data: { apiKey, datadogSite, enabled }
+        })
+    },
+    deleteDatadogIntegration() {
+        return request({
+            url: '/api/deleteDatadogIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    testDatadogIntegration(apiKey, datadogSite) {
+        return request({
+            url: '/api/testDatadogIntegration',
+            method: 'post',
+            data: { apiKey, datadogSite }
         })
     },
 
@@ -934,6 +1001,27 @@ const settingRequests = {
             url: '/api/fetchFilterYamlTemplate',
             method: 'post',
             data: {}
+        })
+    },
+    addMatchingPatternForProxy(proxyPattern, switchProxyMode) {
+        return request({
+            url: '/api/addMatchingPatternForProxy',
+            method: 'post',
+            data: {proxyPattern, switchProxyMode}
+        })
+    },
+    addAllowedHostForPac(hostPattern) {
+        return request({
+            url: '/api/addAllowedHostForPac',
+            method: 'post',
+            data: {hostPattern}
+        })
+    },
+    deleteProxyPattern(patternValue, connectorType) {
+        return request({
+            url: '/api/deleteProxyPattern',
+            method: 'post',
+            data: {patternValue, connectorType}
         })
     }
 }

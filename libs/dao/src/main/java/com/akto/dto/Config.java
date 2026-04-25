@@ -2,8 +2,10 @@ package com.akto.dto;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import lombok.Getter;
@@ -39,7 +41,7 @@ public abstract class Config {
 
     public enum ConfigType {
         SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF, RSA_KP, MCP_REGISTRY,
-        SLACK_ALERT_INTERNAL, ABUSEIPDB, DATA_DOG, BLOCK_ACCESS_WEBHOOK;
+        SLACK_ALERT_INTERNAL, ABUSEIPDB, DATA_DOG, BLOCK_ACCESS_WEBHOOK, DATADOG_FORWARDER;
     }
 
     public ConfigType configType;
@@ -374,7 +376,32 @@ public abstract class Config {
     }
 
     @BsonDiscriminator
+    @Getter
+    @Setter
+    public static class DatadogForwarderConfig extends Config {
+        public static final String API_KEY = "apiKey";
+        public static final String DATADOG_SITE = "datadogSite";
+        public static final String ENABLED = "enabled";
+
+        private String apiKey;
+        private String datadogSite;
+        private boolean enabled;
+
+        public static final String CONFIG_ID = ConfigType.DATADOG_FORWARDER.name() + CONFIG_SALT;
+
+        public DatadogForwarderConfig() {
+            this.configType = ConfigType.DATADOG_FORWARDER;
+        }
+
+        public DatadogForwarderConfig(int accountId) {
+            this.configType = ConfigType.DATADOG_FORWARDER;
+            this.id = CONFIG_ID + "_" + accountId;
+        }
+    }
+
+    @BsonDiscriminator
     public static class OktaConfig extends Config {
+
         private String clientId;
         private String clientSecret;
         private String oktaDomainUrl;
@@ -384,6 +411,12 @@ public abstract class Config {
         private String organizationDomain;
         public static final String ACCOUNT_ID = "accountId";
         private int accountId;
+        /** BSON key for the Okta Management API (SSWS) token. */
+        public static final String MANAGEMENT_API_TOKEN = "managementApiToken";
+        /** SSWS token; persisted in Mongo under {@link #MANAGEMENT_API_TOKEN}. */
+        private String managementApiToken;
+        /** Okta group name → Akto user role. Stored in Mongo as {@code oktaGroupToAktoUserRoleMap}. */
+        private Map<String, String> oktaGroupToAktoUserRoleMap;
 
         public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
 
@@ -428,6 +461,15 @@ public abstract class Config {
             this.authorisationServerId = authorisationServerId;
         }
 
+        public String getOAuthDomainUrl() {
+            String base = "https://" + oktaDomainUrl + "/oauth2/";
+            return base + (authorisationServerId == null || authorisationServerId.isEmpty() ? "/v1" : authorisationServerId + "/v1");
+        }
+
+        public String getManagementBaseUrl() {
+            return "https://" + oktaDomainUrl;
+        }
+
         public String getRedirectUri() {
             return redirectUri;
         }
@@ -448,6 +490,21 @@ public abstract class Config {
         }
         public void setAccountId(int accountId) {
             this.accountId = accountId;
+        }
+
+        public String getManagementApiToken() {
+            return managementApiToken;
+        }
+
+        public void setManagementApiToken(String managementApiToken) {
+            this.managementApiToken = managementApiToken;
+        }
+
+        public Map<String, String> getOktaGroupToAktoUserRoleMap() {
+            return oktaGroupToAktoUserRoleMap;
+        }
+        public void setOktaGroupToAktoUserRoleMap(Map<String, String> oktaGroupToAktoUserRoleMap) {
+            this.oktaGroupToAktoUserRoleMap = oktaGroupToAktoUserRoleMap;
         }
     }
 

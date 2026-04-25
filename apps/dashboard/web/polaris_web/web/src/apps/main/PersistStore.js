@@ -3,6 +3,8 @@ import { devtools, persist } from "zustand/middleware";
 
 import pako from "pako"; // Gzip Compression
 
+import { getInitialDashboardCategory } from "./labelHelper";
+
 // Factory function to create Custom Storage with Gzip Compression
 export const createGzipStorage = (storage) => ({
     getItem: (name) => {
@@ -77,7 +79,8 @@ const initialState = {
     trafficAlerts: [],
     sendEventOnLogin: false,
     tableSelectedTab: {},
-    dashboardCategory: 'API Security',
+    dashboardCategory: getInitialDashboardCategory(), // Persisted across page reloads
+    selectedCollectionScope: null,
 };
 
 let persistStore = (set, get) => ({
@@ -105,7 +108,7 @@ let persistStore = (set, get) => ({
     },
     setAllCollections: (allCollections) => {
         try {
-            const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs, hostName, name, description, envType, isOutOfTestingScope, urls}) => ({
+            const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs, hostName, name, description, envType, isOutOfTestingScope, urls, skills}) => ({
                 id,
                 displayName,
                 urlsCount,
@@ -119,6 +122,7 @@ let persistStore = (set, get) => ({
                 envType,
                 isOutOfTestingScope,
                 urls,
+                skills,
             }));
             set({ allCollections: optimizedCollections });
         } catch (error) {
@@ -253,6 +257,13 @@ let persistStore = (set, get) => ({
             console.error("Error setting tableSelectedTab:", error);
         }
     },
+    setSelectedCollectionScope: (selectedCollectionScope) => {
+        try {
+            set({ selectedCollectionScope });
+        } catch (error) {
+            console.error("Error setting selectedCollectionScope:", error);
+        }
+    },
     resetAll: () => {
         try {
             set(initialState);
@@ -290,7 +301,8 @@ persistStore = persist(persistStore, {
         trafficAlerts: state.trafficAlerts,
         sendEventOnLogin: state.sendEventOnLogin,
         tableSelectedTab: state.tableSelectedTab,
-        dashboardCategory: state.dashboardCategory
+        dashboardCategory: state.dashboardCategory, // Persist dashboard category selection across page reloads
+        selectedCollectionScope: state.selectedCollectionScope,
     })
 });
 

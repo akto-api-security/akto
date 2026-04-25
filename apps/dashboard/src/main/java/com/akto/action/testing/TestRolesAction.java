@@ -108,8 +108,8 @@ public class TestRolesAction extends UserAction {
             Filters.eq(RBAC.USER_ID, user.getId()),
             Filters.eq(RBAC.ACCOUNT_ID, Context.accountId.get()));
 
-        RBAC userRbac = RBACDao.instance.findOne(filterRbac);
-        String userRole = (userRbac != null) ? userRbac.getRole().toUpperCase() : RBAC.Role.MEMBER.toString();
+        RBAC.Role currentUserRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
+        String userRole = (currentUserRole != null) ? currentUserRole.getName().toUpperCase(): RBAC.Role.MEMBER.toString();
         Bson testRoleQ = Filters.or(
             Filters.exists(TestRoles.SCOPE_ROLES, false), // case when scope_roles field does not exist
             Filters.in(TestRoles.SCOPE_ROLES, userRole)   // case when user's role is in the scope_roles array

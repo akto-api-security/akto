@@ -38,6 +38,8 @@ export const getComponentColors = (category) => {
       return { borderColor: '#ec4899', backgroundColor: '#fdf2f8' }; // Pink
     case 'mcp':
       return { borderColor: '#4cbebbff', backgroundColor: '#ecfdf5' }; // Yellow-Green
+    case 'violation':
+      return { borderColor: '#ef4444', backgroundColor: '#fef2f2' }; // Red - has violations
     case 'ai-tool':
       return { borderColor: '#8b5cf6', backgroundColor: '#f5f3ff' }; // Purple
     case 'webhook':

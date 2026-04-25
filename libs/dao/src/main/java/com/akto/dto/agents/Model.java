@@ -20,6 +20,7 @@ public class Model {
     public final static String PARAM_API_KEY = "apiKey";
     public final static String PARAM_AZURE_OPENAI_ENDPOINT = "azureOpenAIEndpoint";
     public final static String PARAM_OLLAMA_ENDPOINT = "ollamaAIEndpoint";
+    public final static String PARAM_DATABRICKS_ENDPOINT = "databricksEndpoint";
 
     public final static String _PARAMS = "params";
     Map<String, String> params;
@@ -55,6 +56,26 @@ public class Model {
 
     public void setType(ModelType type) {
         this.type = type;
+    }
+
+    public String getModelName() {
+        return params != null ? params.get(PARAM_MODEL) : null;
+    }
+
+    public String getApiKey() {
+        return params != null ? params.get(PARAM_API_KEY) : null;
+    }
+
+    public String getAzureEndpoint() {
+        return params != null ? params.get(PARAM_AZURE_OPENAI_ENDPOINT) : null;
+    }
+
+    public String getOllamaEndpoint() {
+        return params != null ? params.get(PARAM_OLLAMA_ENDPOINT) : null;
+    }
+
+    public String getDatabricksEndpoint() {
+        return params != null ? params.get(PARAM_DATABRICKS_ENDPOINT) : null;
     }
 
 }

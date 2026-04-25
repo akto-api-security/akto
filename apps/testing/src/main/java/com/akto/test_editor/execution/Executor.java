@@ -4,7 +4,6 @@ import com.akto.agent.AgentClient;
 import com.akto.billing.UsageMetricUtils;
 
 import com.akto.dao.billing.OrganizationsDao;
-import com.akto.dao.TestingRunWebhookDao;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -19,7 +18,6 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
-import com.akto.dto.TestingRunWebhook;
 import com.akto.dto.testing.*;
 import com.akto.testing.*;
 import com.akto.testing.kafka_utils.TestingConfigurations;
@@ -124,7 +122,9 @@ public class Executor {
         ModifyExecutionOrderResp modifyExecutionOrderResp = executionListBuilder.modifyExecutionFlow(executorNodes, varMap);
 
         Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
-        varMap = VariableResolver.resolveDynamicWordList(varMap, apiInfoKey, newSampleDataMap);
+        Map<String, Object> resolved = VariableResolver.resolveDynamicWordList(varMap, apiInfoKey, newSampleDataMap);
+        varMap.clear();
+        varMap.putAll(resolved);
 
         if (modifyExecutionOrderResp.getError() != null) {
             error_messages.add(modifyExecutionOrderResp.getError());
@@ -735,51 +735,86 @@ public class Executor {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private static String resolveLegacyCallbackUrl(Map<String, Object> varMap, String url, String generatedUUID) {
+        List<String> urlList = (List<String>) varMap.get("wordList_url");
+        if (urlList != null && !urlList.isEmpty()) {
+            String base = urlList.get(0);
+            return (base != null && base.contains("{random_uuid}"))
+                ? base.replace("{random_uuid}", generatedUUID)
+                : (base != null ? base : "") + generatedUUID;
+        }
+        return (url != null ? url : "") + generatedUUID;
+    }
+
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, boolean isMcpRequest) {
         switch (operationType.toLowerCase()) {
             case "send_ssrf_req":
                 if (isMcpRequest) {
                     return new ExecutorSingleOperationResp(false, "SSRF is not supported for MCP requests");
                 }
-                String keyValue = key.toString().replaceAll("\\$\\{random_uuid\\}", "");
-                String url = Utils.extractValue(keyValue, "url=");
-                String redirectUrl = Utils.extractValue(keyValue, "redirect_url=");
-                List<String> uuidList = (List<String>) varMap.getOrDefault("random_uuid", new ArrayList<>());
-                String generatedUUID =  UUID.randomUUID().toString();
-                uuidList.add(generatedUUID);
-                varMap.put("random_uuid", uuidList);
-
-                // Store UUID mapping in common database for SSRF hit tracking
-                try {
-                    String testRunIdStr = (String) varMap.get("testRunId");
-                    String testRunResultSummaryIdStr = (String) varMap.get("testRunResultSummaryId");
-                    Integer accountId = (Integer) varMap.get("accountId");
-                    String apiInfoKeyStr = (String) varMap.get("apiInfoKey");
-                    String testSubType = (String) varMap.get("testSubType");
-                    
-                    if (testRunIdStr != null && testRunResultSummaryIdStr != null && accountId != null && 
-                        apiInfoKeyStr != null && testSubType != null) {
-                        TestingRunWebhook mapping = new TestingRunWebhook(
-                            generatedUUID,
-                            accountId,
-                            new ObjectId(testRunIdStr),
-                            new ObjectId(testRunResultSummaryIdStr),
-                            apiInfoKeyStr,
-                            testSubType,
-                            Context.now()
-                        );
-                        TestingRunWebhookDao.instance.insertOne(mapping);
+                String webhookBase = Utils.getSsrfWebhookServiceBase();
+                boolean useNewWebhookFlow = webhookBase != null && varMap.containsKey("wordList_url_webhook");
+                if (useNewWebhookFlow) {
+                    String uuid = Utils.createWebhookSiteToken(webhookBase);
+                    if (uuid == null) {
+                        return new ExecutorSingleOperationResp(false, "Could not create webhook token");
                     }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error storing SSRF UUID mapping: " + e.getMessage(), LogDb.TESTING);
-                }
+                    @SuppressWarnings("unchecked")
+                    List<String> urlTemplates = (List<String>) varMap.get("wordList_url_webhook");
+                    if (urlTemplates == null || urlTemplates.isEmpty()) {
+                        return new ExecutorSingleOperationResp(false, "Template must define wordLists.url with {random_uuid} placeholder");
+                    }
+                    List<String> callbackUrls = new ArrayList<>();
+                    for (String template : urlTemplates) {
+                        if (template != null && template.contains("{random_uuid}")) {
+                            String url = template.replace("{random_uuid}", uuid);
+                            if (url.endsWith("//")) {
+                                url = url.substring(0, url.length() - 1);
+                            }
+                            callbackUrls.add(url);
+                        } else {
+                            callbackUrls.add(template);
+                        }
+                    }
+                    if (callbackUrls.isEmpty()) {
+                        return new ExecutorSingleOperationResp(false, "Template wordLists.url must contain {random_uuid} placeholder");
+                    }
+                    List<String> uuidList = (List<String>) varMap.getOrDefault("random_uuid", new ArrayList<>());
+                    uuidList.add(uuid);
+                    Utils.storeSsrfWebhookMapping(uuid, varMap);
+                    varMap.put("random_uuid", uuidList);
+                    varMap.put("wordList_url_webhook", callbackUrls);
+                    String firstCallbackUrl = callbackUrls.get(0);
+                    varMap.put("url_webhook", firstCallbackUrl);
+                    return new ExecutorSingleOperationResp(true, "");
+                } else {
 
-                BasicDBObject response = OrganizationsDao.getBillingTokenForAuth();
-                if(response.getString("token") != null){
-                    String tokenVal = response.getString("token");
-                    return Utils.sendRequestToSsrfServer(url + generatedUUID, redirectUrl, tokenVal);
-                }else{
-                    return new ExecutorSingleOperationResp(false, response.getString("error"));
+                    String keyValue = key.toString().replaceAll("\\$\\{random_uuid\\}", "");
+                    String url = Utils.extractValue(keyValue, "url=");
+                    String redirectUrl = Utils.extractValue(keyValue, "redirect_url=");
+                    List<String> uuidList = (List<String>) varMap.getOrDefault("random_uuid", new ArrayList<>());
+                    String generatedUUID = java.util.UUID.randomUUID().toString();
+                    uuidList.add(generatedUUID);
+                    varMap.put("random_uuid", uuidList);
+
+                    String callbackUrl = (url != null && !url.isEmpty() && !url.contains("${"))
+                        ? url + generatedUUID
+                        : resolveLegacyCallbackUrl(varMap, url, generatedUUID);
+                    varMap.put("url_webhook", callbackUrl);
+                    varMap.put("url", callbackUrl);
+                    Utils.storeSsrfWebhookMapping(generatedUUID, varMap);
+
+                    BasicDBObject response = OrganizationsDao.getBillingTokenForAuth();
+                    if (response != null && response.getString("token") != null) {
+                        String tokenVal = response.getString("token");
+                        ExecutorSingleOperationResp postResp = Utils.sendRequestToWebhookService(callbackUrl, redirectUrl, tokenVal);
+                        if (!postResp.getSuccess()) {
+                            loggerMaker.debugAndAddToDb("Legacy SSRF server POST failed (test will continue): " + postResp.getErrMsg(), LogDb.TESTING);
+                        }
+                        return new ExecutorSingleOperationResp(true, "");
+                    }
+                    return new ExecutorSingleOperationResp(false, response != null ? response.getString("error") : "Billing token required for SSRF");
                 }
             case "conversations_list":
                 // conversations list will be the variable of wordlists, hence it will come in key after being resolved

@@ -61,10 +61,12 @@ const UndoDemergedApis = () => {
                 shortcutActions={shortcutActions}
                 persistActions
             >
-                <GetPrettifyEndpoint method={method} methodBoxWidth={" "} url={url} isNew={false} />
-                {/* <Text variant="bodyMd">
-                    {collectionName}
-                </Text> */}
+                <HorizontalStack gap="4" wrap={false} blockAlign="center">
+                    <GetPrettifyEndpoint method={method} methodBoxWidth={" "} url={url} isNew={false} />
+                    <Text variant="bodyMd" color="subdued">
+                        {collectionName || apiCollectionId}
+                    </Text>
+                </HorizontalStack>
             </ResourceItem>
         )
     }

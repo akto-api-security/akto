@@ -1,0 +1,93 @@
+# Threat Detection Patterns - Single Pass Regex with Location Constraints
+# Format: <category>::<locations>::<regex_pattern>
+# Locations: REQUEST_URL, REQUEST_HEADERS, REQUEST_BODY, RESPONSE_BODY
+# Source: /Users/admin/akto_code/tests-library/Threat-Protection (broken down for accuracy)
+# Note: All patterns are compiled with CASELESS flag (case-insensitive globally)
+
+# ===== SQL INJECTION (Request Only) =====
+sqli_drop_table::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_drop_table>\bdrop\s+table\s+\w+)
+sqli_union_select::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_union_select>\bunion\s+(?:all\s+)?select\b)
+sqli_union_from::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_union_from>\bunion\s+.*\bfrom\b)
+sqli_or_boolean::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_or_boolean>\s(?:or|and)\s+(?:1\s*=\s*1|'[^']*'\s*=\s*'[^']*|true|false))
+sqli_exec_execute::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_exec_execute>\b(?:exec|execute)(?:\s+\w+|\s*\())
+# Fixed: removed bare # (matches URL fragments, markdown). Now requires SQL-specific comment context.
+sqli_comment_evasion::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_comment_evasion>(?:'\s*--|'\s*#|\/\*[^*]*\*\/|;\s*--))
+sqli_stacked_queries::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_stacked_queries>;\s*(?:insert|update|delete|select|drop|create|alter)\b)
+sqli_time_based::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_time_based>(?:waitfor\s+delay\s*'[^']*'|(?:benchmark|pg_sleep|sleep)\s*\(\s*['"]?\d+))
+sqli_into_outfile::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<sqli_into_outfile>\binto\s+(?:outfile|dumpfile))
+
+# ===== XSS (Request Only) =====
+xss_script_tag::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xss_script_tag><\s*script\b[^>]*>)
+xss_script_data_src::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xss_script_data_src><script[^>]*\bsrc\s*=\s*["']?data:)
+xss_event_handler_alert::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xss_event_handler_alert>on(?:load|error|click|focus|blur|change|submit|mouse(?:enter|leave|over|out|down|up)|key(?:down|up|press))\s*=\s*["']?[^"'>;]*(?:alert|prompt|confirm|eval|document\.(?:cookie|domain|write|location)|window\.location)\s*\()
+xss_iframe_embed::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xss_iframe_embed><(?:iframe|embed|object|applet)\b[^>]*\b(?:src|data)\s*=)
+xss_svg_event::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xss_svg_event><svg\b[^>]*\bon[a-z]+\s*=)
+xss_javascript_protocol::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xss_javascript_protocol>(?:href|src|action)\s*=\s*["']?\s*javascript:)
+xss_data_html_protocol::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xss_data_html_protocol>(?:href|src|action)\s*=\s*["']?\s*data:text/html)
+xss_style_javascript::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xss_style_javascript>style\s*=\s*["'][^"']*(?:expression\s*\(|url\s*\([^)]*javascript:|url\s*\([^)]*vbscript:))
+xss_style_tag_expression::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xss_style_tag_expression><\s*style\b[^>]*>.*?(?:expression\s*\(|url\s*\([^)]*javascript:))
+xss_meta_refresh::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xss_meta_refresh><meta[^>]*http-equiv\s*=\s*["']?refresh[^>]*javascript:)
+xss_encoded_tags::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xss_encoded_tags>(?:&#x0*3[cC];|&#0*60;)(?:script|iframe))
+# Fixed: require enclosing context or function parens with content to avoid matching bare "alert()" in JS code comments
+xss_bare_alert::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xss_bare_alert>[=\s(,;]["'\-\\]*(?:alert|prompt|confirm)\s*\([^)]*\))
+xss_link_data_html::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<xss_link_data_html><link\b[^>]*\bhref\s*=\s*["']?\s*data:text/html)
+
+# ===== NOSQL INJECTION (Request Only) =====
+# Covers all MongoDB operators from YAML: comparison, logical, array, element, evaluation
+nosql_json_operators_comparison::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<nosql_json_operators_comparison>["']\$(?:ne|eq|gt|gte|lt|lte|in|nin|exists|regex|where|expr|mod|all|size|type|elemmatch)\b)
+nosql_json_operators_logical::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<nosql_json_operators_logical>["']\$(?:and|or|not|nor)\b)
+nosql_json_operators_aggregation::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<nosql_json_operators_aggregation>["']\$(?:match|project|group|unwind|lookup|addfields|replaceroot|replacewith|facet|bucket|bucketauto|sort|sortbycount|skip|limit|sample|setwindowfields)\b)
+nosql_json_operators_update::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<nosql_json_operators_update>["']\$(?:set|unset|inc|mul|push|pull|addtoset|pop|pullall|rename|currentdate)\b)
+# Unquoted operator format (e.g. query params: $ne=1)
+nosql_unquoted_operators::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<nosql_unquoted_operators>(?:^|[^A-Za-z0-9_])\$(?:ne|eq|gt|gte|lt|lte|in|nin|exists|regex|where|expr)\b)
+nosql_db_operations::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<nosql_db_operations>db\.\w+\.(?:insert|mapReduce|find|update|delete|remove|aggregate|count|distinct)\s*\()
+nosql_javascript_injection::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<nosql_javascript_injection>(?:\beval\s*\(|\bFunction\s*\(|this\.\w+\.match\s*\())
+# Time-based blind NoSQL injection
+nosql_time_based::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<nosql_time_based>(?:sleep\s*\(\s*\d+\s*\)|new\s+Date\s*\(\s*\)|do\s*\{[^}]*\}\s*while\s*\())
+
+# ===== OS COMMAND INJECTION (Request Only) =====
+# Fixed: require shell metachar prefix [;&|`] (not bare ^). Removed ambiguous short words: sh, id, node.
+os_cmd_shell_commands::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<os_cmd_shell_commands>[;&|`]\s*(?:cat|ls|whoami|uname|wget|curl|bash|nc|netcat|ncat|socat|perl|python|ruby|ping|netstat|system)\b)
+os_cmd_pipe_chain::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<os_cmd_pipe_chain>\b(?:cat|ls|grep|sed|awk|sort|uniq|head|tail)\s+\S+\s*\|\s*(?:cat|grep|sed|awk|sort|uniq|head|tail))
+os_cmd_substitution::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<os_cmd_substitution>\$\((?:cat|ls|id|whoami|curl|wget|ping|nc|bash|sh)\b)
+os_cmd_backtick_exec::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<os_cmd_backtick_exec>`(?:cat|ls|id|whoami|curl|wget|ping|nc|bash|sh)\s+[^`]*`)
+# Fixed: require shell metachar prefix to avoid matching "timeout 30" in JSON config
+os_cmd_sleep_delay::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<os_cmd_sleep_delay>[;&|`]\s*(?:sleep|timeout)\s+\d+)
+
+# ===== WINDOWS COMMAND INJECTION (Request Only) =====
+windows_cmd_execution::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<windows_cmd_execution>(?:^|[;&|])\s*(?:cmd|powershell|pwsh|wscript|cscript)(?:\.exe)?\s+(?:\/[a-z]|[\\/])?\s*\S+)
+# Added: ping, ipconfig, and extra net subcommands from YAML
+# Note: whoami requires / flag (e.g. /priv, /all) to avoid FP on natural text like "whoami and what"
+windows_system_commands::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<windows_system_commands>\b(?:rundll32|certutil|mshta|bitsadmin|regsvr32|wmic|schtasks|tasklist|nslookup|ipconfig)(?:\.exe)?\s+\S+)
+windows_whoami::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<windows_whoami>\bwhoami(?:\.exe)?\s+/\S+)
+windows_net_commands::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<windows_net_commands>\bnet(?:\.exe)?\s+(?:user|localgroup|use|view|start|stop|session|share|accounts|time|computer|config)\b)
+windows_powershell_syntax::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<windows_powershell_syntax>(?:powershell|pwsh)(?:\.exe)?.*(?:-(?:Command|File|EncodedCommand|Enc|E|ExecutionPolicy|WindowStyle))\s+)
+windows_ping::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<windows_ping>\bping(?:\.exe)?\s+(?:\d{1,3}(?:\.\d{1,3}){3}|\S+\.[a-z]{2,}|-\w+))
+
+# ===== SSRF (Request Only) =====
+# Fixed: require http(s):// prefix to avoid matching "Host: localhost" header
+ssrf_localhost::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ssrf_localhost>\bhttps?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d+)?(?:/|\b))
+ssrf_private_ip::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ssrf_private_ip>\bhttps?://(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3})(?::\d+)?(?:/|\b))
+ssrf_metadata::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ssrf_metadata>\bhttps?://(?:169\.254\.169\.254|metadata\.google\.internal)\b)
+ssrf_file_protocol::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<ssrf_file_protocol>(?:file|gopher|dict|tftp)://)
+
+# ===== PATH TRAVERSAL / LOCAL FILE INCLUSION (Request Only) =====
+lfi_directory_traversal::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<lfi_directory_traversal>(?:\.\./|\.\.\\|%2e%2e/|%2e%2e\\|%2e%2e%2f|%2e%2e%5c){2,})
+lfi_sensitive_files::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<lfi_sensitive_files>(?:/|\\|%2f|%5c)(?:etc/passwd|etc/shadow|proc/self/environ|windows/system\.ini|windows/win\.ini|boot\.ini))
+# Added: PHP wrappers from YAML (php://filter, php://input)
+lfi_php_wrappers::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<lfi_php_wrappers>php://(?:filter|input|data|expect))
+lfi_encoded_traversal::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<lfi_encoded_traversal>%252e%252e|%c0%ae%c0%ae|%uff0e%uff0e)
+# Fixed: require path context to avoid matching bare %00 in binary uploads
+lfi_null_byte::REQUEST_URL,REQUEST_BODY::(?P<lfi_null_byte>(?:\.\w{1,5})(?:%00|\\x00))
+lfi_log_files::REQUEST_URL,REQUEST_HEADERS,REQUEST_BODY::(?P<lfi_log_files>(?:/var/log/|/var/www/|/proc/|/etc/)(?:apache|nginx|mysql|syslog|auth\.log|access\.log|error\.log|httpd))
+
+# ===== SECURITY MISCONFIGURATION (Response Payload Only) =====
+# Fixed: removed X-Powered-By (too noisy, fires on almost every response)
+debug_enabled::RESPONSE_BODY::(?P<debug_enabled>(?:"?debug"?\s*[:=]\s*(?:true|1|"true"|"1")|X-Debug-Token\s*:))
+version_disclosure::RESPONSE_BODY::(?P<version_disclosure>(?:Server\s*:\s*(?:Apache|Nginx|IIS|Express|Tomcat)/\d|X-AspNet-Version\s*:\s*\d))
+# Java/Jakarta exceptions and stack traces
+stack_trace_java::RESPONSE_BODY::(?P<stack_trace_java>(?:Exception in thread\s|(?:java|javax|jakarta|org|com)(?:\.\w+)+\.(?:Exception|Error)\b|^\s*at\s+(?:java|javax|jakarta|org|com)\.\w+))
+# Python tracebacks
+stack_trace_python::RESPONSE_BODY::(?P<stack_trace_python>(?:Traceback \(most recent call last\)|File "[^"]+", line \d+, in \w+))
+# Go panics (from YAML SecurityMisconfig - was missing)
+stack_trace_go::RESPONSE_BODY::(?P<stack_trace_go>(?:goroutine \d+ \[|panic:\s+\S+))

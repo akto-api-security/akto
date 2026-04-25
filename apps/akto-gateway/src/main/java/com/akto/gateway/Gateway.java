@@ -45,13 +45,23 @@ public class Gateway {
 
             Map<String, Object> result = new HashMap<>();
 
-            String guardrails = getStringField(requestData, "guardrails");
-            if ("true".equalsIgnoreCase(guardrails)) {
+            boolean runRequestGuardrails = "true".equalsIgnoreCase(getStringField(requestData, "guardrails"));
+            boolean runResponseGuardrails = "true".equalsIgnoreCase(getStringField(requestData, "response_guardrails"));
+
+            if (runRequestGuardrails || runResponseGuardrails) {
                 long guardrailsStart = System.currentTimeMillis();
-                Map<String, Object> guardrailsResponse = callGuardrails(requestData);
-                logger.info("Guardrails call completed - path: {}, latencyMs: {}",
+                Map<String, Object> guardrailsResult = null;
+
+                if (runRequestGuardrails) {
+                    guardrailsResult = mergeGuardrailsResults(guardrailsResult, callGuardrails(requestData, false));
+                }
+                if (runResponseGuardrails) {
+                    guardrailsResult = mergeGuardrailsResults(guardrailsResult, callGuardrails(requestData, true));
+                }
+
+                logger.info("Guardrails call(s) completed - path: {}, latencyMs: {}",
                     requestData.get("path"), System.currentTimeMillis() - guardrailsStart);
-                result.put("guardrailsResult", guardrailsResponse);
+                result.put("guardrailsResult", guardrailsResult);
             }
 
             String responseGuardrails = getStringField(requestData, "response_guardrails");
@@ -88,7 +98,27 @@ public class Gateway {
         }
     }
 
-    private Map<String, Object> callGuardrails(Map<String, Object> requestData) {
+    private Map<String, Object> mergeGuardrailsResults(Map<String, Object> existing, Map<String, Object> incoming) {
+        if (existing == null) return incoming;
+        if (incoming == null) return existing;
+
+        Map<String, Object> merged = new HashMap<>(existing);
+        boolean allowed = isAllowed(existing) && isAllowed(incoming);
+        merged.put("Allowed", allowed);
+        merged.put("requestResult", existing);
+        merged.put("responseResult", incoming);
+        return merged;
+    }
+
+    private boolean isAllowed(Map<String, Object> result) {
+        if (result == null) return false;
+        Object val = result.get("Allowed");
+        if (val instanceof Boolean) return (Boolean) val;
+        if (val != null) return Boolean.parseBoolean(val.toString());
+        return false;
+    }
+
+    private Map<String, Object> callGuardrails(Map<String, Object> requestData, boolean isResponse) {
         Map<String, Object> validateRequest = new HashMap<>();
         validateRequest.put("requestPayload", requestData.get("requestPayload"));
         validateRequest.put("contextSource", requestData.get("contextSource"));
@@ -113,9 +143,12 @@ public class Gateway {
         putIfNotNull(validateRequest, requestData, "metadata");
 
         String contextSource = getStringField(requestData, "contextSource");
-        logger.info("Calling guardrails /validate/request, contextSource: {}", contextSource);
+        String endpoint = isResponse ? "/validate/response" : "/validate/request";
+        logger.info("Calling guardrails {}, contextSource: {}", endpoint, contextSource);
 
-        Map<String, Object> guardrailsResponse = guardrailsClient.callValidateRequest(validateRequest);
+        Map<String, Object> guardrailsResponse = isResponse
+            ? guardrailsClient.callValidateResponse(validateRequest)
+            : guardrailsClient.callValidateRequest(validateRequest);
 
         logger.info("Guardrails response - allowed: {}",
             guardrailsResponse != null ? guardrailsResponse.get("Allowed") : "null");

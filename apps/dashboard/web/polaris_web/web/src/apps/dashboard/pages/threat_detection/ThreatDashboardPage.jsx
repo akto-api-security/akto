@@ -98,11 +98,14 @@ function ThreatDashboardPage() {
                             activeActorsValue = last.totalActors
                         }
                     }
+                    
+                    const totalAnalysedValue = func.isDemoAccount() ? 885 : (summaryResponse.totalAnalysed || 0);
+                    const totalAttacksValue = func.isDemoAccount() ? 476 : (summaryResponse.totalAttacks || 0);
 
                     setSummaryMetrics({
                         currentPeriod: {
-                            totalAnalysed: summaryResponse.totalAnalysed || 0,
-                            totalAttacks: summaryResponse.totalAttacks || 0,
+                            totalAnalysed: totalAnalysedValue,
+                            totalAttacks: totalAttacksValue,
                             totalCriticalActors: summaryResponse.totalCriticalActors || 0,
                             activeThreats: activeActorsValue,
                         },

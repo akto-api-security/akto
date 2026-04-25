@@ -83,6 +83,7 @@ import ThreatReport from "../dashboard/pages/threat_detection/threat_report/Thre
 import {PollingProvider} from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
+import ProxyPatterns from "../dashboard/pages/settings/proxy_patterns/ProxyPatterns";
 import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
 import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 
@@ -97,6 +98,7 @@ import ConfigureIgnoredEventsPage from "../dashboard/pages/threat_detection/Conf
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
+import Datadog from "../dashboard/pages/settings/integrations/Datadog";
 import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
@@ -122,8 +124,13 @@ import DastProgress from "../dashboard/pages/observe/api_collections/DastProgres
 import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
 import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
+import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
+import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx";
+import ViolationsPage from "../dashboard/pages/nhi_governance/ViolationsPage.jsx";
+import PoliciesPage from "../dashboard/pages/nhi_governance/PoliciesPage.jsx";
+import AllowedHostsForPac from "../dashboard/pages/settings/allowed_hosts/AllowedHostsForPac.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -207,6 +214,10 @@ const router = createBrowserRouter([
                             {
                                 path: "agentic-assets",
                                 element: <Endpoints/>
+                            },
+                            {
+                                path: "users-and-devices",
+                                element: <UsersAndDevices/>
                             },
                             {
                                 path: "query_mode",
@@ -351,6 +362,23 @@ const router = createBrowserRouter([
                                 element: <GuardrailPolicies/>
                             }
                         ]
+                    },
+                    {
+                        path: "nhi",
+                        children: [
+                            {
+                                path: "identities",
+                                element: <IdentitiesPage/>
+                            },
+                            {
+                                path: "violations",
+                                element: <ViolationsPage/>
+                            },
+                            {
+                                path: "policies",
+                                element: <PoliciesPage/>
+                            }
+                        ]
                     }
                 ]
             },
@@ -413,6 +441,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/splunk",
                         element: <Splunk/>,
+                    },
+                    {
+                        path: "integrations/datadog",
+                        element: <Datadog/>,
                     },
                     {
                         path: "integrations/f5_waf",
@@ -541,6 +573,14 @@ const router = createBrowserRouter([
                     {
                         path: 'advanced-filters',
                         element: <AdvancedTrafficFilters/>
+                    },
+                    {
+                        path: 'proxy-patterns',
+                        element: <ProxyPatterns/>
+                    },
+                    {
+                        path: 'allowed-hosts',
+                        element: <AllowedHostsForPac/>
                     },
                     {
                         path: "auth-types/details",

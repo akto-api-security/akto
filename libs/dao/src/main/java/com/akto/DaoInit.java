@@ -336,6 +336,7 @@ public class DaoInit {
         ClassModel<Span> spanClassModel = ClassModel.builder(Span.class).enableDiscriminator(true).build();
         ClassModel<Span.ToolDefinition> toolDefinitionClassModel = ClassModel.builder(Span.ToolDefinition.class).enableDiscriminator(true).build();
         ClassModel<UserAnalysisData.UserAnalysisDataKey> userAnalysisDataKeyClassModel = ClassModel.builder(UserAnalysisData.UserAnalysisDataKey.class).enableDiscriminator(true).build();
+        ClassModel<AccountSettings.ProxyPatternInfo> proxyPatternInfoClassModel = ClassModel.builder(AccountSettings.ProxyPatternInfo.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -378,7 +379,7 @@ public class DaoInit {
                 jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, testingIssueTicketsModel, tlsAuthClassModel,
                 ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
-                traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel)
+                traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -435,7 +436,8 @@ public class DaoInit {
                 new EnumCodec<>(GlobalEnums.CONTEXT_SOURCE.class),
                 new EnumCodec<>(ReputationSource.class),
                 new EnumCodec<>(ReputationScore.class),
-                new EnumCodec<>(JiraIntegration.JiraType.class)
+                new EnumCodec<>(JiraIntegration.JiraType.class),
+                new EnumCodec<>(GlobalEnums.DashboardCategory.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -481,6 +483,7 @@ public class DaoInit {
         ApiInfoDao.instance.createIndicesIfAbsent();
         ApiSequencesDao.instance.createIndicesIfAbsent();
         RuntimeLogsDao.instance.createIndicesIfAbsent();
+        ProtectionLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();
         AgenticTestingLogsDao.instance.createIndicesIfAbsent();
         DashboardLogsDao.instance.createIndicesIfAbsent();
@@ -519,11 +522,13 @@ public class DaoInit {
         McpAuditInfoDao.instance.createIndicesIfAbsent();
         McpReconRequestDao.instance.createIndicesIfAbsent();
         GuardrailPoliciesDao.instance.createIndicesIfAbsent();
+        HistoricalDataDao.instance.createIndicesIfAbsent();
         EndpointShieldLogsDao.instance.createIndicesIfAbsent();
         ModuleInfoDao.instance.createIndicesIfAbsent();
         AgentConversationDao.instance.createIndexIfAbsent();
         AgentConversationResultDao.instance.createIndexIfAbsent();
         IpReputationScoreDao.instance.createIndicesIfAbsent();
         ApiCollectionIconsDao.instance.createIndicesIfAbsent();
+
     }
 }

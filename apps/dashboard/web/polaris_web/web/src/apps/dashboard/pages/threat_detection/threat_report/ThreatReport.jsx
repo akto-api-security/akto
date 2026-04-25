@@ -51,6 +51,28 @@ const ThreatReport = () => {
                 localThreatFiltersMap[x.id] = trimmed
             })
 
+            try {
+                const complianceResp = await api.fetchThreatComplianceInfos()
+                if (complianceResp?.threatComplianceInfos && Array.isArray(complianceResp.threatComplianceInfos)) {
+                    const threatComplianceMap = {}
+                    complianceResp.threatComplianceInfos.forEach((compliance) => {
+                        threatComplianceMap[compliance._id] = compliance
+                    })
+                    Object.keys(localThreatFiltersMap).forEach((filterId) => {
+                        const complianceKey = `threat_compliance/${filterId}.conf`
+                        const compliance = threatComplianceMap[complianceKey]
+                        if (compliance) {
+                            localThreatFiltersMap[filterId] = {
+                                ...localThreatFiltersMap[filterId],
+                                compliance: { mapComplianceToListClauses: compliance.mapComplianceToListClauses }
+                            }
+                        }
+                    })
+                }
+            } catch (e) {
+                console.error(`Failed to fetch and merge threat compliance: ${e?.message}`)
+            }
+
             const filterResponse = await api.getThreatReportFilters(reportId)
             const filters = filterResponse?.response?.filtersForReport || {}
 

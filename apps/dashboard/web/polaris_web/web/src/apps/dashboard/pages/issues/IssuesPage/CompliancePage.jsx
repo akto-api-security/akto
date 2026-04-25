@@ -26,10 +26,11 @@ import values from "@/util/values";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
 import TableStore from "../../../components/tables/TableStore.js";
 import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
+import ComplianceMenu from "./ComplianceMenu.jsx";
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
-import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory  } from "../../../../main/labelHelper";
+import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import testingApi from "../../testing/api.js"
 
 const sortOptions = [
@@ -42,14 +43,12 @@ const sortOptions = [
 ];
 
 const getCompliances = () => {
-    const isDemoAccount = func.isDemoAccount();
     const isMCP = isMCPSecurityCategory();
     const isGenAiSecurity = isGenAISecurityCategory();
     const isAgenticSecurity = isAgenticSecurityCategory();
 
-    if (isDemoAccount && (isMCP || isAgenticSecurity || isGenAiSecurity)) {
-        // Different compliances for demo account + MCP + Agentic Security
-        return ["OWASP Agentic", "OWASP LLM", "NIST AI Risk Management Framework","MITRE ATLAS","CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];
+    if (isMCP || isAgenticSecurity || isGenAiSecurity) {
+        return ["OWASP Agentic Top 10", "OWASP LLM", "EU AI Act", "NIST AI Risk Management Framework", "CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP", "MITRE ATLAS"];
     }
     
     // Default compliances
@@ -162,9 +161,9 @@ function CompliancePage() {
 
 
     function calcFilteredTestIds(complianceView) {
-        let ret = Object.entries(subCategoryMap).filter(([_, v]) => {return !!v.compliance?.mapComplianceToListClauses[complianceView]}).map(([k, _]) => k)
-        
-        return ret
+        return Object.entries(subCategoryMap)
+            .filter(([_, v]) => transform.subcategoryMatchesComplianceFramework(v.compliance, complianceView))
+            .map(([k]) => k);
     }
 
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
@@ -650,6 +649,18 @@ function CompliancePage() {
     }, [])
   
 
+    const handleVulnCategoryClick = (filterType, filterValue) => {
+        const pageKey = window.location.pathname + "/" + (window.location.hash || '');
+        const prev = PersistStore.getState().filtersMap;
+        const existing = (prev[pageKey]?.filters || []).filter(f => f.key !== filterType);
+        PersistStore.getState().setFiltersMap({
+            ...prev,
+            [pageKey]: { filters: [...existing, { key: filterType, value: [filterValue] }], sort: prev[pageKey]?.sort || [] }
+        });
+        func.setToast(true, false, `Table filtered by "${filterValue}" - scroll down to view results`);
+        setKey(k => !k);
+    };
+
     const onSelectCompliance = (compliance) => {
         setComplianceView(compliance)
         resetResourcesSelected()
@@ -664,8 +675,16 @@ function CompliancePage() {
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
         const apiCollectionId = filters.apiCollectionId || []
         let filterCollectionsId = apiCollectionId.concat(filters.collectionIds)
-        let filterSubCategory = calcFilteredTestIds(complianceView)
-        
+        let filterSubCategory
+        if (filters?.issueCategory?.length > 0) {
+            filterSubCategory = []
+            filters.issueCategory.forEach(cat => {
+                filterSubCategory = filterSubCategory.concat(categoryToSubCategories[cat] || [])
+            })
+        } else {
+            filterSubCategory = calcFilteredTestIds(complianceView)
+        }
+
         const collectionIdsArray = filterCollectionsId.map((x) => {return x.toString()})
 
         let obj = {
@@ -746,7 +765,7 @@ function CompliancePage() {
     const components = (
         <>
             <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
-                <CriticalFindingsGraph startTimestamp={getTimeEpoch("since")} endTimestamp={getTimeEpoch("until")} linkText={""} linkUrl={""}/>
+                <CriticalFindingsGraph startTimestamp={getTimeEpoch("since")} endTimestamp={getTimeEpoch("until")} linkText={""} linkUrl={""} onBarClick={handleVulnCategoryClick}/>
                 <CriticalFindingsGraph startTimestamp={getTimeEpoch("since")} endTimestamp={getTimeEpoch("until")} linkText={""} linkUrl={""} complianceMode={complianceView}/>
             </HorizontalGrid>
 
@@ -808,17 +827,10 @@ function CompliancePage() {
                     >
                         <Popover.Pane fixed>
                             <Popover.Section>
-                            <VerticalStack gap={"2"}>
-                                {allCompliances.map(compliance => {return <Button textAlign="left" plain onClick={() => {onSelectCompliance(compliance)}} removeUnderline>
-                                    <Box>
-                                        <HorizontalStack gap={2}>
-                                            <Avatar source={func.getComplianceIcon(compliance)} shape="square"  size="extraSmall"/> 
-                                            <Text>{compliance}</Text>
-                                        </HorizontalStack>
-                                    </Box>
-                                </Button>} )}
-                            </VerticalStack>
-                                
+                                <ComplianceMenu
+                                    items={allCompliances}
+                                    onSelect={onSelectCompliance}
+                                />
                             </Popover.Section>
                         </Popover.Pane>
                     </Popover>

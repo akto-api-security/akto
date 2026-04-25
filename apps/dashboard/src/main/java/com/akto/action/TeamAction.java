@@ -14,10 +14,13 @@ import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.password_reset.PasswordResetUtils;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Pair;
+import com.akto.utils.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 import com.opensymphony.xwork2.Action;
@@ -29,12 +32,7 @@ import org.bson.conversions.Bson;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
 
@@ -44,6 +42,63 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
     BasicDBList users;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TeamAction.class, LogDb.DASHBOARD);
+    public static final String INVALID_PRODUCT_SCOPE = "Invalid product scope: user account does not have access to this scope";
+
+    /**
+     * Maps scope values to display labels
+     */
+    private static String getScopeDisplayLabel(String scope) {
+        switch (scope) {
+            case "API":
+                return "API Security";
+            case "AGENTIC":
+                return "Akto ARGUS";
+            case "ENDPOINT":
+                return "Akto ATLAS";
+            case "DAST":
+                return "DAST";
+            default:
+                return scope;
+        }
+    }
+
+    /**
+     * Formats scope-role mapping for display in pending invitations.
+     * Format: "Invitation sent for Developer on API, Security Engineer on Akto ATLAS"
+     */
+    private String formatScopeRoleMapping(Map<String, String> scopeRoleMapping) {
+        if (scopeRoleMapping == null || scopeRoleMapping.isEmpty()) {
+            return "Invitation sent";
+        }
+
+        StringBuilder roleText = new StringBuilder("Invitation sent for ");
+        boolean first = true;
+        for (Map.Entry<String, String> entry : scopeRoleMapping.entrySet()) {
+            if (!first) {
+                roleText.append(", ");
+            }
+            roleText.append(entry.getValue())
+                    .append(" on ")
+                    .append(getScopeDisplayLabel(entry.getKey()));
+            first = false;
+        }
+        return roleText.toString();
+    }
+
+    /**
+     * Validates that a product scope is accessible for the current account.
+     * Based on STIGG feature grants for the account.
+     *
+     * @param scope the scope to validate
+     * @return true if scope is accessible, false otherwise
+     */
+    private boolean isValidProductScope(String scope) {
+        if (scope == null || scope.isEmpty()) {
+            return false;
+        }
+        Set<String> accessibleScopes = UsageMetricCalculator.getAccessibleProductScopes(Context.accountId.get());
+        return accessibleScopes.contains(scope);
+    }
 
     public String fetchTeamData() {
         int accountId = Context.accountId.get();
@@ -69,6 +124,12 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             RBAC rbac = userToRBAC.get(userObj.getInt("id"));
             String status = (rbac == null || rbac.getRole() == null) ? Role.MEMBER.getName() : rbac.getRole();
             userObj.append("role", status);
+
+            // Add scopeRoleMapping to the user object for n:n scope-role display
+            if (rbac != null && rbac.getScopeRoleMapping() != null && !rbac.getScopeRoleMapping().isEmpty()) {
+                userObj.append("scopeRoleMapping", rbac.getScopeRoleMapping());
+            }
+
             try {
                 String login = userObj.getString(User.LOGIN);
                 if (login != null) {
@@ -88,12 +149,20 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             if (pendingInviteCode.getAccountId() == 0) {//case where account id doesn't exists belonged to older 1_000_000 account
                 pendingInviteCode.setAccountId(1_000_000);
             }
-            String inviteeRole = pendingInviteCode.getInviteeRole();
-            String roleText = "Invitation sent ";
-            if (inviteeRole == null) {
-                roleText += "for Security Engineer";
+
+            // Use new scopeRoleMapping if available, otherwise fall back to old inviteeRole for backward compatibility
+            String roleText;
+            if (pendingInviteCode.getScopeRoleMapping() != null && !pendingInviteCode.getScopeRoleMapping().isEmpty()) {
+                roleText = formatScopeRoleMapping(pendingInviteCode.getScopeRoleMapping());
             } else {
-                roleText += "for " + inviteeRole;
+                // Backward compatibility: use old inviteeRole field
+                String inviteeRole = pendingInviteCode.getInviteeRole();
+                roleText = "Invitation sent ";
+                if (inviteeRole == null) {
+                    roleText += "for Security Engineer";
+                } else {
+                    roleText += "for " + inviteeRole;
+                }
             }
             /*
              * Do not send invitation code, if already a member.
@@ -185,15 +254,27 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                         }
                         if(isValidUpdateRole && shouldChangeRole){
                             /*
-                             * We do only want to update the role, if it exists.
+                             * Update the role only. Product scopes are managed through scope-role mapping.
                              */
-                            RBACDao.instance.updateOneNoUpsert(
-                                filterRbac,
-                                // Saving the custom role here.
-                                Updates.set(RBAC.ROLE, reqUserRole));
 
-                                RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
-                                UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
+                            if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
+                                // Update both primary role and scope-role mapping
+                                RBACDao.instance.updateOneNoUpsert(
+                                        filterRbac,
+                                        Updates.combine(
+                                                Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping)
+                                        )
+                                );
+                            } else {
+                                // Update only primary role (backward compatibility)
+                                RBACDao.instance.updateOneNoUpsert(
+                                        filterRbac,
+                                        Updates.set(RBAC.ROLE, reqUserRole)
+                                );
+                            }
+
+                            RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
+                            UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
                             return Action.SUCCESS.toUpperCase();
                         }else{
                             addActionError("User doesn't have access to modify this role.");
@@ -203,7 +284,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                         addActionError("User role doesn't exist.");
                         return Action.ERROR.toUpperCase();
                     }
-                    
+
                 } else {
                     addActionError("User doesn't exist");
                     return Action.ERROR.toUpperCase();
@@ -225,6 +306,88 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
 
     public String makeAdmin(){
         return performAction(ActionType.UPDATE_USER_ROLE, this.userRole.toUpperCase());
+    }
+
+    private Map<String, String> scopeRoleMapping;
+
+    public String updateUserScopeRoleMapping() {
+        int accId = Context.accountId.get();
+        Bson findQ = Filters.eq(User.LOGIN, email);
+        User userDetails = UsersDao.instance.findOne(findQ);
+
+        if (userDetails == null) {
+            addActionError("User not found");
+            return Action.ERROR.toUpperCase();
+        }
+
+        loggerMaker.debugAndAddToDb("scopeRoleMapping before init: " + scopeRoleMapping);
+        if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
+
+            String defaultRole = RBAC.Role.MEMBER.name();
+            if (UsageMetricCalculator.isRbacFeatureAvailable(Context.accountId.get())) {
+                defaultRole = Utils.fetchDefaultInviteRole(Context.accountId.get(), Role.MEMBER.name());
+            }
+            this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, defaultRole);
+        }
+        loggerMaker.debugAndAddToDb("scopeRoleMapping after init: " + scopeRoleMapping);
+
+        // Validate that all scopes in scopeRoleMappingToSave are valid product scopes
+        // Allow NO_ACCESS assignments for any scope (NO_ACCESS is explicit deny, not a privilege)
+        if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
+            for (Map.Entry<String, String> entry : scopeRoleMapping.entrySet()) {
+                String scope = entry.getKey();
+                String roleStr = entry.getValue();
+
+                // Allow NO_ACCESS assignments for any scope (NO_ACCESS is explicit deny, not a privilege)
+                // Only validate scope accessibility for actual role assignments (non-NO_ACCESS)
+                try {
+                    Role baseRole = RBAC.Role.valueOf(roleStr);
+                    if (!baseRole.equals(RBAC.Role.NO_ACCESS) && !isValidProductScope(scope)) {
+                        addActionError(INVALID_PRODUCT_SCOPE + scope);
+                        loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
+                        return Action.ERROR.toUpperCase();
+                    }
+                } catch (IllegalArgumentException e) {
+                    // roleStr is not a standard role, check if it's a custom role
+                    CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
+                    if (customRole != null) {
+                        Role baseRole = RBAC.Role.valueOf(customRole.getBaseRole());
+                        if (!baseRole.equals(RBAC.Role.NO_ACCESS) && !isValidProductScope(scope)) {
+                            addActionError(INVALID_PRODUCT_SCOPE + scope);
+                            loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
+                            return Action.ERROR.toUpperCase();
+                        }
+                    }
+                }
+            }
+        }
+
+        try {
+            Bson filterRbac = Filters.and(
+                Filters.eq(RBAC.USER_ID, userDetails.getId()),
+                Filters.eq(RBAC.ACCOUNT_ID, accId)
+            );
+
+            RBACDao.instance.getMCollection().updateOne(
+                    filterRbac,
+                    Updates.combine(
+                            Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMapping),
+                            Updates.setOnInsert(RBAC.USER_ID, userDetails.getId()),
+                            Updates.setOnInsert(RBAC.ACCOUNT_ID, accId)
+                    ),
+                    new UpdateOptions().upsert(true)
+            );
+
+            // Clear cache
+            RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
+            UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error updating scope-role mapping: " + e.getMessage());
+            addActionError("Failed to update scope-role mapping");
+            return Action.ERROR.toUpperCase();
+        }
     }
 
     private Role[] userRoleHierarchy;
@@ -349,6 +512,14 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
 
     public String getPasswordResetToken() {
         return passwordResetToken;
+    }
+
+    public void setScopeRoleMapping(Map<String, String> scopeRoleMapping) {
+        this.scopeRoleMapping = scopeRoleMapping;
+    }
+
+    public Map<String, String> getScopeRoleMapping() {
+        return this.scopeRoleMapping;
     }
 
     protected HttpServletResponse servletResponse;

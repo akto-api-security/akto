@@ -1,34 +1,51 @@
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import { 
-    ASSET_TAG_KEYS, 
+    ASSET_TAG_KEYS,
     ROW_TYPES,
     TYPE_TAG_KEYS,
-    formatDisplayName, 
-    getTypeFromTags, 
+    SKILL_TAG_KEY,
+    CLIENT_TYPES,
+    formatDisplayName,
+    getTypeFromTags,
     findAssetTag,
     findTypeTag,
-    getAgentTypeFromValue 
+    getAgentTypeFromValue
 } from "./mcpClientHelper";
 import func from "@/util/func";
+import { getResolvedUsernameForCollection, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
+
+// Table constants
+export const PAGE_LIMIT = 100;
 
 // Route constants
 export const INVENTORY_PATH = '/dashboard/observe/inventory';
 export const INVENTORY_FILTER_KEY = '/dashboard/observe/inventory/';
+export const AGENTIC_ASSETS_PATH = '/dashboard/observe/agentic-assets';
+export const USERS_AND_DEVICES_PATH = '/dashboard/observe/users-and-devices';
+export const AGENTIC_OBSERVE_BACK_PATHS = [AGENTIC_ASSETS_PATH, USERS_AND_DEVICES_PATH];
 export const ASSET_TAG_KEY_VALUES = Object.values(ASSET_TAG_KEYS);
 
+// Row ID prefixes for grouped data
+const ROW_ID_PREFIX = { AGENT: 'agent', SERVICE: 'service', SKILL: 'skill' };
+
 // Table headers with all columns
-export const getHeaders = () => {
-    return [
+export const getHeaders = (options = {}) => {
+    const primaryTitle = options.primaryColumnTitle ?? "Agentic asset";
+    const primaryText = options.primaryColumnText ?? primaryTitle;
+    const includeIconColumn = options.includeIconColumn !== false;
+    const endpointsColumnLabel = options.endpointsColumnLabel ?? "Endpoints";
+    const endpointsColumnBoxWidth = options.endpointsColumnBoxWidth ?? "80px";
+    const headers = [
         { title: "", text: "", value: "iconComp", isText: CellType.TEXT, boxWidth: '24px' },
-        { title: "Agentic asset", text: "Agentic asset", value: "groupName", filterKey: "groupName", textValue: "groupName", showFilter: true, sortActive: true },
-        { title: "Type", text: "Type", value: "clientType", filterKey: "clientType", textValue: "clientType", showFilter: true, sortActive: true, boxWidth: "120px" },
+        { title: primaryTitle, text: primaryText, value: "groupName", filterKey: "groupName", textValue: "groupName", showFilter: true, sortActive: true },
+        { title: "Type", text: "Type", value: "clientType", filterKey: "clientType", textValue: "clientType", boxWidth: "220px" },
         { 
-            title: "Endpoints", 
-            text: "Endpoints", 
+            title: endpointsColumnLabel, 
+            text: endpointsColumnLabel, 
             value: "endpointsCount", 
             isText: CellType.TEXT, 
             sortActive: true, 
-            boxWidth: "80px",
+            boxWidth: endpointsColumnBoxWidth,
             mergeType: (a, b) => (a || 0) + (b || 0),
             shouldMerge: true
         },
@@ -65,6 +82,10 @@ export const getHeaders = () => {
             shouldMerge: true
         },
     ];
+    if (!includeIconColumn) {
+        return headers.filter((h) => h.value !== "iconComp");
+    }
+    return headers;
 };
 
 export const sortOptions = [
@@ -79,6 +100,16 @@ export const sortOptions = [
     { label: "Last traffic seen", value: "detectedTimestamp asc", directionLabel: "Oldest", sortKey: "detectedTimestamp", columnIndex: 7 },
     { label: "Last traffic seen", value: "detectedTimestamp desc", directionLabel: "Newest", sortKey: "detectedTimestamp", columnIndex: 7 },
 ];
+
+/** Same as sortOptions but column indices shifted when the icon column is omitted from headers. */
+export const getSortOptionsWithoutIconColumn = (opts = {}) => {
+    const endpointsColumnLabel = opts.endpointsColumnLabel ?? "Endpoints";
+    return sortOptions.map((o) => ({
+        ...o,
+        columnIndex: o.columnIndex - 1,
+        ...(o.sortKey === "endpointsCount" ? { label: endpointsColumnLabel } : {}),
+    }));
+};
 
 export const resourceName = { singular: "Agentic asset", plural: "Agentic assets" };
 
@@ -104,7 +135,7 @@ export const extractServiceName = (hostName) => {
 // Group collections by agent identification (mcp-client, ai-agent values)
 // These are the sources that discovered the services (cursor, litellm, etc.)
 // Note: browser-llm-agent is excluded from this grouping
-export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveMap = {}) => {
+export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
     const agents = {};
     
     collections.forEach((c) => {
@@ -130,6 +161,7 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
                 endpointIds: new Set(),
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
+                maxRiskScore: 0,
             };
         }
         
@@ -150,17 +182,23 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
         if (traffic > agents[key].maxTrafficTimestamp) {
             agents[key].maxTrafficTimestamp = traffic;
         }
+
+        // Track max risk score
+        const riskScore = riskScoreMap[c.id] || 0;
+        if (riskScore > agents[key].maxRiskScore) {
+            agents[key].maxRiskScore = riskScore;
+        }
     });
     
     return Object.values(agents).map(g => ({
         ...g,
-        id: `agent-${g.groupKey}`,
+        id: `${ROW_ID_PREFIX.AGENT}-${g.groupKey}`,
         endpointsCount: g.endpointIds.size,
         sensitiveInRespTypes: Array.from(g.sensitiveTypes),
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
-        riskScore: null, // Agents don't have risk score
+        riskScore: g.maxRiskScore || null,
     }));
 };
 
@@ -234,7 +272,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
     
     return Object.values(services).map(g => ({
         ...g,
-        id: `service-${g.groupKey}`,
+        id: `${ROW_ID_PREFIX.SERVICE}-${g.groupKey}`,
         endpointsCount: g.endpointIds.size,
         sensitiveInRespTypes: Array.from(g.sensitiveTypes),
         sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
@@ -244,14 +282,199 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
     }));
 };
 
+// Group collections by skill tag value — one row per unique skill name
+export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
+    const skills = {};
+
+    collections.forEach((c) => {
+        if (c.deactivated) return;
+        const skillValues = c.skills || [];
+        if (!skillValues || skillValues.length === 0) return;
+
+        const hostName = c.hostName || c.displayName || c.name;
+        const endpointId = extractEndpointId(hostName);
+
+        skillValues.forEach((skillValue) => {
+            if (!skills[skillValue]) {
+                skills[skillValue] = {
+                    rowType: ROW_TYPES.SKILL,
+                    groupName: skillValue,
+                    groupKey: skillValue,
+                    clientType: CLIENT_TYPES.SKILL,
+                    collections: [],
+                    firstCollection: null,
+                    hostNames: [],
+                    endpointIds: new Set(),
+                    sensitiveTypes: new Set(),
+                    maxTrafficTimestamp: 0,
+                    maxRiskScore: 0,
+                };
+            }
+
+            skills[skillValue].collections.push(c);
+            if (!skills[skillValue].firstCollection) skills[skillValue].firstCollection = c;
+            if (hostName && !skills[skillValue].hostNames.includes(hostName)) {
+                skills[skillValue].hostNames.push(hostName);
+            }
+            if (endpointId) skills[skillValue].endpointIds.add(endpointId);
+
+            const sensitive = sensitiveMap[c.id] || [];
+            sensitive.forEach(s => skills[skillValue].sensitiveTypes.add(s));
+
+            const traffic = trafficMap[c.id] || 0;
+            if (traffic > skills[skillValue].maxTrafficTimestamp) {
+                skills[skillValue].maxTrafficTimestamp = traffic;
+            }
+
+            const riskScore = riskScoreMap[c.id] || 0;
+            if (riskScore > skills[skillValue].maxRiskScore) {
+                skills[skillValue].maxRiskScore = riskScore;
+            }
+        });
+    });
+
+    return Object.values(skills).map(g => ({
+        ...g,
+        id: `${ROW_ID_PREFIX.SKILL}-${g.groupKey}`,
+        endpointsCount: g.endpointIds.size,
+        sensitiveInRespTypes: Array.from(g.sensitiveTypes),
+        sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(' ') || '-',
+        detectedTimestamp: g.maxTrafficTimestamp,
+        lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
+        riskScore: g.maxRiskScore || null,
+    }));
+};
+
+const accumulateHostGroupedCollection = (group, c, trafficMap, sensitiveMap, riskScoreMap) => {
+    const hostName = c.hostName || c.displayName || c.name;
+    if (hostName && !group.hostNames.includes(hostName)) {
+        group.hostNames.push(hostName);
+    }
+    if (!group.firstCollection) {
+        group.firstCollection = c;
+    }
+    const sensitive = sensitiveMap[c.id] || [];
+    sensitive.forEach((s) => group.sensitiveTypes.add(s));
+    const traffic = trafficMap[c.id] || 0;
+    if (traffic > group.maxTrafficTimestamp) {
+        group.maxTrafficTimestamp = traffic;
+    }
+    const riskScore = riskScoreMap[c.id] || 0;
+    if (riskScore > group.maxRiskScore) {
+        group.maxRiskScore = riskScore;
+    }
+};
+
+const finalizeHostGroupedRow = (g, idSegment) => {
+    const clientTypeStr = g.clientTypes.size > 0 ? [...g.clientTypes].sort().join(", ") : "-";
+    return {
+        rowType: g.rowType,
+        groupName: g.groupName,
+        groupKey: g.groupKey,
+        hostNames: g.hostNames,
+        inventoryScopeLabel: g.groupName,
+        collections: g.collections,
+        firstCollection: g.firstCollection,
+        id: `${ROW_ID_PREFIX.SERVICE}-${idSegment}-${String(g.groupKey).replace(/[^a-zA-Z0-9_.-]/g, "_")}`,
+        clientType: clientTypeStr,
+        endpointsCount: g.hostNames.length,
+        sensitiveInRespTypes: Array.from(g.sensitiveTypes),
+        sensitiveSubTypesVal: Array.from(g.sensitiveTypes).join(" ") || "-",
+        detectedTimestamp: g.maxTrafficTimestamp,
+        lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
+        riskScore: g.maxRiskScore,
+    };
+};
+
+/** Group by device id (first segment of agentic collection hostname). Row opens inventory via hostname filter. */
+export const groupCollectionsByDevice = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}) => {
+    const devices = {};
+
+    collections.forEach((c) => {
+        if (c.deactivated) return;
+        const hostName = c.hostName || c.displayName || c.name;
+        if (!hostName) return;
+        const deviceId = extractEndpointId(hostName);
+        if (!deviceId) return;
+
+        if (!devices[deviceId]) {
+            devices[deviceId] = {
+                rowType: ROW_TYPES.SERVICE,
+                groupName: deviceId,
+                groupKey: deviceId,
+                hostNames: [],
+                clientTypes: new Set(),
+                collections: [],
+                firstCollection: null,
+                sensitiveTypes: new Set(),
+                maxTrafficTimestamp: 0,
+                maxRiskScore: 0,
+            };
+        }
+        const g = devices[deviceId];
+        g.collections.push(c);
+        g.clientTypes.add(getTypeFromTags(c.envType));
+        accumulateHostGroupedCollection(g, c, trafficMap, sensitiveMap, riskScoreMap);
+    });
+
+    return Object.values(devices).map((g) => finalizeHostGroupedRow(g, "device"));
+};
+
+/** Group by Endpoint Shield username. Row opens inventory via hostname filter. Skips collections without a resolved username. */
+export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}, usernameMap = {}) => {
+    const users = {};
+
+    collections.forEach((c) => {
+        if (c.deactivated) return;
+        const username = getResolvedUsernameForCollection(c, usernameMap);
+        if (!username || username === DEFAULT_VALUE) return;
+
+        if (!users[username]) {
+            users[username] = {
+                rowType: ROW_TYPES.SERVICE,
+                groupName: username,
+                groupKey: username,
+                hostNames: [],
+                clientTypes: new Set(),
+                collections: [],
+                firstCollection: null,
+                sensitiveTypes: new Set(),
+                maxTrafficTimestamp: 0,
+                maxRiskScore: 0,
+            };
+        }
+        const g = users[username];
+        g.collections.push(c);
+        g.clientTypes.add(getTypeFromTags(c.envType));
+        accumulateHostGroupedCollection(g, c, trafficMap, sensitiveMap, riskScoreMap);
+    });
+
+    return Object.values(users).map((g) => finalizeHostGroupedRow(g, "user"));
+};
+
 export const createEnvTypeFilter = (values, negated = false) => ({
     filters: [{ key: 'envType', label: func.convertToDisambiguateLabelObj(values, null, 2), value: { values, negated }, onRemove: () => {} }],
     sort: []
 });
 
-export const createHostnameFilter = (hostnames) => ({
+export const createHostnameFilter = (hostnames, options = {}) => ({
     filters: [{ key: 'hostName', label: func.convertToDisambiguateLabelObj(hostnames, null, 2), value: { values: hostnames, negated: false }, onRemove: () => {} }],
-    sort: []
+    sort: [],
+    ...(options.inventoryScopeLabel ? { inventoryScopeLabel: options.inventoryScopeLabel } : {}),
 });
 
-export { ROW_TYPES } from "./mcpClientHelper";
+/** Filter payload for PersistStore when navigating from agentic grouped tables to inventory. */
+export const buildAgenticInventoryFilterForRow = (row) => {
+    if (row.rowType === ROW_TYPES.AGENT && row.tagKey && row.tagValue) {
+        return createEnvTypeFilter([`${row.tagKey}=${row.tagValue}`], false);
+    }
+    if (row.rowType === ROW_TYPES.SERVICE && row.hostNames?.length > 0) {
+        return createHostnameFilter(row.hostNames, row.inventoryScopeLabel ? { inventoryScopeLabel: row.inventoryScopeLabel } : {});
+    }
+    if (row.rowType === ROW_TYPES.SKILL && row.groupKey) {
+        return createEnvTypeFilter([`${SKILL_TAG_KEY}=${row.groupKey}`], false);
+    }
+    return null;
+};
+
+export { ROW_TYPES, SKILL_TAG_KEY } from "./mcpClientHelper";

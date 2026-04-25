@@ -47,6 +47,7 @@ import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.OrganizationCache;
 import com.akto.utils.sso.CustomSamlSettings;
 import com.akto.util.Pair;
+import com.akto.utils.Utils;
 import com.akto.utils.sso.SsoUtils;
 import com.auth0.Tokens;
 import com.auth0.jwk.Jwk;
@@ -56,7 +57,6 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.auth0.jwt.interfaces.JWTVerifier;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
 import com.onelogin.saml2.Auth;
 import com.onelogin.saml2.settings.Saml2Settings;
 import com.opensymphony.xwork2.Action;
@@ -72,6 +72,7 @@ import lombok.Setter;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 import javax.servlet.http.HttpServletRequest;
@@ -94,6 +95,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     public static final String BUSINESS_EMAIL_REQUIRED_ERROR = "BUSINESS_EMAIL_REQUIRED";
     public static final String ERROR_STR = "error";
     public static final String ERROR_DESCRIPTION = "error_description";
+
 
     public String getCode() {
         return code;
@@ -187,7 +189,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     }
 
                     code = "";
-                    createUserAndRedirect(userEmail, userName, info, 0, Config.ConfigType.SLACK.toString());
+                    createUserAndRedirect(userEmail, userName, info, 0, Config.ConfigType.SLACK.toString(),null);
                 } else {
                     code = usersIdentityResponse.getError();
                 }
@@ -282,10 +284,23 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             PendingInviteCode pendingInviteCode = PendingInviteCodesDao.instance.findOne(filter);
             if (pendingInviteCode != null && pendingInviteCode.getInviteeEmailId().equals(email)) {
                 PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
-                if(user != null){
-                    AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId(), pendingInviteCode.getInviteeRole());
+
+                // Extract scope-role mapping from invitation
+                this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
+
+                // Ensure complete mapping with NO_ACCESS for unassigned scopes
+                logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping before init: " + this.scopeRoleMapping);
+                if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
+
+                    this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName());
+                    logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after init: " + this.scopeRoleMapping);
                 }
-                createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString(), pendingInviteCode.getInviteeRole());
+                logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after ensuring complete: " + this.scopeRoleMapping);
+
+                if(user != null){
+                    AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId(), pendingInviteCode.getInviteeRole(),this.scopeRoleMapping);
+                }
+                createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString(), pendingInviteCode.getInviteeRole(), this.scopeRoleMapping);
 
                 return SUCCESS.toUpperCase();
             } else if(pendingInviteCode == null){
@@ -298,8 +313,11 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 return ERROR.toUpperCase();
             }
 
+        }else {
+            this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name());
+            // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
         }
-        createUserAndRedirect(email, name, auth0SignupInfo, 0, Config.ConfigType.AUTH0.toString());
+        createUserAndRedirect(email, name, auth0SignupInfo, 0, Config.ConfigType.AUTH0.toString(), this.scopeRoleMapping);
         code = "";
         logger.debug("Executed registerViaAuth0");
         return SUCCESS.toUpperCase();
@@ -315,6 +333,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     String password;
     String email;
     String invitationCode;
+    Map<String, String> scopeRoleMapping;
 
     public String registerViaEmail() {
         code = "";
@@ -327,6 +346,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         }
         int invitedToAccountId = 0;
         String inviteeRole = null;
+        this.scopeRoleMapping = null;
         if (!invitationCode.isEmpty()) {
             Jws<Claims> jws;
             try {
@@ -354,6 +374,19 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
             invitedToAccountId = pendingInviteCode.getAccountId();
             inviteeRole = pendingInviteCode.getInviteeRole();
+
+            // Extract scope-role mapping if available (new n:n mapping approach)
+            this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
+
+            // Ensure complete mapping with NO_ACCESS for unassigned scopes
+            logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping before init: " + this.scopeRoleMapping);
+            if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
+
+                this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName());
+                logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping after init: " + this.scopeRoleMapping);
+            }
+            // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
+            logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping after ensuring complete: " + this.scopeRoleMapping);
 
         } else {
             if (!InitializerListener.isSaas) {
@@ -387,7 +420,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         try {
             shouldLogin = "true";
-            createUserAndRedirect(email, email, signupInfo, invitedToAccountId, "email", inviteeRole);
+            createUserAndRedirect(email, email, signupInfo, invitedToAccountId, "email", inviteeRole, this.scopeRoleMapping);
         } catch (IOException e) {
             e.printStackTrace();
             return ERROR.toUpperCase();
@@ -457,7 +490,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.debug("username {}", username);
             SignupInfo.GithubSignupInfo ghSignupInfo = new SignupInfo.GithubSignupInfo(accessToken, refreshToken, refreshTokenExpiry, email, username);
             shouldLogin = "true";
-            createUserAndRedirectWithDefaultRole(email, username, ghSignupInfo, 1000000, Config.ConfigType.GITHUB.toString());
+            createUserAndRedirectWithDefaultRole(email, username, ghSignupInfo, 1000000, Config.ConfigType.GITHUB.toString(), null);
             code = "";
             logger.debug("Executed registerViaGithub");
 
@@ -472,149 +505,27 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return SUCCESS.toUpperCase();
     }
 
-    public String registerViaOkta() throws IOException{
-        logger.infoAndAddToDb("registerViaOkta called with code: " + (this.code != null ? this.code.substring(0, Math.min(10, this.code.length())) + "..." : "null") + ", state: " + (this.state != null ? "present" : "null"));
-
-        // Log COMPLETE servlet request details to debug why code might be missing
-        logger.infoAndAddToDb("[registerViaOkta] === COMPLETE SERVLET REQUEST DEBUG ===");
-        if(servletRequest != null) {
-            // Request URL and method
-            logger.infoAndAddToDb("[registerViaOkta] Request URL: " + servletRequest.getRequestURL());
-            logger.infoAndAddToDb("[registerViaOkta] Request URI: " + servletRequest.getRequestURI());
-            logger.infoAndAddToDb("[registerViaOkta] Query String: " + servletRequest.getQueryString());
-            logger.infoAndAddToDb("[registerViaOkta] Request Method: " + servletRequest.getMethod());
-            logger.infoAndAddToDb("[registerViaOkta] Content Type: " + servletRequest.getContentType());
-            logger.infoAndAddToDb("[registerViaOkta] Content Length: " + servletRequest.getContentLength());
-
-            // All parameters
-            logger.infoAndAddToDb("[registerViaOkta] === ALL REQUEST PARAMETERS ===");
-            java.util.Map<String, String[]> paramMap = servletRequest.getParameterMap();
-            if(paramMap != null && !paramMap.isEmpty()) {
-                for(java.util.Map.Entry<String, String[]> entry : paramMap.entrySet()) {
-                    String key = entry.getKey();
-                    String[] values = entry.getValue();
-                    if(values != null && values.length > 0) {
-                        // Log ALL values, not just the first one
-                        for(int i = 0; i < values.length; i++) {
-                            String value = values[i];
-                            if(key.equals("code") && value != null && value.length() > 10) {
-                                logger.infoAndAddToDb("[registerViaOkta]   " + key + "[" + i + "] = " + value.substring(0, 10) + "... (length: " + value.length() + ")");
-                            } else {
-                                logger.infoAndAddToDb("[registerViaOkta]   " + key + "[" + i + "] = " + value);
-                            }
-                        }
-                    } else {
-                        logger.infoAndAddToDb("[registerViaOkta]   " + key + " = (empty array)");
-                    }
-                }
-            } else {
-                logger.infoAndAddToDb("[registerViaOkta] Parameter map is empty or null");
-            }
-
-            // Also directly check specific parameters using getParameter()
-            logger.infoAndAddToDb("[registerViaOkta] === DIRECT PARAMETER CHECKS ===");
-            String directCode = servletRequest.getParameter("code");
-            String directState = servletRequest.getParameter("state");
-            String directError = servletRequest.getParameter("error");
-            String directErrorDesc = servletRequest.getParameter("error_description");
-            logger.infoAndAddToDb("[registerViaOkta] Direct getParameter('code'): " + (directCode != null ? directCode.substring(0, Math.min(10, directCode.length())) + "... (length: " + directCode.length() + ")" : "null"));
-            logger.infoAndAddToDb("[registerViaOkta] Direct getParameter('state'): " + (directState != null ? "present (length: " + directState.length() + ")" : "null"));
-            logger.infoAndAddToDb("[registerViaOkta] Direct getParameter('error'): " + directError);
-            logger.infoAndAddToDb("[registerViaOkta] Direct getParameter('error_description'): " + directErrorDesc);
-
-            // Also log the Struts action properties
-            logger.infoAndAddToDb("[registerViaOkta] === STRUTS ACTION PROPERTIES ===");
-            logger.infoAndAddToDb("[registerViaOkta] Action property 'this.code': " + (this.code != null ? this.code.substring(0, Math.min(10, this.code.length())) + "... (length: " + this.code.length() + ")" : "null"));
-            logger.infoAndAddToDb("[registerViaOkta] Action property 'this.state': " + (this.state != null ? "present (length: " + this.state.length() + ")" : "null"));
-
-            // All headers
-            logger.infoAndAddToDb("[registerViaOkta] === ALL REQUEST HEADERS ===");
-            Enumeration<String> headerNames = servletRequest.getHeaderNames();
-            if(headerNames != null) {
-                while(headerNames.hasMoreElements()) {
-                    String headerName = headerNames.nextElement();
-                    String headerValue = servletRequest.getHeader(headerName);
-                    logger.infoAndAddToDb("[registerViaOkta]   " + headerName + ": " + headerValue);
-                }
-            } else {
-                logger.infoAndAddToDb("[registerViaOkta] No headers found");
-            }
-
-            // All attributes
-            logger.infoAndAddToDb("[registerViaOkta] === ALL REQUEST ATTRIBUTES ===");
-            java.util.Enumeration<String> attrNames = servletRequest.getAttributeNames();
-            if(attrNames != null) {
-                while(attrNames.hasMoreElements()) {
-                    String attrName = attrNames.nextElement();
-                    Object attrValue = servletRequest.getAttribute(attrName);
-                    logger.infoAndAddToDb("[registerViaOkta]   " + attrName + " = " + (attrValue != null ? attrValue.toString() : "null"));
-                }
-            } else {
-                logger.infoAndAddToDb("[registerViaOkta] No attributes found");
-            }
-
-            // Try to read body (if POST)
-            if("POST".equalsIgnoreCase(servletRequest.getMethod())) {
-                logger.infoAndAddToDb("[registerViaOkta] === REQUEST BODY (POST) ===");
-                try {
-                    java.io.BufferedReader reader = servletRequest.getReader();
-                    if(reader != null) {
-                        StringBuilder bodyBuilder = new StringBuilder();
-                        String line;
-                        while((line = reader.readLine()) != null) {
-                            bodyBuilder.append(line);
-                        }
-                        String body = bodyBuilder.toString();
-                        logger.infoAndAddToDb("[registerViaOkta] Body: " + (body.isEmpty() ? "(empty)" : body));
-                    } else {
-                        logger.infoAndAddToDb("[registerViaOkta] Reader is null");
-                    }
-                } catch(Exception e) {
-                    logger.infoAndAddToDb("[registerViaOkta] Could not read body: " + e.getMessage());
-                }
-            }
-        } else {
-            logger.infoAndAddToDb("[registerViaOkta] servletRequest is null!");
-        }
-        logger.infoAndAddToDb("[registerViaOkta] === END COMPLETE SERVLET REQUEST DEBUG ===");
-
+    public String registerViaOkta() throws IOException {
         try {
             Config.OktaConfig oktaConfig = null;
-            logger.info("Checking deployment mode");
-            if(DashboardMode.isOnPremDeployment()) {
-                logger.info("On-prem deployment detected");
+            if (DashboardMode.isOnPremDeployment()) {
                 OktaLogin oktaLoginInstance = OktaLogin.getInstance();
-                logger.info("OktaLogin instance: " + (oktaLoginInstance != null ? "found" : "null"));
-                if(oktaLoginInstance == null){
-                    logger.infoAndAddToDb("OktaLogin instance is null, redirecting to /login");
+                if (oktaLoginInstance == null) {
                     servletResponse.sendRedirect("/login");
                     return ERROR.toUpperCase();
                 }
                 try {
-                    logger.info("Parsing state as accountId for on-prem");
                     setAccountId(Integer.parseInt(state));
-                    logger.infoAndAddToDb("Parsed accountId from state: " + this.accountId);
                 } catch (NumberFormatException e) {
-                    logger.infoAndAddToDb("Failed to parse state as accountId: " + e.getMessage());
                     servletResponse.sendRedirect("/login");
                     return ERROR.toUpperCase();
                 }
-                logger.info("Getting OktaConfig from OktaLogin instance");
                 oktaConfig = OktaLogin.getInstance().getOktaConfig();
-                logger.info("OktaConfig retrieved: " + (oktaConfig != null ? "found" : "null"));
             } else {
-                logger.info("SaaS deployment detected");
-                logger.info("Decoding state from Base64");
-                String decodedState = new String(java.util.Base64.getDecoder().decode(state));
-                logger.info("Decoded state: " + decodedState);
-                BasicDBObject parsedState = BasicDBObject.parse(decodedState);
-                String accountId = parsedState.getString("accountId");
-                logger.info("Extracted accountId from parsed state: " + accountId);
-                setAccountId(Integer.parseInt(accountId));
-                logger.infoAndAddToDb("Set accountId: " + this.accountId);
-
-                if(parsedState.containsKey("signupInvitationCode") && parsedState.containsKey("signupEmailId")) {
-                    logger.info("State contains signupInvitationCode and signupEmailId");
+                BasicDBObject parsedState = BasicDBObject.parse(new String(java.util.Base64.getDecoder().decode(state)));
+                setAccountId(Integer.parseInt(parsedState.getString("accountId")));
+                Context.accountId.set(this.accountId);
+                if (parsedState.containsKey("signupInvitationCode") && parsedState.containsKey("signupEmailId")) {
                     setSignupInvitationCode(parsedState.getString("signupInvitationCode"));
                     setSignupEmailId(parsedState.getString("signupEmailId"));
                     logger.infoAndAddToDb("Set signupInvitationCode: " + (this.signupInvitationCode != null ? "present" : "null") + ", signupEmailId: " + this.signupEmailId);
@@ -625,106 +536,71 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 oktaConfig = Config.getOktaConfig(this.accountId);
                 logger.info("OktaConfig retrieved: " + (oktaConfig != null ? "found" : "null"));
             }
-            if(oktaConfig == null) {
-                logger.infoAndAddToDb("OktaConfig is null, redirecting to /login");
+            if (oktaConfig == null) {
                 servletResponse.sendRedirect("/login");
                 return ERROR.toUpperCase();
             }
-            logger.info("Building domain URL from OktaDomainUrl: " + oktaConfig.getOktaDomainUrl());
-            String domainUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/";
-            if(oktaConfig.getAuthorisationServerId() == null || oktaConfig.getAuthorisationServerId().isEmpty()){
-                logger.info("No authorisation server ID found, using default /v1");
-                domainUrl += "/v1";
-            }else{
-                logger.info("Using authorisation server ID: " + oktaConfig.getAuthorisationServerId());
-                domainUrl += oktaConfig.getAuthorisationServerId() + "/v1";
-            }
-            logger.infoAndAddToDb("Trying to login with okta sso for account id: " + accountId + " domain url: " + domainUrl);
-            String clientId = oktaConfig.getClientId();
-            String clientSecret = oktaConfig.getClientSecret();
-            String redirectUri = oktaConfig.getRedirectUri();
-            logger.info("OktaConfig - ClientId: " + (clientId != null ? "present" : "null") + ", ClientSecret: " + (clientSecret != null ? "present" : "null") + ", RedirectUri: " + redirectUri);
+            String domainUrl = oktaConfig.getOAuthDomainUrl();
 
             BasicDBObject params = new BasicDBObject();
             params.put("grant_type", "authorization_code");
             params.put("code", this.code);
-            params.put("client_id", clientId);
-            params.put("client_secret", clientSecret);
-            params.put("redirect_uri", redirectUri);
-            logger.info("Built token request params with grant_type: authorization_code");
-            logger.infoAndAddToDb("========== [registerViaOkta] API CALL 1: TOKEN ENDPOINT ==========");
-            logger.infoAndAddToDb("Making POST request to: " + domainUrl + "/token");
-            Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl +"/token",params);
-            logger.infoAndAddToDb("Token response received, checking for access_token");
+            params.put("client_id", oktaConfig.getClientId());
+            params.put("client_secret", oktaConfig.getClientSecret());
+            params.put("redirect_uri", oktaConfig.getRedirectUri());
+
+            Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl + "/token", params);
             String accessToken = tokenData.get("access_token").toString();
-            logger.info("Access token retrieved: " + (accessToken != null && !accessToken.isEmpty() ? "present (length: " + accessToken.length() + ")" : "null/empty"));
-            logger.infoAndAddToDb("========== [registerViaOkta] API CALL 2: USERINFO ENDPOINT ==========");
-            logger.infoAndAddToDb("Making GET request to: " + domainUrl + "/userinfo");
-            Map<String,Object> userInfo = CustomHttpRequest.getRequest( domainUrl + "/userinfo","Bearer " + accessToken);
-            logger.infoAndAddToDb("UserInfo response received");
+            Map<String, Object> userInfo = CustomHttpRequest.getRequest(domainUrl + "/userinfo", "Bearer " + accessToken, false);
             String email = userInfo.get("email").toString();
             String username = userInfo.get("preferred_username").toString();
-            logger.infoAndAddToDb("Extracted user info - email: " + email + ", preferred_username: " + username);
-
-            if (oktaConfig.getOrganizationDomain() != null && !oktaConfig.getOrganizationDomain().isEmpty()) {
-                logger.info("Organization domain validation required: " + oktaConfig.getOrganizationDomain());
-                String userDomain = null;
-                if (email != null && email.contains("@")) {
-                    userDomain = email.substring(email.indexOf('@') + 1);
-                    logger.info("Extracted user domain from email: " + userDomain);
-                } else {
-                    logger.info("Email does not contain '@' or is null");
-                }
-
+            logger.infoAndAddToDb("Trying to login with okta sso for email: " + email + ", accountId: " + accountId);
+            String oktaUserId = userInfo.get("sub") != null ? userInfo.get("sub").toString() : null;
+            if (!StringUtils.isEmpty(oktaConfig.getOrganizationDomain())) {
+                String userDomain = email.contains("@") ? email.substring(email.indexOf('@') + 1) : null;
                 if (userDomain == null || !oktaConfig.getOrganizationDomain().equalsIgnoreCase(userDomain)) {
-                    logger.errorAndAddToDb("Domain mismatch: user " + email + " with domain " + userDomain +
-                                         " attempted to access account " + accountId +
-                                         " with required domain " + oktaConfig.getOrganizationDomain(), LogDb.DASHBOARD);
-                    logger.info("Redirecting to /login?error=unauthorized due to domain mismatch");
+                    logger.errorAndAddToDb("Domain mismatch: user " + email + " attempted to access account " + accountId +
+                        " with required domain " + oktaConfig.getOrganizationDomain(), LogDb.DASHBOARD);
                     servletResponse.sendRedirect("/login?error=unauthorized");
                     return ERROR.toUpperCase();
                 }
-                logger.infoAndAddToDb("Domain validation passed for user " + email + " accessing account " + accountId);
-            } else {
-                logger.info("No organization domain configured, skipping domain validation");
             }
 
-            logger.info("Checking for pending invite code");
-            if(!StringUtils.isEmpty(signupInvitationCode) && !StringUtils.isEmpty(signupEmailId)) {
-                logger.info("Processing invite code: " + signupInvitationCode + " for email: " + signupEmailId);
+            if (!StringUtils.isEmpty(signupInvitationCode) && !StringUtils.isEmpty(signupEmailId)) {
                 Bson filter = Filters.eq(PendingInviteCode.INVITE_CODE, signupInvitationCode);
-                logger.info("Querying PendingInviteCodesDao for invite code");
                 PendingInviteCode pendingInviteCode = PendingInviteCodesDao.instance.findOne(filter);
-                logger.info("PendingInviteCode found: " + (pendingInviteCode != null ? "yes" : "no"));
                 if (pendingInviteCode != null && pendingInviteCode.getInviteeEmailId().equals(email)) {
-                    logger.info("Invite code matches, deleting invite code and updating accountId to: " + pendingInviteCode.getAccountId());
                     PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
                     accountId = pendingInviteCode.getAccountId();
                     logger.info("Updated accountId from invite: " + accountId);
+
+                    // Extract scope-role mapping if available (new n:n mapping approach)
+                    this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
+                    logger.info("Extracted scope-role mapping from invite: " + this.scopeRoleMapping);
+
+                    // Ensure complete mapping with NO_ACCESS for unassigned scopes
+                    logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping before init: " + this.scopeRoleMapping);
+                    if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
+
+                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName());
+                        logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping after init: " + this.scopeRoleMapping);
+                    }
+                    // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
+                    logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping after ensuring complete: " + this.scopeRoleMapping);
                 } else {
                     logger.info("Invite code does not match or invitee email mismatch");
                 }
-            } else {
-                logger.info("No signupInvitationCode or signupEmailId present");
             }
 
-            logger.info("Creating OktaSignupInfo for user: " + username);
-            SignupInfo.OktaSignupInfo oktaSignupInfo= new SignupInfo.OktaSignupInfo(accessToken, username);
             shouldLogin = "true";
-            logger.info("Setting shouldLogin to true");
-            logger.info("Calling createUserAndRedirectWithDefaultRole for email: " + email + ", accountId: " + accountId);
-            createUserAndRedirectWithDefaultRole(email, username, oktaSignupInfo, accountId, Config.ConfigType.OKTA.toString());
+            String resolvedRole = fetchOktaRole(oktaConfig, oktaUserId, accessToken);
+            createUserAndRedirect(email, username, new SignupInfo.OktaSignupInfo(accessToken, username), accountId, Config.ConfigType.OKTA.toString(), resolvedRole, this.scopeRoleMapping);
             code = "";
-            logger.info("registerViaOkta completed successfully");
         } catch (Exception e) {
-            logger.errorAndAddToDb("Error while signing in via okta sso \n" + e.getMessage(), LogDb.DASHBOARD);
-            logger.info("Exception in registerViaOkta: " + e.getClass().getName() + " - " + e.getMessage());
-            e.printStackTrace();
-            logger.info("Redirecting to /login due to exception");
+            logger.errorAndAddToDb("Error while signing in via okta sso: " + e.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }
-        logger.info("Returning SUCCESS from registerViaOkta");
         return SUCCESS.toUpperCase();
     }
 
@@ -739,6 +615,145 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.error("Error while setting default role to " + fallbackDefault);
         }
         return fallbackDefault;
+    }
+
+    private static final Map<String, String> OKTA_CONVENTION_ROLE_MAP = new java.util.LinkedHashMap<String, String>() {{
+        put("akto_admin", RBAC.Role.ADMIN.name());
+        put("akto_security_engineer", RBAC.Role.MEMBER.name());
+        put("akto_developer", RBAC.Role.DEVELOPER.name());
+        put("akto_guest", RBAC.Role.GUEST.name());
+        put("akto_threat_engineer", RBAC.Role.THREAT_ENGINEER.name());
+        put("akto_threat_viewer", RBAC.Role.THREAT_VIEWER.name());
+    }};
+
+    /** Normalize Okta group name for convention lookup: lowercase, spaces to underscores (e.g. "Akto Admin" -> "akto_admin"). */
+    private static String normalizeGroupForConvention(String group) {
+        if (group == null) return "";
+        return group.toLowerCase().replace(' ', '_').trim();
+    }
+
+    /**
+     * Resolves Akto user role from Okta group membership: custom {@code oktaGroupToAktoUserRoleMap} first, then convention.
+     * Custom role names are supported in {@code oktaGroupToAktoUserRoleMap}; priority is derived from the custom role's baseRole.
+     */
+    private String resolveAktoRoleFromOktaGroupNames(List<String> groupNames, Map<String, String> oktaGroupToAktoUserRoleMap) {
+        if (groupNames == null || groupNames.isEmpty()) {
+            return RBAC.Role.MEMBER.name();
+        }
+        if (oktaGroupToAktoUserRoleMap != null && !oktaGroupToAktoUserRoleMap.isEmpty()) {
+            String role = resolveHighestPriorityRole(groupNames, oktaGroupToAktoUserRoleMap);
+            if (role != null) return role;
+        }
+        List<String> normalized = new ArrayList<>();
+        for (String g : groupNames) {
+            normalized.add(normalizeGroupForConvention(g));
+        }
+        String conventionRole = resolveHighestPriorityRole(normalized, OKTA_CONVENTION_ROLE_MAP);
+        return conventionRole != null ? conventionRole : RBAC.Role.MEMBER.name();
+    }
+
+    /**
+     * Fetches all Okta group names from the Okta Management API (GET /api/v1/groups).
+     * Use when adding mappings from the dashboard (no user ID available). Requires API token.
+     *
+     * @param managementBaseUrl Okta Management API base URL (e.g. https://your-domain.okta.com)
+     * @param apiToken          Okta API token (SSWS)
+     * @return list of group names; empty list if any param is null/empty or on API failure
+     */
+    public static List<String> fetchAllOktaGroupNamesFromManagementApi(String managementBaseUrl, String apiToken) {
+        if (StringUtils.isEmpty(managementBaseUrl) || StringUtils.isEmpty(apiToken)) {
+            return Collections.emptyList();
+        }
+        String url = managementBaseUrl + "/api/v1/groups";
+        String ssws = "SSWS " + apiToken;
+        try {
+            List<Map<String, Object>> groupsList = CustomHttpRequest.getRequestAsList(url, ssws);
+            return extractOktaGroupNamesFromApiResponse(groupsList);
+        } catch (Exception e) {
+            logger.errorAndAddToDb("[Okta SSO] Failed to fetch Okta groups list: " + e.getMessage(), LogDb.DASHBOARD);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Fetches Okta group names for a user from the Okta Management API.
+     * Call this when groups are not available in the access token (e.g. when the token scope does not include groups).
+     *
+     * @param managementBaseUrl Okta Management API base URL (e.g. https://your-domain.okta.com)
+     * @param apiToken          Okta API token (SSWS)
+     * @param oktaUserId        Okta user ID
+     * @return list of group names; empty list if any param is null/empty or on API failure
+     */
+    public static List<String> fetchOktaGroupsFromManagementApi(String managementBaseUrl, String apiToken, String oktaUserId) {
+        if (StringUtils.isEmpty(managementBaseUrl) || StringUtils.isEmpty(apiToken) || oktaUserId == null || oktaUserId.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String url = managementBaseUrl + "/api/v1/users/" + oktaUserId + "/groups";
+        String ssws = "SSWS " + apiToken;
+        try {
+            List<Map<String, Object>> groupsList = CustomHttpRequest.getRequestAsList(url, ssws);
+            return extractOktaGroupNamesFromApiResponse(groupsList);
+        } catch (Exception e) {
+            logger.errorAndAddToDb("[Okta SSO] Failed to fetch Okta groups for user " + oktaUserId + ": " + e.getMessage(), LogDb.DASHBOARD);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Uses JWT {@code groups} first; if empty and an API token is configured, loads groups from Okta Management API.
+     */
+    private String fetchOktaRole(Config.OktaConfig oktaConfig, String oktaUserId, String accessToken) {
+        Map<String, String> oktaGroupToAktoUserRoleMap = oktaConfig.getOktaGroupToAktoUserRoleMap();
+
+        if (StringUtils.isEmpty(oktaConfig.getManagementApiToken()) || oktaUserId == null) {
+            return RBAC.Role.MEMBER.name();
+        }
+        List<String> groupsFromApi = fetchOktaGroupsFromManagementApi(
+                oktaConfig.getManagementBaseUrl(), oktaConfig.getManagementApiToken(), oktaUserId);
+        return resolveAktoRoleFromOktaGroupNames(groupsFromApi, oktaGroupToAktoUserRoleMap);
+    }
+
+    private static List<String> extractOktaGroupNamesFromApiResponse(List<Map<String, Object>> groupsList) {
+        List<String> result = new ArrayList<>();
+        if (groupsList == null) return result;
+        for (Map<String, Object> item : groupsList) {
+            Object profileObj = item.get("profile");
+            if (!(profileObj instanceof Map)) continue;
+            Object name = ((Map<?, ?>) profileObj).get("name");
+            if (name != null) result.add(name.toString());
+        }
+        return result;
+    }
+
+    private String resolveHighestPriorityRole(List<String> keys, Map<String, String> mapping) {
+        if (keys == null || keys.isEmpty() || mapping == null || mapping.isEmpty()) return null;
+        int bestPriority = Integer.MAX_VALUE;
+        String bestRole = null;
+        for (String key : keys) {
+            String mappedRole = mapping.get(key);
+            if (mappedRole == null) continue;
+            int priority;
+            try {
+                priority = RBAC.Role.valueOf(mappedRole).ordinal();
+                String dbName = Context.accountId.get()+"";
+                logger.info("Role " + mappedRole + " found in mapping");
+                logger.info("DB Name: " + dbName);
+            } catch (IllegalArgumentException e) {
+                String dbName = Context.accountId.get()+"";
+                CustomRole customRole = CustomRoleDao.instance.findRoleByName(mappedRole);
+                if (customRole == null) continue;
+                try {
+                    priority = RBAC.Role.valueOf(customRole.getBaseRole()).ordinal();
+                } catch (IllegalArgumentException ex) {
+                    continue;
+                }
+            }
+            if (priority < bestPriority) {
+                bestPriority = priority;
+                bestRole = mappedRole;
+            }
+        }
+        return bestRole;
     }
 
     private int accountId;
@@ -1050,6 +1065,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 if (pendingInviteCode != null && pendingInviteCode.getInviteeEmailId().equals(email)) {
                     PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
                     invitedToAccountId = pendingInviteCode.getAccountId();
+
+                    // Extract scope-role mapping if available (new n:n mapping approach)
+                    this.scopeRoleMapping = pendingInviteCode.getScopeRoleMapping();
                 }
             }
 
@@ -1089,7 +1107,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             if(invitedToAccountId > 0){
                 setAccountId(invitedToAccountId);
             }
-            createUserAndRedirectWithDefaultRole(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString());
+            createUserAndRedirectWithDefaultRole(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), null);
         } catch (Exception e1) {
             logger.errorAndAddToDb("Error while signing in via azure sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
@@ -1139,7 +1157,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             shouldLogin = "true";
             SignupInfo.SamlSsoSignupInfo signUpInfo = new SignupInfo.SamlSsoSignupInfo(username, userEmail, Config.ConfigType.GOOGLE_SAML);
 
-            createUserAndRedirectWithDefaultRole(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString());
+            createUserAndRedirectWithDefaultRole(userEmail, username, signUpInfo, this.accountId, Config.ConfigType.GOOGLE_SAML.toString(), null);
         } catch (Exception e1) {
             logger.errorAndAddToDb("Error while signing in via google workspace sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
@@ -1222,17 +1240,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 //    }
 
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
-                                       int invitationToAccount, String method) throws IOException {
-        createUserAndRedirect(userEmail, username, signupInfo, invitationToAccount, method, null);
+                                       int invitationToAccount, String method, Map<String,String> scopeRoleMapping) throws IOException {
+        createUserAndRedirect(userEmail, username, signupInfo, invitationToAccount, method, null, scopeRoleMapping);
     }
 
     private void createUserAndRedirectWithDefaultRole(String userEmail, String username, SignupInfo signupInfo,
-                                       int invitationToAccount, String method) throws IOException {
-        String defaultRole = RBAC.Role.MEMBER.name();
-        if (UsageMetricCalculator.isRbacFeatureAvailable(invitationToAccount)) {
-            defaultRole = fetchDefaultInviteRole(invitationToAccount, RBAC.Role.GUEST.name());
-        }
-        createUserAndRedirect(userEmail, username, signupInfo, invitationToAccount, method, defaultRole);
+                                       int invitationToAccount, String method, Map<String,String> scopeRoleMapping) throws IOException {
+        // For new users without explicit invitation, initialize with NO_ACCESS for all scopes
+        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name());
+        logger.infoAndAddToDb("[createUserAndRedirectWithDefaultRole] Initialized scopeRoleMapping for new user: " + this.scopeRoleMapping);
+        // Pass null as invitedRole so that createUserAndRedirect uses scopeRoleMapping instead of role
+        createUserAndRedirect(userEmail, username, signupInfo, invitationToAccount, method, null, scopeRoleMapping);
     }
 
     // Organization cache initialization - only done once
@@ -1240,7 +1258,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     private static final OrganizationCache organizationCache = new OrganizationCache();
 
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
-                                       int invitationToAccount, String method, String invitedRole) throws IOException {
+                                       int invitationToAccount, String method, String invitedRole, Map<String,String> scopeRoleMapping) throws IOException {
         
         // Trigger organization cache once
         if (!organizationCacheInitialized) {
@@ -1301,6 +1319,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             boolean isSSOLogin = Config.isConfigSSOType(signupInfo.getConfigType());
             logger.infoAndAddToDb("[createUserAndRedirect] Is SSO login: " + isSSOLogin + " (configType: " + signupInfo.getConfigType() + ")");
+
+            if (Utils.shouldBlockNonSsoLogin(accountId, user, userEmail, isSSOLogin)) {
+                logger.infoAndAddToDb("[createUserAndRedirect] Blocking non-SSO login for user: " + userEmail);
+                if (user != null && user.getSignupInfoMap() != null && user.getSignupInfoMap().containsKey("AUTH0")) {
+                    logger.infoAndAddToDb("[createUserAndRedirect] Unsetting AUTH0 signup info for user: " + userEmail);
+                    UsersDao.instance.updateOne(eq("login", userEmail), Updates.unset(User.SIGNUP_INFO_MAP + ".AUTH0"));
+                }
+                logger.infoAndAddToDb("[createUserAndRedirect] Redirecting to SSO login page");
+                servletResponse.sendRedirect(SSO_URL);
+                return;
+            }
 
             if (user == null) {
                 logger.infoAndAddToDb("[createUserAndRedirect] Creating NEW USER account");
@@ -1390,16 +1419,14 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[createUserAndRedirect] NEW USER CREATED SUCCESSFULLY - userId: " + user.getId() + ", accountId: " + accountId);
 
             } else if (StringUtils.isEmpty(code) && !isSSOLogin) {
-                logger.info("[createUserAndRedirect] EXISTING USER path - non-SSO login with empty code");
                 if (accountId == 0) {
                     logger.errorAndAddToDb("[createUserAndRedirect] ERROR: accountId is 0 for existing user non-SSO login. This is an invalid state.");
                     throw new IllegalStateException("The account doesn't exist.");
                 }
             } else {
-                logger.infoAndAddToDb("[createUserAndRedirect] EXISTING USER path - SSO login or invited user");
                 logger.info("[createUserAndRedirect] User: " + user.getLogin() + ", accountId: " + accountId + ", invitedRole: " + invitedRole);
 
-                if(invitedRole != null && accountId != 0){
+                if((invitedRole != null || scopeRoleMapping!= null) && accountId != 0){
                     logger.info("[createUserAndRedirect] Processing invitation for existing user");
                     // check if the invited account exists in the user info, if not, add it
                     String accountIdStr = String.valueOf(accountId);
@@ -1408,20 +1435,38 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
                     if(!exists){
                         logger.info("[createUserAndRedirect] Adding new account to existing user with role: " + invitedRole);
-                        RBACDao.instance.insertOne(
-                            new RBAC(user.getId(), invitedRole, accountId)
-                        );
+                        RBAC rbacEntry = new RBAC(user.getId(), invitedRole, accountId);
+
+                        // Set scope-role mapping if available (new n:n mapping approach)
+                        if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
+                            rbacEntry.setScopeRoleMapping(scopeRoleMapping);
+                        }
+                        logger.info("[createUserAndRedirect] Set scope-role mapping for existing user: " + scopeRoleMapping);
+                        RBACDao.instance.insertOne(rbacEntry);
                         String accountName = account != null ? account.getName() : "My account";
                         user = UsersDao.addAccount(user.getLogin(), accountId, accountName);
                         logger.infoAndAddToDb("[createUserAndRedirect] Successfully added account " + accountId + " to existing user " + user.getLogin());
                     } else {
-                        logger.info("[createUserAndRedirect] Account already exists for user, skipping RBAC/account addition");
-                    }
+                        Bson filter = Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId));
+                        RBAC existingRbac = RBACDao.instance.findOne(filter);
+                        if (existingRbac != null) {
+                            Bson update = Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMapping);
+                            if(scopeRoleMapping == null || scopeRoleMapping.isEmpty()){
+                                update = Updates.set(RBAC.ROLE, invitedRole);
+                            }
+                            RBACDao.instance.updateOne(filter, update);
+                        }else{
+                            RBAC rbacEntry = new RBAC(user.getId(), invitedRole, accountId);
+                            if(scopeRoleMapping != null && !scopeRoleMapping.isEmpty()){
+                                rbacEntry.setScopeRoleMapping(scopeRoleMapping);
+                            }
+                            RBACDao.instance.insertOne(rbacEntry);
+                        }
 
                     servletRequest.getSession().setAttribute("accountId", accountId);
                     logger.info("[createUserAndRedirect] Set session accountId to: " + accountId);
                 }
-
+                }
                 logger.info("[createUserAndRedirect] Logging in existing user and redirecting to /dashboard/observe/inventory");
                 LoginAction.loginUser(user, servletResponse, true, servletRequest, signupInfo);
                 servletResponse.sendRedirect("/dashboard/observe/inventory");
@@ -1433,11 +1478,34 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[createUserAndRedirect] Initializing account for new user");
             if(!newOrgSetup){
                 Account oldAccount = AccountsDao.instance.findOne("_id", invitationToAccount);
-                user = AccountAction.initializeAccount(userEmail, invitationToAccount, oldAccount.getName(),false, invitedRole == null ? RBAC.Role.MEMBER.name() : invitedRole);
+                user = AccountAction.initializeAccount(userEmail, invitationToAccount, oldAccount.getName(), false, this.scopeRoleMapping);
             }else {
-                user = AccountAction.initializeAccount(userEmail, accountId, "My account", invitationToAccount == 0, invitedRole == null ? RBAC.Role.ADMIN.name() : invitedRole);
+                this.scopeRoleMapping.put("API", RBAC.Role.ADMIN.name());
+                this.scopeRoleMapping.put("ENDPOINT", RBAC.Role.ADMIN.name());
+                this.scopeRoleMapping.put("DAST", RBAC.Role.ADMIN.name());
+                this.scopeRoleMapping.put("AGENTIC", RBAC.Role.ADMIN.name());
+                user = AccountAction.initializeAccount(userEmail, accountId, "My account", invitationToAccount == 0, this.scopeRoleMapping);
             }
             logger.infoAndAddToDb("[createUserAndRedirect] Account initialized successfully for accountId: " + accountId);
+
+            // No need to update scope-role mapping separately now since it's set during account initialization
+            if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
+                // Only update if this is an invited user (invitedRole is set) and scope-role mapping needs to be updated
+                try {
+                    RBACDao.instance.getMCollection().updateOne(
+                        Filters.and(
+                            Filters.eq(RBAC.USER_ID, user.getId()),
+                            Filters.eq(RBAC.ACCOUNT_ID, accountId)
+                        ),
+                        Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping)
+                    );
+                    logger.info("[createUserAndRedirect] Set scope-role mapping for invited user: " + this.scopeRoleMapping);
+                } catch (Exception e) {
+                    logger.errorAndAddToDb(e, "[createUserAndRedirect] Error setting scope-role mapping for invited user: " + e.getMessage());
+                }
+            }
+            RBACDao.instance.deleteUserEntryFromCache(new Pair<>(user.getId(), accountId));
+
 
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);

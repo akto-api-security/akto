@@ -139,12 +139,12 @@ export default {
             }
         })
     },
-    attachFileToIssue(origReq, testReq, issueId) {
+    attachFileToIssue(origReq, testReq, issueId, agenticResult = false) {
         return request({
             url: '/api/attachFileToIssue',
             method: 'post',
             data: {
-                origReq, testReq, issueId
+                origReq, testReq, issueId, agenticResult
             }
         })
     },
@@ -190,30 +190,49 @@ export default {
         }).then((resp) => {
             return resp
         })},
-    triggerSingleStep(type, nodeId, requestData) {
+    triggerSingleStep(type, nodeId, requestData, miniTestingServiceName) {
         return request({
             url: 'api/triggerSingleLoginFlow',
             method: 'post',
-            data: {type, nodeId, requestData}
+            data: { type, nodeId, requestData, miniTestingServiceName }
         }).then((resp) => {
             return resp
         })
     },
-    uploadRecordedLoginFlow(content, tokenFetchCommand) {
+    uploadRecordedLoginFlow(content, tokenFetchCommand, roleName, miniTestingServiceName) {
+        const data = { content, tokenFetchCommand }
+        if (roleName) {
+            data.roleName = roleName
+        }
+        if (miniTestingServiceName) {
+            data.miniTestingServiceName = miniTestingServiceName
+        }
         return request({
             url: '/api/uploadRecordedFlow',
             method: 'post',
-            data: {content, tokenFetchCommand}
+            data
         }).then((resp) => {
             return resp
         })
     },
 
-    fetchRecordedLoginFlow(nodeId) {
+    fetchRecordedLoginScreenshots(roleName) {
+        return request({
+            url: '/api/fetchRecordedLoginScreenshots',
+            method: 'post',
+            data: { roleName }
+        }).then((resp) => resp)
+    },
+
+    fetchRecordedLoginFlow(nodeId, testingRunPlaygroundId) {
+        const data = { nodeId }
+        if (testingRunPlaygroundId) {
+            data.testingRunPlaygroundId = testingRunPlaygroundId
+        }
         return request({
             url: '/api/fetchRecordedFlowOutput',
             method: 'post',
-            data: {nodeId}
+            data
         }).then((resp) => {
             return resp
         })
@@ -279,13 +298,14 @@ export default {
         })
     },
 
-    async getSummaryInfo(startTimestamp, endTimestamp){
+    async getSummaryInfo(startTimestamp, endTimestamp, issueSummaryFilterCollectionIds){
         return await request({
             url: '/api/getIssueSummaryInfo',
             method: 'post',
             data: {
                 startTimestamp: startTimestamp,
                 endTimestamp: endTimestamp,
+                issueSummaryFilterCollectionIds: issueSummaryFilterCollectionIds || [],
             }
         })
     },
@@ -611,11 +631,15 @@ export default {
             data: { content }
         })
     },
-    allTestsCountsRanges() {
+    allTestsCountsRanges(apiCollectionIds) {
+        const data = {}
+        if (apiCollectionIds && apiCollectionIds.length > 0) {
+            data.apiCollectionIds = apiCollectionIds
+        }
         return request({
             url: '/api/fetchTestingRunsRanges',
             method: 'post',
-            data: {}
+            data
         })
     },
     getUniqueHostsTested(testingRunId) {
@@ -625,16 +649,20 @@ export default {
             data: { testingRunId }
         })
     },
-    async fetchCategoryWiseScores(startTimestamp, endTimestamp, dashboardCategory, dataSource = 'testing') {
+    async fetchCategoryWiseScores(startTimestamp, endTimestamp, dashboardCategory, dataSource = 'testing', apiCollectionIds) {
+        const data = {
+            startTimestamp,
+            endTimestamp,
+            dashboardCategory,
+            dataSource
+        }
+        if (apiCollectionIds && apiCollectionIds.length > 0) {
+            data.apiCollectionIds = apiCollectionIds
+        }
         const resp = await request({
             url: '/api/fetchCategoryWiseScores',
             method: 'post',
-            data: {
-                startTimestamp,
-                endTimestamp,
-                dashboardCategory,
-                dataSource
-            }
+            data
         })
         return resp
     },

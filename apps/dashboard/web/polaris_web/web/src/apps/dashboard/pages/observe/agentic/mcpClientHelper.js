@@ -1,7 +1,8 @@
 const TYPE_TAG_KEYS = { MCP_SERVER: 'mcp-server', GEN_AI: 'gen-ai', BROWSER_LLM: 'browser-llm' };
 const ASSET_TAG_KEYS = { MCP_CLIENT: 'mcp-client', AI_AGENT: 'ai-agent', BROWSER_LLM_AGENT: 'browser-llm-agent' };
-const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server' };
-const ROW_TYPES = { AGENT: 'agent', SERVICE: 'service' };
+const SKILL_TAG_KEY = 'skill';
+const CLIENT_TYPES = { LLM: 'LLM', AI_AGENT: 'AI Agent', MCP_SERVER: 'MCP Server', SKILL: 'Skill' };
+const ROW_TYPES = { AGENT: 'agent', SERVICE: 'service', SKILL: 'skill' };
 const TYPE_TAG_TO_DISPLAY = {
     [TYPE_TAG_KEYS.MCP_SERVER]: CLIENT_TYPES.MCP_SERVER,
     [TYPE_TAG_KEYS.GEN_AI]: CLIENT_TYPES.AI_AGENT,
@@ -125,6 +126,35 @@ const getAgentTypeFromValue = (tagValue) => {
     return info?.agentType || CLIENT_TYPES.AI_AGENT;
 };
 
+/**
+ * Agentic asset category for inventory tree rows (AI Agent / MCP Server / LLM / Skill).
+ * Uses raw envType when present, else formatted envType strings from table data.
+ */
+const getAgenticCategoryLabel = (collection) => {
+    const raw = collection?.envTypeOriginal;
+    if (Array.isArray(raw) && raw.length > 0) {
+        if (typeof raw[0] === 'object' && raw[0]?.keyName) {
+            return getTypeFromTags(raw);
+        }
+    }
+    if (Array.isArray(collection?.skills) && collection.skills.length > 0) {
+        return CLIENT_TYPES.SKILL;
+    }
+    const envArr = collection?.envType;
+    if (Array.isArray(envArr) && envArr.length > 0 && typeof envArr[0] === 'string') {
+        if (envArr.some((t) => typeof t === 'string' && t.startsWith('mcp-server='))) {
+            return TYPE_TAG_TO_DISPLAY[TYPE_TAG_KEYS.MCP_SERVER];
+        }
+        if (envArr.some((t) => typeof t === 'string' && t.startsWith('gen-ai='))) {
+            return TYPE_TAG_TO_DISPLAY[TYPE_TAG_KEYS.GEN_AI];
+        }
+        if (envArr.some((t) => typeof t === 'string' && t.startsWith('browser-llm='))) {
+            return TYPE_TAG_TO_DISPLAY[TYPE_TAG_KEYS.BROWSER_LLM];
+        }
+    }
+    return getTypeFromTags(Array.isArray(raw) ? raw : []);
+};
+
 export {
     formatDisplayName,
     getDomainForFavicon,
@@ -134,9 +164,11 @@ export {
     findAssetTag,
     findTypeTag,
     getAgentTypeFromValue,
+    getAgenticCategoryLabel,
     CLIENT_TYPES,
     TYPE_TAG_KEYS,
     ASSET_TAG_KEYS,
+    SKILL_TAG_KEY,
     ROW_TYPES
 };
 export default formatDisplayName;

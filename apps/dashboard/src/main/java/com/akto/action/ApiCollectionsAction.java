@@ -331,11 +331,18 @@ public class ApiCollectionsAction extends UserAction {
             /*
              * Since admin has all access, we don't update any collections for them.
              */
+            //Role
+            String currentScope = Context.contextSource.get().toString();
+            Bson adminFilter =  Filters.nor(
+                    Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN.getName()),
+                    Filters.eq(RBAC.SCOPE_ROLE_MAPPING + "." + currentScope, RBAC.Role.ADMIN.getName())
+                );
+
             RBACDao.instance.getMCollection().updateOne(
                     Filters.and(
                             Filters.eq(RBAC.USER_ID, userId),
                             Filters.eq(RBAC.ACCOUNT_ID, accountId),
-                            Filters.ne(RBAC.ROLE, RBAC.Role.ADMIN.getName())
+                            adminFilter
                     ),
                     Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
                     new UpdateOptions().upsert(false)
@@ -814,7 +821,11 @@ public class ApiCollectionsAction extends UserAction {
 
     // required to measure the count of total tested endpoints per collection.
     public String fetchCoverageInfoInCollections(){
-        this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount();
+        if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+            this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount(this.apiCollectionIds);
+        } else {
+            this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -1136,7 +1147,20 @@ public class ApiCollectionsAction extends UserAction {
             RBAC rbac = RBACDao.instance.findOne(Filters.and(
                     Filters.eq(RBAC.USER_ID, userId),
                     Filters.eq(RBAC.ACCOUNT_ID, accountId)));
-            String role = rbac.getRole();
+
+            // Get scope-specific role if scopeRoleMapping exists, otherwise use primary role
+            String role = null;
+            if (rbac != null) {
+                RBAC.Role scopeAwareRole = rbac.getRoleForScope(
+                        Context.contextSource.get()
+                );
+                if (scopeAwareRole != null) {
+                    role = scopeAwareRole.name();
+                } else {
+                    role = rbac.getRole();
+                }
+            }
+
             CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
             /*
              * If the role is custom role, only update the user with the delta.

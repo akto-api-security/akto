@@ -58,8 +58,25 @@ public class CodeAnalysisAction extends UserAction {
     public void sendMixpanelEvent() {
         try {
             int accountId = Context.accountId.get();
-            DashboardMode dashboardMode = DashboardMode.getDashboardMode();        
-            RBAC record = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
+            DashboardMode dashboardMode = DashboardMode.getDashboardMode();
+
+            RBAC record = null;
+            //check scopeRoleMapping for ADMIN in current scope
+            String currentScope = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+            if (!currentScope.isEmpty()) {
+                // Query for RBAC with scopeRoleMapping containing ADMIN role for current scope
+                Bson filter = Filters.and(
+                        Filters.eq(RBAC.ACCOUNT_ID, accountId),
+                        Filters.eq(RBAC.SCOPE_ROLE_MAPPING + "." + currentScope, Role.ADMIN.name())
+                );
+                record = RBACDao.instance.findOne(filter);
+            }
+
+            //backward compatibility of role
+            if (record == null) {
+                record = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
+            }
+
             if (record == null) {
                 return;
             }

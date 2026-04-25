@@ -269,6 +269,151 @@ const api = {
         })
     },
 
+    fetchMicrosoftDefenderIntegration() {
+        return request({
+            url: '/api/fetchMicrosoftDefenderIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addMicrosoftDefenderIntegration(tenantId, clientId, clientSecret, dataIngestionUrl, recurringIntervalSeconds) {
+        return request({
+            url: '/api/addMicrosoftDefenderIntegration',
+            method: 'post',
+            data: {tenantId, clientId, clientSecret, dataIngestionUrl, recurringIntervalSeconds}
+        })
+    },
+
+    removeMicrosoftDefenderIntegration() {
+        return request({
+            url: '/api/removeMicrosoftDefenderIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchDefenderDevices() {
+        return request({
+            url: '/api/fetchDefenderDevices',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    uploadDefenderScript(scriptContent, scriptName) {
+        return request({
+            url: '/api/uploadDefenderScript',
+            method: 'post',
+            data: { scriptContent, scriptName }
+        })
+    },
+
+    runDefenderKqlQuery(kqlQuery) {
+        return request({
+            url: '/api/runDefenderKqlQuery',
+            method: 'post',
+            data: { kqlQuery }
+        })
+    },
+
+    listDefenderLibraryScripts() {
+        return request({
+            url: '/api/listDefenderLibraryScripts',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    runDefenderLiveResponse(deviceIds, scriptName, scriptParameters) {
+        return request({
+            url: '/api/runDefenderLiveResponse',
+            method: 'post',
+            data: { deviceIds, scriptName, scriptParameters },
+            timeout: 360000
+        })
+    },
+
+    ingestDefenderKqlResults(kqlResults, agentName) {
+        return request({
+            url: '/api/ingestDefenderKqlResults',
+            method: 'post',
+            data: { kqlResults, agentName }
+        })
+    },
+
+    fetchSentinelOneIntegration() {
+        return request({
+            url: '/api/fetchSentinelOneIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    addSentinelOneIntegration(apiToken, consoleUrl, dataIngestionUrl, recurringIntervalSeconds) {
+        return request({
+            url: '/api/addSentinelOneIntegration',
+            method: 'post',
+            data: { apiToken, consoleUrl, dataIngestionUrl, recurringIntervalSeconds }
+        })
+    },
+
+    removeSentinelOneIntegration() {
+        return request({
+            url: '/api/removeSentinelOneIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchSentinelOneAgents() {
+        return request({
+            url: '/api/fetchSentinelOneAgents',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    getGuardrailTypes() {
+        return request({
+            url: '/api/getGuardrailTypes',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveGuardrailsConfig(guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailAgentIds) {
+        return request({
+            url: '/api/saveGuardrailsConfig',
+            method: 'post',
+            data: { guardrailType, guardrailEnvVars, guardrailTargetMode, guardrailAgentIds }
+        })
+    },
+
+    executeGuardrails() {
+        return request({
+            url: '/api/executeGuardrails',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    executeSentinelOneRemoteScript(scriptId, executeAgentIds, executeTaskDescription, executeInputParams) {
+        return request({
+            url: '/api/executeSentinelOneRemoteScript',
+            method: 'post',
+            data: { scriptId, executeAgentIds, executeTaskDescription, executeInputParams }
+        })
+    },
+
+    getSentinelOneScriptTaskStatus(parentTaskId) {
+        return request({
+            url: '/api/getSentinelOneScriptTaskStatus',
+            method: 'post',
+            data: { parentTaskId }
+        })
+    },
+
 }
 
 export default api

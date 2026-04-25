@@ -19,6 +19,29 @@ export const CATEGORY_AGENTIC_SECURITY = 'Agentic Security';
 export const CATEGORY_DAST = 'DAST';
 export const CATEGORY_ENDPOINT_SECURITY = 'Endpoint Security';
 
+export const shortNameToCategory = {
+  'API': CATEGORY_API_SECURITY,
+  'AGENTIC': CATEGORY_AGENTIC_SECURITY,
+  'ENDPOINT': CATEGORY_ENDPOINT_SECURITY,
+  'DAST': CATEGORY_DAST
+}
+
+export const categoryToShortName = {
+  [CATEGORY_API_SECURITY]: 'API',
+  [CATEGORY_AGENTIC_SECURITY]: 'AGENTIC',
+  [CATEGORY_ENDPOINT_SECURITY]: 'ENDPOINT',
+  [CATEGORY_DAST]: 'DAST'
+}
+
+
+export const getInitialDashboardCategory = () => {
+  const categoryFromServer = window.DASHBOARD_CATEGORY;
+  if(categoryFromServer){
+    return categoryFromServer;
+  }
+  return CATEGORY_API_SECURITY; // default category
+}
+
 export function getDashboardCategory() {
   try {
     const category = PersistStore.getState().dashboardCategory

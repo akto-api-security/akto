@@ -608,11 +608,11 @@ const learnMoreObject = {
             docsLink:[
                 {
                     content:"Test Editor Overview",
-                    value:"https://docs.akto.io/test-editor/concepts/overview"
+                    value:"https://docs.akto.io/test-editor/overview"
                 },
                 {
                     content:"What is Test Library",
-                    value:"https://docs.akto.io/test-editor/concepts/test-library"
+                    value:"https://docs.akto.io/test-editor/test-library#how-to-contribute-to-test-library"
                 },
                 {
                     content:"Custom Test",
@@ -632,7 +632,7 @@ const learnMoreObject = {
                 },
                 {
                     content:"How to Create Custom Test",
-                    value:"https://docs.akto.io/test-editor/how-to/create-a-custom-test"
+                    value:"https://docs.akto.io/test-editor/writing-custom-tests"
                 },
                 {
                     content:"How to Edit Test",
@@ -769,24 +769,12 @@ const learnMoreObject = {
                     value:"https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/issues"
                 },
                 {
-                    content:"View an Issue",
-                    value:"https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/issues/view-an-issue"
-                },
-                {
                     content:"Vulnerability Report",
                     value:"https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/issues/vulnerability-report"
                 },
                 {
                     content:"Remediation Steps",
                     value:"https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/issues/remediation"
-                },
-                {
-                    content:"Issue Fingerprinting",
-                    value:"https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/issues/consistent-issue-fingerprinting"
-                },
-                {
-                    content:"Issue Status Tracking",
-                    value:"https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/issues/consistent-issue-status-tracking"
                 },
                 {
                     content:"Triage Issues",
@@ -1747,7 +1735,7 @@ const learnMoreObject = {
             docsLink: [
                 {
                     content: "View Audit Data",
-                    value: "https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/audit-data"
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/audit-data"
                 }
             ]
         },
@@ -1757,7 +1745,7 @@ const learnMoreObject = {
             docsLink: [
                 {
                     content: "View Audit Data",
-                    value: "https://ai-security-docs.akto.io/agentic-ai-discovery/concepts/audit-data"
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/audit-data"
                 }
             ]
         }
@@ -1794,6 +1782,22 @@ const learnMoreObject = {
                 {
                     content: "View Audit Data",
                     value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/audit-data"
+                }
+            ]
+        }
+    },
+    dashboard_observe_users_and_devices: {
+        endpoint_security: {
+            title: "Users and devices (Atlas)",
+            description: "See which agentic assets run per user or device, then open the same inventory view as Agentic assets.",
+            docsLink: [
+                {
+                    content: "What is Akto Atlas",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/overview"
+                },
+                {
+                    content: "Endpoint Discovery",
+                    value: "https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents"
                 }
             ]
         }

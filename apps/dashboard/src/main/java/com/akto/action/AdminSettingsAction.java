@@ -43,6 +43,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 public class AdminSettingsAction extends UserAction {
@@ -77,8 +79,12 @@ public class AdminSettingsAction extends UserAction {
     }
 
     public AccountSettings.SetupType setupType;
-    public Boolean newMergingEnabled;
-    public Boolean doBodyMatch;
+    @Setter
+    @Getter
+    public boolean newMergingEnabled;
+    @Setter
+    @Getter
+    public boolean doBodyMatch;
     private Set<String> privateCidrList;
 
     public Boolean enableTelemetry;
@@ -104,6 +110,10 @@ public class AdminSettingsAction extends UserAction {
     private List<String> filterLogPolicy;
 
     public String updateSetupType() {
+        if (this.setupType == null) {
+            addActionError("setupType is required");
+            return ERROR.toUpperCase();
+        }
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(),
                 Updates.set(AccountSettings.SETUP_TYPE, this.setupType),
@@ -564,6 +574,79 @@ public class AdminSettingsAction extends UserAction {
         }
     }
 
+    @Setter
+    private String hostPattern;
+    @Getter
+    private Map<String, AccountSettings.ProxyPatternInfo> allowedHostsForPac;
+
+    public String addAllowedHostForPac() {
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+
+        if (StringUtils.isEmpty(hostPattern)) {
+            addActionError("Host pattern cannot be empty.");
+            return ERROR.toUpperCase();
+        }
+
+        hostPattern = hostPattern.trim();
+        String key = hostPattern.hashCode() + "";
+        AccountSettings.ProxyPatternInfo info = new AccountSettings.ProxyPatternInfo(hostPattern, user.getLogin(), Context.now());
+        Bson updates = Updates.set(AccountSettings.ALLOWED_HOSTS_FOR_PAC + "." + key, info);
+
+        try {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                updates
+            );
+            AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            this.allowedHostsForPac = settings != null ? settings.getAllowedHostsForPac() : null;
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error adding allowed host for TAC", e);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    private String proxyPattern;
+    @Getter
+    private Map<String, AccountSettings.ProxyPatternInfo> matchingPatternsForProxy;
+
+    @Setter
+    private boolean switchProxyMode;
+
+    public String addMatchingPatternForProxy() {
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+
+        Bson updates = Updates.set("switchProxyMode", switchProxyMode);
+        if(!StringUtils.isEmpty(proxyPattern)){
+            if (!switchProxyMode) {
+                addActionError("Enable proxy mode.");
+                return ERROR.toUpperCase();
+            }
+            proxyPattern = proxyPattern.trim();
+            String key = proxyPattern.hashCode() + "";
+            AccountSettings.ProxyPatternInfo info = new AccountSettings.ProxyPatternInfo(proxyPattern, user.getLogin(), Context.now());
+            updates = Updates.combine(
+                updates,
+                Updates.set(AccountSettings.MATCHING_PATTERNS_FOR_PROXY + "." + key, info)
+            );
+        }
+
+        try {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+               updates
+            );
+            AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            this.matchingPatternsForProxy = settings != null ? settings.getMatchingPatternsForProxy() : null;
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error adding matching pattern for proxy", e);
+            return ERROR.toUpperCase();
+        }
+    }
+
     public void setAccountPermission(String accountPermission) {
         this.accountPermission = accountPermission;
     }
@@ -594,22 +677,6 @@ public class AdminSettingsAction extends UserAction {
 
     public void setSetupType(AccountSettings.SetupType setupType) {
         this.setupType = setupType;
-    }
-
-    public Boolean getNewMergingEnabled() {
-        return newMergingEnabled;
-    }
-
-    public void setNewMergingEnabled(Boolean newMergingEnabled) {
-        this.newMergingEnabled = newMergingEnabled;
-    }
-
-    public Boolean getDoBodyMatch() {
-        return doBodyMatch;
-    }
-
-    public void setDoBodyMatch(Boolean doBodyMatch) {
-        this.doBodyMatch = doBodyMatch;
     }
 
     public void setEnableDebugLogs(boolean enableDebugLogs) {
@@ -707,6 +774,56 @@ public class AdminSettingsAction extends UserAction {
 
     public void setCompulsoryDescription(Map<String, Boolean> compulsoryDescription) {
         this.compulsoryDescription = compulsoryDescription;
+    }
+
+    public void setProxyPattern(String proxyPattern) {
+        this.proxyPattern = proxyPattern;
+    }
+
+    public enum ConnectorType { PAC, PROXY }
+
+    @Setter
+    private String patternValue;
+    @Setter
+    private ConnectorType connectorType;
+    @Getter
+    private Map<String, AccountSettings.ProxyPatternInfo> deletedPatternResult;
+
+    public String deleteProxyPattern() {
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+
+        if (connectorType == null) {
+            addActionError("Connector type cannot be empty.");
+            return ERROR.toUpperCase();
+        }
+
+        if (StringUtils.isEmpty(patternValue)) {
+            addActionError("Pattern value cannot be empty.");
+            return ERROR.toUpperCase();
+        }
+
+        patternValue = patternValue.trim();
+        String key = patternValue.hashCode() + "";
+        String field = connectorType == ConnectorType.PAC
+            ? AccountSettings.ALLOWED_HOSTS_FOR_PAC
+            : AccountSettings.MATCHING_PATTERNS_FOR_PROXY;
+
+        try {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.unset(field + "." + key)
+            );
+            AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            this.deletedPatternResult = settings == null ? null
+                : connectorType == ConnectorType.PAC
+                    ? settings.getAllowedHostsForPac()
+                    : settings.getMatchingPatternsForProxy();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error deleting proxy pattern for connectorType={}", connectorType, e);
+            return ERROR.toUpperCase();
+        }
     }
 
 }

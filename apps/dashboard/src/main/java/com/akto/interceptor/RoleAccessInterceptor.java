@@ -19,6 +19,11 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.policies.UserAgentTypePolicy;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DashboardMode;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.utils.AlertUtils;
+import com.akto.notifications.slack.SlackAlerts;
+import com.akto.notifications.slack.UserBlockedNoScopeAccessAlert;
+import com.akto.notifications.slack.SlackSender;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionInvocation;
@@ -31,6 +36,7 @@ import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import org.apache.struts2.ServletActionContext;
 
 public class RoleAccessInterceptor extends AbstractInterceptor {
@@ -69,7 +75,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             throw new Exception("unable to parse account id: " + e.getMessage());
         }
     }
-
+    
     @Override
     public String intercept(ActionInvocation invocation) throws Exception {
         ApiAuditLogs apiAuditLogs = null;
@@ -107,20 +113,61 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 logger.debug("Time by feature label check in: " + (Context.now() - timeNow));
                 return invocation.invoke();
             }
-
-            logger.debug("Time by feature label check in: " + (Context.now() - timeNow));
             timeNow = Context.now();
-
-            logger.debug("Found user in interceptor: " + user.getLogin());
             int userId = user.getId();
 
-            Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, sessionAccId);
-            logger.debug("Found user role in: " + (Context.now() - timeNow));
-            String userRole = userRoleRecord != null ? userRoleRecord.getName().toUpperCase() : "";
+            CONTEXT_SOURCE contextSource = Context.contextSource.get();
 
-            if(userRole == null || userRole.isEmpty()) {
-                throw new Exception("User role not found");
+
+            String requestUri = request.getRequestURI();
+            boolean isOnboardingRequest = requestUri != null && requestUri.contains("/onboarding");
+
+            Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, sessionAccId);
+
+            String userRole = null;
+            if (userRoleRecord != null) {
+                userRole = userRoleRecord.getName().toUpperCase();
             }
+
+            if (!isOnboardingRequest && userRoleRecord.equals(Role.NO_ACCESS)) {
+                HttpServletResponse response = (HttpServletResponse) ServletActionContext.getResponse();
+                response.setHeader("X-No-Access-Error", "true");
+                ((ActionSupport) invocation.getAction()).addActionError("You do not have access to this product. Please ask Admin to grant access or navigate to accessible product");
+
+                String contextSourceStr = contextSource.toString();
+                logger.debug("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr);
+                loggerMaker.infoAndAddToDb("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr);
+
+                // Send Slack alert with caching to prevent duplicate alerts
+
+                if (AlertUtils.shouldSendNoAccessAlert(user.getLogin(), contextSourceStr, String.valueOf(sessionAccId))) {
+                    try {
+                        SlackAlerts noScopeAccessAlert = new UserBlockedNoScopeAccessAlert(
+                            user.getLogin(),
+                            contextSourceStr,
+                            contextSourceStr,
+                            String.valueOf(sessionAccId)
+                        );
+                        SlackSender.sendAlert(sessionAccId, noScopeAccessAlert, null, true);
+                        logger.infoAndAddToDb("Sent Slack alert for NO_ACCESS denial: " + user.getLogin() + " to scope " + contextSourceStr);
+                    } catch (Exception e) {
+                        logger.errorAndAddToDb(e, "Failed to send Slack alert for NO_ACCESS denial: " + e.getMessage());
+                    }
+                }  else {
+                    logger.infoAndAddToDb("Skipped duplicate Slack alert for user " + user.getLogin() + " (cached)");
+                }
+
+                // Block the request - return FORBIDDEN instead of invoking
+                return FORBIDDEN;
+            }
+
+            if (isOnboardingRequest) {
+                logger.debug("Skipping all access validation for onboarding request from user " + user.getLogin());
+                // Allow onboarding requests to proceed without access checks
+                // This is a special flow where users may not have full access yet
+                return invocation.invoke();
+            }
+            // ===== END PRODUCT SCOPE VALIDATION =====
 
             Feature featureType = Feature.valueOf(this.featureLabel.toUpperCase());
 

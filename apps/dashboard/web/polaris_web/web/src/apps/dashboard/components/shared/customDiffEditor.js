@@ -238,17 +238,19 @@ const transform = {
             updatedData: jsonObj.updatedData,
         }
     },
-    formatData(data,style){
+    formatData(data, style, redactHeaders = []){
         let localFirstLine = data?.firstLine
         let finalData = ""
         let payLoad = null
+        const redactSet = new Set(redactHeaders.map((h) => h.toLowerCase()))
         if(style === "http" && data && Object.keys(data).length > 0){
             if(data.json){
                 Object.keys(data?.json).forEach((element)=> {
                     if(element.includes("Header")){
                         if(data.json[element]){
                             Object.keys(data?.json[element]).forEach((key) => {
-                                finalData = finalData + key + ': ' + data.json[element][key] + "\n"
+                                const value = redactSet.has(key.toLowerCase()) ? '******' : data.json[element][key]
+                                finalData = finalData + key + ': ' + value + "\n"
                             })
                         }
                     }else{

@@ -13,7 +13,7 @@ import transform from './customDiffEditor';
 
 function SampleDataComponent(props) {
 
-    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true, simpleJson = false } = props;
+    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true, simpleJson = false, redactHeaders = [] } = props;
     const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [popoverActive, setPopoverActive] = useState({});
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
@@ -125,11 +125,11 @@ function SampleDataComponent(props) {
         }else{
             setSampleJsonData({ 
                 // If segments came from threat metadata, highlight in request; if they were provided by caller (e.g., LLM analysis), pass to both panes
-                request: { message: transform.formatData(requestJson,"http"), original: transform.formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths, vulnerabilitySegments }, 
-                response: showResponse ? { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, ...(segmentsFromMetadata ? {} : {vulnerabilitySegments}) } : {},
+                request: { message: transform.formatData(requestJson,"http", redactHeaders), original: transform.formatData(originalRequestJson,"http", redactHeaders), highlightPaths:requestJson?.highlightPaths, vulnerabilitySegments },
+                response: showResponse ? { message: transform.formatData(responseJson,"http", redactHeaders), original: transform.formatData(originalResponseJson,"http", redactHeaders), highlightPaths:responseJson?.highlightPaths, ...(segmentsFromMetadata ? {} : {vulnerabilitySegments}) } : {},
             })
         }
-    }, [sampleData, metadata, isNewDiff, showResponse, simpleJson, type])
+    }, [sampleData, metadata, isNewDiff, showResponse, simpleJson, type, redactHeaders])
 
     const copyContent = async(type, completeData, isSimpleJson = false) => {
         let copyString = "";

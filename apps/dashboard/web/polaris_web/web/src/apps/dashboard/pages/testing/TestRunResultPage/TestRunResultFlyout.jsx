@@ -38,7 +38,7 @@ function isSkippedTestError(errorText) {
 }
 
 function TestRunResultFlyout(props) {
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, validationFailed, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -87,10 +87,26 @@ function TestRunResultFlyout(props) {
 
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
 
+    const normalizeRemediationText = (value) => {
+        if (value && typeof value === 'object' && typeof value.message === 'string') {
+            return value.message;
+        }
+        if (typeof value === 'string') {
+            try {
+                const parsed = JSON.parse(value);
+                if (parsed && typeof parsed === 'object' && typeof parsed.message === 'string') {
+                    return parsed.message;
+                }
+            } catch (_) {}
+            return value;
+        }
+        return '';
+    }
+
     const fetchRemediationInfo = useCallback(async (testId) => {
         if (testId && testId.length > 0) {
             await testingApi.fetchRemediationInfo(testId).then((resp) => {
-                setRemediationText(resp)
+                setRemediationText(normalizeRemediationText(resp))
             }).catch((err) => {
                 setRemediationText("Remediations not configured for this test.")
             })
@@ -183,10 +199,10 @@ function TestRunResultFlyout(props) {
     useEffect(() => {
         if (remediationSrc) {
             // Priority 1: Use remediation from backend/subCategoryMap
-            setRemediationText(remediationSrc)
+            setRemediationText(normalizeRemediationText(remediationSrc))
         } else if (conversationRemediationText) {
             // Priority 2: Use remediation text extracted from conversations
-            setRemediationText(conversationRemediationText)
+            setRemediationText(normalizeRemediationText(conversationRemediationText))
         } else {
             // Priority 3: Fall back to fetching from file
             fetchRemediationInfo("tests-library-master/remediation/" + selectedTestRunResult.testCategoryId + ".md")
@@ -429,11 +445,16 @@ function TestRunResultFlyout(props) {
         window.open(navUrl, "_blank")
     }
 
-    const categoryKey = selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] || selectedTestRunResult?.testCategory;
+    const categoryKey =
+      selectedTestRunResult?.superCategoryName ||
+      selectedTestRunResult?.testCategory?.match(/\(([^)]+)\)/)?.[1] ||
+      selectedTestRunResult?.testCategory;
     const owaspData = func.categoryMapping[categoryKey] || {};
     const owaspMapping = owaspData.label || "";
     const owaspUrl = owaspData.url || "";
-    const asiCategories = func.getASICategoriesForAgenticCategory(selectedTestRunResult?.superCategoryName || "");
+    const owaspAgenticData = func.agenticCategoryMapping[categoryKey] || {};
+    const owaspAgenticMapping = owaspAgenticData.label || "";
+    const owaspAgenticUrl = owaspAgenticData.url || "";
 
     function ActionsComp() {
         const issuesActions = issueDetails?.testRunIssueStatus === "IGNORED" ? [...issues, ...reopen] : issues
@@ -463,6 +484,7 @@ function TestRunResultFlyout(props) {
             </Popover>
         )
     }
+
     function TitleComponent() {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : ""
         return (
@@ -529,14 +551,10 @@ function TestRunResultFlyout(props) {
                                         <Badge size="small">OWASP Top 10 | {owaspMapping}</Badge>
                                     </Link>
                                 ) : null}
-                                {asiCategories.length > 0 ? (
-                                    <HorizontalStack gap="1" wrap>
-                                        {asiCategories.map((asi, index) => (
-                                            <Link key={index} onClick={() => window.open(asi.url, '_blank')}>
-                                                <Badge size="small">{asi.label}</Badge>
-                                            </Link>
-                                        ))}
-                                    </HorizontalStack>
+                                {owaspAgenticMapping.length > 0 ? (
+                                    <Link onClick={() => owaspAgenticUrl && window.open(owaspAgenticUrl, '_blank')}>
+                                        <Badge size="small">{owaspAgenticMapping}</Badge>
+                                    </Link>
                                 ) : null}
                             </VerticalStack>
                         </div>
@@ -572,6 +590,15 @@ function TestRunResultFlyout(props) {
                     </HorizontalStack>
 
                     <ApiGroups collectionIds={apiInfo?.collectionIds} />
+                    {/* tools call format: {mcp/agent name} -> value: {tools for that mcp/agent} */}
+                    <VerticalStack gap={1}>
+                        {Object.keys(toolsCalls).map(agentName => (
+                            <HorizontalStack gap={1} key={agentName}>
+                                <Badge status='info'>{agentName}</Badge>
+                                <Text variant="bodySm">{toolsCalls[agentName].join(', ')}</Text>
+                            </HorizontalStack>
+                        ))}
+                    </VerticalStack>
                 </VerticalStack>
                 <HorizontalStack gap={2} wrap={false}>
                     {issueDetails?.id?.apiInfoKey && (

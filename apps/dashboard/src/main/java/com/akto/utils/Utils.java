@@ -1,17 +1,12 @@
 package com.akto.utils;
 
-import com.akto.dao.ThirdPartyAccessDao;
-import com.akto.dao.TrafficInfoDao;
+import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AccountsContextDaoWithRbac;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.FilterSampleDataDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.SensitiveParamInfoDao;
-import com.akto.dao.SensitiveSampleDataDao;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.*;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.*;
@@ -30,7 +25,9 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.testing.ApiExecutor;
 import com.akto.usage.UsageMetricCalculator;
-import com.akto.util.Constants;
+import com.akto.util.DashboardMode;
+import com.akto.util.OrganizationInfo;
+import com.akto.utils.crons.OrganizationCache;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -64,6 +61,93 @@ public class Utils {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.DASHBOARD);
     ;
     private final static ObjectMapper mapper = new ObjectMapper();
+
+    /** Feature label for org-level SSO-only login; when granted, only SSO signup/sign-in is allowed. */
+    public static final String SSO_ONLY_LOGIN = "SSO_ONLY_LOGIN";
+
+    /** if user has at least one SSO signup (OKTA, AZURE, GOOGLE_SAML). */
+    private static boolean hasUserEverSignedUpViaSSO(User user) {
+        if (user == null || user.getSignupInfoMap() == null || user.getSignupInfoMap().isEmpty()) {
+            return false;
+        }
+        for (SignupInfo info : user.getSignupInfoMap().values()) {
+            if (Config.isConfigSSOType(info.getConfigType())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // If SSO login is enabled, then new users are added via the SSO directory and not via the invite user flow in the dashboard
+    // Dont allow such users to invite new users via dashboard
+    public static boolean allowNewUserInviteViaDashboard(int accountId, User user) {
+        if (!isSsoOnlyLoginEnabledForOrg(accountId)) {
+            return false;
+        }
+        return hasUserEverSignedUpViaSSO(user);
+    }
+
+    /**
+     * Conditions:
+     * 1. Org has SSO_ONLY_LOGIN feature enabled
+     * 2. User already signed up via SSO (OKTA, AZURE, GOOGLE_SAML)
+     * 3. User is trying to sign up via non-SSO login (auth0)
+     * 
+     * Then block the login and redirect to SSO login page
+     * 
+     * If any of the above conditions are not met, then allow the login
+     */
+    public static boolean shouldBlockNonSsoLogin(int accountId, User user, String userEmail, boolean isSSOLogin) {
+        if (DashboardMode.isOnPremDeployment()) {
+            return false;
+        }
+
+        if (isSSOLogin) {
+            return false;
+        }
+
+        if (accountId <= 0) {
+            Integer resolved = getAccountIdFromUserEmailDomain(userEmail);
+            loggerMaker.infoAndAddToDb("[shouldBlockNonSsoLogin] Resolved accountId from user email domain: " + resolved);
+            if (resolved == null) {
+                return false;
+            }
+            accountId = resolved;
+        }
+
+        if (!isSsoOnlyLoginEnabledForOrg(accountId)) {
+            return false;
+        }
+
+        return user == null || hasUserEverSignedUpViaSSO(user);
+    }
+
+    /** Check if Org has SSO_ONLY_LOGIN feature enabled via Stigg */
+    private static boolean isSsoOnlyLoginEnabledForOrg(int accountId) {
+        FeatureAccess ssoOnlyLoginAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, SSO_ONLY_LOGIN);
+        return ssoOnlyLoginAccess != null && ssoOnlyLoginAccess.getIsGranted();
+    }
+
+    /** Resolves org by user email domain (e.g. user@company.com -> company.com), returns one accountId for that org or null. */
+    private static Integer getAccountIdFromUserEmailDomain(String login) {
+        if (login == null || !login.contains("@")) {
+            return null;
+        }
+        String domain = login.split("@")[1].toLowerCase();
+        OrganizationInfo orgInfo = OrganizationCache.getOrganizationInfoByDomain(domain);
+        if (orgInfo == null) {
+            loggerMaker.infoAndAddToDb("[getAccountIdFromUserEmailDomain] No organization info found for domain: " + domain);
+            return null;
+        }
+        Organization org = OrganizationsDao.instance.findOne(
+                Filters.eq(Organization.ID, orgInfo.getOrganizationId()),
+                Projections.include(Organization.ACCOUNTS));
+        if (org == null || org.getAccounts() == null || org.getAccounts().isEmpty()) {
+            loggerMaker.infoAndAddToDb("[getAccountIdFromUserEmailDomain] No accounts found for organization: " + orgInfo.getOrganizationId());
+            return null;
+        }
+        return org.getAccounts().iterator().next();
+    }
 
     public static Map<String, String> getAuthMap(JsonNode auth, Map<String, String> variableMap) {
         Map<String, String> result = new HashMap<>();
@@ -896,5 +980,17 @@ public class Utils {
             }
         }
         return new ApiInfoKeyResult(apiInfoKeys.size(), showApiInfo ? apiInfoList : null);
+    }
+
+    public static String fetchDefaultInviteRole(int accountId, String fallbackDefault){
+        try {
+            Context.accountId.set(accountId);
+            CustomRole defaultRole = CustomRoleDao.instance.findOne(CustomRole.DEFAULT_INVITE_ROLE, true);
+            if(defaultRole != null){
+                return defaultRole.getName();
+            }
+        } catch(Exception e){
+        }
+        return fallbackDefault;
     }
 }

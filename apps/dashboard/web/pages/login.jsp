@@ -85,7 +85,7 @@
 
                     window.IS_AWS_WAF_INTEGRATED = '${requestScope.isAwsWafIntegrated}'
                     window.IS_CLOUDFLARE_WAF_INTEGRATED = '${requestScope.isCloudflareWafIntegrated}'
-
+                    window.SCOPE_ROLE_MAPPING = JSON.parse('${requestScope.scopeRoleMapping}' || '{}');
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');
                     window.STIGG_FEATURE_WISE_ALLOWED = JSON.parse('${requestScope.stiggFeatureWiseAllowed}' || '{}');
@@ -115,6 +115,7 @@
                     window.PROTECTIONTRIAL_MSG = '${requestScope.protectionTrialMsg}'
 
                     window.AGENTTRIAL_MSG = '${requestScope.agentTrialMsg}'
+                    window.INVITE_DISABLED_FOR_SSO = '${requestScope.inviteDisabledForSSO}' === 'true';
 
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production

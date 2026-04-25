@@ -71,6 +71,9 @@ public class TestingRun {
     public static final String DASHBOARD_CONTEXT = "dashboardContext";
     private CONTEXT_SOURCE dashboardContext;
 
+    public static final String RUN_AUTOMATED_TESTS = "runAutomatedTests";
+    private boolean runAutomatedTests = false;
+
     public TestingRun() { }
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, String triggeredBy, boolean sendSlackAlert) {
@@ -317,6 +320,14 @@ public class TestingRun {
 
     public void setDashboardContext(CONTEXT_SOURCE dashboardContext) {
         this.dashboardContext = dashboardContext;
+    }
+
+    public boolean getRunAutomatedTests() {
+        return runAutomatedTests;
+    }
+
+    public void setRunAutomatedTests(boolean runAutomatedTests) {
+        this.runAutomatedTests = runAutomatedTests;
     }
 
     @Override
