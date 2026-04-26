@@ -55,6 +55,7 @@ import SelfHosted from "../dashboard/pages/settings/billing/SelfHosted";
 import Onboarding from "../dashboard/pages/onboarding/Onboarding";
 import Dashboard from "../dashboard/pages/Dashboard";
 import Slack from "../dashboard/pages/settings/integrations/Slack";
+import NewRelicIntegration from "../dashboard/pages/settings/integrations/NewRelicIntegration";
 import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
 
 import Store from "../dashboard/store";
@@ -511,6 +512,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/slack",
                         element: <Slack/>,
+                    },
+                    {
+                        path: "integrations/newrelic",
+                        element: <NewRelicIntegration/>,
                     },
                     {
                         path: "integrations/webhooks",

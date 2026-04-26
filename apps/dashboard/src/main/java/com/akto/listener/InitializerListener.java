@@ -2526,6 +2526,13 @@ public class InitializerListener implements ServletContextListener {
 
                 SingleTypeInfo.init();
 
+                // Initialize NewRelic integration (if feature enabled)
+                try {
+                    com.akto.integration.NewRelicIntegrationInitializer.initializeNewRelicIntegration();
+                } catch (Exception e) {
+                    logger.errorAndAddToDb("Failed to initialize NewRelic integration: " + e.getMessage(), LogDb.DASHBOARD);
+                }
+
                 int now = Context.now();
 
                 if (runJobFunctions > 0 || runJobFunctionsAnyway) {

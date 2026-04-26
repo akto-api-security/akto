@@ -6,9 +6,16 @@ const initialState = {
     accessToken: null,
     currentAgentConversationId: '',
     agentConversation: {},
+    // NewRelic Integration State
+    newrelic: {
+        accountId: null,
+        region: 'US',
+        enabled: false,
+        lastSyncTime: null,
+    },
 };
 
-let sessionStore = (set) => ({
+let sessionStore = (set, get) => ({
     ...initialState,
     storeAccessToken: (accessToken) => {
         try {
@@ -36,6 +43,35 @@ let sessionStore = (set) => ({
             set({ agentConversation });
         } catch (error) {
             console.error("Error setting agentConversation:", error);
+        }
+    },
+    // NewRelic Integration Actions
+    setNewRelicConfig: (config) => {
+        try {
+            set({
+                newrelic: {
+                    accountId: config.accountId || null,
+                    region: config.region || 'US',
+                    enabled: config.enabled || false,
+                    lastSyncTime: config.lastSyncTime || null,
+                }
+            });
+        } catch (error) {
+            console.error("Error setting NewRelic config:", error);
+        }
+    },
+    clearNewRelicConfig: () => {
+        try {
+            set({
+                newrelic: {
+                    accountId: null,
+                    region: 'US',
+                    enabled: false,
+                    lastSyncTime: null,
+                }
+            });
+        } catch (error) {
+            console.error("Error clearing NewRelic config:", error);
         }
     },
     resetStore: () => {

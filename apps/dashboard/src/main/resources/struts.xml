@@ -14514,6 +14514,107 @@
             </result>
         </action>
 
+        <!-- NewRelic Integration Actions -->
+        <action name="api/integration/newrelic/save" class="com.akto.action.integration.SaveNewRelicIntegrationAction" method="execute">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATION</param>
+                <param name="accessType">WRITE</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">result</param>
+            </result>
+            <result name="INPUT" type="json">
+                <param name="statusCode">422</param>
+                <param name="root">result</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">500</param>
+                <param name="root">result</param>
+            </result>
+        </action>
+
+        <action name="api/integration/newrelic/get" class="com.akto.action.integration.GetNewRelicIntegrationAction" method="execute">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATION</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">result</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">500</param>
+                <param name="root">result</param>
+            </result>
+        </action>
+
+        <action name="api/testNewRelicIntegration" class="com.akto.action.integration.TestNewRelicConnectionAction" method="execute">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATION</param>
+                <param name="accessType">WRITE</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">result</param>
+            </result>
+            <result name="INPUT" type="json">
+                <param name="statusCode">422</param>
+                <param name="root">result</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">500</param>
+                <param name="root">result</param>
+            </result>
+        </action>
+
+        <action name="api/integration/newrelic/disable" class="com.akto.action.integration.DisableNewRelicIntegrationAction" method="execute">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATION</param>
+                <param name="accessType">WRITE</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">result</param>
+            </result>
+            <result name="NOT_FOUND" type="json">
+                <param name="statusCode">404</param>
+                <param name="root">result</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">500</param>
+                <param name="root">result</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>

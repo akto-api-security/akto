@@ -137,6 +137,12 @@ function Integrations() {
       source: '/public/github_icon.svg'
     }
 
+    let newrelicObj = {
+      id: 'newrelic',
+      name: 'NewRelic',
+      source: '/public/newrelic_logo.svg'
+    }
+
     let googleWorkSpaceObj={
       id: 'google_workspace_sso',
       name: 'Google Workspace SSO',
@@ -243,7 +249,7 @@ function Integrations() {
   function getTabItems(tabId) {
     const emptyItem = [];
     const trafficItems = [burpSuiteObj, postmanObj];
-    const reportingItems = [githubAppObj];
+    const reportingItems = [githubAppObj, newrelicObj];
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
     const aiItems = [/* aktoGptObj, */ agentConfigObj, mcpRegistryObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
@@ -295,7 +301,8 @@ function Integrations() {
         if (!func.checkLocal()){
           allItems = [...allItems, ...alertsItems, ...automationItems, ...ssoItems,  ...cicdItems, ...wafItems, ...siemItems]
         }
-        if(func.checkOnPrem()){
+        // if(func.checkOnPrem()){ //restore this 
+        if(true){ //restore this 
           allItems = [...allItems, ...reportingItems]
         }
         if (func.isDemoAccount()) {
