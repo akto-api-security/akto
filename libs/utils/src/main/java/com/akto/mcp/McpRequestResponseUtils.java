@@ -237,7 +237,6 @@ public final class McpRequestResponseUtils {
                     );
                 }
                 break;
-
             default:
                 break;
         }
@@ -263,7 +262,6 @@ public final class McpRequestResponseUtils {
                 // Update the existing record with new lastDetected timestamp
                 BasicDBObject update = new BasicDBObject();
                 update.put(MCollection.SET, new BasicDBObject("lastDetected", Context.now()));
-
                 McpAuditInfoDao.instance.updateOne(findQuery, update);
                 logger.info("Updated existing MCP audit record for type: " + auditInfo.getType() +
                            ", resourceName: " + auditInfo.getResourceName());
@@ -275,6 +273,43 @@ public final class McpRequestResponseUtils {
             }
         } catch (Exception e) {
             logger.error("Error handling MCP audit data log", e);
+        }
+    }
+
+
+    public static String checkIfServerIsApproved(String serverName) {
+        try {
+            if (serverName == null || serverName.isEmpty()) {
+                return null;
+            }
+
+            // Fetch MCP Registry Config from database
+            com.akto.dao.ConfigsDao configsDao = com.akto.dao.ConfigsDao.instance;
+            org.bson.conversions.Bson filters = com.mongodb.client.model.Filters.eq(
+                "_id", Context.accountId.get() + "_MCP_REGISTRY"
+            );
+            
+            com.akto.dto.Config config = configsDao.findOne(filters);
+            
+            if (config instanceof com.akto.dto.Config.McpRegistryConfig) {
+                com.akto.dto.Config.McpRegistryConfig mcpConfig = 
+                    (com.akto.dto.Config.McpRegistryConfig) config;
+                
+                if (mcpConfig.getApprovedServers() != null) {
+                    for (com.akto.dto.Config.McpRegistryConfig.ApprovedMcpServer approvedServer : 
+                         mcpConfig.getApprovedServers()) {
+                        if (serverName.equalsIgnoreCase(approvedServer.getName())) {
+                            logger.info("MCP server found in approved list: " + serverName);
+                            return "Approved";
+                        }
+                    }
+                }
+            }
+            
+            return null;
+        } catch (Exception e) {
+            logger.error("Error checking approved servers list", e);
+            return null;
         }
     }
     public static BasicDBObject removeMcpRelatedParams(BasicDBObject reqObj) {
