@@ -17,6 +17,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
@@ -42,6 +44,7 @@ import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
+import com.akto.new_relic.NewRelicUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -153,6 +156,8 @@ public class DbLayer {
     private static final int CLEANUP_INTERVAL_SECONDS = 30 * 60; // 30 minutes
     private static final int CLEANUP_JITTER_SECONDS = 3 * 60; // 3 minutes max jitter
     private static final long COLLECTION_SIZE_THRESHOLD = 100_000;
+
+    private static final ExecutorService newRelicExecutorService = Executors.newFixedThreadPool(1);
 
     private static int getLastUpdatedTsForAccount(int accountId) {
         return lastUpdatedTsMap.computeIfAbsent(accountId, k -> 0);
@@ -267,6 +272,16 @@ public class DbLayer {
            updateModuleEnvAndReboot(moduleInfo);
         }
 
+        try {
+            int accountId = Context.accountId.get();
+            newRelicExecutorService.submit(() -> {
+                Context.accountId.set(accountId);
+                NewRelicUtils.forwardModuleHeartbeatEvent(moduleInfo);
+            });
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error submitting module heartbeat forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
+        }
+        
         List<Bson> updateList = new ArrayList<>();
         updateList.add(Updates.setOnInsert("_t", moduleInfo.getClass().getName()));
         updateList.add(Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()));
@@ -2225,6 +2240,16 @@ public class DbLayer {
             loggerMaker.infoAndAddToDb("Deleted " + deletedCount + " old metrics records", LogDb.DASHBOARD);
         }
         MetricDataDao.instance.insertMany(metricData);
+
+        try {
+            int accountId = Context.accountId.get();
+            newRelicExecutorService.submit(() -> {
+                Context.accountId.set(accountId);
+                NewRelicUtils.forwardMetrics(metricData);
+            });
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error submitting metrics forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
+        }
     }
     public static void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Integer accountId = Context.accountId.get();
