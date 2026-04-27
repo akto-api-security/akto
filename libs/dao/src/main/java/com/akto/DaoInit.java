@@ -327,6 +327,8 @@ public class DaoInit {
         ClassModel<ApiSequences> apiSequencesClassModel = ClassModel.builder(ApiSequences.class).enableDiscriminator(true).build();
         ClassModel<EndpointShieldLog> endpointShieldLogClassModel = ClassModel.builder(EndpointShieldLog.class).enableDiscriminator(true).build();
         ClassModel<GuardrailPolicies> guardrailPoliciesClassModel = ClassModel.builder(GuardrailPolicies.class).enableDiscriminator(true).build();
+        ClassModel<McpAllowlist> mcpAllowlistClassModel = ClassModel.builder(McpAllowlist.class).enableDiscriminator(true).build();
+        ClassModel<McpRegistryConfig> mcpRegistryConfigClassModel = ClassModel.builder(McpRegistryConfig.class).enableDiscriminator(true).build();
         ClassModel<IpReputationScore> ipReputationScoreClassModel = ClassModel.builder(IpReputationScore.class).enableDiscriminator(true).build();
         ClassModel<ApiDependenciesFromSwagger.APIIdentifier> apiIdentifierClassModel = ClassModel.builder(ApiDependenciesFromSwagger.APIIdentifier.class)
                 .enableDiscriminator(true).build();
@@ -379,7 +381,8 @@ public class DaoInit {
                 jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, testingIssueTicketsModel, tlsAuthClassModel,
                 ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
-                traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel)
+                traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
+                mcpAllowlistClassModel, mcpRegistryConfigClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -437,7 +440,8 @@ public class DaoInit {
                 new EnumCodec<>(ReputationSource.class),
                 new EnumCodec<>(ReputationScore.class),
                 new EnumCodec<>(JiraIntegration.JiraType.class),
-                new EnumCodec<>(GlobalEnums.DashboardCategory.class)
+                new EnumCodec<>(GlobalEnums.DashboardCategory.class),
+                new EnumCodec<>(McpRegistryConfig.RegistryType.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
