@@ -17,6 +17,8 @@ export const getMethod = (url, method) => {
             return "SERVER";
         }else if(url.includes("settings")){
             return "CONFIG";
+        } else if (url.includes("v1/hooks")){
+          return "HOOK"
         }
     }
     return method;

@@ -202,9 +202,6 @@ def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: 
         tags["ai-agent"] = "cursor"
         tags["source"] = CONTEXT_SOURCE
 
-    # Add MCP server name to tags
-    tags["mcp_server_name"] = mcp_server_name
-
     # Get device ID
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
 
