@@ -12,13 +12,9 @@ import com.akto.dto.agents.Model;
 import com.akto.dto.agents.ModelType;
 import com.akto.dto.audit_logs.Operation;
 import com.akto.dto.audit_logs.Resource;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
-
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
+import org.bson.conversions.Bson;
 
 public class ModelAction extends UserAction {
 
@@ -28,7 +24,6 @@ public class ModelAction extends UserAction {
     String azureOpenAIEndpoint;
     String ollamaAIEndpoint;
     String databricksEndpoint;
-    String githubToken;
     ModelType type;
 
     public String saveAgentModel() {
@@ -61,7 +56,7 @@ public class ModelAction extends UserAction {
          * Anthropic model should be like claude-3 etc.
          */
 
-        if ((apiKey == null || apiKey.isEmpty()) && type != ModelType.OLLAMA && type != ModelType.GITHUB_MODELS) {
+        if ((apiKey == null || apiKey.isEmpty()) && type != ModelType.OLLAMA) {
             addActionError("Please add a apiKey");
             return Action.ERROR.toUpperCase();
         }
@@ -82,11 +77,6 @@ public class ModelAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        if (type == ModelType.GITHUB_MODELS && (githubToken == null || githubToken.isEmpty())) {
-            addActionError("Please add GitHub Personal Access Token");
-            return Action.ERROR.toUpperCase();
-        }
-
         Map<String, String> params = new HashMap<>();
         params.put(Model.PARAM_MODEL, this.model);
         params.put(Model.PARAM_API_KEY, this.apiKey);
@@ -98,9 +88,6 @@ public class ModelAction extends UserAction {
         }
         if (type == ModelType.DATABRICKS) {
             params.put(Model.PARAM_DATABRICKS_ENDPOINT, this.databricksEndpoint);
-        }
-        if (type == ModelType.GITHUB_MODELS) {
-            params.put(Model.PARAM_GITHUB_TOKEN, this.githubToken);
         }
 
         Model model = new Model(name, type, params);
@@ -177,14 +164,6 @@ public class ModelAction extends UserAction {
         this.databricksEndpoint = databricksEndpoint;
     }
 
-    public String getGithubToken() {
-        return githubToken;
-    }
-
-    public void setGithubToken(String githubToken) {
-        this.githubToken = githubToken;
-    }
-
     public ModelType getType() {
         return type;
     }
@@ -193,69 +172,31 @@ public class ModelAction extends UserAction {
         this.type = type;
     }
 
-    List<Map<String, String>> githubModels;
+    List<Model> githubCopilotConfigs;
 
-    public String fetchGithubModels() {
-        if (githubToken == null || githubToken.isEmpty()) {
-            addActionError("Please provide GitHub Personal Access Token");
-            return Action.ERROR.toUpperCase();
-        }
-
+    public String fetchGithubCopilotConfigs() {
         try {
-            OkHttpClient client = new OkHttpClient();
-            Request request = new Request.Builder()
-                    .url("https://models.github.ai/v1/models")
-                    .header("Accept", "application/vnd.github+json")
-                    .header("Authorization", "Bearer " + githubToken)
-                    .header("X-GitHub-Api-Version", "2022-11-28")
-                    .get()
-                    .build();
-
-            try (Response response = client.newCall(request).execute()) {
-                if (!response.isSuccessful()) {
-                    addActionError("Failed to fetch GitHub models: " + response.code());
-                    return Action.ERROR.toUpperCase();
-                }
-
-                String responseBody = response.body().string();
-                ObjectMapper mapper = new ObjectMapper();
-                JsonNode root = mapper.readTree(responseBody);
-                
-                githubModels = new ArrayList<>();
-                
-                if (root.has("data") && root.get("data").isArray()) {
-                    for (JsonNode modelNode : root.get("data")) {
-                        if (modelNode.has("id")) {
-                            String modelId = modelNode.get("id").asText();
-                            String displayName = modelId;
-                            
-                            // Create friendly display name
-                            if (modelNode.has("name")) {
-                                displayName = modelNode.get("name").asText();
-                            }
-                            
-                            Map<String, String> modelInfo = new HashMap<>();
-                            modelInfo.put("value", modelId);
-                            modelInfo.put("label", displayName);
-                            githubModels.add(modelInfo);
-                        }
-                    }
-                }
-
-                return Action.SUCCESS.toUpperCase();
+            Bson filter = Filters.eq("type", ModelType.GITHUB_COPILOT);
+            githubCopilotConfigs = AgentModelDao.instance.findAll(filter);
+            
+            if (githubCopilotConfigs == null) {
+                githubCopilotConfigs = new ArrayList<>();
             }
+            
+            return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
-            addActionError("Error fetching GitHub models: " + e.getMessage());
+            addActionError("Error fetching GitHub Copilot configurations: " + e.getMessage());
             return Action.ERROR.toUpperCase();
         }
     }
 
-    public List<Map<String, String>> getGithubModels() {
-        return githubModels;
+    public List<Model> getGithubCopilotConfigs() {
+        return githubCopilotConfigs;
     }
 
-    public void setGithubModels(List<Map<String, String>> githubModels) {
-        this.githubModels = githubModels;
+    public void setGithubCopilotConfigs(List<Model> githubCopilotConfigs) {
+        this.githubCopilotConfigs = githubCopilotConfigs;
     }
+
 
 }

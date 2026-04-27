@@ -36,8 +36,6 @@ public class LLMProviderClient {
                 return callAzureOpenAI(model, prompt, client);
             case DATABRICKS:
                 return callDatabricks(model, prompt, client);
-            case GITHUB_MODELS:
-                return callGitHubModels(model, prompt, client);
 
                 // TODO: Implement other providers
             case OPENAI:
@@ -191,38 +189,6 @@ public class LLMProviderClient {
         String rawResponse = executeRequest(request, client);
         String content = extractChatCompletionsContent(rawResponse);
         logger.info("Databricks response extracted successfully");
-        return content;
-    }
-
-    private static String callGitHubModels(Model model, String prompt, OkHttpClient client) throws IOException, org.json.JSONException {
-        String githubToken = model.getGithubToken();
-        String modelName = model.getModelName();
-
-        if (githubToken == null || githubToken.isEmpty()) {
-            throw new RuntimeException("GitHub token is not configured in model params");
-        }
-        if (modelName == null || modelName.isEmpty()) {
-            throw new RuntimeException("GitHub Models model name is not configured in model params");
-        }
-
-        String url = "https://models.github.ai/inference/chat/completions";
-
-        logger.info("Calling GitHub Models, model: " + modelName);
-
-        JSONObject payload = buildChatCompletionsPayload(prompt, modelName);
-        RequestBody body = RequestBody.create(payload.toString(), JSON_MEDIA_TYPE);
-        Request request = new Request.Builder()
-                .url(url)
-                .post(body)
-                .addHeader("Content-Type", "application/json")
-                .addHeader("Accept", "application/vnd.github+json")
-                .addHeader("Authorization", "Bearer " + githubToken)
-                .addHeader("X-GitHub-Api-Version", "2022-11-28")
-                .build();
-
-        String rawResponse = executeRequest(request, client);
-        String content = extractChatCompletionsContent(rawResponse);
-        logger.info("GitHub Models response extracted successfully");
         return content;
     }
 

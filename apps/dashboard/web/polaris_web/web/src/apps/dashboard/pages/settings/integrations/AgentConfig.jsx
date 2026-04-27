@@ -11,7 +11,7 @@ const MODEL_TYPES = {
   AZURE_OPENAI: "AZURE_OPENAI",
   OLLAMA: "OLLAMA",
   DATABRICKS: "DATABRICKS",
-  GITHUB_MODELS: "GITHUB_MODELS"
+  GITHUB_COPILOT: "GITHUB_COPILOT"
 }
 
 const OPENAI_MODELS = [
@@ -47,20 +47,25 @@ const DATABRICKS_MODELS = [
   { label: "Databricks Qwen3 Next 80B A3B Instruct", value: "databricks-qwen3-next-80b-a3b-instruct" },
 ]
 
-// Fallback GitHub Models (popular models from GitHub docs)
-const GITHUB_MODELS_FALLBACK = [
-  { label: "OpenAI GPT-4o", value: "gpt-4o" },
-  { label: "OpenAI GPT-4o mini", value: "gpt-4o-mini" },
-  { label: "Anthropic Claude 3.5 Sonnet", value: "claude-3-5-sonnet-20241022" },
-  { label: "Meta Llama 3.3 70B Instruct", value: "Llama-3.3-70B-Instruct" },
-  { label: "Meta Llama 3.1 405B Instruct", value: "Meta-Llama-3.1-405B-Instruct" },
-  { label: "Mistral Large 2411", value: "Mistral-large-2411" },
-  { label: "Mistral Nemo", value: "Mistral-Nemo" },
-  { label: "Cohere Command R Plus", value: "command-r-plus" },
-  { label: "AI21 Jamba 1.5 Large", value: "Jamba-1.5-Large" },
+// GitHub Copilot Models - Famous models available through Copilot
+const GITHUB_COPILOT_MODELS = [
+  { label: "Claude Sonnet 4.5", value: "claude-sonnet-4.5" },
+  { label: "Claude Sonnet 4.6", value: "claude-sonnet-4.6" },
+  { label: "Claude Haiku 4.5", value: "claude-haiku-4.5" },
+  { label: "GPT-4.1", value: "gpt-4.1" },
+  { label: "GPT-4o", value: "gpt-4o" },
+  { label: "GPT-4o mini", value: "gpt-4o-mini" },
+  { label: "GPT-5 mini", value: "gpt-5-mini" },
+  { label: "GPT-5.2", value: "gpt-5-2" },
+  { label: "GPT-5.4", value: "gpt-5-4" },
+  { label: "Gemini 2.5 Pro", value: "gemini-2-5-pro" },
+  { label: "Gemini 3.1 Pro (Preview)", value: "gemini-3-1-pro-preview" },
+  { label: "Gemini 3 Flash (Preview)", value: "gemini-3-flash-preview" },
+  { label: "Grok Code Fast 1", value: "grok-code-fast-1" },
+  { label: "Raptor mini (Preview)", value: "raptor-mini-preview" },
 ]
 
-function getModelSections(type, data, setData, githubModels, fetchingGithubModels, fetchGithubModelsFunc, githubTokenSaved, isEdit=false) {
+function getModelSections(type, data, setData, isEdit=false) {
   let sections = []
 
   sections.push({
@@ -70,36 +75,21 @@ function getModelSections(type, data, setData, githubModels, fetchingGithubModel
     placeholder: "Model name",
   })
 
-  // Special handling for GitHub Models token with Save button
-  if (type === MODEL_TYPES.GITHUB_MODELS) {
-    sections.push({
-      title: "GitHub Personal Access Token",
-      type: "text_with_button",
-      id: "githubToken",
-      placeholder: "Personal Access Token with models:read scope",
-      buttonText: "Save Token",
-      buttonAction: fetchGithubModelsFunc,
-      buttonLoading: fetchingGithubModels,
-      buttonDisabled: !data.githubToken || data.githubToken.trim() === ""
-    })
-  } else {
-    sections.push({
-      title: type === MODEL_TYPES.OLLAMA ? "API Key (Optional)" : "API Key",
-      type: "text",
-      id: "apiKey",
-      placeholder: type === MODEL_TYPES.OLLAMA ? "API Key for the model (optional)" : "API Key for the model",
-    })
-  }
+  sections.push({
+    title: type === MODEL_TYPES.OLLAMA ? "API Key (Optional)" : "API Key",
+    type: "text",
+    id: "apiKey",
+    placeholder: type === MODEL_TYPES.OLLAMA ? "API Key for the model (optional)" : "API Key for the model",
+  })
 
-  // Only show model dropdown for GitHub Models if token is saved
-  const shouldShowModelDropdown = type !== MODEL_TYPES.GITHUB_MODELS || githubTokenSaved
+  const shouldShowModelDropdown = true
   
   if (shouldShowModelDropdown) {
     sections.push({
       title: "Model",
       type: "dropdown",
       id: "model",
-      loading: type === MODEL_TYPES.GITHUB_MODELS && fetchingGithubModels
+      loading: false
     })
   }
   switch (type) {
@@ -184,8 +174,8 @@ function getModelSections(type, data, setData, githubModels, fetchingGithubModel
         items = OLLAMA_MODELS
       } else if (type === MODEL_TYPES.DATABRICKS) {
         items = DATABRICKS_MODELS
-      } else if (type === MODEL_TYPES.GITHUB_MODELS) {
-        items = githubModels || []
+      } else if (type === MODEL_TYPES.GITHUB_COPILOT) {
+        items = GITHUB_COPILOT_MODELS
       }
       section.component = (
         <VerticalStack gap="1">
@@ -222,9 +212,6 @@ function AgentConfig() {
   const [data, setData] = useState({})
   const [modelType, setModelType] = useState(MODEL_TYPES.OPENAI)
   const [modelList, setModelList] = useState([])
-  const [githubModels, setGithubModels] = useState([])
-  const [fetchingGithubModels, setFetchingGithubModels] = useState(false)
-  const [githubTokenSaved, setGithubTokenSaved] = useState(false)
 
   async function fetchModels() {
     await api.getAgentModels().then((res) => {
@@ -244,35 +231,6 @@ function AgentConfig() {
     await fetchModels()
   }
 
-  async function fetchGithubModelsFunc() {
-    const token = data.githubToken
-    if (!token || token.trim() === "") {
-      func.setToast(true, true, "Please enter a GitHub Personal Access Token")
-      return
-    }
-
-    setFetchingGithubModels(true)
-    try {
-      const response = await api.fetchGithubModels({ githubToken: token })
-      if (response && Array.isArray(response) && response.length > 0) {
-        setGithubModels(response)
-        setGithubTokenSaved(true)
-        func.setToast(true, false, "Token saved! Models loaded successfully.")
-      } else {
-        // Use fallback models if API returns empty or fails
-        setGithubModels(GITHUB_MODELS_FALLBACK)
-        setGithubTokenSaved(true)
-        func.setToast(true, false, "Token saved! Using popular GitHub models.")
-      }
-    } catch (error) {
-      // Use fallback models on error
-      setGithubModels(GITHUB_MODELS_FALLBACK)
-      setGithubTokenSaved(true)
-      func.setToast(true, false, "Token saved! Using popular GitHub models.")
-    } finally {
-      setFetchingGithubModels(false)
-    }
-  }
 
   function renderItem(item) {
     const { name, type } = item;
@@ -313,8 +271,6 @@ function AgentConfig() {
         open={addModelPopOverActive}
         onClose={() => {
           setData({})
-          setGithubModels([])
-          setGithubTokenSaved(false)
           setAddModelPopOverActive(false)
         }}
         title="Add model"
@@ -323,8 +279,6 @@ function AgentConfig() {
           onAction: async () => {
             await api.saveAgentModel({ type: modelType, ...data })
             setData({})
-            setGithubModels([])
-            setGithubTokenSaved(false)
             func.setToast(true, false, "Successfully added model")
             setAddModelPopOverActive(false)
           },
@@ -334,8 +288,6 @@ function AgentConfig() {
             content: 'Cancel',
             onAction: () => {
               setData({})
-              setGithubModels([])
-              setGithubTokenSaved(false)
               setAddModelPopOverActive(false)
             },
           },
@@ -366,22 +318,20 @@ function AgentConfig() {
               value: MODEL_TYPES.DATABRICKS
             },
             {
-              label: 'GitHub Models',
-              value: MODEL_TYPES.GITHUB_MODELS
+              label: 'GitHub Copilot',
+              value: MODEL_TYPES.GITHUB_COPILOT
             }
             ]}
             initial={modelType}
             selected={(value) => {
               setModelType(value)
               setData({})
-              setGithubModels([])
-              setGithubTokenSaved(false)
             }} />
         </Modal.Section>
         <Modal.Section>
           <VerticalStack gap="2">
             {
-              getModelSections(modelType, data, setData, githubModels, fetchingGithubModels, fetchGithubModelsFunc, githubTokenSaved).map((section) => {
+              getModelSections(modelType, data, setData).map((section) => {
                 return section.component
               })
             }
@@ -394,8 +344,6 @@ function AgentConfig() {
   const secondaryAction = (
     <Button onClick={() => {
       setData({})
-      setGithubModels([])
-      setGithubTokenSaved(false)
       setAddModelPopOverActive(true)
     }} primary>
       Add model

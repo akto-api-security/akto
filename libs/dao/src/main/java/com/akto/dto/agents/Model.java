@@ -79,8 +79,4 @@ public class Model {
         return params != null ? params.get(PARAM_DATABRICKS_ENDPOINT) : null;
     }
 
-    public String getGithubToken() {
-        return params != null ? params.get(PARAM_GITHUB_TOKEN) : null;
-    }
-
 }
