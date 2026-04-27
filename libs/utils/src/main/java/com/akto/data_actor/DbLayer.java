@@ -411,6 +411,13 @@ public class DbLayer {
         return ApiInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(ApiInfo.RATELIMITS));
     }
 
+    public static List<ApiInfo> fetchApiInfosByCollection(int apiCollectionId) {
+        return ApiInfoDao.instance.findAll(
+            Filters.eq("_id.apiCollectionId", apiCollectionId),
+            Projections.exclude(ApiInfo.RATELIMITS)
+        );
+    }
+
     /**
      * Page size for cursor-based pagination (used by fetchApiRateLimits and fetchAllApiInfoKeys).
      */
