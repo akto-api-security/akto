@@ -70,6 +70,9 @@ public class ApiInfo {
     public static final String AGENT_PROXY_GUARDRAIL_ENABLED = "agentProxyGuardrailEnabled";
     private boolean agentProxyGuardrailEnabled;
 
+    public static final String IS_SKILL_BLOCKED = "isSkillBlocked";
+    private boolean isSkillBlocked;
+
     public static class MessageFieldEntry {
         private String fieldPath;
         private String description;
@@ -565,4 +568,7 @@ public class ApiInfo {
 
     public GuardrailSchema getGuardrailSchema() { return guardrailSchema; }
     public void setGuardrailSchema(GuardrailSchema guardrailSchema) { this.guardrailSchema = guardrailSchema; }
+
+    public boolean getIsSkillBlocked() { return isSkillBlocked; }
+    public void setIsSkillBlocked(boolean isSkillBlocked) { this.isSkillBlocked = isSkillBlocked; }
 }
