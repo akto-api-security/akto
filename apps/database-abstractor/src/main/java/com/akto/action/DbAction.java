@@ -100,6 +100,7 @@ import com.opensymphony.xwork2.ActionSupport;
 
 
 import org.apache.struts2.ServletActionContext;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -709,22 +710,34 @@ public class DbAction extends ActionSupport {
         try {
             List<WriteModel<ApiSequences>> writeModels = new ArrayList<>();
             for (ApiSequences seq : apiSequencesList) {
-                float probability = seq.getPrevStateCount() > 0
-                        ? seq.getTransitionCount() / (float) seq.getPrevStateCount()
-                        : 0f;
                 Bson filter = Filters.and(
                         Filters.eq(ApiSequences.API_COLLECTION_ID, seq.getApiCollectionId()),
                         Filters.eq(ApiSequences.PATHS, seq.getPaths())
                 );
-                Bson update = Updates.combine(
-                        Updates.inc(ApiSequences.TRANSITION_COUNT, seq.getTransitionCount()),
-                        Updates.inc(ApiSequences.PREV_STATE_COUNT, seq.getPrevStateCount()),
-                        Updates.set(ApiSequences.PROBABILITY, probability),
-                        Updates.set(ApiSequences.LAST_UPDATED_AT, Context.now()),
-                        Updates.setOnInsert(ApiSequences.CREATED_AT, Context.now()),
-                        Updates.setOnInsert(ApiSequences.IS_ACTIVE, true)
+                int now = Context.now();
+                List<Bson> pipeline = Arrays.asList(
+                        new Document("$set", new Document()
+                                .append(ApiSequences.TRANSITION_COUNT, new Document("$add", Arrays.asList(
+                                        new Document("$ifNull", Arrays.asList("$" + ApiSequences.TRANSITION_COUNT, 0)),
+                                        seq.getTransitionCount()
+                                )))
+                                .append(ApiSequences.PREV_STATE_COUNT, new Document("$add", Arrays.asList(
+                                        new Document("$ifNull", Arrays.asList("$" + ApiSequences.PREV_STATE_COUNT, 0)),
+                                        seq.getPrevStateCount()
+                                )))
+                                .append(ApiSequences.LAST_UPDATED_AT, now)
+                                .append(ApiSequences.CREATED_AT, new Document("$ifNull", Arrays.asList("$" + ApiSequences.CREATED_AT, now)))
+                                .append(ApiSequences.IS_ACTIVE, new Document("$ifNull", Arrays.asList("$" + ApiSequences.IS_ACTIVE, true)))
+                        ),
+                        new Document("$set", new Document(ApiSequences.PROBABILITY,
+                                new Document("$cond", Arrays.asList(
+                                        new Document("$gt", Arrays.asList("$" + ApiSequences.PREV_STATE_COUNT, 0)),
+                                        new Document("$divide", Arrays.asList("$" + ApiSequences.TRANSITION_COUNT, "$" + ApiSequences.PREV_STATE_COUNT)),
+                                        0
+                                ))
+                        ))
                 );
-                writeModels.add(new UpdateOneModel<>(filter, update, new UpdateOptions().upsert(true)));
+                writeModels.add(new UpdateOneModel<>(filter, pipeline, new UpdateOptions().upsert(true)));
             }
             ApiSequencesDao.instance.getMCollection().bulkWrite(writeModels, new BulkWriteOptions().ordered(false));
         } catch (Exception e) {
