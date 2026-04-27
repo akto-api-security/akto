@@ -851,6 +851,13 @@ const settingRequests = {
             data: { moduleIds }
         })
     },
+    async updateUserDeviceTag(username, team, userRole) {
+        return await request({
+            url: '/api/updateUserDeviceTag',
+            method: 'post',
+            data: { username, team, userRole }
+        })
+    },
     async fetchCloudflareWafIntegration() {
         return await request({
             url: '/api/fetchCloudflareWafIntegration',

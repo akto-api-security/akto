@@ -33,6 +33,7 @@ export const getHeaders = (options = {}) => {
     const primaryTitle = options.primaryColumnTitle ?? "Agentic asset";
     const primaryText = options.primaryColumnText ?? primaryTitle;
     const includeIconColumn = options.includeIconColumn !== false;
+    const includeUserColumns = options.includeUserColumns === true;
     const endpointsColumnLabel = options.endpointsColumnLabel ?? "Endpoints";
     const endpointsColumnBoxWidth = options.endpointsColumnBoxWidth ?? "80px";
     const headers = [
@@ -70,17 +71,39 @@ export const getHeaders = (options = {}) => {
             mergeType: (a, b) => [...new Set([...(a || []), ...(b || [])])],
             shouldMerge: true
         },
-        { 
-            title: "Last traffic seen", 
-            text: "Last traffic seen", 
-            value: "lastTraffic", 
-            numericValue: "detectedTimestamp", 
-            isText: CellType.TEXT, 
-            sortActive: true, 
+        {
+            title: "Last traffic seen",
+            text: "Last traffic seen",
+            value: "lastTraffic",
+            numericValue: "detectedTimestamp",
+            isText: CellType.TEXT,
+            sortActive: true,
             boxWidth: "120px",
             mergeType: (a, b) => Math.max(a || 0, b || 0),
             shouldMerge: true
         },
+        ...(includeUserColumns ? [
+            {
+                title: "Team",
+                text: "Team",
+                value: "team",
+                filterKey: "team",
+                textValue: "team",
+                isText: CellType.TEXT,
+                showFilter: true,
+                boxWidth: "120px",
+            },
+            {
+                title: "User role",
+                text: "User role",
+                value: "userRole",
+                filterKey: "userRole",
+                textValue: "userRole",
+                isText: CellType.TEXT,
+                showFilter: true,
+                boxWidth: "120px",
+            },
+        ] : []),
     ];
     if (!includeIconColumn) {
         return headers.filter((h) => h.value !== "iconComp");
@@ -383,6 +406,8 @@ const finalizeHostGroupedRow = (g, idSegment) => {
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore,
+        team: g.team || '',
+        userRole: g.userRole || '',
     };
 };
 
@@ -421,7 +446,7 @@ export const groupCollectionsByDevice = (collections, trafficMap = {}, sensitive
 };
 
 /** Group by Endpoint Shield username. Row opens inventory via hostname filter. Skips collections without a resolved username. */
-export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}, usernameMap = {}) => {
+export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}, usernameMap = {}, userMetadataMap = {}) => {
     const users = {};
 
     collections.forEach((c) => {
@@ -430,6 +455,7 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
         if (!username || username === DEFAULT_VALUE) return;
 
         if (!users[username]) {
+            const meta = userMetadataMap[username] || {};
             users[username] = {
                 rowType: ROW_TYPES.SERVICE,
                 groupName: username,
@@ -441,6 +467,8 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
+                team: meta.team || '',
+                userRole: meta.userRole || '',
             };
         }
         const g = users[username];
