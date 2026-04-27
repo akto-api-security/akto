@@ -22,6 +22,7 @@ import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.constants.RedisKeyInfo;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.utils.Utils;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.utils.ThreatApiDistributionUtils;
 
 import io.lettuce.core.RedisClient;
@@ -38,8 +39,8 @@ public class DistributionStreamConsumer implements Runnable {
 
     private static final String GROUP_NAME = "threat_group";
     private static final int BATCH_SIZE = 500;
-    private static final int CMS_TTL_SECONDS = 8 * 60 * 60;
-    private static final int DIST_TTL_SECONDS = 8 * 60 * 60;
+    private static final int CMS_TTL_SECONDS = 8 * 60 * 60; // 8 hours
+    private static final int DIST_TTL_SECONDS = 8 * 60 * 60; // 8 hours
     private static final double EPSILON = 0.01;
     private static final double DELTA = 0.01;
     private static final long TRIM_INTERVAL_MS = 5 * 60 * 1000;
@@ -233,11 +234,11 @@ public class DistributionStreamConsumer implements Runnable {
                     .setSubCategory(IP_API_RATE_LIMIT_FILTER.getInfo().getSubCategory())
                     .setSeverity(IP_API_RATE_LIMIT_FILTER.getInfo().getSeverity())
                     .setMetadata(maliciousReq.getMetadata())
-                    .setType("Rule-Based")
+                    .setType("Anomaly")
                     .setSuccessfulExploit(false)
                     .setStatus(status)
                     .setHost(host)
-                    .setContextSource(com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE.API.name())
+                    .setContextSource(GlobalEnums.CONTEXT_SOURCE.API.name())
                     .setSessionId("")
                     .build();
 

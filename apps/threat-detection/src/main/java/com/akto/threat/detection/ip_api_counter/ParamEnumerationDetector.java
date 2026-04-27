@@ -37,8 +37,12 @@ public class ParamEnumerationDetector {
         this.uniqueValueThreshold = threshold;
     }
 
-    public static void initialize(RedisClient redisClient, int threshold) {
-        initialize(redisClient, threshold, 5);
+    // Visible for testing
+    public ParamEnumerationDetector(CmsCounterLayer cmsCounterLayer, int threshold, int windowSizeMinutes) {
+        this.bloomFilterLayer = new BloomFilterLayer(DEFAULT_EXPECTED_INSERTIONS, DEFAULT_FALSE_POSITIVE_RATE);
+        this.uniqueCountCmsLayer = cmsCounterLayer;
+        this.windowSizeMinutes = windowSizeMinutes;
+        this.uniqueValueThreshold = threshold;
     }
 
     public static void initialize(RedisClient redisClient, int threshold, int windowSizeMinutes) {
