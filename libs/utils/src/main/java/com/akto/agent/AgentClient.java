@@ -181,10 +181,16 @@ public class AgentClient {
 
             Map<String,Object> toolsMetadata = new HashMap<>();
             if(jsonNode.has("toolsMetadata") && jsonNode.get("toolsMetadata").isObject()) {
-                jsonNode.get("toolsMetadata").fields().forEachRemaining(entry ->
-                    toolsMetadata.put(entry.getKey(), entry.getValue().asText())
-                );
+                jsonNode.get("toolsMetadata").fields().forEachRemaining(entry -> {
+                    JsonNode toolNode = entry.getValue();
+                    Map<String, String> meta = new HashMap<>();
+                    meta.put("name", toolNode.path("name").asText(""));
+                    meta.put("source", toolNode.path("source").asText(""));
+                    meta.put("dataTrace", toolNode.path("dataTrace").asText(""));
+                    toolsMetadata.put(entry.getKey(), meta);
+                });
             }
+
             
             return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage, toolsMetadata);
             
