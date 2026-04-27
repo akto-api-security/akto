@@ -617,6 +617,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchApiInfosByCollection() {
+        try {
+            apiInfos = DbLayer.fetchApiInfosByCollection(apiCollectionId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchApiInfosByCollection " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchNonTrafficApiInfos() {
         try {
             apiInfos = DbLayer.fetchNonTrafficApiInfos();
