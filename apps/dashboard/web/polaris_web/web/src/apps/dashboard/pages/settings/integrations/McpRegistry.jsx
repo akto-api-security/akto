@@ -329,7 +329,6 @@ function McpRegistry() {
                     <Box>
                         <VerticalStack gap="3">
 
-                            {/* Add Registry Form */}
                             {showAddForm && (
                                 <LegacyCard sectioned>
                                     <VerticalStack gap="3">
