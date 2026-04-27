@@ -211,8 +211,9 @@ function McpRegistry() {
             setShowAddForm(false);
             await fetchRegistrySettings();
         } catch (error) {
-            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add Github Repository";
+            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add Github URL";
             func.setToast(true, true, errorMsg);
+            window.location.reload();
         } finally {
             setAdding(false);
         }
@@ -306,15 +307,15 @@ function McpRegistry() {
                                     onClick={() => setShowAddForm(!showAddForm)}
                                     disabled={saving}
                                 >
-                                    {showAddForm ? 'Cancel' : 'Add Github Repository'}
+                                    {showAddForm ? 'Cancel' : 'Add Github URL'}
                                 </Button>
                             )}
-                            <Button
+                            {/* <Button
                                 onClick={resetToDefault}
                                 disabled={saving}
                             >
                                 Reset to Default
-                            </Button>
+                            </Button> */}
                         </HorizontalStack>
                     </HorizontalStack>
 
@@ -332,7 +333,7 @@ function McpRegistry() {
                             {showAddForm && (
                                 <LegacyCard sectioned>
                                     <VerticalStack gap="3">
-                                        <Text variant="headingMd" as="h4">Add Github Repository</Text>
+                                        <Text variant="headingMd" as="h4">Add Github URL</Text>
                                         <TextField
                                             label="Github Registry URL"
                                             value={newRegistryUrl}
@@ -502,13 +503,10 @@ function McpRegistry() {
                                 Important Notes:
                             </Text>
                             <Text variant="bodyMd">
-                                • All registries will be used for MCP server discovery and validation
+                                • This registry will be used for MCP server validation.
                             </Text>
                             <Text variant="bodyMd">
-                                • Custom registries must follow the MCP Registry API specification
-                            </Text>
-                            <Text variant="bodyMd">
-                                • Ensure your custom registries are accessible from your Akto instance
+                                • Ensure your github url is accessible from the internet.
                             </Text>
                         </VerticalStack>
                     </Banner>
@@ -517,7 +515,7 @@ function McpRegistry() {
         </LegacyCard>
     );
 
-    const cardContent = "Configure and manage multiple MCP Registry endpoints for discovering and validating Model Context Protocol servers in your environment.";
+    const cardContent = "Configure and manage MCP servers from your github for discovering and validating Model Context Protocol servers in your environment.";
 
     return (
         <IntegrationsLayout
