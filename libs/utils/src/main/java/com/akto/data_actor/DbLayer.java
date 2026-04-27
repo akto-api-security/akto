@@ -17,6 +17,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
@@ -153,6 +155,8 @@ public class DbLayer {
     private static final int CLEANUP_JITTER_SECONDS = 3 * 60; // 3 minutes max jitter
     private static final long COLLECTION_SIZE_THRESHOLD = 100_000;
 
+    private static final ExecutorService newRelicExecutorService = Executors.newFixedThreadPool(1);
+
     private static int getLastUpdatedTsForAccount(int accountId) {
         return lastUpdatedTsMap.computeIfAbsent(accountId, k -> 0);
     }
@@ -255,7 +259,15 @@ public class DbLayer {
            updateModuleEnvAndReboot(moduleInfo); 
         }
 
-        NewRelicUtils.forwardModuleHeartbeatEvent(moduleInfo);
+        try {
+            int accountId = Context.accountId.get();
+            newRelicExecutorService.submit(() -> {
+                Context.accountId.set(accountId);
+                NewRelicUtils.forwardModuleHeartbeatEvent(moduleInfo);
+            });
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error submitting module heartbeat forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
+        }
         
         return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
                 Updates.combine(
@@ -2186,7 +2198,15 @@ public class DbLayer {
         }
         MetricDataDao.instance.insertMany(metricData);
 
-        NewRelicUtils.forwardMetrics(metricData);
+        try {
+            int accountId = Context.accountId.get();
+            newRelicExecutorService.submit(() -> {
+                Context.accountId.set(accountId);
+                NewRelicUtils.forwardMetrics(metricData);
+            });
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error submitting metrics forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
+        }
     }
     public static void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Integer accountId = Context.accountId.get();

@@ -9,6 +9,8 @@ import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.utils.AccountUtils;
+import com.akto.utils.OrganizationUtils;
 import com.mongodb.client.model.Filters;
 import com.newrelic.telemetry.Attributes;
 import com.newrelic.telemetry.OkHttpPoster;
@@ -39,50 +41,6 @@ public class NewRelicUtils {
 
     private NewRelicUtils() {}
 
-    /**
-     * Returns the Organization for the given accountId.
-     * Serves from cache if already fetched; otherwise queries and caches the result.
-     * Returns null if not found or on error.
-     */
-    public static Organization fetchOrganization(int accountId) {
-        Organization cached = orgCache.get(accountId);
-        if (cached != null) {
-            return cached;
-        }
-        try {
-            Organization org = OrganizationsDao.instance.findOne(Filters.in(Organization.ACCOUNTS, accountId));
-            if (org != null) {
-                orgCache.put(accountId, org);
-            }
-            return org;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Failed to fetch organization for accountId=" + accountId);
-            return null;
-        }
-    }
-
-    /**
-     * Returns the Account for the given accountId.
-     * Serves from cache if already fetched; otherwise queries Context.getAccount() and caches the result.
-     * Returns null if not found or on error.
-     */
-    public static Account fetchAccount(int accountId) {
-        Account cached = accountCache.get(accountId);
-        if (cached != null) {
-            return cached;
-        }
-        try {
-            Account account = Context.getAccount();
-            if (account != null) {
-                accountCache.put(accountId, account);
-            }
-            return account;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Failed to fetch account for accountId=" + accountId);
-            return null;
-        }
-    }
-
     public static synchronized void init(String apiKey, String serviceName, String environment) {
         if (telemetryClient != null) {
             return;
@@ -104,8 +62,8 @@ public class NewRelicUtils {
         Attributes idAttrs = new Attributes();
         try {
             int accountId = Context.accountId.get();
-            Account account = fetchAccount(accountId);
-            Organization organization = fetchOrganization(accountId);
+            Account account = AccountUtils.fetchAccount(accountId);
+            Organization organization = OrganizationUtils.fetchOrganization(accountId);
 
             String accountName = account != null && account.getName() != null ? account.getName() : "";
             String organizationId = organization != null && organization.getId() != null ? organization.getId() : "";
