@@ -25,4 +25,7 @@ public class McpAllowlist {
 
     private int createdAt;
     public static final String CREATED_AT = "createdAt";
+
+    private boolean manuallyAdded;
+    public static final String MANUALLY_ADDED = "manuallyAdded";
 }

@@ -3949,6 +3949,27 @@
             </result>
         </action>
 
+        <action name="api/addMcpAllowlistEntry" class="com.akto.action.McpAllowlistAction" method="addEntry">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User added MCP allowlist entry</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/addMcpRegistry" class="com.akto.action.McpAllowlistAction" method="addRegistry">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

@@ -122,7 +122,7 @@ public class McpAllowlistAction extends UserAction {
                 if (entryUrl.isEmpty()) continue;
                 String name = extractHost(entryUrl);
                 loggerMaker.infoAndAddToDb("Parsed MCP entry url=" + entryUrl + " name=" + name);
-                entries.add(new McpAllowlist(name, entryUrl, id, addedBy, now));
+                entries.add(new McpAllowlist(name, entryUrl, id, addedBy, now, false));
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Failed to parse CSV for registry id=" + id + " error=" + e.getMessage());
@@ -179,6 +179,33 @@ public class McpAllowlistAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private String mcpServerUrl;
+
+    public String addEntry() {
+        if (mcpServerUrl == null || mcpServerUrl.trim().isEmpty()) {
+            addActionError("mcpServerUrl is required");
+            return Action.ERROR.toUpperCase();
+        }
+
+        McpRegistryConfig githubRegistry = McpRegistryConfigDao.instance.findOne(
+                Filters.eq(McpRegistryConfig.REGISTRY_TYPE, McpRegistryConfig.RegistryType.GITHUB));
+        if (githubRegistry == null) {
+            addActionError("No GITHUB registry configured");
+            return Action.ERROR.toUpperCase();
+        }
+
+        String regId = githubRegistry.getHexId();
+        String entryUrl = mcpServerUrl.trim();
+        String name = extractHost(entryUrl);
+        String addedBy = getSUser().getLogin();
+
+        McpAllowlist entry = new McpAllowlist(name, entryUrl, regId, addedBy, Context.now(), true);
+        McpAllowlistDao.instance.insertOne(entry);
+        loggerMaker.infoAndAddToDb("Manually added MCP allowlist entry url=" + entryUrl + " registryId=" + regId);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchEntries() {
         if (registryId == null || registryId.trim().isEmpty()) {
             addActionError("registryId is required");
@@ -200,6 +227,9 @@ public class McpAllowlistAction extends UserAction {
 
     public McpRegistryConfig.RegistryType getRegistryType() { return registryType; }
     public void setRegistryType(McpRegistryConfig.RegistryType registryType) { this.registryType = registryType; }
+
+    public String getMcpServerUrl() { return mcpServerUrl; }
+    public void setMcpServerUrl(String mcpServerUrl) { this.mcpServerUrl = mcpServerUrl; }
 
     public List<McpRegistryConfig> getMcpRegistries() { return mcpRegistries; }
     public List<McpAllowlist> getMcpAllowlistEntries() { return mcpAllowlistEntries; }
