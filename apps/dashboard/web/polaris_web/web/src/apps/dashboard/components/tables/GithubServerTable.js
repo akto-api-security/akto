@@ -510,13 +510,43 @@ function GithubServerTable(props) {
   const resourceIDResolver = (data) => {
     return data.id;
   };
-  
 
-  const {selectedResources, allResourcesSelected, handleSelectionChange } =
+  const [allDataIds, setAllDataIds] = useState([])
+
+  const {selectedResources: rawSelectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(fullDataIds!== undefined ? fullDataIds : data , {
       resourceIDResolver,
     });
 
+  useEffect(() => {
+    if(!window.location.pathname.includes("testing")){
+      return
+    }
+    if (!allResourcesSelected || (data && data.length >= total) || (fullDataIds && fullDataIds.length >= total) || (rawSelectedResources && rawSelectedResources.length >= total)) {
+      setAllDataIds([])
+      return
+    }
+    let [sortKey, sortOrder] = sortSelected.length === 0 ? ["", ""] : sortSelected[0].split(" ");
+    let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
+    appliedFilters.forEach((filter) => {
+      const value = filter.value;
+      if (value && typeof value === 'object' && value.values !== undefined) {
+        filters[filter.key] = props.supportsNegationFilter ? value : value.values;
+      } else if (Array.isArray(value)) {
+        filters[filter.key] = props.supportsNegationFilter ? { values: value, negated: false } : value;
+      } else {
+        filters[filter.key] = value;
+      }
+    });
+    props.fetchData(sortKey, sortOrder === 'asc' ? -1 : 1, 0, 1000000, filters, filterOperators, queryValue).then((result) => {
+      if (result?.value) {
+        setAllDataIds(result.value.map(resourceIDResolver).filter(Boolean))
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allResourcesSelected])
+
+  const selectedResources = allResourcesSelected && allDataIds.length > 0 ? allDataIds : rawSelectedResources;
   const customSelectionChange = (selectionType,toggleType, selection) => {
     if(props?.treeView || props?.isMultipleItemsSelected === true){
       let tempItems = selection;
@@ -537,7 +567,6 @@ function GithubServerTable(props) {
           selectItems([])
           TableStore.getState().setSelectedItems([])
         }else{
-        //todo: handle
           if (data) {
             if (toggleType) {
               let allItemsSet = new Set()
@@ -646,14 +675,6 @@ function GithubServerTable(props) {
     }
   }, [bulkActionResources, props.setSelectedResourcesForPrimaryAction])
 
-  const extractText = (val) => {
-    if (val == null) return '-'
-    if (typeof val === 'string' || typeof val === 'number') return String(val)
-    if (Array.isArray(val)) return val.filter(x => x != null).map(extractText).filter(x => x && x !== '-').join(', ') || '-'
-    if (typeof val === 'object' && val.props !== undefined) return extractText(val.props.children ?? val.props.itemsArr ?? val.props.text)
-    if (typeof val === 'object') return Object.entries(val).map(([k, v]) => `${k}: ${v}`).join(', ')
-    return String(val)
-  }
 
   const handleExportCsv = useCallback(async () => {
     if (props.onExportCsv) return props.onExportCsv()

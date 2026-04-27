@@ -613,12 +613,15 @@ public class StartTestAction extends UserAction {
         if(skip < 0){
             skip *= -1;
         }
-
-        if(limit < 0){
-            limit *= -1;
+        int pageLimit = limit;
+        if(limit != -1){
+            if(limit < 0){
+                limit *= -1;
+            }
+            pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
+        }else{
+            pageLimit = 10000000;
         }
-
-        int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
 
         testingRuns = TestingRunDao.instance.findAllWithRbacAndContext(
                 Filters.and(testingRunFilters), skip, pageLimit,

@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo } from 'react'
 import { getDashboardCategory, isAgenticSecurityCategory, mapLabel } from '@/apps/main/labelHelper'
+import PersistStore from '@/apps/main/PersistStore'
 
 function scopeAllCollectionsRowLabel() {
     if (isAgenticSecurityCategory()) {
@@ -24,15 +25,17 @@ function buildCollectionScopeSearchOptions(allCollections) {
 }
 
 /**
- * Shared page-level API collection filter (single select today; values are ids for future multi-select).
+ * Shared page-level API collection filter backed by PersistStore so the
+ * selection survives page navigation and full page refreshes.
  */
 export function useCollectionPageScope(allCollections) {
+    const selectedCollectionId = PersistStore((state) => state.selectedCollectionScope)
+    const setSelectedCollectionScope = PersistStore((state) => state.setSelectedCollectionScope)
+
     const collectionSearchOptions = useMemo(
         () => buildCollectionScopeSearchOptions(allCollections),
         [allCollections],
     )
-
-    const [selectedCollectionId, setSelectedCollectionId] = useState(null)
 
     const pageScopeApiCollectionIds = useMemo(
         () => (selectedCollectionId == null ? [] : [selectedCollectionId]),
@@ -48,8 +51,8 @@ export function useCollectionPageScope(allCollections) {
     }, [selectedCollectionId, collectionSearchOptions])
 
     const onCollectionScopeSelect = useCallback((val) => {
-        setSelectedCollectionId(val === 'all' || val == null || val === '' ? null : Number(val))
-    }, [])
+        setSelectedCollectionScope(val === 'all' || val == null || val === '' ? null : Number(val))
+    }, [setSelectedCollectionScope])
 
     const collectionScopePreSelected = useMemo(
         () => (selectedCollectionId == null ? ['all'] : [selectedCollectionId]),
@@ -61,7 +64,6 @@ export function useCollectionPageScope(allCollections) {
     return {
         collectionSearchOptions,
         selectedCollectionId,
-        setSelectedCollectionId,
         pageScopeApiCollectionIds,
         collectionScopeLabel,
         onCollectionScopeSelect,

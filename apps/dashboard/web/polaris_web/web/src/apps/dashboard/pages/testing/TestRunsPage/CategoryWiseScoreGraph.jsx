@@ -1,4 +1,4 @@
-import { Box, Text, HorizontalStack, DataTable, VerticalStack } from '@shopify/polaris';
+import { Box, Text, DataTable, VerticalStack, HorizontalGrid } from '@shopify/polaris';
 import ChartypeComponent from './ChartypeComponent';
 import observeFunc from "../../observe/transform";
 import InfoCard from '../../dashboard/new_components/InfoCard';
@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import func from "@/util/func";
 import LocalStore from "../../../../main/LocalStorageStore";
 import PersistStore from "../../../../main/PersistStore";
+import TitleWithInfo from '../../../components/shared/TitleWithInfo';
 
 function CategoryWiseScoreGraph({ 
     startTimestamp, 
@@ -28,8 +29,8 @@ function CategoryWiseScoreGraph({
     const dashboardCategory = getDashboardCategory();
     
     // Get category map from local storage
+    const subcategoryMap = LocalStore.getState().subCategoryMap;
     const categoryMap = LocalStore.getState().categoryMap;
-    
     // Determine the appropriate API call and fallback data
     const getApiCall = () => {
         if (apiEndpoint) {
@@ -254,8 +255,39 @@ function CategoryWiseScoreGraph({
     //     };
     // }
 
+    let finalMap = {}
+    categoryTestData.forEach(cat => {
+        const storeId = cat.categoryName
+        if(!subcategoryMap){
+           return;
+        }
+        if(!subcategoryMap[storeId]) {
+            return;
+        }
+        const categoryName = subcategoryMap[storeId]?.superCategory?.name;
+        if(!categoryMap[categoryName]) {
+            return;
+        }
+        const displayName = subcategoryMap[storeId]?.superCategory?.displayName;
+        if (!finalMap[categoryName]) {
+            finalMap[categoryName] = {
+                displayName: displayName,
+                categoryName: categoryName,
+                pass: cat.pass,
+                fail: cat.fail,
+                skip: cat.skip,
+            }
+        } else {
+            finalMap[categoryName].pass += cat.pass;
+            finalMap[categoryName].fail += cat.fail;
+            finalMap[categoryName].skip += cat.skip;
+        }
+    });
+
+    const finalTestCategoryData = Object.values(finalMap);
+
     // Prepare table rows for category breakdown with comprehensive stats
-    const tableRows = categoryTestData.map(cat => {
+    const tableRows = finalTestCategoryData.sort((a,b) => b.fail - a.fail).map(cat => {
         const passCount = cat.pass || 0;
         const failCount = cat.fail || 0;
         // const skipCount = cat.skip || 0; // Commented out for now
@@ -270,15 +302,15 @@ function CategoryWiseScoreGraph({
             : func.formatSplitSharePercent(failCount, executedTotal, passCount);
         const primaryLabel = passed ? statusLabels.pass : statusLabels.fail;
 
-        const displayName = (categoryMap && categoryMap[cat.categoryName]?.displayName) || cat.categoryName;
+        const displayName = cat.displayName;
         return [
             <span
-                style={{ cursor: dataSource === 'redteaming' ? 'pointer' : undefined }}
-                onClick={dataSource === 'redteaming' ? () => handleCategoryRowClick(cat.categoryName) : undefined}
+                style={{ cursor: dataSource === 'redteaming' && failCount > 0 ? 'pointer' : undefined }}
+                onClick={dataSource === 'redteaming' && failCount > 0 ? () => handleCategoryRowClick(cat.categoryName) : undefined}
             >{displayName}</span>,
             <VerticalStack gap="2">
                 {/* Main result indicator */}
-                <HorizontalStack gap="1" align="center">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <div style={{ 
                         width: '8px', 
                         height: '8px', 
@@ -296,16 +328,20 @@ function CategoryWiseScoreGraph({
                     <Text variant="bodySm" color='subdued'>
                         <span style={{ color: '#f05352', fontWeight: '500' }}>✗{failCount}</span>
                     </Text>
-                </HorizontalStack>
+                </div>
             </VerticalStack>
         ];
     });
 
     return (
-        <InfoCard
-            title={getTitle()}
-            titleToolTip={getTooltip()}
-            component={<HorizontalStack gap="8" align="center" wrap={false}>
+        <VerticalStack gap={"4"} align='center'>
+            <Box padding={"3"}>
+            <TitleWithInfo
+                titleText={getTitle()}
+                tooltipContent={getTooltip()}
+                textProps={{variant: 'headingMd'}}
+            />
+            <HorizontalGrid columns={2} gap={4} alignItems='center'>
                 {/* Chart and Legend using ChartypeComponent */}
                 <Box>
                     <ChartypeComponent
@@ -345,9 +381,10 @@ function CategoryWiseScoreGraph({
                         />
                     </div>
                 </Box>
-            </HorizontalStack>}
-        />
-    );
+            </HorizontalGrid>
+            </Box>
+        </VerticalStack>
+    )
 }
 
 export default CategoryWiseScoreGraph;

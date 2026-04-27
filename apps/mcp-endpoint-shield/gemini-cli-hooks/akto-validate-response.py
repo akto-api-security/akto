@@ -62,10 +62,12 @@ def uuid_to_ipv6_simple(uuid_str):
     return ":".join(hex_str[i:i+4] for i in range(0, 32, 4))
 
 
-def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(*, guardrails: bool = False, response_guardrails: bool = False, ingest_data: bool) -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
@@ -273,7 +275,7 @@ def send_ingestion_data(
         )
         post_to_akto(
             build_http_proxy_url(
-                guardrails=not AKTO_SYNC_MODE,
+                response_guardrails=not AKTO_SYNC_MODE,
                 ingest_data=True,
             ),
             request_body,

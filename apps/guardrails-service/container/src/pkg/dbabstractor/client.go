@@ -95,7 +95,7 @@ func (c *Client) FetchMcpAuditInfo() ([]byte, error) {
 
 	// Create request body with remarksList
 	requestBody := map[string]any{
-		"remarksList": []string{"Conditionally Approved", "Rejected"},
+		"remarksList": []string{"Conditionally Approved", "Rejected", "Approved"},
 	}
 	jsonBody, err := json.Marshal(requestBody)
 	if err != nil {
