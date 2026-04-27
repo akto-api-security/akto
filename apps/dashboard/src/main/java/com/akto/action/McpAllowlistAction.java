@@ -131,7 +131,10 @@ public class McpAllowlistAction extends UserAction {
         }
 
         McpAllowlistDao.instance.getMCollection().deleteMany(
-                Filters.eq(McpAllowlist.REGISTRY_ID, id));
+                Filters.and(
+                        Filters.eq(McpAllowlist.REGISTRY_ID, id),
+                        Filters.ne(McpAllowlist.MANUALLY_ADDED, true)
+                ));
 
         if (!entries.isEmpty()) {
             McpAllowlistDao.instance.getMCollection().insertMany(entries);
@@ -183,6 +186,7 @@ public class McpAllowlistAction extends UserAction {
 
     public String addEntry() {
         if (mcpServerUrl == null || mcpServerUrl.trim().isEmpty()) {
+            loggerMaker.errorAndAddToDb("addEntry called with empty mcpServerUrl");
             addActionError("mcpServerUrl is required");
             return Action.ERROR.toUpperCase();
         }
@@ -190,6 +194,7 @@ public class McpAllowlistAction extends UserAction {
         McpRegistryConfig githubRegistry = McpRegistryConfigDao.instance.findOne(
                 Filters.eq(McpRegistryConfig.REGISTRY_TYPE, McpRegistryConfig.RegistryType.GITHUB));
         if (githubRegistry == null) {
+            loggerMaker.errorAndAddToDb("addEntry failed: no GITHUB registry configured");
             addActionError("No GITHUB registry configured");
             return Action.ERROR.toUpperCase();
         }
