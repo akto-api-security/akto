@@ -33,6 +33,5 @@ public class McpRegistryConfigDao extends AccountsContextDao<McpRegistryConfig> 
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{McpRegistryConfig.HASH}, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{McpRegistryConfig.REGISTRY_TYPE}, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{McpRegistryConfig.CREATED_AT}, false);
     }
 }
