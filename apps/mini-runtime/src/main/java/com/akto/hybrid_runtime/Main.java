@@ -16,7 +16,6 @@ import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
-import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
@@ -922,25 +921,23 @@ public class Main {
                 parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
                 loggerMaker.infoAndAddToDb("Sync function completed for account: " + accountId);
 
-                SessionAnalyzer sessionAnalyzer = sessionAnalyzerMap.get(accountId);
-                if (sessionAnalyzer != null) {
-                    for (HttpResponseParams httpResponseParams : accWiseResponse) {
-                        try {
-                            sessionAnalyzer.process(httpResponseParams);
-                        } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error in session analyzer: " + e.getMessage());
+                if (UsageMetricUtils.isFeatureAccessGranted(Context.getActualAccountId(), "BEHAVIORAL_ANOMALLY_SEQUENCE")) {
+                    SessionAnalyzer sessionAnalyzer = sessionAnalyzerMap.get(accountId);
+                    if (sessionAnalyzer != null) {
+                        for (HttpResponseParams httpResponseParams : accWiseResponse) {
+                            try {
+                                sessionAnalyzer.process(httpResponseParams);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error in session analyzer: " + e.getMessage());
+                            }
                         }
                     }
                 }
 
                 // Save raw agent traffic logs to MongoDB for future training (boolean feature flag)
                 try {
-                    Organization organization = OrgUtils.getOrganizationCached(Context.getActualAccountId());
-                    if (organization != null && organization.getFeatureWiseAllowed() != null) {
-                        FeatureAccess featureAccess = organization.getFeatureWiseAllowed().get("AGENT_TRAFFIC_LOGS");
-                        if (featureAccess != null && featureAccess.getIsGranted()) {
-                            saveAgentTrafficLogs(accWiseResponse);
-                        }
+                    if (UsageMetricUtils.isFeatureAccessGranted(Context.getActualAccountId(), "AGENT_TRAFFIC_LOGS")) {
+                        saveAgentTrafficLogs(accWiseResponse);
                     }
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error saving agent traffic logs: " + e.getMessage());
@@ -948,9 +945,7 @@ public class Main {
 
                 sendToCentralKafka(centralKafkaTopicName, accWiseResponse);
 
-                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(),"AGENT_TRAFFIC_LOGS");
-                boolean allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
-                if (allowAnalysis) {
+                if (UsageMetricUtils.isFeatureAccessGranted(Context.getActualAccountId(), "AGENT_TRAFFIC_LOGS")) {
                         List<HttpResponseParams> endpointSourceResponses = new ArrayList<>();
                         for (HttpResponseParams hrp : accWiseResponse) {
                             Map<String, String> tagsMap = HttpCallParser.parseTagsMap(hrp.getTags());
