@@ -77,7 +77,7 @@ jobs:
         run: |
           docker buildx create --use
           cd apps/threat-detection
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection:testoptimisations . --push
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-threat-detection:ratelimitoptimisations . --push
           docker buildx create --use
           
       - name: Set up JDK 11
