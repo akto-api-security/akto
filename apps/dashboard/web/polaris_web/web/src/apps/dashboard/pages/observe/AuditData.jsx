@@ -167,6 +167,7 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     temp['riskAnalysisComp'] = <ComponentRiskAnalysisBadges componentRiskAnalysis={auditRecord?.componentRiskAnalysis} />;
 
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
+    temp['originalResourceName'] = temp?.resourceName;
     temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, allCollections, temp?.hostCollectionId);
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
@@ -261,6 +262,18 @@ function AuditData() {
         window.location.reload();
     }
 
+    const getMcpServerName = (originalResourceName) => {
+        if (!originalResourceName) return '';
+        // Format: <device_name>.<ai-agent>.<mcp_server_name>
+        const parts = originalResourceName.split('.');
+        return parts.slice(2).join('.');
+    };
+
+    const addMcpAllowlistEntry = async (mcpServerUrl) => {
+        await api.addMcpAllowlistEntry(mcpServerUrl)
+        window.location.reload();
+    }
+
     const updateAuditDataWithConditions = async (hexId, approvalData) => {
         await api.updateAuditData(hexId, null, approvalData)
         window.location.reload();
@@ -285,6 +298,11 @@ function AuditData() {
                 content: <span style={{ color: '#008060' }}>Mark as resolved</span>,
                 icon: GreenTickIcon,
                 onAction: () => {updateAuditData(item.hexId, "Approved")},
+            },
+            {
+                content: <span style={{ color: '#008060' }}>Add to MCP Allowed List</span>,
+                icon: GreenTickIcon,
+                onAction: () => {addMcpAllowlistEntry(getMcpServerName(item.originalResourceName))},
             },
             {
                 content: <span style={{ color: '#D72C0D' }}>Disapprove</span>,
