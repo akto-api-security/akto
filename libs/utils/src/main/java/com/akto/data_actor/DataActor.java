@@ -396,7 +396,7 @@ public abstract class DataActor {
 
     public abstract List<McpAuditInfo> fetchMcpAuditInfo(Integer updatedAfter, List<String> remarksList);
 
-    public abstract void updateMcpAuditInfo(String type, String resourceName, String mcpHost, ComponentRiskAnalysis componentRiskAnalysis);
+    public abstract void updateMcpAuditInfo(McpAuditInfo auditInfo);
 
     public abstract void storeConversationResults(List<AgentConversationResult> conversationResults);
 
