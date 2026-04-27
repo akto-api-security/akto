@@ -10,7 +10,10 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
 import com.opensymphony.xwork2.Action;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -118,7 +121,7 @@ public class McpAllowlistAction extends UserAction {
                 .parse(new StringReader(csvBody))) {
             for (CSVRecord record : parser.getRecords()) {
                 if (record.size() == 0) continue;
-                String entryUrl = record.get("mcp_server_url").trim();
+                String entryUrl = record.get("mcp_server_name").trim();
                 if (entryUrl.isEmpty()) continue;
                 String name = extractHost(entryUrl);
                 loggerMaker.infoAndAddToDb("Parsed MCP entry url=" + entryUrl + " name=" + name);
@@ -137,11 +140,23 @@ public class McpAllowlistAction extends UserAction {
                 ));
 
         if (!entries.isEmpty()) {
-            McpAllowlistDao.instance.getMCollection().insertMany(entries);
-            loggerMaker.infoAndAddToDb("Inserted " + entries.size() + " MCP allowlist entries for registry id=" + id);
-        } else {
-            loggerMaker.infoAndAddToDb("No entries to insert for registry id=" + id);
+            List<WriteModel<McpAllowlist>> bulkOps = new ArrayList<>();
+            for (McpAllowlist entry : entries) {
+                bulkOps.add(new UpdateOneModel<>(
+                        Filters.and(Filters.eq(McpAllowlist.NAME, entry.getName()), Filters.eq(McpAllowlist.REGISTRY_ID, entry.getRegistryId())),
+                        Updates.combine(
+                                Updates.setOnInsert(McpAllowlist.URL, entry.getUrl()),
+                                Updates.setOnInsert(McpAllowlist.REGISTRY_ID, entry.getRegistryId()),
+                                Updates.setOnInsert(McpAllowlist.ADDED_BY, entry.getAddedBy()),
+                                Updates.setOnInsert(McpAllowlist.MANUALLY_ADDED, false),
+                                Updates.setOnInsert(McpAllowlist.CREATED_AT, entry.getCreatedAt())
+                        ),
+                        new UpdateOptions().upsert(true)
+                ));
+            }
+            McpAllowlistDao.instance.getMCollection().bulkWrite(bulkOps);
         }
+        loggerMaker.infoAndAddToDb("Synced " + entries.size() + " MCP allowlist entries for registry id=" + id);
 
         McpRegistryConfigDao.instance.updateOneNoUpsert(
                 Filters.eq("_id", new ObjectId(id)),
@@ -204,9 +219,19 @@ public class McpAllowlistAction extends UserAction {
         String name = extractHost(entryUrl);
         String addedBy = getSUser().getLogin();
 
-        McpAllowlist entry = new McpAllowlist(name, entryUrl, regId, addedBy, Context.now(), true);
-        McpAllowlistDao.instance.insertOne(entry);
-        loggerMaker.infoAndAddToDb("Manually added MCP allowlist entry url=" + entryUrl + " registryId=" + regId);
+        int now = Context.now();
+        McpAllowlistDao.instance.getMCollection().updateOne(
+                Filters.and(Filters.eq(McpAllowlist.NAME, name), Filters.eq(McpAllowlist.REGISTRY_ID, regId)),
+                Updates.combine(
+                        Updates.setOnInsert(McpAllowlist.URL, entryUrl),
+                        Updates.setOnInsert(McpAllowlist.REGISTRY_ID, regId),
+                        Updates.setOnInsert(McpAllowlist.ADDED_BY, addedBy),
+                        Updates.setOnInsert(McpAllowlist.MANUALLY_ADDED, true),
+                        Updates.setOnInsert(McpAllowlist.CREATED_AT, now)
+                ),
+                new UpdateOptions().upsert(true)
+        );
+        loggerMaker.infoAndAddToDb("Upserted MCP allowlist entry url=" + entryUrl + " registryId=" + regId);
 
         return Action.SUCCESS.toUpperCase();
     }
