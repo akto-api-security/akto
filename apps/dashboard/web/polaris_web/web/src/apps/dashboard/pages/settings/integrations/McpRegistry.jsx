@@ -500,14 +500,23 @@ function McpRegistry() {
                     <Banner tone="info">
                         <VerticalStack gap="2">
                             <Text variant="bodyMd" fontWeight="semibold">
-                                Important Notes:
+                                How to add a Github URL:
                             </Text>
-                            <Text variant="bodyMd">
-                                • This registry will be used for MCP server validation.
-                            </Text>
-                            <Text variant="bodyMd">
-                                • Ensure your github url is accessible from the internet.
-                            </Text>
+                            <Text variant="bodyMd">1. Click <b>Add Github URL</b> to open the form.</Text>
+                            <Text variant="bodyMd">2. Enter the raw GitHub file URL pointing to your CSV (e.g. <code>https://raw.githubusercontent.com/owner/repo/main/mcp_servers.csv</code>).</Text>
+                            <Text variant="bodyMd">3. The CSV must have a header row with column <code>mcp_server_name</code>.</Text>
+                            <Text variant="bodyMd">4. If the file is in a private repo, add an authentication header — key: <code>Authorization</code>, value: <code>Bearer &lt;your_github_token&gt;</code>.</Text>
+                            <Text variant="bodyMd">5. Click <b>Add Registry</b> — MCP server entries will be ingested automatically from the CSV.</Text>
+                        </VerticalStack>
+                    </Banner>
+
+                    <Banner tone="info">
+                        <VerticalStack gap="2">
+                            <Text variant="bodyMd" fontWeight="semibold">Important Notes:</Text>
+                            <Text variant="bodyMd">• Only one registry URL is supported.</Text>
+                            <Text variant="bodyMd">• Your CSV must have a header row with a <code>mcp_server_name</code> column. Example:</Text>
+                            <pre style={{margin: 0, fontSize: '12px', background: '#f4f4f4', padding: '8px', borderRadius: '4px'}}>{'mcp_server_name\napi.githubcopilot.com\nmcp.notion.com'}</pre>
+                            <Text variant="bodyMd">• Updated your CSV? Wait 5 minutes, then click <b>Sync now</b> to pull in the latest changes.</Text>
                         </VerticalStack>
                     </Banner>
                 </VerticalStack>
