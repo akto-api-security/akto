@@ -992,31 +992,22 @@ public class ApiCollectionsAction extends UserAction {
             }
 
             String skillUrl = "/skills/" + this.skillName;
-            List<Integer> validCollectionIds = SingleTypeInfoDao.instance.findDistinctFields(
-                SingleTypeInfo._API_COLLECTION_ID,
-                Integer.class,
+            UpdateResult result = ApiInfoDao.instance.updateMany(
                 Filters.and(
-                    Filters.in(SingleTypeInfo._API_COLLECTION_ID, this.apiCollectionIds),
-                    Filters.eq(SingleTypeInfo._URL, skillUrl)
-                )
-            ).stream().collect(Collectors.toList());
-
-            if (validCollectionIds.isEmpty()) {
-                addActionError("No valid skill collections found");
-                return ERROR.toUpperCase();
-            }
-
-            ApiInfoDao.instance.updateMany(
-                Filters.and(
-                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, validCollectionIds),
+                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, this.apiCollectionIds),
                     Filters.eq(ApiInfo.ID_URL, skillUrl)
                 ),
                 Updates.set(ApiInfo.IS_SKILL_BLOCKED, this.isSkillBlocked)
             );
 
+            if (result.getMatchedCount() == 0) {
+                addActionError("No valid skill collections found");
+                return ERROR.toUpperCase();
+            }
+
             response = new BasicDBObject();
             response.put("success", true);
-            response.put("updatedCollections", validCollectionIds.size());
+            response.put("updatedCollections", result.getMatchedCount());
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             addActionError("Error updating skill block status: " + e.getMessage());

@@ -2883,6 +2883,16 @@
         <action name="api/updateSkillBlockStatus" class="com.akto.action.ApiCollectionsAction" method="updateSkillBlockStatus">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack"/>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated skill block status</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS" type="json">
                 <param name="root">response</param>
             </result>
@@ -2896,6 +2906,15 @@
         <action name="api/fetchBlockedSkillCollections" class="com.akto.action.ApiCollectionsAction" method="fetchBlockedSkillCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack"/>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS" type="json">
                 <param name="root">response</param>
             </result>
@@ -2909,6 +2928,15 @@
         <action name="api/fetchBlockedSkillNames" class="com.akto.action.ApiCollectionsAction" method="fetchBlockedSkillNames">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack"/>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS" type="json">
                 <param name="root">response</param>
             </result>
