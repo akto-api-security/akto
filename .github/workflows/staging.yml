@@ -48,7 +48,7 @@ jobs:
           wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
 
       - name: Run mvn package
-        run: mvn package -Dakto-build-time=$(date +%s)
+        run: mvn package -Dakto-image-tag=${{ env.THREAT_VERSION }} -Dakto-build-time=$(date +%s) -Dakto-release-version=${{ env.THREAT_VERSION }}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
