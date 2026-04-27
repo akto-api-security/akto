@@ -5,6 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
@@ -804,5 +805,9 @@ public class DbActor extends DataActor {
             writeModels.add(new UpdateOneModel<>(filter, pipeline, new UpdateOptions().upsert(true)));
         }
         ApiSequencesDao.instance.getMCollection().bulkWrite(writeModels, new BulkWriteOptions().ordered(false));
+    } 
+    
+    public void storeAgentQueryData(AgentQueryData agentQueryData) {
+        DbLayer.storeAgentQueryData(agentQueryData);
     }
 }

@@ -8,6 +8,7 @@ import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -4665,4 +4666,17 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb(e, "error in writeApiSequences: " + e, LoggerMaker.LogDb.RUNTIME);
         }
     }
+    public void storeAgentQueryData(AgentQueryData agentQueryData) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("agentQueryData", agentQueryData);
+        String jsonBody = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeAgentQueryData", "", "POST", jsonBody, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in storeAgentQueryData" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }   
 }

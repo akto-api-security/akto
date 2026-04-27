@@ -2,6 +2,7 @@ package com.akto.hybrid_runtime;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -9,6 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import com.akto.RuntimeMode;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
@@ -39,6 +41,7 @@ import com.akto.runtime.parser.SampleParser;
 import com.akto.runtime.utils.Utils;
 import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.usage.OrgUtils;
+import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
@@ -908,7 +911,7 @@ public class Main {
                 //loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to protobuf kafka topic");
                 for (HttpResponseParams httpResponseParams: accWiseResponse) {
                     try {
-                        sendToProtobufKafka(httpResponseParams);
+                        sendToProtobufKafka(httpResponseParams, accountInfo);
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error sending to protobuf kafka: " + e.getMessage());
                     }
@@ -944,6 +947,27 @@ public class Main {
                 }
 
                 sendToCentralKafka(centralKafkaTopicName, accWiseResponse);
+
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(),"AGENT_TRAFFIC_LOGS");
+                boolean allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
+                if (allowAnalysis) {
+                        List<HttpResponseParams> endpointSourceResponses = new ArrayList<>();
+                        for (HttpResponseParams hrp : accWiseResponse) {
+                            Map<String, String> tagsMap = HttpCallParser.parseTagsMap(hrp.getTags());
+                            if (tagsMap != null && Constants.AI_AGENT_SOURCE_ENDPOINT.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))) {
+                                endpointSourceResponses.add(hrp);
+                            }
+                        }
+
+                        if (!endpointSourceResponses.isEmpty()) {
+                            try {
+                                saveAgentTrafficLogs(endpointSourceResponses);
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb(e, "Error saving agent traffic logs: " + e.getMessage());
+                            }
+                        }
+                }
+                
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in handleResponseParams: " + e.toString());
             }
@@ -1113,7 +1137,7 @@ public class Main {
     /**
      * Convert HttpResponseParams to protobuf format and send to akto.api.logs2 topic
      */
-    private static void sendToProtobufKafka(HttpResponseParams httpResponseParams) {
+    private static void sendToProtobufKafka(HttpResponseParams httpResponseParams, AccountInfo accountInfo) {
         if(!isProtoKafkaEnabled()){
             return;
         }
@@ -1173,7 +1197,18 @@ public class Main {
             byte[] protobufBytes = protobufMessage.toByteArray();
             
             // Send to kafka
-            ProducerRecord<String, byte[]> record = new ProducerRecord<>("akto.api.logs2", protobufBytes);
+            AccountSettings settings = accountInfo.getAccountSettings();
+            AccountSettings.ThreatKafkaPartitionKey partitionKey = (settings != null) ? settings.getThreatKafkaPartitionKey() : null;
+            String ip = protobufMessage.getIp();
+            ProducerRecord<String, byte[]> record;
+
+            if (partitionKey != null && partitionKey.equals(AccountSettings.ThreatKafkaPartitionKey.IP)
+                    && !ip.isEmpty()) {
+                record = new ProducerRecord<>("akto.api.logs2", ip, protobufBytes);
+            } else {
+                record = new ProducerRecord<>("akto.api.logs2", protobufBytes);
+            }
+            
             protobufKafkaProducer.send(record, (metadata, exception) -> {
                 if (exception != null) {
                     loggerMaker.errorAndAddToDb(exception, "Error sending protobuf message to kafka: " + exception.getMessage());

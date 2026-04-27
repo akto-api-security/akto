@@ -117,6 +117,14 @@ public class AccountSettings {
     private List<String> filterLogPolicy;
     public static final String FILTER_LOG_POLICY = "filterLogPolicy";
 
+    // Used by mini-runtime to send to threat topic.
+    public static final String THREAT_KAFKA_PARTITION_KEY = "threatKafkaPartitionKey";
+    private ThreatKafkaPartitionKey threatKafkaPartitionKey;
+
+    public enum ThreatKafkaPartitionKey {
+        IP
+    }
+
     public AccountSettings() {
     }
 
@@ -161,6 +169,14 @@ public class AccountSettings {
 
     public enum SetupType {
         PROD, QA, STAGING, DEV
+    }
+
+    public ThreatKafkaPartitionKey getThreatKafkaPartitionKey() {
+        return threatKafkaPartitionKey;
+    }
+
+    public void setThreatKafkaPartitionKey(ThreatKafkaPartitionKey threatKafkaPartitionKey) {
+        this.threatKafkaPartitionKey = threatKafkaPartitionKey;
     }
 
     public Map<String, Map<Pattern, String>> convertApiCollectionNameMapperToRegex() {
