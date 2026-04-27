@@ -378,7 +378,7 @@ function AuditData() {
     const getActionsList = (item) => {
         return [{title: 'Actions', items: [
             {
-                content: <span style={{ color: '#008060' }}>Conditional Approval</span>,
+                content: <span style={{ color: '#008060' }}>Conditionally Approve</span>,
                 icon: GreenSettingsIcon,
                 onAction: () => {
                     setSelectedAuditItem(item);
@@ -386,12 +386,12 @@ function AuditData() {
                 },
             },
             {
-                content: <span style={{ color: '#008060' }}>Mark as resolved</span>,
+                content: <span style={{ color: '#008060' }}>Approve</span>,
                 icon: GreenTickIcon,
                 onAction: () => {updateAuditData(item.hexId, "Approved", item.groupedHexIds)},
             },
             {
-                content: <span style={{ color: '#D72C0D' }}>Disapprove</span>,
+                content: <span style={{ color: '#D72C0D' }}>Block</span>,
                 icon: RedCancelIcon,
                 onAction: () => {updateAuditData(item.hexId, "Rejected", item.groupedHexIds)},
                 destructive: true
