@@ -60,9 +60,9 @@ export const getHeaders = (options = {}) => {
             mergeType: (a, b) => Math.max(a || 0, b || 0),
             shouldMerge: true
         },
-        { 
-            title: "Sensitive data", 
-            text: "Sensitive data", 
+        {
+            title: "Sensitive data",
+            text: "Sensitive data",
             value: "sensitiveSubTypes", 
             numericValue: "sensitiveInRespTypes",
             textValue: "sensitiveSubTypesVal", 

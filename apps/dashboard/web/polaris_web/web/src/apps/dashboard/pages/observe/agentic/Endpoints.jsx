@@ -76,11 +76,9 @@ function Endpoints() {
                 </Box>
             ),
             sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || [], false),
-            riskScoreComp: group.riskScore !== null ? (
-                <Badge status={getRiskScoreStatus(group.riskScore)} size="small">
-                    {group.riskScore}
-                </Badge>
-            ) : "-",
+            riskScoreComp: group.riskScore !== null
+                ? <Badge status={getRiskScoreStatus(group.riskScore)} size="small">{group.riskScore}</Badge>
+                : "-",
         }));
     }, [getRiskScoreStatus]);
 
@@ -93,12 +91,12 @@ function Endpoints() {
                 apiCollectionsResp,
                 trafficInfoResp,
                 riskScoreResp,
-                sensitiveInfoResp
+                sensitiveInfoResp,
             ] = await Promise.all([
                 api.getAllCollectionsBasic(),
                 api.getLastTrafficSeen(),
                 api.getRiskScoreInfo(),
-                api.getSensitiveInfoForCollections()
+                api.getSensitiveInfoForCollections(),
             ]);
 
             if (!isMountedRef.current) return;

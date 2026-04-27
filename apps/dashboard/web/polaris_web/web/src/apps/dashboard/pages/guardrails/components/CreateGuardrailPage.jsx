@@ -313,6 +313,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         }
     }, [isEditMode, editingPolicy]);
 
+    const isVisibilityOnly = (collection) =>
+        collection.envType && collection.envType.some(tag =>
+            tag.keyName === 'visibilityOnly' && tag.value === 'true'
+        );
+
     const filterCollections = () => {
         setCollectionsLoading(true);
         try {
@@ -320,7 +325,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 const hasMcpEnvType = collection.envType && collection.envType.some(envType =>
                     envType.keyName === 'mcp-server' && envType.value === 'MCP Server'
                 );
-                return hasMcpEnvType;
+                return hasMcpEnvType && !isVisibilityOnly(collection);
             })
             .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
             .map(collection => ({
@@ -333,7 +338,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 const hasGenAiEnvType = collection.envType && collection.envType.some(envType =>
                     envType.keyName === 'gen-ai' && envType.value === 'Gen AI'
                 );
-                return hasGenAiEnvType;
+                return hasGenAiEnvType && !isVisibilityOnly(collection);
             })
             .sort((a, b) => (b.startTs || 0) - (a.startTs || 0))
             .map(collection => ({
