@@ -35,6 +35,7 @@ import com.akto.threat.detection.ip_api_counter.DistributionStreamConsumer;
 import com.akto.threat.detection.tasks.ConfigPoller;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
+import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.utils.Utils;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
@@ -108,8 +109,8 @@ public class Main {
 
     triggerDistributionDataForwardCron(apiDistributionEnabled, distributionDataForwardLayer);
 
-    com.akto.threat.detection.kafka.KafkaProtoProducer internalKafkaProducer =
-        new com.akto.threat.detection.kafka.KafkaProtoProducer(internalKafka);
+    KafkaProtoProducer internalKafkaProducer =
+        new KafkaProtoProducer(internalKafka);
 
     // Start threat stream consumers (background threads)
     if (localRedis != null && apiDistributionEnabled && distributionCalculator != null) {
@@ -163,7 +164,7 @@ public class Main {
   }
 
   public static void startDistributionStreamConsumers(RedisClient redisClient,
-      com.akto.threat.detection.kafka.KafkaProtoProducer internalKafkaProducer, String instanceId) {
+      KafkaProtoProducer internalKafkaProducer, String instanceId) {
     java.util.concurrent.ExecutorService streamExecutor = Executors.newFixedThreadPool(1);
     streamExecutor.submit(new DistributionStreamConsumer(
         redisClient, instanceId, internalKafkaProducer));
