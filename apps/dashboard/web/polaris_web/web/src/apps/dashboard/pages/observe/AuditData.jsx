@@ -107,9 +107,15 @@ let filters = [
         ],
     },
     {
-        key: 'collectionName',
-        label: 'Collection Name',
-        title: 'Collection Name',
+        key: 'aiAgent',
+        label: 'AI Agent',
+        title: 'AI Agent',
+        choices: [],
+    },
+    {
+        key: 'mcpServer',
+        label: 'MCP Server',
+        title: 'MCP Server',
         choices: [],
     }
 ]
@@ -232,7 +238,7 @@ function MCPChildren({ parent, dateRange, getActionsList }) {
                     {loadingChildren ? (
                         <HorizontalStack align="center" gap="2"><Spinner size="small" /><Text>Loading components...</Text></HorizontalStack>
                     ) : children.length === 0 ? (
-                        <Text color="subdued">No tools, resources, or prompts found for this MCP server.</Text>
+                        <Text color="subdued">No tools found for this MCP server.</Text>
                     ) : (
                         <DataTable
                             columnContentTypes={['text', 'text', 'text', 'text', 'text', 'text', 'text']}
@@ -352,21 +358,32 @@ function AuditData() {
         switch (key) {
             case "markedBy":
             case "apiAccessTypes":
+            case "aiAgent":
+            case "mcpServer":
                 return func.convertToDisambiguateLabelObj(value, null, 2)
-            case "collectionName":
-                return func.convertToDisambiguateLabelObj(value, collectionsMap, 1)
             default:
                 return value;
         }
     }
 
-    const updateAuditData = async (hexId, remarks, hexIds = null) => {
-        await api.updateAuditData(hexId, remarks, null, hexIds)
+    // Server-level decisions cascade to every tool/resource/prompt under the same
+    // hostCollectionIds. The user can still override an individual tool afterwards
+    // by changing that tool's state from the child action menu.
+    const cascadeIdsForItem = (item) => (
+        item?.type === 'mcp-server' && Array.isArray(item?.groupedHostCollectionIds)
+            ? item.groupedHostCollectionIds
+            : null
+    );
+
+    const updateAuditData = async (item, remarks, allAgents = false) => {
+        const allAgentsServer = allAgents ? item?.mcpServerName : null
+        await api.updateAuditData(item.hexId, remarks, null, item?.groupedHexIds, cascadeIdsForItem(item), allAgentsServer)
         window.location.reload();
     }
 
-    const updateAuditDataWithConditions = async (hexId, approvalData, hexIds = null) => {
-        await api.updateAuditData(hexId, null, approvalData, hexIds)
+    const updateAuditDataWithConditions = async (hexId, approvalData, hexIds = null, item = null) => {
+        const allAgentsServer = item?._allAgents ? item?.mcpServerName : null
+        await api.updateAuditData(hexId, null, approvalData, hexIds, cascadeIdsForItem(item), allAgentsServer)
         window.location.reload();
     }
 
@@ -376,27 +393,54 @@ function AuditData() {
     const RedCancelIcon = () => <Icon source={CircleCancelMajor} tone="critical" />;
 
     const getActionsList = (item) => {
-        return [{title: 'Actions', items: [
+        const sections = [{title: 'Actions', items: [
             {
                 content: <span style={{ color: '#008060' }}>Conditionally Approve</span>,
                 icon: GreenSettingsIcon,
                 onAction: () => {
-                    setSelectedAuditItem(item);
+                    setSelectedAuditItem({ ...item, _allAgents: false });
                     setModalOpen(true);
                 },
             },
             {
                 content: <span style={{ color: '#008060' }}>Approve</span>,
                 icon: GreenTickIcon,
-                onAction: () => {updateAuditData(item.hexId, "Approved", item.groupedHexIds)},
+                onAction: () => {updateAuditData(item, "Approved")},
             },
             {
                 content: <span style={{ color: '#D72C0D' }}>Block</span>,
                 icon: RedCancelIcon,
-                onAction: () => {updateAuditData(item.hexId, "Rejected", item.groupedHexIds)},
+                onAction: () => {updateAuditData(item, "Rejected")},
                 destructive: true
             }
         ]}]
+
+        // Server rows can fan an action across every AI agent using the same MCP
+        // server. Tools/resources/prompts stay scoped to their agent variant.
+        if (item?.type === 'mcp-server' && item?.mcpServerName) {
+            sections.push({ title: 'For all AI agents', items: [
+                {
+                    content: <span style={{ color: '#008060' }}>Conditionally Approve</span>,
+                    icon: GreenSettingsIcon,
+                    onAction: () => {
+                        setSelectedAuditItem({ ...item, _allAgents: true });
+                        setModalOpen(true);
+                    },
+                },
+                {
+                    content: <span style={{ color: '#008060' }}>Approve</span>,
+                    icon: GreenTickIcon,
+                    onAction: () => {updateAuditData(item, "Approved", true)},
+                },
+                {
+                    content: <span style={{ color: '#D72C0D' }}>Block</span>,
+                    icon: RedCancelIcon,
+                    onAction: () => {updateAuditData(item, "Rejected", true)},
+                    destructive: true
+                }
+            ]})
+        }
+        return sections
     }
 
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
@@ -405,9 +449,6 @@ function AuditData() {
         let total = 0;
         let finalFilters = {...filters}
         finalFilters['lastDetected'] = [startTimestamp, endTimestamp]
-        const selectedCollections = Array.isArray(filters?.collectionName) ? filters.collectionName : []
-        finalFilters['hostCollectionId'] = selectedCollections.map(id => parseInt(id))
-        delete finalFilters['collectionName']
         // Parent rows are MCP servers; tools/resources/prompts surface via expansion.
         finalFilters['type'] = ['mcp-server']
 
@@ -452,12 +493,35 @@ function AuditData() {
         if (usersResponse) {
             filters[0].choices = usersResponse.map((user) => ({label: user.login, value: user.login}))
         }
-        filters[2].choices = Object.entries(collectionsMap).map(([id, name]) => ({ label: name, value: id }));
+
+        // Pull the deduped server list to seed AI Agent / MCP Server choices.
+        try {
+            const serversRes = await api.fetchAuditData(
+                'lastDetected', -1, 0, 1000,
+                { type: ['mcp-server'], lastDetected: [startTimestamp, endTimestamp] },
+                {}, '', true
+            )
+            const allCollections = PersistStore.getState().allCollections;
+            const agents = new Set()
+            const servers = new Set()
+            if (serversRes && Array.isArray(serversRes.auditData)) {
+                serversRes.auditData.forEach((rec) => {
+                    const stripped = stripDeviceIdFromName(rec?.resourceName, allCollections, rec?.hostCollectionId)
+                    const { agent, server } = splitAgentAndServer(stripped)
+                    if (agent && agent !== '-') agents.add(agent)
+                    if (server && server !== '-') servers.add(server)
+                })
+            }
+            filters[2].choices = Array.from(agents).sort().map(a => ({ label: a, value: a }))
+            filters[3].choices = Array.from(servers).sort().map(s => ({ label: s, value: s }))
+        } catch (e) {
+            // leave choices empty on failure; user can still search/filter elsewhere
+        }
     }
 
     useEffect(() => {
         fillFilters()
-    }, [collectionsMap])
+    }, [collectionsMap, startTimestamp, endTimestamp])
 
     const primaryActions = (
         <HorizontalStack gap={"2"}>

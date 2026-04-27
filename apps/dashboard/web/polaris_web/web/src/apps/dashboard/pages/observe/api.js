@@ -40,10 +40,16 @@ export default {
         });
         return resp;
     },
-    async updateAuditData(hexId, remarks, approvalData = null, hexIds = null) {
+    async updateAuditData(hexId, remarks, approvalData = null, hexIds = null, cascadeHostCollectionIds = null, mcpServerForAllAgents = null) {
         const data = { hexId };
         if (Array.isArray(hexIds) && hexIds.length > 0) {
             data.hexIds = hexIds;
+        }
+        if (Array.isArray(cascadeHostCollectionIds) && cascadeHostCollectionIds.length > 0) {
+            data.cascadeHostCollectionIds = cascadeHostCollectionIds;
+        }
+        if (typeof mcpServerForAllAgents === 'string' && mcpServerForAllAgents.length > 0) {
+            data.mcpServerForAllAgents = mcpServerForAllAgents;
         }
         if (approvalData) {
             data.approvalData = approvalData;

@@ -173,10 +173,16 @@ public class AuditDataAction extends UserAction {
 
             Bson sort = sortOrder == 1 ? Sorts.ascending(sortKey) : Sorts.descending(sortKey);
 
+            // Pull agent/server filters out of the generic filters map so they bypass
+            // prepareFilters (they need to be applied to the derived _groupKey, not
+            // any DB column).
+            List<String> agentChoices = popListFilter(filters, "aiAgent");
+            List<String> serverChoices = popListFilter(filters, "mcpServer");
+
             if (mergeMcpServers) {
-                runMergedAggregation(filter, sort, skip, limit, true);
+                runMergedAggregation(filter, sort, skip, limit, true, agentChoices, serverChoices);
             } else if (mergeMcpComponents) {
-                runMergedAggregation(filter, sort, skip, limit, false);
+                runMergedAggregation(filter, sort, skip, limit, false, null, null);
             } else {
                 this.auditData = McpAuditInfoDao.instance.findAll(filter, skip, limit, sort);
                 this.total = McpAuditInfoDao.instance.count(filter);
@@ -198,7 +204,20 @@ public class AuditDataAction extends UserAction {
      * hostCollectionId is collected on it so the children-fetch can scope across all
      * device-specific collections.
      */
-    private void runMergedAggregation(Bson matchFilter, Bson sort, int skip, int limit, boolean stripDevicePrefix) {
+    @SuppressWarnings("unchecked")
+    private List<String> popListFilter(Map<String, List> filters, String key) {
+        if (filters == null) return null;
+        List raw = filters.remove(key);
+        if (raw == null || raw.isEmpty()) return null;
+        List<String> out = new ArrayList<>();
+        for (Object o : raw) {
+            if (o != null) out.add(o.toString());
+        }
+        return out.isEmpty() ? null : out;
+    }
+
+    private void runMergedAggregation(Bson matchFilter, Bson sort, int skip, int limit, boolean stripDevicePrefix,
+                                      List<String> agentChoices, List<String> serverChoices) {
         List<Bson> commonStages = new ArrayList<>();
         commonStages.add(Aggregates.match(matchFilter));
 
@@ -257,6 +276,31 @@ public class AuditDataAction extends UserAction {
             ))
         ));
         commonStages.add(addPriority);
+
+        // Optional agent/server filtering against the derived _groupKey (server-mode only).
+        // _groupKey is "<agent>.<server>" when the canonical name has 2+ segments, or
+        // just "<server>" when it has 1 (no agent prefix).
+        List<Bson> groupKeyMatchOrs = new ArrayList<>();
+        if (stripDevicePrefix && agentChoices != null && !agentChoices.isEmpty()) {
+            List<Bson> agentOrs = new ArrayList<>();
+            for (String a : agentChoices) {
+                String esc = java.util.regex.Pattern.quote(a);
+                agentOrs.add(Filters.regex("_groupKey", "^" + esc + "\\."));
+            }
+            groupKeyMatchOrs.add(Filters.or(agentOrs));
+        }
+        if (stripDevicePrefix && serverChoices != null && !serverChoices.isEmpty()) {
+            List<Bson> serverOrs = new ArrayList<>();
+            for (String s : serverChoices) {
+                String esc = java.util.regex.Pattern.quote(s);
+                serverOrs.add(Filters.regex("_groupKey", "(^|\\.)" + esc + "$"));
+            }
+            groupKeyMatchOrs.add(Filters.or(serverOrs));
+        }
+        if (!groupKeyMatchOrs.isEmpty()) {
+            commonStages.add(Aggregates.match(Filters.and(groupKeyMatchOrs)));
+        }
+
         commonStages.add(Aggregates.sort(Sorts.orderBy(
             Sorts.ascending("_priority"),
             Sorts.descending(McpAuditInfo.LAST_DETECTED)
@@ -367,6 +411,18 @@ public class AuditDataAction extends UserAction {
     String remarks;
     @Setter
     Map<String, Object> approvalData;
+    // When non-empty, also apply the same update to all mcp-tool / mcp-resource /
+    // mcp-prompt records belonging to these hostCollectionIds. Used by the UI when
+    // a server-level decision should cascade to every component it owns. Tools
+    // can still be overridden afterwards via a per-tool action on the child row.
+    @Setter
+    List<Integer> cascadeHostCollectionIds;
+    // When set, the update applies to every mcp-server record whose resourceName
+    // resolves to this server name across any AI agent (and to those servers'
+    // children when cascading). E.g. value "akto-docs" matches "claudecli.akto-docs",
+    // "cursor.akto-docs", and "<device>.cursor.akto-docs" alike.
+    @Setter
+    String mcpServerForAllAgents;
 
     public String updateAuditData() {
         User user = getSUser();
@@ -384,6 +440,30 @@ public class AuditDataAction extends UserAction {
             } else if (hexId != null && !hexId.isEmpty()) {
                 targetIds.add(new ObjectId(hexId));
             }
+
+            // "For all agents" mode: discover every mcp-server record whose
+            // resourceName matches the requested server (bare, agent-prefixed, or
+            // device+agent-prefixed) and pull their hexIds/hostCollectionIds into
+            // the update scope.
+            List<Integer> allAgentsCollectionIds = new ArrayList<>();
+            if (mcpServerForAllAgents != null && !mcpServerForAllAgents.trim().isEmpty()) {
+                String escaped = java.util.regex.Pattern.quote(mcpServerForAllAgents.trim());
+                Bson serverMatch = Filters.and(
+                    Filters.eq(McpAuditInfo.TYPE, "mcp-server"),
+                    Filters.regex(McpAuditInfo.RESOURCE_NAME, "(^|\\.)" + escaped + "$")
+                );
+                try (MongoCursor<McpAuditInfo> cursor = McpAuditInfoDao.instance.getMCollection()
+                        .find(serverMatch).cursor()) {
+                    while (cursor.hasNext()) {
+                        McpAuditInfo rec = cursor.next();
+                        if (rec.getId() != null && !targetIds.contains(rec.getId())) {
+                            targetIds.add(rec.getId());
+                        }
+                        allAgentsCollectionIds.add(rec.getHostCollectionId());
+                    }
+                }
+            }
+
             if (targetIds.isEmpty()) {
                 addActionError("No record id provided");
                 return ERROR.toUpperCase();
@@ -418,6 +498,19 @@ public class AuditDataAction extends UserAction {
                 McpAuditInfoDao.instance.updateOne(Filters.eq(Constants.ID, targetIds.get(0)), combined);
             } else {
                 McpAuditInfoDao.instance.updateMany(Filters.in(Constants.ID, targetIds), combined);
+            }
+
+            List<Integer> mergedCascade = new ArrayList<>();
+            if (cascadeHostCollectionIds != null) mergedCascade.addAll(cascadeHostCollectionIds);
+            for (Integer id : allAgentsCollectionIds) {
+                if (id != null && !mergedCascade.contains(id)) mergedCascade.add(id);
+            }
+            if (!mergedCascade.isEmpty()) {
+                Bson childFilter = Filters.and(
+                    Filters.in(McpAuditInfo.HOST_COLLECTION_ID, mergedCascade),
+                    Filters.in(McpAuditInfo.TYPE, Arrays.asList("mcp-tool", "mcp-resource", "mcp-prompt"))
+                );
+                McpAuditInfoDao.instance.updateMany(childFilter, combined);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error updating audit data: " + e.getMessage(), LogDb.DASHBOARD);
