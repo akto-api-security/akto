@@ -106,6 +106,7 @@ import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
 import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
 import AzureDataExplorer from "../dashboard/pages/settings/integrations/AzureDataExplorer";
 import ServiceNow from "../dashboard/pages/settings/integrations/ServiceNow";
+import LinearIntegration from "../dashboard/pages/settings/integrations/LinearIntegration/LinearIntegration";
 import DevRev from "../dashboard/pages/settings/integrations/DevRev";
 import McpRegistry from "../dashboard/pages/settings/integrations/McpRegistry";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
@@ -472,6 +473,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/servicenow",
                         element: <ServiceNow/>,
+                    },
+                    {
+                        path: "integrations/linear",
+                        element: <LinearIntegration/>,
                     },
                     {
                         path: "integrations/devrev",

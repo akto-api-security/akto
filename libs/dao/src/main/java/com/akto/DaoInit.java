@@ -36,6 +36,11 @@ import com.akto.dto.gpt.AktoGptConfig;
 import com.akto.dto.gpt.AktoGptConfigState;
 import com.akto.dto.integration.NewRelicIntegration;
 import com.akto.dto.jira_integration.JiraIntegration;
+import com.akto.dto.linear_integration.LinearIntegration;
+import com.akto.dto.linear_integration.IssueTemplate;
+import com.akto.dto.linear_integration.LinearIssueMapping;
+import com.akto.dto.linear_integration.LinearTeam;
+import com.akto.dto.linear_integration.LinearProject;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.TicketSyncJobParams;
@@ -271,6 +276,11 @@ public class DaoInit {
         ClassModel<TrafficMetricsAlert> trafficMetricsAlertClassModel = ClassModel.builder(TrafficMetricsAlert.class).enableDiscriminator(true).build();
         ClassModel<JiraIntegration> jiraintegrationClassModel = ClassModel.builder(JiraIntegration.class).enableDiscriminator(true).build();
         ClassModel<NewRelicIntegration> newRelicIntegrationClassModel = ClassModel.builder(NewRelicIntegration.class).enableDiscriminator(true).build();
+        ClassModel<LinearIntegration> linearIntegrationClassModel = ClassModel.builder(LinearIntegration.class).enableDiscriminator(true).build();
+        ClassModel<IssueTemplate> issueTemplateClassModel = ClassModel.builder(IssueTemplate.class).enableDiscriminator(true).build();
+        ClassModel<LinearIssueMapping> linearIssueMappingClassModel = ClassModel.builder(LinearIssueMapping.class).enableDiscriminator(true).build();
+        ClassModel<LinearTeam> linearTeamClassModel = ClassModel.builder(LinearTeam.class).enableDiscriminator(true).build();
+        ClassModel<LinearProject> linearProjectClassModel = ClassModel.builder(LinearProject.class).enableDiscriminator(true).build();
         ClassModel<MethodCondition> methodConditionClassModel = ClassModel.builder(MethodCondition.class).enableDiscriminator(true).build();
         ClassModel<RegexTestingEndpoints> regexTestingEndpointsClassModel = ClassModel.builder(RegexTestingEndpoints.class).enableDiscriminator(true).build();
         ClassModel<HostRegexTestingEndpoints> hostRegexTestingEndpointsClassModel = ClassModel.builder(HostRegexTestingEndpoints.class).enableDiscriminator(true).build();
@@ -362,7 +372,8 @@ public class DaoInit {
                 accessMatrixUrlToRoleClassModel, accessMatrixTaskInfoClassModel,
                 loaderClassModel, normalLoaderClassModel, postmanUploadLoaderClassModel, aktoGptConfigClassModel,
                 vulnerableRequestForTemplateClassModel, trafficMetricsAlertClassModel, jiraintegrationClassModel,
-                newRelicIntegrationClassModel,
+                newRelicIntegrationClassModel, linearIntegrationClassModel, issueTemplateClassModel,
+                linearIssueMappingClassModel, linearTeamClassModel, linearProjectClassModel,
                 setupClassModel,
                 cronTimersClassModel, connectionInfoClassModel, testLibraryClassModel,
                 methodConditionClassModel, regexTestingEndpointsClassModel, hostRegexTestingEndpointsClassModel,
