@@ -1547,7 +1547,7 @@ public class HttpCallParser {
 
     private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
         if (McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
-            FeatureAccess mcpSecurityAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(), "MCP_SECURITY");
+            FeatureAccess mcpSecurityAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(), "SECURITY_TYPE_AGENTIC");
             if (mcpSecurityAccess == null || !mcpSecurityAccess.getIsGranted()) {
                 return Optional.empty();
             }
