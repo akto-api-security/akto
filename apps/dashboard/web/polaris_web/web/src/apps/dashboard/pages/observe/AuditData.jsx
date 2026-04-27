@@ -1,5 +1,5 @@
 
-import { Text, HorizontalStack, VerticalStack, Box } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box, Spinner, Popover, Button, ActionList, DataTable } from "@shopify/polaris"
 import { useEffect, useReducer, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
@@ -10,7 +10,7 @@ import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCard
 import GithubServerTable from "../../components/tables/GithubServerTable";
 import { MethodBox } from "./GetPrettifyEndpoint";
 import { CellType } from "../../components/tables/rows/GithubRow";
-import { CircleTickMajor, CircleCancelMajor, SettingsMajor } from "@shopify/polaris-icons";
+import { CircleTickMajor, CircleCancelMajor, SettingsMajor, HorizontalDotsMinor } from "@shopify/polaris-icons";
 import { Icon } from "@shopify/polaris";
 import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
@@ -20,9 +20,10 @@ import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadge
 
 const headings = [
     {
-        title: 'Type',
-        value: 'typeComp',
-        text: 'Type',
+        title: '',
+        value: 'expanderSpacer',
+        text: '',
+        type: CellType.COLLAPSIBLE,
     },
     {
         title: 'Risk Analysis',
@@ -30,15 +31,16 @@ const headings = [
         text: 'Risk Analysis',
     },
     {
-        text: "Agentic Component name",
-        value: "resourceName",
-        title: "Agentic Component name"
+        title: 'MCP Server',
+        text: 'MCP Server',
+        value: 'mcpServerName',
+        type: CellType.TEXT,
     },
     {
-        text: "Collection name",
-        value: "collectionName",
-        title: "Collection name",
-        type: CellType.TEXT
+        title: 'AI Agent',
+        text: 'AI Agent',
+        value: 'aiAgentName',
+        type: CellType.TEXT,
     },
     {
         title: 'Last Detected',
@@ -87,17 +89,6 @@ const sortOptions = [
 ];
 
 let filters = [
-    {
-        key: 'type',
-        label: 'Type',
-        title: 'Type',
-        choices: [
-            { label: "Tool", value: "mcp-tool" },
-            { label: "Resource", value: "mcp-resource" },
-            { label: "Prompt", value: "mcp-prompt" },
-            { label: "Server", value: "mcp-server" }
-        ],
-    },
     {
         key: 'markedBy',
         label: 'Marked By',
@@ -157,6 +148,111 @@ const stripDeviceIdFromName = (name, allCollections, collectionId) => {
     return name;
 };
 
+const childTypeLabel = (type) => {
+    switch (type) {
+        case 'mcp-tool': return 'Tool';
+        case 'mcp-resource': return 'Resource';
+        case 'mcp-prompt': return 'Prompt';
+        default: return type || '-';
+    }
+};
+
+function ChildActionMenu({ child, getActionsList }) {
+    const [active, setActive] = useState(false);
+    return (
+        <Popover
+            active={active}
+            activator={
+                <Button plain icon={HorizontalDotsMinor} onClick={() => setActive((p) => !p)} />
+            }
+            autofocusTarget="first-node"
+            onClose={() => setActive(false)}
+        >
+            <ActionList actionRole="menuitem" sections={getActionsList(child)} />
+        </Popover>
+    );
+}
+
+function MCPChildren({ parent, dateRange, getActionsList }) {
+    const [loadingChildren, setLoadingChildren] = useState(true);
+    const [children, setChildren] = useState([]);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function load() {
+            setLoadingChildren(true);
+            try {
+                // A parent row may represent multiple device-specific mcp-server records
+                // grouped by (agent, server). Fetch tools/resources/prompts across ALL of
+                // those member hostCollectionIds.
+                const collectionIds = Array.isArray(parent.groupedHostCollectionIds) && parent.groupedHostCollectionIds.length > 0
+                    ? parent.groupedHostCollectionIds
+                    : [parent.hostCollectionId];
+                const res = await api.fetchAuditData(
+                    'lastDetected', -1, 0, 500,
+                    {
+                        type: ['mcp-tool', 'mcp-resource', 'mcp-prompt'],
+                        hostCollectionId: collectionIds,
+                        lastDetected: dateRange,
+                    },
+                    {}, '', false, true
+                );
+                if (!cancelled) setChildren(res?.auditData || []);
+            } catch (e) {
+                if (!cancelled) setChildren([]);
+            } finally {
+                if (!cancelled) setLoadingChildren(false);
+            }
+        }
+        load();
+        return () => { cancelled = true; };
+    }, [JSON.stringify(parent.groupedHostCollectionIds || [parent.hostCollectionId]), dateRange[0], dateRange[1]]);
+
+    const renderRemarks = (child) => {
+        if (!child?.remarks) {
+            return <Text variant="bodySm" color="critical" fontWeight="bold">Pending...</Text>;
+        }
+        return <Text variant="bodySm">{child.remarks}</Text>;
+    };
+
+    const rows = children.map((child) => [
+        <Text key={`type-${child.hexId}`} variant="bodySm">{childTypeLabel(child.type)}</Text>,
+        <ComponentRiskAnalysisBadges key={`risk-${child.hexId}`} componentRiskAnalysis={child?.componentRiskAnalysis} />,
+        <Text key={`name-${child.hexId}`} variant="bodySm">{child.resourceName}</Text>,
+        <Text key={`access-${child.hexId}`} variant="bodySm">{(child.apiAccessTypes || []).join(', ') || '-'}</Text>,
+        renderRemarks(child),
+        <Text key={`mb-${child.hexId}`} variant="bodySm">{child.markedBy || '-'}</Text>,
+        <ChildActionMenu key={`act-${child.hexId}`} child={child} getActionsList={getActionsList} />,
+    ]);
+
+    return (
+        <tr>
+            <td colSpan="100%" style={{ padding: 0 }}>
+                <Box padding="3" background="bg-subdued">
+                    {loadingChildren ? (
+                        <HorizontalStack align="center" gap="2"><Spinner size="small" /><Text>Loading components...</Text></HorizontalStack>
+                    ) : children.length === 0 ? (
+                        <Text color="subdued">No tools, resources, or prompts found for this MCP server.</Text>
+                    ) : (
+                        <DataTable
+                            columnContentTypes={['text', 'text', 'text', 'text', 'text', 'text', 'text']}
+                            headings={['Type', 'Risk Analysis', 'Name', 'Access Types', 'Remarks', 'Marked By', '']}
+                            rows={rows}
+                        />
+                    )}
+                </Box>
+            </td>
+        </tr>
+    );
+}
+
+const splitAgentAndServer = (name) => {
+    if (!name) return { agent: '-', server: '-' };
+    const dot = name.indexOf('.');
+    if (dot <= 0 || dot >= name.length - 1) return { agent: '-', server: name };
+    return { agent: name.substring(0, dot), server: name.substring(dot + 1) };
+};
+
 const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegistry) => {
     const allCollections = PersistStore.getState().allCollections;
     let temp = {...auditRecord}
@@ -167,7 +263,12 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     temp['riskAnalysisComp'] = <ComponentRiskAnalysisBadges componentRiskAnalysis={auditRecord?.componentRiskAnalysis} />;
 
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
+    // Preserve the unstripped hostname for child lookups (children store mcpHost = original parent hostname)
+    temp['originalResourceName'] = temp?.resourceName;
     temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, allCollections, temp?.hostCollectionId);
+    const { agent, server } = splitAgentAndServer(temp.resourceName);
+    temp['aiAgentName'] = agent;
+    temp['mcpServerName'] = server;
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
     temp['approvedAtComp'] = func.prettifyEpoch(temp?.approvedAt)
@@ -225,6 +326,10 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
             {collectionRegistry === "available" && <RegistryBadge />}
         </HorizontalStack>
     );
+    // Required by GithubRow for tree-style expand/collapse
+    temp['id'] = temp.hexId;
+    temp['name'] = temp.hexId;
+    temp['isTerminal'] = false;
     return temp;
 }
 
@@ -245,7 +350,6 @@ function AuditData() {
 
     function disambiguateLabel(key, value) {
         switch (key) {
-            case "type":
             case "markedBy":
             case "apiAccessTypes":
                 return func.convertToDisambiguateLabelObj(value, null, 2)
@@ -256,13 +360,13 @@ function AuditData() {
         }
     }
 
-    const updateAuditData = async (hexId, remarks) => {
-        await api.updateAuditData(hexId, remarks)
+    const updateAuditData = async (hexId, remarks, hexIds = null) => {
+        await api.updateAuditData(hexId, remarks, null, hexIds)
         window.location.reload();
     }
 
-    const updateAuditDataWithConditions = async (hexId, approvalData) => {
-        await api.updateAuditData(hexId, null, approvalData)
+    const updateAuditDataWithConditions = async (hexId, approvalData, hexIds = null) => {
+        await api.updateAuditData(hexId, null, approvalData, hexIds)
         window.location.reload();
     }
 
@@ -284,12 +388,12 @@ function AuditData() {
             {
                 content: <span style={{ color: '#008060' }}>Mark as resolved</span>,
                 icon: GreenTickIcon,
-                onAction: () => {updateAuditData(item.hexId, "Approved")},
+                onAction: () => {updateAuditData(item.hexId, "Approved", item.groupedHexIds)},
             },
             {
                 content: <span style={{ color: '#D72C0D' }}>Disapprove</span>,
                 icon: RedCancelIcon,
-                onAction: () => {updateAuditData(item.hexId, "Rejected")},
+                onAction: () => {updateAuditData(item.hexId, "Rejected", item.groupedHexIds)},
                 destructive: true
             }
         ]}]
@@ -301,14 +405,18 @@ function AuditData() {
         let total = 0;
         let finalFilters = {...filters}
         finalFilters['lastDetected'] = [startTimestamp, endTimestamp]
-        finalFilters['hostCollectionId'] = filters['collectionName'].map(id => parseInt(id)) || Object.keys(collectionsMap).map(id => parseInt(id))
+        const selectedCollections = Array.isArray(filters?.collectionName) ? filters.collectionName : []
+        finalFilters['hostCollectionId'] = selectedCollections.map(id => parseInt(id))
         delete finalFilters['collectionName']
+        // Parent rows are MCP servers; tools/resources/prompts surface via expansion.
+        finalFilters['type'] = ['mcp-server']
 
         try {
-            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue)
+            // Backend dedupes by (agent, server) and returns one canonical record per
+            // group, with `groupedHostCollectionIds` listing every member collection.
+            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue, true)
             if (res && res.auditData) {
                 res.auditData.forEach((auditRecord) => {
-                    // Get collection name and registry status from separate maps
                     let collectionName = "-";
                     if(collectionsMap[auditRecord?.hostCollectionId]){
                         collectionName = collectionsMap[auditRecord?.hostCollectionId];
@@ -317,17 +425,24 @@ function AuditData() {
                     }
                     const collectionRegistryStatus = collectionsRegistryStatusMap[auditRecord?.hostCollectionId];
                     const dataObj = convertDataIntoTableFormat(
-                        auditRecord, 
-                        collectionName, 
+                        auditRecord,
+                        collectionName,
                         collectionRegistryStatus
                     )
+                    dataObj.collapsibleRow = (
+                        <MCPChildren
+                            parent={dataObj}
+                            dateRange={[startTimestamp, endTimestamp]}
+                            getActionsList={getActionsList}
+                        />
+                    );
                     ret.push(dataObj);
                 })
                 total = res.total || 0;
             }
         } catch (error) {
         }
-        
+
         setLoading(false);
         return {value: ret, total: total};
     }
@@ -335,9 +450,9 @@ function AuditData() {
     const fillFilters = async () => {
         const usersResponse = await settingRequests.getTeamData()
         if (usersResponse) {
-            filters[1].choices = usersResponse.map((user) => ({label: user.login, value: user.login}))
+            filters[0].choices = usersResponse.map((user) => ({label: user.login, value: user.login}))
         }
-        filters[3].choices = Object.entries(collectionsMap).map(([id, name]) => ({ label: name, value: id }));
+        filters[2].choices = Object.entries(collectionsMap).map(([id, name]) => ({ label: name, value: id }));
     }
 
     useEffect(() => {
@@ -370,9 +485,9 @@ function AuditData() {
             primaryAction={primaryActions}
             components = {[
                 <GithubServerTable
-                    key={startTimestamp + endTimestamp + filters[1].choices.length}
+                    key={startTimestamp + endTimestamp + filters[0].choices.length}
                     headers={headings}
-                    resourceName={resourceName} 
+                    resourceName={resourceName}
                     appliedFilters={[]}
                     sortOptions={sortOptions}
                     disambiguateLabel={disambiguateLabel}

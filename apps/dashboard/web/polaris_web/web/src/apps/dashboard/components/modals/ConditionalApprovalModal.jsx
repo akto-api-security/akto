@@ -195,7 +195,7 @@ const ConditionalApprovalModal = ({
                 remarks: "Conditionally Approved",
                 conditions: conditions,
                 justification: justification.trim()
-            });
+            }, auditItem.groupedHexIds);
             onClose();
         } catch (error) {
             console.error("Error approving with conditions:", error);

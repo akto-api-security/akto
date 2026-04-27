@@ -32,22 +32,25 @@ export default {
             data: { startTimestamp, endTimestamp }
         })
     },
-    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators, searchString) {
+    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers = false, mergeMcpComponents = false) {
         const resp = await request({
             url: '/api/fetchAuditData',
             method: 'post',
-            data: { sortKey, sortOrder, skip, limit, filters, filterOperators, searchString }
+            data: { sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers, mergeMcpComponents }
         });
         return resp;
     },
-    async updateAuditData(hexId, remarks, approvalData = null) {
+    async updateAuditData(hexId, remarks, approvalData = null, hexIds = null) {
         const data = { hexId };
+        if (Array.isArray(hexIds) && hexIds.length > 0) {
+            data.hexIds = hexIds;
+        }
         if (approvalData) {
             data.approvalData = approvalData;
         } else {
             data.remarks = remarks;
         }
-        
+
         const resp = await request({
             url: '/api/updateAuditData',
             method: 'post',
