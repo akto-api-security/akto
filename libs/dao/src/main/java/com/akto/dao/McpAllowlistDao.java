@@ -1,7 +1,7 @@
 package com.akto.dao;
 
-import com.akto.dao.context.Context;
 import com.akto.dto.McpAllowlist;
+import com.mongodb.client.model.CreateCollectionOptions;
 
 public class McpAllowlistDao extends AccountsContextDao<McpAllowlist> {
 
@@ -20,17 +20,7 @@ public class McpAllowlistDao extends AccountsContextDao<McpAllowlist> {
     }
 
     public void createIndicesIfAbsent() {
-        boolean exists = false;
-        for (String col : clients[0].getDatabase(Context.accountId.get() + "").listCollectionNames()) {
-            if (getCollName().equalsIgnoreCase(col)) {
-                exists = true;
-                break;
-            }
-        }
-        if (!exists) {
-            clients[0].getDatabase(Context.accountId.get() + "").createCollection(getCollName());
-        }
-
+        createCollectionIfAbsent(getDBName(), getCollName(), new CreateCollectionOptions());
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{McpAllowlist.REGISTRY_ID}, false);
         MCollection.createUniqueIndex(getDBName(), getCollName(), new String[]{McpAllowlist.NAME, McpAllowlist.REGISTRY_ID}, false);
     }

@@ -1,7 +1,7 @@
 package com.akto.dao;
 
-import com.akto.dao.context.Context;
 import com.akto.dto.McpRegistryConfig;
+import com.mongodb.client.model.CreateCollectionOptions;
 
 public class McpRegistryConfigDao extends AccountsContextDao<McpRegistryConfig> {
 
@@ -20,18 +20,7 @@ public class McpRegistryConfigDao extends AccountsContextDao<McpRegistryConfig> 
     }
 
     public void createIndicesIfAbsent() {
-        boolean exists = false;
-        for (String col : clients[0].getDatabase(Context.accountId.get() + "").listCollectionNames()) {
-            if (getCollName().equalsIgnoreCase(col)) {
-                exists = true;
-                break;
-            }
-        }
-        if (!exists) {
-            clients[0].getDatabase(Context.accountId.get() + "").createCollection(getCollName());
-        }
-
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{McpRegistryConfig.HASH}, false);
+        createCollectionIfAbsent(getDBName(), getCollName(), new CreateCollectionOptions());
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{McpRegistryConfig.REGISTRY_TYPE}, false);
     }
 }

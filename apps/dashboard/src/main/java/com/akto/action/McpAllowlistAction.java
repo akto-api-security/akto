@@ -52,13 +52,13 @@ public class McpAllowlistAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        String hash = sha256Hex(registryUrl.trim());
-        if (McpRegistryConfigDao.instance.findOne(Filters.eq(McpRegistryConfig.HASH, hash)) != null) {
-            addActionError("Registry already exists");
+        if (McpRegistryConfigDao.instance.findOne(Filters.eq(McpRegistryConfig.REGISTRY_TYPE, McpRegistryConfig.RegistryType.GITHUB)) != null) {
+            addActionError("A GITHUB registry already exists");
             return Action.ERROR.toUpperCase();
         }
 
         int now = Context.now();
+        String hash = sha256Hex(registryUrl.trim());
         McpRegistryConfig config = new McpRegistryConfig(registryUrl.trim(), headers, hash, now, now, registryType);
         String insertedId = McpRegistryConfigDao.instance.insertOne(config)
                 .getInsertedId().asObjectId().getValue().toHexString();
