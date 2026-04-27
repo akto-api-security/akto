@@ -213,7 +213,7 @@ def build_validation_request(
     if is_mcp:
         host = mcp_mirror_host(mcp_server_name)
     else:
-        host = CLAUDE_API_URL.replace("https://", "").replace("http://", "")
+        host = os.getenv("AKTO_HOSTNAME") or CLAUDE_API_URL.replace("https://", "").replace("http://", "")
 
     req_hdr: Dict[str, str] = {
         "host": host,
