@@ -44,7 +44,7 @@ public class DistributionStreamConsumer implements Runnable {
     private static final double EPSILON = 0.01;
     private static final double DELTA = 0.01;
     private static final long TRIM_INTERVAL_MS = 5 * 60 * 1000;
-    private static final long MAX_STREAM_LENGTH = 500000;
+    private static final long MAX_STREAM_LENGTH = 2000000;
     private static final int FIELDS_PER_MESSAGE = 6;
 
     private static final FilterConfig IP_API_RATE_LIMIT_FILTER = Utils.getipApiRateLimitFilter();
@@ -124,19 +124,47 @@ public class DistributionStreamConsumer implements Runnable {
         logger.infoAndAddToDb("DistributionStreamConsumer stopped: " + consumerId);
     }
 
+    /**
+     * Build a flat ARGV array for the Lua script and execute via EVALSHA.
+     *
+     * Layout: [ HEADER (6 fixed fields) | BUCKET_RANGES (variable) | MESSAGE_0 | MESSAGE_1 | ... ]
+     *
+     * HEADER:
+     *   [0] messageCount    — number of messages in this batch
+     *   [1] epsilon          — CMS error rate (e.g. 0.01)
+     *   [2] delta            — CMS confidence (e.g. 0.01)
+     *   [3] cmsTtl           — TTL for CMS keys in seconds
+     *   [4] distTtl          — TTL for distribution hash keys in seconds
+     *   [5] bucketCount      — number of bucket range entries that follow
+     *
+     * BUCKET_RANGES (at indices 6 .. 6+bucketCount-1):
+     *   Each entry is "label,min,max" e.g. "b1,1,10", "b2,11,50", ...
+     *
+     * MESSAGES (at indices headerSize .. end, each FIELDS_PER_MESSAGE wide):
+     *   [+0] ipApiCmsKey      — CMS item key (e.g. "ipApiCmsData|acctId|ip|url|method")
+     *   [+1] apiKey           — distribution key (e.g. "acctId|url|method")
+     *   [+2] minute           — current epoch minute
+     *   [+3] rateLimitWindow  — sliding window size in minutes
+     *   [+4] threshold        — rate limit threshold (-1 = no check)
+     *   [+5] mitigationPeriod — cooldown period in seconds after breach
+     */
     private void processBatch(List<StreamMessage<String, String>> messages) {
         int headerSize = 6 + bucketRangeArgs.length;
         int totalArgvSize = headerSize + messages.size() * FIELDS_PER_MESSAGE;
         String[] argv = new String[totalArgvSize];
 
+        // Fixed header fields
         argv[0] = String.valueOf(messages.size());
         argv[1] = String.valueOf(EPSILON);
         argv[2] = String.valueOf(DELTA);
         argv[3] = String.valueOf(CMS_TTL_SECONDS);
         argv[4] = String.valueOf(DIST_TTL_SECONDS);
         argv[5] = String.valueOf(bucketRangeArgs.length);
+
+        // Bucket ranges (variable length, e.g. ["b1,1,10", "b2,11,50", ...])
         System.arraycopy(bucketRangeArgs, 0, argv, 6, bucketRangeArgs.length);
 
+        // Per-message fields, packed sequentially after the header
         int offset = headerSize;
         for (StreamMessage<String, String> msg : messages) {
             Map<String, String> body = msg.getBody();
