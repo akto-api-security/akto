@@ -27,13 +27,16 @@ import com.akto.metrics.AllMetrics;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.hyperscan.HyperscanThreatMatcher;
+import com.akto.threat.detection.hyperscan.PatternUpdateService;
 import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.ip_api_counter.DistributionDataForwardLayer;
+import com.akto.threat.detection.ip_api_counter.DistributionStreamConsumer;
 import com.akto.threat.detection.tasks.ConfigPoller;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
+import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.utils.Utils;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
@@ -75,6 +78,21 @@ public class Main {
       logger.warnAndAddToDb("Hyperscan initialization error (non-fatal): " + e.getMessage());
     }
 
+    // Start PatternUpdateService for periodic pattern updates from public URL
+    try {
+      String patternFileUrl = "https://akto.blob.core.windows.net/threat-config/threat-patterns.txt";
+      String localPatternFile = System.getenv().getOrDefault("LOCAL_PATTERN_FILE", "threat-patterns-example.txt");
+
+      PatternUpdateService patternUpdateService = new PatternUpdateService(
+          localPatternFile,
+          patternFileUrl
+      );
+      patternUpdateService.startPeriodicUpdates();
+      logger.infoAndAddToDb("PatternUpdateService started - will check for pattern updates every 15 minutes from: " + patternFileUrl);
+    } catch (Exception e) {
+      logger.warnAndAddToDb("PatternUpdateService initialization error (non-fatal): " + e.getMessage());
+    }
+
     int accountId = ClientActor.getAccountId();
     Context.accountId.set(accountId);
     String instanceId = ModuleInfoWorker.getModuleName(ModuleInfo.ModuleType.THREAT_DETECTION); 
@@ -95,12 +113,25 @@ public class Main {
     initCustomDataTypeScheduler();
 
     CmsCounterLayer.initialize(localRedis);
-    DistributionCalculator distributionCalculator = new DistributionCalculator();
-    DistributionDataForwardLayer distributionDataForwardLayer = new DistributionDataForwardLayer(localRedis, distributionCalculator);
+
+    DistributionCalculator distributionCalculator = localRedis != null
+        ? new DistributionCalculator(localRedis)
+        : null;
+    DistributionDataForwardLayer distributionDataForwardLayer = localRedis != null
+        ? new DistributionDataForwardLayer(localRedis)
+        : null;
 
     boolean apiDistributionEnabled = Utils.apiDistributionEnabled(localRedis != null, System.getenv().getOrDefault("API_DISTRIBUTION_ENABLED", "true").equals("true"));
 
     triggerDistributionDataForwardCron(apiDistributionEnabled, distributionDataForwardLayer);
+
+    KafkaProtoProducer internalKafkaProducer =
+        new KafkaProtoProducer(internalKafka);
+
+    // Start threat stream consumers (background threads)
+    if (localRedis != null && apiDistributionEnabled && distributionCalculator != null) {
+        startDistributionStreamConsumers(localRedis, internalKafkaProducer, instanceId);
+    }
 
     String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss"));
     logger.warnAndAddToDb("Initialization finished starting DetectorTask at " + currentTime);
@@ -131,7 +162,7 @@ public class Main {
     ApiCountInfoRelayCron apiCountInfoRelayCron = new ApiCountInfoRelayCron(localRedis);
     try {
         logger.info("Scheduling relayApiCountInfoCron at " + Context.now());
-        apiCountInfoRelayCron.relayApiCountInfo();
+        //apiCountInfoRelayCron.relayApiCountInfo();
     } catch (Exception e) {
         logger.errorAndAddToDb(e,"Error scheduling relayApiCountInfoCron : {} ");
     }
@@ -146,6 +177,14 @@ public class Main {
     } catch (Exception e) {
         logger.errorAndAddToDb(e,"Error scheduling relayApiCountInfoCron : {} ");
     }
+  }
+
+  public static void startDistributionStreamConsumers(RedisClient redisClient,
+      KafkaProtoProducer internalKafkaProducer, String instanceId) {
+    java.util.concurrent.ExecutorService streamExecutor = Executors.newFixedThreadPool(1);
+    streamExecutor.submit(new DistributionStreamConsumer(
+        redisClient, instanceId, internalKafkaProducer));
+    logger.infoAndAddToDb("Started threat stream consumer: " + instanceId);
   }
 
   public static RedisClient createLocalRedisClient() {
