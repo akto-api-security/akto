@@ -84,7 +84,7 @@ def build_http_proxy_url(
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
     logger.info(f"API CALL: POST {url}")
     if LOG_PAYLOADS:
-        logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
+        logger.debug(f"Request payload: {json.dumps(payload)}")
 
     headers = {"Content-Type": "application/json"}
     if AKTO_TOKEN:
@@ -106,7 +106,7 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
             logger.info(f"API RESPONSE: Status {status_code}, Duration: {duration_ms}ms, Size: {len(raw)} bytes")
 
             if LOG_PAYLOADS:
-                logger.debug(f"Response body: {raw[:1000]}...")
+                logger.debug(f"Response body: {raw}")
 
             try:
                 return json.loads(raw)
@@ -303,8 +303,8 @@ def call_guardrails(
     else:
         logger.info(f"Validating built-in / non-MCP tool result: {tool_name}")
     if LOG_PAYLOADS:
-        logger.debug(f"Tool input: {json.dumps(tool_input)[:500]}...")
-        logger.debug(f"Tool response: {json.dumps(tool_response)[:500]}...")
+        logger.debug(f"Tool input: {json.dumps(tool_input)}")
+        logger.debug(f"Tool response: {json.dumps(tool_response)}")
 
     try:
         request_body = build_ingestion_payload(
@@ -346,17 +346,11 @@ def call_guardrails(
 
 
 def posttool_fingerprint(
-    tool_name: str,
-    tool_use_id: str,
     tool_input: Any,
-    tool_response: Any,
 ) -> str:
     canonical = json.dumps(
         {
-            "t": tool_name,
-            "u": tool_use_id or "",
             "i": tool_input,
-            "r": tool_response,
         },
         sort_keys=True,
         ensure_ascii=False,
@@ -516,8 +510,8 @@ def send_ingestion_data(
     else:
         logger.info(f"Ingesting non-MCP tool result (gen-ai only): {tool_name}")
     if LOG_PAYLOADS:
-        logger.debug(f"Tool input: {json.dumps(tool_input)[:500]}...")
-        logger.debug(f"Tool response: {json.dumps(tool_response)[:500]}...")
+        logger.debug(f"Tool input: {json.dumps(tool_input)}")
+        logger.debug(f"Tool response: {json.dumps(tool_response)}")
 
     try:
         request_body = build_ingestion_payload(
@@ -586,7 +580,7 @@ def main():
             session_info=session_info,
         )
         fingerprint = posttool_fingerprint(
-            tool_name, tool_use_id, tool_input, tool_response
+            tool_input
         )
         allowed, _ = apply_warn_resubmit_flow(
             gr_allowed, gr_reason, behaviour, fingerprint
