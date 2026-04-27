@@ -85,7 +85,7 @@ def build_http_proxy_url(
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
     logger.info(f"API CALL: POST {url}")
     if LOG_PAYLOADS:
-        logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
+        logger.debug(f"Request payload: {json.dumps(payload)}")
 
     headers = {"Content-Type": "application/json"}
     if AKTO_TOKEN:
@@ -107,7 +107,7 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
             logger.info(f"API RESPONSE: Status {status_code}, Duration: {duration_ms}ms, Size: {len(raw)} bytes")
 
             if LOG_PAYLOADS:
-                logger.debug(f"Response body: {raw[:1000]}...")
+                logger.debug(f"Response body: {raw}")
 
             try:
                 return json.loads(raw)
@@ -284,20 +284,20 @@ def call_guardrails(
     mcp_server_name: str,
     mcp_tool_name: str,
     session_info: dict = None,
-) -> Tuple[bool, str, str]:
+) -> Tuple[bool, str, str, bool, str]:
     if not tool_input:
-        return True, "", ""
+        return True, "", "", False, ""
 
     if not AKTO_DATA_INGESTION_URL:
         logger.warning("AKTO_DATA_INGESTION_URL not set, allowing request (fail-open)")
-        return True, "", ""
+        return True, "", "", False, ""
 
     if is_mcp:
         logger.info(f"Validating MCP tools/call for {mcp_tool_name} (server={mcp_server_name}, claudeTool={tool_name})")
     else:
         logger.info(f"Validating built-in / non-MCP tool request: {tool_name}")
     if LOG_PAYLOADS:
-        logger.debug(f"Tool input payload: {json.dumps(tool_input)[:500]}...")
+        logger.debug(f"Tool input payload: {json.dumps(tool_input)}")
 
     try:
         request_body = build_validation_request(
@@ -320,16 +320,18 @@ def call_guardrails(
         behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get(
             "Behaviour", ""
         )
+        modified = guardrails_result.get("Modified", False)
+        modified_payload = guardrails_result.get("ModifiedPayload", "")
 
         if allowed:
             logger.info(f"Request ALLOWED for {tool_name}")
         else:
             logger.warning(f"Request DENIED for {tool_name}: {reason}")
 
-        return allowed, reason, behaviour
+        return allowed, reason, behaviour, modified, modified_payload
     except Exception as e:
         logger.error(f"Guardrails validation error: {e}")
-        return True, "", ""
+        return True, "", "", False, ""
 
 
 def pretool_fingerprint(tool_name: str, tool_input: Any) -> str:
@@ -365,6 +367,62 @@ def save_warn_pending(hashes: Set[str]) -> None:
                 os.remove(tmp_path)
             except OSError:
                 pass
+
+
+def extract_tool_input_from_modified_payload(
+    modified_payload: Any,
+    *,
+    is_mcp: bool,
+    fallback: Any,
+) -> Any:
+    """
+    Akto returns the mirrored HTTP body in ModifiedPayload.
+    Non-MCP: {"body": <tool arguments>, "toolName": "..."}.
+    MCP: JSON-RPC tools/call with params.arguments.
+    """
+    if modified_payload is None:
+        return fallback
+    if isinstance(modified_payload, str) and not modified_payload.strip():
+        return fallback
+    if isinstance(modified_payload, dict):
+        parsed = modified_payload
+    else:
+        try:
+            parsed = json.loads(modified_payload)
+        except (json.JSONDecodeError, TypeError):
+            logger.warning("ModifiedPayload is not valid JSON; keeping original tool_input")
+            return fallback
+    if not isinstance(parsed, dict):
+        return fallback
+    if is_mcp:
+        params = parsed.get("params")
+        if isinstance(params, dict) and isinstance(params.get("arguments"), dict):
+            return params["arguments"]
+        logger.warning(
+            "MCP ModifiedPayload missing params.arguments dict; keeping original tool_input"
+        )
+        return fallback
+    body = parsed.get("body")
+    if isinstance(body, dict):
+        return body
+    logger.warning(
+        "Non-MCP ModifiedPayload missing body dict; keeping original tool_input"
+    )
+    return fallback
+
+
+def pretool_allow_output(*, updated_input: Any = None, reason: str = "") -> Dict[str, Any]:
+    """PreToolUse allow decision; optional updatedInput replaces entire tool arguments."""
+    out: Dict[str, Any] = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow",
+            "permissionDecisionReason": reason or "Tool request allowed",
+        }
+    }
+    if updated_input is not None:
+        out["hookSpecificOutput"]["updatedInput"] = updated_input
+    return out
 
 
 def apply_warn_resubmit_flow(
@@ -473,13 +531,16 @@ def main():
     tool_input = input_data.get("tool_input") or {}
     is_mcp, mcp_server_name, mcp_tool_name = parse_claude_tool(tool_name)
 
+    modified = False
+    modified_payload = ""
+
     if is_mcp:
         logger.info(f"Processing MCP tool request: {tool_name} (server={mcp_server_name}, mcpTool={mcp_tool_name})")
     else:
         logger.info(f"Processing non-MCP tool request (gen-ai only): {tool_name}")
 
     if AKTO_SYNC_MODE:
-        gr_allowed, gr_reason, behaviour = call_guardrails(
+        gr_allowed, gr_reason, behaviour, modified, modified_payload = call_guardrails(
             tool_name,
             tool_input,
             is_mcp=is_mcp,
@@ -502,8 +563,11 @@ def main():
                 block_reason = f"Tool request blocked: {gr_reason}"
 
             output = {
-                "decision": "block",
-                "reason": block_reason,
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": block_reason,
+                }
             }
             logger.warning(f"BLOCKING tool request - Tool: {tool_name}, Reason: {gr_reason}")
             print(json.dumps(output))
@@ -517,6 +581,24 @@ def main():
                 session_info=session_info,
             )
             sys.exit(0)
+
+    if modified and modified_payload:
+        new_input = extract_tool_input_from_modified_payload(
+            modified_payload,
+            is_mcp=is_mcp,
+            fallback=tool_input,
+        )
+        if new_input is not tool_input:
+            logger.info(f"Applying guardrail-modified tool_input for {tool_name}")
+        print(
+            json.dumps(
+                pretool_allow_output(
+                    updated_input=new_input,
+                    reason="Tool request allowed (Akto guardrails)",
+                )
+            )
+        )
+        sys.exit(0)
 
     logger.info(f"Tool request allowed for {tool_name}")
     sys.exit(0)

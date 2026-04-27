@@ -83,7 +83,7 @@ def build_http_proxy_url(
 def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any], str]:
     logger.info(f"API CALL: POST {url}")
     if LOG_PAYLOADS:
-        logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
+        logger.debug(f"Request payload: {json.dumps(payload)}")
 
     headers = {"Content-Type": "application/json"}
     if AKTO_TOKEN:
@@ -106,7 +106,7 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
             logger.info(f"API RESPONSE: Status {status_code}, Duration: {duration_ms}ms, Size: {len(raw)} bytes")
 
             if LOG_PAYLOADS:
-                logger.debug(f"Response body: {raw[:1000]}...")
+                logger.debug(f"Response body: {raw}")
 
             try:
                 return json.loads(raw)
@@ -199,7 +199,7 @@ def call_guardrails(query: str, session_info: dict = None) -> Tuple[bool, str, s
 
     logger.info("Validating prompt against guardrails")
     if LOG_PAYLOADS:
-        logger.debug(f"Prompt: {query[:200]}...")
+        logger.debug(f"Prompt: {query}")
     else:
         logger.info(f"Prompt preview: {query[:100]}...")
 
