@@ -236,6 +236,18 @@ public class McpAllowlistAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String deleteRegistry() {
+        if (registryId == null || registryId.trim().isEmpty()) {
+            addActionError("registryId is required");
+            return Action.ERROR.toUpperCase();
+        }
+        String id = registryId.trim();
+        McpAllowlistDao.instance.getMCollection().deleteMany(Filters.eq(McpAllowlist.REGISTRY_ID, id));
+        McpRegistryConfigDao.instance.getMCollection().deleteOne(Filters.eq("_id", new ObjectId(id)));
+        loggerMaker.infoAndAddToDb("Deleted MCP registry id=" + id + " and all associated allowlist entries");
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchEntries() {
         if (registryId == null || registryId.trim().isEmpty()) {
             addActionError("registryId is required");
