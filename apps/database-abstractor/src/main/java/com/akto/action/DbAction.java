@@ -43,6 +43,7 @@ import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.runtime_filters.RuntimeFilter;
@@ -188,7 +189,13 @@ public class DbAction extends ActionSupport {
     private String miniRuntimeName;
 
     @Getter @Setter
+    private String moduleId;
+
+    @Getter @Setter
     private List<SessionDocument> sessionDocuments;
+
+    @Getter @Setter
+    private AgentQueryData agentQueryData;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
 
@@ -354,6 +361,9 @@ public class DbAction extends ActionSupport {
     @lombok.Setter
     List<CollectionTags> tagsList;
 
+    @lombok.Getter
+    @lombok.Setter
+    List<String> skills;
 
     @lombok.Getter
     @lombok.Setter
@@ -512,7 +522,7 @@ public class DbAction extends ActionSupport {
 
     public String fetchAndUpdateModuleForReboot() {
         try {
-            moduleInfoList = DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName);
+            moduleInfoList = DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName, moduleId);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchAndUpdateModuleForReboot " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -602,6 +612,16 @@ public class DbAction extends ActionSupport {
             e.printStackTrace();
             loggerMaker.error("fetchApiRateLimits account id: " + Context.accountId.get());
             loggerMaker.errorAndAddToDb(e, "error in fetchApiRateLimits" + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchApiInfosByCollection() {
+        try {
+            apiInfos = DbLayer.fetchApiInfosByCollection(apiCollectionId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchApiInfosByCollection " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -3040,7 +3060,28 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionForHostAndVpc() {
         try {
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, checkTagsNeedUpdates(tagsList, colId), accessType);
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, checkTagsNeedUpdates(tagsList, colId), accessType, skills);
+            boolean isMcpServer = tagsList != null
+                && tagsList.stream().anyMatch(t -> Constants.AKTO_MCP_SERVER_TAG.equals(t.getKeyName()));
+            if (isMcpServer) {
+                try {
+                    McpAuditInfo auditInfo = new McpAuditInfo(
+                        Context.now(),
+                        "",
+                        Constants.AKTO_MCP_SERVER_TAG,
+                        0,
+                        host,
+                        "",
+                        null,
+                        colId,
+                        null,
+                        null
+                    );
+                    DbLayer.insertMCPAuditDataLog(auditInfo);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error creating or inserting MCP audit info: " + e.toString());
+                }
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHostAndVpc " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -3630,6 +3671,16 @@ public class DbAction extends ActionSupport {
             DbLayer.storeSpans(spans);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in storeSpans " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String storeAgentQueryData() {
+        try {
+            DbLayer.storeAgentQueryData(agentQueryData);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in storeAgentQueryData " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();

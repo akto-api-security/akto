@@ -2,6 +2,7 @@ package com.akto.data_actor;
 
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
@@ -606,6 +607,10 @@ public class DbActor extends DataActor {
         DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags, accessType);
     }
 
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType, List<String> skills) {
+        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags, accessType, skills);
+    }
+
     public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
         return DbLayer.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip, deltaPeriodValue);
     }
@@ -743,5 +748,10 @@ public class DbActor extends DataActor {
     @Override
     public void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook) {
         DbLayer.storeTestingRunWebhook(testingRunWebhook);
+    }
+
+    @Override
+    public void storeAgentQueryData(AgentQueryData agentQueryData) {
+        DbLayer.storeAgentQueryData(agentQueryData);
     }
 }

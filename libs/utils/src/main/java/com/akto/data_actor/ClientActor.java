@@ -15,6 +15,7 @@ import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -1145,6 +1146,10 @@ public class ClientActor extends DataActor {
     }
 
     public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType) {
+        createCollectionForHostAndVpc(host, colId, vpcId, tags, accessType, null);
+    }
+
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType, List<String> skills) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("colId", colId);
@@ -1152,6 +1157,7 @@ public class ClientActor extends DataActor {
         obj.put("vpcId", vpcId);
         obj.put("tagsList", tags);
         obj.put("accessType", accessType);
+        obj.put("skills", skills);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForHostAndVpc", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
@@ -4460,4 +4466,18 @@ public class ClientActor extends DataActor {
             return;
         }
     }
+
+    @Override
+    public void storeAgentQueryData(AgentQueryData agentQueryData) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("agentQueryData", agentQueryData);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeAgentQueryData", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in storeAgentQueryData" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }   
 }

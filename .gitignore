@@ -1,3 +1,4 @@
+start.sh
 .idea/
 **/target
 *.iml
@@ -23,3 +24,4 @@ https:
 **/data-zoo-logs
 run-cyborg.sh
 run-cyborg-consumer.sh
+.github/hooks

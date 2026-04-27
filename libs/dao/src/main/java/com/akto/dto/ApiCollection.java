@@ -111,6 +111,9 @@ public class ApiCollection {
     List<CollectionTags> tagsList;
     public static final String TAGS_STRING = "tagsList";
 
+    Set<String> skills;
+    public static final String SKILLS = "skills";
+
     List<String> hostNames;
     public static final String HOST_NAMES = "hostNames";
 
@@ -461,6 +464,14 @@ public class ApiCollection {
 
     public void setTagsList(List<CollectionTags> tagsList) {
         this.tagsList = tagsList;
+    }
+
+    public Set<String> getSkills() {
+        return skills;
+    }
+
+    public void setSkills(Set<String> skills) {
+        this.skills = skills;
     }
 
     public String getSseCallbackUrl() {

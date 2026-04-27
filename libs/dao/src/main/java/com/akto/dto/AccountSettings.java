@@ -38,6 +38,14 @@ public class AccountSettings {
     public static final String CENTRAL_KAFKA_IP = "centralKafkaIp";
     private String centralKafkaIp;
 
+    // Used by mini-runtime to send to threat topic.
+    public static final String THREAT_KAFKA_PARTITION_KEY = "threatKafkaPartitionKey";
+    private ThreatKafkaPartitionKey threatKafkaPartitionKey;
+
+    public enum ThreatKafkaPartitionKey {
+        IP
+    }
+
     public static final String MERGE_ASYNC_OUTSIDE = "mergeAsyncOutside";
     private boolean mergeAsyncOutside;
 
@@ -130,6 +138,12 @@ public class AccountSettings {
 
     public static final String MATCHING_PATTERNS_FOR_PROXY = "matchingPatternsForProxy";
     private Map<String, ProxyPatternInfo> matchingPatternsForProxy;
+
+    public static final String ALLOWED_HOSTS_FOR_PAC = "allowedHostsForPac";
+
+    @Getter
+    @Setter
+    private Map<String, ProxyPatternInfo> allowedHostsForPac;
 
     @Getter
     @Setter
@@ -308,6 +322,14 @@ public class AccountSettings {
 
     public void setCentralKafkaIp(String centralKafkaIp) {
         this.centralKafkaIp = centralKafkaIp;
+    }
+
+    public ThreatKafkaPartitionKey getThreatKafkaPartitionKey() {
+        return threatKafkaPartitionKey;
+    }
+
+    public void setThreatKafkaPartitionKey(ThreatKafkaPartitionKey threatKafkaPartitionKey) {
+        this.threatKafkaPartitionKey = threatKafkaPartitionKey;
     }
 
     public boolean getMergeAsyncOutside() {

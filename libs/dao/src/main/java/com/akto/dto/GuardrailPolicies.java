@@ -83,6 +83,7 @@ public class GuardrailPolicies {
     private CONTEXT_SOURCE contextSource;
 
     private SecretsDetection secretsDetection;
+    private boolean applyToAllServers;
 
     public String getHexId() {
         if (this.id != null) {
@@ -189,10 +190,13 @@ public class GuardrailPolicies {
     public static class PiiType {
         private String type;
         private String behavior; // "Block" or "Mask"
+        /** Minimum matches for this data type in the prompt (inclusive) to trigger; e.g. 20 means fire when 20+ of this type are present. */
+        private int minMatchCount = 1;
 
-        public PiiType(String type, String behavior) {
+        public PiiType(String type, String behavior, int minMatchCount) {
             this.type = type;
             this.behavior = behavior;
+            this.minMatchCount = minMatchCount >= 1 ? minMatchCount : 1;
         }
     }
 

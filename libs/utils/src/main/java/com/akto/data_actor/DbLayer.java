@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
+import com.akto.dao.agentic_sessions.AgentQueryDataDao;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.graph.SvcToSvcGraphEdgesDao;
 import com.akto.dao.graph.SvcToSvcGraphNodesDao;
@@ -79,6 +80,7 @@ import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
@@ -243,6 +245,17 @@ public class DbLayer {
         }
     }
 
+    private static List<Bson> buildAdditionalDataUpdates(Map<String, Object> additionalData) {
+        List<Bson> updates = new ArrayList<>();
+        if (additionalData == null || additionalData.isEmpty()) {
+            return updates;
+        }
+        for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
+            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + "." + entry.getKey(), entry.getValue()));
+        }
+        return updates;
+    }
+
     public static ModuleInfo updateModuleInfo(ModuleInfo moduleInfo) {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -256,7 +269,7 @@ public class DbLayer {
         }
 
         if(Context.accountId.get() == 1758787662){
-           updateModuleEnvAndReboot(moduleInfo); 
+           updateModuleEnvAndReboot(moduleInfo);
         }
 
         try {
@@ -269,17 +282,19 @@ public class DbLayer {
             loggerMaker.errorAndAddToDb(e, "Error submitting module heartbeat forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
         }
         
-        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
-                Updates.combine(
-                        //putting class name because findOneAndUpdate doesn't put class name by default
-                        Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
-                        Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
-                        Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
-                        Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
-                        Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
-                        Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
-                        Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
-                ), updateOptions);
+        List<Bson> updateList = new ArrayList<>();
+        updateList.add(Updates.setOnInsert("_t", moduleInfo.getClass().getName()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()));
+        updateList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
+        updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getAdditionalData()));
+
+        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
+                Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
+                Updates.combine(updateList),
+                updateOptions);
     }
 
     public static void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
@@ -314,12 +329,17 @@ public class DbLayer {
     }
 
     public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
+        return fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName, null);
+    }
+
+    public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName, String moduleId) {
         if (moduleType == null) {
             return new ArrayList<>();
         }
 
         if (moduleType != ModuleInfo.ModuleType.THREAT_DETECTION &&
                 moduleType != ModuleInfo.ModuleType.AKTO_AGENT_GATEWAY &&
+                moduleType != ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD &&
                 (miniRuntimeName == null || miniRuntimeName.isEmpty())) {
             return new ArrayList<>();
         }
@@ -327,10 +347,13 @@ public class DbLayer {
         List<Bson> filterConditions = new ArrayList<>();
         filterConditions.add(Filters.eq(ModuleInfo._REBOOT, true));
         filterConditions.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleType.name()));
-        
-        // Only add miniRuntimeName filter if it's not null
+
         if (miniRuntimeName != null && !miniRuntimeName.isEmpty()) {
             filterConditions.add(Filters.eq(ModuleInfo.MINI_RUNTIME_NAME, miniRuntimeName));
+        }
+
+        if (moduleId != null && !moduleId.isEmpty()) {
+            filterConditions.add(Filters.eq("_id", moduleId));
         }
 
         Bson filter = Filters.and(filterConditions);
@@ -403,6 +426,13 @@ public class DbLayer {
 
     public static List<ApiInfo> fetchApiInfos() {
         return ApiInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(ApiInfo.RATELIMITS));
+    }
+
+    public static List<ApiInfo> fetchApiInfosByCollection(int apiCollectionId) {
+        return ApiInfoDao.instance.findAll(
+            Filters.eq("_id.apiCollectionId", apiCollectionId),
+            Projections.exclude(ApiInfo.RATELIMITS)
+        );
     }
 
     /**
@@ -1037,6 +1067,10 @@ public class DbLayer {
     }
 
     public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags, String accessType) {
+        createCollectionForHostAndVpc(host, id, vpcId, tags, accessType, null);
+    }
+
+    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags, String accessType, List<String> skills) {
 
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -1061,9 +1095,14 @@ public class DbLayer {
             }
         }
 
-        // Skip update for existing apiCollection if vpc and tags are same.
-        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty()) && !accessTypeChanged) {
-            loggerMaker.info("No new tags or vpcId or accessType, Updates skipped for collectionId: " + id);
+        if (skills != null) {
+            skills.removeIf(s -> s == null || s.trim().isEmpty());
+        }
+        boolean hasSkills = skills != null && !skills.isEmpty();
+
+        // Skip update for existing apiCollection if vpc, tags, skills, and accessType are same.
+        if (apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty()) && !accessTypeChanged && !hasSkills) {
+            loggerMaker.info("No new tags or vpcId or accessType or skills, Updates skipped for collectionId: " + id);
             return;
         }
 
@@ -1084,6 +1123,10 @@ public class DbLayer {
 
         if(accessType != null && !accessType.isEmpty()) {
             updates = Updates.combine(updates, Updates.set(ApiCollection.ACCESS_TYPE, accessType));
+        }
+
+        if (hasSkills) {
+            updates = Updates.combine(updates, Updates.addEachToSet(ApiCollection.SKILLS, skills));
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
@@ -2275,7 +2318,7 @@ public class DbLayer {
     }
 
     public static List<TestingRunResultSummary> fetchStatusOfTests() {
-        int timeFilter = Context.now() - 30 * 60;
+        int timeFilter = Context.now() - 7 * 60 * 60;
         List<TestingRunResultSummary> currentRunningTests = TestingRunResultSummariesDao.instance.findAll(
             Filters.gte(TestingRunResultSummary.START_TIMESTAMP, timeFilter),
             Projections.include("_id", TestingRunResultSummary.STATE, TestingRunResultSummary.TESTING_RUN_ID) 
@@ -2834,5 +2877,9 @@ public class DbLayer {
         if (!bulkUpdates.isEmpty()) {
             SessionDocumentDao.instance.getMCollection().bulkWrite(bulkUpdates);
         }
+    }
+
+    public static void storeAgentQueryData(AgentQueryData agentQueryData) {
+        AgentQueryDataDao.instance.insertOne(agentQueryData);
     }
 }
