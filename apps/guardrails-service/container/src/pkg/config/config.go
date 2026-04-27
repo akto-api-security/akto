@@ -83,7 +83,7 @@ func LoadConfig() *Config {
 		KafkaBatchSize:           getEnvAsInt("KAFKA_BATCH_SIZE", 100),
 		KafkaBatchLingerSec:      getEnvAsInt("KAFKA_BATCH_LINGER_SEC", 5),
 		KafkaMaxWaitSec:          getEnvAsInt("KAFKA_MAX_WAIT_SEC", 1),
-		PolicyRefreshIntervalMin: getEnvAsInt("POLICY_REFRESH_INTERVAL_MIN", 5),
+		PolicyRefreshIntervalMin: getEnvAsInt("POLICY_REFRESH_INTERVAL_MIN", 1),
 		FilterHost:               getEnv("FILTER_HOST", ""),
 		FilterPath:               getEnv("FILTER_PATH", ""),
 		SessionSyncIntervalMin:   getEnvAsInt("SESSION_SYNC_INTERVAL_MIN", 5),
