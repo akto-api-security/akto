@@ -1547,6 +1547,10 @@ public class HttpCallParser {
 
     private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
         if (McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
+            FeatureAccess mcpSecurityAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(), "MCP_SECURITY");
+            if (mcpSecurityAccess == null || !mcpSecurityAccess.getIsGranted()) {
+                return Optional.empty();
+            }
             return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES));
         }
         return Optional.empty();
