@@ -11,6 +11,8 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -56,6 +58,13 @@ public class ApiSequencesFlusher implements WindowFlusher {
         }
 
         if (sequences.isEmpty()) return;
+
+        // Keep only top 1000 sequences by transition count to cap DB writes and filter noise
+        int maxSequences = 1000;
+        if (sequences.size() > maxSequences) {
+            Collections.sort(sequences, Comparator.comparingInt(ApiSequences::getTransitionCount).reversed());
+            sequences = sequences.subList(0, maxSequences);
+        }
 
         try {
             dataActor.writeApiSequences(sequences);
