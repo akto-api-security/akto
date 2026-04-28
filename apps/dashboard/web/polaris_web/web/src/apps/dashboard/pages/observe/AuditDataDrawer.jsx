@@ -1,21 +1,32 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import {
     ActionList,
     Badge,
     Box,
     Button,
     HorizontalStack,
-    IndexTable,
     Popover,
     Spinner,
     Text,
     VerticalStack,
-    useIndexResourceState,
 } from "@shopify/polaris"
 import FlyLayout from "../../components/layouts/FlyLayout"
 import api from "./api"
 import func from "@/util/func"
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges"
+import GithubSimpleTable from "../../components/tables/GithubSimpleTable"
+import { CellType } from "../../components/tables/rows/GithubRow"
+
+const childResourceName = { singular: "item", plural: "items" }
+
+const childHeadings = [
+    { text: "Type", value: "typeComp", title: "Type" },
+    { text: "Risk Analysis", value: "riskAnalysisComp", title: "Risk Analysis" },
+    { text: "Name", value: "resourceName", title: "Name", type: CellType.TEXT },
+    { text: "Access Types", value: "apiAccessTypesComp", title: "Access Types" },
+    { text: "Remarks", value: "remarksComp", title: "Remarks" },
+    { text: "Marked By", value: "markedBy", title: "Marked By", type: CellType.TEXT },
+]
 
 const childTypeLabel = (type) => {
     switch (type) {
@@ -120,19 +131,6 @@ function AuditDataDrawer({
         }
     }, [show, auditItem?.hexId, fetchChildren, isEndpointSecurity])
 
-    const resourceIDResolver = (item) => item.hexId
-    const {
-        selectedResources,
-        allResourcesSelected,
-        handleSelectionChange,
-        clearSelection,
-    } = useIndexResourceState(children, { resourceIDResolver })
-
-    useEffect(() => {
-        if (typeof clearSelection === "function") clearSelection()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [auditItem?.hexId])
-
     const cascadeIds = auditItem?.type === "mcp-server"
         && Array.isArray(auditItem?.groupedHostCollectionIds)
         ? auditItem.groupedHostCollectionIds
@@ -155,11 +153,11 @@ function AuditDataDrawer({
         }
     }
 
-    const updateSelectedChildren = async (remarks) => {
-        if (!selectedResources || selectedResources.length === 0) return
+    const updateSelectedChildren = async (remarks, selectedHexIds) => {
+        if (!Array.isArray(selectedHexIds) || selectedHexIds.length === 0) return
         setBusy(true)
         try {
-            await Promise.all(selectedResources.map(async (hexId) => {
+            await Promise.all(selectedHexIds.map(async (hexId) => {
                 const child = children.find((c) => c.hexId === hexId)
                 if (!child) return
                 await api.updateAuditData(
@@ -167,9 +165,8 @@ function AuditDataDrawer({
                     child.groupedHexIds, null, null, null
                 )
             }))
-            func.setToast(true, false, `${selectedResources.length} item${selectedResources.length === 1 ? "" : "s"} updated`)
+            func.setToast(true, false, `${selectedHexIds.length} item${selectedHexIds.length === 1 ? "" : "s"} updated`)
             await fetchChildren()
-            if (typeof clearSelection === "function") clearSelection()
             if (typeof onAfterUpdate === "function") onAfterUpdate("children")
         } catch (e) {
             func.setToast(true, true, "Failed to update selected items")
@@ -178,25 +175,39 @@ function AuditDataDrawer({
         }
     }
 
-    const requestChildrenConditional = () => {
-        if (!selectedResources || selectedResources.length === 0) return
+    const requestChildrenConditional = (selectedHexIds) => {
+        if (!Array.isArray(selectedHexIds) || selectedHexIds.length === 0) return
         if (typeof onRequestConditional !== "function") return
-        const selectedItems = selectedResources
+        const selectedItems = selectedHexIds
             .map((id) => children.find((c) => c.hexId === id))
             .filter(Boolean)
         onRequestConditional("children", auditItem, selectedItems)
     }
 
-    // All bulk actions live behind one overflow trigger to keep the bar tidy.
-    const bulkActions = useMemo(() => ([
-        { content: "Allow", onAction: () => updateSelectedChildren("Approved") },
+    // GithubSimpleTable owns the selection state and passes the selected ids in.
+    const promotedBulkActions = (selectedHexIds) => ([
+        { content: "Allow", onAction: () => updateSelectedChildren("Approved", selectedHexIds) },
         {
             content: "Block",
-            onAction: () => updateSelectedChildren("Rejected"),
+            onAction: () => updateSelectedChildren("Rejected", selectedHexIds),
             destructive: true,
         },
-        { content: "Conditionally allow", onAction: requestChildrenConditional },
-    ]), [selectedResources, children])
+        { content: "Conditionally allow", onAction: () => requestChildrenConditional(selectedHexIds) },
+    ])
+
+    // Pre-format children into table-ready rows. id mirrors hexId so the table
+    // selection state references the same key our update helpers look up by.
+    const childRows = children.map((child) => ({
+        ...child,
+        id: child.hexId,
+        typeComp: <Text variant="bodySm">{childTypeLabel(child.type)}</Text>,
+        riskAnalysisComp: <ComponentRiskAnalysisBadges componentRiskAnalysis={child?.componentRiskAnalysis} />,
+        apiAccessTypesComp: (child.apiAccessTypes || []).join(", ") || "-",
+        remarksComp: child?.remarks
+            ? <Text variant="bodySm">{child.remarks}</Text>
+            : <Text variant="bodySm" color="critical" fontWeight="bold">Pending</Text>,
+        markedBy: child.markedBy || "-",
+    }))
 
     const serverActionItems = [
         { content: "Allow this server", onAction: () => updateServer("Approved") },
@@ -245,36 +256,6 @@ function AuditDataDrawer({
         </Box>
     ) : null
 
-    const childrenRows = children.map((child, index) => (
-        <IndexTable.Row
-            id={child.hexId}
-            key={child.hexId}
-            position={index}
-            selected={selectedResources?.includes(child.hexId)}
-        >
-            <IndexTable.Cell>
-                <Text variant="bodySm">{childTypeLabel(child.type)}</Text>
-            </IndexTable.Cell>
-            <IndexTable.Cell>
-                <ComponentRiskAnalysisBadges componentRiskAnalysis={child?.componentRiskAnalysis} />
-            </IndexTable.Cell>
-            <IndexTable.Cell>
-                <Text variant="bodySm">{child.resourceName}</Text>
-            </IndexTable.Cell>
-            <IndexTable.Cell>
-                <Text variant="bodySm">{(child.apiAccessTypes || []).join(", ") || "-"}</Text>
-            </IndexTable.Cell>
-            <IndexTable.Cell>
-                {child?.remarks
-                    ? <Text variant="bodySm">{child.remarks}</Text>
-                    : <Text variant="bodySm" color="critical" fontWeight="bold">Pending</Text>}
-            </IndexTable.Cell>
-            <IndexTable.Cell>
-                <Text variant="bodySm">{child.markedBy || "-"}</Text>
-            </IndexTable.Cell>
-        </IndexTable.Row>
-    ))
-
     const childrenSection = (
         <Box>
             <VerticalStack gap="3">
@@ -287,24 +268,21 @@ function AuditDataDrawer({
                 ) : children.length === 0 ? (
                     <Text color="subdued">No tools, resources, or prompts found for this MCP server.</Text>
                 ) : (
-                    <IndexTable
-                        resourceName={{ singular: "item", plural: "items" }}
-                        itemCount={children.length}
-                        selectedItemsCount={allResourcesSelected ? "All" : (selectedResources?.length || 0)}
-                        onSelectionChange={handleSelectionChange}
-                        selectable
-                        bulkActions={bulkActions}
-                        headings={[
-                            { title: "Type" },
-                            { title: "Risk Analysis" },
-                            { title: "Name" },
-                            { title: "Access Types" },
-                            { title: "Remarks" },
-                            { title: "Marked By" },
-                        ]}
-                    >
-                        {childrenRows}
-                    </IndexTable>
+                    <GithubSimpleTable
+                        key={`children-${auditItem?.hexId || ""}-${children.length}`}
+                        resourceName={childResourceName}
+                        useNewRow={true}
+                        condensedHeight={true}
+                        headers={childHeadings}
+                        headings={childHeadings}
+                        data={childRows}
+                        selectable={true}
+                        promotedBulkActions={promotedBulkActions}
+                        hideQueryField={true}
+                        hidePagination={true}
+                        showFooter={false}
+                        pageLimit={children.length}
+                    />
                 )}
             </VerticalStack>
         </Box>
