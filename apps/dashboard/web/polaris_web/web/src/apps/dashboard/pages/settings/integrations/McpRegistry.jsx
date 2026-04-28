@@ -513,7 +513,8 @@ function McpRegistry() {
                             <Text variant="bodyMd" fontWeight="semibold">Important Notes:</Text>
                             <Text variant="bodyMd">• Only one registry URL is supported.</Text>
                             <Text variant="bodyMd">• Your CSV must have a header row with a <code>mcp_server_name</code> column. Example:</Text>
-                            <pre style={{margin: 0, fontSize: '12px', background: '#f4f4f4', padding: '8px', borderRadius: '4px'}}>{'mcp_server_name\napi.githubcopilot.com\nmcp.notion.com'}</pre>
+                            <pre style={{margin: 0, fontSize: '12px', background: '#f4f4f4', padding: '8px', borderRadius: '4px'}}>{'mcp_server_name\napi.githubcopilot.com\nmcp.notion.com\nfilesystem-local\nmy-postgres'}</pre>
+                            <Text variant="bodyMd">For remote MCP servers, use the domain name (e.g. <code>api.example.com</code>). For local MCP servers, use the name your team has given it (e.g. <code>filesystem-local</code>, <code>my-postgres</code>).</Text>
                             <Text variant="bodyMd">• Updated your CSV? Wait 5 minutes, then click <b>Sync now</b> to pull in the latest changes.</Text>
                         </VerticalStack>
                     </Banner>
