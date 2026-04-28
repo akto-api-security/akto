@@ -278,6 +278,7 @@ function AuditDataDrawer({
                         data={childRows}
                         selectable={true}
                         promotedBulkActions={promotedBulkActions}
+                        disambiguateLabel={(_key, value) => value}
                         hideQueryField={true}
                         hidePagination={true}
                         showFooter={false}
