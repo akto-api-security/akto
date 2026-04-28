@@ -197,7 +197,7 @@ func filterPoliciesByMcpServer(policies []types.Policy, mcpServerName string) []
 }
 
 func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
-	refreshInterval := time.Duration(s.config.McpListRefreshIntervalMin) * time.Minute
+	refreshInterval := time.Duration(s.config.McpAllowedListRefreshIntervalMin) * time.Minute
 
 	s.mcpListCache.mu.RLock()
 	if !s.mcpListCache.lastFetched.IsZero() && time.Since(s.mcpListCache.lastFetched) < refreshInterval {
