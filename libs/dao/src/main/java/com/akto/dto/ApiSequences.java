@@ -22,11 +22,12 @@ public class ApiSequences {
     int transitionCount;
     public static final String TRANSITION_COUNT = "transitionCount";
 
-    // Example: No of times the path "a" was seen
+    // Example: In a->b No of times the path "a" was seen
     int prevStateCount;
     public static final String PREV_STATE_COUNT = "prevStateCount";
 
     // No of times the last endpoint in the sequence was seen
+    // In a->b , no of time b was seen
     int lastStateCount;
     public static final String LAST_STATE_COUNT = "lastStateCount";
 
