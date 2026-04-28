@@ -103,9 +103,10 @@ export default function Header() {
         if (mcpSecurityGranted === false) {
             disabled.push("MCP Security");
         }
-        if (agenticSecurityGranted === false) {
-            disabled.push("Agentic Security");
-        }
+        // TEMP: keep Akto ARGUS (Agentic Security) enabled for QA regardless of Stigg grant.
+        // if (agenticSecurityGranted === false) {
+        //     disabled.push("Agentic Security");
+        // }
         if (dastGranted === false) {
             disabled.push("DAST")
         }
