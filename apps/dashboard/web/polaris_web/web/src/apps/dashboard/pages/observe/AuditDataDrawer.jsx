@@ -279,10 +279,16 @@ function AuditDataDrawer({
                         data={childRows}
                         selectable={true}
                         promotedBulkActions={promotedBulkActions}
+                        disambiguateLabel={(_key, value) => value}
                         hideQueryField={true}
                         hidePagination={true}
                         showFooter={false}
                         pageLimit={children.length}
+                        // Isolate the table's persisted filter scope from the main page —
+                        // otherwise it inherits the audit table's pageFiltersMap (keyed by
+                        // window.location.pathname) and re-applies filters like apiAccessTypes
+                        // client-side, hiding every child whose value doesn't match.
+                        filterStateUrl={`audit-drawer/${auditItem?.aiAgentName || ""}/${auditItem?.mcpServerName || ""}`}
                     />
                 )}
             </VerticalStack>
