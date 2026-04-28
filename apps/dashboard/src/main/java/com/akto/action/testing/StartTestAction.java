@@ -1768,7 +1768,8 @@ public class StartTestAction extends UserAction {
         this.conversationsList = AgentConversationResultDao.instance.findAll(
                 Filters.eq(GenericAgentConversation._CONVERSATION_ID, this.conversationId),
                 0, 100,
-                Sorts.ascending(GenericAgentConversation._LAST_UPDATED_AT));
+                // TODO: there's inconsistency in this DTO in all branches ??
+                Sorts.ascending(GenericAgentConversation._LAST_UPDATED_AT, GenericAgentConversation._TIMESTAMP));
         return SUCCESS.toUpperCase();
     }
 
