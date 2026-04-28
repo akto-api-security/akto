@@ -1,5 +1,6 @@
 
-import { Text, HorizontalStack, VerticalStack, Box } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box, Icon } from "@shopify/polaris"
+import { CircleTickMajor, CircleCancelMajor, SettingsMajor } from "@shopify/polaris-icons";
 import { useEffect, useReducer, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
@@ -10,35 +11,32 @@ import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCard
 import GithubServerTable from "../../components/tables/GithubServerTable";
 import { MethodBox } from "./GetPrettifyEndpoint";
 import { CellType } from "../../components/tables/rows/GithubRow";
-import { CircleTickMajor, CircleCancelMajor, SettingsMajor } from "@shopify/polaris-icons";
-import { Icon } from "@shopify/polaris";
-import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
 import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
 import RegistryBadge from "../../components/shared/RegistryBadge";
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges";
+import { isEndpointSecurityCategory } from "../../../main/labelHelper";
+import AuditDataDrawer from "./AuditDataDrawer";
 
-const headings = [
-    {
-        title: 'Type',
-        value: 'typeComp',
-        text: 'Type',
-    },
+const headingsEndpointSecurity = [
     {
         title: 'Risk Analysis',
         value: 'riskAnalysisComp',
         text: 'Risk Analysis',
     },
     {
-        text: "Agentic Component name",
-        value: "resourceName",
-        title: "Agentic Component name"
+        title: 'MCP Server',
+        text: 'MCP Server',
+        value: 'mcpServerName',
+        type: CellType.TEXT,
+        filterKey: 'mcpServer',
     },
     {
-        text: "Collection name",
-        value: "collectionName",
-        title: "Collection name",
-        type: CellType.TEXT
+        title: 'AI Agent',
+        text: 'AI Agent',
+        value: 'aiAgentName',
+        type: CellType.TEXT,
+        filterKey: 'aiAgent',
     },
     {
         title: 'Last Detected',
@@ -72,6 +70,67 @@ const headings = [
         value: "markedBy",
         type: CellType.TEXT
     },
+]
+
+const headingsDefault = [
+    {
+        title: 'Type',
+        value: 'typeComp',
+        text: 'Type',
+        filterKey: 'type',
+    },
+    {
+        title: 'Risk Analysis',
+        value: 'riskAnalysisComp',
+        text: 'Risk Analysis',
+    },
+    {
+        text: "Agentic Component name",
+        value: "resourceName",
+        title: "Agentic Component name",
+        type: CellType.TEXT,
+    },
+    {
+        text: "Collection name",
+        value: "collectionName",
+        title: "Collection name",
+        filterKey: 'collectionName',
+        type: CellType.TEXT,
+    },
+    {
+        title: 'Last Detected',
+        text: "Last Detected",
+        value: "lastDetectedComp",
+        sortActive: true,
+        sortKey: 'lastDetected',
+        type: CellType.TEXT
+    },
+    {
+        title: 'Updated',
+        text: "Updated",
+        value: "updatedTimestampComp",
+        sortKey: 'updatedTimestamp',
+        sortActive: true,
+        type: CellType.TEXT
+    },
+    {
+        title: 'Access Types',
+        text: "Access Types",
+        value: "apiAccessTypesComp",
+        filterKey: 'apiAccessTypes',
+    },
+    {
+        title: 'Remarks',
+        text: "Remarks",
+        value: "remarksComp"
+    },
+    {
+        title: 'Marked By',
+        text: "Marked By",
+        value: "markedBy",
+        type: CellType.TEXT,
+        filterKey: 'markedBy',
+    },
     {
         title: '',
         type: CellType.ACTION,
@@ -86,7 +145,7 @@ const sortOptions = [
    
 ];
 
-let filters = [
+let filtersDefault = [
     {
         key: 'type',
         label: 'Type',
@@ -123,6 +182,38 @@ let filters = [
     }
 ]
 
+let filtersEndpointSecurity = [
+    {
+        key: 'markedBy',
+        label: 'Marked By',
+        title: 'Marked By',
+        choices: [],
+    },
+    {
+        key: 'apiAccessTypes',
+        label: 'Access Types',
+        title: 'Access Types',
+        choices: [
+            { label: "Public", value: "PUBLIC" },
+            { label: "Private", value: "PRIVATE" },
+            { label: "Partner", value: "PARTNER" },
+            { label: "Third Party", value: "THIRD_PARTY" }
+        ],
+    },
+    {
+        key: 'aiAgent',
+        label: 'AI Agent',
+        title: 'AI Agent',
+        choices: [],
+    },
+    {
+        key: 'mcpServer',
+        label: 'MCP Server',
+        title: 'MCP Server',
+        choices: [],
+    }
+]
+
 const resourceName = {
     singular: 'audit record',
     plural: 'audit records',
@@ -152,6 +243,13 @@ const stripDeviceIdFromName = (name, allCollections, collectionId) => {
     return name;
 };
 
+const splitAgentAndServer = (name) => {
+    if (!name) return { agent: '-', server: '-' };
+    const dot = name.indexOf('.');
+    if (dot <= 0 || dot >= name.length - 1) return { agent: '-', server: name };
+    return { agent: name.substring(0, dot), server: name.substring(dot + 1) };
+};
+
 const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegistry) => {
     const allCollections = PersistStore.getState().allCollections;
     let temp = {...auditRecord}
@@ -163,8 +261,12 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     temp['riskAnalysisComp'] = <ComponentRiskAnalysisBadges componentRiskAnalysis={auditRecord?.componentRiskAnalysis} />;
 
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
+    // Preserve the unstripped hostname for child lookups (children store mcpHost = original parent hostname)
     temp['originalResourceName'] = temp?.resourceName;
     temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, allCollections, temp?.hostCollectionId);
+    const { agent, server } = splitAgentAndServer(temp.resourceName);
+    temp['aiAgentName'] = agent;
+    temp['mcpServerName'] = server;
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
     temp['approvedAtComp'] = func.prettifyEpoch(temp?.approvedAt)
@@ -222,6 +324,10 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
             {collectionRegistry === "available" && <RegistryBadge />}
         </HorizontalStack>
     );
+    // Required by GithubRow for tree-style expand/collapse
+    temp['id'] = temp.hexId;
+    temp['name'] = temp.hexId;
+    temp['isTerminal'] = false;
     return temp;
 }
 
@@ -229,6 +335,12 @@ function AuditData() {
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedAuditItem, setSelectedAuditItem] = useState(null);
+    const [filterVersion, setFilterVersion] = useState(0);
+    const [showDrawer, setShowDrawer] = useState(false);
+    // Scope of the in-flight conditional-approval modal: 'server' | 'agent' | 'children'.
+    const [conditionalScope, setConditionalScope] = useState('server');
+    // For the 'children' scope, the actual child records the user selected in the drawer.
+    const [conditionalChildren, setConditionalChildren] = useState(null);
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
     const getTimeEpoch = (key) => {
@@ -240,11 +352,17 @@ function AuditData() {
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const collectionsRegistryStatusMap = PersistStore(state => state.collectionsRegistryStatusMap)
 
+    const isEndpointSecurity = isEndpointSecurityCategory();
+    const filters = isEndpointSecurity ? filtersEndpointSecurity : filtersDefault;
+    const headings = isEndpointSecurity ? headingsEndpointSecurity : headingsDefault;
+
     function disambiguateLabel(key, value) {
         switch (key) {
             case "type":
             case "markedBy":
             case "apiAccessTypes":
+            case "aiAgent":
+            case "mcpServer":
                 return func.convertToDisambiguateLabelObj(value, null, 2)
             case "collectionName":
                 return func.convertToDisambiguateLabelObj(value, collectionsMap, 1)
@@ -253,6 +371,17 @@ function AuditData() {
         }
     }
 
+    const cascadeIdsForItem = (item) => (
+        item?.type === 'mcp-server' && Array.isArray(item?.groupedHostCollectionIds)
+            ? item.groupedHostCollectionIds
+            : null
+    );
+
+    // Non-endpoint-security row actions (... menu)
+    const GreenTickIcon = () => <Icon source={CircleTickMajor} tone="success" />;
+    const GreenSettingsIcon = () => <Icon source={SettingsMajor} tone="success" />;
+    const RedCancelIcon = () => <Icon source={CircleCancelMajor} tone="critical" />;
+
     const updateAuditData = async (hexId, remarks) => {
         await api.updateAuditData(hexId, remarks)
         window.location.reload();
@@ -260,7 +389,6 @@ function AuditData() {
 
     const getMcpServerName = (originalResourceName) => {
         if (!originalResourceName) return '';
-        // Format: <device_name>.<ai-agent>.<mcp_server_name>
         const parts = originalResourceName.split('.');
         return parts.slice(2).join('.');
     };
@@ -276,30 +404,17 @@ function AuditData() {
         }
     }
 
-    const updateAuditDataWithConditions = async (hexId, approvalData) => {
-        await api.updateAuditData(hexId, null, approvalData)
-        window.location.reload();
-    }
-
-    // Custom colored icons
-    const GreenTickIcon = () => <Icon source={CircleTickMajor} tone="success" />;
-    const GreenSettingsIcon = () => <Icon source={SettingsMajor} tone="success" />;
-    const RedCancelIcon = () => <Icon source={CircleCancelMajor} tone="critical" />;
-
     const getActionsList = (item) => {
-        return [{title: 'Actions', items: [
+        return [{ title: 'Actions', items: [
             {
                 content: <span style={{ color: '#008060' }}>Conditional Approval</span>,
                 icon: GreenSettingsIcon,
-                onAction: () => {
-                    setSelectedAuditItem(item);
-                    setModalOpen(true);
-                },
+                onAction: () => { setSelectedAuditItem(item); setModalOpen(true); },
             },
             {
                 content: <span style={{ color: '#008060' }}>Mark as resolved</span>,
                 icon: GreenTickIcon,
-                onAction: () => {updateAuditData(item.hexId, "Approved")},
+                onAction: () => { updateAuditData(item.hexId, "Approved") },
             },
             ...(item.isEndpointSource ? [{
                 content: <span style={{ color: '#008060' }}>Add to MCP Allowed List</span>,
@@ -309,26 +424,80 @@ function AuditData() {
             {
                 content: <span style={{ color: '#D72C0D' }}>Disapprove</span>,
                 icon: RedCancelIcon,
-                onAction: () => {updateAuditData(item.hexId, "Rejected")},
-                destructive: true
-            }
+                onAction: () => { updateAuditData(item.hexId, "Rejected") },
+                destructive: true,
+            },
         ]}]
     }
 
-    async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
+    // Endpoint-security: row click opens drawer
+    const handleRowClick = (rowData) => {
+        setSelectedAuditItem(rowData);
+        setShowDrawer(true);
+    }
+
+    const handleAfterDrawerUpdate = (scope) => {
+        // Server-scope mutations affect rows beyond the drawer; reload to resync the
+        // parent table. Children mutations stay inside the drawer, which refetches
+        // its own list — no reload needed.
+        if (scope === 'server') {
+            window.location.reload();
+        }
+    }
+
+    const handleRequestConditional = (scope, item, selectedChildren) => {
+        setSelectedAuditItem(item);
+        setConditionalScope(scope);
+        setConditionalChildren(scope === 'children' ? selectedChildren : null);
+        setModalOpen(true);
+    }
+
+    const updateAuditDataWithConditions = async (_hexId, approvalData, _hexIds, _item) => {
+        try {
+            if (conditionalScope === 'children') {
+                if (!Array.isArray(conditionalChildren) || conditionalChildren.length === 0) return
+                await Promise.all(conditionalChildren.map((child) =>
+                    api.updateAuditData(child.hexId, null, approvalData, child.groupedHexIds, null, null)
+                ))
+                window.location.reload()
+            } else {
+                const item = selectedAuditItem
+                await api.updateAuditData(
+                    item?.hexId,
+                    null,
+                    approvalData,
+                    item?.groupedHexIds,
+                    cascadeIdsForItem(item),
+                    null
+                )
+                window.location.reload()
+            }
+        } catch (e) {
+            func.setToast(true, true, 'Failed to apply conditional approval')
+        }
+    }
+
+    async function fetchData(sortKey, sortOrder, skip, limit, filterParams, filterOperators, queryValue){
         setLoading(true);
         let ret = []
         let total = 0;
-        let finalFilters = {...filters}
+        let finalFilters = {...filterParams}
         finalFilters['lastDetected'] = [startTimestamp, endTimestamp]
-        finalFilters['hostCollectionId'] = filters['collectionName'].map(id => parseInt(id)) || Object.keys(collectionsMap).map(id => parseInt(id))
-        delete finalFilters['collectionName']
+
+        if (isEndpointSecurity) {
+            finalFilters['type'] = ['mcp-server']
+        } else {
+            finalFilters['hostCollectionId'] = (filterParams['collectionName'] || []).map(id => parseInt(id))
+            if (finalFilters['hostCollectionId'].length === 0) {
+                finalFilters['hostCollectionId'] = Object.keys(collectionsMap).map(id => parseInt(id))
+            }
+            delete finalFilters['collectionName']
+        }
 
         try {
-            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue)
+            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue, isEndpointSecurity)
             if (res && res.auditData) {
                 res.auditData.forEach((auditRecord) => {
-                    // Get collection name and registry status from separate maps
                     let collectionName = "-";
                     if(collectionsMap[auditRecord?.hostCollectionId]){
                         collectionName = collectionsMap[auditRecord?.hostCollectionId];
@@ -337,8 +506,8 @@ function AuditData() {
                     }
                     const collectionRegistryStatus = collectionsRegistryStatusMap[auditRecord?.hostCollectionId];
                     const dataObj = convertDataIntoTableFormat(
-                        auditRecord, 
-                        collectionName, 
+                        auditRecord,
+                        collectionName,
                         collectionRegistryStatus
                     )
                     ret.push(dataObj);
@@ -347,22 +516,53 @@ function AuditData() {
             }
         } catch (error) {
         }
-        
+
         setLoading(false);
         return {value: ret, total: total};
     }
 
     const fillFilters = async () => {
-        const usersResponse = await settingRequests.getTeamData()
-        if (usersResponse) {
-            filters[1].choices = usersResponse.map((user) => ({label: user.login, value: user.login}))
+        if (isEndpointSecurity) {
+            try {
+                const serversRes = await api.fetchAuditData(
+                    'lastDetected', -1, 0, 1000,
+                    { type: ['mcp-server'], lastDetected: [startTimestamp, endTimestamp] },
+                    {}, '', true
+                )
+                const allCollections = PersistStore.getState().allCollections;
+                const agents = new Set()
+                const servers = new Set()
+                const markedByUsers = new Set()
+                if (serversRes && Array.isArray(serversRes.auditData)) {
+                    serversRes.auditData.forEach((rec) => {
+                        const stripped = stripDeviceIdFromName(rec?.resourceName, allCollections, rec?.hostCollectionId)
+                        const { agent, server } = splitAgentAndServer(stripped)
+                        if (agent && agent !== '-') agents.add(agent)
+                        if (server && server !== '-') servers.add(server)
+                        if (rec?.markedBy) markedByUsers.add(rec.markedBy)
+                    })
+                }
+                filtersEndpointSecurity[0].choices = Array.from(markedByUsers).sort().map(u => ({ label: u, value: u }))
+                filtersEndpointSecurity[2].choices = Array.from(agents).sort().map(a => ({ label: a, value: a }))
+                filtersEndpointSecurity[3].choices = Array.from(servers).sort().map(s => ({ label: s, value: s }))
+            } catch (e) {}
+            setFilterVersion(v => v + 1)
+        } else {
+            try {
+                const res = await api.fetchAuditData('lastDetected', -1, 0, 1000, { lastDetected: [startTimestamp, endTimestamp] }, {}, '', false)
+                const markedByUsers = new Set()
+                if (res && Array.isArray(res.auditData)) {
+                    res.auditData.forEach((rec) => { if (rec?.markedBy) markedByUsers.add(rec.markedBy) })
+                }
+                filtersDefault[1].choices = Array.from(markedByUsers).sort().map(u => ({ label: u, value: u }))
+            } catch (e) {}
+            filtersDefault[3].choices = Object.entries(collectionsMap).map(([id, name]) => ({ label: name, value: id }));
         }
-        filters[3].choices = Object.entries(collectionsMap).map(([id, name]) => ({ label: name, value: id }));
     }
 
     useEffect(() => {
         fillFilters()
-    }, [collectionsMap])
+    }, [collectionsMap, startTimestamp, endTimestamp])
 
     const primaryActions = (
         <HorizontalStack gap={"2"}>
@@ -390,9 +590,9 @@ function AuditData() {
             primaryAction={primaryActions}
             components = {[
                 <GithubServerTable
-                    key={startTimestamp + endTimestamp + filters[1].choices.length}
+                    key={startTimestamp + endTimestamp + (isEndpointSecurity ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(isEndpointSecurity)}
                     headers={headings}
-                    resourceName={resourceName} 
+                    resourceName={resourceName}
                     appliedFilters={[]}
                     sortOptions={sortOptions}
                     disambiguateLabel={disambiguateLabel}
@@ -405,21 +605,47 @@ function AuditData() {
                     condensedHeight={true}
                     pageLimit={20}
                     headings={headings}
-                    getActions = {(item) => getActionsList(item)}
-                    hasRowActions={true}
+                    {...(isEndpointSecurity
+                        ? { onRowClick: handleRowClick, rowClickable: true }
+                        : { getActions: (item) => getActionsList(item), hasRowActions: true }
+                    )}
                 />
             ]}
             />
-            
-            <ConditionalApprovalModal
-                isOpen={modalOpen}
-                onClose={() => {
-                    setModalOpen(false);
-                    setSelectedAuditItem(null);
-                }}
-                onApprove={updateAuditDataWithConditions}
-                auditItem={selectedAuditItem}
-            />
+
+            {isEndpointSecurity ? (
+                <>
+                    <AuditDataDrawer
+                        auditItem={selectedAuditItem}
+                        show={showDrawer}
+                        setShow={setShowDrawer}
+                        startTimestamp={startTimestamp}
+                        endTimestamp={endTimestamp}
+                        onRequestConditional={handleRequestConditional}
+                        onAfterUpdate={handleAfterDrawerUpdate}
+                        onAddToAllowlist={(item) => addMcpAllowlistEntry(getMcpServerName(item?.originalResourceName))}
+                        isEndpointSecurity={isEndpointSecurity}
+                    />
+                    <ConditionalApprovalModal
+                        isOpen={modalOpen}
+                        onClose={() => {
+                            setModalOpen(false);
+                            setConditionalChildren(null);
+                        }}
+                        onApprove={updateAuditDataWithConditions}
+                        auditItem={selectedAuditItem}
+                    />
+                </>
+            ) : (
+                <ConditionalApprovalModal
+                    isOpen={modalOpen}
+                    onClose={() => setModalOpen(false)}
+                    onApprove={(hexId, approvalData) => {
+                        api.updateAuditData(selectedAuditItem?.hexId, null, approvalData).then(() => window.location.reload())
+                    }}
+                    auditItem={selectedAuditItem}
+                />
+            )}
         </>
     )
 }
