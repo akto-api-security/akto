@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import IntegrationsLayout from './IntegrationsLayout'
-import { Box, Button, LegacyCard, TextField, Text, VerticalStack, HorizontalStack, Banner, DataTable, Scrollable, Link } from '@shopify/polaris'
+import { Box, Button, LegacyCard, TextField, Text, VerticalStack, HorizontalStack, Banner, DataTable, Scrollable, Link, Badge } from '@shopify/polaris'
 import { DeleteMinor } from '@shopify/polaris-icons'
 import "../settings.css"
 import func from "@/util/func"
@@ -536,7 +536,7 @@ function McpRegistry() {
 
     return (
         <IntegrationsLayout
-            title="MCP Registry"
+            title={<HorizontalStack gap="2" blockAlign="center"><span>MCP Registry</span><Badge status="info">Beta</Badge></HorizontalStack>}
             cardContent={cardContent}
             component={component}
             docsUrl="https://registry.modelcontextprotocol.io/docs"
