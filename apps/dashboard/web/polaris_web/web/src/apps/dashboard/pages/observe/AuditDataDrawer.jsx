@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import {
     ActionList,
-    Badge,
     Box,
     Button,
     HorizontalStack,
@@ -10,6 +9,12 @@ import {
     Text,
     VerticalStack,
 } from "@shopify/polaris"
+import {
+    ClockMinor,
+    PersonMinor,
+    GlobeMinor,
+    InfoMinor,
+} from "@shopify/polaris-icons"
 import FlyLayout from "../../components/layouts/FlyLayout"
 import AllowlistBadge from "../../components/shared/AllowlistBadge"
 import api from "./api"
@@ -17,6 +22,7 @@ import func from "@/util/func"
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges"
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable"
 import { CellType } from "../../components/tables/rows/GithubRow"
+import GithubCell from "../../components/tables/cells/GithubCell"
 
 const childResourceName = { singular: "item", plural: "items" }
 
@@ -269,63 +275,65 @@ function AuditDataDrawer({
         </Box>
     )
 
+    const auditCellData = auditItem ? {
+        resourceName: auditItem.resourceName,
+        typeBadge: [auditItem.type].filter(Boolean),
+        remarksBadge: [auditItem.remarks || "Pending"],
+        lastDetected: func.prettifyEpoch(auditItem.lastDetected),
+        updatedTimestamp: func.prettifyEpoch(auditItem.updatedTimestamp),
+        markedBy: auditItem.markedBy || "-",
+        mcpHost: auditItem.mcpHost || "-",
+        aiAgentName: (isEndpointSecurity && auditItem.aiAgentName && auditItem.aiAgentName !== "-")
+            ? auditItem.aiAgentName
+            : undefined,
+    } : null
+
+    const auditCellHeaders = [
+        { value: "resourceName", itemOrder: 1 },
+        { value: "typeBadge", itemOrder: 2 },
+        { value: "remarksBadge", itemOrder: 2 },
+        { value: "lastDetected", itemOrder: 3, icon: ClockMinor, iconTooltip: "Last detected" },
+        { value: "updatedTimestamp", itemOrder: 3, icon: ClockMinor, iconTooltip: "Last updated" },
+        { value: "markedBy", itemOrder: 3, icon: PersonMinor, iconTooltip: "Marked by" },
+        { value: "mcpHost", itemOrder: 3, icon: GlobeMinor, iconTooltip: "Collection" },
+        { value: "aiAgentName", itemOrder: 3, icon: InfoMinor, iconTooltip: "AI Agent" },
+    ]
+
+    const auditGetStatus = (item) => remarksTone(item)
+
     const recordDetailBody = auditItem ? (
-        <VerticalStack gap={"2"}>
-            <Box width="100%">
-            <HorizontalStack gap="2" align="space-between">
-                <VerticalStack gap="3">
-                    <VerticalStack gap="1">
-                        <Text variant="headingMd">{auditItem.resourceName}</Text>
-                        <HorizontalStack gap="2" blockAlign="center">
-                            <Badge>{auditItem.type}</Badge>
-                            <Badge tone={remarksTone(auditItem.remarks)}>
-                                {auditItem.remarks || "Pending"}
-                            </Badge>
-                        </HorizontalStack>
-                    </VerticalStack>
-                    {[
-                        { label: "Last Detected", value: func.prettifyEpoch(auditItem.lastDetected) },
-                        { label: "Updated", value: func.prettifyEpoch(auditItem.updatedTimestamp) },
-                        { label: "Access Types", value: (auditItem.apiAccessTypes || []).join(", ") || "-" },
-                        { label: "Marked By", value: auditItem.markedBy || "-" },
-                        { label: "Collection", value: auditItem.mcpHost || "-" },
-                    ].map(({ label, value }) => (
-                        <HorizontalStack key={label} gap="2">
-                            <Text variant="bodySm" color="subdued" fontWeight="medium">{label}:</Text>
-                            <Text variant="bodySm">{value}</Text>
-                        </HorizontalStack>
-                    ))}
-                </VerticalStack>
-                {isEndpointSecurity && (
-                    <ActionDropdown
-                        label="Action"
-                        items={serverActionItems}
-                        loading={busy}
-                    />
-                )}
-            </HorizontalStack>
-            </Box>
-            {isEndpointSecurity && auditItem?.aiAgentName && auditItem.aiAgentName !== "-" && (
-                    <Text variant="bodySm" color="subdued">
-                        AI Agent: {auditItem.aiAgentName}
-                    </Text>
+        <HorizontalStack gap="2" align="space-between" wrap={false}>
+            <GithubCell
+                width="100%"
+                nameWidth="38vw"
+                data={auditCellData}
+                headers={auditCellHeaders}
+                getStatus={auditGetStatus}
+            />
+            {isEndpointSecurity && (
+                <ActionDropdown
+                    label="Action"
+                    items={serverActionItems}
+                    loading={busy}
+                />
             )}
-        </VerticalStack>
+        </HorizontalStack>
     ) : null
 
     // Bundle every section into a single FlyLayout slot so we control the gaps
     // ourselves; FlyLayout's stack has no spacing between siblings by default.
     const drawerBody = isEndpointSecurity ? (
         <VerticalStack gap="5">
+            {recordDetailBody}
             {childrenSection}
         </VerticalStack>
-    ) : null
+    ) : recordDetailBody
 
     return (
         <FlyLayout
             show={show}
             setShow={setShow}
-            titleComp={recordDetailBody}
+            titleComp={"Agent Details"}
             components={[drawerBody]}
         />
     )
