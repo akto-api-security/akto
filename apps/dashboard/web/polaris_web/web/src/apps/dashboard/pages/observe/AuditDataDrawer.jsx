@@ -270,9 +270,9 @@ function AuditDataDrawer({
     )
 
     const recordDetailBody = auditItem ? (
-        <VerticalStack gap="4">
-            <VerticalStack gap={"2"}>
-            <HorizontalStack gap="2" blockAlign="center" align="space-between">
+        <VerticalStack gap={"2"}>
+            <Box width="100%">
+            <HorizontalStack gap="2" align="space-between">
                 <VerticalStack gap="3">
                     <VerticalStack gap="1">
                         <Text variant="headingMd">{auditItem.resourceName}</Text>
@@ -304,12 +304,12 @@ function AuditDataDrawer({
                     />
                 )}
             </HorizontalStack>
+            </Box>
             {isEndpointSecurity && auditItem?.aiAgentName && auditItem.aiAgentName !== "-" && (
                     <Text variant="bodySm" color="subdued">
                         AI Agent: {auditItem.aiAgentName}
                     </Text>
-                )}
-            </VerticalStack>
+            )}
         </VerticalStack>
     ) : null
 
