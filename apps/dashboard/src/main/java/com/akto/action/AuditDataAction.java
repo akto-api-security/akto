@@ -195,7 +195,7 @@ public class AuditDataAction extends UserAction {
             loggerMaker.info("Fetched " + auditData.size() + " audit records out of " + total + " total");
 
             try {
-                List<McpAllowlist> allowlistEntries = McpAllowlistDao.instance.findAll(new BasicDBObject());
+                List<McpAllowlist> allowlistEntries = McpAllowlistDao.instance.findAll(new BasicDBObject(), Projections.include(McpAllowlist.NAME));
                 Set<String> allowlistNames = allowlistEntries.stream()
                         .map(McpAllowlist::getName)
                         .collect(Collectors.toSet());
