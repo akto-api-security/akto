@@ -30,6 +30,11 @@ public class ApiSequences {
     int lastStateCount;
     public static final String LAST_STATE_COUNT = "lastStateCount";
 
+    /*
+     * Precedence Score = occurrences of the sequence / occurrences of the last endpoint in the sequence
+     * A score close to 1.0 means: "almost every time endpoint Z is called, 
+     * it's preceded by this exact sequence.
+     */
     float precedenceScore;
     public static final String PRECEDENCE_SCORE = "precedenceScore";
 
