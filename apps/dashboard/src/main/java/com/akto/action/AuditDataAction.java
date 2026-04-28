@@ -246,34 +246,47 @@ public class AuditDataAction extends UserAction {
                                       List<String> agentChoices, List<String> serverChoices) {
         List<Bson> commonStages = new ArrayList<>();
 
-        // Filter: exactly 2 dots in resourceName + type=mcp-server, plus the existing
-        // contextSource/legacy filter passed in by the caller.
+        // At least 2 dots required (3+ segments). No trailing anchor — resourceNames
+        // with more than 3 segments are still valid; we split on the first 2 dots only.
         commonStages.add(Aggregates.match(Filters.and(
             matchFilter,
-            Filters.regex(McpAuditInfo.RESOURCE_NAME, "^[^.]+\\.[^.]+\\.[^.]+$"),
+            Filters.regex(McpAuditInfo.RESOURCE_NAME, "^[^.]+\\.[^.]+\\.[^.]+"),
             Filters.eq(McpAuditInfo.TYPE, "mcp-server")
         )));
 
-        // Split into parts
-        commonStages.add(Aggregates.addFields(new Field<>("_parts",
-            new BasicDBObject("$split", Arrays.asList("$" + McpAuditInfo.RESOURCE_NAME, "."))
-        )));
+        // Locate the first and second dot so we can slice the string without $split.
+        // This lets serverName absorb any additional dots (e.g. "cloudapp.azure.com").
+        commonStages.add(Aggregates.addFields(
+            new Field<>("_firstDot", new BasicDBObject("$indexOfBytes",
+                Arrays.asList("$" + McpAuditInfo.RESOURCE_NAME, ".")))
+        ));
+        commonStages.add(Aggregates.addFields(
+            new Field<>("_secondDot", new BasicDBObject("$indexOfBytes",
+                Arrays.asList("$" + McpAuditInfo.RESOURCE_NAME, ".",
+                    new BasicDBObject("$add", Arrays.asList("$_firstDot", 1)))))
+        ));
 
-        // Extract agent + server (ignore device id at parts[0])
+        // device  = before 1st dot  (not extracted — unused after grouping)
+        // agent   = between 1st and 2nd dot
+        // server  = everything after 2nd dot  (may itself contain dots)
+        // _groupKey = agent.server  = everything after the 1st dot
         commonStages.add(Aggregates.addFields(Arrays.asList(
-            new Field<>("agentName",
-                new BasicDBObject("$arrayElemAt", Arrays.asList("$_parts", 1))
-            ),
-            new Field<>("serverName",
-                new BasicDBObject("$arrayElemAt", Arrays.asList("$_parts", 2))
-            ),
-            new Field<>("_groupKey",
-                new BasicDBObject("$concat", Arrays.asList(
-                    new BasicDBObject("$arrayElemAt", Arrays.asList("$_parts", 1)),
-                    ".",
-                    new BasicDBObject("$arrayElemAt", Arrays.asList("$_parts", 2))
-                ))
-            )
+            new Field<>("agentName", new BasicDBObject("$substrBytes", Arrays.asList(
+                "$" + McpAuditInfo.RESOURCE_NAME,
+                new BasicDBObject("$add", Arrays.asList("$_firstDot", 1)),
+                new BasicDBObject("$subtract", Arrays.asList("$_secondDot",
+                    new BasicDBObject("$add", Arrays.asList("$_firstDot", 1))))
+            ))),
+            new Field<>("serverName", new BasicDBObject("$substrBytes", Arrays.asList(
+                "$" + McpAuditInfo.RESOURCE_NAME,
+                new BasicDBObject("$add", Arrays.asList("$_secondDot", 1)),
+                -1
+            ))),
+            new Field<>("_groupKey", new BasicDBObject("$substrBytes", Arrays.asList(
+                "$" + McpAuditInfo.RESOURCE_NAME,
+                new BasicDBObject("$add", Arrays.asList("$_firstDot", 1)),
+                -1
+            )))
         )));
 
         // Optional agent/server filtering against the derived agent/server fields.
