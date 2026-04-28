@@ -1,9 +1,11 @@
 package com.akto.action;
 
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.McpAllowlistDao;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.McpAllowlist;
 import com.akto.dto.McpAuditInfo;
 import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.dto.User;
@@ -28,12 +30,15 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
+import com.mongodb.BasicDBObject;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class AuditDataAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(AuditDataAction.class, LogDb.DASHBOARD);
@@ -188,6 +193,20 @@ public class AuditDataAction extends UserAction {
                 this.total = McpAuditInfoDao.instance.count(filter);
             }
             loggerMaker.info("Fetched " + auditData.size() + " audit records out of " + total + " total");
+
+            try {
+                List<McpAllowlist> allowlistEntries = McpAllowlistDao.instance.findAll(new BasicDBObject());
+                Set<String> allowlistNames = allowlistEntries.stream()
+                        .map(McpAllowlist::getName)
+                        .collect(Collectors.toSet());
+                for (McpAuditInfo record : this.auditData) {
+                    if (Constants.AKTO_MCP_SERVER_TAG.equals(record.getType())) {
+                        record.setVerified(allowlistNames.contains(McpRequestResponseUtils.extractServiceNameFromHost(record.getResourceName())));
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error enriching audit data with allowlist: " + e.getMessage(), LogDb.DASHBOARD);
+            }
 
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -449,7 +468,7 @@ public class AuditDataAction extends UserAction {
             if (mcpServerForAllAgents != null && !mcpServerForAllAgents.trim().isEmpty()) {
                 String escaped = java.util.regex.Pattern.quote(mcpServerForAllAgents.trim());
                 Bson serverMatch = Filters.and(
-                    Filters.eq(McpAuditInfo.TYPE, "mcp-server"),
+                    Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
                     Filters.regex(McpAuditInfo.RESOURCE_NAME, "(^|\\.)" + escaped + "$")
                 );
                 try (MongoCursor<McpAuditInfo> cursor = McpAuditInfoDao.instance.getMCollection()

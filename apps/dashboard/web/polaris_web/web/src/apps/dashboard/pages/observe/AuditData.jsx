@@ -14,6 +14,7 @@ import { CellType } from "../../components/tables/rows/GithubRow";
 import PersistStore from "../../../main/PersistStore";
 import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
 import RegistryBadge from "../../components/shared/RegistryBadge";
+import AllowlistBadge from "../../components/shared/AllowlistBadge";
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges";
 import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 import AuditDataDrawer from "./AuditDataDrawer";
@@ -266,7 +267,13 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, allCollections, temp?.hostCollectionId);
     const { agent, server } = splitAgentAndServer(temp.resourceName);
     temp['aiAgentName'] = agent;
-    temp['mcpServerName'] = server;
+    temp['rawMcpServerName'] = server;
+    temp['mcpServerName'] = temp?.verified ? (
+        <HorizontalStack gap="1" blockAlign="center">
+            <Text>{server}</Text>
+            <AllowlistBadge />
+        </HorizontalStack>
+    ) : server;
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
     temp['approvedAtComp'] = func.prettifyEpoch(temp?.approvedAt)

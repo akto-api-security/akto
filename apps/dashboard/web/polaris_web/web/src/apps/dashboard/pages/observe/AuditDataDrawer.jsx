@@ -13,6 +13,7 @@ import {
     useIndexResourceState,
 } from "@shopify/polaris"
 import FlyLayout from "../../components/layouts/FlyLayout"
+import AllowlistBadge from "../../components/shared/AllowlistBadge"
 import api from "./api"
 import func from "@/util/func"
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges"
@@ -215,7 +216,7 @@ function AuditDataDrawer({
         <Box padding="4" background="bg-subdued" borderRadius="2">
             <HorizontalStack align="space-between" blockAlign="center" gap="4">
                 <VerticalStack gap="2">
-                    <Text variant="headingMd">{auditItem?.mcpServerName || auditItem?.resourceName}</Text>
+                    <Text variant="headingMd">{auditItem?.rawMcpServerName || auditItem?.resourceName}</Text>
                     <HorizontalStack gap="2" blockAlign="center">
                         {auditItem?.aiAgentName && auditItem.aiAgentName !== "-" && (
                             <Badge tone="info">Agent: {auditItem.aiAgentName}</Badge>
@@ -304,9 +305,12 @@ function AuditDataDrawer({
 
     const titleComp = auditItem ? (
         <VerticalStack gap="1">
-            <Text variant="headingMd">
-                {isEndpointSecurity ? (auditItem?.mcpServerName || auditItem?.resourceName) : auditItem?.resourceName}
-            </Text>
+            <HorizontalStack gap="1" blockAlign="center">
+                <Text variant="headingMd">
+                    {isEndpointSecurity ? (auditItem?.rawMcpServerName || auditItem?.resourceName) : auditItem?.resourceName}
+                </Text>
+                {isEndpointSecurity && auditItem?.verified && <AllowlistBadge />}
+            </HorizontalStack>
             {isEndpointSecurity && auditItem?.aiAgentName && auditItem.aiAgentName !== "-" && (
                 <Text variant="bodySm" color="subdued">
                     AI Agent: {auditItem.aiAgentName}

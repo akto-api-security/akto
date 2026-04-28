@@ -62,6 +62,9 @@ public class McpAuditInfo {
     private List<String> groupedHexIds;
     private Integer groupedCount;
 
+    @BsonIgnore
+    private boolean verified;
+
     public String getHexId() {
         return this.id != null ? this.id.toHexString() : null;
     }
