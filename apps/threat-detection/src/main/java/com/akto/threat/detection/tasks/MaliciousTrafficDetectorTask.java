@@ -550,30 +550,26 @@ public class MaliciousTrafficDetectorTask implements Task {
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, urlForAggregation, method.toString());
       String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, urlForAggregation, method.toString());
       long curEpochMin = responseParam.getTime() / 60;
-      this.distributionCalculator.updateFrequencyBuckets(distributionKey, curEpochMin, ipApiCmsKey);
 
-      // Check and raise alert for RateLimits
       RatelimitConfigItem ratelimitConfig = this.threatConfigEvaluator.getDefaultRateLimitConfig();
 
       ApiInfo.ApiInfoKey templateApiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method);
       long ratelimit = this.threatConfigEvaluator.getRatelimit(templateApiInfoKey);
 
-      long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin,
-          ratelimitConfig.getPeriod());
-
-      if (ratelimit != Constants.RATE_LIMIT_UNLIMITED_REQUESTS && count > ratelimit
-          && !this.threatConfigEvaluator.isActorInMitigationPeriod(ipApiCmsKey, ratelimitConfig)) {
-        logger.debugAndAddToDb("Ratelimit hit for url " + apiInfoKey.getUrl() + " actor: " + actor + " ratelimitConfig "
-            + ratelimitConfig.toString());
-
-        RedactionType redactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
-        SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam,
-            ipApiRateLimitFilter, metadata, errors, successfulExploit, isIgnoredEvent, redactionType);
-        generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq,
-            EventType.EVENT_TYPE_AGGREGATED);
-
-        this.threatConfigEvaluator.setActorInMitigationPeriod(ipApiCmsKey, ratelimitConfig);
+      // Fully async: XADD to Redis stream — ZERO sync Redis calls
+      String host = "";
+      Map<String, List<String>> reqHeaders = responseParam.getRequestParams().getHeaders();
+      if (reqHeaders != null && reqHeaders.containsKey("host") && !reqHeaders.get("host").isEmpty()) {
+        host = reqHeaders.get("host").get(0);
       }
+      String countryCode = metadata != null && metadata.getCountryCode() != null ? metadata.getCountryCode() : "";
+      String destCountryCode = metadata != null && metadata.getDestCountryCode() != null ? metadata.getDestCountryCode() : "";
+
+      this.distributionCalculator.processRequest(
+          distributionKey, curEpochMin, ipApiCmsKey, ratelimitConfig.getPeriod(),
+          ratelimit, ratelimitConfig.getMitigationPeriod(),
+          actor, host, responseParam.getAccountId(), responseParam.getTime(),
+          countryCode, destCountryCode);
     }
 
     boolean skipFilterLoop = false;

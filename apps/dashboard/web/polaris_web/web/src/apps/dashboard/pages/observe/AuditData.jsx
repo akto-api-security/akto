@@ -219,29 +219,24 @@ const resourceName = {
     plural: 'audit records',
 };
 
+const isAtlasEndpointCollection = (allCollections, collectionId) => {
+    if (!allCollections || !collectionId) return false;
+    const collection = allCollections.find(col => col.id === collectionId);
+    if (!collection || !collection.envType || !Array.isArray(collection.envType)) return false;
+    return collection.envType.some(env => env.value && env.value.toLowerCase() === 'endpoint');
+};
+
 const stripDeviceIdFromName = (name, allCollections, collectionId) => {
     if (!name || !allCollections || !collectionId) {
         return name;
     }
-    
-    // Find the collection by ID
-    const collection = allCollections.find(col => col.id === collectionId);
-    if (!collection || !collection.envType || !Array.isArray(collection.envType)) {
-        return name;
-    }
-    
-    // Check if any envType has source "ENDPOINT" (case insensitive)
-    const hasEndpointSource = collection.envType.some(env => 
-        env.value && env.value.toLowerCase() === 'endpoint'
-    );
-    
-    if (!hasEndpointSource) {
+
+    if (!isAtlasEndpointCollection(allCollections, collectionId)) {
         return name;
     }
 
     const dotIndex = name.indexOf('.');
     if (dotIndex > 0 && dotIndex < name.length - 1) {
-        // Return everything after the first dot
         return name.substring(dotIndex + 1);
     }
     
@@ -258,6 +253,7 @@ const splitAgentAndServer = (name) => {
 const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegistry) => {
     const allCollections = PersistStore.getState().allCollections;
     let temp = {...auditRecord}
+    temp['isEndpointSource'] = isAtlasEndpointCollection(allCollections, auditRecord?.hostCollectionId);
     temp['typeComp'] = (
         <MethodBox method={""} url={auditRecord?.type.toLowerCase() || "TOOL"}/>
     )
@@ -393,6 +389,42 @@ function AuditData() {
 
     const getMcpServerName = (originalResourceName) => {
         if (!originalResourceName) return '';
+        // Format: <device_name>.<ai-agent>.<mcp_server_name>
+        const parts = originalResourceName.split('.');
+        return parts.slice(2).join('.');
+    };
+
+    const addMcpAllowlistEntry = async (mcpServerUrl) => {
+        try {
+            await api.addMcpAllowlistEntry(mcpServerUrl)
+            func.setToast(true, false, `${mcpServerUrl} added to MCP allowed list successfully`)
+            window.location.reload();
+        } catch (error) {
+            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add to MCP allowed list"
+            func.setToast(true, true, errorMsg)
+        }
+    }
+
+    const getMcpServerName = (originalResourceName) => {
+        if (!originalResourceName) return '';
+        // Format: <device_name>.<ai-agent>.<mcp_server_name>
+        const parts = originalResourceName.split('.');
+        return parts.slice(2).join('.');
+    };
+
+    const addMcpAllowlistEntry = async (mcpServerUrl) => {
+        try {
+            await api.addMcpAllowlistEntry(mcpServerUrl)
+            func.setToast(true, false, `${mcpServerUrl} added to MCP allowed list successfully`)
+            window.location.reload();
+        } catch (error) {
+            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add to MCP allowed list"
+            func.setToast(true, true, errorMsg)
+        }
+    }
+
+    const getMcpServerName = (originalResourceName) => {
+        if (!originalResourceName) return '';
         const parts = originalResourceName.split('.');
         return parts.slice(2).join('.');
     };
@@ -423,7 +455,7 @@ function AuditData() {
             ...(item.isEndpointSource ? [{
                 content: <span style={{ color: '#008060' }}>Add to MCP Allowed List</span>,
                 icon: GreenTickIcon,
-                onAction: () => { addMcpAllowlistEntry(getMcpServerName(item.originalResourceName)) },
+                onAction: () => {addMcpAllowlistEntry(getMcpServerName(item.originalResourceName))},
             }] : []),
             {
                 content: <span style={{ color: '#D72C0D' }}>Disapprove</span>,

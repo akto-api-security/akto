@@ -64,6 +64,14 @@ export default {
         });
         return resp;
     },
+    async addMcpAllowlistEntry(mcpServerUrl) {
+        const resp = await request({
+            url: '/api/addMcpAllowlistEntry',
+            method: 'post',
+            data: { mcpServerUrl }
+        });
+        return resp;
+    },
 
     async fetchMcpAuditInfoByCollection(apiCollectionId) {
         const id = typeof apiCollectionId === 'string' ? parseInt(apiCollectionId, 10) : apiCollectionId;
