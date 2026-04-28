@@ -41,7 +41,7 @@ public class ApiSequencesDao extends AccountsContextDao<ApiSequences> {
             db.createCollection(getCollName());
         }
 
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiSequences.API_COLLECTION_ID }, false);
+        MCollection.createUniqueIndex(getDBName(), getCollName(), new String[] { ApiSequences.API_COLLECTION_ID, ApiSequences.PATHS }, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiSequences.CREATED_AT }, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiSequences.LAST_UPDATED_AT }, false);
     }
