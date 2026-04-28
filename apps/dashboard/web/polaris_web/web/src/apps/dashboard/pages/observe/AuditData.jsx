@@ -259,9 +259,9 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     temp['riskAnalysisComp'] = <ComponentRiskAnalysisBadges componentRiskAnalysis={temp?.componentRiskAnalysis} />;
 
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
-    temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
-    temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
-    temp['approvedAtComp'] = func.prettifyEpoch(temp?.approvedAt)
+    temp['lastDetectedComp'] = temp?.lastDetected ? func.prettifyEpoch(temp.lastDetected) : "-"
+    temp['updatedTimestampComp'] = temp?.updatedTimestamp ? func.prettifyEpoch(temp.updatedTimestamp) : "-"
+    temp['approvedAtComp'] = temp?.approvedAt ? func.prettifyEpoch(temp.approvedAt) : "-"
     temp['expiresAtComp'] = temp?.approvalConditions?.expiresAt ? (() => {
         const expirationDate = new Date(temp.approvalConditions.expiresAt * 1000);
         return expirationDate.toLocaleString('en-US', {

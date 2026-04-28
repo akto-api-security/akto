@@ -278,8 +278,8 @@ function AuditDataDrawer({
         resourceName: auditItem.resourceName,
         typeBadge: [auditItem.type].filter(Boolean),
         remarksBadge: [auditItem.remarks || "Pending"],
-        lastDetected: func.prettifyEpoch(auditItem.lastDetected),
-        updatedTimestamp: func.prettifyEpoch(auditItem.updatedTimestamp),
+        lastDetected: auditItem.lastDetected ? func.prettifyEpoch(auditItem.lastDetected) : "-",
+        updatedTimestamp: auditItem.updatedTimestamp ? func.prettifyEpoch(auditItem.updatedTimestamp) : "-",
         markedBy: auditItem.markedBy || "-",
         mcpHost: auditItem.mcpHost || "-",
         aiAgentName: (isEndpointSecurity && auditItem.aiAgentName && auditItem.aiAgentName !== "-")
