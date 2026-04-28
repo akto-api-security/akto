@@ -33,6 +33,17 @@ const remarksTone = (remarks) => {
     return undefined
 }
 
+// Children come back as merged docs ({_id: resourceName, groupedHexIds, …}) with
+// remarks/markedBy/approvalConditions already collapsed server-side. Promote a stable
+// hexId so the existing rendering and update call sites stay unchanged.
+const normalizeChildRow = (raw) => {
+    if (!raw) return raw
+    const hexId = Array.isArray(raw.groupedHexIds) && raw.groupedHexIds.length > 0
+        ? raw.groupedHexIds[0]
+        : raw._id
+    return { ...raw, hexId }
+}
+
 function ActionDropdown({ label, items, loading, disabled }) {
     const [open, setOpen] = useState(false)
     const wrapped = items.map((it) => ({
@@ -83,26 +94,23 @@ function AuditDataDrawer({
         if (!auditItem) return
         setLoadingChildren(true)
         try {
-            const collectionIds = Array.isArray(auditItem.groupedHostCollectionIds)
-                && auditItem.groupedHostCollectionIds.length > 0
-                ? auditItem.groupedHostCollectionIds
-                : [auditItem.hostCollectionId]
+            const agentName = auditItem.aiAgentName && auditItem.aiAgentName !== "-" ? auditItem.aiAgentName : null
+            const serverName = auditItem.mcpServerName && auditItem.mcpServerName !== "-" ? auditItem.mcpServerName : null
             const res = await api.fetchAuditData(
                 "lastDetected", -1, 0, 500,
                 {
                     type: ["mcp-tool", "mcp-resource", "mcp-prompt"],
-                    hostCollectionId: collectionIds,
                     lastDetected: [startTimestamp, endTimestamp],
                 },
-                {}, "", false, true
+                {}, "", false, agentName, serverName
             )
-            setChildren(res?.auditData || [])
+            setChildren((res?.auditData || []).map(normalizeChildRow))
         } catch (e) {
             setChildren([])
         } finally {
             setLoadingChildren(false)
         }
-    }, [auditItem?.hexId, startTimestamp, endTimestamp])
+    }, [auditItem?.hexId, auditItem?.aiAgentName, auditItem?.mcpServerName, startTimestamp, endTimestamp])
 
     useEffect(() => {
         if (show && auditItem && isEndpointSecurity) {

@@ -226,47 +226,37 @@ const isAtlasEndpointCollection = (allCollections, collectionId) => {
     return collection.envType.some(env => env.value && env.value.toLowerCase() === 'endpoint');
 };
 
-const stripDeviceIdFromName = (name, allCollections, collectionId) => {
-    if (!name || !allCollections || !collectionId) {
-        return name;
-    }
-
-    if (!isAtlasEndpointCollection(allCollections, collectionId)) {
-        return name;
-    }
-
-    const dotIndex = name.indexOf('.');
-    if (dotIndex > 0 && dotIndex < name.length - 1) {
-        return name.substring(dotIndex + 1);
-    }
-    
-    return name;
-};
-
-const splitAgentAndServer = (name) => {
-    if (!name) return { agent: '-', server: '-' };
-    const dot = name.indexOf('.');
-    if (dot <= 0 || dot >= name.length - 1) return { agent: '-', server: name };
-    return { agent: name.substring(0, dot), server: name.substring(dot + 1) };
-};
-
 const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegistry) => {
     const allCollections = PersistStore.getState().allCollections;
     let temp = {...auditRecord}
-    temp['isEndpointSource'] = isAtlasEndpointCollection(allCollections, auditRecord?.hostCollectionId);
+
+    // Merged-server rows come from the aggregation pipeline and carry agentName/serverName/
+    // groupedHexIds directly. The backend already collapses remarksArr into the most-restrictive
+    // remarks/markedBy/approvalConditions on the row.
+    const isMerged = Array.isArray(auditRecord?.groupedHexIds) && (auditRecord?.agentName !== undefined || auditRecord?.serverName !== undefined);
+
+    if (isMerged) {
+        temp['type'] = 'mcp-server';
+        temp['hexId'] = auditRecord.groupedHexIds.length > 0 ? auditRecord.groupedHexIds[0] : auditRecord?._id;
+        temp['resourceName'] = auditRecord?._id;
+        temp['aiAgentName'] = auditRecord?.agentName || '-';
+        temp['mcpServerName'] = auditRecord?.serverName || auditRecord?._id;
+        // Endpoint-security path: derive isEndpointSource by checking any of the merged
+        // collections is an Atlas endpoint collection.
+        temp['isEndpointSource'] = (auditRecord?.groupedHostCollectionIds || []).some(
+            (cid) => isAtlasEndpointCollection(allCollections, cid)
+        );
+    } else {
+        temp['isEndpointSource'] = isAtlasEndpointCollection(allCollections, auditRecord?.hostCollectionId);
+    }
+
     temp['typeComp'] = (
-        <MethodBox method={""} url={auditRecord?.type.toLowerCase() || "TOOL"}/>
+        <MethodBox method={""} url={(temp?.type || "TOOL").toLowerCase()}/>
     )
 
-    temp['riskAnalysisComp'] = <ComponentRiskAnalysisBadges componentRiskAnalysis={auditRecord?.componentRiskAnalysis} />;
+    temp['riskAnalysisComp'] = <ComponentRiskAnalysisBadges componentRiskAnalysis={temp?.componentRiskAnalysis} />;
 
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
-    // Preserve the unstripped hostname for child lookups (children store mcpHost = original parent hostname)
-    temp['originalResourceName'] = temp?.resourceName;
-    temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, allCollections, temp?.hostCollectionId);
-    const { agent, server } = splitAgentAndServer(temp.resourceName);
-    temp['aiAgentName'] = agent;
-    temp['mcpServerName'] = server;
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
     temp['approvedAtComp'] = func.prettifyEpoch(temp?.approvedAt)
@@ -318,12 +308,14 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
                 )}
             </VerticalStack>
     )
-    temp['collectionName'] = (
-        <HorizontalStack gap="2" align="center">
-            <Text>{stripDeviceIdFromName(collectionName, allCollections, temp?.hostCollectionId)}</Text>
-            {collectionRegistry === "available" && <RegistryBadge />}
-        </HorizontalStack>
-    );
+    if (!isMerged) {
+        temp['collectionName'] = (
+            <HorizontalStack gap="2" align="center">
+                <Text>{collectionName}</Text>
+                {collectionRegistry === "available" && <RegistryBadge />}
+            </HorizontalStack>
+        );
+    }
     // Required by GithubRow for tree-style expand/collapse
     temp['id'] = temp.hexId;
     temp['name'] = temp.hexId;
@@ -387,12 +379,6 @@ function AuditData() {
         window.location.reload();
     }
 
-    const getMcpServerName = (originalResourceName) => {
-        if (!originalResourceName) return '';
-        const parts = originalResourceName.split('.');
-        return parts.slice(2).join('.');
-    };
-
     const addMcpAllowlistEntry = async (mcpServerUrl) => {
         try {
             await api.addMcpAllowlistEntry(mcpServerUrl)
@@ -419,7 +405,7 @@ function AuditData() {
             ...(item.isEndpointSource ? [{
                 content: <span style={{ color: '#008060' }}>Add to MCP Allowed List</span>,
                 icon: GreenTickIcon,
-                onAction: () => {addMcpAllowlistEntry(getMcpServerName(item.originalResourceName))},
+                onAction: () => {addMcpAllowlistEntry(item.mcpServerName)},
             }] : []),
             {
                 content: <span style={{ color: '#D72C0D' }}>Disapprove</span>,
@@ -529,16 +515,13 @@ function AuditData() {
                     { type: ['mcp-server'], lastDetected: [startTimestamp, endTimestamp] },
                     {}, '', true
                 )
-                const allCollections = PersistStore.getState().allCollections;
                 const agents = new Set()
                 const servers = new Set()
                 const markedByUsers = new Set()
                 if (serversRes && Array.isArray(serversRes.auditData)) {
                     serversRes.auditData.forEach((rec) => {
-                        const stripped = stripDeviceIdFromName(rec?.resourceName, allCollections, rec?.hostCollectionId)
-                        const { agent, server } = splitAgentAndServer(stripped)
-                        if (agent && agent !== '-') agents.add(agent)
-                        if (server && server !== '-') servers.add(server)
+                        if (rec?.agentName) agents.add(rec.agentName)
+                        if (rec?.serverName) servers.add(rec.serverName)
                         if (rec?.markedBy) markedByUsers.add(rec.markedBy)
                     })
                 }
@@ -623,7 +606,7 @@ function AuditData() {
                         endTimestamp={endTimestamp}
                         onRequestConditional={handleRequestConditional}
                         onAfterUpdate={handleAfterDrawerUpdate}
-                        onAddToAllowlist={(item) => addMcpAllowlistEntry(getMcpServerName(item?.originalResourceName))}
+                        onAddToAllowlist={(item) => addMcpAllowlistEntry(item?.mcpServerName)}
                         isEndpointSecurity={isEndpointSecurity}
                     />
                     <ConditionalApprovalModal

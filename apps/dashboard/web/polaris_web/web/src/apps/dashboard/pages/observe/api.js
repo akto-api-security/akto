@@ -32,11 +32,14 @@ export default {
             data: { startTimestamp, endTimestamp }
         })
     },
-    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers = false, mergeMcpComponents = false) {
+    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers = false, aiAgentName = null, mcpServerName = null) {
+        const data = { sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers };
+        if (typeof aiAgentName === 'string' && aiAgentName.length > 0) data.aiAgentName = aiAgentName;
+        if (typeof mcpServerName === 'string' && mcpServerName.length > 0) data.mcpServerName = mcpServerName;
         const resp = await request({
             url: '/api/fetchAuditData',
             method: 'post',
-            data: { sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers, mergeMcpComponents }
+            data
         });
         return resp;
     },
