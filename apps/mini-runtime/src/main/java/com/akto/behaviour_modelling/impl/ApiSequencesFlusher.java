@@ -38,22 +38,21 @@ public class ApiSequencesFlusher implements WindowFlusher {
             Long prevStateCount = apiCounts.get(fromApi);
             if (prevStateCount == null || prevStateCount == 0) continue;
 
-            float probability = transitionCount / (float) prevStateCount;
-
             List<String> paths = new ArrayList<>();
             for (ApiInfoKey apiInfoKey : seq) {
                 paths.add(apiInfoKey.toString());
             }
 
-            // id=0: upsert in DbActor matches on (apiCollectionId, paths), id unused for insert key
+            int id = (fromApi.getApiCollectionId() + paths.toString()).hashCode();
+            // probability is computed in the DB from cumulative counts after $inc
             ApiSequences apiSequence = new ApiSequences(
-                    0,
+                    id,
                     fromApi.getApiCollectionId(),
                     paths,
                     (int) transitionCount,
                     prevStateCount.intValue(),
                     0f,
-                    probability
+                    0f
             );
             sequences.add(apiSequence);
         }

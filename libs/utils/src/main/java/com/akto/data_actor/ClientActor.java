@@ -4633,13 +4633,14 @@ public class ClientActor extends DataActor {
         }
     }
 
+    int sequenceBatchLimit = 100;
     @Override
     public void writeApiSequences(List<ApiSequences> sequences) {
         if (sequences == null || sequences.isEmpty()) return;
         List<ApiSequences> batch = new ArrayList<>();
         for (int i = 0; i < sequences.size(); i++) {
             batch.add(sequences.get(i));
-            if (batch.size() % batchWriteLimit == 0) {
+            if (batch.size() % sequenceBatchLimit == 0) {
                 List<ApiSequences> finalBatch = batch;
                 threadPool.submit(() -> writeApiSequencesBatch(finalBatch));
                 batch = new ArrayList<>();
