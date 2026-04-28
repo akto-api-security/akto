@@ -14,6 +14,7 @@ import { CellType } from "../../components/tables/rows/GithubRow";
 import PersistStore from "../../../main/PersistStore";
 import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
 import RegistryBadge from "../../components/shared/RegistryBadge";
+import AllowlistBadge from "../../components/shared/AllowlistBadge";
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges";
 import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 import AuditDataDrawer from "./AuditDataDrawer";
@@ -27,8 +28,7 @@ const headingsEndpointSecurity = [
     {
         title: 'MCP Server',
         text: 'MCP Server',
-        value: 'mcpServerName',
-        type: CellType.TEXT,
+        value: 'mcpServerNameComp',
         filterKey: 'mcpServer',
     },
     {
@@ -240,7 +240,14 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
         temp['hexId'] = auditRecord.groupedHexIds.length > 0 ? auditRecord.groupedHexIds[0] : auditRecord?._id;
         temp['resourceName'] = auditRecord?._id;
         temp['aiAgentName'] = auditRecord?.agentName || '-';
-        temp['mcpServerName'] = auditRecord?.serverName || auditRecord?._id;
+        const serverName = auditRecord?.serverName || auditRecord?._id;
+        temp['mcpServerName'] = serverName;
+        temp['mcpServerNameComp'] = (
+            <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+                <Text>{serverName}</Text>
+                {temp?.verified && <AllowlistBadge />}
+            </HorizontalStack>
+        );
         // Endpoint-security path: derive isEndpointSource by checking any of the merged
         // collections is an Atlas endpoint collection.
         temp['isEndpointSource'] = (auditRecord?.groupedHostCollectionIds || []).some(

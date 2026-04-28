@@ -11,6 +11,7 @@ import {
     VerticalStack,
 } from "@shopify/polaris"
 import FlyLayout from "../../components/layouts/FlyLayout"
+import AllowlistBadge from "../../components/shared/AllowlistBadge"
 import api from "./api"
 import func from "@/util/func"
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges"
@@ -296,9 +297,12 @@ function AuditDataDrawer({
 
     const titleComp = auditItem ? (
         <VerticalStack gap="1">
-            <Text variant="headingMd">
-                {isEndpointSecurity ? (auditItem?.mcpServerName || auditItem?.resourceName) : auditItem?.resourceName}
-            </Text>
+            <HorizontalStack gap="1" blockAlign="center">
+                <Text variant="headingMd">
+                    {isEndpointSecurity ? (auditItem?.mcpServerName || auditItem?.resourceName) : auditItem?.resourceName}
+                </Text>
+                {isEndpointSecurity && auditItem?.verified && <AllowlistBadge />}
+            </HorizontalStack>
             {isEndpointSecurity && auditItem?.aiAgentName && auditItem.aiAgentName !== "-" && (
                 <Text variant="bodySm" color="subdued">
                     AI Agent: {auditItem.aiAgentName}

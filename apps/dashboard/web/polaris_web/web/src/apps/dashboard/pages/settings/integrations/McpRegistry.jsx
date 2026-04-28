@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import IntegrationsLayout from './IntegrationsLayout'
-import { Box, Button, LegacyCard, TextField, Text, VerticalStack, HorizontalStack, Banner, DataTable, Scrollable } from '@shopify/polaris'
+import { Box, Button, LegacyCard, TextField, Text, VerticalStack, HorizontalStack, Banner, DataTable, Scrollable, Link } from '@shopify/polaris'
 import { DeleteMinor } from '@shopify/polaris-icons'
 import "../settings.css"
 import func from "@/util/func"
@@ -25,7 +25,7 @@ function McpRegistry() {
     // New registry form state
     const [newRegistryUrl, setNewRegistryUrl] = useState('');
     const [newRegistryHeaders, setNewRegistryHeaders] = useState([{ key: '', value: '' }]);
-    const [newRegistryType, setNewRegistryType] = useState('GITHUB');
+    const [newRegistryType, setNewRegistryType] = useState('CSV_URL');
     const [showAddForm, setShowAddForm] = useState(false);
     const [adding, setAdding] = useState(false);
 
@@ -154,7 +154,7 @@ function McpRegistry() {
         const trimmedUrl = newRegistryUrl.trim();
 
         if (!trimmedUrl) {
-            func.setToast(true, true, "Please enter a Github registry URL");
+            func.setToast(true, true, "Please enter a registry URL");
             return;
         }
 
@@ -198,19 +198,19 @@ function McpRegistry() {
         }
 
         const headersObj = headersArrayToObject(newRegistryHeaders);
-        const registryType = newRegistryType || 'GITHUB';
+        const registryType = newRegistryType || 'CSV_URL';
 
         setAdding(true);
         try {
             await api.addMcpRegistry(trimmedUrl, headersObj, registryType);
-            func.setToast(true, false, "Github registry added. Endpoints will be ingested on sync.");
+            func.setToast(true, false, "Registry added. Endpoints will be ingested on sync.");
             setNewRegistryUrl('');
             setNewRegistryHeaders([{ key: '', value: '' }]);
-            setNewRegistryType('GITHUB');
+            setNewRegistryType('CSV_URL');
             setShowAddForm(false);
             await fetchRegistrySettings();
         } catch (error) {
-            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add Github URL";
+            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add URL";
             func.setToast(true, true, errorMsg);
             window.location.reload();
         } finally {
@@ -306,7 +306,7 @@ function McpRegistry() {
                                     onClick={() => setShowAddForm(!showAddForm)}
                                     disabled={saving}
                                 >
-                                    {showAddForm ? 'Cancel' : 'Add Github URL'}
+                                    {showAddForm ? 'Cancel' : 'Add URL'}
                                 </Button>
                             )}
                             {/* <Button
@@ -331,12 +331,12 @@ function McpRegistry() {
                             {showAddForm && (
                                 <LegacyCard sectioned>
                                     <VerticalStack gap="3">
-                                        <Text variant="headingMd" as="h4">Add Github URL</Text>
+                                        <Text variant="headingMd" as="h4">Add URL</Text>
                                         <TextField
-                                            label="Github Registry URL"
+                                            label="Registry URL"
                                             value={newRegistryUrl}
                                             onChange={setNewRegistryUrl}
-                                            placeholder="https://github.com/owner/repo/blob/main/registry.json"
+                                            placeholder="https://example.com/path/to/mcp_servers.csv"
                                             helpText="The file at this URL will be read to extract MCP endpoints."
                                             autoComplete="off"
                                             maxLength={MAX_URL_LENGTH}
@@ -495,34 +495,44 @@ function McpRegistry() {
                         </VerticalStack>
                     </Box>
 
-                    <Banner tone="info">
-                        <VerticalStack gap="2">
-                            <Text variant="bodyMd" fontWeight="semibold">
-                                How to add a Github URL:
-                            </Text>
-                            <Text variant="bodyMd">1. Click <b>Add Github URL</b> to open the form.</Text>
-                            <Text variant="bodyMd">2. Enter the raw GitHub file URL pointing to your CSV (e.g. <code>https://raw.githubusercontent.com/owner/repo/main/mcp_servers.csv</code>).</Text>
-                            <Text variant="bodyMd">3. The CSV must have a header row with column <code>mcp_server_name</code>.</Text>
-                            <Text variant="bodyMd">4. If the file is in a private repo, add an authentication header — key: <code>Authorization</code>, value: <code>Bearer &lt;your_github_token&gt;</code>.</Text>
-                            <Text variant="bodyMd">5. Click <b>Add Registry</b> — MCP server entries will be ingested automatically from the CSV.</Text>
+                    <LegacyCard sectioned>
+                        <VerticalStack gap="4">
+                            <Text variant="headingMd">How to add a URL</Text>
+                            <VerticalStack gap="2">
+                                <Text variant="bodyMd" fontWeight="semibold">1. Open the form</Text>
+                                <Text variant="bodyMd" color="subdued">Click <b>Add URL</b> to open the form.</Text>
+                                <Text variant="bodyMd" fontWeight="semibold">2. Enter the URL</Text>
+                                <Text variant="bodyMd" color="subdued">Enter the URL pointing to your CSV file (e.g. <code>https://example.com/path/to/mcp_servers.csv</code>).</Text>
+                                <Link url="https://raw.githubusercontent.com/nayanakto/ai-security/refs/heads/main/sample_mcp.csv" target="_blank">Download sample CSV</Link>
+                                <Text variant="bodyMd" fontWeight="semibold">3. Add authentication (if required)</Text>
+                                <Text variant="bodyMd" color="subdued">If the file requires authentication, add a header — key: <code>Authorization</code>, value: <code>Bearer &lt;your_token&gt;</code>.</Text>
+                                <Text variant="bodyMd" fontWeight="semibold">4. Submit</Text>
+                                <Text variant="bodyMd" color="subdued">Click <b>Add Registry</b> — MCP server entries will be ingested automatically from the CSV.</Text>
+                            </VerticalStack>
                         </VerticalStack>
-                    </Banner>
+                    </LegacyCard>
 
-                    <Banner tone="info">
-                        <VerticalStack gap="2">
-                            <Text variant="bodyMd" fontWeight="semibold">Important Notes:</Text>
-                            <Text variant="bodyMd">• Only one registry URL is supported.</Text>
-                            <Text variant="bodyMd">• Your CSV must have a header row with a <code>mcp_server_name</code> column. Example:</Text>
-                            <pre style={{margin: 0, fontSize: '12px', background: '#f4f4f4', padding: '8px', borderRadius: '4px'}}>{'mcp_server_name\napi.githubcopilot.com\nmcp.notion.com'}</pre>
-                            <Text variant="bodyMd">• Updated your CSV? Wait 5 minutes, then click <b>Sync now</b> to pull in the latest changes.</Text>
+                    <LegacyCard sectioned>
+                        <VerticalStack gap="4">
+                            <Text variant="headingMd">Important Notes</Text>
+                            <VerticalStack gap="2">
+                                <Text variant="bodyMd" fontWeight="semibold">1. Only one registry URL is supported.</Text>
+                                <Text variant="bodyMd" fontWeight="semibold">2. CSV format</Text>
+                                <Text variant="bodyMd" color="subdued">Your CSV must have a header row with a <code>mcp_server_name</code> column. Each row is one MCP server name.</Text>
+                                <pre style={{ margin: 0, fontSize: '12px', fontFamily: 'monospace', lineHeight: '1.8', background: '#f6f6f7', border: '1px solid #e1e3e5', borderRadius: '6px', padding: '10px 14px' }}>{'mcp_server_name\napi.githubcopilot.com\nmcp.notion.com\nfilesystem-local\nmy-postgres'}</pre>
+                                <Text variant="bodyMd" color="subdued">For remote MCP servers, use the domain name (e.g. <code>api.example.com</code>). For local MCP servers, use the name your team has given it (e.g. <code>filesystem-local</code>, <code>my-postgres</code>).</Text>
+                                <Link url="https://raw.githubusercontent.com/nayanakto/ai-security/refs/heads/main/sample_mcp.csv" target="_blank">Download sample CSV</Link>
+                                <Text variant="bodyMd" fontWeight="semibold">3. Syncing</Text>
+                                <Text variant="bodyMd" color="subdued">Updated your CSV? Wait 5 minutes for changes to propagate, then click <b>Sync now</b> to pull in the latest entries.</Text>
+                            </VerticalStack>
                         </VerticalStack>
-                    </Banner>
+                    </LegacyCard>
                 </VerticalStack>
             </LegacyCard.Section>
         </LegacyCard>
     );
 
-    const cardContent = "Configure and manage MCP servers from your github for discovering and validating Model Context Protocol servers in your environment.";
+    const cardContent = "Configure and manage MCP servers from a remote registry URL for discovering and validating Model Context Protocol servers in your environment.";
 
     return (
         <IntegrationsLayout

@@ -22,6 +22,7 @@ public class McpAllowlistDao extends AccountsContextDao<McpAllowlist> {
     public void createIndicesIfAbsent() {
         createCollectionIfAbsent(getDBName(), getCollName(), new CreateCollectionOptions());
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{McpAllowlist.REGISTRY_ID}, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{McpAllowlist.CREATED_AT}, false);
         MCollection.createUniqueIndex(getDBName(), getCollName(), new String[]{McpAllowlist.NAME, McpAllowlist.REGISTRY_ID}, false);
     }
 }
