@@ -20,11 +20,6 @@ import AuditDataDrawer from "./AuditDataDrawer";
 
 const headingsEndpointSecurity = [
     {
-        title: 'Risk Analysis',
-        value: 'riskAnalysisComp',
-        text: 'Risk Analysis',
-    },
-    {
         title: 'MCP Server',
         text: 'MCP Server',
         value: 'mcpServerName',
