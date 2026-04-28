@@ -28,6 +28,12 @@ type policyCache struct {
 	mu            sync.RWMutex
 }
 
+type mcpListCache struct {
+	mcpAllowedList []types.McpAllowedList
+	lastFetched    time.Time
+	mu             sync.RWMutex
+}
+
 // Service handles payload validation using akto-gateway library
 type Service struct {
 	config        *config.Config
@@ -35,6 +41,7 @@ type Service struct {
 	processor     mcp.RequestProcessor // Default processor (skipThreat=false)
 	logger        *zap.Logger
 	cache         *policyCache
+	mcpListCache  *mcpListCache
 	sessionMgr    *session.SessionManager // Our session manager implementation for session tracking
 	schemaFetcher *SchemaFetcher
 }
@@ -186,6 +193,33 @@ func filterPoliciesByMcpServer(policies []types.Policy, mcpServerName string) []
 		}
 	}
 	return filtered
+}
+
+func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
+	refreshInterval := time.Duration(s.config.McpListRefreshIntervalMin) * time.Minute
+
+	s.mcpListCache.mu.RLock()
+	if !s.mcpListCache.lastFetched.IsZero() && time.Since(s.mcpListCache.lastFetched) < refreshInterval {
+		s.mcpListCache.mu.RUnlock()
+		return s.mcpListCache.mcpAllowedList, nil
+	}
+	s.mcpListCache.mu.RUnlock()
+
+	s.mcpListCache.mu.Lock()
+	defer s.mcpListCache.mu.Unlock()
+
+	rawMcpAllowedHostList, err := s.dbClient.FetchMcpAllowedHostList()
+	if err != nil {
+		return nil, err
+	}
+
+	var mcpAllowedList []types.McpAllowedList
+	if err := json.Unmarshal(rawMcpAllowedHostList, &mcpAllowedList); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal MCP allowed host list: %w", err)
+	}
+	s.mcpListCache.mcpAllowedList = mcpAllowedList
+	s.mcpListCache.lastFetched = time.Now()
+	return mcpAllowedList, nil
 }
 
 func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
@@ -427,6 +461,7 @@ func (s *Service) validationContextFromParams(
 		McpServerName:   mcpServerName,
 		SessionID:       sessionID,
 		SkipThreat:      params.EffectiveSkipThreat(), // Set skipThreat directly in context
+		Tag:             params.Tag,
 	}
 }
 
@@ -554,6 +589,17 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
 
+	mcpAllowedHostList, err := s.getMcpAllowedHostList()
+	if err != nil {
+		s.logger.Error("ValidateRequest - failed to get MCP allowed host list",
+			zap.String("path", params.Path),
+			zap.String("method", params.Method),
+			zap.String("account", params.AktoAccountID),
+			zap.String("contextSource", contextSource),
+			zap.String("sessionID", sessionID),
+			zap.Error(err))
+		return nil, fmt.Errorf("failed to get MCP allowed host list: %w", err)
+	}
 	s.logger.Info("ValidateRequest - loaded policies",
 		zap.String("contextSource", contextSource),
 		zap.Int("policiesCount", len(policies)),
@@ -584,7 +630,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	// Use the default processor - skipThreat is passed via ValidationContext
 	processStart := time.Now()
-	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules, mcpAllowedHostList)
 	if err != nil {
 		s.logger.Error("ValidateRequest - ProcessRequest failed",
 			zap.String("path", params.Path),
@@ -838,6 +884,12 @@ func (s *Service) ValidateRequestWithPolicy(
 		s.logger.Warn("No request payload filters found in converted policy - this might be why guardrails aren't working!")
 	}
 
+	mcpAllowedHostList, err := s.getMcpAllowedHostList()
+	if err != nil {
+		s.logger.Error("Failed to get MCP allowed host list", zap.Error(err))
+		return nil, fmt.Errorf("failed to get MCP allowed host list: %w", err)
+	}
+
 	s.logger.Info("Calling ProcessRequest with provided policy only",
 		zap.Int("policiesCount", len(policies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
@@ -848,7 +900,7 @@ func (s *Service) ValidateRequestWithPolicy(
 		zap.Int("responseFiltersCount", len(providedPolicyConverted.Filters.ResponsePayload)))
 
 	// Use the default processor - skipThreat is passed via ValidationContext
-	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules, mcpAllowedHostList)
 	if err != nil {
 		s.logger.Error("ProcessRequest failed", zap.Error(err))
 		return nil, fmt.Errorf("failed to process request: %w", err)
@@ -963,6 +1015,12 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			zap.Int("policiesCount", len(itemPolicies)),
 			zap.Strings("policyNames", policyNames(itemPolicies)))
 
+		mcpAllowedHostList, err := s.getMcpAllowedHostList()
+		if err != nil {
+			s.logger.Error("Failed to get MCP allowed host list", zap.Error(err))
+			return nil, fmt.Errorf("failed to get MCP allowed host list: %w", err)
+		}
+
 		var reqResult, respResult *mcp.ValidationResult
 
 		// Validate request payload if present
@@ -974,7 +1032,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				zap.String("payload", data.RequestPayload))
 
 			reqPayload := s.extractPayloadForValidation(data.RequestPayload, data.Method, data.Path, true)
-			processResult, err := s.processor.ProcessRequest(ctx, reqPayload, valCtx, itemPolicies, auditPolicies, hasAuditRules)
+			processResult, err := s.processor.ProcessRequest(ctx, reqPayload, valCtx, itemPolicies, auditPolicies, hasAuditRules, mcpAllowedHostList)
 			if err != nil {
 				s.logger.Error("Failed to validate request",
 					zap.Int("index", i),
