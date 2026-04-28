@@ -11,12 +11,11 @@ import {
 } from "@shopify/polaris"
 import {
     ClockMinor,
-    PersonMinor,
+    ProfileMinor,
     GlobeMinor,
     InfoMinor,
 } from "@shopify/polaris-icons"
 import FlyLayout from "../../components/layouts/FlyLayout"
-import AllowlistBadge from "../../components/shared/AllowlistBadge"
 import api from "./api"
 import func from "@/util/func"
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges"
@@ -294,7 +293,7 @@ function AuditDataDrawer({
         { value: "remarksBadge", itemOrder: 2 },
         { value: "lastDetected", itemOrder: 3, icon: ClockMinor, iconTooltip: "Last detected" },
         { value: "updatedTimestamp", itemOrder: 3, icon: ClockMinor, iconTooltip: "Last updated" },
-        { value: "markedBy", itemOrder: 3, icon: PersonMinor, iconTooltip: "Marked by" },
+        { value: "markedBy", itemOrder: 3, icon: ProfileMinor, iconTooltip: "Marked by" },
         { value: "mcpHost", itemOrder: 3, icon: GlobeMinor, iconTooltip: "Collection" },
         { value: "aiAgentName", itemOrder: 3, icon: InfoMinor, iconTooltip: "AI Agent" },
     ]
