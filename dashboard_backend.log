@@ -1234,3 +1234,7 @@ ERROR StatusLogger Log4j2 could not find a logging implementation. Please add lo
 [qtp1805463717-47] DEBUG com.akto.interceptor.RoleAccessInterceptor - Time by feature label check in: 0
 [qtp1805463717-47] INFO com.akto.action.AuditDataAction - Fetched 1 audit records out of 1 total
 [qtp1805463717-47] DEBUG com.akto.filter.LoggingFilter - url=/api/fetchAuditData;method=POST;statusCode=200;username=abhijeet@akto.io;ip=[0:0:0:0:0:0:0:1];totalTime=0;apiCounterVal=1
+[pool-12-thread-1] INFO com.akto.task.Cluster - Dibs acquired: { id='alerts-cron', startTs='1777384934', expiryTs='1777385534', freqInSeconds='300', lastPing='1777384934', winner='7d633733-ada2-4ef6-aa2a-82c44f43756b'}
+[pool-12-thread-1] INFO com.akto.task.Cluster - Dibs final result: acquired=true, { id='alerts-cron', startTs='1777384934', expiryTs='1777385534', freqInSeconds='300', lastPing='1777384934', winner='7d633733-ada2-4ef6-aa2a-82c44f43756b'}
+[pool-12-thread-1] DEBUG com.akto.utils.crons.TestingAlertsCron - Starting testing alerts check
+[pool-12-thread-1] DEBUG com.akto.utils.crons.TestingAlertsCron - No organizations to check for testing alerts
