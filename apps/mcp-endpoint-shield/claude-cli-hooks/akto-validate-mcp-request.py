@@ -13,6 +13,7 @@ from urllib.parse import quote
 from typing import Any, Dict, Set, Tuple, Union
 
 from akto_machine_id import get_machine_id, get_username
+from akto_skill_blocked import is_skill_blocked
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
@@ -477,6 +478,18 @@ def main():
         logger.info(f"Processing MCP tool request: {tool_name} (server={mcp_server_name}, mcpTool={mcp_tool_name})")
     else:
         logger.info(f"Processing non-MCP tool request (gen-ai only): {tool_name}")
+
+    # For MCP tools use the tool name (e.g. mcp__skills__babysit → babysit),
+    # for built-in tools use the raw tool name.
+    check_name = mcp_tool_name if is_mcp and mcp_tool_name else tool_name
+    if is_skill_blocked(check_name, logger):
+        output = {
+            "decision": "block",
+            "reason": f"Skill '{check_name}' is blocked by your organization's policy",
+        }
+        logger.warning(f"BLOCKING by org policy - Tool: {tool_name}, Skill: {check_name}")
+        print(json.dumps(output))
+        sys.exit(0)
 
     if AKTO_SYNC_MODE:
         gr_allowed, gr_reason, behaviour = call_guardrails(

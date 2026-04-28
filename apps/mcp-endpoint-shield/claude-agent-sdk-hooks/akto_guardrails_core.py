@@ -34,6 +34,8 @@ import time
 import urllib.request
 from typing import Any, Dict, Set, Tuple, Union
 
+from akto_skill_blocked import async_is_skill_blocked
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -371,6 +373,13 @@ async def call_guardrails_mcp_async(
     """Validate an MCP tool call. Returns (allowed, reason)."""
     if not tool_input:
         return True, ""
+
+    # Extract skill name: mcp__<server>__<tool> → <tool>, else use full tool_name
+    parts = tool_name.split("__") if tool_name.startswith("mcp__") else []
+    skill_name = "__".join(parts[2:]) if len(parts) >= 3 else tool_name
+    if await async_is_skill_blocked(skill_name, logger):
+        return False, f"Skill '{skill_name}' is blocked by your organization's policy"
+
     if not _data_ingestion_url():
         logger.warning("AKTO_DATA_INGESTION_URL not set, allowing MCP request (fail-open)")
         return True, ""

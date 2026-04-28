@@ -14,6 +14,7 @@ from typing import Any, Dict, Set, Tuple, Union
 from urllib.parse import quote
 
 from akto_machine_id import get_machine_id, get_username
+from akto_skill_blocked import is_skill_blocked
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.codex/akto/logs"))
@@ -386,6 +387,18 @@ def main():
     session_id = input_data.get("session_id", "")
 
     logger.info(f"Session: {session_id}, Processing tool request: {tool_name}")
+
+    if is_skill_blocked(tool_name, logger):
+        output = {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": f"Skill '{tool_name}' is blocked by your organization's policy",
+            }
+        }
+        logger.warning(f"BLOCKING by org policy - Tool: {tool_name}")
+        print(json.dumps(output))
+        sys.exit(0)
 
     if AKTO_SYNC_MODE:
         gr_allowed, gr_reason, behaviour = call_guardrails(
