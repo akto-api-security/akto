@@ -25,9 +25,6 @@ public class ApiSequencesDao extends AccountsContextDao<ApiSequences> {
         return ApiSequences.class;
     }
 
-    public String getFilterKeyString() {
-        return ApiSequences.ID;
-    }
 
     public void createIndicesIfAbsent() {
         boolean exists = false;

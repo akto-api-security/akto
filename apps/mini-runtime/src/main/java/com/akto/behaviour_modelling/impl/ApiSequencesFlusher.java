@@ -43,10 +43,8 @@ public class ApiSequencesFlusher implements WindowFlusher {
                 paths.add(apiInfoKey.toString());
             }
 
-            int id = (fromApi.getApiCollectionId() + paths.toString()).hashCode();
             // probability is computed in the DB from cumulative counts after $inc
             ApiSequences apiSequence = new ApiSequences(
-                    id,
                     fromApi.getApiCollectionId(),
                     paths,
                     (int) transitionCount,
