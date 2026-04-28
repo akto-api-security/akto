@@ -17,6 +17,7 @@ import PersistStore from "../../../main/PersistStore";
 import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
 import RegistryBadge from "../../components/shared/RegistryBadge";
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges";
+import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 
 const headings = [
     {
@@ -35,12 +36,14 @@ const headings = [
         text: 'MCP Server',
         value: 'mcpServerName',
         type: CellType.TEXT,
+        filterKey: 'mcpServer',
     },
     {
         title: 'AI Agent',
         text: 'AI Agent',
         value: 'aiAgentName',
         type: CellType.TEXT,
+        filterKey: 'aiAgent',
     },
     {
         title: 'Last Detected',
@@ -88,7 +91,44 @@ const sortOptions = [
    
 ];
 
-let filters = [
+let filtersDefault = [
+    {
+        key: 'type',
+        label: 'Type',
+        title: 'Type',
+        choices: [
+            { label: "Tool", value: "mcp-tool" },
+            { label: "Resource", value: "mcp-resource" },
+            { label: "Prompt", value: "mcp-prompt" },
+            { label: "Server", value: "mcp-server" }
+        ],
+    },
+    {
+        key: 'markedBy',
+        label: 'Marked By',
+        title: 'Marked By',
+        choices: [],
+    },
+    {
+        key: 'apiAccessTypes',
+        label: 'Access Types',
+        title: 'Access Types',
+        choices: [
+            { label: "Public", value: "PUBLIC" },
+            { label: "Private", value: "PRIVATE" },
+            { label: "Partner", value: "PARTNER" },
+            { label: "Third Party", value: "THIRD_PARTY" }
+        ],
+    },
+    {
+        key: 'collectionName',
+        label: 'Collection Name',
+        title: 'Collection Name',
+        choices: [],
+    }
+]
+
+let filtersEndpointSecurity = [
     {
         key: 'markedBy',
         label: 'Marked By',
@@ -343,6 +383,7 @@ function AuditData() {
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedAuditItem, setSelectedAuditItem] = useState(null);
+    const [filterVersion, setFilterVersion] = useState(0);
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
     const getTimeEpoch = (key) => {
@@ -354,13 +395,19 @@ function AuditData() {
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const collectionsRegistryStatusMap = PersistStore(state => state.collectionsRegistryStatusMap)
 
+    const isEndpointSecurity = isEndpointSecurityCategory();
+    const filters = isEndpointSecurity ? filtersEndpointSecurity : filtersDefault;
+
     function disambiguateLabel(key, value) {
         switch (key) {
+            case "type":
             case "markedBy":
             case "apiAccessTypes":
             case "aiAgent":
             case "mcpServer":
                 return func.convertToDisambiguateLabelObj(value, null, 2)
+            case "collectionName":
+                return func.convertToDisambiguateLabelObj(value, collectionsMap, 1)
             default:
                 return value;
         }
@@ -443,19 +490,25 @@ function AuditData() {
         return sections
     }
 
-    async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
+    async function fetchData(sortKey, sortOrder, skip, limit, filterParams, filterOperators, queryValue){
         setLoading(true);
         let ret = []
         let total = 0;
-        let finalFilters = {...filters}
+        let finalFilters = {...filterParams}
         finalFilters['lastDetected'] = [startTimestamp, endTimestamp]
-        // Parent rows are MCP servers; tools/resources/prompts surface via expansion.
-        finalFilters['type'] = ['mcp-server']
+
+        if (isEndpointSecurity) {
+            finalFilters['type'] = ['mcp-server']
+        } else {
+            finalFilters['hostCollectionId'] = (filterParams['collectionName'] || []).map(id => parseInt(id))
+            if (finalFilters['hostCollectionId'].length === 0) {
+                finalFilters['hostCollectionId'] = Object.keys(collectionsMap).map(id => parseInt(id))
+            }
+            delete finalFilters['collectionName']
+        }
 
         try {
-            // Backend dedupes by (agent, server) and returns one canonical record per
-            // group, with `groupedHostCollectionIds` listing every member collection.
-            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue, true)
+            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue, isEndpointSecurity)
             if (res && res.auditData) {
                 res.auditData.forEach((auditRecord) => {
                     let collectionName = "-";
@@ -470,13 +523,15 @@ function AuditData() {
                         collectionName,
                         collectionRegistryStatus
                     )
-                    dataObj.collapsibleRow = (
-                        <MCPChildren
-                            parent={dataObj}
-                            dateRange={[startTimestamp, endTimestamp]}
-                            getActionsList={getActionsList}
-                        />
-                    );
+                    if (isEndpointSecurity) {
+                        dataObj.collapsibleRow = (
+                            <MCPChildren
+                                parent={dataObj}
+                                dateRange={[startTimestamp, endTimestamp]}
+                                getActionsList={getActionsList}
+                            />
+                        );
+                    }
                     ret.push(dataObj);
                 })
                 total = res.total || 0;
@@ -489,33 +544,37 @@ function AuditData() {
     }
 
     const fillFilters = async () => {
-        const usersResponse = await settingRequests.getTeamData()
-        if (usersResponse) {
-            filters[0].choices = usersResponse.map((user) => ({label: user.login, value: user.login}))
-        }
-
-        // Pull the deduped server list to seed AI Agent / MCP Server choices.
-        try {
-            const serversRes = await api.fetchAuditData(
-                'lastDetected', -1, 0, 1000,
-                { type: ['mcp-server'], lastDetected: [startTimestamp, endTimestamp] },
-                {}, '', true
-            )
-            const allCollections = PersistStore.getState().allCollections;
-            const agents = new Set()
-            const servers = new Set()
-            if (serversRes && Array.isArray(serversRes.auditData)) {
-                serversRes.auditData.forEach((rec) => {
-                    const stripped = stripDeviceIdFromName(rec?.resourceName, allCollections, rec?.hostCollectionId)
-                    const { agent, server } = splitAgentAndServer(stripped)
-                    if (agent && agent !== '-') agents.add(agent)
-                    if (server && server !== '-') servers.add(server)
-                })
+        if (isEndpointSecurity) {
+            try {
+                const serversRes = await api.fetchAuditData(
+                    'lastDetected', -1, 0, 1000,
+                    { type: ['mcp-server'], lastDetected: [startTimestamp, endTimestamp] },
+                    {}, '', true
+                )
+                const allCollections = PersistStore.getState().allCollections;
+                const agents = new Set()
+                const servers = new Set()
+                const markedByUsers = new Set()
+                if (serversRes && Array.isArray(serversRes.auditData)) {
+                    serversRes.auditData.forEach((rec) => {
+                        const stripped = stripDeviceIdFromName(rec?.resourceName, allCollections, rec?.hostCollectionId)
+                        const { agent, server } = splitAgentAndServer(stripped)
+                        if (agent && agent !== '-') agents.add(agent)
+                        if (server && server !== '-') servers.add(server)
+                        if (rec?.markedBy) markedByUsers.add(rec.markedBy)
+                    })
+                }
+                filtersEndpointSecurity[0].choices = Array.from(markedByUsers).sort().map(u => ({ label: u, value: u }))
+                filtersEndpointSecurity[2].choices = Array.from(agents).sort().map(a => ({ label: a, value: a }))
+                filtersEndpointSecurity[3].choices = Array.from(servers).sort().map(s => ({ label: s, value: s }))
+            } catch (e) {}
+            setFilterVersion(v => v + 1)
+        } else {
+            const usersResponse = await settingRequests.getTeamData()
+            if (usersResponse) {
+                filtersDefault[1].choices = usersResponse.map((user) => ({label: user.login, value: user.login}))
             }
-            filters[2].choices = Array.from(agents).sort().map(a => ({ label: a, value: a }))
-            filters[3].choices = Array.from(servers).sort().map(s => ({ label: s, value: s }))
-        } catch (e) {
-            // leave choices empty on failure; user can still search/filter elsewhere
+            filtersDefault[3].choices = Object.entries(collectionsMap).map(([id, name]) => ({ label: name, value: id }));
         }
     }
 
@@ -549,7 +608,7 @@ function AuditData() {
             primaryAction={primaryActions}
             components = {[
                 <GithubServerTable
-                    key={startTimestamp + endTimestamp + filters[0].choices.length}
+                    key={startTimestamp + endTimestamp + (isEndpointSecurity ? filterVersion : filtersDefault[1].choices.length) + String(isEndpointSecurity)}
                     headers={headings}
                     resourceName={resourceName}
                     appliedFilters={[]}
