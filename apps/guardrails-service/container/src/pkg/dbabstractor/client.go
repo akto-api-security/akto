@@ -235,7 +235,16 @@ func (c *Client) SendRequest(method, endpoint string, body interface{}) ([]byte,
 func (c *Client) FetchMcpAllowedHostList() ([]byte, error) {
 	url := c.baseURL + "/fetchMcpAllowlist"
 
-	req, err := http.NewRequest("POST", url, nil)
+	requestBody := map[string]any{
+		"timestamp": 0,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
