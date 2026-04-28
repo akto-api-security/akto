@@ -389,42 +389,6 @@ function AuditData() {
 
     const getMcpServerName = (originalResourceName) => {
         if (!originalResourceName) return '';
-        // Format: <device_name>.<ai-agent>.<mcp_server_name>
-        const parts = originalResourceName.split('.');
-        return parts.slice(2).join('.');
-    };
-
-    const addMcpAllowlistEntry = async (mcpServerUrl) => {
-        try {
-            await api.addMcpAllowlistEntry(mcpServerUrl)
-            func.setToast(true, false, `${mcpServerUrl} added to MCP allowed list successfully`)
-            window.location.reload();
-        } catch (error) {
-            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add to MCP allowed list"
-            func.setToast(true, true, errorMsg)
-        }
-    }
-
-    const getMcpServerName = (originalResourceName) => {
-        if (!originalResourceName) return '';
-        // Format: <device_name>.<ai-agent>.<mcp_server_name>
-        const parts = originalResourceName.split('.');
-        return parts.slice(2).join('.');
-    };
-
-    const addMcpAllowlistEntry = async (mcpServerUrl) => {
-        try {
-            await api.addMcpAllowlistEntry(mcpServerUrl)
-            func.setToast(true, false, `${mcpServerUrl} added to MCP allowed list successfully`)
-            window.location.reload();
-        } catch (error) {
-            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add to MCP allowed list"
-            func.setToast(true, true, errorMsg)
-        }
-    }
-
-    const getMcpServerName = (originalResourceName) => {
-        if (!originalResourceName) return '';
         const parts = originalResourceName.split('.');
         return parts.slice(2).join('.');
     };
