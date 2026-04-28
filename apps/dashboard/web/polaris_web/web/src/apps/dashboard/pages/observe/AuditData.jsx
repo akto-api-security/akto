@@ -623,6 +623,7 @@ function AuditData() {
                         endTimestamp={endTimestamp}
                         onRequestConditional={handleRequestConditional}
                         onAfterUpdate={handleAfterDrawerUpdate}
+                        onAddToAllowlist={(item) => addMcpAllowlistEntry(getMcpServerName(item?.originalResourceName))}
                         isEndpointSecurity={isEndpointSecurity}
                     />
                     <ConditionalApprovalModal

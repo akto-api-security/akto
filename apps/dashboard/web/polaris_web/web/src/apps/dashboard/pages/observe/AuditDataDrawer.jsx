@@ -72,6 +72,7 @@ function AuditDataDrawer({
     endTimestamp,
     onRequestConditional,
     onAfterUpdate,
+    onAddToAllowlist,
     isEndpointSecurity,
 }) {
     const [children, setChildren] = useState([])
@@ -204,6 +205,10 @@ function AuditDataDrawer({
                 }
             },
         },
+        ...(auditItem?.isEndpointSource && typeof onAddToAllowlist === "function" ? [{
+            content: "Add to MCP Allowed List",
+            onAction: () => onAddToAllowlist(auditItem),
+        }] : []),
     ]
 
     const serverSection = auditItem ? (
