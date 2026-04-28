@@ -240,7 +240,14 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
         temp['hexId'] = auditRecord.groupedHexIds.length > 0 ? auditRecord.groupedHexIds[0] : auditRecord?._id;
         temp['resourceName'] = auditRecord?._id;
         temp['aiAgentName'] = auditRecord?.agentName || '-';
-        temp['mcpServerName'] = auditRecord?.serverName || auditRecord?._id;
+        const serverName = auditRecord?.serverName || auditRecord?._id;
+        temp['mcpServerName'] = serverName;
+        temp['mcpServerNameComp'] = (
+            <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+                <Text>{serverName}</Text>
+                {temp?.verified && <AllowlistBadge />}
+            </HorizontalStack>
+        );
         // Endpoint-security path: derive isEndpointSource by checking any of the merged
         // collections is an Atlas endpoint collection.
         temp['isEndpointSource'] = (auditRecord?.groupedHostCollectionIds || []).some(

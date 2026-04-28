@@ -211,9 +211,13 @@ public class AuditDataAction extends UserAction {
                 Set<String> allowlistNames = allowlistEntries.stream()
                         .map(McpAllowlist::getName)
                         .collect(Collectors.toSet());
-                for (McpAuditInfo record : this.auditData) {
-                    if (Constants.AKTO_MCP_SERVER_TAG.equals(record.getType())) {
-                        record.setVerified(allowlistNames.contains(McpRequestResponseUtils.extractServiceNameFromHost(record.getResourceName())));
+                for (Object item : this.auditData) {
+                    if (item instanceof BasicDBObject) {
+                        BasicDBObject row = (BasicDBObject) item;
+                        String serverName = row.getString("serverName");
+                        if (serverName != null) {
+                            row.put("verified", allowlistNames.contains(serverName));
+                        }
                     }
                 }
             } catch (Exception e) {
