@@ -29,6 +29,7 @@ public class GenericAgentConversation {
     private int createdAt;
     private int lastUpdatedAt;
     public static final String _LAST_UPDATED_AT = "lastUpdatedAt";
+    public static final String _TIMESTAMP = "timestamp";
     private int tokensUsed;
     private int externalApiTokens;
     private int tokensLimit;
