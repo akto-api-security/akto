@@ -238,6 +238,9 @@ public class Utils {
                     result.put("Authorization", basicHeader);
                 }
                 break;
+            case "noauth":
+                // Postman "No Auth" — no headers to add
+                break;
             default:
                 throw new IllegalArgumentException("Unsupported auth type: " + authType);
         }
