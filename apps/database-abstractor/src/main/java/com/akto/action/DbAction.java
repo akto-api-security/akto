@@ -5589,6 +5589,36 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    // Fields for fetchMcpAllowlist API
+    private List<McpAllowlist> mcpAllowlist;
+    private Integer timestamp;
+
+    public List<McpAllowlist> getMcpAllowlist() {
+        return mcpAllowlist;
+    }
+
+    public void setMcpAllowlist(List<McpAllowlist> mcpAllowlist) {
+        this.mcpAllowlist = mcpAllowlist;
+    }
+
+    public Integer getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(Integer timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public String fetchMcpAllowlist() {
+        try {
+            this.mcpAllowlist = DbLayer.fetchMcpAllowlist(timestamp);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchMcpAllowlist: " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public Map<String, Integer> getTestedApisMap() {
         return testedApisMap;
     }
