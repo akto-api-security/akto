@@ -130,7 +130,6 @@ function McpRegistry() {
             return;
         }
         setExpandedEndpointsId(registryId);
-        if (endpointsByRegistryId[registryId]) return;
 
         setEndpointsLoadingId(registryId);
         try {
