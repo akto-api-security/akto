@@ -34,7 +34,7 @@ public class McpRegistryConfig {
     public static final String REGISTRY_TYPE = "registryType";
 
     public enum RegistryType {
-        GITHUB
+        CSV_URL
     }
 
     public McpRegistryConfig(String url, Map<String, String> headers, String hash, int createdAt, int updatedAt, RegistryType registryType) {

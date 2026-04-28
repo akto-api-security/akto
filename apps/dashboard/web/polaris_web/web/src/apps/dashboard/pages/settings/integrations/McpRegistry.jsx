@@ -25,7 +25,7 @@ function McpRegistry() {
     // New registry form state
     const [newRegistryUrl, setNewRegistryUrl] = useState('');
     const [newRegistryHeaders, setNewRegistryHeaders] = useState([{ key: '', value: '' }]);
-    const [newRegistryType, setNewRegistryType] = useState('GITHUB');
+    const [newRegistryType, setNewRegistryType] = useState('CSV_URL');
     const [showAddForm, setShowAddForm] = useState(false);
     const [adding, setAdding] = useState(false);
 
@@ -154,7 +154,7 @@ function McpRegistry() {
         const trimmedUrl = newRegistryUrl.trim();
 
         if (!trimmedUrl) {
-            func.setToast(true, true, "Please enter a Github registry URL");
+            func.setToast(true, true, "Please enter a registry URL");
             return;
         }
 
@@ -198,19 +198,19 @@ function McpRegistry() {
         }
 
         const headersObj = headersArrayToObject(newRegistryHeaders);
-        const registryType = newRegistryType || 'GITHUB';
+        const registryType = newRegistryType || 'CSV_URL';
 
         setAdding(true);
         try {
             await api.addMcpRegistry(trimmedUrl, headersObj, registryType);
-            func.setToast(true, false, "Github registry added. Endpoints will be ingested on sync.");
+            func.setToast(true, false, "Registry added. Endpoints will be ingested on sync.");
             setNewRegistryUrl('');
             setNewRegistryHeaders([{ key: '', value: '' }]);
-            setNewRegistryType('GITHUB');
+            setNewRegistryType('CSV_URL');
             setShowAddForm(false);
             await fetchRegistrySettings();
         } catch (error) {
-            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add Github URL";
+            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add URL";
             func.setToast(true, true, errorMsg);
             window.location.reload();
         } finally {
@@ -306,7 +306,7 @@ function McpRegistry() {
                                     onClick={() => setShowAddForm(!showAddForm)}
                                     disabled={saving}
                                 >
-                                    {showAddForm ? 'Cancel' : 'Add Github URL'}
+                                    {showAddForm ? 'Cancel' : 'Add URL'}
                                 </Button>
                             )}
                             {/* <Button
@@ -331,12 +331,12 @@ function McpRegistry() {
                             {showAddForm && (
                                 <LegacyCard sectioned>
                                     <VerticalStack gap="3">
-                                        <Text variant="headingMd" as="h4">Add Github URL</Text>
+                                        <Text variant="headingMd" as="h4">Add URL</Text>
                                         <TextField
-                                            label="Github Registry URL"
+                                            label="Registry URL"
                                             value={newRegistryUrl}
                                             onChange={setNewRegistryUrl}
-                                            placeholder="https://github.com/owner/repo/blob/main/registry.json"
+                                            placeholder="https://example.com/path/to/mcp_servers.csv"
                                             helpText="The file at this URL will be read to extract MCP endpoints."
                                             autoComplete="off"
                                             maxLength={MAX_URL_LENGTH}
@@ -497,15 +497,15 @@ function McpRegistry() {
 
                     <LegacyCard sectioned>
                         <VerticalStack gap="4">
-                            <Text variant="headingMd">How to add a Github URL</Text>
+                            <Text variant="headingMd">How to add a URL</Text>
                             <VerticalStack gap="2">
                                 <Text variant="bodyMd" fontWeight="semibold">1. Open the form</Text>
-                                <Text variant="bodyMd" color="subdued">Click <b>Add Github URL</b> to open the form.</Text>
+                                <Text variant="bodyMd" color="subdued">Click <b>Add URL</b> to open the form.</Text>
                                 <Text variant="bodyMd" fontWeight="semibold">2. Enter the URL</Text>
-                                <Text variant="bodyMd" color="subdued">Enter the raw GitHub file URL pointing to your CSV (e.g. <code>https://raw.githubusercontent.com/owner/repo/main/mcp_servers.csv</code>).</Text>
+                                <Text variant="bodyMd" color="subdued">Enter the URL pointing to your CSV file (e.g. <code>https://example.com/path/to/mcp_servers.csv</code>).</Text>
                                 <Link url="https://github.com/nayanakto/private_ai_security/blob/main/mcp_servers.csv" target="_blank">Download sample CSV</Link>
-                                <Text variant="bodyMd" fontWeight="semibold">3. Add authentication (private repos only)</Text>
-                                <Text variant="bodyMd" color="subdued">If the file is in a private repo, add a header — key: <code>Authorization</code>, value: <code>Bearer &lt;your_github_token&gt;</code>.</Text>
+                                <Text variant="bodyMd" fontWeight="semibold">3. Add authentication (if required)</Text>
+                                <Text variant="bodyMd" color="subdued">If the file requires authentication, add a header — key: <code>Authorization</code>, value: <code>Bearer &lt;your_token&gt;</code>.</Text>
                                 <Text variant="bodyMd" fontWeight="semibold">4. Submit</Text>
                                 <Text variant="bodyMd" color="subdued">Click <b>Add Registry</b> — MCP server entries will be ingested automatically from the CSV.</Text>
                             </VerticalStack>
@@ -532,7 +532,7 @@ function McpRegistry() {
         </LegacyCard>
     );
 
-    const cardContent = "Configure and manage MCP servers from your github for discovering and validating Model Context Protocol servers in your environment.";
+    const cardContent = "Configure and manage MCP servers from a remote registry URL for discovering and validating Model Context Protocol servers in your environment.";
 
     return (
         <IntegrationsLayout

@@ -52,8 +52,8 @@ public class McpAllowlistAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        if (McpRegistryConfigDao.instance.findOne(Filters.eq(McpRegistryConfig.REGISTRY_TYPE, McpRegistryConfig.RegistryType.GITHUB)) != null) {
-            addActionError("A GITHUB registry already exists");
+        if (McpRegistryConfigDao.instance.findOne(Filters.eq(McpRegistryConfig.REGISTRY_TYPE, McpRegistryConfig.RegistryType.CSV_URL)) != null) {
+            addActionError("A CSV_URL registry already exists");
             return Action.ERROR.toUpperCase();
         }
 
@@ -206,15 +206,15 @@ public class McpAllowlistAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        McpRegistryConfig githubRegistry = McpRegistryConfigDao.instance.findOne(
-                Filters.eq(McpRegistryConfig.REGISTRY_TYPE, McpRegistryConfig.RegistryType.GITHUB));
-        if (githubRegistry == null) {
-            loggerMaker.errorAndAddToDb("addEntry failed: no GITHUB registry configured");
-            addActionError("No GITHUB registry configured");
+        McpRegistryConfig csvRegistry = McpRegistryConfigDao.instance.findOne(
+                Filters.eq(McpRegistryConfig.REGISTRY_TYPE, McpRegistryConfig.RegistryType.CSV_URL));
+        if (csvRegistry == null) {
+            loggerMaker.errorAndAddToDb("addEntry failed: no CSV_URL registry configured");
+            addActionError("No CSV_URL registry configured");
             return Action.ERROR.toUpperCase();
         }
 
-        String regId = githubRegistry.getHexId();
+        String regId = csvRegistry.getHexId();
         String entryUrl = mcpServerUrl.trim();
         String name = extractHost(entryUrl);
         String addedBy = getSUser().getLogin();
