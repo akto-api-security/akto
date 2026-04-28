@@ -1,5 +1,8 @@
 package com.akto.dto;
 
+import java.util.List;
+import java.util.Map;
+
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 @BsonDiscriminator
@@ -26,7 +29,7 @@ public abstract class Config {
     String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, SLACK_ALERT_CYBORG, CYBORG_TOOLS_AUTH, DATADOG_FORWARDER;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, SLACK_ALERT_CYBORG, CYBORG_TOOLS_AUTH, DATADOG_FORWARDER, MCP_REGISTRY;
     }
 
     ConfigType configType;
@@ -729,6 +732,32 @@ public abstract class Config {
 
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    }
+
+    @BsonDiscriminator
+    public static class McpRegistryConfig extends Config {
+        public static final String REGISTRIES = "registries";
+        public static final String APPROVED_SERVERS = "approvedServers";
+
+        private List<Map<String, Object>> registries;
+        private List<Map<String, Object>> approvedServers;
+
+        public static final String CONFIG_ID = ConfigType.MCP_REGISTRY.name() + CONFIG_SALT;
+
+        public McpRegistryConfig() {
+            this.configType = ConfigType.MCP_REGISTRY;
+        }
+
+        public McpRegistryConfig(int accountId) {
+            this.configType = ConfigType.MCP_REGISTRY;
+            this.id = accountId + "_MCP_REGISTRY";
+        }
+
+        public List<Map<String, Object>> getRegistries() { return registries; }
+        public void setRegistries(List<Map<String, Object>> registries) { this.registries = registries; }
+
+        public List<Map<String, Object>> getApprovedServers() { return approvedServers; }
+        public void setApprovedServers(List<Map<String, Object>> approvedServers) { this.approvedServers = approvedServers; }
     }
 
 }
