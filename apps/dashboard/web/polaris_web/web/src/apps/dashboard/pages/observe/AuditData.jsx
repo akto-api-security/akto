@@ -28,8 +28,7 @@ const headingsEndpointSecurity = [
     {
         title: 'MCP Server',
         text: 'MCP Server',
-        value: 'mcpServerName',
-        type: CellType.TEXT,
+        value: 'mcpServerNameComp',
         filterKey: 'mcpServer',
     },
     {
@@ -267,13 +266,13 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     temp['resourceName'] = stripDeviceIdFromName(temp?.resourceName, allCollections, temp?.hostCollectionId);
     const { agent, server } = splitAgentAndServer(temp.resourceName);
     temp['aiAgentName'] = agent;
-    temp['rawMcpServerName'] = server;
-    temp['mcpServerName'] = temp?.verified ? (
-        <HorizontalStack gap="1" blockAlign="center">
+    temp['mcpServerName'] = server;
+    temp['mcpServerNameComp'] = (
+        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
             <Text>{server}</Text>
-            <AllowlistBadge />
+            {temp?.verified && <AllowlistBadge />}
         </HorizontalStack>
-    ) : server;
+    );
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
     temp['approvedAtComp'] = func.prettifyEpoch(temp?.approvedAt)
