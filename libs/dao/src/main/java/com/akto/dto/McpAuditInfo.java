@@ -1,6 +1,5 @@
 package com.akto.dto;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -53,14 +52,6 @@ public class McpAuditInfo {
     private ComponentRiskAnalysis componentRiskAnalysis;
 
     private String contextSource;
-
-    // Populated only by the aggregation path in AuditDataAction.fetchAuditData when
-    // mergeMcpServers=true. Lists every hostCollectionId belonging to the (agent, server)
-    // group this canonical record represents, every member record's hex id (for fan-out
-    // updates), and how many raw records were folded into it.
-    private List<Integer> groupedHostCollectionIds;
-    private List<String> groupedHexIds;
-    private Integer groupedCount;
 
     @BsonIgnore
     private boolean verified;

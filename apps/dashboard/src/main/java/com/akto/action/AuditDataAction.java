@@ -14,14 +14,15 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Field;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
-import org.bson.Document;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -43,8 +44,12 @@ import java.util.stream.Collectors;
 public class AuditDataAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(AuditDataAction.class, LogDb.DASHBOARD);
     
+    // Holds either List<McpAuditInfo> (non-merged path) or List<BasicDBObject> (merged path
+    // — see runMergedAggregation / runChildrenForAgentServer). Both serialize to JSON objects,
+    // so the frontend reads res.auditData uniformly and branches on the presence of merged-only
+    // fields like agentName/serverName/groupedHexIds.
     @Getter
-    private List<McpAuditInfo> auditData;
+    private List<?> auditData;
     // Pagination and filtering parameters
     @Setter
     private String sortKey;
@@ -73,11 +78,14 @@ public class AuditDataAction extends UserAction {
     @Setter
     private boolean mergeMcpServers = false;
 
-    // When true, fetchAuditData groups records by their raw resourceName. Used for
-    // child rows (tools/resources/prompts) where the resourceName is the tool name
-    // and multiple device-specific records share that name.
+    // When both are set, fetchAuditData returns the unique tools/resources/prompts owned
+    // by the (aiAgentName, mcpServerName) MCP server across every device that reported it.
+    // The action resolves the parent collection ids server-side, so the caller does not
+    // need to know about device-prefixed resourceNames or hostCollectionIds.
     @Setter
-    private boolean mergeMcpComponents = false;
+    private String aiAgentName;
+    @Setter
+    private String mcpServerName;
 
     @Getter
     @Setter
@@ -154,18 +162,22 @@ public class AuditDataAction extends UserAction {
                 searchOrs.add(Filters.regex(McpAuditInfo.REMARKS, searchString, "i"));
                 searchOrs.add(Filters.regex(McpAuditInfo.RESOURCE_NAME, searchString, "i"));
 
-                // Surface parent servers whose tools/resources/prompts match the search.
-                // hostCollectionId is the reliable shared key; mcpHost on children may
-                // differ from the parent's reconstructed resourceName for AI-agent traffic.
-                Bson childMatchFilter = Filters.and(
-                    Filters.regex(McpAuditInfo.RESOURCE_NAME, searchString, "i"),
-                    Filters.in(McpAuditInfo.TYPE, Arrays.asList("mcp-tool", "mcp-resource", "mcp-prompt"))
-                );
-                List<Integer> matchingCollectionIds = McpAuditInfoDao.instance.getMCollection()
-                    .distinct(McpAuditInfo.HOST_COLLECTION_ID, childMatchFilter, Integer.class)
-                    .into(new ArrayList<>());
-                if (!matchingCollectionIds.isEmpty()) {
-                    searchOrs.add(Filters.in(McpAuditInfo.HOST_COLLECTION_ID, matchingCollectionIds));
+                // Only the merged-server table needs to surface parents by their children's
+                // names — Argus matches children directly via the resourceName regex, and the
+                // children-by-name path is already scoped to a single (agent, server).
+                if (mergeMcpServers) {
+                    // hostCollectionId is the reliable shared key; mcpHost on children may
+                    // differ from the parent's reconstructed resourceName for AI-agent traffic.
+                    Bson childMatchFilter = Filters.and(
+                        Filters.regex(McpAuditInfo.RESOURCE_NAME, searchString, "i"),
+                        Filters.in(McpAuditInfo.TYPE, Arrays.asList("mcp-tool", "mcp-resource", "mcp-prompt"))
+                    );
+                    List<Integer> matchingCollectionIds = McpAuditInfoDao.instance.getMCollection()
+                        .distinct(McpAuditInfo.HOST_COLLECTION_ID, childMatchFilter, Integer.class)
+                        .into(new ArrayList<>());
+                    if (!matchingCollectionIds.isEmpty()) {
+                        searchOrs.add(Filters.in(McpAuditInfo.HOST_COLLECTION_ID, matchingCollectionIds));
+                    }
                 }
 
                 filter = Filters.and(filter, Filters.or(searchOrs));
@@ -184,10 +196,10 @@ public class AuditDataAction extends UserAction {
             List<String> agentChoices = popListFilter(filters, "aiAgent");
             List<String> serverChoices = popListFilter(filters, "mcpServer");
 
-            if (mergeMcpServers) {
-                runMergedAggregation(filter, sort, skip, limit, true, agentChoices, serverChoices);
-            } else if (mergeMcpComponents) {
-                runMergedAggregation(filter, sort, skip, limit, false, null, null);
+            if (StringUtils.isNotBlank(aiAgentName) && StringUtils.isNotBlank(mcpServerName)) {
+                runChildrenForAgentServer(filter, sort, skip, limit, aiAgentName.trim(), mcpServerName.trim());
+            } else if (mergeMcpServers) {
+                runMergedAggregation(filter, sort, skip, limit, agentChoices, serverChoices);
             } else {
                 this.auditData = McpAuditInfoDao.instance.findAll(filter, skip, limit, sort);
                 this.total = McpAuditInfoDao.instance.count(filter);
@@ -215,15 +227,6 @@ public class AuditDataAction extends UserAction {
         }
     }
 
-    /**
-     * Aggregation path: dedupe records by canonical (agent, server) name. The canonical
-     * name is resourceName with the leading "<device-id>." segment removed when there
-     * are 2+ segments; otherwise the resourceName is used as-is. The most recent record
-     * (by lastDetected) in each group becomes the representative; every member's
-     * hostCollectionId is collected on it so the children-fetch can scope across all
-     * device-specific collections.
-     */
-    @SuppressWarnings("unchecked")
     private List<String> popListFilter(Map<String, List> filters, String key) {
         if (filters == null) return null;
         List raw = filters.remove(key);
@@ -235,100 +238,72 @@ public class AuditDataAction extends UserAction {
         return out.isEmpty() ? null : out;
     }
 
-    private void runMergedAggregation(Bson matchFilter, Bson sort, int skip, int limit, boolean stripDevicePrefix,
+    private void runMergedAggregation(Bson matchFilter, Bson sort, int skip, int limit,
                                       List<String> agentChoices, List<String> serverChoices) {
         List<Bson> commonStages = new ArrayList<>();
-        commonStages.add(Aggregates.match(matchFilter));
 
-        if (stripDevicePrefix) {
-            // Server-mode key: strip the leading "<device-id>." segment so multiple
-            // devices reporting the same MCP server collapse together.
-            commonStages.add(new Document("$addFields", new Document("_parts",
-                new Document("$split", Arrays.asList("$" + McpAuditInfo.RESOURCE_NAME, ".")))));
-            commonStages.add(new Document("$addFields", new Document("_groupKey",
-                new Document("$cond", Arrays.asList(
-                    new Document("$gte", Arrays.asList(new Document("$size", "$_parts"), 2)),
-                    new Document("$reduce", new Document()
-                        .append("input", new Document("$slice", Arrays.asList("$_parts", 1, Integer.MAX_VALUE)))
-                        .append("initialValue", "")
-                        .append("in", new Document("$cond", Arrays.asList(
-                            new Document("$eq", Arrays.asList("$$value", "")),
-                            "$$this",
-                            new Document("$concat", Arrays.asList("$$value", ".", "$$this"))
-                        )))
-                    ),
-                    "$" + McpAuditInfo.RESOURCE_NAME
+        // Filter: exactly 2 dots in resourceName + type=mcp-server, plus the existing
+        // contextSource/legacy filter passed in by the caller.
+        commonStages.add(Aggregates.match(Filters.and(
+            matchFilter,
+            Filters.regex(McpAuditInfo.RESOURCE_NAME, "^[^.]+\\.[^.]+\\.[^.]+$"),
+            Filters.eq(McpAuditInfo.TYPE, "mcp-server")
+        )));
+
+        // Split into parts
+        commonStages.add(Aggregates.addFields(new Field<>("_parts",
+            new BasicDBObject("$split", Arrays.asList("$" + McpAuditInfo.RESOURCE_NAME, "."))
+        )));
+
+        // Extract agent + server (ignore device id at parts[0])
+        commonStages.add(Aggregates.addFields(Arrays.asList(
+            new Field<>("agentName",
+                new BasicDBObject("$arrayElemAt", Arrays.asList("$_parts", 1))
+            ),
+            new Field<>("serverName",
+                new BasicDBObject("$arrayElemAt", Arrays.asList("$_parts", 2))
+            ),
+            new Field<>("_groupKey",
+                new BasicDBObject("$concat", Arrays.asList(
+                    new BasicDBObject("$arrayElemAt", Arrays.asList("$_parts", 1)),
+                    ".",
+                    new BasicDBObject("$arrayElemAt", Arrays.asList("$_parts", 2))
                 ))
-            )));
-        } else {
-            // Component-mode key: raw resourceName. Children records use the tool name
-            // directly (e.g. "searchDocumentation") with no device prefix, so we collapse
-            // by name alone within the parent's hostCollectionId scope.
-            commonStages.add(new Document("$addFields", new Document("_groupKey",
-                "$" + McpAuditInfo.RESOURCE_NAME)));
-        }
+            )
+        )));
 
-        // Lower _priority = more restrictive, so $first after the priority sort picks the
-        // most-restrictive policy across the group. The shield enforces "rejected wins"
-        // semantics across all devices, so the UI must reflect that: Rejected (0)
-        // > Conditional Approval (1) > Approved (2) > Pending (3). Within a priority
-        // tier, latest record wins.
-        // Conditional approvals are stored either as remarks="Conditionally Approved"
-        // (current modal output) or as remarks="Approved" with an approvalConditions
-        // object (legacy). Both shapes resolve to priority 1.
-        Document addPriority = new Document("$addFields", new Document("_priority",
-            new Document("$cond", Arrays.asList(
-                new Document("$eq", Arrays.asList("$" + McpAuditInfo.REMARKS, "Rejected")), 0,
-                new Document("$cond", Arrays.asList(
-                    new Document("$or", Arrays.asList(
-                        new Document("$eq", Arrays.asList("$" + McpAuditInfo.REMARKS, "Conditionally Approved")),
-                        new Document("$and", Arrays.asList(
-                            new Document("$eq", Arrays.asList("$" + McpAuditInfo.REMARKS, "Approved")),
-                            new Document("$ne", Arrays.asList("$" + McpAuditInfo.APPROVAL_CONDITIONS, null))
-                        ))
-                    )), 1,
-                    new Document("$cond", Arrays.asList(
-                        new Document("$eq", Arrays.asList("$" + McpAuditInfo.REMARKS, "Approved")), 2,
-                        3
-                    ))
-                ))
-            ))
-        ));
-        commonStages.add(addPriority);
-
-        // Optional agent/server filtering against the derived _groupKey (server-mode only).
-        // _groupKey is "<agent>.<server>" when the canonical name has 2+ segments, or
-        // just "<server>" when it has 1 (no agent prefix).
+        // Optional agent/server filtering against the derived agent/server fields.
         List<Bson> groupKeyMatchOrs = new ArrayList<>();
-        if (stripDevicePrefix && agentChoices != null && !agentChoices.isEmpty()) {
-            List<Bson> agentOrs = new ArrayList<>();
-            for (String a : agentChoices) {
-                String esc = java.util.regex.Pattern.quote(a);
-                agentOrs.add(Filters.regex("_groupKey", "^" + esc + "\\."));
-            }
-            groupKeyMatchOrs.add(Filters.or(agentOrs));
+        if (agentChoices != null && !agentChoices.isEmpty()) {
+            groupKeyMatchOrs.add(Filters.in("agentName", agentChoices));
         }
-        if (stripDevicePrefix && serverChoices != null && !serverChoices.isEmpty()) {
-            List<Bson> serverOrs = new ArrayList<>();
-            for (String s : serverChoices) {
-                String esc = java.util.regex.Pattern.quote(s);
-                serverOrs.add(Filters.regex("_groupKey", "(^|\\.)" + esc + "$"));
-            }
-            groupKeyMatchOrs.add(Filters.or(serverOrs));
+        if (serverChoices != null && !serverChoices.isEmpty()) {
+            groupKeyMatchOrs.add(Filters.in("serverName", serverChoices));
         }
         if (!groupKeyMatchOrs.isEmpty()) {
             commonStages.add(Aggregates.match(Filters.and(groupKeyMatchOrs)));
         }
 
-        commonStages.add(Aggregates.sort(Sorts.orderBy(
-            Sorts.ascending("_priority"),
-            Sorts.descending(McpAuditInfo.LAST_DETECTED)
-        )));
+        // Sort by lastDetected DESC before grouping so $first picks the most recent
+        // record's componentRiskAnalysis / apiAccessTypes for the group leader.
+        commonStages.add(Aggregates.sort(Sorts.descending(McpAuditInfo.LAST_DETECTED)));
+
+        // Group
         commonStages.add(Aggregates.group("$_groupKey",
-            Accumulators.first("doc", "$$ROOT"),
+            Accumulators.first("agentName", "$agentName"),
+            Accumulators.first("serverName", "$serverName"),
+            Accumulators.max(McpAuditInfo.LAST_DETECTED, "$" + McpAuditInfo.LAST_DETECTED),
+            Accumulators.max(McpAuditInfo.APPROVED_AT, "$" + McpAuditInfo.APPROVED_AT),
+            Accumulators.max(McpAuditInfo.UPDATED_TIMESTAMP, "$" + McpAuditInfo.UPDATED_TIMESTAMP),
+            Accumulators.first(McpAuditInfo.COMPONENT_RISK_ANALYSIS, "$" + McpAuditInfo.COMPONENT_RISK_ANALYSIS),
+            Accumulators.first(McpAuditInfo.API_ACCESS_TYPES, "$" + McpAuditInfo.API_ACCESS_TYPES),
+            Accumulators.addToSet("remarksArr", new BasicDBObject()
+                .append(McpAuditInfo.REMARKS, "$" + McpAuditInfo.REMARKS)
+                .append(McpAuditInfo.MARKED_BY, "$" + McpAuditInfo.MARKED_BY)
+                .append(McpAuditInfo.APPROVAL_CONDITIONS, "$" + McpAuditInfo.APPROVAL_CONDITIONS)
+            ),
             Accumulators.addToSet("groupedHostCollectionIds", "$" + McpAuditInfo.HOST_COLLECTION_ID),
-            Accumulators.addToSet("groupedHexIds",
-                new Document("$toString", "$_id")),
+            Accumulators.addToSet("groupedHexIds", new BasicDBObject("$toString", "$_id")),
             Accumulators.sum("groupedCount", 1)
         ));
 
@@ -336,8 +311,8 @@ public class AuditDataAction extends UserAction {
         List<Bson> countPipeline = new ArrayList<>(commonStages);
         countPipeline.add(Aggregates.count("count"));
         long groupTotal = 0;
-        try (MongoCursor<Document> cursor = McpAuditInfoDao.instance.getMCollection()
-                .aggregate(countPipeline, Document.class).cursor()) {
+        try (MongoCursor<BasicDBObject> cursor = McpAuditInfoDao.instance.getMCollection()
+                .aggregate(countPipeline, BasicDBObject.class).cursor()) {
             if (cursor.hasNext()) {
                 Number n = (Number) cursor.next().get("count");
                 if (n != null) groupTotal = n.longValue();
@@ -345,35 +320,148 @@ public class AuditDataAction extends UserAction {
         }
         this.total = groupTotal;
 
-        // Data pipeline: hoist the canonical doc + extras, drop helper fields, paginate
+        // Data pipeline: paginate + sort, return the BasicDBObject rows directly.
         List<Bson> dataPipeline = new ArrayList<>(commonStages);
-        dataPipeline.add(new Document("$replaceRoot", new Document("newRoot",
-            new Document("$mergeObjects", Arrays.asList(
-                "$doc",
-                new Document()
-                    .append("groupedHostCollectionIds", "$groupedHostCollectionIds")
-                    .append("groupedHexIds", "$groupedHexIds")
-                    .append("groupedCount", "$groupedCount")
-            ))
-        )));
-        // _parts only exists when stripDevicePrefix=true, but $project with a value of 0
-        // is a no-op for missing fields.
-        dataPipeline.add(new Document("$project", new Document()
-            .append("_parts", 0)
-            .append("_groupKey", 0)
-            .append("_priority", 0)));
         dataPipeline.add(Aggregates.sort(sort));
         dataPipeline.add(Aggregates.skip(skip));
         dataPipeline.add(Aggregates.limit(limit));
 
-        List<McpAuditInfo> rows = new ArrayList<>();
-        try (MongoCursor<McpAuditInfo> cursor = McpAuditInfoDao.instance.getMCollection()
-                .aggregate(dataPipeline, McpAuditInfo.class).cursor()) {
+        List<BasicDBObject> rows = new ArrayList<>();
+        try (MongoCursor<BasicDBObject> cursor = McpAuditInfoDao.instance.getMCollection()
+                .aggregate(dataPipeline, BasicDBObject.class).cursor()) {
             while (cursor.hasNext()) {
-                rows.add(cursor.next());
+                BasicDBObject row = cursor.next();
+                collapseRemarksArr(row);
+                rows.add(row);
             }
         }
         this.auditData = rows;
+    }
+
+    /**
+     * Children-by-name path: given an (agent, server) pair, resolve every parent
+     * mcp-server record's hostCollectionId, then return the unique tools/resources/prompts
+     * owned by those collections — one row per resourceName, with the most-recent
+     * componentRiskAnalysis/apiAccessTypes preserved as the "leader" record.
+     */
+    private void runChildrenForAgentServer(Bson matchFilter, Bson sort, int skip, int limit,
+                                           String agentName, String serverName) {
+        // Resolve parent collection ids for this (agent, server). Parent resourceNames are
+        // "<device>.<agent>.<server>"; the regex below anchors agent + server.
+        String agentEsc = java.util.regex.Pattern.quote(agentName);
+        String serverEsc = java.util.regex.Pattern.quote(serverName);
+        Bson parentMatch = Filters.and(
+            Filters.eq(McpAuditInfo.TYPE, "mcp-server"),
+            Filters.regex(McpAuditInfo.RESOURCE_NAME, "^[^.]+\\." + agentEsc + "\\." + serverEsc + "$")
+        );
+        List<Integer> parentCollectionIds = McpAuditInfoDao.instance.getMCollection()
+            .distinct(McpAuditInfo.HOST_COLLECTION_ID, parentMatch, Integer.class)
+            .into(new ArrayList<>());
+
+        if (parentCollectionIds.isEmpty()) {
+            this.auditData = new ArrayList<BasicDBObject>();
+            this.total = 0;
+            return;
+        }
+
+        List<Bson> commonStages = new ArrayList<>();
+        commonStages.add(Aggregates.match(Filters.and(
+            matchFilter,
+            Filters.in(McpAuditInfo.HOST_COLLECTION_ID, parentCollectionIds),
+            Filters.in(McpAuditInfo.TYPE, Arrays.asList("mcp-tool", "mcp-resource", "mcp-prompt"))
+        )));
+
+        // Sort by lastDetected DESC so $first picks the most-recent record's per-doc fields.
+        commonStages.add(Aggregates.sort(Sorts.descending(McpAuditInfo.LAST_DETECTED)));
+
+        commonStages.add(Aggregates.group("$" + McpAuditInfo.RESOURCE_NAME,
+            Accumulators.first(McpAuditInfo.RESOURCE_NAME, "$" + McpAuditInfo.RESOURCE_NAME),
+            Accumulators.first(McpAuditInfo.TYPE, "$" + McpAuditInfo.TYPE),
+            Accumulators.max(McpAuditInfo.LAST_DETECTED, "$" + McpAuditInfo.LAST_DETECTED),
+            Accumulators.max(McpAuditInfo.APPROVED_AT, "$" + McpAuditInfo.APPROVED_AT),
+            Accumulators.max(McpAuditInfo.UPDATED_TIMESTAMP, "$" + McpAuditInfo.UPDATED_TIMESTAMP),
+            Accumulators.first(McpAuditInfo.COMPONENT_RISK_ANALYSIS, "$" + McpAuditInfo.COMPONENT_RISK_ANALYSIS),
+            Accumulators.first(McpAuditInfo.API_ACCESS_TYPES, "$" + McpAuditInfo.API_ACCESS_TYPES),
+            Accumulators.addToSet("remarksArr", new BasicDBObject()
+                .append(McpAuditInfo.REMARKS, "$" + McpAuditInfo.REMARKS)
+                .append(McpAuditInfo.MARKED_BY, "$" + McpAuditInfo.MARKED_BY)
+                .append(McpAuditInfo.APPROVAL_CONDITIONS, "$" + McpAuditInfo.APPROVAL_CONDITIONS)
+            ),
+            Accumulators.addToSet("groupedHostCollectionIds", "$" + McpAuditInfo.HOST_COLLECTION_ID),
+            Accumulators.addToSet("groupedHexIds", new BasicDBObject("$toString", "$_id")),
+            Accumulators.sum("groupedCount", 1)
+        ));
+
+        // Total count
+        List<Bson> countPipeline = new ArrayList<>(commonStages);
+        countPipeline.add(Aggregates.count("count"));
+        long groupTotal = 0;
+        try (MongoCursor<BasicDBObject> cursor = McpAuditInfoDao.instance.getMCollection()
+                .aggregate(countPipeline, BasicDBObject.class).cursor()) {
+            if (cursor.hasNext()) {
+                Number n = (Number) cursor.next().get("count");
+                if (n != null) groupTotal = n.longValue();
+            }
+        }
+        this.total = groupTotal;
+
+        List<Bson> dataPipeline = new ArrayList<>(commonStages);
+        dataPipeline.add(Aggregates.sort(sort));
+        dataPipeline.add(Aggregates.skip(skip));
+        dataPipeline.add(Aggregates.limit(limit));
+
+        List<BasicDBObject> rows = new ArrayList<>();
+        try (MongoCursor<BasicDBObject> cursor = McpAuditInfoDao.instance.getMCollection()
+                .aggregate(dataPipeline, BasicDBObject.class).cursor()) {
+            while (cursor.hasNext()) {
+                BasicDBObject row = cursor.next();
+                collapseRemarksArr(row);
+                rows.add(row);
+            }
+        }
+        this.auditData = rows;
+    }
+
+    /**
+     * Pick the most-restrictive remarks across the group's remarksArr and promote
+     * remarks/markedBy/approvalConditions onto the row as flat fields. Mirrors the
+     * shield's "rejected wins" policy:
+     *   Rejected (0) > Conditional Approval (1) > Approved (2) > Pending (3).
+     * Conditional approvals show up either as remarks="Conditionally Approved" or
+     * remarks="Approved" with a non-null approvalConditions object — both map to 1.
+     * Drops remarksArr from the row once collapsed so the wire payload stays small.
+     */
+    @SuppressWarnings("unchecked")
+    private static void collapseRemarksArr(BasicDBObject row) {
+        if (row == null) return;
+        Object raw = row.get("remarksArr");
+        if (!(raw instanceof List)) {
+            row.removeField("remarksArr");
+            return;
+        }
+        Map<String, Object> chosen = null;
+        int chosenPriority = Integer.MAX_VALUE;
+        for (Object o : (List<?>) raw) {
+            if (!(o instanceof Map)) continue;
+            Map<String, Object> entry = (Map<String, Object>) o;
+            String r = entry.get(McpAuditInfo.REMARKS) instanceof String ? (String) entry.get(McpAuditInfo.REMARKS) : null;
+            Object cond = entry.get(McpAuditInfo.APPROVAL_CONDITIONS);
+            int p;
+            if ("Rejected".equals(r)) p = 0;
+            else if ("Conditionally Approved".equals(r) || ("Approved".equals(r) && cond != null)) p = 1;
+            else if ("Approved".equals(r)) p = 2;
+            else p = 3;
+            if (p < chosenPriority) {
+                chosenPriority = p;
+                chosen = entry;
+            }
+        }
+        if (chosen != null) {
+            row.put(McpAuditInfo.REMARKS, chosen.get(McpAuditInfo.REMARKS));
+            row.put(McpAuditInfo.MARKED_BY, chosen.get(McpAuditInfo.MARKED_BY));
+            row.put(McpAuditInfo.APPROVAL_CONDITIONS, chosen.get(McpAuditInfo.APPROVAL_CONDITIONS));
+        }
+        row.removeField("remarksArr");
     }
 
     /**
