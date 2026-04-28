@@ -1,5 +1,6 @@
 
-import { Text, HorizontalStack, VerticalStack, Box } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box, Icon } from "@shopify/polaris"
+import { CircleTickMajor, CircleCancelMajor, SettingsMajor } from "@shopify/polaris-icons";
 import { useEffect, useReducer, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
@@ -17,7 +18,7 @@ import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadge
 import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 import AuditDataDrawer from "./AuditDataDrawer";
 
-const headings = [
+const headingsEndpointSecurity = [
     {
         title: 'Risk Analysis',
         value: 'riskAnalysisComp',
@@ -69,6 +70,71 @@ const headings = [
         value: "markedBy",
         type: CellType.TEXT
     },
+]
+
+const headingsDefault = [
+    {
+        title: 'Type',
+        value: 'typeComp',
+        text: 'Type',
+        filterKey: 'type',
+    },
+    {
+        title: 'Risk Analysis',
+        value: 'riskAnalysisComp',
+        text: 'Risk Analysis',
+    },
+    {
+        text: "Agentic Component name",
+        value: "resourceName",
+        title: "Agentic Component name",
+        type: CellType.TEXT,
+    },
+    {
+        text: "Collection name",
+        value: "collectionName",
+        title: "Collection name",
+        filterKey: 'collectionName',
+        type: CellType.TEXT,
+    },
+    {
+        title: 'Last Detected',
+        text: "Last Detected",
+        value: "lastDetectedComp",
+        sortActive: true,
+        sortKey: 'lastDetected',
+        type: CellType.TEXT
+    },
+    {
+        title: 'Updated',
+        text: "Updated",
+        value: "updatedTimestampComp",
+        sortKey: 'updatedTimestamp',
+        sortActive: true,
+        type: CellType.TEXT
+    },
+    {
+        title: 'Access Types',
+        text: "Access Types",
+        value: "apiAccessTypesComp",
+        filterKey: 'apiAccessTypes',
+    },
+    {
+        title: 'Remarks',
+        text: "Remarks",
+        value: "remarksComp"
+    },
+    {
+        title: 'Marked By',
+        text: "Marked By",
+        value: "markedBy",
+        type: CellType.TEXT,
+        filterKey: 'markedBy',
+    },
+    {
+        title: '',
+        type: CellType.ACTION,
+    }
 ]
 
 const sortOptions = [
@@ -292,6 +358,7 @@ function AuditData() {
 
     const isEndpointSecurity = isEndpointSecurityCategory();
     const filters = isEndpointSecurity ? filtersEndpointSecurity : filtersDefault;
+    const headings = isEndpointSecurity ? headingsEndpointSecurity : headingsDefault;
 
     function disambiguateLabel(key, value) {
         switch (key) {
@@ -314,6 +381,60 @@ function AuditData() {
             : null
     );
 
+    // Non-endpoint-security row actions (... menu)
+    const GreenTickIcon = () => <Icon source={CircleTickMajor} tone="success" />;
+    const GreenSettingsIcon = () => <Icon source={SettingsMajor} tone="success" />;
+    const RedCancelIcon = () => <Icon source={CircleCancelMajor} tone="critical" />;
+
+    const updateAuditData = async (hexId, remarks) => {
+        await api.updateAuditData(hexId, remarks)
+        window.location.reload();
+    }
+
+    const getMcpServerName = (originalResourceName) => {
+        if (!originalResourceName) return '';
+        const parts = originalResourceName.split('.');
+        return parts.slice(2).join('.');
+    };
+
+    const addMcpAllowlistEntry = async (mcpServerUrl) => {
+        try {
+            await api.addMcpAllowlistEntry(mcpServerUrl)
+            func.setToast(true, false, `${mcpServerUrl} added to MCP allowed list successfully`)
+            window.location.reload();
+        } catch (error) {
+            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add to MCP allowed list"
+            func.setToast(true, true, errorMsg)
+        }
+    }
+
+    const getActionsList = (item) => {
+        return [{ title: 'Actions', items: [
+            {
+                content: <span style={{ color: '#008060' }}>Conditional Approval</span>,
+                icon: GreenSettingsIcon,
+                onAction: () => { setSelectedAuditItem(item); setModalOpen(true); },
+            },
+            {
+                content: <span style={{ color: '#008060' }}>Mark as resolved</span>,
+                icon: GreenTickIcon,
+                onAction: () => { updateAuditData(item.hexId, "Approved") },
+            },
+            ...(item.isEndpointSource ? [{
+                content: <span style={{ color: '#008060' }}>Add to MCP Allowed List</span>,
+                icon: GreenTickIcon,
+                onAction: () => { addMcpAllowlistEntry(getMcpServerName(item.originalResourceName)) },
+            }] : []),
+            {
+                content: <span style={{ color: '#D72C0D' }}>Disapprove</span>,
+                icon: RedCancelIcon,
+                onAction: () => { updateAuditData(item.hexId, "Rejected") },
+                destructive: true,
+            },
+        ]}]
+    }
+
+    // Endpoint-security: row click opens drawer
     const handleRowClick = (rowData) => {
         setSelectedAuditItem(rowData);
         setShowDrawer(true);
@@ -473,7 +594,7 @@ function AuditData() {
             primaryAction={primaryActions}
             components = {[
                 <GithubServerTable
-                    key={startTimestamp + endTimestamp + (isEndpointSecurity ? filterVersion : filtersDefault[1].choices.length) + String(isEndpointSecurity)}
+                    key={startTimestamp + endTimestamp + (isEndpointSecurity ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(isEndpointSecurity)}
                     headers={headings}
                     resourceName={resourceName}
                     appliedFilters={[]}
@@ -488,31 +609,46 @@ function AuditData() {
                     condensedHeight={true}
                     pageLimit={20}
                     headings={headings}
-                    onRowClick={handleRowClick}
-                    rowClickable={true}
+                    {...(isEndpointSecurity
+                        ? { onRowClick: handleRowClick, rowClickable: true }
+                        : { getActions: (item) => getActionsList(item), hasRowActions: true }
+                    )}
                 />
             ]}
             />
 
-            <AuditDataDrawer
-                auditItem={selectedAuditItem}
-                show={showDrawer}
-                setShow={setShowDrawer}
-                startTimestamp={startTimestamp}
-                endTimestamp={endTimestamp}
-                onRequestConditional={handleRequestConditional}
-                onAfterUpdate={handleAfterDrawerUpdate}
-            />
-
-            <ConditionalApprovalModal
-                isOpen={modalOpen}
-                onClose={() => {
-                    setModalOpen(false);
-                    setConditionalChildren(null);
-                }}
-                onApprove={updateAuditDataWithConditions}
-                auditItem={selectedAuditItem}
-            />
+            {isEndpointSecurity ? (
+                <>
+                    <AuditDataDrawer
+                        auditItem={selectedAuditItem}
+                        show={showDrawer}
+                        setShow={setShowDrawer}
+                        startTimestamp={startTimestamp}
+                        endTimestamp={endTimestamp}
+                        onRequestConditional={handleRequestConditional}
+                        onAfterUpdate={handleAfterDrawerUpdate}
+                        isEndpointSecurity={isEndpointSecurity}
+                    />
+                    <ConditionalApprovalModal
+                        isOpen={modalOpen}
+                        onClose={() => {
+                            setModalOpen(false);
+                            setConditionalChildren(null);
+                        }}
+                        onApprove={updateAuditDataWithConditions}
+                        auditItem={selectedAuditItem}
+                    />
+                </>
+            ) : (
+                <ConditionalApprovalModal
+                    isOpen={modalOpen}
+                    onClose={() => setModalOpen(false)}
+                    onApprove={(hexId, approvalData) => {
+                        api.updateAuditData(selectedAuditItem?.hexId, null, approvalData).then(() => window.location.reload())
+                    }}
+                    auditItem={selectedAuditItem}
+                />
+            )}
         </>
     )
 }

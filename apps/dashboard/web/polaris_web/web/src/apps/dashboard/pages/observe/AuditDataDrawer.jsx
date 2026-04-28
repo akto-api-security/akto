@@ -72,6 +72,7 @@ function AuditDataDrawer({
     endTimestamp,
     onRequestConditional,
     onAfterUpdate,
+    isEndpointSecurity,
 }) {
     const [children, setChildren] = useState([])
     const [loadingChildren, setLoadingChildren] = useState(false)
@@ -103,12 +104,12 @@ function AuditDataDrawer({
     }, [auditItem?.hexId, startTimestamp, endTimestamp])
 
     useEffect(() => {
-        if (show && auditItem) {
+        if (show && auditItem && isEndpointSecurity) {
             fetchChildren()
         } else if (!show) {
             setChildren([])
         }
-    }, [show, auditItem?.hexId, fetchChildren])
+    }, [show, auditItem?.hexId, fetchChildren, isEndpointSecurity])
 
     const resourceIDResolver = (item) => item.hexId
     const {
@@ -299,9 +300,9 @@ function AuditDataDrawer({
     const titleComp = auditItem ? (
         <VerticalStack gap="1">
             <Text variant="headingMd">
-                {auditItem?.mcpServerName || auditItem?.resourceName}
+                {isEndpointSecurity ? (auditItem?.mcpServerName || auditItem?.resourceName) : auditItem?.resourceName}
             </Text>
-            {auditItem?.aiAgentName && auditItem.aiAgentName !== "-" && (
+            {isEndpointSecurity && auditItem?.aiAgentName && auditItem.aiAgentName !== "-" && (
                 <Text variant="bodySm" color="subdued">
                     AI Agent: {auditItem.aiAgentName}
                 </Text>
@@ -311,14 +312,51 @@ function AuditDataDrawer({
         <Text variant="headingMd">Audit Data</Text>
     )
 
+    const recordDetailBody = auditItem ? (
+        <VerticalStack gap="4">
+            <Box padding="4" background="bg-subdued" borderRadius="2">
+                <VerticalStack gap="3">
+                    <HorizontalStack align="space-between" blockAlign="center">
+                        <VerticalStack gap="1">
+                            <Text variant="headingMd">{auditItem.resourceName}</Text>
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <Badge>{auditItem.type}</Badge>
+                                <Badge tone={remarksTone(auditItem.remarks)}>
+                                    {auditItem.remarks || "Pending"}
+                                </Badge>
+                            </HorizontalStack>
+                        </VerticalStack>
+                        <ActionDropdown
+                            label="Action"
+                            items={serverActionItems}
+                            loading={busy}
+                        />
+                    </HorizontalStack>
+                    {[
+                        { label: "Last Detected", value: func.prettifyEpoch(auditItem.lastDetected) },
+                        { label: "Updated", value: func.prettifyEpoch(auditItem.updatedTimestamp) },
+                        { label: "Access Types", value: (auditItem.apiAccessTypes || []).join(", ") || "-" },
+                        { label: "Marked By", value: auditItem.markedBy || "-" },
+                        { label: "Collection", value: auditItem.mcpHost || "-" },
+                    ].map(({ label, value }) => (
+                        <HorizontalStack key={label} gap="2">
+                            <Text variant="bodySm" color="subdued" fontWeight="medium">{label}:</Text>
+                            <Text variant="bodySm">{value}</Text>
+                        </HorizontalStack>
+                    ))}
+                </VerticalStack>
+            </Box>
+        </VerticalStack>
+    ) : null
+
     // Bundle every section into a single FlyLayout slot so we control the gaps
     // ourselves; FlyLayout's stack has no spacing between siblings by default.
-    const drawerBody = (
+    const drawerBody = isEndpointSecurity ? (
         <VerticalStack gap="5">
             {serverSection}
             {childrenSection}
         </VerticalStack>
-    )
+    ) : recordDetailBody
 
     return (
         <FlyLayout
