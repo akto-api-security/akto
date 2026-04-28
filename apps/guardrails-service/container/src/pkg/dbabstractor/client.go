@@ -231,3 +231,47 @@ func (c *Client) SendRequest(method, endpoint string, body interface{}) ([]byte,
 
 	return respBody, nil
 }
+
+func (c *Client) FetchMcpAllowedHostList() ([]byte, error) {
+	url := c.baseURL + "/fetchMcpAllowlist"
+
+	requestBody := map[string]any{
+		"timestamp": 0,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	token := auth.GetDatabaseAbstractorServiceToken()
+	if token == "" {
+		return nil, fmt.Errorf("DATABASE_ABSTRACTOR_SERVICE_TOKEN not set")
+	}
+	req.Header.Set("Authorization", token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch MCP allowed host list: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch MCP allowed host list, status: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	c.logger.Info("Successfully fetched MCP allowed host list",
+		zap.Int("responseSize", len(body)),
+		zap.String("responsePreview", string(body[:min(len(body), 500)])))
+
+	return body, nil
+}
