@@ -271,24 +271,18 @@ function AuditDataDrawer({
 
     const recordDetailBody = auditItem ? (
         <VerticalStack gap="4">
-            <HorizontalStack gap="2" blockAlign="center">
+            <VerticalStack gap={"2"}>
+            <HorizontalStack gap="2" blockAlign="center" align="space-between">
                 <VerticalStack gap="3">
-                    <HorizontalStack align="space-between" blockAlign="center">
-                        <VerticalStack gap="1">
-                            <Text variant="headingMd">{auditItem.resourceName}</Text>
-                            <HorizontalStack gap="2" blockAlign="center">
-                                <Badge>{auditItem.type}</Badge>
-                                <Badge tone={remarksTone(auditItem.remarks)}>
-                                    {auditItem.remarks || "Pending"}
-                                </Badge>
-                            </HorizontalStack>
-                        </VerticalStack>
-                        <ActionDropdown
-                            label="Action"
-                            items={serverActionItems}
-                            loading={busy}
-                        />
-                    </HorizontalStack>
+                    <VerticalStack gap="1">
+                        <Text variant="headingMd">{auditItem.resourceName}</Text>
+                        <HorizontalStack gap="2" blockAlign="center">
+                            <Badge>{auditItem.type}</Badge>
+                            <Badge tone={remarksTone(auditItem.remarks)}>
+                                {auditItem.remarks || "Pending"}
+                            </Badge>
+                        </HorizontalStack>
+                    </VerticalStack>
                     {[
                         { label: "Last Detected", value: func.prettifyEpoch(auditItem.lastDetected) },
                         { label: "Updated", value: func.prettifyEpoch(auditItem.updatedTimestamp) },
@@ -302,12 +296,20 @@ function AuditDataDrawer({
                         </HorizontalStack>
                     ))}
                 </VerticalStack>
-                {isEndpointSecurity && auditItem?.aiAgentName && auditItem.aiAgentName !== "-" && (
+                {isEndpointSecurity && (
+                    <ActionDropdown
+                        label="Action"
+                        items={serverActionItems}
+                        loading={busy}
+                    />
+                )}
+            </HorizontalStack>
+            {isEndpointSecurity && auditItem?.aiAgentName && auditItem.aiAgentName !== "-" && (
                     <Text variant="bodySm" color="subdued">
                         AI Agent: {auditItem.aiAgentName}
                     </Text>
                 )}
-            </HorizontalStack>
+            </VerticalStack>
         </VerticalStack>
     ) : null
 
