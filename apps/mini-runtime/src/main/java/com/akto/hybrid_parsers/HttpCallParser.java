@@ -2,6 +2,7 @@ package com.akto.hybrid_parsers;
 
 import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.agentic_sessions.AgentQueryDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.traffic.CollectionTags.TagSource;
@@ -12,6 +13,7 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.*;
 import com.akto.dto.ApiCollection.ServiceGraphEdgeInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.agentic_sessions.AgentQueryData;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -287,6 +289,21 @@ public class HttpCallParser {
     }
 
     /**
+     * Parses a tags JSON string into a map. Returns null if the input is null/empty or cannot be parsed.
+     */
+    @SuppressWarnings("unchecked")
+    public static Map<String, String> parseTagsMap(String tagsJson) {
+        if (tagsJson == null || tagsJson.isEmpty()) {
+            return null;
+        }
+        try {
+            return gson.fromJson(tagsJson, Map.class);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * Gets the hostname to use for collection creation. For AI agent traffic (N8N, LangChain, Copilot),
      * reconstructs the full hostname by prepending bot/workflow name to the base hostname.
      * For regular traffic, returns the hostname from headers as-is.
@@ -295,22 +312,21 @@ public class HttpCallParser {
      * @return The hostname to use for collection creation
      */
     public static String getHostnameForCollection(HttpResponseParams responseParam) {
+        return getHostnameForCollection(responseParam, parseTagsMap(responseParam.getTags()));
+    }
+
+    public static String getHostnameForCollection(HttpResponseParams responseParam, Map<String, String> tagsMap) {
         // Get base hostname from headers
         String baseHostname = getHeaderValue(responseParam.getRequestParams().getHeaders(), "host");
         if (baseHostname == null || baseHostname.isEmpty()) {
             return baseHostname;
         }
 
-        // Check if this is AI agent traffic
-        String tagsJson = responseParam.getTags();
-        if (tagsJson == null || tagsJson.isEmpty()) {
+        if (tagsMap == null) {
             return baseHostname;
         }
 
         try {
-            // Parse tags JSON
-            @SuppressWarnings("unchecked")
-            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
 
             // Check if this is an AI agent source
             String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
@@ -522,26 +538,18 @@ public class HttpCallParser {
      * @param httpResponseParam The HTTP response parameters
      * @return true if this is N8N traffic, false otherwise
      */
-    private boolean isN8nTraffic(HttpResponseParams httpResponseParam) {
-        try {
-            String tagsJson = httpResponseParam.getTags();
-            if (tagsJson == null || tagsJson.isEmpty()) {
-                return false;
-            }
-
-            @SuppressWarnings("unchecked")
-            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
-            if (tagsMap == null) {
-                return false;
-            }
-
-            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
-            return Constants.AI_AGENT_SOURCE_N8N.equals(source);
-
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error checking if traffic is N8N: " + e.getMessage());
+    private boolean isN8nTraffic(Map<String, String> tagsMap) {
+        if (tagsMap == null) {
             return false;
         }
+        return Constants.AI_AGENT_SOURCE_N8N.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+    }
+
+    private boolean isAgenticTraffic(Map<String, String> tagsMap) {
+        if (tagsMap == null) {
+            return false;
+        }
+        return Arrays.asList(Constants.AI_AGENT_SOURCE_N8N, Constants.AI_AGENT_SOURCE_LANGCHAIN, Constants.AI_AGENT_SOURCE_COPILOT_STUDIO, Constants.AI_AGENT_SOURCE_DATABRICS, Constants.AI_AGENT_SOURCE_VERTEX, Constants.AI_AGENT_SOURCE_SNOWFLAKE, Constants.AI_AGENT_SOURCE_ARCADE_DEV, Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER, Constants.AI_AGENT_SOURCE_ENDPOINT).contains(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
     /**
@@ -632,26 +640,11 @@ public class HttpCallParser {
      * @param httpResponseParam The HTTP response parameters
      * @return true if this is Arcade traffic, false otherwise
      */
-    private boolean isArcadeTraffic(HttpResponseParams httpResponseParam) {
-        try {
-            String tagsJson = httpResponseParam.getTags();
-            if (tagsJson == null || tagsJson.isEmpty()) {
-                return false;
-            }
-
-            @SuppressWarnings("unchecked")
-            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
-            if (tagsMap == null) {
-                return false;
-            }
-
-            String source = tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
-            return Constants.AI_AGENT_SOURCE_ARCADE_DEV.equals(source);
-
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error checking if traffic is Arcade: " + e.getMessage());
+    private boolean isArcadeTraffic(Map<String, String> tagsMap) {
+        if (tagsMap == null) {
             return false;
         }
+        return Constants.AI_AGENT_SOURCE_ARCADE_DEV.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
     private boolean isAtlasTraffic(HttpResponseParams httpResponseParam) {
@@ -672,6 +665,27 @@ public class HttpCallParser {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error checking if traffic is Atlas: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private boolean isArgusTraffic(HttpResponseParams httpResponseParam) {
+        try {
+            String tagsJson = httpResponseParam.getTags();
+            if (tagsJson == null || tagsJson.isEmpty()) {
+                return false;
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) {
+                return false;
+            }
+
+            return tagsMap.containsKey(Constants.AKTO_GEN_AI_TAG);
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking if traffic is Argus: " + e.getMessage());
             return false;
         }
     }
@@ -970,34 +984,30 @@ public class HttpCallParser {
     private static final String ENVIRONMENT_TAG_KEY = "privatecloud.agoda.com/environment";
     private static final String COMPONENT_TAG_KEY = "catalog.agoda.com/component";
 
-    private String extractServiceTag(String tagsJson) {
-        if (tagsJson == null || tagsJson.isEmpty()) {
+    private String extractServiceTag(Map<String, String> tagsMap) {
+        if (tagsMap == null) {
             return null;
         }
-
-        try {
-            @SuppressWarnings("unchecked")
-            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
-            return tagsMap.get(SERVICE_TAG_KEY);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error parsing tags JSON for service tag extraction");
-            return null;
-        }
+        return tagsMap.get(SERVICE_TAG_KEY);
     }
 
-    public int createApiCollectionId(HttpResponseParams httpResponseParam){
+    public int createApiCollectionId(HttpResponseParams httpResponseParam) {
+        return createApiCollectionId(httpResponseParam, parseTagsMap(httpResponseParam.getTags()));
+    }
+
+    public int createApiCollectionId(HttpResponseParams httpResponseParam, Map<String, String> tagsMap){
         int apiCollectionId;
 
         String direction = httpResponseParam.getDirection();
 
         // Check if service tag is present in tags - if yes, use service-tag based collection
-        String serviceTagValue = extractServiceTag(httpResponseParam.getTags());
+        String serviceTagValue = extractServiceTag(tagsMap);
         if (serviceTagValue != null && !serviceTagValue.isEmpty()) {
-            return createApiCollectionIdByServiceTag(httpResponseParam, serviceTagValue);
+            return createApiCollectionIdByServiceTag(httpResponseParam, serviceTagValue, tagsMap);
         }
 
         // Use getHostnameForCollection to get reconstructed hostname for AI agents
-        String hostName = getHostnameForCollection(httpResponseParam);
+        String hostName = getHostnameForCollection(httpResponseParam, tagsMap);
 
         if (hostName != null && !hostNameToIdMap.containsKey(hostName) && RuntimeUtil.hasSpecialCharacters(hostName)) {
             hostName = "Special_Char_Host";
@@ -1093,8 +1103,12 @@ public class HttpCallParser {
     }
 
     public int createApiCollectionIdByServiceTag(HttpResponseParams httpResponseParam, String serviceTagValue) {
+        return createApiCollectionIdByServiceTag(httpResponseParam, serviceTagValue, parseTagsMap(httpResponseParam.getTags()));
+    }
+
+    public int createApiCollectionIdByServiceTag(HttpResponseParams httpResponseParam, String serviceTagValue, Map<String, String> tagsMap) {
         int apiCollectionId;
-        String hostName = getHostnameForCollection(httpResponseParam);
+        String hostName = getHostnameForCollection(httpResponseParam, tagsMap);
         String tagsJson = httpResponseParam.getTags();
         String direction = httpResponseParam.getDirection();
 
@@ -1366,13 +1380,13 @@ public class HttpCallParser {
                         + httpResponseParam.getRequestParams().getURL());
             }
 
-            if (isAtlasTraffic(httpResponseParam)) {
+            if (isAtlasTraffic(httpResponseParam) || isArgusTraffic(httpResponseParam)) {
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams skipping advanced filters for atlas traffic "
+                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams skipping advanced filters for agentic traffic "
                             + httpResponseParam.getRequestParams().getURL());
                 }
                 if(Utils.printDebugHostLog(httpResponseParam) != null){
-                    Utils.printDebugHostLog(" in filterHttpResponseParams skipping advanced filters for atlas traffic "
+                    Utils.printDebugHostLog(" in filterHttpResponseParams skipping advanced filters for agentic traffic "
                             + httpResponseParam.getRequestParams().getURL());
                 }
             } else {
@@ -1407,16 +1421,26 @@ public class HttpCallParser {
                 }
             }
 
-            int apiCollectionId = createApiCollectionId(httpResponseParam);
+            Map<String, String> tagsMap = parseTagsMap(httpResponseParam.getTags());
+            int apiCollectionId = createApiCollectionId(httpResponseParam, tagsMap);
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(),"AGENT_TRAFFIC_LOGS");
+            boolean allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
+
+            // if traffic is agentic, then send the data to cyborg
+            if (isAgenticTraffic(tagsMap) && allowAnalysis) {
+                AgentQueryData agentQueryData = AgentQueryDataDao.instance.createAgentQueryDataFromHttpResponseParams(httpResponseParam);
+                dataActor.storeAgentQueryData(agentQueryData);
+            }
+
             // Parse N8N trace metadata if this is N8N traffic
-            if (isN8nTraffic(httpResponseParam)) {
+            if (isN8nTraffic(tagsMap)) {
                 parseN8nTrace(httpResponseParam);
             }
 
             // Build service graph edges for Arcade traffic
-            if (isArcadeTraffic(httpResponseParam)) {
+            if (isArcadeTraffic(tagsMap)) {
                 parseArcadeServiceGraph(httpResponseParam);
             }
 
