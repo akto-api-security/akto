@@ -1,5 +1,5 @@
 
-import { Text, HorizontalStack, VerticalStack, Box, Spinner, Popover, Button, ActionList, DataTable } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box } from "@shopify/polaris"
 import { useEffect, useReducer, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
@@ -10,22 +10,14 @@ import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCard
 import GithubServerTable from "../../components/tables/GithubServerTable";
 import { MethodBox } from "./GetPrettifyEndpoint";
 import { CellType } from "../../components/tables/rows/GithubRow";
-import { CircleTickMajor, CircleCancelMajor, SettingsMajor, HorizontalDotsMinor } from "@shopify/polaris-icons";
-import { Icon } from "@shopify/polaris";
-import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
 import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
 import RegistryBadge from "../../components/shared/RegistryBadge";
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges";
 import { isEndpointSecurityCategory } from "../../../main/labelHelper";
+import AuditDataDrawer from "./AuditDataDrawer";
 
 const headings = [
-    {
-        title: '',
-        value: 'expanderSpacer',
-        text: '',
-        type: CellType.COLLAPSIBLE,
-    },
     {
         title: 'Risk Analysis',
         value: 'riskAnalysisComp',
@@ -77,10 +69,6 @@ const headings = [
         value: "markedBy",
         type: CellType.TEXT
     },
-    {
-        title: '',
-        type: CellType.ACTION,
-    }
 ]
 
 const sortOptions = [
@@ -194,104 +182,6 @@ const stripDeviceIdFromName = (name, allCollections, collectionId) => {
     return name;
 };
 
-const childTypeLabel = (type) => {
-    switch (type) {
-        case 'mcp-tool': return 'Tool';
-        case 'mcp-resource': return 'Resource';
-        case 'mcp-prompt': return 'Prompt';
-        default: return type || '-';
-    }
-};
-
-function ChildActionMenu({ child, getActionsList }) {
-    const [active, setActive] = useState(false);
-    return (
-        <Popover
-            active={active}
-            activator={
-                <Button plain icon={HorizontalDotsMinor} onClick={() => setActive((p) => !p)} />
-            }
-            autofocusTarget="first-node"
-            onClose={() => setActive(false)}
-        >
-            <ActionList actionRole="menuitem" sections={getActionsList(child)} />
-        </Popover>
-    );
-}
-
-function MCPChildren({ parent, dateRange, getActionsList }) {
-    const [loadingChildren, setLoadingChildren] = useState(true);
-    const [children, setChildren] = useState([]);
-
-    useEffect(() => {
-        let cancelled = false;
-        async function load() {
-            setLoadingChildren(true);
-            try {
-                // A parent row may represent multiple device-specific mcp-server records
-                // grouped by (agent, server). Fetch tools/resources/prompts across ALL of
-                // those member hostCollectionIds.
-                const collectionIds = Array.isArray(parent.groupedHostCollectionIds) && parent.groupedHostCollectionIds.length > 0
-                    ? parent.groupedHostCollectionIds
-                    : [parent.hostCollectionId];
-                const res = await api.fetchAuditData(
-                    'lastDetected', -1, 0, 500,
-                    {
-                        type: ['mcp-tool', 'mcp-resource', 'mcp-prompt'],
-                        hostCollectionId: collectionIds,
-                        lastDetected: dateRange,
-                    },
-                    {}, '', false, true
-                );
-                if (!cancelled) setChildren(res?.auditData || []);
-            } catch (e) {
-                if (!cancelled) setChildren([]);
-            } finally {
-                if (!cancelled) setLoadingChildren(false);
-            }
-        }
-        load();
-        return () => { cancelled = true; };
-    }, [JSON.stringify(parent.groupedHostCollectionIds || [parent.hostCollectionId]), dateRange[0], dateRange[1]]);
-
-    const renderRemarks = (child) => {
-        if (!child?.remarks) {
-            return <Text variant="bodySm" color="critical" fontWeight="bold">Pending...</Text>;
-        }
-        return <Text variant="bodySm">{child.remarks}</Text>;
-    };
-
-    const rows = children.map((child) => [
-        <Text key={`type-${child.hexId}`} variant="bodySm">{childTypeLabel(child.type)}</Text>,
-        <ComponentRiskAnalysisBadges key={`risk-${child.hexId}`} componentRiskAnalysis={child?.componentRiskAnalysis} />,
-        <Text key={`name-${child.hexId}`} variant="bodySm">{child.resourceName}</Text>,
-        <Text key={`access-${child.hexId}`} variant="bodySm">{(child.apiAccessTypes || []).join(', ') || '-'}</Text>,
-        renderRemarks(child),
-        <Text key={`mb-${child.hexId}`} variant="bodySm">{child.markedBy || '-'}</Text>,
-        <ChildActionMenu key={`act-${child.hexId}`} child={child} getActionsList={getActionsList} />,
-    ]);
-
-    return (
-        <tr>
-            <td colSpan="100%" style={{ padding: 0 }}>
-                <Box padding="3" background="bg-subdued">
-                    {loadingChildren ? (
-                        <HorizontalStack align="center" gap="2"><Spinner size="small" /><Text>Loading components...</Text></HorizontalStack>
-                    ) : children.length === 0 ? (
-                        <Text color="subdued">No tools found for this MCP server.</Text>
-                    ) : (
-                        <DataTable
-                            columnContentTypes={['text', 'text', 'text', 'text', 'text', 'text', 'text']}
-                            headings={['Type', 'Risk Analysis', 'Name', 'Access Types', 'Remarks', 'Marked By', '']}
-                            rows={rows}
-                        />
-                    )}
-                </Box>
-            </td>
-        </tr>
-    );
-}
-
 const splitAgentAndServer = (name) => {
     if (!name) return { agent: '-', server: '-' };
     const dot = name.indexOf('.');
@@ -384,6 +274,11 @@ function AuditData() {
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedAuditItem, setSelectedAuditItem] = useState(null);
     const [filterVersion, setFilterVersion] = useState(0);
+    const [showDrawer, setShowDrawer] = useState(false);
+    // Scope of the in-flight conditional-approval modal: 'server' | 'agent' | 'children'.
+    const [conditionalScope, setConditionalScope] = useState('server');
+    // For the 'children' scope, the actual child records the user selected in the drawer.
+    const [conditionalChildren, setConditionalChildren] = useState(null);
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
     const getTimeEpoch = (key) => {
@@ -413,81 +308,56 @@ function AuditData() {
         }
     }
 
-    // Server-level decisions cascade to every tool/resource/prompt under the same
-    // hostCollectionIds. The user can still override an individual tool afterwards
-    // by changing that tool's state from the child action menu.
     const cascadeIdsForItem = (item) => (
         item?.type === 'mcp-server' && Array.isArray(item?.groupedHostCollectionIds)
             ? item.groupedHostCollectionIds
             : null
     );
 
-    const updateAuditData = async (item, remarks, allAgents = false) => {
-        const allAgentsServer = allAgents ? item?.mcpServerName : null
-        await api.updateAuditData(item.hexId, remarks, null, item?.groupedHexIds, cascadeIdsForItem(item), allAgentsServer)
-        window.location.reload();
+    const handleRowClick = (rowData) => {
+        setSelectedAuditItem(rowData);
+        setShowDrawer(true);
     }
 
-    const updateAuditDataWithConditions = async (hexId, approvalData, hexIds = null, item = null) => {
-        const allAgentsServer = item?._allAgents ? item?.mcpServerName : null
-        await api.updateAuditData(hexId, null, approvalData, hexIds, cascadeIdsForItem(item), allAgentsServer)
-        window.location.reload();
-    }
-
-    // Custom colored icons
-    const GreenTickIcon = () => <Icon source={CircleTickMajor} tone="success" />;
-    const GreenSettingsIcon = () => <Icon source={SettingsMajor} tone="success" />;
-    const RedCancelIcon = () => <Icon source={CircleCancelMajor} tone="critical" />;
-
-    const getActionsList = (item) => {
-        const sections = [{title: 'Actions', items: [
-            {
-                content: <span style={{ color: '#008060' }}>Conditionally Approve</span>,
-                icon: GreenSettingsIcon,
-                onAction: () => {
-                    setSelectedAuditItem({ ...item, _allAgents: false });
-                    setModalOpen(true);
-                },
-            },
-            {
-                content: <span style={{ color: '#008060' }}>Approve</span>,
-                icon: GreenTickIcon,
-                onAction: () => {updateAuditData(item, "Approved")},
-            },
-            {
-                content: <span style={{ color: '#D72C0D' }}>Block</span>,
-                icon: RedCancelIcon,
-                onAction: () => {updateAuditData(item, "Rejected")},
-                destructive: true
-            }
-        ]}]
-
-        // Server rows can fan an action across every AI agent using the same MCP
-        // server. Tools/resources/prompts stay scoped to their agent variant.
-        if (item?.type === 'mcp-server' && item?.mcpServerName) {
-            sections.push({ title: 'For all AI agents', items: [
-                {
-                    content: <span style={{ color: '#008060' }}>Conditionally Approve</span>,
-                    icon: GreenSettingsIcon,
-                    onAction: () => {
-                        setSelectedAuditItem({ ...item, _allAgents: true });
-                        setModalOpen(true);
-                    },
-                },
-                {
-                    content: <span style={{ color: '#008060' }}>Approve</span>,
-                    icon: GreenTickIcon,
-                    onAction: () => {updateAuditData(item, "Approved", true)},
-                },
-                {
-                    content: <span style={{ color: '#D72C0D' }}>Block</span>,
-                    icon: RedCancelIcon,
-                    onAction: () => {updateAuditData(item, "Rejected", true)},
-                    destructive: true
-                }
-            ]})
+    const handleAfterDrawerUpdate = (scope) => {
+        // Server-scope mutations affect rows beyond the drawer; reload to resync the
+        // parent table. Children mutations stay inside the drawer, which refetches
+        // its own list — no reload needed.
+        if (scope === 'server') {
+            window.location.reload();
         }
-        return sections
+    }
+
+    const handleRequestConditional = (scope, item, selectedChildren) => {
+        setSelectedAuditItem(item);
+        setConditionalScope(scope);
+        setConditionalChildren(scope === 'children' ? selectedChildren : null);
+        setModalOpen(true);
+    }
+
+    const updateAuditDataWithConditions = async (_hexId, approvalData, _hexIds, _item) => {
+        try {
+            if (conditionalScope === 'children') {
+                if (!Array.isArray(conditionalChildren) || conditionalChildren.length === 0) return
+                await Promise.all(conditionalChildren.map((child) =>
+                    api.updateAuditData(child.hexId, null, approvalData, child.groupedHexIds, null, null)
+                ))
+                window.location.reload()
+            } else {
+                const item = selectedAuditItem
+                await api.updateAuditData(
+                    item?.hexId,
+                    null,
+                    approvalData,
+                    item?.groupedHexIds,
+                    cascadeIdsForItem(item),
+                    null
+                )
+                window.location.reload()
+            }
+        } catch (e) {
+            func.setToast(true, true, 'Failed to apply conditional approval')
+        }
     }
 
     async function fetchData(sortKey, sortOrder, skip, limit, filterParams, filterOperators, queryValue){
@@ -523,15 +393,6 @@ function AuditData() {
                         collectionName,
                         collectionRegistryStatus
                     )
-                    if (isEndpointSecurity) {
-                        dataObj.collapsibleRow = (
-                            <MCPChildren
-                                parent={dataObj}
-                                dateRange={[startTimestamp, endTimestamp]}
-                                getActionsList={getActionsList}
-                            />
-                        );
-                    }
                     ret.push(dataObj);
                 })
                 total = res.total || 0;
@@ -570,10 +431,14 @@ function AuditData() {
             } catch (e) {}
             setFilterVersion(v => v + 1)
         } else {
-            const usersResponse = await settingRequests.getTeamData()
-            if (usersResponse) {
-                filtersDefault[1].choices = usersResponse.map((user) => ({label: user.login, value: user.login}))
-            }
+            try {
+                const res = await api.fetchAuditData('lastDetected', -1, 0, 1000, { lastDetected: [startTimestamp, endTimestamp] }, {}, '', false)
+                const markedByUsers = new Set()
+                if (res && Array.isArray(res.auditData)) {
+                    res.auditData.forEach((rec) => { if (rec?.markedBy) markedByUsers.add(rec.markedBy) })
+                }
+                filtersDefault[1].choices = Array.from(markedByUsers).sort().map(u => ({ label: u, value: u }))
+            } catch (e) {}
             filtersDefault[3].choices = Object.entries(collectionsMap).map(([id, name]) => ({ label: name, value: id }));
         }
     }
@@ -623,17 +488,27 @@ function AuditData() {
                     condensedHeight={true}
                     pageLimit={20}
                     headings={headings}
-                    getActions = {(item) => getActionsList(item)}
-                    hasRowActions={true}
+                    onRowClick={handleRowClick}
+                    rowClickable={true}
                 />
             ]}
             />
-            
+
+            <AuditDataDrawer
+                auditItem={selectedAuditItem}
+                show={showDrawer}
+                setShow={setShowDrawer}
+                startTimestamp={startTimestamp}
+                endTimestamp={endTimestamp}
+                onRequestConditional={handleRequestConditional}
+                onAfterUpdate={handleAfterDrawerUpdate}
+            />
+
             <ConditionalApprovalModal
                 isOpen={modalOpen}
                 onClose={() => {
                     setModalOpen(false);
-                    setSelectedAuditItem(null);
+                    setConditionalChildren(null);
                 }}
                 onApprove={updateAuditDataWithConditions}
                 auditItem={selectedAuditItem}
