@@ -2736,6 +2736,21 @@ public class DbLayer {
         }
     }
 
+    public static List<McpAllowlist> fetchMcpAllowlist(Integer timestamp) {
+        try {
+            Bson filter;
+            if (timestamp != null && timestamp != -1) {
+                filter = Filters.gte(McpAllowlist.CREATED_AT, timestamp);
+            } else {
+                filter = Filters.empty();
+            }
+            return McpAllowlistDao.instance.findAll(filter);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchMcpAllowlist: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
     public static void updateMcpAuditInfo(String componentType, String componentName, String mcpHost, ComponentRiskAnalysis componentRiskAnalysis) {
         if (componentType == null || componentName == null || componentRiskAnalysis == null || mcpHost == null) {
             return;
