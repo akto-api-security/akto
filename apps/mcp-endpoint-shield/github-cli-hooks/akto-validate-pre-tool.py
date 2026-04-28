@@ -9,6 +9,7 @@ import sys
 import time
 import urllib.request
 from typing import Any, Dict, Set, Tuple, Union
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "common"))
 from akto_machine_id import get_machine_id, get_username
 from akto_heartbeat import send_heartbeat
 from akto_skill_blocked import is_skill_blocked
