@@ -231,32 +231,6 @@ function AuditDataDrawer({
         }] : []),
     ]
 
-    const serverSection = auditItem ? (
-        <Box padding="4" background="bg-subdued" borderRadius="2">
-            <HorizontalStack align="space-between" blockAlign="center" gap="4">
-                <VerticalStack gap="2">
-                    <Text variant="headingMd">{auditItem?.mcpServerName || auditItem?.resourceName}</Text>
-                    <HorizontalStack gap="2" blockAlign="center">
-                        {auditItem?.aiAgentName && auditItem.aiAgentName !== "-" && (
-                            <Badge tone="info">Agent: {auditItem.aiAgentName}</Badge>
-                        )}
-                        <Badge tone={remarksTone(auditItem?.remarks)}>
-                            {auditItem?.remarks || "Pending"}
-                        </Badge>
-                        <Text color="subdued" variant="bodySm">
-                            Last detected: {func.prettifyEpoch(auditItem?.lastDetected)}
-                        </Text>
-                    </HorizontalStack>
-                </VerticalStack>
-                <ActionDropdown
-                    label="Action for this server"
-                    items={serverActionItems}
-                    loading={busy}
-                />
-            </HorizontalStack>
-        </Box>
-    ) : null
-
     const childrenSection = (
         <Box>
             <VerticalStack gap="3">
@@ -295,27 +269,9 @@ function AuditDataDrawer({
         </Box>
     )
 
-    const titleComp = auditItem ? (
-        <VerticalStack gap="1">
-            <HorizontalStack gap="1" blockAlign="center">
-                <Text variant="headingMd">
-                    {isEndpointSecurity ? (auditItem?.mcpServerName || auditItem?.resourceName) : auditItem?.resourceName}
-                </Text>
-                {isEndpointSecurity && auditItem?.verified && <AllowlistBadge />}
-            </HorizontalStack>
-            {isEndpointSecurity && auditItem?.aiAgentName && auditItem.aiAgentName !== "-" && (
-                <Text variant="bodySm" color="subdued">
-                    AI Agent: {auditItem.aiAgentName}
-                </Text>
-            )}
-        </VerticalStack>
-    ) : (
-        <Text variant="headingMd">Audit Data</Text>
-    )
-
     const recordDetailBody = auditItem ? (
         <VerticalStack gap="4">
-            <Box padding="4" background="bg-subdued" borderRadius="2">
+            <HorizontalStack gap="2" blockAlign="center">
                 <VerticalStack gap="3">
                     <HorizontalStack align="space-between" blockAlign="center">
                         <VerticalStack gap="1">
@@ -346,7 +302,12 @@ function AuditDataDrawer({
                         </HorizontalStack>
                     ))}
                 </VerticalStack>
-            </Box>
+                {isEndpointSecurity && auditItem?.aiAgentName && auditItem.aiAgentName !== "-" && (
+                    <Text variant="bodySm" color="subdued">
+                        AI Agent: {auditItem.aiAgentName}
+                    </Text>
+                )}
+            </HorizontalStack>
         </VerticalStack>
     ) : null
 
@@ -354,16 +315,15 @@ function AuditDataDrawer({
     // ourselves; FlyLayout's stack has no spacing between siblings by default.
     const drawerBody = isEndpointSecurity ? (
         <VerticalStack gap="5">
-            {serverSection}
             {childrenSection}
         </VerticalStack>
-    ) : recordDetailBody
+    ) : null
 
     return (
         <FlyLayout
             show={show}
             setShow={setShow}
-            titleComp={titleComp}
+            titleComp={recordDetailBody}
             components={[drawerBody]}
         />
     )
