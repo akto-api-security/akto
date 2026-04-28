@@ -1,7 +1,6 @@
 package com.akto.dto;
 
 import java.util.List;
-import org.bson.codecs.pojo.annotations.BsonId;
 import com.akto.dao.context.Context;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -11,10 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ApiSequences {
-
-    @BsonId
-    int id;
-    public static final String ID = "_id";
 
     int apiCollectionId;
     public static final String API_COLLECTION_ID = "apiCollectionId";
@@ -49,9 +44,8 @@ public class ApiSequences {
     boolean isActive;
     public static final String IS_ACTIVE = "isActive";
 
-    public ApiSequences(int id, int apiCollectionId, List<String> paths, int transitionCount, 
+    public ApiSequences(int apiCollectionId, List<String> paths, int transitionCount,
                        int prevStateCount, float precedenceScore, float probability) {
-        this.id = id;
         this.apiCollectionId = apiCollectionId;
         this.paths = paths;
         this.transitionCount = transitionCount;
@@ -65,8 +59,7 @@ public class ApiSequences {
     @Override
     public String toString() {
         return "{" +
-            " id='" + getId() + "'" +
-            ", apiCollectionId='" + getApiCollectionId() + "'" +
+            " apiCollectionId='" + getApiCollectionId() + "'" +
             ", paths='" + getPaths() + "'" +
             ", transitionCount='" + getTransitionCount() + "'" +
             ", prevStateCount='" + getPrevStateCount() + "'" +
