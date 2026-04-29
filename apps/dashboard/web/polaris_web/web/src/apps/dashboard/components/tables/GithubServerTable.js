@@ -718,7 +718,9 @@ function GithubServerTable(props) {
                   {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}
                   onSort={setSortSelected}
                   cancelAction={{
-                    onAction: () => {},
+                    onAction: () => {
+                      handleFiltersQueryClear();
+                    },
                     disabled: false,
                     loading: false,
                   }}

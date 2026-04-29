@@ -53,6 +53,9 @@ public class McpAuditInfo {
 
     private String contextSource;
 
+    @BsonIgnore
+    private boolean verified;
+
     public String getHexId() {
         return this.id != null ? this.id.toHexString() : null;
     }

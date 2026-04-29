@@ -32,22 +32,34 @@ export default {
             data: { startTimestamp, endTimestamp }
         })
     },
-    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators, searchString) {
+    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers = false, aiAgentName = null, mcpServerName = null) {
+        const data = { sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers };
+        if (typeof aiAgentName === 'string' && aiAgentName.length > 0) data.aiAgentName = aiAgentName;
+        if (typeof mcpServerName === 'string' && mcpServerName.length > 0) data.mcpServerName = mcpServerName;
         const resp = await request({
             url: '/api/fetchAuditData',
             method: 'post',
-            data: { sortKey, sortOrder, skip, limit, filters, filterOperators, searchString }
+            data
         });
         return resp;
     },
-    async updateAuditData(hexId, remarks, approvalData = null) {
+    async updateAuditData(hexId, remarks, approvalData = null, hexIds = null, cascadeHostCollectionIds = null, mcpServerForAllAgents = null) {
         const data = { hexId };
+        if (Array.isArray(hexIds) && hexIds.length > 0) {
+            data.hexIds = hexIds;
+        }
+        if (Array.isArray(cascadeHostCollectionIds) && cascadeHostCollectionIds.length > 0) {
+            data.cascadeHostCollectionIds = cascadeHostCollectionIds;
+        }
+        if (typeof mcpServerForAllAgents === 'string' && mcpServerForAllAgents.length > 0) {
+            data.mcpServerForAllAgents = mcpServerForAllAgents;
+        }
         if (approvalData) {
             data.approvalData = approvalData;
         } else {
             data.remarks = remarks;
         }
-        
+
         const resp = await request({
             url: '/api/updateAuditData',
             method: 'post',
