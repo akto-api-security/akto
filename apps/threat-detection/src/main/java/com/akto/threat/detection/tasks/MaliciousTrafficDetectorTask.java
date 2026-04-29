@@ -8,6 +8,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -104,6 +105,10 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static final HttpRequestParams requestParams = new HttpRequestParams();
   private static final HttpResponseParams responseParams = new HttpResponseParams();
   private static final FilterConfig ipApiRateLimitFilter = Utils.getipApiRateLimitFilter();
+  private static final Set<String> DEFAULT_THREAT_PROTECTION_FILTER_IDS = new HashSet<>(Arrays.asList(
+      "LocalFileInclusionLFIRFI", "NoSQLInjection", "OSCommandInjection", "SQLInjection",
+      "SSRF", "SecurityMisconfig", "WindowsCommandInjection", "XSS"
+  ));
   private static Supplier<String> lazyToString;
   private DistributionCalculator distributionCalculator;
   private com.akto.threat.detection.utils.ThreatDetectorWithStrategy threatDetector;
@@ -488,17 +493,20 @@ public class MaliciousTrafficDetectorTask implements Task {
       return;
     }
     AccountConfig accountConfig = AccountConfigurationCache.getInstance().getConfig(dataActor);
-    boolean isHyperscanOnly = accountConfig != null && accountConfig.isHyperscanEnabled();
+    boolean isHyperscanEnabled = accountConfig != null && accountConfig.isHyperscanEnabled();
+
+    Map<String, FilterConfig> filters = this.getFilters();
+
+    // When hyperscan is enabled, skip default threat protection filters (hyperscan handles them)
+    // Only custom YAML templates should run through the filter loop
+    if (isHyperscanEnabled && filters != null && !filters.isEmpty()) {
+      filters = new java.util.HashMap<>(filters);
+      filters.keySet().removeAll(DEFAULT_THREAT_PROTECTION_FILTER_IDS);
+    }
 
     RawApi rawApi = null;
     RawApiMetadata metadata = null;
-    if (!isHyperscanOnly) {
-      Map<String, FilterConfig> filters = this.getFilters();
-      if (filters.isEmpty()) {
-        logger.warnAndAddToDb("No filters found for account " + responseParam.getAccountId());
-        return;
-      }
-
+    if ((filters != null && !filters.isEmpty()) || isHyperscanEnabled) {
       rawApi = RawApi.buildFromMessageNew(responseParam);
       metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());
       rawApi.setRawApiMetdata(metadata);
@@ -532,10 +540,9 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     List<SchemaConformanceError> errors = null;
 
-    // Skip YAML-based exploit/ignore checks for Hyperscan mode
     boolean successfulExploit = false;
     boolean isIgnoredEvent = false;
-    if (!isHyperscanOnly) {
+    if (rawApi != null) {
       if (!ignoredEventFilters.isEmpty()) {
         isIgnoredEvent = threatDetector.isIgnoredEvent(ignoredEventFilters, rawApi, apiInfoKey);
       }
@@ -572,20 +579,17 @@ public class MaliciousTrafficDetectorTask implements Task {
           countryCode, destCountryCode);
     }
 
-    boolean skipFilterLoop = false;
-
     // Run Hyperscan if enabled
-    if (isHyperscanOnly) {
+    if (isHyperscanEnabled) {
       RedactionType hsRedactionType = getRedactionType(responseParam.getRequestParams().getHeaders());
       hyperscanEventHandler.detectAndPushEvents(
           responseParam, apiInfoKey, actor, metadata,
           successfulExploit, isIgnoredEvent, hsRedactionType);
-      skipFilterLoop = true;
     }
 
-    // Only run filter loop if not skipped
-    if (!skipFilterLoop) {
-      for (FilterConfig apiFilter : apiFilters.values()) {
+    // Run custom filter loop
+    if (filters != null && !filters.isEmpty()) {
+      for (FilterConfig apiFilter : filters.values()) {
       boolean hasPassedFilter = false;
        // Create a fresh vulnerable list for each filter
       List<SchemaConformanceError> vulnerable = null;
