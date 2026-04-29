@@ -125,7 +125,7 @@ public class McpAllowlistAction extends UserAction {
                 if (entryUrl.isEmpty()) continue;
                 String name = extractHost(entryUrl);
                 loggerMaker.infoAndAddToDb("Parsed MCP entry url=" + entryUrl + " name=" + name);
-                entries.add(new McpAllowlist(name, entryUrl, id, addedBy, now, false));
+                entries.add(new McpAllowlist(name, entryUrl, id, addedBy, now, false, McpAllowlist.Source.REGISTRY));
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Failed to parse CSV for registry id=" + id + " error=" + e.getMessage());
@@ -149,7 +149,8 @@ public class McpAllowlistAction extends UserAction {
                                 Updates.setOnInsert(McpAllowlist.REGISTRY_ID, entry.getRegistryId()),
                                 Updates.setOnInsert(McpAllowlist.ADDED_BY, entry.getAddedBy()),
                                 Updates.setOnInsert(McpAllowlist.MANUALLY_ADDED, false),
-                                Updates.setOnInsert(McpAllowlist.CREATED_AT, entry.getCreatedAt())
+                                Updates.setOnInsert(McpAllowlist.CREATED_AT, entry.getCreatedAt()),
+                                Updates.setOnInsert(McpAllowlist.SOURCE, McpAllowlist.Source.REGISTRY.name())
                         ),
                         new UpdateOptions().upsert(true)
                 ));
@@ -227,7 +228,8 @@ public class McpAllowlistAction extends UserAction {
                         Updates.setOnInsert(McpAllowlist.REGISTRY_ID, regId),
                         Updates.setOnInsert(McpAllowlist.ADDED_BY, addedBy),
                         Updates.setOnInsert(McpAllowlist.MANUALLY_ADDED, true),
-                        Updates.setOnInsert(McpAllowlist.CREATED_AT, now)
+                        Updates.setOnInsert(McpAllowlist.CREATED_AT, now),
+                        Updates.setOnInsert(McpAllowlist.SOURCE, McpAllowlist.Source.AUDIT_DATA.name())
                 ),
                 new UpdateOptions().upsert(true)
         );
