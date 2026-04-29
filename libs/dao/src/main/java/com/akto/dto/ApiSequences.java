@@ -26,6 +26,10 @@ public class ApiSequences {
     int prevStateCount;
     public static final String PREV_STATE_COUNT = "prevStateCount";
 
+    // No of times the last endpoint in the sequence was seen
+    int lastStateCount;
+    public static final String LAST_STATE_COUNT = "lastStateCount";
+
     float precedenceScore;
     public static final String PRECEDENCE_SCORE = "precedenceScore";
 
@@ -45,11 +49,12 @@ public class ApiSequences {
     public static final String IS_ACTIVE = "isActive";
 
     public ApiSequences(int apiCollectionId, List<String> paths, int transitionCount,
-                       int prevStateCount, float precedenceScore, float probability) {
+                       int prevStateCount, int lastStateCount, float precedenceScore, float probability) {
         this.apiCollectionId = apiCollectionId;
         this.paths = paths;
         this.transitionCount = transitionCount;
         this.prevStateCount = prevStateCount;
+        this.lastStateCount = lastStateCount;
         this.precedenceScore = precedenceScore;
         this.probability = probability;
         this.createdAt = Context.now();

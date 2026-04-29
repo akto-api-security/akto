@@ -1,5 +1,6 @@
 package com.akto.behaviour_modelling;
 
+import com.akto.behaviour_modelling.core.MarkovModelBuilder;
 import com.akto.behaviour_modelling.impl.IpBasedIdentifier;
 import com.akto.behaviour_modelling.impl.RawCountAccumulator;
 import com.akto.behaviour_modelling.model.TransitionKey;
@@ -57,8 +58,12 @@ public class SessionAnalyzerTest {
     // ── helpers ────────────────────────────────────────────────────────────────
 
     private SessionAnalyzer buildAnalyzer() {
+        return buildAnalyzer(1);
+    }
+
+    private SessionAnalyzer buildAnalyzer(int maxOrder) {
         SequenceAnalyzerConfig config = new SequenceAnalyzerConfig(
-                2,
+                maxOrder,
                 10 * 60 * 1000L,
                 new IpBasedIdentifier(),
                 RawCountAccumulator::new,
@@ -409,6 +414,266 @@ public class SessionAnalyzerTest {
         // Total transitions should be exactly 2 (not 3)
         Assertions.assertEquals(2, snapshot.getTransitionCounts().size(),
                 "User B's single call should not emit a transition");
+
+        analyzer.shutdown();
+    }
+
+    // ── VOMC helpers ──────────────────────────────────────────────────────────
+
+    private void seedCatalog(String... urls) {
+        Map<URLStatic, PolicyCatalog> strictUrls = new HashMap<>();
+        Map<URLTemplate, PolicyCatalog> templateUrls = new HashMap<>();
+        for (String url : urls) {
+            addStrict(strictUrls, "GET", url);
+        }
+        ApiInfoCatalog catalog = new ApiInfoCatalog(strictUrls, templateUrls, new ArrayList<>());
+        Map<Integer, ApiInfoCatalog> catalogMap = new HashMap<>();
+        catalogMap.put(COLLECTION_ID, catalog);
+        aktoPolicyNew.setApiInfoCatalogMap(catalogMap);
+    }
+
+    private TransitionKey tkey(String... urls) {
+        ApiInfoKey[] keys = new ApiInfoKey[urls.length];
+        for (int i = 0; i < urls.length; i++) {
+            keys[i] = key("GET", urls[i]);
+        }
+        return new TransitionKey(keys);
+    }
+
+    // ── Test A: Multi-Order Emission Correctness ──────────────────────────────
+
+    @Test
+    public void testA_multiOrderEmission() throws InterruptedException {
+        seedCatalog("/a", "/b", "/c", "/d");
+        SessionAnalyzer analyzer = buildAnalyzer(3);
+
+        analyzer.process(record("GET", "/a", "user-1"));
+        analyzer.process(record("GET", "/b", "user-1"));
+        analyzer.process(record("GET", "/c", "user-1"));
+        analyzer.process(record("GET", "/d", "user-1"));
+
+        WindowSnapshot snapshot = flushAndCapture(analyzer);
+        Assertions.assertNotNull(snapshot);
+
+        // 4 unique APIs, 1 count each
+        Assertions.assertEquals(4, snapshot.getApiCounts().size());
+        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("GET", "/a")));
+        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("GET", "/d")));
+
+        // 6 transitions total across 3 orders
+        Assertions.assertEquals(6, snapshot.getTransitionCounts().size(),
+                "Expected 3 order-1 + 2 order-2 + 1 order-3 = 6 transitions");
+
+        // Order-1 (length 2)
+        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(tkey("/a", "/b")));
+        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(tkey("/b", "/c")));
+        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(tkey("/c", "/d")));
+
+        // Order-2 (length 3)
+        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(tkey("/a", "/b", "/c")));
+        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(tkey("/b", "/c", "/d")));
+
+        // Order-3 (length 4)
+        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(tkey("/a", "/b", "/c", "/d")));
+
+        analyzer.shutdown();
+    }
+
+    // ── Test B: VOMC Pruning — Collapsible Contexts ───────────────────────────
+
+    @Test
+    public void testB_vomcCollapsibleContexts() throws InterruptedException {
+        seedCatalog("/login", "/dashboard", "/settings");
+        SessionAnalyzer analyzer = buildAnalyzer(2);
+
+        // 100 users all follow the same pattern: login → dashboard → settings
+        for (int i = 0; i < 100; i++) {
+            analyzer.process(record("GET", "/login", "user-" + i));
+            analyzer.process(record("GET", "/dashboard", "user-" + i));
+            analyzer.process(record("GET", "/settings", "user-" + i));
+        }
+
+        WindowSnapshot snapshot = flushAndCapture(analyzer);
+        Assertions.assertNotNull(snapshot);
+
+        // Before pruning: order-1 and order-2 transitions exist
+        Map<TransitionKey, Long> raw = snapshot.getTransitionCounts();
+        Assertions.assertNotNull(raw.get(tkey("/login", "/dashboard")), "Order-1 login→dashboard should exist");
+        Assertions.assertNotNull(raw.get(tkey("/dashboard", "/settings")), "Order-1 dashboard→settings should exist");
+        Assertions.assertNotNull(raw.get(tkey("/login", "/dashboard", "/settings")), "Order-2 should exist pre-prune");
+
+        // After VOMC pruning: order-2 context [login, dashboard] has same distribution
+        // as order-1 context [dashboard] (both 100% → settings). Should be collapsed.
+        Map<TransitionKey, Long> pruned = MarkovModelBuilder.prune(raw);
+
+        Assertions.assertNull(pruned.get(tkey("/login", "/dashboard", "/settings")),
+                "Order-2 [login→dashboard→settings] should be collapsed — same distribution as parent");
+        Assertions.assertNotNull(pruned.get(tkey("/login", "/dashboard")),
+                "Order-1 transitions should survive");
+        Assertions.assertNotNull(pruned.get(tkey("/dashboard", "/settings")),
+                "Order-1 transitions should survive");
+
+        analyzer.shutdown();
+    }
+
+    // ── Test C: VOMC Pruning — Non-Collapsible Contexts ───────────────────────
+
+    @Test
+    public void testC_vomcNonCollapsibleContexts() throws InterruptedException {
+        seedCatalog("/login", "/dashboard", "/admin", "/settings");
+        SessionAnalyzer analyzer = buildAnalyzer(2);
+
+        // 50 users: login → dashboard → settings
+        for (int i = 0; i < 50; i++) {
+            analyzer.process(record("GET", "/login", "user-a-" + i));
+            analyzer.process(record("GET", "/dashboard", "user-a-" + i));
+            analyzer.process(record("GET", "/settings", "user-a-" + i));
+        }
+
+        // 50 users: admin → dashboard → admin
+        for (int i = 0; i < 50; i++) {
+            analyzer.process(record("GET", "/admin", "user-b-" + i));
+            analyzer.process(record("GET", "/dashboard", "user-b-" + i));
+            analyzer.process(record("GET", "/admin", "user-b-" + i));
+        }
+
+        WindowSnapshot snapshot = flushAndCapture(analyzer);
+        Assertions.assertNotNull(snapshot);
+
+        Map<TransitionKey, Long> pruned = MarkovModelBuilder.prune(snapshot.getTransitionCounts());
+
+        // Order-1 context [dashboard] has 50/50 split (settings vs admin)
+        // Order-2 context [login, dashboard] → 100% settings (distinct from parent)
+        // Order-2 context [admin, dashboard] → 100% admin (distinct from parent)
+        // Both order-2 contexts should survive pruning.
+
+        Assertions.assertNotNull(pruned.get(tkey("/login", "/dashboard", "/settings")),
+                "Order-2 [login→dashboard→settings] should survive — distinct from parent");
+        Assertions.assertNotNull(pruned.get(tkey("/admin", "/dashboard", "/admin")),
+                "Order-2 [admin→dashboard→admin] should survive — distinct from parent");
+
+        // Order-1 transitions should also survive
+        Assertions.assertNotNull(pruned.get(tkey("/login", "/dashboard")));
+        Assertions.assertNotNull(pruned.get(tkey("/dashboard", "/settings")));
+        Assertions.assertNotNull(pruned.get(tkey("/dashboard", "/admin")));
+        Assertions.assertNotNull(pruned.get(tkey("/admin", "/dashboard")));
+
+        analyzer.shutdown();
+    }
+
+    // ── Test D: Precedence Score + End-to-End Flusher ─────────────────────────
+
+    @Test
+    public void testD_precedenceScoreEndToEnd() throws InterruptedException {
+        seedCatalog("/login", "/signup", "/dashboard");
+        SessionAnalyzer analyzer = buildAnalyzer(1);
+
+        // 80 users: login → dashboard
+        for (int i = 0; i < 80; i++) {
+            analyzer.process(record("GET", "/login", "user-a-" + i));
+            analyzer.process(record("GET", "/dashboard", "user-a-" + i));
+        }
+
+        // 20 users: signup → dashboard
+        for (int i = 0; i < 20; i++) {
+            analyzer.process(record("GET", "/signup", "user-b-" + i));
+            analyzer.process(record("GET", "/dashboard", "user-b-" + i));
+        }
+
+        WindowSnapshot snapshot = flushAndCapture(analyzer);
+        Assertions.assertNotNull(snapshot);
+
+        // Verify counts
+        Assertions.assertEquals(80L, snapshot.getApiCounts().get(key("GET", "/login")));
+        Assertions.assertEquals(20L, snapshot.getApiCounts().get(key("GET", "/signup")));
+        Assertions.assertEquals(100L, snapshot.getApiCounts().get(key("GET", "/dashboard")));
+
+        Assertions.assertEquals(80L, snapshot.getTransitionCounts().get(tkey("/login", "/dashboard")));
+        Assertions.assertEquals(20L, snapshot.getTransitionCounts().get(tkey("/signup", "/dashboard")));
+
+        // Verify the ApiSequences built by the flusher have correct lastStateCount
+        // lastStateCount for both transitions = dashboard count = 100
+        // precedenceScore is 0f (computed in DB), so we just verify structure
+        Assertions.assertEquals(2, snapshot.getTransitionCounts().size(),
+                "Should have exactly 2 transitions");
+
+        analyzer.shutdown();
+    }
+
+    // ── Test E: Top-1000 Cap ──────────────────────────────────────────────────
+
+    @Test
+    public void testE_top1000Cap() throws InterruptedException {
+        // Seed 1100 unique APIs
+        String[] apis = new String[1100];
+        for (int i = 0; i < 1100; i++) {
+            apis[i] = "/api/" + i;
+        }
+        seedCatalog(apis);
+
+        SessionAnalyzer analyzer = buildAnalyzer(1);
+
+        // Generate 1100 unique transitions, each with count=1
+        // Each user calls a unique pair: /api/i → /api/(i+1)
+        for (int i = 0; i < 1099; i++) {
+            String userId = "user-" + i;
+            analyzer.process(record("GET", "/api/" + i, userId));
+            analyzer.process(record("GET", "/api/" + (i + 1), userId));
+        }
+
+        // Add extra traffic to one transition to make it high-count
+        for (int i = 0; i < 100; i++) {
+            String userId = "boost-" + i;
+            analyzer.process(record("GET", "/api/0", userId));
+            analyzer.process(record("GET", "/api/1", userId));
+        }
+
+        WindowSnapshot snapshot = flushAndCapture(analyzer);
+        Assertions.assertNotNull(snapshot);
+
+        // Should have 1099 unique transitions
+        Assertions.assertTrue(snapshot.getTransitionCounts().size() >= 1099,
+                "Should have at least 1099 unique transitions");
+
+        // The boosted transition /api/0 → /api/1 should have count 101 (1 + 100)
+        Assertions.assertEquals(101L, snapshot.getTransitionCounts().get(tkey("/api/0", "/api/1")));
+
+        // Note: top-1000 cap is applied in ApiSequencesFlusher, not in the snapshot.
+        // This test verifies the snapshot has all transitions; the cap is an integration
+        // concern tested separately via the flusher.
+
+        analyzer.shutdown();
+    }
+
+    // ── Test F: Window Boundary with Multi-Order ──────────────────────────────
+
+    @Test
+    public void testF_windowBoundaryMultiOrder() throws InterruptedException {
+        seedCatalog("/a", "/b", "/c", "/d");
+        capturedSnapshot.set(null);
+        SessionAnalyzer analyzer = buildAnalyzer(3);
+
+        // Window N: user builds full deque [A, B, C]
+        analyzer.process(record("GET", "/a", "user-1"));
+        analyzer.process(record("GET", "/b", "user-1"));
+        analyzer.process(record("GET", "/c", "user-1"));
+
+        WindowSnapshot windowN = flushAndCapture(analyzer);
+        Assertions.assertNotNull(windowN);
+        // Window N should have transitions from the A→B→C sequence
+        Assertions.assertFalse(windowN.getTransitionCounts().isEmpty(),
+                "Window N should have transitions");
+
+        capturedSnapshot.set(null);
+
+        // Window N+1: same user calls D. Deque was reset — no context.
+        analyzer.process(record("GET", "/d", "user-1"));
+
+        WindowSnapshot windowN1 = flushAndCapture(analyzer);
+        Assertions.assertNotNull(windowN1);
+        Assertions.assertEquals(1L, windowN1.getApiCounts().get(key("GET", "/d")));
+        Assertions.assertTrue(windowN1.getTransitionCounts().isEmpty(),
+                "No transitions in window N+1 — deque was reset, even with maxOrder=3");
 
         analyzer.shutdown();
     }

@@ -1,5 +1,6 @@
 package com.akto.behaviour_modelling.impl;
 
+import com.akto.behaviour_modelling.core.MarkovModelBuilder;
 import com.akto.behaviour_modelling.core.WindowFlusher;
 import com.akto.behaviour_modelling.model.TransitionKey;
 import com.akto.behaviour_modelling.model.WindowSnapshot;
@@ -28,29 +29,37 @@ public class ApiSequencesFlusher implements WindowFlusher {
         Map<ApiInfoKey, Long> apiCounts = snapshot.getApiCounts();
         Map<TransitionKey, Long> transitionCounts = snapshot.getTransitionCounts();
 
+        // VOMC pruning: remove redundant higher-order contexts
+        Map<TransitionKey, Long> prunedTransitions = MarkovModelBuilder.prune(transitionCounts);
+
         List<ApiSequences> sequences = new ArrayList<>();
 
-        for (Map.Entry<TransitionKey, Long> entry : transitionCounts.entrySet()) {
+        for (Map.Entry<TransitionKey, Long> entry : prunedTransitions.entrySet()) {
             TransitionKey key = entry.getKey();
             long transitionCount = entry.getValue();
 
             ApiInfoKey[] seq = key.getSequence();
             ApiInfoKey fromApi = seq[0];
+            ApiInfoKey lastApi = seq[seq.length - 1];
 
             Long prevStateCount = apiCounts.get(fromApi);
             if (prevStateCount == null || prevStateCount == 0) continue;
+
+            Long lastApiCount = apiCounts.get(lastApi);
+            int lastStateCount = (lastApiCount != null) ? lastApiCount.intValue() : 0;
 
             List<String> paths = new ArrayList<>();
             for (ApiInfoKey apiInfoKey : seq) {
                 paths.add(apiInfoKey.toString());
             }
 
-            // probability is computed in the DB from cumulative counts after $inc
+            // probability and precedenceScore are computed in the DB from cumulative counts
             ApiSequences apiSequence = new ApiSequences(
                     fromApi.getApiCollectionId(),
                     paths,
                     (int) transitionCount,
                     prevStateCount.intValue(),
+                    lastStateCount,
                     0f,
                     0f
             );
@@ -68,7 +77,8 @@ public class ApiSequencesFlusher implements WindowFlusher {
 
         try {
             dataActor.writeApiSequences(sequences);
-            loggerMaker.infoAndAddToDb("Flushed " + sequences.size() + " api sequences for window ["
+            loggerMaker.infoAndAddToDb("Flushed " + sequences.size() + " api sequences (pruned from "
+                    + transitionCounts.size() + ") for window ["
                     + snapshot.getWindowStart() + " - " + snapshot.getWindowEnd() + "]");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error flushing api sequences: " + e.getMessage(), LogDb.RUNTIME);
