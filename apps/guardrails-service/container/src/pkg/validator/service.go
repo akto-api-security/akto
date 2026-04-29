@@ -355,6 +355,7 @@ func (s *Service) refreshCollectionTagsIfNeeded() {
 	}
 	if err := json.Unmarshal(raw, &response); err != nil {
 		s.logger.Warn("Failed to parse API collections response", zap.Error(err))
+		s.collectionTagsCache.lastFetched = time.Now()
 		return
 	}
 
