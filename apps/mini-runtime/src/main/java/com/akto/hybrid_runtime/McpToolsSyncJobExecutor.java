@@ -333,6 +333,7 @@ public class McpToolsSyncJobExecutor {
             new HashMap<>(),
             false,
             new HashMap<>(),
+            new HashMap<>(),
             apiConfig,
             true,
             true,

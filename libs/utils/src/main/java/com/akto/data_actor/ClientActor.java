@@ -73,6 +73,7 @@ public class ClientActor extends DataActor {
     public static final String ULTRON_URL = "https://ultron.akto.io";
     private static final String PARAM_TEST_SCRIPT_TYPE = "testScriptType";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
+    private static ExecutorService sequenceThreadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
         
     /**
      * Dedicated thread pool for agent traffic log HTTP writes.
@@ -4633,7 +4634,40 @@ public class ClientActor extends DataActor {
         }
     }
 
+    int sequenceBatchLimit = 100;
     @Override
+    public void writeApiSequences(List<ApiSequences> sequences) {
+        if (sequences == null || sequences.isEmpty()) return;
+        List<ApiSequences> batch = new ArrayList<>();
+        for (int i = 0; i < sequences.size(); i++) {
+            batch.add(sequences.get(i));
+            if (batch.size() % sequenceBatchLimit == 0) {
+                List<ApiSequences> finalBatch = batch;
+                sequenceThreadPool.submit(() -> writeApiSequencesBatch(finalBatch));
+                batch = new ArrayList<>();
+            }
+        }
+        if (!batch.isEmpty()) {
+            List<ApiSequences> finalBatch = batch;
+            sequenceThreadPool.submit(() -> writeApiSequencesBatch(finalBatch));
+        }
+    }
+
+    private void writeApiSequencesBatch(List<ApiSequences> sequences) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiSequencesList", sequences);
+        String objString = gson.toJson(obj);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/writeApiSequences", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb(null, "non 2xx response in writeApiSequences", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in writeApiSequences: " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
     public void storeAgentQueryData(AgentQueryData agentQueryData) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
