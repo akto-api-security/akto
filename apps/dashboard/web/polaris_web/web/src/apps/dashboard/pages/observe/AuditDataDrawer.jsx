@@ -144,13 +144,11 @@ function AuditDataDrawer({
 
     const updateServer = async (remarks) => {
         if (!auditItem) return
-        const serverName = auditItem.mcpServerName && auditItem.mcpServerName !== "-" ? auditItem.mcpServerName : null
         setBusy(true)
         try {
             await api.updateAuditData(
                 auditItem.hexId, remarks, null,
-                auditItem.groupedHexIds, cascadeIds,
-                remarks === "Approved" ? serverName : null
+                auditItem.groupedHexIds, cascadeIds, null, null
             )
             func.setToast(true, false, `Server ${remarks === "Approved" ? "allowed" : remarks === "Rejected" ? "blocked" : "updated"}`)
             if (typeof onAfterUpdate === "function") onAfterUpdate("server")
