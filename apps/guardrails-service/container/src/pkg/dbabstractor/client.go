@@ -190,7 +190,7 @@ func (c *Client) FetchGuardrailEndpoints() ([]byte, error) {
 
 // FetchApiCollections fetches all API collections (with their tags) from database-abstractor
 func (c *Client) FetchApiCollections() ([]byte, error) {
-	url := c.baseURL + "/fetchAllCollections"
+	url := c.baseURL + "/fetchAllApiCollections"
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte("{}")))
 	if err != nil {

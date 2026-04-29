@@ -24,7 +24,6 @@ type policyCache struct {
 	auditPolicies        map[string]*types.AuditPolicy
 	compiledRules        map[string]*regexp.Regexp
 	hasAuditRules        bool
-	blockPersonalAccount bool // true if any active policy has blockPersonalAccount=true
 	lastFetched          time.Time
 	mu                   sync.RWMutex
 }
@@ -35,10 +34,9 @@ type collectionTag struct {
 	Value   string `json:"value"`
 }
 
-// collectionTagsCache caches collection tags keyed by vxlan ID for fast per-request lookup
+// collectionTagsCache caches collection tags keyed by host name
 type collectionTagsCache struct {
-	// byVxlanId maps akto_vxlan_id (string) -> tagKey -> tagValue
-	byVxlanId   map[string]map[string]string
+	byHostName  map[string]map[string]string // hostName -> tagKey -> tagValue
 	lastFetched time.Time
 	mu          sync.RWMutex
 }
@@ -123,7 +121,7 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		logger:              logger,
 		cache:               &policyCache{},
 		mcpListCache:        &mcpListCache{},
-		collectionTagsCache: &collectionTagsCache{byVxlanId: make(map[string]map[string]string)},
+		collectionTagsCache: &collectionTagsCache{byHostName: make(map[string]map[string]string)},
 		sessionMgr:          sessionManager,
 		schemaFetcher:       schemaFetcher,
 	}, nil
@@ -292,7 +290,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 
 	s.logger.Info("Refreshing policies cache - fetching ALL policies")
 
-	policies, auditPolicies, compiledRules, hasAuditRules, hasBlockPersonalAccount, err := s.fetchAndParsePolicies()
+	policies, auditPolicies, compiledRules, hasAuditRules, err := s.fetchAndParsePolicies()
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
@@ -302,24 +300,24 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.cache.auditPolicies = auditPolicies
 	s.cache.compiledRules = compiledRules
 	s.cache.hasAuditRules = hasAuditRules
-	s.cache.blockPersonalAccount = hasBlockPersonalAccount
 	s.cache.lastFetched = time.Now()
 
 	s.logger.Info("Policy cache refreshed with ALL policies",
 		zap.Int("policiesCount", len(policies)),
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
-		zap.Bool("blockPersonalAccount", hasBlockPersonalAccount),
 		zap.Time("lastFetched", s.cache.lastFetched),
 		zap.Any("policies", policies))
 
 	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
-// blockPersonalAccountEnabled reads the cached flag under a read lock.
-func (s *Service) blockPersonalAccountEnabled() bool {
-	s.cache.mu.RLock()
-	defer s.cache.mu.RUnlock()
-	return s.cache.blockPersonalAccount
+func hasBlockPersonalAccountPolicy(policies []types.Policy) bool {
+	for _, p := range policies {
+		if p.Info.Name == "block_personal_account" {
+			return true
+		}
+	}
+	return false
 }
 
 // refreshCollectionTagsIfNeeded fetches all collections from the database abstractor and
@@ -345,12 +343,13 @@ func (s *Service) refreshCollectionTagsIfNeeded() {
 	raw, err := s.dbClient.FetchApiCollections()
 	if err != nil {
 		s.logger.Warn("Failed to fetch API collections for tag cache", zap.Error(err))
+		s.collectionTagsCache.lastFetched = time.Now()
 		return
 	}
 
 	var response struct {
 		ApiCollections []struct {
-			VxlanId  int             `json:"vxlanId"`
+			HostName string          `json:"hostName"`
 			TagsList []collectionTag `json:"tagsList"`
 		} `json:"apiCollections"`
 	}
@@ -359,59 +358,60 @@ func (s *Service) refreshCollectionTagsIfNeeded() {
 		return
 	}
 
-	byVxlanId := make(map[string]map[string]string, len(response.ApiCollections))
+	byHostName := make(map[string]map[string]string, len(response.ApiCollections))
 	for _, c := range response.ApiCollections {
-		if c.VxlanId == 0 {
+		if c.HostName == "" {
 			continue
 		}
-		key := fmt.Sprintf("%d", c.VxlanId)
 		tags := make(map[string]string, len(c.TagsList))
 		for _, t := range c.TagsList {
 			if t.KeyName != "" {
 				tags[t.KeyName] = t.Value
 			}
 		}
-		byVxlanId[key] = tags
+		byHostName[c.HostName] = tags
 	}
 
-	s.collectionTagsCache.byVxlanId = byVxlanId
+	s.collectionTagsCache.byHostName = byHostName
 	s.collectionTagsCache.lastFetched = time.Now()
-	s.logger.Info("Collection tag cache refreshed", zap.Int("collectionsCount", len(byVxlanId)))
+	s.logger.Info("Collection tag cache refreshed", zap.Int("collectionsCount", len(byHostName)))
 }
 
-// getLoginUserEmailType returns the value of the "login-user-email-type" tag for the
-// incoming request. It first checks the request's own tag JSON, then falls back to the
-// collection tag cache keyed by akto_vxlan_id.
-// It also returns "personal" if the "browser-llm-account-type" tag equals "personal".
+// getLoginUserEmailType looks up the host from request headers in the collection tag cache
+// and returns login-user-email-type, falling back to browser-llm-account-type.
 func (s *Service) getLoginUserEmailType(params *models.ValidateRequestParams) string {
-	const tagKey = "login-user-email-type"
-	const browserLlmTagKey = "browser-llm-account-type"
-
-	if params.Tag != "" {
-		var tagMap map[string]interface{}
-		if err := json.Unmarshal([]byte(params.Tag), &tagMap); err == nil {
-			if v, ok := tagMap[browserLlmTagKey].(string); ok && v == "personal" {
-				return "personal"
-			}
-			if v, ok := tagMap[tagKey].(string); ok && v != "" {
-				return v
-			}
-		}
+	var reqHeaders map[string]string
+	if params.RequestHeaders != "" {
+		json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders)
+	}
+	host := extractHostHeader(reqHeaders)
+	s.logger.Info("getLoginUserEmailType - host extracted", zap.String("host", host))
+	if host == "" {
+		return ""
 	}
 
-	if params.AktoVxlanID != "" {
-		s.collectionTagsCache.mu.RLock()
-		tags, ok := s.collectionTagsCache.byVxlanId[params.AktoVxlanID]
-		s.collectionTagsCache.mu.RUnlock()
-		if ok {
-			if tags[browserLlmTagKey] == "personal" {
-				return "personal"
-			}
-			return tags[tagKey]
-		}
+	s.collectionTagsCache.mu.RLock()
+	tags, ok := s.collectionTagsCache.byHostName[host]
+	cacheSize := len(s.collectionTagsCache.byHostName)
+	s.collectionTagsCache.mu.RUnlock()
+
+	s.logger.Info("getLoginUserEmailType - cache lookup",
+		zap.String("host", host),
+		zap.Bool("found", ok),
+		zap.Int("cacheSize", cacheSize),
+		zap.Any("tags", tags))
+
+	if !ok {
+		return ""
 	}
 
-	return ""
+	if v := tags["login-user-email-type"]; v != "" {
+		s.logger.Info("getLoginUserEmailType - returning login-user-email-type", zap.String("value", v))
+		return v
+	}
+	v := tags["browser-llm-account-type"]
+	s.logger.Info("getLoginUserEmailType - returning browser-llm-account-type", zap.String("value", v))
+	return v
 }
 
 // extractHostHeader extracts the host header value from request headers
@@ -426,10 +426,10 @@ func extractHostHeader(headers map[string]string) string {
 }
 
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
-func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, bool, error) {
+func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
 	rawGuardrailPolicies, err := s.dbClient.FetchGuardrailPolicies()
 	if err != nil {
-		return nil, nil, nil, false, false, fmt.Errorf("failed to fetch guardrail policies: %w", err)
+		return nil, nil, nil, false, fmt.Errorf("failed to fetch guardrail policies: %w", err)
 	}
 
 	s.logger.Debug("Raw guardrail policies response",
@@ -444,7 +444,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		s.logger.Error("Failed to parse guardrail policies",
 			zap.Error(err),
 			zap.String("rawResponse", string(rawGuardrailPolicies)))
-		return nil, nil, nil, false, false, fmt.Errorf("failed to parse guardrail policies: %w", err)
+		return nil, nil, nil, false, fmt.Errorf("failed to parse guardrail policies: %w", err)
 	}
 
 	s.logger.Info("Parsed guardrail policies",
@@ -458,15 +458,6 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 			policies = append(policies, policy)
 		}
 	}
-
-	hasBlockPersonalAccount := false
-	for _, p := range policies {
-		if p.Info.Name == "block_personal_account" {
-			hasBlockPersonalAccount = true
-			break
-		}
-	}
-	s.logger.Info("Parsed blockPersonalAccount flag", zap.Bool("hasBlockPersonalAccount", hasBlockPersonalAccount))
 
 	// Fetch MCP audit info from database abstractor
 	rawAuditPolicies, err := s.dbClient.FetchMcpAuditInfo()
@@ -538,10 +529,9 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 	s.logger.Info("Successfully fetched and parsed policies",
 		zap.Int("guardrailPolicies", len(policies)),
 		zap.Int("auditPolicies", len(auditPolicies)),
-		zap.Int("compiledRules", len(compiledRules)),
-		zap.Bool("hasBlockPersonalAccount", hasBlockPersonalAccount))
+		zap.Int("compiledRules", len(compiledRules)))
 
-	return policies, auditPolicies, compiledRules, hasAuditRules, hasBlockPersonalAccount, nil
+	return policies, auditPolicies, compiledRules, hasAuditRules, nil
 }
 
 // validationContextFromParams builds mcp.ValidationContext from traffic params and explicit payload strings for the context.
@@ -742,15 +732,15 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Any("policies", policies),
 		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
-	// Check account-type guardrail after policies are loaded (cache is warm)
-	s.refreshCollectionTagsIfNeeded()
-	if s.blockPersonalAccountEnabled() {
+	// Check account-type guardrail: block if any active policy is named block_personal_account
+	if hasBlockPersonalAccountPolicy(policies) {
+		s.refreshCollectionTagsIfNeeded()
 		accountType := s.getLoginUserEmailType(params)
 		s.logger.Info("ValidateRequest - account type check",
 			zap.String("path", params.Path),
 			zap.String("sessionID", sessionID),
 			zap.String("accountType", accountType))
-		if accountType != "enterprise" {
+		if accountType != "" && accountType != "enterprise" {
 			s.logger.Warn("ValidateRequest - blocking non-enterprise account",
 				zap.String("path", params.Path),
 				zap.String("method", params.Method),
