@@ -1,19 +1,33 @@
 package com.akto.account_job_executor.executor.executors;
 
+import com.akto.account_job_executor.client.CyborgApiClient;
 import com.akto.account_job_executor.executor.AccountJobExecutor;
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.tracing.SpanDao;
+import com.akto.dao.tracing.TraceDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.traffic.CollectionTags;
+import com.akto.dto.tracing.model.Span;
+import com.akto.dto.tracing.model.Trace;
 import com.akto.dto.jobs.AccountJob;
 import com.akto.jobs.executors.BinaryDownloader;
 import com.akto.jobs.executors.BinaryExecutor;
+import com.akto.jobs.executors.clickup.ClickupApiClient;
+import com.akto.jobs.executors.clickup.ClickupTraceParser;
 import com.akto.jobs.executors.salesforce.IngestorClient;
 import com.akto.jobs.executors.salesforce.SalesforceApiClient;
 import com.akto.jobs.executors.salesforce.SalesforceDataTransformer;
 import com.akto.jobs.executors.salesforce.SalesforceStateManager;
 import com.akto.log.LoggerMaker;
+import com.akto.tracing.ServiceGraphBuilder;
+import com.akto.util.Constants;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.mongodb.client.model.Filters;
 
 import java.io.File;
+import java.net.URI;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static com.akto.jobs.executors.AIAgentConnectorConstants.*;
 
@@ -94,6 +108,10 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
 
             case "OPENAI":
                 executeOpenaiConnector(job, config);
+                break;
+
+            case CONNECTOR_TYPE_CLICKUP:
+                executeClickupConnector(job, config);
                 break;
 
             default:
@@ -186,6 +204,48 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
         logger.info("Executing OpenAI connector: jobId={}", job.getId());
         executeBinaryConnector(job, config, BINARY_NAME_OPENAI);
         logger.info("OpenAI connector execution completed: jobId={}", job.getId());
+    }
+
+    private void executeClickupConnector(AccountJob job, Map<String, Object> config) throws Exception {
+        logger.info("Executing ClickUp connector: jobId={}", job.getId());
+
+        String clickupBaseUrl = getConfigValue(config, CONFIG_CLICKUP_BASE_URL);
+        String clickupApiToken = getConfigValue(config, CONFIG_CLICKUP_API_TOKEN);
+        String clickupWorkspaceId = getConfigValue(config, CONFIG_CLICKUP_WORKSPACE_ID);
+        int pageRows = parseIntConfig(config, CONFIG_CLICKUP_PAGE_ROWS, 200);
+        int lookbackHours = parseIntConfig(config, CONFIG_CLICKUP_LOOKBACK_HOURS, 24);
+
+        long nowMs = System.currentTimeMillis();
+        long fromTimestampMs = loadLastTimestampFromConfig(config, nowMs - (lookbackHours * 60L * 60L * 1000L));
+        if (fromTimestampMs >= nowMs) {
+            fromTimestampMs = nowMs - (5 * 60 * 1000L);
+        }
+
+        ClickupApiClient clickupApiClient = new ClickupApiClient(clickupBaseUrl, clickupApiToken, clickupWorkspaceId, pageRows);
+        JsonNode responseNode = clickupApiClient.fetchTraceSummaries(fromTimestampMs, nowMs);
+        updateJobHeartbeat(job);
+
+        int apiCollectionId = getOrCreateClickupCollectionId(clickupBaseUrl, clickupWorkspaceId);
+        ClickupTraceParser.ParseResult parseResult = new ClickupTraceParser().parse(responseNode, apiCollectionId);
+
+        int traceCount = upsertTraces(parseResult.getTraces());
+        int spanCount = upsertSpans(parseResult.getSpans());
+        if (!parseResult.getServiceGraphEdges().isEmpty()) {
+            ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, parseResult.getServiceGraphEdges());
+        }
+
+        long newCursor = parseResult.getMaxSeenTimestampMs() > 0
+            ? Math.max(fromTimestampMs, parseResult.getMaxSeenTimestampMs() - 60_000L)
+            : nowMs - 60_000L;
+        saveLastTimestampToJob(job, config, newCursor);
+
+        logger.infoAndAddToDb(
+            "ClickUp connector completed: workspaceId=" + clickupWorkspaceId +
+                ", tracesUpserted=" + traceCount +
+                ", spansUpserted=" + spanCount +
+                ", serviceGraphEdges=" + parseResult.getServiceGraphEdges().size(),
+            LoggerMaker.LogDb.AGENTIC_TESTING
+        );
     }
 
     /**
@@ -340,6 +400,90 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
     private void saveOffsetToConfig(Map<String, Object> config, int offset) {
         config.put("SALESFORCE_OFFSET", String.valueOf(offset));
         logger.info("Saved offset to config: {}", offset);
+    }
+
+    private long loadLastTimestampFromConfig(Map<String, Object> config, long defaultTimestamp) {
+        Object tsObj = config.get(CONFIG_CLICKUP_LAST_TIMESTAMP);
+        if (tsObj == null) {
+            return defaultTimestamp;
+        }
+
+        try {
+            return Long.parseLong(tsObj.toString());
+        } catch (NumberFormatException e) {
+            logger.error("Invalid ClickUp timestamp in config: {}, using default {}", tsObj, defaultTimestamp);
+            return defaultTimestamp;
+        }
+    }
+
+    private void saveLastTimestampToJob(AccountJob job, Map<String, Object> config, long lastTimestamp) {
+        config.put(CONFIG_CLICKUP_LAST_TIMESTAMP, String.valueOf(lastTimestamp));
+        Map<String, Object> updates = new HashMap<>();
+        updates.put(AccountJob.CONFIG, config);
+        updates.put(AccountJob.LAST_UPDATED_AT, Context.now());
+        CyborgApiClient.updateJob(job.getId(), updates);
+    }
+
+    private int parseIntConfig(Map<String, Object> config, String key, int defaultValue) {
+        Object value = config.get(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (Exception e) {
+            logger.error("Invalid integer config for {}: {}. Falling back to {}", key, value, defaultValue);
+            return defaultValue;
+        }
+    }
+
+    private int getOrCreateClickupCollectionId(String clickupBaseUrl, String workspaceId) {
+        String hostName;
+        try {
+            hostName = "clickup-" + workspaceId + "." + URI.create(clickupBaseUrl).getHost();
+        } catch (Exception e) {
+            hostName = "clickup-" + workspaceId + ".clickup.local";
+        }
+
+        ApiCollection collection = ApiCollectionsDao.instance.findByHost(hostName);
+        if (collection != null) {
+            return collection.getId();
+        }
+
+        int collectionId = hostName.hashCode();
+        ApiCollection createdCollection = ApiCollection.createManualCollection(collectionId, "ClickUp Agent " + workspaceId);
+        createdCollection.setHostName(hostName);
+        createdCollection.setTagsList(Collections.singletonList(
+            new CollectionTags(Context.now(), Constants.AKTO_GEN_AI_TAG, "ClickUp Agent Connector", CollectionTags.TagSource.USER)
+        ));
+        ApiCollectionsDao.instance.replaceOne(Filters.eq(ApiCollection.ID, collectionId), createdCollection);
+        return collectionId;
+    }
+
+    private int upsertTraces(List<Trace> traces) {
+        if (traces == null || traces.isEmpty()) {
+            return 0;
+        }
+
+        int count = 0;
+        for (Trace trace : traces) {
+            TraceDao.instance.replaceOne(Filters.eq("_id", trace.getId()), trace);
+            count++;
+        }
+        return count;
+    }
+
+    private int upsertSpans(List<Span> spans) {
+        if (spans == null || spans.isEmpty()) {
+            return 0;
+        }
+
+        int count = 0;
+        for (Span span : spans) {
+            SpanDao.instance.replaceOne(Filters.eq("_id", span.getId()), span);
+            count++;
+        }
+        return count;
     }
 
     /**

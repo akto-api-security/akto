@@ -88,6 +88,13 @@ public class AIAgentConnectorImportAction extends UserAction {
     private String openaiOrgId;
     private String openaiApiBaseUrl;
 
+    // ClickUp connector parameters
+    private String clickupBaseUrl;
+    private String clickupApiToken;
+    private String clickupWorkspaceId;
+    private Integer clickupPageRows;
+    private Integer clickupLookbackHours;
+
     /**
      * Unified method to initiate import for any AI Agent Connector.
      * The connector type is determined by the connectorType parameter.
@@ -157,13 +164,15 @@ public class AIAgentConnectorImportAction extends UserAction {
      * Builds configuration map based on connector type.
      */
     private Map<String, String> buildConfig() {
-        if (dataIngestionUrl == null || dataIngestionUrl.isEmpty()) {
+        if (!CONNECTOR_TYPE_CLICKUP.equals(connectorType) && (dataIngestionUrl == null || dataIngestionUrl.isEmpty())) {
             loggerMaker.error("Missing required Data Ingestion Service URL", LogDb.DASHBOARD);
             return null;
         }
         
         Map<String, String> config = new HashMap<>();
-        config.put(CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
+        if (dataIngestionUrl != null && !dataIngestionUrl.isEmpty()) {
+            config.put(CONFIG_DATA_INGESTION_SERVICE_URL, dataIngestionUrl);
+        }
 
         switch (connectorType) {
             case CONNECTOR_TYPE_N8N:
@@ -324,6 +333,27 @@ public class AIAgentConnectorImportAction extends UserAction {
                     ? openaiApiBaseUrl
                     : "https://api.openai.com";
                 config.put(CONFIG_OPENAI_API_BASE_URL, openaiBaseUrl);
+                break;
+
+            case CONNECTOR_TYPE_CLICKUP:
+                if (clickupApiToken == null || clickupApiToken.isEmpty() ||
+                    clickupWorkspaceId == null || clickupWorkspaceId.isEmpty()) {
+                    loggerMaker.error("Missing required ClickUp configuration (API token and workspace ID)", LogDb.DASHBOARD);
+                    return null;
+                }
+
+                String clickupResolvedBaseUrl = (clickupBaseUrl != null && !clickupBaseUrl.isEmpty())
+                    ? clickupBaseUrl
+                    : "https://frontdoor-prod-us-east-2-2.clickup.com";
+                config.put(CONFIG_CLICKUP_BASE_URL, clickupResolvedBaseUrl);
+                config.put(CONFIG_CLICKUP_API_TOKEN, clickupApiToken);
+                config.put(CONFIG_CLICKUP_WORKSPACE_ID, clickupWorkspaceId);
+                config.put(CONFIG_CLICKUP_PAGE_ROWS, String.valueOf(
+                    (clickupPageRows != null && clickupPageRows > 0) ? clickupPageRows : 200
+                ));
+                config.put(CONFIG_CLICKUP_LOOKBACK_HOURS, String.valueOf(
+                    (clickupLookbackHours != null && clickupLookbackHours > 0) ? clickupLookbackHours : 24
+                ));
                 break;
 
             default:
