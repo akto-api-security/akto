@@ -547,6 +547,11 @@ public class AuditDataAction extends UserAction {
     // "cursor.akto-docs", and "<device>.cursor.akto-docs" alike.
     @Setter
     String mcpServerForAllAgents;
+    // When set, clears blockAll=false on all mcp-server records sharing this server
+    // name without fanning out the remarks update. Used when a single server is
+    // approved to lift the global auto-block while keeping other instances "Rejected".
+    @Setter
+    String clearBlockAllForServer;
 
     public String updateAuditData() {
         User user = getSUser();
@@ -634,11 +639,13 @@ public class AuditDataAction extends UserAction {
                 );
             }
 
-            // When approving any server that had blockAll=true, clear blockAll for all
-            // servers sharing the same server name so newly arriving records are no longer
-            // auto-blocked across all agents.
-            if ("Approved".equals(remarks) && mcpServerForAllAgents != null && !mcpServerForAllAgents.trim().isEmpty()) {
-                String escaped = java.util.regex.Pattern.quote(mcpServerForAllAgents.trim());
+            // When approving a single server that was part of a blockAll group, clear
+            // blockAll=false on every server sharing that name so no new auto-blocking
+            // happens — while leaving the other servers' remarks unchanged (still "Rejected").
+            String blockAllClearTarget = (clearBlockAllForServer != null && !clearBlockAllForServer.trim().isEmpty())
+                    ? clearBlockAllForServer.trim() : null;
+            if (blockAllClearTarget != null) {
+                String escaped = java.util.regex.Pattern.quote(blockAllClearTarget);
                 Bson blockAllMatch = Filters.and(
                     Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
                     Filters.regex(McpAuditInfo.RESOURCE_NAME, "(^|\\.)" + escaped + "$"),

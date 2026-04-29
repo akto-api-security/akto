@@ -149,7 +149,8 @@ function AuditDataDrawer({
         try {
             await api.updateAuditData(
                 auditItem.hexId, remarks, null,
-                auditItem.groupedHexIds, cascadeIds, serverName
+                auditItem.groupedHexIds, cascadeIds, null,
+                remarks === "Approved" ? serverName : null
             )
             func.setToast(true, false, `Server ${remarks === "Approved" ? "allowed" : remarks === "Rejected" ? "blocked" : "updated"}`)
             if (typeof onAfterUpdate === "function") onAfterUpdate("server")
