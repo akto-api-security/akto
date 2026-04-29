@@ -78,7 +78,7 @@ public class APICatalogSync {
     public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
 
     private static DataActor dataActor = DataActorFactory.fetchInstance();
-    public static Set<MergedUrls> mergedUrls;
+    public static Set<MergedUrls> mergedUrls = new HashSet<>();
     private static final ClientLayer clientLayer = new ClientLayer();
     private static RSAPublicKey publicKey = PayloadEncodeUtil.getPublicKey();
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {

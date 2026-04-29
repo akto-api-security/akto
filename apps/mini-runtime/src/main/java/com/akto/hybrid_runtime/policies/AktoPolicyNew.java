@@ -369,6 +369,10 @@ public class AktoPolicyNew {
         return bulkUpdates;
     }
 
+    public boolean isMergeUrlsOnVersions() {
+        return mergeUrlsOnVersions;
+    }
+
     public List<RuntimeFilter> getFilters() {
         return filters;
     }
