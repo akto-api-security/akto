@@ -34,6 +34,21 @@ public class ModuleInfo {
     private boolean deleteTopicAndReboot;
     public static final String DELETE_TOPIC_AND_REBOOT = "deleteTopicAndReboot";
 
+    public ModuleInfo() {}
+
+    public ModuleInfo(ModuleInfo other) {
+        this.moduleType = other.moduleType;
+        this.currentVersion = other.currentVersion;
+        this.id = other.id;
+        this.startedTs = other.startedTs;
+        this.lastHeartbeatReceived = other.lastHeartbeatReceived;
+        this.name = other.name;
+        this.miniRuntimeName = other.miniRuntimeName;
+        this.reboot = other.reboot;
+        this.deleteTopicAndReboot = other.deleteTopicAndReboot;
+        // additionalData intentionally excluded to reduce the size of object stored in MetricData
+    }
+
     public ModuleType getModuleType() {
         return moduleType;
     }

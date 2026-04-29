@@ -98,7 +98,7 @@ public class AllMetrics {
             try {
                 Context.accountId.set(accountId);
 
-                ModuleInfo moduleInfo = ModuleInfoWorker.getModuleInfo();
+                ModuleInfo moduleInfo = new ModuleInfo(ModuleInfoWorker.getModuleInfo());
 
                 // Collect infrastructure metrics from MXBeans
                 collectInfraMetrics();
