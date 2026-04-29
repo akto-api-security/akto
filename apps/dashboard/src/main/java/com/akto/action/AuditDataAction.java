@@ -473,7 +473,8 @@ public class AuditDataAction extends UserAction {
         int chosenPriority = Integer.MAX_VALUE;
         String displayRemarks = null;
         Object displayMarkedBy = null;
-        Object activeConditionalCond = null; // conditions from the active conditional entry, if any
+        Object activeConditionalCond = null; // approvalConditions from the active conditional entry, if any
+        Object rejectedCond = null;          // non-expired approvalConditions from any Rejected entry
 
         for (Object o : (List<?>) raw) {
             if (!(o instanceof Map)) continue;
@@ -482,7 +483,10 @@ public class AuditDataAction extends UserAction {
                     ? (String) entry.get(McpAuditInfo.REMARKS) : null;
             Object cond = entry.get(McpAuditInfo.APPROVAL_CONDITIONS);
             int p = remarksPriority(r, cond, nowEpochSeconds);
-            if (p == 1) activeConditionalCond = cond; // track regardless of who wins
+            if (p == 1) activeConditionalCond = cond;
+            if (p == 0 && cond != null && !isConditionalApprovalExpired(cond, nowEpochSeconds)) {
+                rejectedCond = cond; // pick up non-expired conditions from any Rejected entry
+            }
             if (p < chosenPriority) {
                 chosenPriority = p;
                 displayRemarks = (p == 3) ? "Pending" : r; // expired conditional → Pending
@@ -493,14 +497,19 @@ public class AuditDataAction extends UserAction {
         if (chosenPriority < Integer.MAX_VALUE) {
             row.put(McpAuditInfo.REMARKS, displayRemarks);
             row.put(McpAuditInfo.MARKED_BY, displayMarkedBy);
-            // Expose active conditional's conditions when:
-            // - the active conditional itself wins (Scenario 4), or
-            // - Rejected wins alongside an active conditional (Scenario 5).
+            // Expose approvalConditions for Rejected and active-conditional statuses only.
+            // For Rejected: prefer active conditional's conditions (Scenario 5),
+            // fall back to non-expired conditions from any Rejected entry in the group.
+            // For active conditional: show its conditions directly.
             // Strip for Approved and all other statuses.
-            boolean exposeConditions = activeConditionalCond != null
-                    && (chosenPriority == 0 || chosenPriority == 1);
-            if (exposeConditions) {
-                row.put(McpAuditInfo.APPROVAL_CONDITIONS, activeConditionalCond);
+            Object condToExpose = null;
+            if (chosenPriority == 0) {
+                condToExpose = activeConditionalCond != null ? activeConditionalCond : rejectedCond;
+            } else if (chosenPriority == 1) {
+                condToExpose = activeConditionalCond;
+            }
+            if (condToExpose != null) {
+                row.put(McpAuditInfo.APPROVAL_CONDITIONS, condToExpose);
             } else {
                 row.removeField(McpAuditInfo.APPROVAL_CONDITIONS);
             }
