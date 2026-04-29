@@ -547,11 +547,6 @@ public class AuditDataAction extends UserAction {
     // "cursor.akto-docs", and "<device>.cursor.akto-docs" alike.
     @Setter
     String mcpServerForAllAgents;
-    // When set, clears blockAll=false on all mcp-server records sharing this server
-    // name without fanning out the remarks update. Used when a single server is
-    // approved to lift the global auto-block while keeping other instances "Rejected".
-    @Setter
-    String clearBlockAllForServer;
 
     public String updateAuditData() {
         User user = getSUser();
@@ -572,9 +567,13 @@ public class AuditDataAction extends UserAction {
 
             // "For all agents" mode: discover every mcp-server record whose
             // resourceName matches the requested server (bare, agent-prefixed, or
-            // device+agent-prefixed) and pull their hexIds/hostCollectionIds into
-            // the update scope.
+            // device+agent-prefixed). For Rejected, fan out the update to all of them
+            // (block-for-all-agents). For Approved, only the originally-selected server
+            // is approved, but we still collect the IDs so we can clear blockAll on all.
             List<Integer> allAgentsCollectionIds = new ArrayList<>();
+            List<ObjectId> allAgentsServerIds = new ArrayList<>();
+            boolean fanOutRemarks = mcpServerForAllAgents != null && !mcpServerForAllAgents.trim().isEmpty()
+                    && !"Approved".equals(remarks);
             if (mcpServerForAllAgents != null && !mcpServerForAllAgents.trim().isEmpty()) {
                 String escaped = java.util.regex.Pattern.quote(mcpServerForAllAgents.trim());
                 Bson serverMatch = Filters.and(
@@ -585,10 +584,13 @@ public class AuditDataAction extends UserAction {
                         .find(serverMatch).cursor()) {
                     while (cursor.hasNext()) {
                         McpAuditInfo rec = cursor.next();
-                        if (rec.getId() != null && !targetIds.contains(rec.getId())) {
-                            targetIds.add(rec.getId());
-                        }
+                        if (rec.getId() != null) allAgentsServerIds.add(rec.getId());
                         allAgentsCollectionIds.add(rec.getHostCollectionId());
+                    }
+                }
+                if (fanOutRemarks) {
+                    for (ObjectId id : allAgentsServerIds) {
+                        if (!targetIds.contains(id)) targetIds.add(id);
                     }
                 }
             }
@@ -640,26 +642,12 @@ public class AuditDataAction extends UserAction {
             }
 
             // When approving any server from a blockAll group, clear blockAll=false across
-            // all servers sharing that name — leaving their remarks unchanged (still "Rejected").
-            if (clearBlockAllForServer != null && !clearBlockAllForServer.trim().isEmpty()) {
-                String escaped = java.util.regex.Pattern.quote(clearBlockAllForServer.trim());
-                List<ObjectId> allServerIds = new ArrayList<>();
-                try (MongoCursor<McpAuditInfo> cur = McpAuditInfoDao.instance.getMCollection()
-                        .find(Filters.and(
-                            Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
-                            Filters.regex(McpAuditInfo.RESOURCE_NAME, "(^|\\.)" + escaped + "$")
-                        )).cursor()) {
-                    while (cur.hasNext()) {
-                        McpAuditInfo rec = cur.next();
-                        if (rec.getId() != null) allServerIds.add(rec.getId());
-                    }
-                }
-                if (!allServerIds.isEmpty()) {
-                    McpAuditInfoDao.instance.updateMany(
-                        Filters.in(Constants.ID, allServerIds),
-                        Updates.set(McpAuditInfo.BLOCK_ALL, false)
-                    );
-                }
+            // all servers sharing that name — leaving the other instances' remarks unchanged.
+            if ("Approved".equals(remarks) && !allAgentsServerIds.isEmpty()) {
+                McpAuditInfoDao.instance.updateMany(
+                    Filters.in(Constants.ID, allAgentsServerIds),
+                    Updates.set(McpAuditInfo.BLOCK_ALL, false)
+                );
             }
 
             List<Integer> mergedCascade = new ArrayList<>();
