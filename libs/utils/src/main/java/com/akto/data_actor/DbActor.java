@@ -1,5 +1,7 @@
 package com.akto.data_actor;
 
+import com.akto.dao.ApiSequencesDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -46,14 +48,19 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.jobs.JobScheduler;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
@@ -766,6 +773,51 @@ public class DbActor extends DataActor {
     }
 
     @Override
+    public void writeApiSequences(List<ApiSequences> apiSequencesList) {
+        if (apiSequencesList == null || apiSequencesList.isEmpty())
+            return;
+        List<WriteModel<ApiSequences>> writeModels = new ArrayList<>();
+        for (ApiSequences seq : apiSequencesList) {
+            Bson filter = Filters.and(
+                    Filters.eq(ApiSequences.API_COLLECTION_ID, seq.getApiCollectionId()),
+                    Filters.eq(ApiSequences.PATHS, seq.getPaths()));
+            int now = Context.now();
+            List<Bson> pipeline = Arrays.asList(
+                    new Document("$set", new Document()
+                            .append(ApiSequences.TRANSITION_COUNT, new Document("$add", Arrays.asList(
+                                    new Document("$ifNull", Arrays.asList("$" + ApiSequences.TRANSITION_COUNT, 0)),
+                                    seq.getTransitionCount())))
+                            .append(ApiSequences.PREV_STATE_COUNT, new Document("$add", Arrays.asList(
+                                    new Document("$ifNull", Arrays.asList("$" + ApiSequences.PREV_STATE_COUNT, 0)),
+                                    seq.getPrevStateCount())))
+                            .append(ApiSequences.LAST_STATE_COUNT, new Document("$add", Arrays.asList(
+                                    new Document("$ifNull", Arrays.asList("$" + ApiSequences.LAST_STATE_COUNT, 0)),
+                                    seq.getLastStateCount())))
+                            .append(ApiSequences.LAST_UPDATED_AT, now)
+                            .append(ApiSequences.CREATED_AT,
+                                    new Document("$ifNull", Arrays.asList("$" + ApiSequences.CREATED_AT, now)))
+                            .append(ApiSequences.IS_ACTIVE,
+                                    new Document("$ifNull", Arrays.asList("$" + ApiSequences.IS_ACTIVE, true)))),
+                    new Document("$set", new Document()
+                            .append(ApiSequences.PROBABILITY,
+                                    new Document("$cond", Arrays.asList(
+                                            new Document("$gt", Arrays.asList("$" + ApiSequences.PREV_STATE_COUNT, 0)),
+                                            new Document("$divide",
+                                                    Arrays.asList("$" + ApiSequences.TRANSITION_COUNT,
+                                                            "$" + ApiSequences.PREV_STATE_COUNT)),
+                                            0)))
+                            .append(ApiSequences.PRECEDENCE_SCORE,
+                                    new Document("$cond", Arrays.asList(
+                                            new Document("$gt", Arrays.asList("$" + ApiSequences.LAST_STATE_COUNT, 0)),
+                                            new Document("$divide",
+                                                    Arrays.asList("$" + ApiSequences.TRANSITION_COUNT,
+                                                            "$" + ApiSequences.LAST_STATE_COUNT)),
+                                            0)))));
+            writeModels.add(new UpdateOneModel<>(filter, pipeline, new UpdateOptions().upsert(true)));
+        }
+        ApiSequencesDao.instance.getMCollection().bulkWrite(writeModels, new BulkWriteOptions().ordered(false));
+    } 
+    
     public void storeAgentQueryData(AgentQueryData agentQueryData) {
         DbLayer.storeAgentQueryData(agentQueryData);
     }
