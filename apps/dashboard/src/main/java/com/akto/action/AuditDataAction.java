@@ -488,12 +488,13 @@ public class AuditDataAction extends UserAction {
             }
             if (p < chosenPriority) {
                 chosenPriority = p;
-                displayRemarks = (p == 3) ? null : r;
+                displayRemarks = r;
                 displayMarkedBy = entry.get(McpAuditInfo.MARKED_BY);
             }
         }
 
         if (chosenPriority < Integer.MAX_VALUE) {
+            if (chosenPriority == 3) displayRemarks = "Rejected";
             row.put(McpAuditInfo.REMARKS, displayRemarks);
             row.put(McpAuditInfo.MARKED_BY, displayMarkedBy);
             // Expose approvalConditions for Rejected and active-conditional statuses only.
