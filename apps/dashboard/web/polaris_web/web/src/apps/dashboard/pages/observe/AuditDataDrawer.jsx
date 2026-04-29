@@ -159,6 +159,28 @@ function AuditDataDrawer({
         }
     }
 
+    const blockForAllAgents = async () => {
+        if (!auditItem) return
+        const serverName = auditItem.mcpServerName && auditItem.mcpServerName !== "-" ? auditItem.mcpServerName : null
+        if (!serverName) {
+            func.setToast(true, true, "Cannot determine server name")
+            return
+        }
+        setBusy(true)
+        try {
+            await api.updateAuditData(
+                auditItem.hexId, "Rejected for all agents", null,
+                auditItem.groupedHexIds, cascadeIds, serverName
+            )
+            func.setToast(true, false, "Server blocked for all agents")
+            if (typeof onAfterUpdate === "function") onAfterUpdate("server")
+        } catch (e) {
+            func.setToast(true, true, "Failed to block server for all agents")
+        } finally {
+            setBusy(false)
+        }
+    }
+
     const updateSelectedChildren = async (remarks, selectedHexIds) => {
         if (!Array.isArray(selectedHexIds) || selectedHexIds.length === 0) return
         setBusy(true)
@@ -221,6 +243,11 @@ function AuditDataDrawer({
             content: "Block this server",
             destructive: true,
             onAction: () => updateServer("Rejected"),
+        },
+        {
+            content: "Block for all agents",
+            destructive: true,
+            onAction: () => blockForAllAgents(),
         },
         {
             content: "Conditionally allow this server",
