@@ -639,19 +639,27 @@ public class AuditDataAction extends UserAction {
                 );
             }
 
-            // When approving a single server that was part of a blockAll group, clear
-            // blockAll=false on every server sharing that name so no new auto-blocking
-            // happens — while leaving the other servers' remarks unchanged (still "Rejected").
-            String blockAllClearTarget = (clearBlockAllForServer != null && !clearBlockAllForServer.trim().isEmpty())
-                    ? clearBlockAllForServer.trim() : null;
-            if (blockAllClearTarget != null) {
-                String escaped = java.util.regex.Pattern.quote(blockAllClearTarget);
-                Bson blockAllMatch = Filters.and(
-                    Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
-                    Filters.regex(McpAuditInfo.RESOURCE_NAME, "(^|\\.)" + escaped + "$"),
-                    Filters.eq(McpAuditInfo.BLOCK_ALL, true)
-                );
-                McpAuditInfoDao.instance.updateMany(blockAllMatch, Updates.set(McpAuditInfo.BLOCK_ALL, false));
+            // When approving any server from a blockAll group, clear blockAll=false across
+            // all servers sharing that name — leaving their remarks unchanged (still "Rejected").
+            if (clearBlockAllForServer != null && !clearBlockAllForServer.trim().isEmpty()) {
+                String escaped = java.util.regex.Pattern.quote(clearBlockAllForServer.trim());
+                List<ObjectId> allServerIds = new ArrayList<>();
+                try (MongoCursor<McpAuditInfo> cur = McpAuditInfoDao.instance.getMCollection()
+                        .find(Filters.and(
+                            Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
+                            Filters.regex(McpAuditInfo.RESOURCE_NAME, "(^|\\.)" + escaped + "$")
+                        )).cursor()) {
+                    while (cur.hasNext()) {
+                        McpAuditInfo rec = cur.next();
+                        if (rec.getId() != null) allServerIds.add(rec.getId());
+                    }
+                }
+                if (!allServerIds.isEmpty()) {
+                    McpAuditInfoDao.instance.updateMany(
+                        Filters.in(Constants.ID, allServerIds),
+                        Updates.set(McpAuditInfo.BLOCK_ALL, false)
+                    );
+                }
             }
 
             List<Integer> mergedCascade = new ArrayList<>();
