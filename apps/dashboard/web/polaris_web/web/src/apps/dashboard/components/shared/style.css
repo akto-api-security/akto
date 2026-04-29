@@ -2,6 +2,13 @@
     display: none;
 }
 
+.audit-table-icon {
+    --pc-avatar-extra-small-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
 .highlight{
     background-color:#FFE9E8;
     color: #D72B0C !important;

@@ -18,6 +18,8 @@ import AllowlistBadge from "../../components/shared/AllowlistBadge";
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges";
 import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 import AuditDataDrawer from "./AuditDataDrawer";
+import CollectionIcon from "../../components/shared/CollectionIcon";
+import "../../components/shared/style.css";
 
 const headingsEndpointSecurity = [
     {
@@ -29,7 +31,7 @@ const headingsEndpointSecurity = [
     {
         title: 'AI Agent',
         text: 'AI Agent',
-        value: 'aiAgentName',
+        value: 'aiAgentNameComp',
         type: CellType.TEXT,
         filterKey: 'aiAgent',
     },
@@ -238,7 +240,14 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
         const serverName = auditRecord?.serverName || auditRecord?._id;
         temp['mcpServerName'] = serverName;
         temp['mcpServerNameComp'] = (
-            <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+            <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                <Box className="audit-table-icon">
+                    <CollectionIcon
+                        hostName={serverName}
+                        assetTagValue={serverName}
+                        displayName={serverName}
+                    />
+                </Box>
                 <Text>{serverName}</Text>
                 {temp?.verified && <AllowlistBadge />}
             </HorizontalStack>
@@ -247,6 +256,18 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
         // collections is an Atlas endpoint collection.
         temp['isEndpointSource'] = (auditRecord?.groupedHostCollectionIds || []).some(
             (cid) => isAtlasEndpointCollection(allCollections, cid)
+        );
+        temp['aiAgentNameComp'] = (
+            <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                <Box className="audit-table-icon">
+                    <CollectionIcon
+                        hostName={temp['aiAgentName']}
+                        assetTagValue={temp['aiAgentName']}
+                        displayName={temp['aiAgentName']}
+                    />
+                </Box>
+                <Text>{temp['aiAgentName']}</Text>
+            </HorizontalStack>
         );
     } else {
         temp['isEndpointSource'] = isAtlasEndpointCollection(allCollections, auditRecord?.hostCollectionId);
