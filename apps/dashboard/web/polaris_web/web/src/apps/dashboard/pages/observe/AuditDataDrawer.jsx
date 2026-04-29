@@ -179,6 +179,28 @@ function AuditDataDrawer({
         }
     }
 
+    const blockForAllAgents = async () => {
+        if (!auditItem) return
+        const serverName = auditItem.mcpServerName && auditItem.mcpServerName !== "-" ? auditItem.mcpServerName : null
+        if (!serverName) {
+            func.setToast(true, true, "Cannot determine server name")
+            return
+        }
+        setBusy(true)
+        try {
+            await api.updateAuditData(
+                auditItem.hexId, "Rejected", null,
+                auditItem.groupedHexIds, cascadeIds, serverName
+            )
+            func.setToast(true, false, "Server blocked for all agents")
+            if (typeof onAfterUpdate === "function") onAfterUpdate("server")
+        } catch (e) {
+            func.setToast(true, true, "Failed to block server for all agents")
+        } finally {
+            setBusy(false)
+        }
+    }
+
     const updateSelectedChildren = async (remarks, selectedHexIds) => {
         if (!Array.isArray(selectedHexIds) || selectedHexIds.length === 0) return
         setBusy(true)
@@ -231,7 +253,7 @@ function AuditDataDrawer({
         apiAccessTypesComp: (child.apiAccessTypes || []).join(", ") || "-",
         remarksComp: child?.remarks
             ? <Text variant="bodySm">{child.remarks}</Text>
-            : <Text variant="bodySm" color="critical" fontWeight="bold">Pending</Text>,
+            : <Text variant="bodySm">Approved</Text>,
         markedBy: child.markedBy || "-",
     }))
 
@@ -251,6 +273,11 @@ function AuditDataDrawer({
             destructive: true,
             onAction: () => updateServer("Rejected"),
             disabled: !flags.block,
+        },
+        {
+            content: "Block for all agents",
+            destructive: true,
+            onAction: () => blockForAllAgents(),
         },
         {
             content: "Conditionally allow this server",
@@ -311,7 +338,7 @@ function AuditDataDrawer({
     const auditCellData = auditItem ? {
         resourceName: auditItem.resourceName,
         typeBadge: [auditItem.type].filter(Boolean),
-        remarksBadge: [auditItem.remarks || "Pending"],
+        remarksBadge: [auditItem.remarks || "Approved"],
         lastDetected: auditItem.lastDetected ? func.prettifyEpoch(auditItem.lastDetected) : "-",
         updatedTimestamp: auditItem.updatedTimestamp ? func.prettifyEpoch(auditItem.updatedTimestamp) : "-",
         markedBy: auditItem.markedBy || "-",

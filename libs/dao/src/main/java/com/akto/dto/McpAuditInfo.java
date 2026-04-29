@@ -28,6 +28,7 @@ public class McpAuditInfo {
     public static final String APPROVAL_CONDITIONS = "approvalConditions";
     public static final String APPROVED_AT = "approvedAt";
     public static final String CONTEXT_SOURCE = "contextSource";
+    public static final String BLOCK_ALL = "blockAll";
 
     private ObjectId id;
 
@@ -52,6 +53,10 @@ public class McpAuditInfo {
     private ComponentRiskAnalysis componentRiskAnalysis;
 
     private String contextSource;
+
+    // When true, any newly detected record for this server name is auto-blocked.
+    // Set server-side when the user triggers "Block for all agents".
+    private boolean blockAll;
 
     @BsonIgnore
     private boolean verified;

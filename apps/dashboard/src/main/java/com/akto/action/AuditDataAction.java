@@ -661,6 +661,45 @@ public class AuditDataAction extends UserAction {
                 McpAuditInfoDao.instance.updateMany(Filters.in(Constants.ID, targetIds), combined);
             }
 
+            // When blocking for all agents, stamp blockAll=true on every matched server record
+            // so newly arriving records for this server name are auto-blocked at ingest time.
+            if (mcpServerForAllAgents != null && !mcpServerForAllAgents.trim().isEmpty()
+                    && "Rejected".equals(remarks)) {
+                McpAuditInfoDao.instance.updateMany(
+                    Filters.in(Constants.ID, targetIds),
+                    Updates.set(McpAuditInfo.BLOCK_ALL, true)
+                );
+            }
+
+            // When approving any server, clear blockAll=false on every mcp-server record
+            // sharing that server name — derived server-side from the approved record's
+            // resourceName so the UI doesn't need to send anything extra.
+            if ("Approved".equals(remarks) && !targetIds.isEmpty()) {
+                String approvedServerName = null;
+                McpAuditInfo approvedRec = McpAuditInfoDao.instance.getMCollection()
+                        .find(Filters.eq(Constants.ID, targetIds.get(0))).first();
+                if (approvedRec != null && approvedRec.getResourceName() != null) {
+                    String rn = approvedRec.getResourceName();
+                    int secondDot = rn.indexOf('.', rn.indexOf('.') + 1);
+                    if (secondDot > 0 && secondDot < rn.length() - 1) {
+                        approvedServerName = rn.substring(secondDot + 1);
+                    } else {
+                        approvedServerName = rn;
+                    }
+                }
+                if (approvedServerName != null && !approvedServerName.isEmpty()) {
+                    String escaped = java.util.regex.Pattern.quote(approvedServerName);
+                    Bson blockAllMatch = Filters.and(
+                        Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
+                        Filters.regex(McpAuditInfo.RESOURCE_NAME, "(^|\\.)" + escaped + "$")
+                    );
+                    McpAuditInfoDao.instance.updateMany(
+                        blockAllMatch,
+                        Updates.set(McpAuditInfo.BLOCK_ALL, false)
+                    );
+                }
+            }
+
             List<Integer> mergedCascade = new ArrayList<>();
             if (cascadeHostCollectionIds != null) mergedCascade.addAll(cascadeHostCollectionIds);
             for (Integer id : allAgentsCollectionIds) {
