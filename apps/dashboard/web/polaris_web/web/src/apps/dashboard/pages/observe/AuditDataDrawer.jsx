@@ -68,6 +68,7 @@ function ActionDropdown({ label, items, loading, disabled }) {
         ...it,
         onAction: () => {
             setOpen(false)
+            if (it.disabled) return
             if (typeof it.onAction === "function") it.onAction()
         },
     }))
@@ -166,7 +167,7 @@ function AuditDataDrawer({
         try {
             await api.updateAuditData(
                 auditItem.hexId, remarks, null,
-                auditItem.groupedHexIds, cascadeIds, null, null
+                auditItem.groupedHexIds, cascadeIds, null
             )
             func.setToast(true, false, `Server ${remarks === "Approved" ? "allowed" : remarks === "Rejected" ? "blocked" : "updated"}`)
             if (typeof onAfterUpdate === "function") onAfterUpdate("server")
@@ -186,7 +187,7 @@ function AuditDataDrawer({
                 if (!child) return
                 await api.updateAuditData(
                     child.hexId, remarks, null,
-                    child.groupedHexIds, null, null, null
+                    child.groupedHexIds, null, null
                 )
             }))
             func.setToast(true, false, `${selectedHexIds.length} item${selectedHexIds.length === 1 ? "" : "s"} updated`)
@@ -233,29 +234,92 @@ function AuditDataDrawer({
         markedBy: child.markedBy || "-",
     }))
 
-    const showAllowlistOnly = registryConfigured && !auditItem?.verified && auditItem?.isEndpointSource && typeof onAddToAllowlist === "function"
+    const nowEpochSec = Math.floor(Date.now() / 1000)
+    const remarks = auditItem?.remarks
+    const isPending =
+        remarks == null ||
+        remarks === "" ||
+        (typeof remarks === "string" && remarks.trim() === "")
+    const isRejected = remarks === "Rejected"
+    const isApproved = remarks === "Approved"
+    const isConditional = remarks === "Conditionally Approved"
 
-    const serverActionItems = showAllowlistOnly
-        ? [{
-            content: "Add to MCP Allowed List",
-            onAction: () => onAddToAllowlist(auditItem),
-        }]
-        : [
-            { content: "Allow this server", onAction: () => updateServer("Approved") },
-            {
-                content: "Block this server",
-                destructive: true,
-                onAction: () => updateServer("Rejected"),
+    const expiresAtRaw = auditItem?.approvalConditions?.expiresAt
+    const expiresAtNum =
+        typeof expiresAtRaw === "number"
+            ? expiresAtRaw
+            : (typeof expiresAtRaw === "string" && expiresAtRaw !== "" ? parseInt(expiresAtRaw, 10) : NaN)
+    const conditionalExpired =
+        isConditional &&
+        Number.isFinite(expiresAtNum) &&
+        expiresAtNum > 0 &&
+        (expiresAtNum > 1e12 ? expiresAtNum < Date.now() : expiresAtNum < nowEpochSec)
+
+    const applyRemarkBasedActions = () => {
+        if (isPending) {
+            blockEnabled = true
+        } else if (isRejected) {
+            allowEnabled = true
+            conditionalEnabled = true
+        } else if (isConditional) {
+            if (conditionalExpired) {
+                allowEnabled = true
+                conditionalEnabled = true
+            } else {
+                allowEnabled = true
+                blockEnabled = true
+                conditionalEnabled = true
+            }
+        } else if (isApproved) {
+            blockEnabled = true
+        }
+    }
+
+    let allowEnabled = false
+    let blockEnabled = false
+    let conditionalEnabled = false
+    let addEnabled = false
+
+    if (auditItem?.verified) {
+        applyRemarkBasedActions()
+    } else {
+        if (registryConfigured && typeof onAddToAllowlist === "function" && auditItem?.isEndpointSource) {
+            addEnabled = true
+        }
+        if (!addEnabled) {
+            applyRemarkBasedActions()
+        }
+    }
+
+    const serverActionItems = [
+        {
+            content: "Allow this server",
+            onAction: () => updateServer("Approved"),
+            disabled: !allowEnabled,
+        },
+        {
+            content: "Block this server",
+            destructive: true,
+            onAction: () => updateServer("Rejected"),
+            disabled: !blockEnabled,
+        },
+        {
+            content: "Conditionally allow this server",
+            onAction: () => {
+                if (typeof onRequestConditional === "function") {
+                    onRequestConditional("server", auditItem, null)
+                }
             },
-            {
-                content: "Conditionally allow this server",
-                onAction: () => {
-                    if (typeof onRequestConditional === "function") {
-                        onRequestConditional("server", auditItem, null)
-                    }
-                },
+            disabled: !conditionalEnabled,
+        },
+        {
+            content: "Add to MCP registry",
+            onAction: () => {
+                if (typeof onAddToAllowlist === "function") onAddToAllowlist(auditItem)
             },
-        ]
+            disabled: !addEnabled,
+        },
+    ]
 
     const childrenSection = (
         <Box>
