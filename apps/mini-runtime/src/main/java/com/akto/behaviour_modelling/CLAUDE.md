@@ -308,52 +308,6 @@ db.api_sequences.aggregate([
 ])
 ```
 
-### Rolling Window Probabilities (Future Enhancement)
-Current schema stores cumulative counts. To track rolling windows:
-1. Add `window_id` or `windowStart` field to api_sequences
-2. Partition upsert by (apiCollectionId, paths, window_id)
-3. Query last N windows and re-aggregate probabilities
-
----
-
-## Extension Points for Anomaly Detection
-
-### Phase 2: Unique-User Weighting
-Currently, transitions are counted once per occurrence. To weight by unique users:
-1. Modify `RawCountAccumulator` to track `Set<String> userIds` per transition
-2. Pass `userId` to `recordTransition()` (already wired in signature)
-3. In flusher, divide transitionCount by unique user count for deduplication
-
-### Phase 2: Multi-Order Markov Chains (Trigrams, 4-grams)
-Currently, `sequenceLength=2` means only bigrams (A→B). To support longer sequences:
-1. Set `sequenceLength=3` in config
-2. Deque size automatically becomes 2 (keeps last 2 calls)
-3. Emit transitions only when deque is full: A→B→C
-4. New `TransitionKey` will have 3 elements; DB upsert still works (upsert key is (apiCollectionId, paths))
-
-### Phase 3: VOMC Collapsibility Pruning
-Higher-order contexts may be statistically identical to lower-order. To prune redundant sequences:
-1. Implement `MarkovModelBuilder.prune()` that compares credible intervals of transition probabilities
-2. Call prune on snapshot before flush (or as post-processing in flusher)
-3. Only emit sequences that carry distinct information
-
-### Anomaly Scoring Functions (Your Module)
-Implement an AnomalyDetector that:
-1. Queries `api_sequences` for a given user's recent requests
-2. Builds a set of "observed transitions" this window
-3. For each observed transition, fetch expected probability from DB
-4. Score: sum of negative log-probabilities (lower = more normal)
-5. Flag users with anomaly score > threshold
-
-**Key queries:**
-```java
-// For user who just called: A → B → C
-List<ApiSequences> seq1 = db.find({ paths: [A, B], apiCollectionId: 1001 });
-List<ApiSequences> seq2 = db.find({ paths: [B, C], apiCollectionId: 1001 });
-double score = -log(seq1.probability) - log(seq2.probability);
-if (score > THRESHOLD) flagAsAnomalous(userId);
-```
-
 ---
 
 ## Known Limitations
@@ -366,12 +320,9 @@ if (score > THRESHOLD) flagAsAnomalous(userId);
 
 4. **Noise from Early Windows:** First few windows may have incomplete data (users still warming up). Consider disabling anomaly detection for first 30 minutes of runtime.
 
-5. **Source IP Limitation (Phase 1):** Using IP as userId means:
-   - Shared IPs (offices, proxies) are treated as one user
-   - Mobile users with changing IPs create multiple sessions
-   - Phase 2 will switch to true user ID (auth token, session ID)
+5. **Source IP as userId:** Shared IPs (offices, proxies) are treated as one user; mobile users with changing IPs create multiple sessions.
 
-6. **No Real-Time Updates:** Sequences are flushed every 10 minutes. Anomalies detected in real-time require in-memory checks or a separate fast-path detector.
+6. **No Real-Time Updates:** Sequences are flushed every 10 minutes.
 
 ---
 
@@ -399,19 +350,11 @@ analyzer.shutdown(); // flushes any remaining data in current window
 
 ## Testing the Module
 
-- **Unit Tests:** Test SessionAnalyzer in isolation with mock catalogs and capturable flushers
-- **Integration Tests:** Feed realistic request sequences, verify snapshot and DB state
-- **Behavioral Tests:** Validate multi-order emission, VOMC pruning, precedence scores, window boundaries
-- **End-to-End:** Generate traffic via Kafka, process through mini-runtime, query MongoDB for expected probabilities
-
-See `SessionAnalyzerTest.java` for examples of each approach.
-
----
-
-## Future Work
-
-1. **Real-Time Anomaly Detection:** In-memory anomaly scorer that triggers alerts without waiting for window flush
-2. **Contextual Sequences:** Extend paths to include HTTP status codes, response sizes, latency buckets (e.g., `[/users/INTEGER#GET#200, /dashboard#GET#200]`)
-3. **VOMC Pruning:** Automatically remove redundant higher-order sequences
-4. **Seasonal Models:** Track probabilities per hour-of-day or day-of-week for more accurate thresholds
-5. **User Clustering:** Group users by similar behavior patterns, detect outliers within clusters
+See `SessionAnalyzerTest.java` for behavioral tests covering:
+- URL templatization and unknown API filtering
+- Transition aggregation across users
+- Window boundary isolation
+- Multiple collection isolation
+- Rapid user scale-up
+- API method separation
+- Per-user deque independence
