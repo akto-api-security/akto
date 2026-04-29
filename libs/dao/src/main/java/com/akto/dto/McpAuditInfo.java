@@ -27,6 +27,7 @@ public class McpAuditInfo {
     public static final String APPROVAL_CONDITIONS = "approvalConditions";
     public static final String APPROVED_AT = "approvedAt";
     public static final String CONTEXT_SOURCE = "contextSource";
+    public static final String BLOCK_ALL = "blockAll";
 
     private ObjectId id;
 
@@ -49,6 +50,7 @@ public class McpAuditInfo {
     // Approval timestamp - set when item is approved or conditionally approved
     private Integer approvedAt;
     private String contextSource;
+    private boolean blockAll;
 
     public String getHexId() {
         return this.id != null ? this.id.toHexString() : null;
