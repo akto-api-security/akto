@@ -599,16 +599,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 },
                 deniedTopics,
                 wordFilters,
-                piiFilters: piiTypes,
-                regexPatterns: regexPatterns
+                piiFilters: enablePiiTypes ? piiTypes : [],
+                regexPatterns: enableRegexPatterns ? regexPatterns
                     .filter(r => r && r.pattern)
-                    .map(r => r.pattern),
-                regexPatternsV2: regexPatterns
+                    .map(r => r.pattern) : [],
+                regexPatternsV2: enableRegexPatterns ? regexPatterns
                     .filter(r => r && r.pattern && r.behavior)
                     .map(r => ({
                         pattern: r.pattern,
                         behavior: r.behavior.toLowerCase()
-                    })),
+                    })) : [],
                 ...(enableLlmPrompt && llmPrompt && llmPrompt.trim() ? {
                     llmRule: {
                         enabled: true,

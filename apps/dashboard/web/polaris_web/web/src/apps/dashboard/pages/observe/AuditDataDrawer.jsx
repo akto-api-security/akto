@@ -17,11 +17,13 @@ import {
 } from "@shopify/polaris-icons"
 import FlyLayout from "../../components/layouts/FlyLayout"
 import api from "./api"
+import settingsApi from "../settings/api"
 import func from "@/util/func"
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges"
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable"
 import { CellType } from "../../components/tables/rows/GithubRow"
 import GithubCell from "../../components/tables/cells/GithubCell"
+import { getServerActionFlags } from "./auditServerActionFlags"
 
 const childResourceName = { singular: "item", plural: "items" }
 
@@ -67,6 +69,7 @@ function ActionDropdown({ label, items, loading, disabled }) {
         ...it,
         onAction: () => {
             setOpen(false)
+            if (it.disabled) return
             if (typeof it.onAction === "function") it.onAction()
         },
     }))
@@ -106,6 +109,23 @@ function AuditDataDrawer({
     const [children, setChildren] = useState([])
     const [loadingChildren, setLoadingChildren] = useState(false)
     const [busy, setBusy] = useState(false)
+    const [registryConfigured, setRegistryConfigured] = useState(false)
+
+    useEffect(() => {
+        if (!show || !isEndpointSecurity) return
+        let cancelled = false
+        ;(async () => {
+            try {
+                const res = await settingsApi.fetchMcpRegistries()
+                const list = res?.mcpRegistries
+                const ok = Array.isArray(list) && list.length > 0
+                if (!cancelled) setRegistryConfigured(ok)
+            } catch {
+                if (!cancelled) setRegistryConfigured(false)
+            }
+        })()
+        return () => { cancelled = true }
+    }, [show, isEndpointSecurity])
 
     const fetchChildren = useCallback(async () => {
         if (!auditItem) return
@@ -148,7 +168,7 @@ function AuditDataDrawer({
         try {
             await api.updateAuditData(
                 auditItem.hexId, remarks, null,
-                auditItem.groupedHexIds, cascadeIds, null, null
+                auditItem.groupedHexIds, cascadeIds, null
             )
             func.setToast(true, false, `Server ${remarks === "Approved" ? "allowed" : remarks === "Rejected" ? "blocked" : "updated"}`)
             if (typeof onAfterUpdate === "function") onAfterUpdate("server")
@@ -190,7 +210,7 @@ function AuditDataDrawer({
                 if (!child) return
                 await api.updateAuditData(
                     child.hexId, remarks, null,
-                    child.groupedHexIds, null, null, null
+                    child.groupedHexIds, null, null
                 )
             }))
             func.setToast(true, false, `${selectedHexIds.length} item${selectedHexIds.length === 1 ? "" : "s"} updated`)
@@ -237,12 +257,22 @@ function AuditDataDrawer({
         markedBy: child.markedBy || "-",
     }))
 
+    const flags = getServerActionFlags(auditItem, {
+        registryConfigured,
+        addHandlerAvailable: typeof onAddToAllowlist === "function",
+    })
+
     const serverActionItems = [
-        { content: "Allow this server", onAction: () => updateServer("Approved") },
+        {
+            content: "Allow this server",
+            onAction: () => updateServer("Approved"),
+            disabled: !flags.allow,
+        },
         {
             content: "Block this server",
             destructive: true,
             onAction: () => updateServer("Rejected"),
+            disabled: !flags.block,
         },
         {
             content: "Block for all agents",
@@ -256,11 +286,15 @@ function AuditDataDrawer({
                     onRequestConditional("server", auditItem, null)
                 }
             },
+            disabled: !flags.conditional,
         },
-        ...(auditItem?.isEndpointSource && typeof onAddToAllowlist === "function" ? [{
-            content: "Add to MCP Allowed List",
-            onAction: () => onAddToAllowlist(auditItem),
-        }] : []),
+        {
+            content: "Add to MCP registry",
+            onAction: () => {
+                if (typeof onAddToAllowlist === "function") onAddToAllowlist(auditItem)
+            },
+            disabled: !flags.add,
+        },
     ]
 
     const childrenSection = (

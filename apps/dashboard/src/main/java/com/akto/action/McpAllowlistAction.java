@@ -29,8 +29,10 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class McpAllowlistAction extends UserAction {
 
@@ -125,7 +127,7 @@ public class McpAllowlistAction extends UserAction {
                 if (entryUrl.isEmpty()) continue;
                 String name = extractHost(entryUrl);
                 loggerMaker.infoAndAddToDb("Parsed MCP entry url=" + entryUrl + " name=" + name);
-                entries.add(new McpAllowlist(name, entryUrl, id, addedBy, now, false));
+                entries.add(new McpAllowlist(name, entryUrl, id, addedBy, now, false, McpAllowlist.Source.REGISTRY));
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Failed to parse CSV for registry id=" + id + " error=" + e.getMessage());
@@ -149,7 +151,8 @@ public class McpAllowlistAction extends UserAction {
                                 Updates.setOnInsert(McpAllowlist.REGISTRY_ID, entry.getRegistryId()),
                                 Updates.setOnInsert(McpAllowlist.ADDED_BY, entry.getAddedBy()),
                                 Updates.setOnInsert(McpAllowlist.MANUALLY_ADDED, false),
-                                Updates.setOnInsert(McpAllowlist.CREATED_AT, entry.getCreatedAt())
+                                Updates.setOnInsert(McpAllowlist.CREATED_AT, entry.getCreatedAt()),
+                                Updates.setOnInsert(McpAllowlist.SOURCE, McpAllowlist.Source.REGISTRY.name())
                         ),
                         new UpdateOptions().upsert(true)
                 ));
@@ -197,12 +200,20 @@ public class McpAllowlistAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private String mcpServerUrl;
+    private List<String> mcpServerUrls;
 
     public String addEntry() {
-        if (mcpServerUrl == null || mcpServerUrl.trim().isEmpty()) {
-            loggerMaker.errorAndAddToDb("addEntry called with empty mcpServerUrl");
-            addActionError("mcpServerUrl is required");
+        Set<String> urlSet = new LinkedHashSet<>();
+        if (mcpServerUrls != null) {
+            for (String u : mcpServerUrls) {
+                if (u != null && !u.trim().isEmpty()) {
+                    urlSet.add(u.trim());
+                }
+            }
+        }
+        if (urlSet.isEmpty()) {
+            loggerMaker.errorAndAddToDb("addEntry called with empty mcpServerUrls");
+            addActionError("mcpServerUrls is required");
             return Action.ERROR.toUpperCase();
         }
 
@@ -215,23 +226,29 @@ public class McpAllowlistAction extends UserAction {
         }
 
         String regId = csvRegistry.getHexId();
-        String entryUrl = mcpServerUrl.trim();
-        String name = extractHost(entryUrl);
         String addedBy = getSUser().getLogin();
-
         int now = Context.now();
-        McpAllowlistDao.instance.getMCollection().updateOne(
-                Filters.and(Filters.eq(McpAllowlist.NAME, name), Filters.eq(McpAllowlist.REGISTRY_ID, regId)),
-                Updates.combine(
-                        Updates.setOnInsert(McpAllowlist.URL, entryUrl),
-                        Updates.setOnInsert(McpAllowlist.REGISTRY_ID, regId),
-                        Updates.setOnInsert(McpAllowlist.ADDED_BY, addedBy),
-                        Updates.setOnInsert(McpAllowlist.MANUALLY_ADDED, true),
-                        Updates.setOnInsert(McpAllowlist.CREATED_AT, now)
-                ),
-                new UpdateOptions().upsert(true)
-        );
-        loggerMaker.infoAndAddToDb("Upserted MCP allowlist entry url=" + entryUrl + " registryId=" + regId);
+
+        List<WriteModel<McpAllowlist>> bulkOps = new ArrayList<>();
+        for (String entryUrl : urlSet) {
+            String name = extractHost(entryUrl);
+            bulkOps.add(new UpdateOneModel<>(
+                    Filters.and(Filters.eq(McpAllowlist.NAME, name), Filters.eq(McpAllowlist.REGISTRY_ID, regId)),
+                    Updates.combine(
+                            Updates.setOnInsert(McpAllowlist.URL, entryUrl),
+                            Updates.setOnInsert(McpAllowlist.REGISTRY_ID, regId),
+                            Updates.setOnInsert(McpAllowlist.ADDED_BY, addedBy),
+                            Updates.setOnInsert(McpAllowlist.MANUALLY_ADDED, true),
+                            Updates.setOnInsert(McpAllowlist.CREATED_AT, now),
+                            Updates.setOnInsert(McpAllowlist.SOURCE, McpAllowlist.Source.AUDIT_DATA.name())
+                    ),
+                    new UpdateOptions().upsert(true)
+            ));
+        }
+        if (!bulkOps.isEmpty()) {
+            McpAllowlistDao.instance.getMCollection().bulkWrite(bulkOps);
+        }
+        loggerMaker.infoAndAddToDb("Upserted " + urlSet.size() + " MCP allowlist entries registryId=" + regId);
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -270,8 +287,8 @@ public class McpAllowlistAction extends UserAction {
     public McpRegistryConfig.RegistryType getRegistryType() { return registryType; }
     public void setRegistryType(McpRegistryConfig.RegistryType registryType) { this.registryType = registryType; }
 
-    public String getMcpServerUrl() { return mcpServerUrl; }
-    public void setMcpServerUrl(String mcpServerUrl) { this.mcpServerUrl = mcpServerUrl; }
+    public List<String> getMcpServerUrls() { return mcpServerUrls; }
+    public void setMcpServerUrls(List<String> mcpServerUrls) { this.mcpServerUrls = mcpServerUrls; }
 
     public List<McpRegistryConfig> getMcpRegistries() { return mcpRegistries; }
     public List<McpAllowlist> getMcpAllowlistEntries() { return mcpAllowlistEntries; }

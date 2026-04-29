@@ -28,4 +28,19 @@ public class McpAllowlist {
 
     private boolean manuallyAdded;
     public static final String MANUALLY_ADDED = "manuallyAdded";
+
+    private Source source;
+    public static final String SOURCE = "source";
+
+    @Getter
+    @AllArgsConstructor
+    public enum Source {
+        REGISTRY("Registry"), AUDIT_DATA("Audit data");
+
+        private final String displayName;
+    }
+
+    public String getSourceDisplay() {
+        return source != null ? source.getDisplayName() : null;
+    }
 }

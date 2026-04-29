@@ -67,8 +67,9 @@ function McpRegistry() {
         return list.map((entry) => [
             entry.name || '-',
             entry.url || '-',
+            entry.sourceDisplay || 'Registry',
             entry.addedBy || '-',
-            entry.createdAt ? func.epochToDateTime(entry.createdAt) : '-'
+            entry.createdAt ? func.epochToDateTime(entry.createdAt) : '-',
         ]);
     };
 
@@ -473,8 +474,8 @@ function McpRegistry() {
                                                             </Text>
                                                             <Scrollable style={{ maxHeight: '480px' }} shadow focusable>
                                                                 <DataTable
-                                                                    columnContentTypes={['text', 'text', 'text', 'text']}
-                                                                    headings={['Name', 'URL', 'Added By', 'Created At']}
+                                                                    columnContentTypes={['text', 'text', 'text', 'text', 'text']}
+                                                                    headings={['Name', 'URL', 'Source', 'Added By', 'Created At']}
                                                                     rows={buildEndpointRows(registry.hexId)}
                                                                     increasedTableDensity
                                                                     hoverable
