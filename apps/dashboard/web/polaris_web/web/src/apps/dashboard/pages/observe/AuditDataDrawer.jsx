@@ -17,6 +17,7 @@ import {
 } from "@shopify/polaris-icons"
 import FlyLayout from "../../components/layouts/FlyLayout"
 import api from "./api"
+import settingsApi from "../settings/api"
 import func from "@/util/func"
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges"
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable"
@@ -106,6 +107,23 @@ function AuditDataDrawer({
     const [children, setChildren] = useState([])
     const [loadingChildren, setLoadingChildren] = useState(false)
     const [busy, setBusy] = useState(false)
+    const [registryConfigured, setRegistryConfigured] = useState(false)
+
+    useEffect(() => {
+        if (!show || !isEndpointSecurity) return
+        let cancelled = false
+        ;(async () => {
+            try {
+                const res = await settingsApi.fetchMcpRegistries()
+                const list = res?.mcpRegistries
+                const ok = Array.isArray(list) && list.length > 0
+                if (!cancelled) setRegistryConfigured(ok)
+            } catch {
+                if (!cancelled) setRegistryConfigured(false)
+            }
+        })()
+        return () => { cancelled = true }
+    }, [show, isEndpointSecurity])
 
     const fetchChildren = useCallback(async () => {
         if (!auditItem) return
@@ -215,26 +233,29 @@ function AuditDataDrawer({
         markedBy: child.markedBy || "-",
     }))
 
-    const serverActionItems = [
-        { content: "Allow this server", onAction: () => updateServer("Approved") },
-        {
-            content: "Block this server",
-            destructive: true,
-            onAction: () => updateServer("Rejected"),
-        },
-        {
-            content: "Conditionally allow this server",
-            onAction: () => {
-                if (typeof onRequestConditional === "function") {
-                    onRequestConditional("server", auditItem, null)
-                }
-            },
-        },
-        ...(auditItem?.isEndpointSource && typeof onAddToAllowlist === "function" ? [{
+    const showAllowlistOnly = registryConfigured && !auditItem?.verified && auditItem?.isEndpointSource && typeof onAddToAllowlist === "function"
+
+    const serverActionItems = showAllowlistOnly
+        ? [{
             content: "Add to MCP Allowed List",
             onAction: () => onAddToAllowlist(auditItem),
-        }] : []),
-    ]
+        }]
+        : [
+            { content: "Allow this server", onAction: () => updateServer("Approved") },
+            {
+                content: "Block this server",
+                destructive: true,
+                onAction: () => updateServer("Rejected"),
+            },
+            {
+                content: "Conditionally allow this server",
+                onAction: () => {
+                    if (typeof onRequestConditional === "function") {
+                        onRequestConditional("server", auditItem, null)
+                    }
+                },
+            },
+        ]
 
     const childrenSection = (
         <Box>
