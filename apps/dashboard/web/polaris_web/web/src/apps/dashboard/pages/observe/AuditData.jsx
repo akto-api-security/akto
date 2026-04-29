@@ -297,7 +297,7 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     })() : null
     temp['remarksComp'] = (
         (temp?.remarks === null || temp?.remarks === "" || !temp?.remarks) ? 
-            <Text variant="headingSm" color="critical" fontWeight="bold">Pending...</Text> : 
+            <Text variant="headingSm">Approved</Text> : 
             <VerticalStack gap="1">
                 <Text variant="bodyMd">{temp?.remarks}</Text>
                 {temp?.approvalConditions && (

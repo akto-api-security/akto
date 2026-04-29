@@ -233,7 +233,7 @@ function AuditDataDrawer({
         apiAccessTypesComp: (child.apiAccessTypes || []).join(", ") || "-",
         remarksComp: child?.remarks
             ? <Text variant="bodySm">{child.remarks}</Text>
-            : <Text variant="bodySm" color="critical" fontWeight="bold">Pending</Text>,
+            : <Text variant="bodySm">Approved</Text>,
         markedBy: child.markedBy || "-",
     }))
 
@@ -304,7 +304,7 @@ function AuditDataDrawer({
     const auditCellData = auditItem ? {
         resourceName: auditItem.resourceName,
         typeBadge: [auditItem.type].filter(Boolean),
-        remarksBadge: [auditItem.remarks || "Pending"],
+        remarksBadge: [auditItem.remarks || "Approved"],
         lastDetected: auditItem.lastDetected ? func.prettifyEpoch(auditItem.lastDetected) : "-",
         updatedTimestamp: auditItem.updatedTimestamp ? func.prettifyEpoch(auditItem.updatedTimestamp) : "-",
         markedBy: auditItem.markedBy || "-",
