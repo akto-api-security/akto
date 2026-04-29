@@ -113,8 +113,11 @@ public class SampleParser {
         String sourceStr = (String) json.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
         HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
 
-        // JSON string of K8 POD tags
-        String tags = (String) json.getOrDefault("tag", "");
+        Object tagRaw = json.get("tag");
+        String tags = IngestRootTagParser.normalizeTagField(tagRaw);
+        if (tags == null) {
+            tags = "";
+        }
         List<String> parentMcpToolNames;
         try {
             parentMcpToolNames = (List<String>) json.get("parentMcpToolNames");

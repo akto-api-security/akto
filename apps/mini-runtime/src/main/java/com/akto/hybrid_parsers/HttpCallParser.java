@@ -42,6 +42,7 @@ import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.tracing.ServiceGraphBuilder;
 import com.akto.tracing.TraceParseResult;
+import com.akto.tracing.clickup.ClickUpTraceParser;
 import com.akto.tracing.n8n.N8nTraceParser;
 import com.akto.usage.OrgUtils;
 import com.akto.hybrid_runtime.APICatalogSync;
@@ -338,6 +339,7 @@ public class HttpCallParser {
                     && !source.equals(Constants.AI_AGENT_SOURCE_SNOWFLAKE)
                     && !source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)
                     && !source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_CLICKUP)
                     )) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
@@ -545,11 +547,18 @@ public class HttpCallParser {
         return Constants.AI_AGENT_SOURCE_N8N.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
+    private boolean isClickUpTraffic(Map<String, String> tagsMap) {
+        if (tagsMap == null) {
+            return false;
+        }
+        return Constants.AI_AGENT_SOURCE_CLICKUP.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+    }
+
     private boolean isAgenticTraffic(Map<String, String> tagsMap) {
         if (tagsMap == null) {
             return false;
         }
-        return Arrays.asList(Constants.AI_AGENT_SOURCE_N8N, Constants.AI_AGENT_SOURCE_LANGCHAIN, Constants.AI_AGENT_SOURCE_COPILOT_STUDIO, Constants.AI_AGENT_SOURCE_DATABRICS, Constants.AI_AGENT_SOURCE_VERTEX, Constants.AI_AGENT_SOURCE_SNOWFLAKE, Constants.AI_AGENT_SOURCE_ARCADE_DEV, Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER, Constants.AI_AGENT_SOURCE_ENDPOINT).contains(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+        return Arrays.asList(Constants.AI_AGENT_SOURCE_N8N, Constants.AI_AGENT_SOURCE_LANGCHAIN, Constants.AI_AGENT_SOURCE_COPILOT_STUDIO, Constants.AI_AGENT_SOURCE_DATABRICS, Constants.AI_AGENT_SOURCE_VERTEX, Constants.AI_AGENT_SOURCE_SNOWFLAKE, Constants.AI_AGENT_SOURCE_ARCADE_DEV, Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER, Constants.AI_AGENT_SOURCE_ENDPOINT, Constants.AI_AGENT_SOURCE_CLICKUP).contains(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
     /**
@@ -631,6 +640,51 @@ public class HttpCallParser {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing N8N trace: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Parses ClickUp trace summary from {@code responsePayload} key {@link Constants#CLICKUP_TRACE_METADATA_KEY}
+     * and persists trace/spans (same path as N8N → TraceDao).
+     */
+    private void parseClickUpTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String payload = httpResponseParam.getPayload();
+            if (payload == null || payload.isEmpty()) {
+                return;
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payloadMap = gson.fromJson(payload, Map.class);
+            if (payloadMap == null || !payloadMap.containsKey(Constants.CLICKUP_TRACE_METADATA_KEY)) {
+                return;
+            }
+            Object clickupMeta = payloadMap.get(Constants.CLICKUP_TRACE_METADATA_KEY);
+            if (clickupMeta == null) {
+                return;
+            }
+            String clickupTraceJson = gson.toJson(clickupMeta);
+            if (!ClickUpTraceParser.getInstance().canParse(clickupTraceJson)) {
+                loggerMaker.info("clickupTraceMetadata present but not parseable as ClickUp trace", LogDb.RUNTIME);
+                return;
+            }
+            TraceParseResult result = ClickUpTraceParser.getInstance().parse(clickupTraceJson);
+            dataActor.storeTrace(result.getTrace());
+            if (result.getSpans() != null && !result.getSpans().isEmpty()) {
+                dataActor.storeSpans(result.getSpans());
+                loggerMaker.info("Stored ClickUp trace with " + result.getSpans().size() + " spans", LogDb.RUNTIME);
+            }
+            String workflowId = result.getWorkflowId();
+            if (workflowId == null || workflowId.isEmpty()) {
+                return;
+            }
+            String hostname = getHostnameForCollection(httpResponseParam);
+            int apiCollectionId = ServiceGraphBuilder.getInstance().getApiCollectionIdFromWorkflowId(workflowId, hostname);
+            Map<String, ServiceGraphEdgeInfo> edges = ClickUpTraceParser.getInstance().extractServiceGraph(clickupTraceJson);
+            if (apiCollectionId != -1 && edges != null && !edges.isEmpty()) {
+                ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing ClickUp trace: " + e.getMessage());
         }
     }
 
@@ -1437,6 +1491,10 @@ public class HttpCallParser {
             // Parse N8N trace metadata if this is N8N traffic
             if (isN8nTraffic(tagsMap)) {
                 parseN8nTrace(httpResponseParam);
+            }
+
+            if (isClickUpTraffic(tagsMap)) {
+                parseClickUpTrace(httpResponseParam);
             }
 
             // Build service graph edges for Arcade traffic

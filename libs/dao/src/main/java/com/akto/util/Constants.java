@@ -48,6 +48,10 @@ public class Constants {
     public final static String _AKTO = "AKTO";
     public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
+
+    /** Ingest `tag` JSON: vendor / integration id (http-proxy cron). */
+    public static final String INGEST_TAG_SERVICE = "service";
+    public static final String INGEST_SERVICE_VALUE_CLICKUP = "clickup";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
     public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
@@ -74,6 +78,9 @@ public class Constants {
     public static final String AI_AGENT_SOURCE_ARCADE_DEV = "ARCADE_DEV";
     public static final String AI_AGENT_SOURCE_MICROSOFT_DEFENDER = "DEFENDER";
     public static final String AI_AGENT_SOURCE_ENDPOINT = "ENDPOINT";
+    public static final String AI_AGENT_SOURCE_CLICKUP = "CLICKUP";
+
+    public static final String CLICKUP_TRACE_METADATA_KEY = "clickupTraceMetadata";
     public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
     public static final String AI_AGENT_TAG_SOURCE = "source";
     public static final String AI_AGENT_TAG_CONNECTOR = "connector";
