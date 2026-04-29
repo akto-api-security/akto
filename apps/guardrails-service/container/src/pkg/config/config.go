@@ -30,6 +30,8 @@ type Config struct {
 
 	McpAllowedListRefreshIntervalMin int
 
+	CollectionRefreshIntervalMin int
+
 	// Supports comma-separated or "regex:" prefixed patterns.
 	FilterHost string
 	FilterPath string
@@ -90,7 +92,8 @@ func LoadConfig() *Config {
 		FilterPath:               getEnv("FILTER_PATH", ""),
 		SessionSyncIntervalMin:   getEnvAsInt("SESSION_SYNC_INTERVAL_MIN", 5),
 		SessionEnabled:           getEnvAsBool("SESSION_ENABLED", true),
-		McpAllowedListRefreshIntervalMin: getEnvAsInt("MCP_ALLOWLIST_REFRESH_INTERVAL_MIN", 1),
+		McpAllowedListRefreshIntervalMin:  getEnvAsInt("MCP_ALLOWLIST_REFRESH_INTERVAL_MIN", 1),
+		CollectionRefreshIntervalMin:   getEnvAsInt("COLLECTION_REFRESH_INTERVAL_MIN", 5),
 		File: FileConfig{
 			MaxFiles:         getEnvAsInt("FILE_VALIDATE_MAX_FILES", 5),
 			MaxTextFileBytes: getEnvAsInt("FILE_VALIDATE_MAX_TEXT_FILE_BYTES", 5*1024*1024),
