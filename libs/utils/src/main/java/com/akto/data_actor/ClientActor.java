@@ -4643,7 +4643,7 @@ public class ClientActor extends DataActor {
             batch.add(sequences.get(i));
             if (batch.size() % sequenceBatchLimit == 0) {
                 List<ApiSequences> finalBatch = batch;
-                threadPool.submit(() -> writeApiSequencesBatch(finalBatch));
+                sequenceThreadPool.submit(() -> writeApiSequencesBatch(finalBatch));
                 batch = new ArrayList<>();
             }
         }

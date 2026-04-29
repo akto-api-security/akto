@@ -790,12 +790,12 @@ public class DbActor extends DataActor {
                             .append(ApiSequences.PREV_STATE_COUNT, new Document("$add", Arrays.asList(
                                     new Document("$ifNull", Arrays.asList("$" + ApiSequences.PREV_STATE_COUNT, 0)),
                                     seq.getPrevStateCount())))
-                            .append(ApiSequences.LAST_UPDATED_AT, now)
-                            .append(ApiSequences.CREATED_AT,
-                                    new Document("$ifNull", Arrays.asList("$" + ApiSequences.CREATED_AT, now)))
                             .append(ApiSequences.LAST_STATE_COUNT, new Document("$add", Arrays.asList(
                                     new Document("$ifNull", Arrays.asList("$" + ApiSequences.LAST_STATE_COUNT, 0)),
                                     seq.getLastStateCount())))
+                            .append(ApiSequences.LAST_UPDATED_AT, now)
+                            .append(ApiSequences.CREATED_AT,
+                                    new Document("$ifNull", Arrays.asList("$" + ApiSequences.CREATED_AT, now)))
                             .append(ApiSequences.IS_ACTIVE,
                                     new Document("$ifNull", Arrays.asList("$" + ApiSequences.IS_ACTIVE, true)))),
                     new Document("$set", new Document()
