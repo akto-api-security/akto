@@ -23,6 +23,7 @@ import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadge
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable"
 import { CellType } from "../../components/tables/rows/GithubRow"
 import GithubCell from "../../components/tables/cells/GithubCell"
+import { getServerActionFlags } from "./auditServerActionFlags"
 
 const childResourceName = { singular: "item", plural: "items" }
 
@@ -234,74 +235,22 @@ function AuditDataDrawer({
         markedBy: child.markedBy || "-",
     }))
 
-    const nowEpochSec = Math.floor(Date.now() / 1000)
-    const remarks = auditItem?.remarks
-    const isPending =
-        remarks == null ||
-        remarks === "" ||
-        (typeof remarks === "string" && remarks.trim() === "")
-    const isRejected = remarks === "Rejected"
-    const isApproved = remarks === "Approved"
-    const isConditional = remarks === "Conditionally Approved"
-
-    const expiresAtRaw = auditItem?.approvalConditions?.expiresAt
-    const expiresAtNum =
-        typeof expiresAtRaw === "number"
-            ? expiresAtRaw
-            : (typeof expiresAtRaw === "string" && expiresAtRaw !== "" ? parseInt(expiresAtRaw, 10) : NaN)
-    const conditionalExpired =
-        isConditional &&
-        Number.isFinite(expiresAtNum) &&
-        expiresAtNum > 0 &&
-        (expiresAtNum > 1e12 ? expiresAtNum < Date.now() : expiresAtNum < nowEpochSec)
-
-    const applyRemarkBasedActions = () => {
-        if (isPending) {
-            blockEnabled = true
-        } else if (isRejected) {
-            allowEnabled = true
-            conditionalEnabled = true
-        } else if (isConditional) {
-            if (conditionalExpired) {
-                allowEnabled = true
-                conditionalEnabled = true
-            } else {
-                allowEnabled = true
-                blockEnabled = true
-                conditionalEnabled = true
-            }
-        } else if (isApproved) {
-            blockEnabled = true
-        }
-    }
-
-    let allowEnabled = false
-    let blockEnabled = false
-    let conditionalEnabled = false
-    let addEnabled = false
-
-    if (auditItem?.verified) {
-        applyRemarkBasedActions()
-    } else {
-        if (registryConfigured && typeof onAddToAllowlist === "function" && auditItem?.isEndpointSource) {
-            addEnabled = true
-        }
-        if (!addEnabled) {
-            applyRemarkBasedActions()
-        }
-    }
+    const flags = getServerActionFlags(auditItem, {
+        registryConfigured,
+        addHandlerAvailable: typeof onAddToAllowlist === "function",
+    })
 
     const serverActionItems = [
         {
             content: "Allow this server",
             onAction: () => updateServer("Approved"),
-            disabled: !allowEnabled,
+            disabled: !flags.allow,
         },
         {
             content: "Block this server",
             destructive: true,
             onAction: () => updateServer("Rejected"),
-            disabled: !blockEnabled,
+            disabled: !flags.block,
         },
         {
             content: "Conditionally allow this server",
@@ -310,14 +259,14 @@ function AuditDataDrawer({
                     onRequestConditional("server", auditItem, null)
                 }
             },
-            disabled: !conditionalEnabled,
+            disabled: !flags.conditional,
         },
         {
             content: "Add to MCP registry",
             onAction: () => {
                 if (typeof onAddToAllowlist === "function") onAddToAllowlist(auditItem)
             },
-            disabled: !addEnabled,
+            disabled: !flags.add,
         },
     ]
 

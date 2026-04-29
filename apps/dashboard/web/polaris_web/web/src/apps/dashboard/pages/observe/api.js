@@ -67,13 +67,15 @@ export default {
         });
         return resp;
     },
-    async addMcpAllowlistEntry(mcpServerUrl) {
-        const resp = await request({
+    async addMcpAllowlistUrls(mcpServerUrls) {
+        const list = Array.isArray(mcpServerUrls) ? mcpServerUrls : [mcpServerUrls];
+        const urls = [...new Set(list.map((u) => String(u ?? '').trim()).filter(Boolean))];
+        if (!urls.length) return null;
+        return request({
             url: '/api/addMcpAllowlistEntry',
             method: 'post',
-            data: { mcpServerUrl }
+            data: { mcpServerUrls: urls },
         });
-        return resp;
     },
 
     async fetchMcpAuditInfoByCollection(apiCollectionId) {
