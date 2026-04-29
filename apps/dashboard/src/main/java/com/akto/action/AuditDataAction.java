@@ -448,8 +448,7 @@ public class AuditDataAction extends UserAction {
     }
 
     // Priority: Rejected=0, ActiveConditional=1, Approved=2, ExpiredConditional=3, Pending=4
-    // Priority: Rejected=0, ActiveConditional=1, Approved=2, ExpiredConditional=3, Pending=4
-    // Expired conditional loses to both Rejected and Approved — it reverts to Pending.
+    // Expired conditional loses to both Rejected and Approved - reverts to null (Pending in UI).
     // Only "Conditionally Approved" entries are checked for expiry; "Approved" with stale
     // approvalConditions in DB is still treated as Approved.
     private static int remarksPriority(String r, Object cond, long nowEpochSeconds) {
@@ -489,7 +488,7 @@ public class AuditDataAction extends UserAction {
             }
             if (p < chosenPriority) {
                 chosenPriority = p;
-                displayRemarks = (p == 3) ? "Pending" : r; // expired conditional → Pending
+                displayRemarks = (p == 3) ? null : r;
                 displayMarkedBy = entry.get(McpAuditInfo.MARKED_BY);
             }
         }
