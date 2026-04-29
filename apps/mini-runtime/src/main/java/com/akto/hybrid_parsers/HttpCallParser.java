@@ -1547,8 +1547,8 @@ public class HttpCallParser {
 
     private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
         if (McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
-            FeatureAccess mcpSecurityAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(), "SECURITY_TYPE_AGENTIC");
-            if (mcpSecurityAccess == null || !mcpSecurityAccess.getIsGranted()) {
+            FeatureAccess skipAgenticTags = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(), "SKIP_AGENTIC_TAGS");
+            if (skipAgenticTags != null && skipAgenticTags.getIsGranted()) {
                 return Optional.empty();
             }
             return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES));
