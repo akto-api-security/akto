@@ -188,6 +188,46 @@ func (c *Client) FetchGuardrailEndpoints() ([]byte, error) {
 	return body, nil
 }
 
+// FetchApiCollections fetches all API collections (with their tags) from database-abstractor
+func (c *Client) FetchApiCollections() ([]byte, error) {
+	url := c.baseURL + "/fetchAllApiCollections"
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte("{}")))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	token := auth.GetDatabaseAbstractorServiceToken()
+	if token == "" {
+		return nil, fmt.Errorf("DATABASE_ABSTRACTOR_SERVICE_TOKEN not set")
+	}
+	req.Header.Set("Authorization", token)
+	req.Header.Set("Content-Type", "application/json")
+
+	c.logger.Info("Fetching API collections", zap.String("url", url))
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch API collections: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch API collections, status: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	c.logger.Info("Successfully fetched API collections",
+		zap.Int("responseSize", len(body)),
+		zap.String("responsePreview", string(body[:min(len(body), 500)])))
+
+	return body, nil
+}
+
 // SendRequest sends a generic request to database-abstractor service
 func (c *Client) SendRequest(method, endpoint string, body interface{}) ([]byte, error) {
 	url := c.baseURL + endpoint
