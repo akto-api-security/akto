@@ -503,7 +503,7 @@ function McpRegistry() {
                                 <Text variant="bodyMd" color="subdued">Click <b>Add URL</b> to open the form.</Text>
                                 <Text variant="bodyMd" fontWeight="semibold">2. Enter the URL</Text>
                                 <Text variant="bodyMd" color="subdued">Enter the URL pointing to your CSV file (e.g. <code>https://example.com/path/to/mcp_servers.csv</code>).</Text>
-                                <Link url="https://raw.githubusercontent.com/nayanakto/ai-security/refs/heads/main/sample_mcp.csv" target="_blank">Download sample CSV</Link>
+                                <Link url="https://raw.githubusercontent.com/akto-api-security/akto/master/apps/dashboard/src/main/resources/sample_mcp_registry.csv" target="_blank">Download sample CSV</Link>
                                 <Text variant="bodyMd" fontWeight="semibold">3. Add authentication (if required)</Text>
                                 <Text variant="bodyMd" color="subdued">If the file requires authentication, add a header — key: <code>Authorization</code>, value: <code>Bearer &lt;your_token&gt;</code>.</Text>
                                 <Text variant="bodyMd" fontWeight="semibold">4. Submit</Text>
@@ -521,7 +521,7 @@ function McpRegistry() {
                                 <Text variant="bodyMd" color="subdued">Your CSV must have a header row with a <code>mcp_server_name</code> column. Each row is one MCP server name.</Text>
                                 <pre style={{ margin: 0, fontSize: '12px', fontFamily: 'monospace', lineHeight: '1.8', background: '#f6f6f7', border: '1px solid #e1e3e5', borderRadius: '6px', padding: '10px 14px' }}>{'mcp_server_name\napi.githubcopilot.com\nmcp.notion.com\nfilesystem-local\nmy-postgres'}</pre>
                                 <Text variant="bodyMd" color="subdued">For remote MCP servers, use the domain name (e.g. <code>api.example.com</code>). For local MCP servers, use the name your team has given it (e.g. <code>filesystem-local</code>, <code>my-postgres</code>).</Text>
-                                <Link url="https://raw.githubusercontent.com/nayanakto/ai-security/refs/heads/main/sample_mcp.csv" target="_blank">Download sample CSV</Link>
+                                <Link url="https://raw.githubusercontent.com/akto-api-security/akto/master/apps/dashboard/src/main/resources/sample_mcp_registry.csv" target="_blank">Download sample CSV</Link>
                                 <Text variant="bodyMd" fontWeight="semibold">3. Syncing</Text>
                                 <Text variant="bodyMd" color="subdued">Updated your CSV? Wait 5 minutes for changes to propagate, then click <b>Sync now</b> to pull in the latest entries.</Text>
                             </VerticalStack>
