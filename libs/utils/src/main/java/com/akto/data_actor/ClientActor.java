@@ -73,6 +73,7 @@ public class ClientActor extends DataActor {
     public static final String ULTRON_URL = "https://ultron.akto.io";
     private static final String PARAM_TEST_SCRIPT_TYPE = "testScriptType";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
+    private static ExecutorService sequenceThreadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
         
     /**
      * Dedicated thread pool for agent traffic log HTTP writes.
@@ -4648,7 +4649,7 @@ public class ClientActor extends DataActor {
         }
         if (!batch.isEmpty()) {
             List<ApiSequences> finalBatch = batch;
-            threadPool.submit(() -> writeApiSequencesBatch(finalBatch));
+            sequenceThreadPool.submit(() -> writeApiSequencesBatch(finalBatch));
         }
     }
 
