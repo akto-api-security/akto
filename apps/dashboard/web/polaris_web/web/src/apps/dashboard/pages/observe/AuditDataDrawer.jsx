@@ -144,11 +144,13 @@ function AuditDataDrawer({
 
     const updateServer = async (remarks) => {
         if (!auditItem) return
+        const serverName = auditItem.mcpServerName && auditItem.mcpServerName !== "-" ? auditItem.mcpServerName : null
         setBusy(true)
         try {
             await api.updateAuditData(
                 auditItem.hexId, remarks, null,
-                auditItem.groupedHexIds, cascadeIds, null, null
+                auditItem.groupedHexIds, cascadeIds, null,
+                remarks === "Approved" ? serverName : null
             )
             func.setToast(true, false, `Server ${remarks === "Approved" ? "allowed" : remarks === "Rejected" ? "blocked" : "updated"}`)
             if (typeof onAfterUpdate === "function") onAfterUpdate("server")
@@ -169,7 +171,7 @@ function AuditDataDrawer({
         setBusy(true)
         try {
             await api.updateAuditData(
-                auditItem.hexId, "Rejected for all agents", null,
+                auditItem.hexId, "Rejected", null,
                 auditItem.groupedHexIds, cascadeIds, serverName
             )
             func.setToast(true, false, "Server blocked for all agents")
