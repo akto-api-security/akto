@@ -23,6 +23,7 @@ public class ModuleInfoWorker {
     private final String version;
     private final DataActor dataActor;
     private final String moduleName;
+    private static ModuleInfo moduleInfo;
     private static final String podName = System.getenv().getOrDefault("POD_NAME", "");
     private static final String nodeName = System.getenv().getOrDefault("NODE_NAME", "");
     private static final String hostname = System.getenv().getOrDefault("HOSTNAME", "");
@@ -84,9 +85,13 @@ public class ModuleInfoWorker {
         }
     }
 
+    public static ModuleInfo getModuleInfo() {
+        return moduleInfo;
+    }
+
     private void scheduleHeartBeatUpdate () {
         ModuleInfoWorker _this = this;
-        ModuleInfo moduleInfo = new ModuleInfo();
+        moduleInfo = new ModuleInfo();
         moduleInfo.setModuleType(this.moduleType);
         moduleInfo.setCurrentVersion(this.version);
         moduleInfo.setStartedTs(this.startedTs);
