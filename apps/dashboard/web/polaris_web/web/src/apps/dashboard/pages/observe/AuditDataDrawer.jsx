@@ -169,7 +169,7 @@ function AuditDataDrawer({
         setBusy(true)
         try {
             await api.updateAuditData(
-                auditItem.hexId, "Rejected for all agents", null,
+                auditItem.hexId, "Rejected", null,
                 auditItem.groupedHexIds, cascadeIds, serverName
             )
             func.setToast(true, false, "Server blocked for all agents")
