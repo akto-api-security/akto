@@ -415,6 +415,58 @@ func (s *Service) getLoginUserEmailType(params *models.ValidateRequestParams) st
 	return v
 }
 
+// TODO: move reportAndBlockPersonalAccount to mcp library so threat reporting
+// and validation live in one place alongside other policy enforcement.
+func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID string) *mcp.ValidationResult {
+	blockReason := "Blocked: personal accounts are not permitted by guardrail policy"
+
+	if s.sessionMgr != nil && sessionID != "" {
+		s.sessionMgr.TrackResponse(sessionID, requestID, blockReason, true)
+		s.sessionMgr.UpdateBlockedReason(sessionID, blockReason)
+	}
+
+	if !params.EffectiveSkipThreat() {
+		reqHeaders := make(map[string]string)
+		if params.RequestHeaders != "" {
+			json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders)
+		}
+		statusCode := 0
+		if params.StatusCode != "" {
+			fmt.Sscanf(params.StatusCode, "%d", &statusCode)
+		}
+		go func() {
+			if err := mcp.ReportThreat(
+				context.Background(),
+				payloadToValidate,
+				"",
+				types.ThreatMetadata{
+					PolicyName:   "block_personal_account",
+					RuleViolated: "personal account type",
+					Severity:     "MEDIUM",
+					Reason:       blockReason,
+				},
+				params.IP,
+				params.Path,
+				params.Method,
+				reqHeaders,
+				nil,
+				statusCode,
+				types.ContextSource(params.ContextSource),
+				extractHostHeader(reqHeaders),
+				sessionID,
+			); err != nil {
+				s.logger.Warn("Failed to report threat for block_personal_account", zap.Error(err))
+			}
+		}()
+	}
+
+	return &mcp.ValidationResult{
+		Allowed:   false,
+		Reason:    blockReason,
+		Behaviour: "block",
+	}
+}
+
 // extractHostHeader extracts the host header value from request headers
 func extractHostHeader(headers map[string]string) string {
 	if host, ok := headers["Host"]; ok {
@@ -748,11 +800,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 				zap.String("account", params.AktoAccountID),
 				zap.String("accountType", accountType),
 				zap.String("sessionID", sessionID))
-			return &mcp.ValidationResult{
-				Allowed:   false,
-				Reason:    "Blocked: personal accounts are not permitted by guardrail policy",
-				Behaviour: "block",
-			}, nil
+			return s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID), nil
 		}
 	}
 
