@@ -2633,12 +2633,6 @@ public class DbLayer {
     }
 
     public static void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
-        loggerMaker.infoAndAddToDb(String.format(
-            "[insertMCPAuditDataLog] Received: resourceName=%s type=%s mcpHost=%s hostCollectionId=%d blockAll=%b contextSource=%s",
-            auditInfo.getResourceName(), auditInfo.getType(), auditInfo.getMcpHost(),
-            auditInfo.getHostCollectionId(), auditInfo.isBlockAll(), auditInfo.getContextSource()
-        ), LogDb.DASHBOARD);
-
         List<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.eq(McpAuditInfo.TYPE, auditInfo.getType()));
         filterList.add(Filters.eq(McpAuditInfo.RESOURCE_NAME, auditInfo.getResourceName()));
@@ -2672,9 +2666,37 @@ public class DbLayer {
                 Filters.eq(McpAuditInfo.BLOCK_ALL, true)
             );
             blockedEntry = McpAuditInfoDao.instance.findOne(blockAllFilter);
+        } else if (Constants.AKTO_MCP_TOOLS_TAG.equals(auditInfo.getType())) {
+            // For mcp-tool, mcpHost is <device>.<clientType>.<serverName>.
+            // Extract serverName suffix (same two-dot logic as mcp-server resourceName above)
+            // and check if that server has blockAll=true.
+            String mcpHost = auditInfo.getMcpHost();
+            if (mcpHost != null && !mcpHost.isEmpty()) {
+                int firstDot = mcpHost.indexOf('.');
+                int secondDot = firstDot >= 0 ? mcpHost.indexOf('.', firstDot + 1) : -1;
+                String serverName = secondDot >= 0 ? mcpHost.substring(secondDot + 1) : mcpHost;
+
+                loggerMaker.infoAndAddToDb(String.format(
+                    "[insertMCPAuditDataLog] mcp-tool: extracted serverName=%s from mcpHost=%s, checking for blockAll=true",
+                    serverName, mcpHost
+                ), LogDb.DASHBOARD);
+
+                String regexPattern = "(^|\\.)" + java.util.regex.Pattern.quote(serverName) + "$";
+                Bson blockAllFilter = Filters.and(
+                    Filters.regex(McpAuditInfo.RESOURCE_NAME, regexPattern),
+                    Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
+                    Filters.eq(McpAuditInfo.BLOCK_ALL, true)
+                );
+                blockedEntry = McpAuditInfoDao.instance.findOne(blockAllFilter);
+            } else {
+                loggerMaker.infoAndAddToDb(String.format(
+                    "[insertMCPAuditDataLog] mcp-tool has no mcpHost, skipping server blockAll check for resourceName=%s",
+                    auditInfo.getResourceName()
+                ), LogDb.DASHBOARD);
+            }
         } else {
             loggerMaker.infoAndAddToDb(String.format(
-                "[insertMCPAuditDataLog] Skipping blockAll check for non-mcp-server type=%s resourceName=%s",
+                "[insertMCPAuditDataLog] Skipping blockAll check for type=%s resourceName=%s",
                 auditInfo.getType(), auditInfo.getResourceName()
             ), LogDb.DASHBOARD);
         }
@@ -2702,11 +2724,14 @@ public class DbLayer {
         }
         if (blockedEntry != null) {
             loggerMaker.infoAndAddToDb(String.format(
-                "[insertMCPAuditDataLog] Applying blockAll=true and remarks to entry for resourceName=%s mcpHost=%s",
+                "[insertMCPAuditDataLog] Applying remarks=Rejected to entry for resourceName=%s mcpHost=%s",
                 auditInfo.getResourceName(), auditInfo.getMcpHost()
             ), LogDb.DASHBOARD);
             updateList.add(Updates.set(McpAuditInfo.REMARKS, "Rejected"));
-            updateList.add(Updates.set(McpAuditInfo.BLOCK_ALL, true));
+            updateList.add(Updates.set(McpAuditInfo.MARKED_BY, "System"));
+            if (!Constants.AKTO_MCP_TOOLS_TAG.equals(auditInfo.getType())) {
+                updateList.add(Updates.set(McpAuditInfo.BLOCK_ALL, true));
+            }
         }
 
         Bson updates = Updates.combine(updateList.toArray(new Bson[0]));
