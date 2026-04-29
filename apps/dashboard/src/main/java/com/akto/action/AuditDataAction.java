@@ -634,6 +634,19 @@ public class AuditDataAction extends UserAction {
                 );
             }
 
+            // When approving any server that had blockAll=true, clear blockAll for all
+            // servers sharing the same server name so newly arriving records are no longer
+            // auto-blocked across all agents.
+            if ("Approved".equals(remarks) && mcpServerForAllAgents != null && !mcpServerForAllAgents.trim().isEmpty()) {
+                String escaped = java.util.regex.Pattern.quote(mcpServerForAllAgents.trim());
+                Bson blockAllMatch = Filters.and(
+                    Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
+                    Filters.regex(McpAuditInfo.RESOURCE_NAME, "(^|\\.)" + escaped + "$"),
+                    Filters.eq(McpAuditInfo.BLOCK_ALL, true)
+                );
+                McpAuditInfoDao.instance.updateMany(blockAllMatch, Updates.set(McpAuditInfo.BLOCK_ALL, false));
+            }
+
             List<Integer> mergedCascade = new ArrayList<>();
             if (cascadeHostCollectionIds != null) mergedCascade.addAll(cascadeHostCollectionIds);
             for (Integer id : allAgentsCollectionIds) {
