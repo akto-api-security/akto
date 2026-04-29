@@ -547,11 +547,6 @@ public class AuditDataAction extends UserAction {
     // "cursor.akto-docs", and "<device>.cursor.akto-docs" alike.
     @Setter
     String mcpServerForAllAgents;
-    // When set, clears blockAll=false on all mcp-server records sharing this server
-    // name without fanning out the remarks update. Used when a single server is
-    // approved to lift the global auto-block while keeping other instances "Rejected".
-    @Setter
-    String clearBlockAllForServer;
 
     public String updateAuditData() {
         User user = getSUser();
@@ -639,24 +634,30 @@ public class AuditDataAction extends UserAction {
                 );
             }
 
-            // When approving any server from a blockAll group, clear blockAll=false across
-            // all servers sharing that name — leaving their remarks unchanged (still "Rejected").
-            if (clearBlockAllForServer != null && !clearBlockAllForServer.trim().isEmpty()) {
-                String escaped = java.util.regex.Pattern.quote(clearBlockAllForServer.trim());
-                List<ObjectId> allServerIds = new ArrayList<>();
-                try (MongoCursor<McpAuditInfo> cur = McpAuditInfoDao.instance.getMCollection()
-                        .find(Filters.and(
-                            Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
-                            Filters.regex(McpAuditInfo.RESOURCE_NAME, "(^|\\.)" + escaped + "$")
-                        )).cursor()) {
-                    while (cur.hasNext()) {
-                        McpAuditInfo rec = cur.next();
-                        if (rec.getId() != null) allServerIds.add(rec.getId());
+            // When approving any server, clear blockAll=false on every mcp-server record
+            // sharing that server name — derived server-side from the approved record's
+            // resourceName so the UI doesn't need to send anything extra.
+            if ("Approved".equals(remarks) && !targetIds.isEmpty()) {
+                String approvedServerName = null;
+                McpAuditInfo approvedRec = McpAuditInfoDao.instance.getMCollection()
+                        .find(Filters.eq(Constants.ID, targetIds.get(0))).first();
+                if (approvedRec != null && approvedRec.getResourceName() != null) {
+                    String rn = approvedRec.getResourceName();
+                    int secondDot = rn.indexOf('.', rn.indexOf('.') + 1);
+                    if (secondDot > 0 && secondDot < rn.length() - 1) {
+                        approvedServerName = rn.substring(secondDot + 1);
+                    } else {
+                        approvedServerName = rn;
                     }
                 }
-                if (!allServerIds.isEmpty()) {
+                if (approvedServerName != null && !approvedServerName.isEmpty()) {
+                    String escaped = java.util.regex.Pattern.quote(approvedServerName);
+                    Bson blockAllMatch = Filters.and(
+                        Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
+                        Filters.regex(McpAuditInfo.RESOURCE_NAME, "(^|\\.)" + escaped + "$")
+                    );
                     McpAuditInfoDao.instance.updateMany(
-                        Filters.in(Constants.ID, allServerIds),
+                        blockAllMatch,
                         Updates.set(McpAuditInfo.BLOCK_ALL, false)
                     );
                 }
