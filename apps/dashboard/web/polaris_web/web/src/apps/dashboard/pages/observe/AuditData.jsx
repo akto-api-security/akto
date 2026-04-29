@@ -1,7 +1,7 @@
 
 import { Text, HorizontalStack, VerticalStack, Box, Icon } from "@shopify/polaris"
 import { CircleTickMajor, CircleCancelMajor, SettingsMajor } from "@shopify/polaris-icons";
-import { useEffect, useReducer, useState } from "react"
+import { useEffect, useMemo, useReducer, useRef, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
 import api from "./api"
@@ -19,6 +19,8 @@ import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadge
 import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 import AuditDataDrawer from "./AuditDataDrawer";
 import CollectionIcon from "../../components/shared/CollectionIcon";
+import settingsApi from "../settings/api";
+import { intersectServerActionFlags } from "./auditServerActionFlags";
 import "../../components/shared/style.css";
 
 const headingsEndpointSecurity = [
@@ -356,6 +358,8 @@ function AuditData() {
     const [conditionalScope, setConditionalScope] = useState('server');
     // For the 'children' scope, the actual child records the user selected in the drawer.
     const [conditionalChildren, setConditionalChildren] = useState(null);
+    // When opening conditional approval from bulk selection (1+ MCP server rows); same approval applies to each.
+    const [conditionalBulkRows, setConditionalBulkRows] = useState(null);
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
     const getTimeEpoch = (key) => {
@@ -369,7 +373,31 @@ function AuditData() {
 
     const isEndpointSecurity = isEndpointSecurityCategory();
     const filters = isEndpointSecurity ? filtersEndpointSecurity : filtersDefault;
-    const headings = isEndpointSecurity ? headingsEndpointSecurity : headingsDefault;
+    const headings = useMemo(() => {
+        if (!isEndpointSecurity) return headingsDefault;
+        return headingsEndpointSecurity;
+    }, [isEndpointSecurity]);
+
+    const [registryConfigured, setRegistryConfigured] = useState(false);
+    const endpointRowCacheRef = useRef({});
+
+    useEffect(() => {
+        if (!isEndpointSecurity) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await settingsApi.fetchMcpRegistries();
+                const list = res?.mcpRegistries;
+                const ok = Array.isArray(list) && list.length > 0;
+                if (!cancelled) setRegistryConfigured(ok);
+            } catch {
+                if (!cancelled) setRegistryConfigured(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [isEndpointSecurity]);
 
     function disambiguateLabel(key, value) {
         switch (key) {
@@ -392,6 +420,64 @@ function AuditData() {
             : null
     );
 
+    const getRowsForSelectedIds = (selectedIds) => {
+        if (!Array.isArray(selectedIds) || selectedIds.length === 0) return [];
+        return selectedIds.map((id) => endpointRowCacheRef.current[String(id)]).filter(Boolean);
+    };
+
+    const bulkIntersectionFlagsForIds = (selectedIds) => {
+        const rows = getRowsForSelectedIds(selectedIds);
+        if (!rows.length || rows.length !== selectedIds.length) {
+            return { allow: false, block: false, conditional: false, add: false };
+        }
+        return intersectServerActionFlags(rows, {
+            registryConfigured,
+            addHandlerAvailable: true,
+        });
+    };
+
+    const bulkUpdateServers = async (remarks, selectedIds) => {
+        const rows = getRowsForSelectedIds(selectedIds);
+        if (!rows.length) return;
+        const hexIds = [];
+        const cascades = [];
+        for (const row of rows) {
+            if (Array.isArray(row.groupedHexIds) && row.groupedHexIds.length) {
+                row.groupedHexIds.forEach((h) => {
+                    if (h) hexIds.push(String(h));
+                });
+            } else if (row.hexId) hexIds.push(String(row.hexId));
+            const c = cascadeIdsForItem(row);
+            if (c) {
+                c.forEach((id) => {
+                    if (id != null && !cascades.includes(id)) cascades.push(id);
+                });
+            }
+        }
+        const unique = [...new Set(hexIds)];
+        if (!unique.length) return;
+        try {
+            await api.updateAuditData(unique[0], remarks, null, unique, cascades.length ? cascades : null, null);
+            func.setToast(true, false, "Updated selected servers");
+            window.location.reload();
+        } catch (e) {
+            func.setToast(true, true, "Bulk update failed");
+        }
+    };
+
+    const bulkAddToRegistry = async (selectedIds) => {
+        const rows = getRowsForSelectedIds(selectedIds);
+        if (!rows.length) return;
+        const names = [...new Set(rows.map((r) => r.mcpServerName).filter(Boolean))];
+        try {
+            await api.addMcpAllowlistUrls(names);
+            func.setToast(true, false, "Added selected servers to MCP registry");
+            window.location.reload();
+        } catch (e) {
+            func.setToast(true, true, "One or more registry adds failed");
+        }
+    };
+
     // Non-endpoint-security row actions (... menu)
     const GreenTickIcon = () => <Icon source={CircleTickMajor} tone="success" />;
     const GreenSettingsIcon = () => <Icon source={SettingsMajor} tone="success" />;
@@ -402,16 +488,17 @@ function AuditData() {
         window.location.reload();
     }
 
-    const addMcpAllowlistEntry = async (mcpServerUrl) => {
+    const addToMcpAllowlist = async (mcpServerUrls) => {
         try {
-            await api.addMcpAllowlistEntry(mcpServerUrl)
-            func.setToast(true, false, `${mcpServerUrl} added to MCP allowed list successfully`)
+            await api.addMcpAllowlistUrls(mcpServerUrls);
+            const label = Array.isArray(mcpServerUrls) ? mcpServerUrls.join(", ") : mcpServerUrls;
+            func.setToast(true, false, `${label} added to MCP allowed list successfully`);
             window.location.reload();
         } catch (error) {
-            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add to MCP allowed list"
-            func.setToast(true, true, errorMsg)
+            const errorMsg = error?.response?.data?.actionErrors?.[0] || "Failed to add to MCP allowed list";
+            func.setToast(true, true, errorMsg);
         }
-    }
+    };
 
     const getActionsList = (item) => {
         return [{ title: 'Actions', items: [
@@ -428,7 +515,7 @@ function AuditData() {
             ...(item.isEndpointSource ? [{
                 content: <span style={{ color: '#008060' }}>Add to MCP Allowed List</span>,
                 icon: GreenTickIcon,
-                onAction: () => {addMcpAllowlistEntry(item.mcpServerName)},
+                onAction: () => { addToMcpAllowlist(item.mcpServerName) },
             }] : []),
             {
                 content: <span style={{ color: '#D72C0D' }}>Disapprove</span>,
@@ -455,11 +542,65 @@ function AuditData() {
     }
 
     const handleRequestConditional = (scope, item, selectedChildren) => {
+        setConditionalBulkRows(null);
         setSelectedAuditItem(item);
         setConditionalScope(scope);
         setConditionalChildren(scope === 'children' ? selectedChildren : null);
         setModalOpen(true);
     }
+
+    const handleRequestConditionalBulk = (rows) => {
+        if (!Array.isArray(rows) || rows.length === 0) return;
+        setConditionalBulkRows([...rows]);
+        setSelectedAuditItem(rows[0]);
+        setConditionalScope('server');
+        setConditionalChildren(null);
+        setModalOpen(true);
+    };
+
+    const endpointPromotedBulkActions = (selectedIds) => {
+        if (selectedIds === "All" || !Array.isArray(selectedIds) || selectedIds.length === 0) {
+            return [];
+        }
+        const n = selectedIds.length;
+        const countPhrase = `${n} selected server${n === 1 ? "" : "s"}`;
+        const allowLabel = n === 1 ? "Allow this server" : `Allow ${countPhrase}`;
+        const blockLabel = n === 1 ? "Block this server" : `Block ${countPhrase}`;
+        const rows = getRowsForSelectedIds(selectedIds);
+        const flags = bulkIntersectionFlagsForIds(selectedIds);
+        const guard = (allowed, run) => {
+            if (!allowed) {
+                func.setToast(true, true, "This action is not available for all selected rows.");
+                return;
+            }
+            run();
+        };
+        const actions = [
+            {
+                content: allowLabel,
+                disabled: !flags.allow,
+                onAction: () => guard(flags.allow, () => bulkUpdateServers("Approved", selectedIds)),
+            },
+            {
+                content: blockLabel,
+                destructive: true,
+                disabled: !flags.block,
+                onAction: () => guard(flags.block, () => bulkUpdateServers("Rejected", selectedIds)),
+            },
+        ];
+        if (flags.conditional && rows.length === selectedIds.length) {
+            actions.push({
+                content: n === 1 ? "Conditionally allow this server" : "Conditionally allow selected servers",
+                onAction: () => handleRequestConditionalBulk(rows),
+            });
+        }
+        actions.push({
+            content: "Add to MCP registry",
+            disabled: !flags.add,
+            onAction: () => guard(flags.add, () => bulkAddToRegistry(selectedIds)),
+        });
+        return actions;
+    };
 
     const updateAuditDataWithConditions = async (_hexId, approvalData, _hexIds, _item) => {
         try {
@@ -468,18 +609,30 @@ function AuditData() {
                 await Promise.all(conditionalChildren.map((child) =>
                     api.updateAuditData(child.hexId, null, approvalData, child.groupedHexIds, null, null)
                 ))
+                setConditionalBulkRows(null);
                 window.location.reload()
             } else {
-                const item = selectedAuditItem
-                await api.updateAuditData(
-                    item?.hexId,
-                    null,
-                    approvalData,
-                    item?.groupedHexIds,
-                    cascadeIdsForItem(item),
-                    null
-                )
-                window.location.reload()
+                const bulkTargets =
+                    Array.isArray(conditionalBulkRows) && conditionalBulkRows.length > 0
+                        ? conditionalBulkRows
+                        : selectedAuditItem
+                          ? [selectedAuditItem]
+                          : [];
+                if (bulkTargets.length === 0) return;
+                await Promise.all(
+                    bulkTargets.map((item) =>
+                        api.updateAuditData(
+                            item?.hexId,
+                            null,
+                            approvalData,
+                            item?.groupedHexIds,
+                            cascadeIdsForItem(item),
+                            null
+                        )
+                    )
+                );
+                setConditionalBulkRows(null);
+                window.location.reload();
             }
         } catch (e) {
             func.setToast(true, true, 'Failed to apply conditional approval')
@@ -506,6 +659,9 @@ function AuditData() {
         try {
             const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue, isEndpointSecurity)
             if (res && res.auditData) {
+                if (isEndpointSecurity) {
+                    endpointRowCacheRef.current = {};
+                }
                 res.auditData.forEach((auditRecord) => {
                     let collectionName = "-";
                     if(collectionsMap[auditRecord?.hostCollectionId]){
@@ -520,6 +676,7 @@ function AuditData() {
                         collectionRegistryStatus
                     )
                     ret.push(dataObj);
+                    endpointRowCacheRef.current[String(dataObj.hexId || dataObj.id)] = dataObj;
                 })
                 total = res.total || 0;
             }
@@ -596,26 +753,32 @@ function AuditData() {
             primaryAction={primaryActions}
             components = {[
                 <GithubServerTable
-                    key={startTimestamp + endTimestamp + (isEndpointSecurity ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(isEndpointSecurity)}
-                    headers={headings}
-                    resourceName={resourceName}
-                    appliedFilters={[]}
-                    sortOptions={sortOptions}
-                    disambiguateLabel={disambiguateLabel}
-                    loading={loading}
-                    fetchData={fetchData}
-                    filters={filters}
-                    hideQueryField={false}
-                    getStatus={func.getTestResultStatus}
-                    useNewRow={true}
-                    condensedHeight={true}
-                    pageLimit={20}
-                    headings={headings}
-                    {...(isEndpointSecurity
-                        ? { onRowClick: handleRowClick, rowClickable: true }
-                        : { getActions: (item) => getActionsList(item), hasRowActions: true }
-                    )}
-                />
+                        key={startTimestamp + endTimestamp + (isEndpointSecurity ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(isEndpointSecurity)}
+                        headers={headings}
+                        resourceName={resourceName}
+                        appliedFilters={[]}
+                        sortOptions={sortOptions}
+                        disambiguateLabel={disambiguateLabel}
+                        loading={loading}
+                        fetchData={fetchData}
+                        filters={filters}
+                        hideQueryField={false}
+                        getStatus={func.getTestResultStatus}
+                        useNewRow={true}
+                        condensedHeight={true}
+                        pageLimit={20}
+                        headings={headings}
+                        {...(isEndpointSecurity
+                            ? {
+                                onRowClick: handleRowClick,
+                                rowClickable: true,
+                                selectable: true,
+                                promotedBulkActions: endpointPromotedBulkActions,
+                                filterStateUrl: "audit-data-endpoint",
+                            }
+                            : { getActions: (item) => getActionsList(item), hasRowActions: true }
+                        )}
+                />,
             ]}
             />
 
@@ -629,7 +792,7 @@ function AuditData() {
                         endTimestamp={endTimestamp}
                         onRequestConditional={handleRequestConditional}
                         onAfterUpdate={handleAfterDrawerUpdate}
-                        onAddToAllowlist={(item) => addMcpAllowlistEntry(item?.mcpServerName)}
+                        onAddToAllowlist={(item) => addToMcpAllowlist(item?.mcpServerName)}
                         isEndpointSecurity={isEndpointSecurity}
                     />
                     <ConditionalApprovalModal
@@ -637,6 +800,7 @@ function AuditData() {
                         onClose={() => {
                             setModalOpen(false);
                             setConditionalChildren(null);
+                            setConditionalBulkRows(null);
                         }}
                         onApprove={updateAuditDataWithConditions}
                         auditItem={selectedAuditItem}

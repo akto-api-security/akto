@@ -439,15 +439,28 @@ public class AuditDataAction extends UserAction {
         this.auditData = rows;
     }
 
-    /**
-     * Pick the most-restrictive remarks across the group's remarksArr and promote
-     * remarks/markedBy/approvalConditions onto the row as flat fields. Mirrors the
-     * shield's "rejected wins" policy:
-     *   Rejected (0) > Conditional Approval (1) > Approved (2) > Pending (3).
-     * Conditional approvals show up either as remarks="Conditionally Approved" or
-     * remarks="Approved" with a non-null approvalConditions object — both map to 1.
-     * Drops remarksArr from the row once collapsed so the wire payload stays small.
-     */
+    private static boolean isConditionalApprovalExpired(Object cond, long nowEpochSeconds) {
+        if (!(cond instanceof Map)) return false;
+        Object expiresAt = ((Map<?, ?>) cond).get("expiresAt");
+        if (!(expiresAt instanceof Number)) return false;
+        long exp = ((Number) expiresAt).longValue();
+        return exp > 0 && nowEpochSeconds > exp;
+    }
+
+    // Priority: Rejected=0, ActiveConditional=1, Approved=2, ExpiredConditional=3, Pending=4
+    // Priority: Rejected=0, ActiveConditional=1, Approved=2, ExpiredConditional=3, Pending=4
+    // Expired conditional loses to both Rejected and Approved — it reverts to Pending.
+    // Only "Conditionally Approved" entries are checked for expiry; "Approved" with stale
+    // approvalConditions in DB is still treated as Approved.
+    private static int remarksPriority(String r, Object cond, long nowEpochSeconds) {
+        if ("Rejected".equals(r)) return 0;
+        if ("Conditionally Approved".equals(r)) {
+            return isConditionalApprovalExpired(cond, nowEpochSeconds) ? 3 : 1;
+        }
+        if ("Approved".equals(r)) return 2;
+        return 4;
+    }
+
     @SuppressWarnings("unchecked")
     private static void collapseRemarksArr(BasicDBObject row) {
         if (row == null) return;
@@ -456,27 +469,50 @@ public class AuditDataAction extends UserAction {
             row.removeField("remarksArr");
             return;
         }
-        Map<String, Object> chosen = null;
+        long nowEpochSeconds = System.currentTimeMillis() / 1000L;
         int chosenPriority = Integer.MAX_VALUE;
+        String displayRemarks = null;
+        Object displayMarkedBy = null;
+        Object activeConditionalCond = null; // approvalConditions from the active conditional entry, if any
+        Object rejectedCond = null;          // non-expired approvalConditions from any Rejected entry
+
         for (Object o : (List<?>) raw) {
             if (!(o instanceof Map)) continue;
             Map<String, Object> entry = (Map<String, Object>) o;
-            String r = entry.get(McpAuditInfo.REMARKS) instanceof String ? (String) entry.get(McpAuditInfo.REMARKS) : null;
+            String r = entry.get(McpAuditInfo.REMARKS) instanceof String
+                    ? (String) entry.get(McpAuditInfo.REMARKS) : null;
             Object cond = entry.get(McpAuditInfo.APPROVAL_CONDITIONS);
-            int p;
-            if ("Rejected".equals(r)) p = 0;
-            else if ("Conditionally Approved".equals(r) || ("Approved".equals(r) && cond != null)) p = 1;
-            else if ("Approved".equals(r)) p = 2;
-            else p = 3;
+            int p = remarksPriority(r, cond, nowEpochSeconds);
+            if (p == 1) activeConditionalCond = cond;
+            if (p == 0 && cond != null && !isConditionalApprovalExpired(cond, nowEpochSeconds)) {
+                rejectedCond = cond; // pick up non-expired conditions from any Rejected entry
+            }
             if (p < chosenPriority) {
                 chosenPriority = p;
-                chosen = entry;
+                displayRemarks = (p == 3) ? "Pending" : r; // expired conditional → Pending
+                displayMarkedBy = entry.get(McpAuditInfo.MARKED_BY);
             }
         }
-        if (chosen != null) {
-            row.put(McpAuditInfo.REMARKS, chosen.get(McpAuditInfo.REMARKS));
-            row.put(McpAuditInfo.MARKED_BY, chosen.get(McpAuditInfo.MARKED_BY));
-            row.put(McpAuditInfo.APPROVAL_CONDITIONS, chosen.get(McpAuditInfo.APPROVAL_CONDITIONS));
+
+        if (chosenPriority < Integer.MAX_VALUE) {
+            row.put(McpAuditInfo.REMARKS, displayRemarks);
+            row.put(McpAuditInfo.MARKED_BY, displayMarkedBy);
+            // Expose approvalConditions for Rejected and active-conditional statuses only.
+            // For Rejected: prefer active conditional's conditions (Scenario 5),
+            // fall back to non-expired conditions from any Rejected entry in the group.
+            // For active conditional: show its conditions directly.
+            // Strip for Approved and all other statuses.
+            Object condToExpose = null;
+            if (chosenPriority == 0) {
+                condToExpose = activeConditionalCond != null ? activeConditionalCond : rejectedCond;
+            } else if (chosenPriority == 1) {
+                condToExpose = activeConditionalCond;
+            }
+            if (condToExpose != null) {
+                row.put(McpAuditInfo.APPROVAL_CONDITIONS, condToExpose);
+            } else {
+                row.removeField(McpAuditInfo.APPROVAL_CONDITIONS);
+            }
         }
         row.removeField("remarksArr");
     }
@@ -615,6 +651,7 @@ public class AuditDataAction extends UserAction {
                 if ("Approved".equals(remarks)) {
                     updates.add(Updates.set("approvedAt", currentTime));
                 }
+                updates.add(Updates.unset(McpAuditInfo.APPROVAL_CONDITIONS));
             }
 
             Bson combined = Updates.combine(updates);
