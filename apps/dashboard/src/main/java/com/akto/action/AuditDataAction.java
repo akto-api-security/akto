@@ -624,6 +624,16 @@ public class AuditDataAction extends UserAction {
                 McpAuditInfoDao.instance.updateMany(Filters.in(Constants.ID, targetIds), combined);
             }
 
+            // When blocking for all agents, stamp blockAll=true on every matched server record
+            // so newly arriving records for this server name are auto-blocked at ingest time.
+            if (mcpServerForAllAgents != null && !mcpServerForAllAgents.trim().isEmpty()
+                    && "Rejected".equals(remarks)) {
+                McpAuditInfoDao.instance.updateMany(
+                    Filters.in(Constants.ID, targetIds),
+                    Updates.set(McpAuditInfo.BLOCK_ALL, true)
+                );
+            }
+
             List<Integer> mergedCascade = new ArrayList<>();
             if (cascadeHostCollectionIds != null) mergedCascade.addAll(cascadeHostCollectionIds);
             for (Integer id : allAgentsCollectionIds) {
