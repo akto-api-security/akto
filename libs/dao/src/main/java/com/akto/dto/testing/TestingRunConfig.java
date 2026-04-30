@@ -41,6 +41,12 @@ public class TestingRunConfig {
     @Setter
     private String conversationId;
 
+    /** In-memory only: current test run result summary, for agent/executor (not persisted). */
+    @BsonIgnore
+    @Getter
+    @Setter
+    private ObjectId testRunResultSummaryId;
+
     public TestingRunConfig() {}
 
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,

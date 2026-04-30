@@ -683,6 +683,9 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
             testSubType + "logId" + testExecutionLogId, LogDb.TESTING);
 
+        if (testingRunConfig != null && testRunResultSummaryId != null) {
+            testingRunConfig.setTestRunResultSummaryId(testRunResultSummaryId);
+        }
 
             com.akto.test_editor.execution.Executor executor = new Executor();
         executor.overrideTestUrl(rawApi, testingRunConfig);
