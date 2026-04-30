@@ -9,7 +9,8 @@ import {
     getTypeFromTags,
     findAssetTag,
     findTypeTag,
-    getAgentTypeFromValue
+    getAgentTypeFromValue,
+    hasPersonalAccountTag,
 } from "./mcpClientHelper";
 import func from "@/util/func";
 import { getResolvedUsernameForCollection, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
@@ -185,11 +186,13 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
+                hasPersonalAccount: false,
             };
         }
-        
+
         agents[key].collections.push(c);
         if (!agents[key].firstCollection) agents[key].firstCollection = c;
+        if (hasPersonalAccountTag(c.envType)) agents[key].hasPersonalAccount = true;
         
         // Track unique endpoint IDs
         if (endpointId) {
@@ -261,15 +264,16 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
+                hasPersonalAccount: false,
             };
         }
-        
+
         services[key].collections.push(c);
-        // Track all hostnames for this service for filtering
         if (!services[key].hostNames.includes(hostName)) {
             services[key].hostNames.push(hostName);
         }
         if (!services[key].firstCollection) services[key].firstCollection = c;
+        if (hasPersonalAccountTag(c.envType)) services[key].hasPersonalAccount = true;
         
         // Track unique endpoint IDs
         if (endpointId) {
@@ -331,11 +335,13 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
                     sensitiveTypes: new Set(),
                     maxTrafficTimestamp: 0,
                     maxRiskScore: 0,
+                    hasPersonalAccount: false,
                 };
             }
 
             skills[skillValue].collections.push(c);
             if (!skills[skillValue].firstCollection) skills[skillValue].firstCollection = c;
+            if (hasPersonalAccountTag(c.envType)) skills[skillValue].hasPersonalAccount = true;
             if (hostName && !skills[skillValue].hostNames.includes(hostName)) {
                 skills[skillValue].hostNames.push(hostName);
             }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Box, Badge } from "@shopify/polaris";
+import { IndexFiltersMode, Box, Badge, HorizontalStack, Text } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -25,7 +25,7 @@ import {
     extractEndpointId,
     buildAgenticInventoryFilterForRow,
 } from "./constants";
-import { CLIENT_TYPES } from "./mcpClientHelper";
+import { CLIENT_TYPES, ROW_TYPES, hasPersonalAccountTag } from "./mcpClientHelper";
 
 const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
 
@@ -53,7 +53,11 @@ function Endpoints() {
         setSelected(selectedIndex);
     };
 
-    const headers = useMemo(() => getHeaders(), []);
+    const headers = useMemo(() => {
+        const h = getHeaders();
+        h[1] = { ...h[1], value: "groupNameDisplay" };
+        return h;
+    }, []);
 
     const getRiskScoreStatus = useCallback((riskScore) => {
         if (riskScore >= 4.5) return "critical";
@@ -66,6 +70,14 @@ function Endpoints() {
     const prettifyGroupData = useCallback((groups) => {
         return groups.map((group) => ({
             ...group,
+            groupNameDisplay: group.hasPersonalAccount && group.rowType !== ROW_TYPES.SKILL
+                ? (
+                    <HorizontalStack gap="2" align="start" wrap={false}>
+                        <Text>{group.groupName}</Text>
+                        <Badge size="small" status="warning">Contains personal account</Badge>
+                    </HorizontalStack>
+                )
+                : group.groupName,
             iconComp: (
                 <Box>
                     <CollectionIcon
