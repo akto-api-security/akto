@@ -11,7 +11,9 @@ import sys
 import urllib.request
 from typing import Any, Dict, Tuple, Union
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "common"))
 from akto_machine_id import get_machine_id, get_username
+from akto_skill_blocked import is_skill_blocked
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.cursor/akto/mcp-logs"))
@@ -329,6 +331,23 @@ def main():
     mcp_server_name = extract_mcp_server_name(input_data)
 
     logger.info(f"Processing request for MCP server: {mcp_server_name}")
+
+    # Extract skill name: prefer mcp__<server>__<tool> → <tool>, else fall back to server name
+    raw_tool_name = input_data.get("tool_name", "")
+    if raw_tool_name.startswith("mcp__"):
+        parts = raw_tool_name.split("__")
+        skill_name = "__".join(parts[2:]) if len(parts) >= 3 else mcp_server_name
+    else:
+        skill_name = raw_tool_name or mcp_server_name
+    if is_skill_blocked(skill_name, logger):
+        output = {
+            "permission": "deny",
+            "user_message": "Skill blocked by your organization's policy",
+            "agent_message": f"Skill '{skill_name}' is blocked by your organization's policy",
+        }
+        logger.warning(f"BLOCKING by org policy - Skill: {skill_name}")
+        print(json.dumps(output))
+        sys.exit(0)
 
     if not tool_input.strip() or tool_input == "{}":
         logger.info("Empty tool input, allowing request")

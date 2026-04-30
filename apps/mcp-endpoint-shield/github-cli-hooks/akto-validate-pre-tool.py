@@ -9,8 +9,10 @@ import sys
 import time
 import urllib.request
 from typing import Any, Dict, Set, Tuple, Union
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "common"))
 from akto_machine_id import get_machine_id, get_username
 from akto_heartbeat import send_heartbeat
+from akto_skill_blocked import is_skill_blocked
 
 # Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -359,6 +361,21 @@ def main():
     timestamp = input_data.get("timestamp", int(time.time() * 1000))
 
     logger.info(f"Tool: {tool_name}, CWD: {cwd}")
+
+    if is_skill_blocked(tool_name, logger):
+        denial_reason = f"Skill '{tool_name}' is blocked by your organization's policy"
+        logger.warning(f"BLOCKING by org policy - Tool: {tool_name}")
+        output = {
+            "permissionDecision": "deny",
+            "permissionDecisionReason": denial_reason,
+            "hookSpecificOutput": {
+                "permissionDecision": "deny",
+                "permissionDecisionReason": denial_reason,
+            },
+        }
+        sys.stdout.write(json.dumps(output))
+        sys.stdout.flush()
+        sys.exit(cfg["blocked_exit_code"])
 
     if not AKTO_SYNC_MODE or not AKTO_DATA_INGESTION_URL:
         logger.info("Guardrails disabled (sync mode off or no URL)")
