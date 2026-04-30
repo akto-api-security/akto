@@ -156,15 +156,14 @@ const getAgenticCategoryLabel = (collection) => {
 };
 
 const PERSONAL_ACCOUNT_TAG_KEYS = ['browser-llm-account-type', 'login-user-email-type'];
-const PERSONAL_ACCOUNT_VALUE = 'personal';
 
 const hasPersonalAccountTag = (envType) => {
     if (!Array.isArray(envType)) return false;
     return envType.some((tag) => {
         if (typeof tag === 'string') {
-            return PERSONAL_ACCOUNT_TAG_KEYS.some((key) => tag === `${key}=${PERSONAL_ACCOUNT_VALUE}`);
+            return PERSONAL_ACCOUNT_TAG_KEYS.some((key) => tag === `${key}=personal`);
         }
-        return PERSONAL_ACCOUNT_TAG_KEYS.includes(tag.keyName) && tag.value === PERSONAL_ACCOUNT_VALUE;
+        return PERSONAL_ACCOUNT_TAG_KEYS.includes(tag.keyName) && tag.value === 'personal';
     });
 };
 

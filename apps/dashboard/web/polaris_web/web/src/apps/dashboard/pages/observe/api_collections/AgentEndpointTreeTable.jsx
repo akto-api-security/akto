@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import HeadingWithTooltip from '../../../components/shared/HeadingWithTooltip';
 import TooltipText from '../../../components/shared/TooltipText';
 import { FILTER_TYPES } from './useAgenticFilter';
-import { getAgenticCategoryLabel } from '../agentic/mcpClientHelper';
+import { getAgenticCategoryLabel, hasPersonalAccountTag } from '../agentic/mcpClientHelper';
 
 /** IndexTable adds a leading selection column when `selectable` is true (see AgentEndpointTreeTable). */
 const INDEX_TABLE_SELECTION_COLUMN_COUNT = 1;
@@ -177,25 +177,24 @@ const groupByEndpointId = (collections) => {
             groups[endpointId] = {
                 endpointId,
                 children: [],
-                // Initialize merge-able fields
                 riskScore: 0,
                 sensitiveInRespTypes: [],
                 detectedTimestamp: 0,
                 startTs: Infinity,
                 apiCollectionIds: [],
-                // First collection for icon reference
                 firstCollection: null,
-                // Username from first collection (all collections in same endpoint should have same username)
                 username: '-',
+                hasPersonalAccount: false,
             };
         }
         groups[endpointId].children.push(collection);
         groups[endpointId].apiCollectionIds.push(collection.id);
-        
-        // Store first collection for icon lookup and username
         if (!groups[endpointId].firstCollection) {
             groups[endpointId].firstCollection = collection;
             groups[endpointId].username = collection.username || '-';
+        }
+        if (hasPersonalAccountTag(collection.envTypeOriginal)) {
+            groups[endpointId].hasPersonalAccount = true;
         }
         
         // Merge values
@@ -238,6 +237,7 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
                         <TooltipText tooltip={group.endpointId} text={group.endpointId} textProps={{variant: 'headingSm'}} />
                     </Box>
                     <Badge size="small" status="new">{childCount}</Badge>
+                    {group.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
                 </HorizontalStack>
             ),
             username: group.username || '-',
