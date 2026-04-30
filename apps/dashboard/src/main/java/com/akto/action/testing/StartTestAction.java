@@ -1509,6 +1509,11 @@ public class StartTestAction extends UserAction {
                                         editableTestingRunConfig.getSendMsTeamsAlert()));
                     }
 
+                    if (existingTestingRun.getDoNotMarkIssuesAsFixed() != editableTestingRunConfig.isDoNotMarkIssuesAsFixed()) {
+                        updates.add(Updates.set(TestingRun.DO_NOT_MARK_ISSUES_AS_FIXED,
+                                editableTestingRunConfig.isDoNotMarkIssuesAsFixed()));
+                    }
+
                     int periodInSeconds = getPeriodInSeconds(editableTestingRunConfig.getRecurringDaily(), editableTestingRunConfig.getRecurringWeekly(), editableTestingRunConfig.getRecurringMonthly());
                     if (editableTestingRunConfig.getContinuousTesting()) {
                         periodInSeconds = -1;
