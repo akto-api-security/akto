@@ -235,7 +235,7 @@ public class LoggerMaker  {
     public void warnAndAddToDb(String info, LogDb db) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
         String infoMessage = "acc: " + accountId + ", " + info;
-        logger.info(infoMessage);
+        logger.warn(infoMessage);
         try{
             insert(infoMessage, "warn",db);
         } catch (Exception e){
