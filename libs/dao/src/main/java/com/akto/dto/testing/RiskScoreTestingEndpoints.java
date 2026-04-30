@@ -2,13 +2,11 @@ package com.akto.dto.testing;
 
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.MCollection;
-import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
 
 import org.apache.commons.lang3.NotImplementedException;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
@@ -18,7 +16,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 public class RiskScoreTestingEndpoints extends TestingEndpoints {
 
@@ -29,7 +26,7 @@ public class RiskScoreTestingEndpoints extends TestingEndpoints {
     @BsonIgnore
     private List<ApiInfo> filterRiskScoreGroupApis;
 
-    public static int BATCH_SIZE = 100;
+    public static int BATCH_SIZE = 500;
 
     public enum RiskScoreGroupType {
         LOW, MEDIUM, HIGH

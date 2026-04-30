@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.bson.conversions.Bson;
 
+import com.akto.DaoInit;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AktoDataTypeDao;
 import com.akto.dao.ApiInfoDao;
@@ -21,12 +22,11 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.RiskScoreTestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.LastCronRunInfo;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -42,7 +42,6 @@ import com.mongodb.client.model.WriteModel;
 import static com.akto.utils.Utils.calculateRiskValueForSeverity;
 import static com.akto.jobs.utils.Utils.getRiskScoreValueFromSeverityScore;
 public class RiskScoreOfCollections {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreOfCollections.class, LogDb.DASHBOARD);;
 
     private Map<ApiInfoKey, Float> getSeverityScoreMap(List<TestingRunIssues> issues){
         // Method to calculate severity Score for the apiInfo on the basis of HIGH, LOW, MEDIUM
@@ -68,52 +67,56 @@ public class RiskScoreOfCollections {
         List<ApiInfoKey> updatedApiInfoKeys = new ArrayList<>();
 
         // get freshly updated testing run issues here
-        Bson projections = Projections.include("_id", TestingRunIssues.LAST_SEEN, TestingRunIssues.LAST_UPDATED);
-        Bson filters = Filters.or(Filters.gte(TestingRunIssues.LAST_SEEN, timeStampFilter), 
-            Filters.gte(TestingRunIssues.LAST_UPDATED, timeStampFilter));
-
-        List<TestingRunIssues> issues = new ArrayList<>();
-        try {
-            issues = TestingRunIssuesDao.instance.findAll(filters, projections);   
-        } catch (Exception e) {
-            e.printStackTrace();
-            return new HashMap<>();
-        }
-
-        // after getting issues, get updated apiinfokeys related to that issues only
-        if(issues == null || issues.size() == 0){
-            return new HashMap<>();
-        }
-        for(TestingRunIssues issue: issues){
-            TestingIssuesId issueId = issue.getId();
-            ApiInfoKey apiInfoKey = issueId.getApiInfoKey();
-            updatedApiInfoKeys.add(apiInfoKey);
-        }
-
-        
-
-        if(updatedApiInfoKeys == null || updatedApiInfoKeys.size() == 0){
-            return new HashMap<>();
-        }
-
-        loggerMaker.debugAndAddToDb("Updating severity score for " + updatedApiInfoKeys.size() + " apis at timestamp " + Context.now() , LogDb.DASHBOARD);
-
-        Bson filterQ = Filters.and(
-            Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
-            Filters.in("_id.apiInfoKey", updatedApiInfoKeys)
-        );
-
+        Bson projections = Projections.include("_id", TestingRunIssues.LAST_SEEN, TestingRunIssues.LAST_UPDATED, TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.KEY_SEVERITY);
+       
         List<TestingRunIssues> updatedIssues = new ArrayList<>();
-        try {
-            updatedIssues = TestingRunIssuesDao.instance.findAll(filterQ);
-        } catch (Exception e) {
-            e.printStackTrace();
+        if(timeStampFilter != 0){
+            Bson filters = Filters.and(
+                Filters.or(
+                    Filters.gte(TestingRunIssues.LAST_SEEN, timeStampFilter), 
+                    Filters.gte(TestingRunIssues.LAST_UPDATED, timeStampFilter)
+                ),
+                UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunIssues.ID_API_COLLECTION_ID)
+            );
+            List<TestingRunIssues> issues = new ArrayList<>();
+            try {
+                issues = TestingRunIssuesDao.instance.findAll(filters, projections);   
+            } catch (Exception e) {
+                e.printStackTrace();
+                return new HashMap<>();
+            }
+
+            // after getting issues, get updated apiinfokeys related to that issues only
+            if(issues == null || issues.size() == 0){
+                return new HashMap<>();
+            }
+            for(TestingRunIssues issue: issues){
+                TestingIssuesId issueId = issue.getId();
+                ApiInfoKey apiInfoKey = issueId.getApiInfoKey();
+                updatedApiInfoKeys.add(apiInfoKey);
+            }
+
+            Bson filterQ = Filters.and(
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
+                Filters.in("_id.apiInfoKey", updatedApiInfoKeys)
+            );
+
+            
+            try {
+                updatedIssues = TestingRunIssuesDao.instance.findAll(filterQ);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+        }else{
+            updatedIssues = TestingRunIssuesDao.instance.findAll(Filters.and(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"), UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunIssues.ID_API_COLLECTION_ID)), projections);
         }
 
         if(updatedIssues == null || updatedIssues.size() == 0){
             return new HashMap<>();
         }
 
+        
         Map<ApiInfoKey, Float> severityScoreMap = getSeverityScoreMap(updatedIssues); 
         return severityScoreMap;
     }
@@ -157,9 +160,7 @@ public class RiskScoreOfCollections {
                 float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, getRiskScoreValueFromSeverityScore(severityScore));
 
                 if (apiInfo != null) {
-                    if (apiInfo.getRiskScore() != riskScore) {
-                        riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore);
-                    }
+                   riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore); 
                 }
                 
                 Bson update = Updates.combine(
@@ -261,24 +262,28 @@ public class RiskScoreOfCollections {
         }
     }
 
+
+    public static void main(String[] args) {
+        RiskScoreOfCollections riskScoreOfCollections = new RiskScoreOfCollections();
+        Context.accountId.set(1000_000);
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
+        riskScoreOfCollections.calculateRiskScoreForAllApis();
+    }
+
     public void calculateRiskScoreForAllApis() {
-        int timeStamp = Context.now() - 24*60*60;
         int limit = 1000;
         int count = 0; 
 
         List<WriteModel<ApiInfo>> bulkUpdates = new ArrayList<>();
-        Bson filter = Filters.or(
-            Filters.exists(ApiInfo.LAST_CALCULATED_TIME, false),
-            Filters.lte(ApiInfo.LAST_CALCULATED_TIME, timeStamp)
-        );
+        Bson filter = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
         Bson projection = Projections.include("_id", ApiInfo.API_ACCESS_TYPES, ApiInfo.LAST_SEEN, ApiInfo.SEVERITY_SCORE, ApiInfo.IS_SENSITIVE, ApiInfo.COLLECTION_IDS, ApiInfo.RISK_SCORE);
 
         RiskScoreTestingEndpointsUtils riskScoreTestingEndpointsUtils = new RiskScoreTestingEndpointsUtils();
 
         // create a set for severityScore
         Map<ApiInfoKey, Float> initialSeverityScoreMap = getUpdatedApiInfosMap(0);
-        while(count < 100){
-            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter,0, limit, Sorts.descending(ApiInfo.LAST_CALCULATED_TIME), projection);
+        while(count < 1000){
+            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter,(count*limit), limit, Sorts.ascending(ApiInfo.LAST_CALCULATED_TIME), projection);
             for(ApiInfo apiInfo: apiInfos){
                 float riskScore = ApiInfoDao.getRiskScore(apiInfo, apiInfo.getIsSensitive(), getRiskScoreValueFromSeverityScore(initialSeverityScoreMap.getOrDefault(apiInfo.getId(), (float) 0)));
                 Bson update = Updates.combine(
@@ -288,19 +293,7 @@ public class RiskScoreOfCollections {
                 Bson filterQ = ApiInfoDao.getFilter(apiInfo.getId());
                 
                 bulkUpdates.add(new UpdateManyModel<>(filterQ, update, new UpdateOptions().upsert(false)));
-                
-                List<Integer> collectionIds = apiInfo.getCollectionIds();
-                float oldRiskScore = apiInfo.getRiskScore();
-                RiskScoreTestingEndpoints.RiskScoreGroupType oldRiskScoreGroupType = RiskScoreTestingEndpoints.calculateRiskScoreGroup(oldRiskScore);
-                int oldRiskScoreGroupCollectionId = RiskScoreTestingEndpoints.getApiCollectionId(oldRiskScoreGroupType);
-
-                if (!collectionIds.contains(oldRiskScoreGroupCollectionId)) {
-                    // Add API to risk score API group if it is not already added
-                    riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore);
-                } else if (oldRiskScore != riskScore) {
-                    // Update API in risk score API group if risk score has changed
-                    riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore);
-                }
+                riskScoreTestingEndpointsUtils.updateApiRiskScoreGroup(apiInfo, riskScore);
             }
             if(bulkUpdates.size() > 0){
                 ApiInfoDao.instance.bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));

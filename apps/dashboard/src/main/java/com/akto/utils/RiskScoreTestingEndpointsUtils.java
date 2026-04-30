@@ -6,9 +6,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
+import org.bson.conversions.Bson;
+
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
@@ -52,37 +53,34 @@ public class RiskScoreTestingEndpointsUtils {
         try {
             for(RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType: RiskScoreTestingEndpoints.RiskScoreGroupType.values()) {
                 RiskScoreTestingEndpoints riskScoreTestingEndpoints = new RiskScoreTestingEndpoints(riskScoreGroupType);
-                
-                List<TestingEndpoints> testingEndpoints = new ArrayList<>();
-                testingEndpoints.add(riskScoreTestingEndpoints);
                 int apiCollectionId = RiskScoreTestingEndpoints.getApiCollectionId(riskScoreGroupType);
     
                 // Remove APIs from the original risk score group
                 List<ApiInfo> removeApisFromRiskScoreGroupList = removeApisFromRiskScoreGroupMap.get(riskScoreGroupType);
-                loggerMaker.debugAndAddToDb("Removing " + removeApisFromRiskScoreGroupList.size() + " APIs from risk score group - " + riskScoreGroupType, LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Removing " + removeApisFromRiskScoreGroupList.size() + " APIs from risk score group - " + riskScoreGroupType);
                 for (int start = 0; start < removeApisFromRiskScoreGroupList.size(); start += RiskScoreTestingEndpoints.BATCH_SIZE) {
                     int end = Math.min(start + RiskScoreTestingEndpoints.BATCH_SIZE, removeApisFromRiskScoreGroupList.size());
-    
                     List<ApiInfo> batch = removeApisFromRiskScoreGroupList.subList(start, end);
-    
-                    riskScoreTestingEndpoints.setFilterRiskScoreGroupApis(batch);
-                    ApiCollectionUsers.removeFromCollectionsForCollectionId(testingEndpoints, apiCollectionId);
+                    RiskScoreTestingEndpoints removeEndpoints = new RiskScoreTestingEndpoints(riskScoreGroupType);
+                    removeEndpoints.setFilterRiskScoreGroupApis(batch);
+                    ApiCollectionUsers.removeFromCollectionsForCollectionId(
+                        java.util.Collections.singletonList(removeEndpoints), apiCollectionId);
                 }
-    
+
                 // Add APIs to the new risk score group
                 List<ApiInfo> addApisToRiskScoreGroupList = addApisToRiskScoreGroupMap.get(riskScoreGroupType);
-                loggerMaker.debugAndAddToDb("Adding " + addApisToRiskScoreGroupList.size() + " APIs to risk score group - " + riskScoreGroupType, LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Adding " + addApisToRiskScoreGroupList.size() + " APIs to risk score group - " + riskScoreGroupType);
                 for (int start = 0; start < addApisToRiskScoreGroupList.size(); start += RiskScoreTestingEndpoints.BATCH_SIZE) {
                     int end = Math.min(start + RiskScoreTestingEndpoints.BATCH_SIZE, addApisToRiskScoreGroupList.size());
-    
                     List<ApiInfo> batch = addApisToRiskScoreGroupList.subList(start, end);
-    
-                    riskScoreTestingEndpoints.setFilterRiskScoreGroupApis(batch);
-                    ApiCollectionUsers.addToCollectionsForCollectionId(testingEndpoints, apiCollectionId);
+                    RiskScoreTestingEndpoints addEndpoints = new RiskScoreTestingEndpoints(riskScoreGroupType);
+                    addEndpoints.setFilterRiskScoreGroupApis(batch);
+                    ApiCollectionUsers.addToCollectionsForCollectionId(
+                        java.util.Collections.singletonList(addEndpoints), apiCollectionId);
                 }
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error updating risk score group APIs - " + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("Error updating risk score group APIs - " + e.getMessage());
         }
     }
 
@@ -92,11 +90,11 @@ public class RiskScoreTestingEndpointsUtils {
         try {
             executorService.submit(() -> {
                 Context.accountId.set(accountId);
-                loggerMaker.debugAndAddToDb("Updating risk score API groups", LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Updating risk score API groups");
                 updateRiskScoreApiGroups();
             });
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error syncing risk score group APIs - " + e.getMessage(), LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb("Error syncing risk score group APIs - " + e.getMessage());
         }
     }
 }
