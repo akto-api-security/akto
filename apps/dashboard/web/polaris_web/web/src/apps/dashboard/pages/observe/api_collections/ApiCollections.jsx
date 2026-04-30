@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack, Badge} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import RegistryBadge from "../../../components/shared/RegistryBadge";
 import RunTest from "./RunTest";
@@ -38,7 +38,6 @@ import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../../main/labelHelper";
 import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
 import { AGENTIC_OBSERVE_BACK_PATHS, INVENTORY_FILTER_KEY } from "../agentic/constants";
-import { hasPersonalAccountTag } from "../agentic/mcpClientHelper";
 import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
 import { sendQuery } from "../../agentic/services/agenticService";
@@ -325,7 +324,6 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
                 <HorizontalStack gap="2" align="start">
                     <Box maxWidth="30vw"><Text truncate fontWeight="medium">{displayText}</Text></Box>
                     {c.registryStatus === "available" && <RegistryBadge />}
-                    {hasPersonalAccountTag(c.envType) && <Badge size="small" status="warning">Contains personal account</Badge>}
                 </HorizontalStack>
             ),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] || 0),

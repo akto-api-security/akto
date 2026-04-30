@@ -156,14 +156,19 @@ const getAgenticCategoryLabel = (collection) => {
 };
 
 const PERSONAL_ACCOUNT_TAG_KEYS = ['ai-agent-account-type', 'ai-agent-email', 'browser-llm-account-type', 'login-user-email-type'];
+const NON_PERSONAL_VALUES = ['enterprise'];
 
 const hasPersonalAccountTag = (envType) => {
     if (!Array.isArray(envType)) return false;
     return envType.some((tag) => {
         if (typeof tag === 'string') {
-            return PERSONAL_ACCOUNT_TAG_KEYS.some((key) => tag.startsWith(`${key}=`));
+            return PERSONAL_ACCOUNT_TAG_KEYS.some((key) => {
+                if (!tag.startsWith(`${key}=`)) return false;
+                const value = tag.slice(key.length + 1);
+                return value && !NON_PERSONAL_VALUES.includes(value);
+            });
         }
-        return PERSONAL_ACCOUNT_TAG_KEYS.includes(tag.keyName) && tag.value;
+        return PERSONAL_ACCOUNT_TAG_KEYS.includes(tag.keyName) && tag.value && !NON_PERSONAL_VALUES.includes(tag.value);
     });
 };
 
