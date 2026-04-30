@@ -1,5 +1,5 @@
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
-import { 
+import {
     ASSET_TAG_KEYS,
     ROW_TYPES,
     TYPE_TAG_KEYS,
@@ -9,7 +9,8 @@ import {
     getTypeFromTags,
     findAssetTag,
     findTypeTag,
-    getAgentTypeFromValue
+    getAgentTypeFromValue,
+    hasPersonalAccountTag,
 } from "./mcpClientHelper";
 import func from "@/util/func";
 import { getResolvedUsernameForCollection, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
@@ -38,7 +39,7 @@ export const getHeaders = (options = {}) => {
     const endpointsColumnBoxWidth = options.endpointsColumnBoxWidth ?? "80px";
     const headers = [
         { title: "", text: "", value: "iconComp", isText: CellType.TEXT, boxWidth: '24px' },
-        { title: primaryTitle, text: primaryText, value: "groupName", filterKey: "groupName", textValue: "groupName", showFilter: true, sortActive: true },
+        { title: primaryTitle, text: primaryText, value: "groupNameDisplay", filterKey: "groupName", textValue: "groupName", showFilter: true, sortActive: true },
         { title: "Type", text: "Type", value: "clientType", filterKey: "clientType", textValue: "clientType", boxWidth: "220px" },
         { 
             title: endpointsColumnLabel, 
@@ -185,21 +186,23 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
+                hasPersonalAccount: false,
             };
         }
-        
+
         agents[key].collections.push(c);
         if (!agents[key].firstCollection) agents[key].firstCollection = c;
-        
+        if (hasPersonalAccountTag(c.envType)) agents[key].hasPersonalAccount = true;
+
         // Track unique endpoint IDs
         if (endpointId) {
             agents[key].endpointIds.add(endpointId);
         }
-        
+
         // Aggregate sensitive types
         const sensitive = sensitiveMap[c.id] || [];
         sensitive.forEach(s => agents[key].sensitiveTypes.add(s));
-        
+
         // Track max traffic timestamp
         const traffic = trafficMap[c.id] || 0;
         if (traffic > agents[key].maxTrafficTimestamp) {
@@ -261,15 +264,16 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
+                hasPersonalAccount: false,
             };
         }
-        
+
         services[key].collections.push(c);
-        // Track all hostnames for this service for filtering
         if (!services[key].hostNames.includes(hostName)) {
             services[key].hostNames.push(hostName);
         }
         if (!services[key].firstCollection) services[key].firstCollection = c;
+        if (hasPersonalAccountTag(c.envType)) services[key].hasPersonalAccount = true;
         
         // Track unique endpoint IDs
         if (endpointId) {
@@ -331,6 +335,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
                     sensitiveTypes: new Set(),
                     maxTrafficTimestamp: 0,
                     maxRiskScore: 0,
+                    hasPersonalAccount: false,
                 };
             }
 
@@ -340,6 +345,7 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
                 skills[skillValue].hostNames.push(hostName);
             }
             if (endpointId) skills[skillValue].endpointIds.add(endpointId);
+            if (hasPersonalAccountTag(c.envType)) skills[skillValue].hasPersonalAccount = true;
 
             const sensitive = sensitiveMap[c.id] || [];
             sensitive.forEach(s => skills[skillValue].sensitiveTypes.add(s));

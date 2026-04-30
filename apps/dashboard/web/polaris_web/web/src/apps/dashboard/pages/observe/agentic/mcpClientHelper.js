@@ -155,6 +155,19 @@ const getAgenticCategoryLabel = (collection) => {
     return getTypeFromTags(Array.isArray(raw) ? raw : []);
 };
 
+const PERSONAL_ACCOUNT_TAG_KEYS = ['browser-llm-account-type', 'login-user-email-type'];
+const PERSONAL_ACCOUNT_VALUE = 'personal';
+
+const hasPersonalAccountTag = (envType) => {
+    if (!Array.isArray(envType)) return false;
+    return envType.some((tag) => {
+        if (typeof tag === 'string') {
+            return PERSONAL_ACCOUNT_TAG_KEYS.some((key) => tag === `${key}=${PERSONAL_ACCOUNT_VALUE}`);
+        }
+        return PERSONAL_ACCOUNT_TAG_KEYS.includes(tag.keyName) && tag.value === PERSONAL_ACCOUNT_VALUE;
+    });
+};
+
 export {
     formatDisplayName,
     getDomainForFavicon,
@@ -165,10 +178,12 @@ export {
     findTypeTag,
     getAgentTypeFromValue,
     getAgenticCategoryLabel,
+    hasPersonalAccountTag,
     CLIENT_TYPES,
     TYPE_TAG_KEYS,
     ASSET_TAG_KEYS,
     SKILL_TAG_KEY,
-    ROW_TYPES
+    ROW_TYPES,
+    PERSONAL_ACCOUNT_TAG_KEYS,
 };
 export default formatDisplayName;

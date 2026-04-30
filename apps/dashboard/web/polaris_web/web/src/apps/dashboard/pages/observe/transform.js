@@ -10,6 +10,7 @@ import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 import ShowListInBadge from "../../components/shared/ShowListInBadge";
 import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../main/labelHelper";
 import { CollectionIcon } from "../../components/shared/CollectionIcon";
+import { hasPersonalAccountTag } from "./agentic/mcpClientHelper";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -569,11 +570,15 @@ const transform = {
                 displayText = serviceName || c.serviceName || splitApiCollectionName;
             }
 
-            // Create displayNameComp - always create new one when filterType is provided to show correct text
-            const displayNameComp = (filterType ? null : c.displayNameComp) || (
+            const isPersonalAccount = hasPersonalAccountTag(c.envTypeOriginal);
+
+            // Create displayNameComp - always create new one when filterType is provided or when the
+            // collection has a personal account tag (to ensure the badge is always rendered fresh)
+            const displayNameComp = (filterType || isPersonalAccount ? null : c.displayNameComp) || (
                 <HorizontalStack gap="2" align="start">
                     <Box maxWidth="30vw"><Text truncate fontWeight="medium">{displayText}</Text></Box>
                     {c.registryStatus === "available" && <Badge>Registry</Badge>}
+                    {isPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
                 </HorizontalStack>
             );
 
