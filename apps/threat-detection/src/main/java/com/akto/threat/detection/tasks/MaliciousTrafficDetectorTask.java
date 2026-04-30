@@ -95,7 +95,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
   ));
   private static Supplier<String> lazyToString;
   private DistributionCalculator distributionCalculator;
-  private com.akto.threat.detection.utils.ThreatDetectorWithStrategy threatDetector;
+  private ThreatDetectorWithStrategy threatDetector;
   private boolean apiDistributionEnabled;
   private ApiCountCacheLayer apiCacheCountLayer;
   private final AtomicInteger applyFilterLogCount = new AtomicInteger(0);
