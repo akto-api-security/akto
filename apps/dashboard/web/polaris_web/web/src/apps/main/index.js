@@ -28,16 +28,19 @@ const signupPages = ['/check-inbox', '/business-email', '/signup', '/sso-login',
 const currentPath = window.location.pathname;
 const isSignupPage = signupPages.some(page => currentPath.startsWith(page));
 const isWhitelisted = func.isWhiteListedOrganization();
+const shouldApplyPlanGate = window.IS_METERED === true;
 
 let free = false
-if(isWhitelisted || isSignupPage) {
-  free = false; // Whitelisted users & Signup pages should not block user
-} else {
-  // For non-whitelisted, non-signup users, check plan type
-  if(window.PLAN_TYPE && ALLOWED_PLANS.includes(window.PLAN_TYPE.toLowerCase())) {
-    free = false; // Valid plan type = no restrictions
+if (shouldApplyPlanGate) {
+  if(isWhitelisted || isSignupPage) {
+    free = false; // Whitelisted users & Signup pages should not block user
   } else {
-    free = true; // No valid plan = Block user
+    // For non-whitelisted, non-signup users, check plan type
+    if(window.PLAN_TYPE && ALLOWED_PLANS.includes(window.PLAN_TYPE.toLowerCase())) {
+      free = false; // Valid plan type = no restrictions
+    } else {
+      free = true; // No valid plan = Block user
+    }
   }
 }
 
