@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Box, Badge, HorizontalStack, Text } from "@shopify/polaris";
+import { IndexFiltersMode, Box, Badge } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -75,14 +75,6 @@ function Endpoints() {
                     />
                 </Box>
             ),
-            groupNameDisplay: group.hasPersonalAccount
-                ? (
-                    <HorizontalStack gap="2" align="start" wrap={false}>
-                        <Text>{group.groupName}</Text>
-                        <Badge size="small" status="warning">Contains personal account</Badge>
-                    </HorizontalStack>
-                )
-                : group.groupName,
             sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || [], false),
             riskScoreComp: group.riskScore !== null
                 ? <Badge status={getRiskScoreStatus(group.riskScore)} size="small">{group.riskScore}</Badge>
