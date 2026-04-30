@@ -837,6 +837,13 @@ const settingRequests = {
             data: {email}
         })
     },
+    async fetchAccountJobs() {
+        return await request({
+            url: '/api/fetchAccountJobs',
+            method: 'post',
+            data: {}
+        })
+    },
     async fetchModuleInfo(filter = {}) {
         return await request({
             url: '/api/fetchModuleInfo',
