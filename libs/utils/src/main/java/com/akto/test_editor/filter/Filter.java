@@ -213,13 +213,14 @@ public class Filter {
                     String response = Utils.buildResponseIHttpFormat(rawApi);
 
                     queryData.put(TestExecutorModifier._OPERATION, operation);
+                    String requestAndResponse =
+                        "Request payload: \n" + ogRequest + "\n\nResponse payload: \n" + response;
                     BasicDBObject generatedData;
                     if (filterActionRequest.isValidationContext()) {
-                        queryData.put(TestExecutorModifier._REQUEST, response);
+                        queryData.put(TestExecutorModifier._REQUEST, requestAndResponse);
                         generatedData = new TestValidatorModifier().handle(queryData);
                     } else {
-                        String request = "Request payload: \n" + ogRequest + "\n\nResponse payload: \n" + response;
-                        queryData.put(TestExecutorModifier._REQUEST, request);
+                        queryData.put(TestExecutorModifier._REQUEST, requestAndResponse);
                         generatedData = new TestFilterModifier().handle(queryData);
                     }
 
