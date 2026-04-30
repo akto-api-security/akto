@@ -39,7 +39,7 @@ export const getHeaders = (options = {}) => {
     const endpointsColumnBoxWidth = options.endpointsColumnBoxWidth ?? "80px";
     const headers = [
         { title: "", text: "", value: "iconComp", isText: CellType.TEXT, boxWidth: '24px' },
-        { title: primaryTitle, text: primaryText, value: "groupNameComp", filterKey: "groupName", textValue: "groupName", showFilter: true, sortActive: true },
+        { title: primaryTitle, text: primaryText, value: "groupNameDisplay", filterKey: "groupName", textValue: "groupName", showFilter: true, sortActive: true },
         { title: "Type", text: "Type", value: "clientType", filterKey: "clientType", textValue: "clientType", boxWidth: "220px" },
         { 
             title: endpointsColumnLabel, 

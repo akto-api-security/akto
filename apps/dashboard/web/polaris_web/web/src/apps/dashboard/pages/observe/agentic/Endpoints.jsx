@@ -75,7 +75,7 @@ function Endpoints() {
                     />
                 </Box>
             ),
-            groupNameComp: group.hasPersonalAccount
+            groupNameDisplay: group.hasPersonalAccount
                 ? (
                     <HorizontalStack gap="2" align="start" wrap={false}>
                         <Text>{group.groupName}</Text>
