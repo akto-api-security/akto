@@ -26,7 +26,7 @@ Entry point: `Main.java` — wires up Redis, Kafka configs, crons, and starts th
 | `hyperscan/` | High-performance regex pattern matching (replaces YAML filters when enabled) |
 | `ip_api_counter/` | Behavioral detection — param enumeration, IP/API hit distribution via Count-Min Sketch |
 | `smart_event_detector/` | Sliding window threshold notifier for aggregated threat rules |
-| `cache/` | Redis-backed caches for account config, API counts, and counter state |
+| `cache/` | Redis-backed caches for account config, filter rules, OpenAPI schemas, API counts, and counter state |
 | `crons/` | Background schedulers (API count relay, distribution forwarding) |
 | `strategy/` | Detection strategy abstractions (YAML filter vs. hyperscan) |
 | `constants/` | Kafka topic names and Redis key patterns |
@@ -47,7 +47,6 @@ Two modes, controlled per-account via `AccountConfigurationCache`:
 | `AKTO_THREAT_DETECTION_LOCAL_REDIS_URI` | Local Redis for counters/caching |
 | `AGGREGATION_RULES_ENABLED` | Enables Redis + API count relay cron (default: true) |
 | `API_DISTRIBUTION_ENABLED` | Enables per-IP/API behavioral tracking (default: true) |
-| `KAFKA_POLL_ENABLED` | Toggle Kafka polling (default: true) |
 
 ## Actor identification
 
@@ -55,10 +54,12 @@ Actor = the IP/identity attributed to a request. Resolved by `ThreatConfiguratio
 
 ## Filter lifecycle
 
-Filters are fetched from DB every 5 minutes (`filterUpdateIntervalSec = 300`) via `getFilters()`. On each refresh, filters are split into three buckets:
+Filters are fetched from DB every 5 minutes via `FilterCache.getFilters()`. On each refresh, filters are split into three buckets:
 - `apiFilters` — active threat detection filters
 - `successfulExploitFilters` — post-match severity escalation
 - `ignoredEventFilters` — suppress alerts matching known-safe patterns
+
+`FilterCache` also owns the OpenAPI schema Redis cache (`getApiSchema()`), with a 24-hour TTL and DB fallback when Redis is unavailable.
 
 ## Notes
 
