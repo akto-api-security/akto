@@ -155,20 +155,15 @@ const getAgenticCategoryLabel = (collection) => {
     return getTypeFromTags(Array.isArray(raw) ? raw : []);
 };
 
-const PERSONAL_ACCOUNT_TAG_KEYS = ['ai-agent-account-type', 'ai-agent-email', 'browser-llm-account-type', 'login-user-email-type'];
-const NON_PERSONAL_VALUES = ['enterprise'];
+const PERSONAL_ACCOUNT_TAG_KEYS = ['browser-llm-account-type', 'login-user-email-type', 'ai-agent-account-type'];
 
 const hasPersonalAccountTag = (envType) => {
     if (!Array.isArray(envType)) return false;
     return envType.some((tag) => {
         if (typeof tag === 'string') {
-            return PERSONAL_ACCOUNT_TAG_KEYS.some((key) => {
-                if (!tag.startsWith(`${key}=`)) return false;
-                const value = tag.slice(key.length + 1);
-                return value && !NON_PERSONAL_VALUES.includes(value);
-            });
+            return PERSONAL_ACCOUNT_TAG_KEYS.some((key) => tag === `${key}=personal`);
         }
-        return PERSONAL_ACCOUNT_TAG_KEYS.includes(tag.keyName) && tag.value && !NON_PERSONAL_VALUES.includes(tag.value);
+        return PERSONAL_ACCOUNT_TAG_KEYS.includes(tag.keyName) && tag.value === 'personal';
     });
 };
 
