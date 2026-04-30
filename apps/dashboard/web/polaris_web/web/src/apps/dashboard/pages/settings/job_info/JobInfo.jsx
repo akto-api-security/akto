@@ -156,7 +156,6 @@ const JobInfo = () => {
                     rowClickable={true}
                     onRowClick={(row) => setSelectedJob(row)}
                     hideQueryField={true}
-                    hidePagination={true}
                     useNewRow={true}
                     hasRowActions={true}
                     getActions={getActions}
