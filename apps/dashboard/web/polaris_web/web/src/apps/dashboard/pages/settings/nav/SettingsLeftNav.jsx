@@ -46,6 +46,12 @@ const SettingsLeftNav = () => {
             selected: page === "module-info",
             onClick: () => navigate("/dashboard/settings/module-info")
         }]
+    const jobInfoArr = [{
+            label: 'Job Info',
+            icon: AutomationFilledMajor,
+            selected: page === "job-info",
+            onClick: () => navigate("/dashboard/settings/job-info")
+        }]
     const metricsArr = window.DASHBOARD_MODE !== 'ON_PREM' ? [{
         label: 'Metrics',
         icon: ReportFilledMinor,
@@ -135,6 +141,7 @@ const SettingsLeftNav = () => {
                     },
                     ...logsArr,
                     ...moduleInfoArr,
+                    ...jobInfoArr,
                     ...metricsArr,
                     {
                         label: 'Auth types',
