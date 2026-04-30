@@ -74,6 +74,17 @@ public class Constants {
     public static final String AKTO_MALICIOUS_MCP_SERVER_TAG = "malicious-mcp-server";
     public static final String AKTO_DAST_TAG = "dast";
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
+    /** Ingest {@code tag} JSON: integration id for http-proxy sourced traffic (e.g. ClickUp cron). */
+    public static final String INGEST_TAG_SERVICE = "service";
+    public static final String INGEST_SERVICE_VALUE_CLICKUP = "clickup";
+
+    /** Kafka ingest {@code tag} keys — align with mini-runtime hybrid AI-agent handling (same as N8N-style traces). */
+    public static final String AI_AGENT_TAG_SOURCE = "source";
+    public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
+    public static final String AI_AGENT_SOURCE_CLICKUP = "CLICKUP";
+
+    /** Response payload wrapper for hybrid runtime trace parsing (mirrors {@code n8nTraceMetadata}). */
+    public static final String CLICKUP_TRACE_METADATA_KEY = "clickupTraceMetadata";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
     public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";

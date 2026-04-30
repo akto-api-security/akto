@@ -224,6 +224,7 @@ import com.akto.utils.AutomatedApiGroupsUtils;
 import com.akto.utils.TestTemplateUtils;
 import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.Crons;
+import com.akto.utils.crons.ClickUpIngestCron;
 import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
@@ -279,6 +280,7 @@ public class InitializerListener implements ServletContextListener {
     public static boolean connectedToMongo = false;
     
     SyncCron syncCronInfo = new SyncCron();
+    ClickUpIngestCron clickUpIngestCron = new ClickUpIngestCron();
     TokenGeneratorCron tokenGeneratorCron = new TokenGeneratorCron();
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
     AgentBasePromptDetectionCron agentBasePromptDetectionCron = new AgentBasePromptDetectionCron();
@@ -2651,6 +2653,7 @@ public class InitializerListener implements ServletContextListener {
                         // trimCappedCollectionsJob();
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpUpdateCronScheduler();
+                        clickUpIngestCron.schedule();
                         agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
                         updateApiGroupsForAccounts();
                         setupAutomatedApiGroupsScheduler();
