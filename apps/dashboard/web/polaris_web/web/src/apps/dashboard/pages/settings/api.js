@@ -844,6 +844,13 @@ const settingRequests = {
             data: {}
         })
     },
+    async deleteAccountJob(jobId) {
+        return await request({
+            url: '/api/deleteAccountJob',
+            method: 'post',
+            data: { jobId }
+        })
+    },
     async fetchModuleInfo(filter = {}) {
         return await request({
             url: '/api/fetchModuleInfo',

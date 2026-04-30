@@ -1,10 +1,12 @@
 import { Badge, Box, Divider, HorizontalStack, LegacyCard, Modal, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
+import { DeleteMajor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react"
 import settingRequests from "../api"
 import func from "@/util/func"
 import EmptyCard from "../../dashboard/new_components/EmptyCard"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
 import { CellType } from "../../../components/tables/rows/GithubRow"
+import ConfirmationModal from "../../../components/shared/ConfirmationModal"
 
 const STATUS_BADGE_CLASS = {
     COMPLETED: "SUCCESS",
@@ -27,6 +29,7 @@ const headings = [
     { text: "Started At", value: "startedAtStr", title: "Started At", type: CellType.TEXT },
     { text: "Finished At", value: "finishedAtStr", title: "Finished At", type: CellType.TEXT },
     { text: "Error", value: "errorComp", title: "Error" },
+    { title: "", type: CellType.ACTION },
 ]
 
 const KeyValueRow = ({ label, value }) => (
@@ -69,6 +72,29 @@ const JobInfo = () => {
     useEffect(() => {
         fetchJobs()
     }, [])
+
+    const handleDelete = (job) => {
+        const deleteMessage = `Are you sure you want to delete this job "${job.jobType} / ${job.subType}"? This will remove it from the jobs list and cannot be undone.`
+        func.showConfirmationModal(
+            deleteMessage,
+            "Delete",
+            async () => {
+                await settingRequests.deleteAccountJob(job.id)
+                fetchJobs()
+            }
+        )
+    }
+
+    const getActions = (row) => [
+        {
+            items: [{
+                content: "Delete",
+                icon: DeleteMajor,
+                destructive: true,
+                onAction: () => handleDelete(row),
+            }]
+        }
+    ]
 
     const tableData = jobs.map(job => {
         const status = job.jobStatus || "-"
@@ -132,6 +158,9 @@ const JobInfo = () => {
                     hideQueryField={true}
                     hidePagination={true}
                     useNewRow={true}
+                    hasRowActions={true}
+                    getActions={getActions}
+                    preventRowClickOnActions={true}
                 />
             ) : (
                 <EmptyCard
@@ -143,6 +172,12 @@ const JobInfo = () => {
                     }
                 />
             )}
+
+            <ConfirmationModal
+                modalContent=""
+                primaryActionContent="Delete"
+                primaryAction={() => {}}
+            />
 
             {selectedJob && (
                 <Modal
