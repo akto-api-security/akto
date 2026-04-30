@@ -96,6 +96,10 @@ const getFriendlyLlmName = (domain) => {
 
 const getTypeFromTags = (envType) => {
     if (!Array.isArray(envType)) return CLIENT_TYPES.MCP_SERVER;
+    const hasSkill = envType.some(tag => tag.keyName === SKILL_TAG_KEY);
+    const hasAiAgent = envType.some(tag => tag.keyName === ASSET_TAG_KEYS.AI_AGENT);
+    const hasMcpServer = envType.some(tag => tag.keyName === TYPE_TAG_KEYS.MCP_SERVER);
+    if (hasSkill && !hasAiAgent && !hasMcpServer) return CLIENT_TYPES.SKILL;
     for (const tag of envType) {
         if (tag.keyName && TYPE_TAG_TO_DISPLAY[tag.keyName]) return TYPE_TAG_TO_DISPLAY[tag.keyName];
     }
@@ -142,9 +146,11 @@ const getAgenticCategoryLabel = (collection) => {
     }
     const envArr = collection?.envType;
     if (Array.isArray(envArr) && envArr.length > 0 && typeof envArr[0] === 'string') {
-        if (envArr.some((t) => typeof t === 'string' && t.startsWith('mcp-server='))) {
-            return TYPE_TAG_TO_DISPLAY[TYPE_TAG_KEYS.MCP_SERVER];
-        }
+        const hasSkillStr = envArr.some((t) => typeof t === 'string' && t.startsWith(`${SKILL_TAG_KEY}=`));
+        const hasAiAgentStr = envArr.some((t) => typeof t === 'string' && t.startsWith(`${ASSET_TAG_KEYS.AI_AGENT}=`));
+        const hasMcpServerStr = envArr.some((t) => typeof t === 'string' && t.startsWith('mcp-server='));
+        if (hasSkillStr && !hasAiAgentStr && !hasMcpServerStr) return CLIENT_TYPES.SKILL;
+        if (hasMcpServerStr) return TYPE_TAG_TO_DISPLAY[TYPE_TAG_KEYS.MCP_SERVER];
         if (envArr.some((t) => typeof t === 'string' && t.startsWith('gen-ai='))) {
             return TYPE_TAG_TO_DISPLAY[TYPE_TAG_KEYS.GEN_AI];
         }
