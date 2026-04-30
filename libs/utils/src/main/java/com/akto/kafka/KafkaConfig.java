@@ -1,6 +1,7 @@
 package com.akto.kafka;
 
 import java.util.Properties;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 
 public class KafkaConfig {
   // Kafka authentication configuration constants
@@ -99,6 +100,23 @@ public class KafkaConfig {
 
   public static Builder newBuilder() {
     return new Builder();
+  }
+
+  public Properties toConsumerProperties() {
+    Properties properties = new Properties();
+    properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+    properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, keySerializer.getDeserializer());
+    properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, valueSerializer.getDeserializer());
+    properties.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+    properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+    properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+    if (consumerConfig != null) {
+      properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, consumerConfig.getMaxPollRecords());
+      if (consumerConfig.getFetchMaxBytes() > 0) {
+        properties.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, consumerConfig.getFetchMaxBytes());
+      }
+    }
+    return properties;
   }
 
   /**

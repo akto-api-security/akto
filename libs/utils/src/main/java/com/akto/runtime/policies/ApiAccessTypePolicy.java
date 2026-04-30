@@ -83,14 +83,11 @@ public class ApiAccessTypePolicy {
             ipList.addAll(Arrays.asList(parts));
         }
 
-        logger.debug("Client IPs: " + clientIps);
         String sourceIP = httpResponseParams.getSourceIP();
 
         if (sourceIP != null && !sourceIP.isEmpty() && !sourceIP.equals("null")) {
-            logger.debug("Received source IP: " + sourceIP);
             ipList.add(cleanIp(sourceIP));
         }
-        logger.debug("Final IP list: " + ipList);
         return ipList;
     }
 
