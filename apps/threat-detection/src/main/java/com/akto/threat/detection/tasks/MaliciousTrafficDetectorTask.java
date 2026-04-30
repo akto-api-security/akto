@@ -212,11 +212,6 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
   }
 
 
-
-
-
-
-
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
     String actor = this.threatConfigEvaluator.getActorId(responseParam);
