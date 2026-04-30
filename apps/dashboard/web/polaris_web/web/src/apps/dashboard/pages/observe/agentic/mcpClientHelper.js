@@ -155,7 +155,7 @@ const getAgenticCategoryLabel = (collection) => {
     return getTypeFromTags(Array.isArray(raw) ? raw : []);
 };
 
-const PERSONAL_ACCOUNT_TAG_KEYS = ['browser-llm-account-type', 'login-user-email-type', 'ai-agent-account-type'];
+const PERSONAL_ACCOUNT_TAG_KEYS = ['browser-llm-account-type', 'login-user-email-type'];
 
 const hasPersonalAccountTag = (envType) => {
     if (!Array.isArray(envType)) return false;
