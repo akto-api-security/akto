@@ -101,19 +101,13 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
   private final AtomicInteger applyFilterLogCount = new AtomicInteger(0);
   private static final int MAX_APPLY_FILTER_LOGS = 1000;
 
-  // Kafka records per minute tracking
-  private int recordsReadCount = 0;
-  private long lastRecordCountLogTime = System.currentTimeMillis();
-  private String instanceId;
 
 
   private final HyperscanEventHandler hyperscanEventHandler;
 
   public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled, String instanceId) throws Exception {
-    super(trafficConfig, KafkaTopic.TRAFFIC_LOGS);
-
-    this.instanceId = instanceId;
+    super(trafficConfig, KafkaTopic.TRAFFIC_LOGS, instanceId);
 
     Context.accountId.set(ClientActor.getAccountId());
 
@@ -172,8 +166,6 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
   @Override
   void processRecords(ConsumerRecords<String, byte[]> records) {
     try {
-      logRecordsPerMin(records.count());
-
       AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
       if (config == null) {
         Context.isRedactPayload.set(false);
@@ -198,23 +190,6 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     }
   }
 
-  private void logRecordsPerMin(int count) {
-    recordsReadCount += count;
-    long currentTime = System.currentTimeMillis();
-    long timeDiff = currentTime - lastRecordCountLogTime;
-    if (timeDiff >= 60000) {
-      logger.warnAndAddToDb(this.instanceId + ": Kafka records read in last minute: " + recordsReadCount +
-          " (avg " + String.format("%.2f", recordsReadCount / (timeDiff / 1000.0)) + " records/sec)");
-      logger.warnAndAddToDb(this.instanceId + ": Assigned partitions: " + kafkaConsumer.assignment());
-      logger.warnAndAddToDb(this.instanceId + ": Subscription: " + kafkaConsumer.subscription());
-      if (kafkaConsumer.assignment().isEmpty()) {
-        logger
-            .warnAndAddToDb(this.instanceId + ": WARNING - No partitions assigned! Consumer may not receive records.");
-      }
-      recordsReadCount = 0;
-      lastRecordCountLogTime = currentTime;
-    }
-  }
 
   private boolean ignoreTrafficFilter(HttpResponseParam responseParam) {
     Map<String, StringList> headers = responseParam.getRequestHeadersMap();
