@@ -9,6 +9,10 @@ import subprocess
 import uuid
 import re
 import socket
+import json
+import tempfile
+from pathlib import Path
+from urllib.parse import urlparse
 
 try:
     import pwd
@@ -225,3 +229,109 @@ if __name__ == "__main__":
     # Print machine ID when script is executed directly
     print(get_machine_id())
 # done
+
+
+"""
+Resolve Claude MCP server name -> URL.
+
+Reads two files Claude actually uses:
+  1. ~/.claude.json          — projects.<path>.mcpServers (written by `claude mcp add`)
+  2. .mcp.json (cwd/given)   — top-level mcpServers (project-scoped, git-tracked)
+
+Cache: /tmp/mcp_resolver_cache.json, invalidated by mtime of source files.
+
+Usage:
+    python mcp_resolver.py <server-name>           # prints URL
+    python mcp_resolver.py <server-name> --domain  # prints just domain
+    python mcp_resolver.py --list                  # prints all as JSON
+
+Library:
+    from mcp_resolver import resolve, resolve_domain, build_index
+"""
+
+_CACHE_FILE = Path(tempfile.gettempdir()) / "akto_mcp_resolver_cache.json"
+
+
+def _source_paths(project_dir: Path | None = None) -> list[Path]:
+    base = project_dir or Path.cwd()
+    return [
+        Path.home() / ".claude.json",
+        base / ".mcp.json",
+    ]
+
+
+def _parse(path: Path) -> dict[str, str]:
+    """Return {server_name: url} for HTTP servers in a single config file."""
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+    result: dict[str, str] = {}
+
+    def _collect(servers: dict) -> None:
+        for name, cfg in servers.items():
+            if not isinstance(cfg, dict):
+                continue
+            url = cfg.get("url") or cfg.get("serverUrl")
+            try:
+                result[name] = urlparse(url).netloc if url else name
+            except Exception:
+                result[name] = name
+
+    # ~/.claude.json: servers live under projects.<path>.mcpServers
+    if "projects" in data:
+        for project_data in data["projects"].values():
+            if isinstance(project_data, dict) and "mcpServers" in project_data:
+                _collect(project_data["mcpServers"])
+
+    # .mcp.json / fallback: top-level mcpServers
+    if "mcpServers" in data:
+        _collect(data["mcpServers"])
+
+    return result
+
+
+def _combined_mtime(paths: list[Path]) -> float:
+    return sum(p.stat().st_mtime for p in paths if p.exists())
+
+
+def build_index(project_dir: Path | None = None) -> dict[str, str]:
+    """Return {server_name: url} for all Claude HTTP MCP servers."""
+    paths = _source_paths(project_dir)
+    mtime = _combined_mtime(paths)
+
+    if _CACHE_FILE.exists():
+        try:
+            cached = json.loads(_CACHE_FILE.read_text(encoding="utf-8"))
+            if cached.get("mtime") == mtime:
+                return cached["index"]
+        except (json.JSONDecodeError, OSError, KeyError):
+            pass
+
+    index: dict[str, str] = {}
+    for p in paths:
+        index.update(_parse(p))
+
+    try:
+        _CACHE_FILE.write_text(json.dumps({"mtime": mtime, "index": index}), encoding="utf-8")
+    except OSError:
+        pass
+
+    return index
+
+
+def resolve(server_name: str, project_dir: Path | None = None) -> str:
+    """Resolve server name to domain (HTTP) or name (stdio). Always returns a string."""
+    try:
+        return build_index(project_dir).get(server_name) or server_name
+    except Exception:
+        return server_name
+
+
+def resolve_domain(server_name: str, project_dir: Path | None = None) -> str | None:
+    """Resolve server name to domain/host only. Returns None if not found."""
+    url = resolve(server_name, project_dir)
+    return urlparse(url).netloc if url else None

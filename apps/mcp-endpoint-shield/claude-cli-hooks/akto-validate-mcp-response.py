@@ -12,7 +12,7 @@ import urllib.request
 from urllib.parse import quote
 from typing import Any, Dict, Set, Tuple, Union
 
-from akto_machine_id import get_machine_id, get_username
+from akto_machine_id import get_machine_id, get_username, resolve
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
@@ -154,7 +154,9 @@ def parse_claude_tool(tool_name: str) -> Tuple[bool, str, str]:
     mcp_tool = "__".join(parts[2:])
     if not server or not mcp_tool:
         return False, "", ""
-    return True, server, mcp_tool
+    mcp_domain_name = resolve(server)
+    logger.info(f"[MCP Resolver] resolved domainName: {mcp_domain_name} for Mcp Server: {server}")
+    return True, mcp_domain_name, mcp_tool
 
 def _tool_arguments_for_jsonrpc(tool_input: Any) -> Dict[str, Any]:
     if isinstance(tool_input, dict):
