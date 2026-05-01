@@ -772,6 +772,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchApiSequences() {
+        try {
+            apiSequencesList = ApiSequencesDao.instance.findAll(new BasicDBObject());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchApiSequences: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String bulkWriteSti() {
         loggerMaker.infoAndAddToDb("bulkWriteSti called");
         int accId = Context.accountId.get();
