@@ -774,7 +774,7 @@ public class DbAction extends ActionSupport {
 
     public String fetchApiSequences() {
         try {
-            apiSequencesList = ApiSequencesDao.instance.findAll(new BasicDBObject());
+            apiSequencesList = ApiSequencesDao.instance.findAll(new BasicDBObject(), skip, 1000, null);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchApiSequences: " + e.getMessage());
             return Action.ERROR.toUpperCase();
