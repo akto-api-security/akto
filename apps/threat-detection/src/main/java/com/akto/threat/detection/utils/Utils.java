@@ -108,6 +108,17 @@ public class Utils {
         return ipApiRateLimitFilter;
     }
 
+    public static FilterConfig buildSequenceAnomalyFilter() {
+        FilterConfig filter = new FilterConfig("SequenceAnomaly", null, null, null);
+        Info info = new Info();
+        info.setName("SequenceAnomaly");
+        info.setCategory(new Category("Behavioral", "Behavioral", "Behavioral"));
+        info.setSubCategory("ApiSequenceAnomaly");
+        info.setSeverity("HIGH");
+        filter.setInfo(info);
+        return filter;
+    }
+
     /**
      * Build a synthetic FilterConfig for a Hyperscan-detected threat category.
      * This allows Hyperscan results to flow through the same event pipeline as YAML filters.
