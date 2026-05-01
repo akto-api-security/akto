@@ -890,7 +890,7 @@ public class Main {
                 // aktoPolicyNew is fully built by the time HttpCallParser constructor returns
                 SessionAnalyzer sessionAnalyzer = new SessionAnalyzer(
                     new SequenceAnalyzerConfig(
-                        2,
+                        10,             // maxOrder: track orders 1 through 10
                         10 * 60 * 1000L, // 10 minutes
                         new IpBasedIdentifier(),
                         RawCountAccumulator::new,
