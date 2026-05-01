@@ -48,9 +48,6 @@ import com.akto.threat.detection.cache.FilterCache;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.cache.SequenceCache;
 import com.akto.threat.detection.constants.KafkaTopic;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import java.util.concurrent.TimeUnit;
 import com.akto.threat.detection.constants.RedisKeyInfo;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.ip_api_counter.ParamEnumerationDetector;
@@ -105,23 +102,8 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
   private final AtomicInteger applyFilterLogCount = new AtomicInteger(0);
   private static final int MAX_APPLY_FILTER_LOGS = 1000;
 
-  // Sequence anomaly detection
-  private static final float SEQUENCE_ANOMALY_PROBABILITY_THRESHOLD = 0.05f;
-  private static final int SEQUENCE_ANOMALY_COUNT_THRESHOLD = 5;
-  private static final int SEQUENCE_ANOMALY_MIN_CACHE_SIZE = 50;
   private static final FilterConfig SEQUENCE_ANOMALY_FILTER = Utils.buildSequenceAnomalyFilter();
-
   private SequenceCache sequenceCache;
-  // actor → last API key (ApiInfoKey.toString()); TTL 10 min matches sequence window
-  private final Cache<String, String> actorLastApi = Caffeine.newBuilder()
-      .maximumSize(100_000)
-      .expireAfterWrite(10, TimeUnit.MINUTES)
-      .build();
-  // actor → consecutive anomalous transition count; TTL 10 min
-  private final Cache<String, Integer> actorAnomalyCount = Caffeine.newBuilder()
-      .maximumSize(100_000)
-      .expireAfterWrite(10, TimeUnit.MINUTES)
-      .build();
 
 
 
@@ -481,27 +463,12 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
 
   private void checkSequenceAnomaly(String actor, int apiCollectionId, String urlForAggregation,
       URLMethods.Method method, HttpResponseParams responseParam) {
-    if (apiCollectionId == 0 || sequenceCache.size() < SEQUENCE_ANOMALY_MIN_CACHE_SIZE) return;
+    if (apiCollectionId == 0) return;
 
     String currentApiKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method).toString();
-    String prevApiKey = actorLastApi.getIfPresent(actor);
-    actorLastApi.put(actor, currentApiKey);
+    boolean shouldAlert = sequenceCache.checkSequenceAnomaly(actor, currentApiKey);
 
-    if (prevApiKey == null) return;
-
-    Float probability = sequenceCache.getProbability(prevApiKey, currentApiKey);
-    boolean isAnomalous = probability == null || probability < SEQUENCE_ANOMALY_PROBABILITY_THRESHOLD;
-
-    if (!isAnomalous) {
-      actorAnomalyCount.invalidate(actor);
-      return;
-    }
-
-    int count = actorAnomalyCount.get(actor, k -> 0) + 1;
-    actorAnomalyCount.put(actor, count);
-
-    if (count >= SEQUENCE_ANOMALY_COUNT_THRESHOLD) {
-      actorAnomalyCount.invalidate(actor);
+    if (shouldAlert) {
       RedactionType redactionType = Utils.getRedactionType(responseParam.getRequestParams().getHeaders(), dataActor);
       SampleMaliciousRequest seqReq = Utils.buildSampleMaliciousRequest(
           actor, responseParam, SEQUENCE_ANOMALY_FILTER, null, null, false, false, redactionType);
