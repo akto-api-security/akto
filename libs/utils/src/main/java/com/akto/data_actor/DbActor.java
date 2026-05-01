@@ -270,4 +270,9 @@ public class DbActor extends DataActor {
         DbLayer.ingestMetric(metricData);
     }
 
+    @Override
+    public List<ApiSequences> fetchApiSequences() {
+        return DbLayer.fetchApiSequences();
+    }
+
 }

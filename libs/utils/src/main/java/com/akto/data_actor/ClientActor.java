@@ -1604,4 +1604,32 @@ public class ClientActor extends DataActor {
         return;
     };
 
+    @Override
+    public List<ApiSequences> fetchApiSequences() {
+        List<ApiSequences> apiSequences = new ArrayList<>();
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchApiSequences", "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb(null, "invalid response in fetchApiSequences", LoggerMaker.LogDb.RUNTIME);
+                return apiSequences;
+            }
+            try {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList objList = (BasicDBList) payloadObj.get("apiSequencesList");
+                for (Object obj : objList) {
+                    BasicDBObject obj2 = (BasicDBObject) obj;
+                    apiSequences.add(objectMapper.readValue(obj2.toJson(), ApiSequences.class));
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "error extracting response in fetchApiSequences", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchApiSequences", LoggerMaker.LogDb.RUNTIME);
+        }
+        return apiSequences;
+    }
+
 }

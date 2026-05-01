@@ -6,6 +6,7 @@ import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.metrics.MetricDataDao;
+import com.akto.dto.ApiSequences;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.metrics.MetricData;
 
@@ -554,5 +555,9 @@ public class DbLayer {
 
     public static void ingestMetric(List<MetricData> metricData) {
         MetricDataDao.instance.insertMany(metricData);
+    }
+
+    public static List<ApiSequences> fetchApiSequences() {
+        return ApiSequencesDao.instance.findAll(new BasicDBObject());
     }
 }
