@@ -24,6 +24,7 @@ public final class AIAgentConnectorConstants {
     public static final String CONNECTOR_TYPE_SALESFORCE = "SALESFORCE";
     public static final String CONNECTOR_TYPE_ANTHROPIC = "ANTHROPIC";
     public static final String CONNECTOR_TYPE_OPENAI = "OPENAI";
+    public static final String CONNECTOR_TYPE_CLICKUP = "CLICKUP";
 
     // Binary Names
     public static final String BINARY_NAME_N8N = "n8n-shield";
@@ -93,6 +94,14 @@ public final class AIAgentConnectorConstants {
     public static final String CONFIG_OPENAI_API_KEY = "OPENAI_API_KEY";
     public static final String CONFIG_OPENAI_ORG_ID = "OPENAI_ORG_ID";
     public static final String CONFIG_OPENAI_API_BASE_URL = "OPENAI_API_BASE_URL";
+
+    // Configuration Keys - ClickUp
+    public static final String CONFIG_CLICKUP_BASE_URL = "CLICKUP_BASE_URL";
+    public static final String CONFIG_CLICKUP_API_TOKEN = "CLICKUP_API_TOKEN";
+    public static final String CONFIG_CLICKUP_WORKSPACE_ID = "CLICKUP_WORKSPACE_ID";
+    public static final String CONFIG_CLICKUP_PAGE_ROWS = "CLICKUP_PAGE_ROWS";
+    public static final String CONFIG_CLICKUP_LOOKBACK_HOURS = "CLICKUP_LOOKBACK_HOURS";
+    public static final String CONFIG_CLICKUP_LAST_TIMESTAMP = "CLICKUP_LAST_TIMESTAMP";
 
     // Salesforce API Configuration
     public static final String SALESFORCE_API_VERSION = "v66.0";
