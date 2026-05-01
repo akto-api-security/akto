@@ -557,7 +557,9 @@ public class DbLayer {
         MetricDataDao.instance.insertMany(metricData);
     }
 
-    public static List<ApiSequences> fetchApiSequences() {
-        return ApiSequencesDao.instance.findAll(new BasicDBObject());
+    private static final int API_SEQUENCES_BATCH_SIZE = 1000;
+
+    public static List<ApiSequences> fetchApiSequences(int skip) {
+        return ApiSequencesDao.instance.findAll(new BasicDBObject(), skip, API_SEQUENCES_BATCH_SIZE, null);
     }
 }

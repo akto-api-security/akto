@@ -1608,26 +1608,35 @@ public class ClientActor extends DataActor {
     public List<ApiSequences> fetchApiSequences() {
         List<ApiSequences> apiSequences = new ArrayList<>();
         Map<String, List<String>> headers = buildHeaders();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchApiSequences", "", "GET", null, headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb(null, "invalid response in fetchApiSequences", LoggerMaker.LogDb.RUNTIME);
-                return apiSequences;
-            }
+        int skip = 0;
+        for (int i = 0; i < 100; i++) {
+            BasicDBObject payload = new BasicDBObject();
+            payload.put("skip", skip);
+            OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchApiSequences", "", "POST", payload.toJson(), headers, "");
             try {
-                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
-                BasicDBList objList = (BasicDBList) payloadObj.get("apiSequencesList");
-                for (Object obj : objList) {
-                    BasicDBObject obj2 = (BasicDBObject) obj;
-                    apiSequences.add(objectMapper.readValue(obj2.toJson(), ApiSequences.class));
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+                String responsePayload = response.getBody();
+                if (response.getStatusCode() != 200 || responsePayload == null) {
+                    loggerMaker.errorAndAddToDb(null, "invalid response in fetchApiSequences", LoggerMaker.LogDb.RUNTIME);
+                    break;
+                }
+                try {
+                    BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                    BasicDBList objList = (BasicDBList) payloadObj.get("apiSequencesList");
+                    if (objList.isEmpty()) break;
+                    for (Object obj : objList) {
+                        BasicDBObject obj2 = (BasicDBObject) obj;
+                        apiSequences.add(objectMapper.readValue(obj2.toJson(), ApiSequences.class));
+                    }
+                    skip += objList.size();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "error extracting response in fetchApiSequences", LoggerMaker.LogDb.RUNTIME);
+                    break;
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "error extracting response in fetchApiSequences", LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "error in fetchApiSequences", LoggerMaker.LogDb.RUNTIME);
+                break;
             }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "error in fetchApiSequences", LoggerMaker.LogDb.RUNTIME);
         }
         return apiSequences;
     }

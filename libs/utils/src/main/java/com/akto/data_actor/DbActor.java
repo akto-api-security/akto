@@ -272,7 +272,15 @@ public class DbActor extends DataActor {
 
     @Override
     public List<ApiSequences> fetchApiSequences() {
-        return DbLayer.fetchApiSequences();
+        List<ApiSequences> all = new ArrayList<>();
+        int skip = 0;
+        List<ApiSequences> batch;
+        do {
+            batch = DbLayer.fetchApiSequences(skip);
+            all.addAll(batch);
+            skip += batch.size();
+        } while (!batch.isEmpty());
+        return all;
     }
 
 }
