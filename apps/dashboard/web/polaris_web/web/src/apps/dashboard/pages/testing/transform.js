@@ -1480,6 +1480,7 @@ const transform = {
       testSuiteIds: testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
       selectedSlackChannelId: testRun?.slackChannel || 0,
+      doNotMarkIssuesAsFixed: Boolean(testRun.doNotMarkIssuesAsFixed),
     }
   },
   prepareTestingEndpointsApisList(apiEndpoints) {
