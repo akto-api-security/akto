@@ -419,7 +419,7 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
         // Check execution result
         if (!result.isSuccess()) {
             String errorMsg = "Binary execution failed with exit code " + result.getExitCode() +
-                ". Output: " + result.getStdout().substring(0, Math.min(500, result.getStdout().length()));
+                ". Output: " + result.getStdout().substring(0, Math.min(2000, result.getStdout().length()));
             logger.error("Binary execution failed: {}", errorMsg);
             throw new Exception(errorMsg);
         }
