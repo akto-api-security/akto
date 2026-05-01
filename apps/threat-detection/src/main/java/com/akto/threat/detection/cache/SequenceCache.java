@@ -69,10 +69,7 @@ public class SequenceCache {
         Float probability = transitionProbabilities.get(prevApiKey + "|" + currentApiKey);
         boolean isAnomalous = probability == null || probability < PROBABILITY_THRESHOLD;
 
-        if (!isAnomalous) {
-            actorAnomalyCount.invalidate(actor);
-            return false;
-        }
+        if (!isAnomalous) return false;
 
         int count = actorAnomalyCount.get(actor, k -> 0) + 1;
         actorAnomalyCount.put(actor, count);
