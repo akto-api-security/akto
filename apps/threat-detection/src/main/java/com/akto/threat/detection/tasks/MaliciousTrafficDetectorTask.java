@@ -46,6 +46,7 @@ import com.akto.proto.http_response_param.v1.StringList;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.FilterCache;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
+import com.akto.threat.detection.cache.SequenceCache;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.constants.RedisKeyInfo;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
@@ -101,6 +102,9 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
   private final AtomicInteger applyFilterLogCount = new AtomicInteger(0);
   private static final int MAX_APPLY_FILTER_LOGS = 1000;
 
+  private static final FilterConfig SEQUENCE_ANOMALY_FILTER = Utils.buildSequenceAnomalyFilter();
+  private SequenceCache sequenceCache;
+
 
 
   private final HyperscanEventHandler hyperscanEventHandler;
@@ -147,6 +151,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
 
     this.threatDetector = new ThreatDetectorWithStrategy();
     this.hyperscanEventHandler = new HyperscanEventHandler(this::generateAndPushMaliciousEventRequest);
+    this.sequenceCache = new SequenceCache(dataActor);
   }
 
   private int MAX_KAFKA_DEBUG_MSGS = 100;
@@ -258,6 +263,9 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     String urlForAggregation = matchedTemplate != null ? matchedTemplate.getTemplateString() : url;
 
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
+
+    // Sequence anomaly detection — pure in-memory, no Redis, no locking (single-threaded loop)
+    checkSequenceAnomaly(actor, apiCollectionId, urlForAggregation, method, responseParam);
 
     // Increment API count using template URL for proper aggregation (skip for default collection)
     String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, urlForAggregation, method.toString());
@@ -452,6 +460,22 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     }
     }
     }
+
+  private void checkSequenceAnomaly(String actor, int apiCollectionId, String urlForAggregation,
+      URLMethods.Method method, HttpResponseParams responseParam) {
+    if (apiCollectionId == 0) return;
+
+    String currentApiKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method).toString();
+    boolean shouldAlert = sequenceCache.checkSequenceAnomaly(actor, currentApiKey);
+
+    if (shouldAlert) {
+      RedactionType redactionType = Utils.getRedactionType(responseParam.getRequestParams().getHeaders(), dataActor);
+      SampleMaliciousRequest seqReq = Utils.buildSampleMaliciousRequest(
+          actor, responseParam, SEQUENCE_ANOMALY_FILTER, null, null, false, false, redactionType);
+      generateAndPushMaliciousEventRequest(
+          SEQUENCE_ANOMALY_FILTER, actor, responseParam, seqReq, EventType.EVENT_TYPE_SINGLE);
+    }
+  }
 
   private void generateAndPushMaliciousEventRequest(
       FilterConfig apiFilter,

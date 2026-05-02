@@ -1,7 +1,6 @@
 package com.akto.dto;
 
 import java.util.List;
-import org.bson.codecs.pojo.annotations.BsonId;
 import com.akto.dao.context.Context;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -11,10 +10,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ApiSequences {
-
-    @BsonId
-    int id;
-    public static final String ID = "_id";
 
     int apiCollectionId;
     public static final String API_COLLECTION_ID = "apiCollectionId";
@@ -30,6 +25,10 @@ public class ApiSequences {
     // Example: No of times the path "a" was seen
     int prevStateCount;
     public static final String PREV_STATE_COUNT = "prevStateCount";
+
+    // No of times the last endpoint in the sequence was seen
+    int lastStateCount;
+    public static final String LAST_STATE_COUNT = "lastStateCount";
 
     float precedenceScore;
     public static final String PRECEDENCE_SCORE = "precedenceScore";
@@ -49,13 +48,13 @@ public class ApiSequences {
     boolean isActive;
     public static final String IS_ACTIVE = "isActive";
 
-    public ApiSequences(int id, int apiCollectionId, List<String> paths, int transitionCount, 
-                       int prevStateCount, float precedenceScore, float probability) {
-        this.id = id;
+    public ApiSequences(int apiCollectionId, List<String> paths, int transitionCount,
+                       int prevStateCount, int lastStateCount, float precedenceScore, float probability) {
         this.apiCollectionId = apiCollectionId;
         this.paths = paths;
         this.transitionCount = transitionCount;
         this.prevStateCount = prevStateCount;
+        this.lastStateCount = lastStateCount;
         this.precedenceScore = precedenceScore;
         this.probability = probability;
         this.createdAt = Context.now();
@@ -65,8 +64,7 @@ public class ApiSequences {
     @Override
     public String toString() {
         return "{" +
-            " id='" + getId() + "'" +
-            ", apiCollectionId='" + getApiCollectionId() + "'" +
+            " apiCollectionId='" + getApiCollectionId() + "'" +
             ", paths='" + getPaths() + "'" +
             ", transitionCount='" + getTransitionCount() + "'" +
             ", prevStateCount='" + getPrevStateCount() + "'" +

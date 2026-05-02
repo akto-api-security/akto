@@ -270,4 +270,17 @@ public class DbActor extends DataActor {
         DbLayer.ingestMetric(metricData);
     }
 
+    @Override
+    public List<ApiSequences> fetchApiSequences() {
+        List<ApiSequences> all = new ArrayList<>();
+        int skip = 0;
+        List<ApiSequences> batch;
+        do {
+            batch = DbLayer.fetchApiSequences(skip);
+            all.addAll(batch);
+            skip += batch.size();
+        } while (!batch.isEmpty());
+        return all;
+    }
+
 }
