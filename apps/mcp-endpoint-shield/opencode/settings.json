@@ -1,0 +1,38 @@
+{
+  "name": "Akto Guardrails for OpenCode",
+  "description": "Security guardrails plugin for OpenCode AI agent",
+  "version": "1.0.0",
+  "author": "Akto",
+  "license": "MIT",
+  "compatibility": {
+    "minVersion": "1.0.0",
+    "maxVersion": "*"
+  },
+  "configuration": {
+    "required": [
+      "AKTO_DATA_INGESTION_URL"
+    ],
+    "optional": [
+      "AKTO_TIMEOUT",
+      "AKTO_TOKEN",
+      "MODE",
+      "DEVICE_ID",
+      "LOG_PAYLOADS",
+      "LOG_LEVEL"
+    ]
+  },
+  "hooks": {
+    "experimental.chat.messages.transform": {
+      "description": "Validates user prompts before sending to AI",
+      "blocking": true
+    },
+    "tool.execute.before": {
+      "description": "Validates tool calls before execution",
+      "blocking": true
+    },
+    "tool.execute.after": {
+      "description": "Logs tool responses after execution",
+      "blocking": false
+    }
+  }
+}
