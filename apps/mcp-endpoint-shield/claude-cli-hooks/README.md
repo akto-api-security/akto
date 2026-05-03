@@ -17,10 +17,13 @@ Copy the following files to this directory:
 - `akto-validate-response.py`
 - `akto-validate-mcp-request.py`
 - `akto-validate-mcp-response.py`
+- `akto-validate-file.py`
+- `../shared/akto_validate_file_common.py` (copy next to the other hook scripts, or keep the `shared/` folder as a sibling of `hooks/`)
 - `akto-validate-prompt-wrapper.sh`
 - `akto-validate-response-wrapper.sh`
 - `akto-validate-mcp-request-wrapper.sh`
 - `akto-validate-mcp-response-wrapper.sh`
+- `akto-validate-file-wrapper.sh`
 - `akto_machine_id.py`
 
 ### 2. Configure environment
@@ -95,6 +98,17 @@ Edit `~/.claude/settings.json`:
           }
         ]
       }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-validate-file-wrapper.sh",
+            "timeout": 15
+          }
+        ]
+      }
     ]
   }
 }
@@ -130,6 +144,48 @@ Block response format:
 - Trigger: `Stop`
 - Captures prompt/response data from transcript and ingests it to Akto
 - Observational only (cannot block)
+
+### File Validation Hook
+
+#### Before File Read (`akto-validate-file.py`)
+
+- Trigger: `PermissionRequest` for `Read` and `Glob` tools
+- Reads the file content and validates it against Akto guardrails before Claude is allowed to access it
+- Can block file reads — Claude never sees the file content if denied
+
+Deny response format (printed to stdout):
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PermissionRequest",
+    "decision": {
+      "behavior": "deny",
+      "message": "Blocked by Akto Guardrails: <reason>"
+    }
+  }
+}
+```
+
+Allow response format:
+
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PermissionRequest",
+    "decision": {
+      "behavior": "allow"
+    }
+  }
+}
+```
+
+Files are skipped (allowed) when:
+- `AKTO_SYNC_MODE=false` or `VALIDATE_FILES=false`
+- File does not exist or is a directory
+- File size exceeds `FILE_MAX_BYTES`
+- `AKTO_DATA_INGESTION_URL` is not set
+- The guardrails service returns a 4xx (unsupported file type)
 
 ### MCP Tool Hooks
 
@@ -192,6 +248,8 @@ The `mcp_server_name` tag in ingested data is derived from `tool_name`:
 | `LOG_DIR` | `~/.claude/akto/logs` | Directory for log files |
 | `LOG_LEVEL` | `INFO` | Logging verbosity: DEBUG, INFO, WARNING, ERROR |
 | `LOG_PAYLOADS` | `false` | Log request/response payload previews |
+| `VALIDATE_FILES` | `true` | Enable/disable file content validation via PermissionRequest hook |
+| `FILE_MAX_BYTES` | `5242880` | Max file size (bytes) to validate — larger files are skipped (fail-open) |
 
 ## Viewing Logs
 
@@ -201,6 +259,7 @@ Default log directory: `~/.claude/akto/logs/`
 - `validate-response.log` - conversation ingestion
 - `validate-mcp-request.log` - MCP request validation
 - `validate-mcp-response.log` - MCP response ingestion
+- `validate-file.log` - file content validation
 
 Tail all logs:
 
