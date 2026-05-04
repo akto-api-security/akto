@@ -177,7 +177,7 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 
 
 def extract_mcp_server_name(input_data: Dict[str, Any]) -> str:
-    print(f"input_data: {input_data}")
+    logger.info(f"input_data: {input_data}")
     """Extract MCP server identifier from Cursor hook input."""
     # Priority: server > url (extract domain) > command > tool_name prefix > default
     if server := input_data.get("server"):
