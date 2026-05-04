@@ -1604,4 +1604,41 @@ public class ClientActor extends DataActor {
         return;
     };
 
+    @Override
+    public List<EndpointMcpConfig> fetchEndpointMcpConfigs(String tempCollectionName, int updatedDate) {
+        List<EndpointMcpConfig> configs = new ArrayList<>();
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        if (tempCollectionName != null) {
+            obj.put("tempCollectionName", tempCollectionName);
+        }
+        obj.put("updatedDate", updatedDate);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchEndpointMcpConfig", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchEndpointMcpConfigs", LoggerMaker.LogDb.RUNTIME);
+                return configs;
+            }
+            try {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList list = (BasicDBList) payloadObj.get("endpointMcpConfigs");
+                if (list == null) {
+                    return configs;
+                }
+                for (Object item : list) {
+                    BasicDBObject itemObj = (BasicDBObject) item;
+                    EndpointMcpConfig cfg = objectMapper.readValue(itemObj.toJson(), EndpointMcpConfig.class);
+                    configs.add(cfg);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchEndpointMcpConfigs " + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchEndpointMcpConfigs " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return configs;
+    }
+
 }
