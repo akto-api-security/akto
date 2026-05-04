@@ -179,12 +179,21 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
 
 def extract_mcp_server_name(input_data: Dict[str, Any]) -> str:
     """Extract MCP server identifier from Cursor hook input."""
-    # Priority: server > url (extract domain) > command > tool_name prefix > default
+    # Priority: server > url (extract domain) > tool_input.url > command > tool_name prefix > default
     if server := input_data.get("server"):
         return server
     if url := input_data.get("url"):
-        # Extract domain from URL
         return url.replace("https://", "").replace("http://", "").split("/")[0]
+    # Check url inside tool_input JSON string
+    tool_input_raw = input_data.get("tool_input", "")
+    if tool_input_raw:
+        try:
+            tool_input_dict = json.loads(tool_input_raw) if isinstance(tool_input_raw, str) else tool_input_raw
+            if isinstance(tool_input_dict, dict):
+                if nested_url := tool_input_dict.get("url"):
+                    return nested_url.replace("https://", "").replace("http://", "").split("/")[0]
+        except (json.JSONDecodeError, TypeError):
+            pass
     if command := input_data.get("command"):
         return command
     if tool_name := input_data.get("tool_name", ""):
@@ -198,7 +207,7 @@ def mcp_mirror_host(mcp_server_name: str) -> str:
     return f"{DEVICE_ID}.{AKTO_CONNECTOR_VALUE}.{mcp_server_name}"
 
 
-def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: str) -> Dict[str, Any]:
+def build_ingestion_payload(tool_name: str, tool_input: str, result_json: str, mcp_server_name: str) -> Dict[str, Any]:
     import time
 
     tags = {
@@ -230,7 +239,7 @@ def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: 
     request_payload = json.dumps({
         "jsonrpc": "2.0",
         "method": "tools/call",
-        "params": {"name": "", "arguments": tool_input_dict},
+        "params": {"name": tool_name, "arguments": tool_input_dict},
         "id": 1,
     })
 
@@ -266,7 +275,7 @@ def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: 
     }
 
 
-def send_ingestion_data(tool_input: str, result_json: str, mcp_server_name: str):
+def send_ingestion_data(tool_name: str, tool_input: str, result_json: str, mcp_server_name: str):
     if not tool_input.strip() or not result_json.strip():
         return
 
@@ -276,7 +285,7 @@ def send_ingestion_data(tool_input: str, result_json: str, mcp_server_name: str)
         logger.debug(f"Result: {result_json[:500]}...")
 
     try:
-        request_body = build_ingestion_payload(tool_input, result_json, mcp_server_name)
+        request_body = build_ingestion_payload(tool_name, tool_input, result_json, mcp_server_name)
         post_payload_json(
             build_http_proxy_url(
                 guardrails=not AKTO_SYNC_MODE,
@@ -303,6 +312,7 @@ def main():
 
     # Extract tool_input and result_json
     tool_input = json.dumps(input_data.get("tool_input", {}))
+    tool_name = input_data.get("tool_name", "")
     result_json = input_data.get("result_json", "{}")
     mcp_server_name = extract_mcp_server_name(input_data)
 
@@ -314,7 +324,7 @@ def main():
         sys.exit(0)
 
     # Send data for ingestion
-    send_ingestion_data(tool_input, result_json, mcp_server_name)
+    send_ingestion_data(tool_name, tool_input, result_json, mcp_server_name)
 
     # After hooks must return empty JSON (cannot modify/block responses)
     logger.info("Response ingestion completed")
