@@ -19,7 +19,7 @@ public class McpCollectionResolver {
 
     private static final LoggerMaker logger = new LoggerMaker(McpCollectionResolver.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final McpCollectionResolver INSTANCE = new McpCollectionResolver();
-    private static final long REFRESH_INTERVAL_MINUTES = 5;
+    private static final long REFRESH_INTERVAL_MINUTES = 1;
 
     private final ConcurrentHashMap<String, String> tempToReal = new ConcurrentHashMap<>();
     private volatile int lastUpdatedTs = 0;
