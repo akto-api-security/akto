@@ -14,6 +14,8 @@ const { spawn } = require('child_process')
 const LOG_DIR = `${process.env.HOME}/.config/opencode/akto/logs`
 const OPENCODE_DIR = path.dirname(__filename)
 const AKTO_DATA_INGESTION_URL = process.env.AKTO_DATA_INGESTION_URL || ''
+const AKTO_SYNC_MODE = (process.env.AKTO_SYNC_MODE || 'true').toLowerCase() === 'true'
+const AKTO_TIMEOUT = parseInt(process.env.AKTO_TIMEOUT || '5', 10) * 1000
 
 function ensureLogDir() {
   if (!fs.existsSync(LOG_DIR)) {
@@ -111,6 +113,82 @@ function parseMcpTool(toolName) {
   }
 }
 
+// Run Python script synchronously for prompt validation - BLOCKING
+// Returns promise with { decision, reason } or { decision: 'allow' }
+function runPromptValidationSync(prompt) {
+  return new Promise((resolve) => {
+    const scriptPath = path.join(OPENCODE_DIR, 'akto-validate-prompt.py')
+
+    if (!fs.existsSync(scriptPath)) {
+      log('SCRIPT_NOT_FOUND', { script: 'akto-validate-prompt.py', path: scriptPath })
+      resolve({ decision: 'allow' }) // Fail-open if script not found
+      return
+    }
+
+    const pythonProcess = spawn('python3', [scriptPath], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: AKTO_TIMEOUT,
+    })
+
+    let stdoutData = ''
+    let stderrData = ''
+
+    const inputData = { prompt }
+
+    pythonProcess.stdout.on('data', (data) => {
+      stdoutData += data.toString()
+    })
+
+    pythonProcess.stderr.on('data', (data) => {
+      stderrData += data.toString()
+    })
+
+    pythonProcess.on('error', (error) => {
+      log('PROMPT_VALIDATION_ERROR', { error: error.message })
+      resolve({ decision: 'allow' }) // Fail-open on error
+    })
+
+    pythonProcess.on('close', (code) => {
+      if (stderrData) {
+        log('PROMPT_VALIDATION_STDERR', { stderr: stderrData.substring(0, 500) })
+      }
+
+      try {
+        const outputLines = stdoutData.trim().split('\n')
+        const lastLine = outputLines[outputLines.length - 1]
+
+        if (lastLine && lastLine.trim()) {
+          const result = JSON.parse(lastLine)
+
+          if (result.decision === 'block') {
+            log('PROMPT_BLOCKED_BY_GUARDRAILS', { reason: result.reason })
+            resolve({ decision: 'block', reason: result.reason })
+            return
+          }
+        }
+      } catch (e) {
+        log('PROMPT_VALIDATION_PARSE_ERROR', { error: e.message })
+      }
+
+      log('PROMPT_ALLOWED', { statusCode: code })
+      resolve({ decision: 'allow' })
+    })
+
+    // Timeout handler
+    const timeoutHandle = setTimeout(() => {
+      log('PROMPT_VALIDATION_TIMEOUT', { timeout: AKTO_TIMEOUT })
+      pythonProcess.kill()
+      resolve({ decision: 'allow' }) // Fail-open on timeout
+    }, AKTO_TIMEOUT)
+
+    pythonProcess.stdin.write(JSON.stringify(inputData))
+    pythonProcess.stdin.end()
+
+    // Clear timeout if process exits before timeout
+    pythonProcess.once('exit', () => clearTimeout(timeoutHandle))
+  })
+}
+
 // Run Python script for MCP tool handling - non-blocking
 function runPythonMcpScript(scriptName, toolName, toolInput, isAfterHook = false) {
   const scriptPath = path.join(OPENCODE_DIR, scriptName)
@@ -181,9 +259,51 @@ export default async function aktoGuardrails(ctx) {
           return
         }
 
-        log('PROMPT_RECEIVED', { contentLength: content.length })
+        log('PROMPT_RECEIVED', { contentLength: content.length, preview: content.substring(0, 50) })
 
-        // Send to Akto (non-blocking)
+        // ============================================================
+        // SYNC MODE: Validate prompt before sending to AI (BLOCKING)
+        // ============================================================
+        if (AKTO_SYNC_MODE && AKTO_DATA_INGESTION_URL) {
+          log('PROMPT_VALIDATION_START', { syncMode: true })
+
+          const validationResult = await runPromptValidationSync(content)
+          log('VALIDATION_RESULT_RECEIVED', { decision: validationResult.decision })
+
+          if (validationResult.decision === 'block') {
+            log('PROMPT_BLOCKED_WITH_MESSAGE', { reason: validationResult.reason })
+
+            // BLOCK THE PROMPT: Replace with blocking message
+            // Show a clean UI message instead of exception
+            const blockMessage = `🚫 Akto Guardrails\n\nYour prompt was blocked by Akto guardrails:\n"${validationResult.reason}"\n\nPlease rephrase your request and try again.`
+
+            // Clear user message and show block notification
+            output.messages = []
+
+            // Add a system message showing the block reason
+            output.messages.push({
+              info: { role: 'assistant' },  // Show as assistant message for visibility
+              parts: [{
+                text: blockMessage
+              }]
+            })
+
+            log('PROMPT_BLOCKED_MESSAGE_ADDED', {
+              messageLength: blockMessage.length,
+              reason: validationResult.reason
+            })
+
+            // Return the modified output - this prevents AI from responding
+            // and shows the block message to user instead
+            return output
+          }
+
+          log('PROMPT_VALIDATION_COMPLETE', { decision: 'allow' })
+        }
+
+        // ============================================================
+        // LOGGING: Send to Akto (non-blocking, for audit trail)
+        // ============================================================
         if (AKTO_DATA_INGESTION_URL) {
           const payload = {
             path: '/v1/chat/messages',
@@ -210,7 +330,8 @@ export default async function aktoGuardrails(ctx) {
           sendToAkto(payload)
         }
       } catch (error) {
-        log('PROMPT_ERROR', { error: error.message })
+        log('PROMPT_ERROR_CAUGHT', { error: error.message })
+        throw error
       }
     },
 

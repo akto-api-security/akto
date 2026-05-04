@@ -364,11 +364,17 @@ def main():
                 "reason": block_reason,
             }
             logger.warning(f"BLOCKING prompt - Reason: {gr_reason}")
-            print(json.dumps(output))
+            logger.warning(f"BLOCK DECISION OUTPUT: {json.dumps(output)}")
+
+            # CRITICAL: Print the JSON block decision to stdout (OpenCode reads this)
+            print(json.dumps(output), flush=True)
+            logger.info("Block decision printed to stdout - OpenCode plugin should receive this")
+
             ingest_blocked_request(prompt, gr_reason, session_info)
+            logger.info("Block decision sent to OpenCode plugin and Akto ingested")
             sys.exit(0)
 
-    logger.info("Prompt allowed")
+    logger.info("Prompt allowed - continuing to AI")
     sys.exit(0)
 
 
