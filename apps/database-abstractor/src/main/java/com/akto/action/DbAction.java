@@ -3141,6 +3141,13 @@ public class DbAction extends ActionSupport {
                     loggerMaker.errorAndAddToDb(e, "Error creating or inserting MCP audit info: " + e.toString());
                 }
             }
+            if (mcpServerCollectionInfo != null) {
+                try {
+                    DbLayer.upsertEndpointMcpConfig(mcpServerCollectionInfo);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error upserting endpoint mcp config: " + e.toString());
+                }
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHostAndVpc " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -5968,5 +5975,15 @@ public class DbAction extends ActionSupport {
 
     public void setApiSequencesList(List<ApiSequences> apiSequencesList) {
         this.apiSequencesList = apiSequencesList;
+    }
+
+    McpServerCollectionInfo mcpServerCollectionInfo;
+
+    public McpServerCollectionInfo getMcpServerCollectionInfo() {
+        return mcpServerCollectionInfo;
+    }
+
+    public void setMcpServerCollectionInfo(McpServerCollectionInfo mcpServerCollectionInfo) {
+        this.mcpServerCollectionInfo = mcpServerCollectionInfo;
     }
 }
