@@ -46,7 +46,7 @@ AKTO_CONNECTOR = "cursor"
 AKTO_CONNECTOR_VALUE = "cursor"
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
-DEVICE_ID = get_machine_id()
+DEVICE_ID = os.getenv("DEVICE_ID") or get_machine_id()
 
 # SSL Configuration
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
