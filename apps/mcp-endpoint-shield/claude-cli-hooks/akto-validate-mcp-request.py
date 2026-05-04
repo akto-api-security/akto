@@ -57,8 +57,8 @@ if MODE == "atlas":
     CLAUDE_API_URL = f"https://{DEVICE_ID}.ai-agent.{AKTO_CONNECTOR_VALUE}" if DEVICE_ID else "https://api.anthropic.com"
     logger.info(f"MODE: {MODE}, Device ID: {DEVICE_ID}, CLAUDE_API_URL: {CLAUDE_API_URL}")
 else:
-    CLAUDE_API_URL = os.getenv("CLAUDE_API_URL", "https://api.anthropic.com")
-    logger.info(f"MODE: {MODE}, CLAUDE_API_URL: {CLAUDE_API_URL}")
+    CLAUDE_API_URL = os.getenv("AKTO_HOST", "https://api.anthropic.com")
+    logger.info(f"MODE: {MODE}, AKTO_HOST: {CLAUDE_API_URL}")
 
 
 def create_ssl_context():
