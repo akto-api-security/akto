@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-# Codex CLI PreToolUse: validates Bash, apply_patch, and MCP tool calls.
-# MCP traffic is wrapped in JSON-RPC 2.0 tools/call so Akto classifies it as MCP.
 
 import hashlib
 import json
@@ -11,13 +9,12 @@ import ssl
 import sys
 import time
 import urllib.request
-from typing import Any, Dict, Set, Tuple, Union
 from urllib.parse import quote
+from typing import Any, Dict, Optional, Set, Tuple, Union
 
 from akto_machine_id import get_machine_id, get_username
 
-# Configure logging
-LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.codex/akto/logs"))
+LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.gemini/akto/chat-logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
 
@@ -26,115 +23,43 @@ os.makedirs(LOG_DIR, exist_ok=True)
 logger = logging.getLogger(__name__)
 logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
-file_handler = logging.FileHandler(os.path.join(LOG_DIR, "validate-pre-tool.log"))
-file_handler.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
-file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-logger.addHandler(file_handler)
+if not logger.handlers:
+    file_handler = logging.FileHandler(os.path.join(LOG_DIR, "akto-validate-pre-tool.log"))
+    file_handler.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+    file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    logger.addHandler(file_handler)
 
-console_handler = logging.StreamHandler(sys.stderr)
-console_handler.setLevel(logging.ERROR)
-logger.addHandler(console_handler)
+    console_handler = logging.StreamHandler(sys.stderr)
+    console_handler.setLevel(logging.ERROR)
+    logger.addHandler(console_handler)
 
 MODE = os.getenv("MODE", "argus").lower()
 AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
-AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "codex_cli")
-AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "codexcli")
+AKTO_INGEST_NON_MCP_TOOLS = os.getenv("AKTO_INGEST_NON_MCP_TOOLS", "false").lower() == "true"
+AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "gemini_cli")
+AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "geminicli")
 AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
-# Built-in (e.g. Bash) tool traffic: mirror non-MCP path; blocked-request ingestion off by default (claude-cli-hooks).
-AKTO_INGEST_NON_MCP_TOOLS = os.getenv("AKTO_INGEST_NON_MCP_TOOLS", "false").lower() == "true"
-# /mcp matches Akto's JsonRpcUtils.isMcpPath; non-MCP uses /{prefix}/{normalized-tool-name}.
+WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_pretool_warn_pending.json")
 MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
 NON_MCP_TOOL_PATH_PREFIX = os.getenv("NON_MCP_TOOL_PATH_PREFIX", "/tool")
-WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_pretool_warn_pending.json")
 
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
-
-# Auto-detect Codex API host and path from the same env vars Codex CLI uses
-def _detect_codex_api():
-    base_url = os.getenv("OPENAI_BASE_URL")
-    if base_url:
-        return base_url.rstrip("/"), "/v1/responses"
-    if os.getenv("OPENAI_API_KEY"):
-        return "https://api.openai.com", "/v1/responses"
-    return "https://chatgpt.com", "/backend-api/codex/responses"
-
-_detected_host, CODEX_API_PATH = _detect_codex_api()
 DEVICE_ID = os.getenv("DEVICE_ID") or get_machine_id()
+
+GEMINI_API_URL = os.getenv("GEMINI_API_URL", "https://generativelanguage.googleapis.com")
 if MODE == "atlas":
-    CODEX_API_HOST = f"https://{DEVICE_ID}.ai-agent.{AKTO_CONNECTOR_VALUE}" if DEVICE_ID else _detected_host
-    logger.info(f"MODE: {MODE}, Device ID: {DEVICE_ID}, CODEX_API_HOST: {CODEX_API_HOST}, CODEX_API_PATH: {CODEX_API_PATH}")
+    GEMINI_API_URL = f"https://{DEVICE_ID}.ai-agent.{AKTO_CONNECTOR_VALUE}" if DEVICE_ID else GEMINI_API_URL
+    logger.info(f"MODE: {MODE}, Device ID: {DEVICE_ID}, GEMINI_API_URL: {GEMINI_API_URL}")
 else:
-    CODEX_API_HOST = _detected_host
-    logger.info(f"MODE: {MODE}, CODEX_API_HOST: {CODEX_API_HOST}, CODEX_API_PATH: {CODEX_API_PATH}")
+    logger.info(f"MODE: {MODE}, GEMINI_API_URL: {GEMINI_API_URL}")
 
 
 def create_ssl_context():
     return ssl._create_unverified_context()
-
-
-def parse_codex_tool(tool_name: str) -> Tuple[bool, str, str]:
-    """Codex MCP tool naming is `mcp__<server>__<tool>` (verbatim from
-    https://developers.openai.com/codex/hooks). Returns (is_mcp, server, mcp_tool)."""
-    if not tool_name.startswith("mcp__"):
-        return False, "", ""
-    parts = tool_name.split("__")
-    if len(parts) < 3:
-        return False, "", ""
-    server = parts[1]
-    mcp_tool = "__".join(parts[2:])
-    if not server or not mcp_tool:
-        return False, "", ""
-    return True, server, mcp_tool
-
-
-def _tool_arguments_for_jsonrpc(tool_input: Any) -> Dict[str, Any]:
-    if isinstance(tool_input, dict):
-        return tool_input
-    if tool_input is None:
-        return {}
-    return {"input": tool_input}
-
-
-def build_tools_call_jsonrpc(mcp_tool_name: str, tool_input: Any, request_id: int = 1) -> str:
-    """JSON-RPC body aligned with MCP tools/call (https://modelcontextprotocol.io)."""
-    return json.dumps(
-        {
-            "jsonrpc": "2.0",
-            "method": "tools/call",
-            "params": {"name": mcp_tool_name, "arguments": _tool_arguments_for_jsonrpc(tool_input)},
-            "id": request_id,
-        }
-    )
-
-
-def mcp_mirror_host(mcp_server_name: str) -> str:
-    return f"{DEVICE_ID}.{AKTO_CONNECTOR_VALUE}.{mcp_server_name}"
-
-
-def normalize_tool_name_for_url_path(tool_name: str) -> str:
-    s = (tool_name or "unknown").strip()
-    s = re.sub(r"[^a-zA-Z0-9._~-]+", "-", s)
-    s = re.sub(r"-+", "-", s).strip("-")
-    if not s:
-        s = "unknown"
-    return quote(s, safe=".-_~")
-
-
-def non_mcp_ingest_path(tool_name: str) -> str:
-    fixed = (os.getenv("NON_MCP_INGEST_PATH") or "").strip()
-    if fixed:
-        return fixed if fixed.startswith("/") else "/" + fixed
-    prefix = (NON_MCP_TOOL_PATH_PREFIX or "/tool").strip()
-    if not prefix.startswith("/"):
-        prefix = "/" + prefix
-    prefix = prefix.rstrip("/")
-    if not prefix:
-        prefix = "/tool"
-    return f"{prefix}/{normalize_tool_name_for_url_path(tool_name)}"
 
 
 def build_http_proxy_url(
@@ -162,7 +87,6 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
     headers = {"Content-Type": "application/json"}
     if AKTO_TOKEN:
         headers["authorization"] = AKTO_TOKEN
-
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -192,7 +116,72 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         raise
 
 
-def build_hook_tags(*, is_mcp: bool, tool_name: str) -> Dict[str, str]:
+def normalize_tool_name_for_url_path(tool_name: str) -> str:
+    s = (tool_name or "unknown").strip()
+    s = re.sub(r"[^a-zA-Z0-9._~-]+", "-", s)
+    s = re.sub(r"-+", "-", s).strip("-")
+    if not s:
+        s = "unknown"
+    return quote(s, safe=".-_~")
+
+
+def non_mcp_ingest_path(tool_name: str) -> str:
+    fixed = (os.getenv("NON_MCP_INGEST_PATH") or "").strip()
+    if fixed:
+        return fixed if fixed.startswith("/") else "/" + fixed
+    prefix = (NON_MCP_TOOL_PATH_PREFIX or "/tool").strip()
+    if not prefix.startswith("/"):
+        prefix = "/" + prefix
+    prefix = prefix.rstrip("/")
+    if not prefix:
+        prefix = "/tool"
+    return f"{prefix}/{normalize_tool_name_for_url_path(tool_name)}"
+
+
+# Gemini MCP tools are named mcp_<server>_<tool>. Server name is the first segment after "mcp_";
+# the remainder (which may itself contain underscores) is the tool name.
+# When Gemini supplies mcp_context with server_name/tool_name, prefer those to avoid ambiguity
+# for server names that contain underscores.
+def parse_gemini_tool(tool_name: str, mcp_context: Optional[Dict[str, Any]] = None) -> Tuple[bool, str, str]:
+    if isinstance(mcp_context, dict) and mcp_context:
+        server = str(mcp_context.get("server_name") or mcp_context.get("serverName") or "").strip()
+        mcp_tool = str(mcp_context.get("tool_name") or mcp_context.get("toolName") or "").strip()
+        if server and mcp_tool:
+            return True, server, mcp_tool
+
+    if not tool_name.startswith("mcp_"):
+        return False, "", ""
+    rest = tool_name[4:]
+    server, _, mcp_tool = rest.partition("_")
+    if not server or not mcp_tool:
+        return False, "", ""
+    return True, server, mcp_tool
+
+
+def _tool_arguments_for_jsonrpc(tool_input: Any) -> Dict[str, Any]:
+    if isinstance(tool_input, dict):
+        return tool_input
+    if tool_input is None:
+        return {}
+    return {"input": tool_input}
+
+
+def build_tools_call_jsonrpc(mcp_tool_name: str, tool_input: Any, request_id: int = 1) -> str:
+    return json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {"name": mcp_tool_name, "arguments": _tool_arguments_for_jsonrpc(tool_input)},
+            "id": request_id,
+        }
+    )
+
+
+def mcp_mirror_host(mcp_server_name: str) -> str:
+    return f"{DEVICE_ID}.{AKTO_CONNECTOR_VALUE}.{mcp_server_name}"
+
+
+def build_hook_tags(*, is_mcp: bool) -> Dict[str, str]:
     tags: Dict[str, str] = {}
     if is_mcp:
         tags["mcp-server"] = "MCP Server"
@@ -200,7 +189,6 @@ def build_hook_tags(*, is_mcp: bool, tool_name: str) -> Dict[str, str]:
     else:
         tags["gen-ai"] = "Gen AI"
         tags["ai-agent"] = AKTO_CONNECTOR_VALUE
-        tags["tool_name"] = tool_name
     if MODE == "atlas":
         tags["source"] = CONTEXT_SOURCE
     return tags
@@ -213,29 +201,29 @@ def build_validation_request(
     is_mcp: bool,
     mcp_server_name: str,
     mcp_tool_name: str,
-    session_info: dict = None,
+    session_info: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    tags = build_hook_tags(is_mcp=is_mcp, tool_name=tool_name)
+    tags = build_hook_tags(is_mcp=is_mcp)
 
     if is_mcp:
         host = mcp_mirror_host(mcp_server_name)
     else:
-        host = CODEX_API_HOST.replace("https://", "").replace("http://", "")
+        host = GEMINI_API_URL.replace("https://", "").replace("http://", "")
 
-    req_headers: Dict[str, str] = {
+    req_hdr: Dict[str, str] = {
         "host": host,
-        "x-codex-hook": "PreToolUse",
+        "x-gemini-hook": "BeforeTool",
         "content-type": "application/json",
     }
     if is_mcp and mcp_server_name:
-        req_headers["x-mcp-server"] = mcp_server_name
+        req_hdr["x-mcp-server"] = mcp_server_name
     if session_info:
         for key, value in session_info.items():
             if value is not None:
-                req_headers[f"x-akto-installer-{key}"] = str(value)
+                req_hdr[f"x-akto-installer-{key}"] = str(value)
 
-    request_headers = json.dumps(req_headers)
-    response_headers = json.dumps({"x-codex-hook": "PreToolUse"})
+    request_headers = json.dumps(req_hdr)
+    response_headers = json.dumps({"x-gemini-hook": "BeforeTool"})
     if is_mcp:
         request_payload = build_tools_call_jsonrpc(mcp_tool_name, tool_input)
     else:
@@ -271,6 +259,18 @@ def build_validation_request(
     }
 
 
+def _guardrails_behaviour_value(behaviour: Any) -> str:
+    return str(behaviour or "").strip().lower()
+
+
+def _is_warn_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "warn"
+
+
+def _is_alert_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "alert"
+
+
 def call_guardrails(
     tool_name: str,
     tool_input: Any,
@@ -278,7 +278,7 @@ def call_guardrails(
     is_mcp: bool,
     mcp_server_name: str,
     mcp_tool_name: str,
-    session_info: dict = None,
+    session_info: Optional[Dict[str, Any]] = None,
 ) -> Tuple[bool, str, str]:
     if not tool_input:
         return True, "", ""
@@ -288,7 +288,7 @@ def call_guardrails(
         return True, "", ""
 
     if is_mcp:
-        logger.info(f"Validating MCP tools/call for {mcp_tool_name} (server={mcp_server_name}, codexTool={tool_name})")
+        logger.info(f"Validating MCP tools/call for {mcp_tool_name} (server={mcp_server_name}, geminiTool={tool_name})")
     else:
         logger.info(f"Validating built-in / non-MCP tool request: {tool_name}")
     if LOG_PAYLOADS:
@@ -312,9 +312,7 @@ def call_guardrails(
         guardrails_result = data.get("guardrailsResult", {})
         allowed = guardrails_result.get("Allowed", True)
         reason = guardrails_result.get("Reason", "")
-        behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get(
-            "Behaviour", ""
-        )
+        behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get("Behaviour", "")
 
         if allowed:
             logger.info(f"Request ALLOWED for {tool_name}")
@@ -328,24 +326,8 @@ def call_guardrails(
 
 
 def pretool_fingerprint(tool_name: str, tool_input: Any) -> str:
-    canonical = json.dumps(
-        {"t": tool_name, "i": tool_input},
-        sort_keys=True,
-        ensure_ascii=False,
-    )
+    canonical = json.dumps({"t": tool_name, "i": tool_input}, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-
-
-def _guardrails_behaviour_value(behaviour: Any) -> str:
-    return str(behaviour or "").strip().lower()
-
-
-def _is_warn_behaviour(behaviour: Any) -> bool:
-    return _guardrails_behaviour_value(behaviour) == "warn"
-
-
-def _is_alert_behaviour(behaviour: Any) -> bool:
-    return _guardrails_behaviour_value(behaviour) == "alert"
 
 
 def load_warn_pending() -> Set[str]:
@@ -386,9 +368,7 @@ def apply_warn_resubmit_flow(
         return True, ""
 
     if _is_alert_behaviour(behaviour):
-        logger.info(
-            "Alert behaviour: allowing despite violation (server-side alert only)"
-        )
+        logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
         return True, ""
 
     if not _is_warn_behaviour(behaviour):
@@ -403,6 +383,7 @@ def apply_warn_resubmit_flow(
 
     pending.add(fingerprint)
     save_warn_pending(pending)
+    logger.info("Warn flow: first occurrence — blocked, resend same tool call to bypass")
     return False, reason
 
 
@@ -414,7 +395,7 @@ def ingest_blocked_request(
     is_mcp: bool,
     mcp_server_name: str,
     mcp_tool_name: str,
-    session_info: dict = None,
+    session_info: Optional[Dict[str, Any]] = None,
 ):
     if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
         return
@@ -425,6 +406,7 @@ def ingest_blocked_request(
         )
         return
 
+    logger.info("Ingesting blocked request data")
     try:
         request_body = build_validation_request(
             tool_name,
@@ -436,7 +418,7 @@ def ingest_blocked_request(
         )
         request_body["responseHeaders"] = json.dumps(
             {
-                "x-codex-hook": "PreToolUse",
+                "x-gemini-hook": "BeforeTool",
                 "x-blocked-by": "Akto Proxy",
                 "content-type": "application/json",
             }
@@ -447,48 +429,56 @@ def ingest_blocked_request(
         request_body["statusCode"] = "403"
         request_body["status"] = "403"
         post_payload_json(
-            build_http_proxy_url(
-                guardrails=False, response_guardrails=False, ingest_data=True
-            ),
+            build_http_proxy_url(guardrails=False, ingest_data=True),
             request_body,
         )
-        logger.info("Blocked tool request ingestion successful")
+        logger.info("Blocked request ingestion successful")
     except Exception as e:
         logger.error(f"Ingestion error: {e}")
 
 
 def main():
-    logger.info(f"=== PreToolUse hook started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
+    stdin_enc_before = getattr(sys.stdin, "encoding", "unknown")
+    stdout_enc_before = getattr(sys.stdout, "encoding", "unknown")
+    if hasattr(sys.stdin, "reconfigure"):
+        sys.stdin.reconfigure(encoding="utf-8")
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    stdin_enc_after = getattr(sys.stdin, "encoding", "unknown")
+
+    logger.info(f"=== BeforeTool Hook started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
+    logger.info(f"Platform: {sys.platform}, Python: {sys.version.split()[0]}")
+    logger.info(f"stdin encoding: {stdin_enc_before} -> {stdin_enc_after}, stdout encoding: {stdout_enc_before}")
+    logger.info(f"AKTO_DATA_INGESTION_URL set: {bool(AKTO_DATA_INGESTION_URL)}, DEVICE_ID: {DEVICE_ID or '(auto)'}, CONNECTOR: {AKTO_CONNECTOR}")
 
     try:
         input_data = json.load(sys.stdin)
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON input: {e}")
+        sys.stdout.write(json.dumps({}))
         sys.exit(0)
 
-    session_info = {}
-    for field in (
-        "session_id",
-        "transcript_path",
-        "cwd",
-        "hook_event_name",
-        "model",
-        "turn_id",
-        "tool_use_id",
-    ):
+    hook_event = input_data.get("hook_event_name", "")
+    if hook_event and hook_event != "BeforeTool":
+        logger.info(f"Ignoring non-BeforeTool event: {hook_event}")
+        sys.stdout.write(json.dumps({}))
+        sys.exit(0)
+
+    session_info: Dict[str, Any] = {}
+    for field in ("session_id", "transcript_path", "cwd", "hook_event_name", "timestamp", "original_request_name"):
         value = input_data.get(field)
         if value is not None:
             session_info[field] = value
 
     tool_name = str(input_data.get("tool_name") or "")
     tool_input = input_data.get("tool_input") or {}
-    is_mcp, mcp_server_name, mcp_tool_name = parse_codex_tool(tool_name)
-    session_id = input_data.get("session_id", "")
+    mcp_context = input_data.get("mcp_context") or {}
+    is_mcp, mcp_server_name, mcp_tool_name = parse_gemini_tool(tool_name, mcp_context)
 
     if is_mcp:
-        logger.info(f"Session: {session_id}, Processing MCP tool request: {tool_name} (server={mcp_server_name}, mcpTool={mcp_tool_name})")
+        logger.info(f"Processing MCP tool request: {tool_name} (server={mcp_server_name}, mcpTool={mcp_tool_name})")
     else:
-        logger.info(f"Session: {session_id}, Processing non-MCP tool request: {tool_name}")
+        logger.info(f"Processing non-MCP tool request (gen-ai only): {tool_name}")
 
     if AKTO_SYNC_MODE:
         gr_allowed, gr_reason, behaviour = call_guardrails(
@@ -500,9 +490,7 @@ def main():
             session_info=session_info,
         )
         fingerprint = pretool_fingerprint(tool_name, tool_input)
-        allowed, _ = apply_warn_resubmit_flow(
-            gr_allowed, gr_reason, behaviour, fingerprint
-        )
+        allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
 
         if not allowed:
             if _is_warn_behaviour(behaviour):
@@ -511,24 +499,18 @@ def main():
                     f"Reason for blocking: {gr_reason}"
                 )
             else:
-                block_reason = gr_reason or "Policy violation"
+                block_reason = f"Tool request blocked: {gr_reason}"
 
-            # PreToolUse: documented deny shape (hookSpecificOutput only; no continue/stopReason).
             output = {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": block_reason,
-                }
+                "decision": "deny",
+                "reason": block_reason,
             }
-            logger.warning(
-                f"BLOCKING tool request - Tool: {tool_name}, Reason: {gr_reason}"
-            )
-            print(json.dumps(output))
+            logger.warning(f"BLOCKING tool request - Tool: {tool_name}, Reason: {block_reason}")
+            sys.stdout.write(json.dumps(output))
             ingest_blocked_request(
                 tool_name,
                 tool_input,
-                gr_reason or "Policy violation",
+                gr_reason,
                 is_mcp=is_mcp,
                 mcp_server_name=mcp_server_name,
                 mcp_tool_name=mcp_tool_name,
@@ -537,6 +519,7 @@ def main():
             sys.exit(0)
 
     logger.info(f"Tool request allowed for {tool_name}")
+    sys.stdout.write(json.dumps({}))
     sys.exit(0)
 
 
