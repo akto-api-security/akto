@@ -5986,4 +5986,42 @@ public class DbAction extends ActionSupport {
     public void setMcpServerCollectionInfo(McpServerCollectionInfo mcpServerCollectionInfo) {
         this.mcpServerCollectionInfo = mcpServerCollectionInfo;
     }
+
+    private List<EndpointMcpConfig> endpointMcpConfigs;
+    private String tempCollectionName;
+    private Integer updatedDate;
+
+    public List<EndpointMcpConfig> getEndpointMcpConfigs() {
+        return endpointMcpConfigs;
+    }
+
+    public void setEndpointMcpConfigs(List<EndpointMcpConfig> endpointMcpConfigs) {
+        this.endpointMcpConfigs = endpointMcpConfigs;
+    }
+
+    public String getTempCollectionName() {
+        return tempCollectionName;
+    }
+
+    public void setTempCollectionName(String tempCollectionName) {
+        this.tempCollectionName = tempCollectionName;
+    }
+
+    public Integer getUpdatedDate() {
+        return updatedDate;
+    }
+
+    public void setUpdatedDate(Integer updatedDate) {
+        this.updatedDate = updatedDate;
+    }
+
+    public String fetchEndpointMcpConfig() {
+        try {
+            this.endpointMcpConfigs = DbLayer.fetchEndpointMcpConfig(tempCollectionName, updatedDate);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchEndpointMcpConfig: " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
 }

@@ -2746,6 +2746,23 @@ public class DbLayer {
         ), LogDb.DASHBOARD);
     }
 
+    public static List<EndpointMcpConfig> fetchEndpointMcpConfig(String tempCollectionName, Integer updatedDate) {
+        try {
+            List<Bson> filters = new ArrayList<>();
+            if (tempCollectionName != null) {
+                filters.add(Filters.eq(EndpointMcpConfig.TEMP_COLLECTION_NAME_FIELD, tempCollectionName));
+            }
+            if (updatedDate != null) {
+                filters.add(Filters.gte(EndpointMcpConfig.UPDATED_DATE_FIELD, updatedDate));
+            }
+            Bson filter = filters.isEmpty() ? Filters.empty() : Filters.and(filters);
+            return EndpointMcpConfigDao.instance.findAll(filter);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchEndpointMcpConfig: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
     public static void upsertEndpointMcpConfig(McpServerCollectionInfo info) {
         int now = Context.now();
         Bson filter = Filters.eq(EndpointMcpConfig.COLLECTION_NAME_FIELD, info.getCollectionName());

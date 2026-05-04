@@ -19,7 +19,8 @@ public class EndpointMcpConfigDao extends AccountsContextDao<EndpointMcpConfig> 
 
     public void createIndicesIfAbsent() {
         createCollectionIfAbsent(getDBName(), getCollName(), new CreateCollectionOptions());
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{EndpointMcpConfig.COLLECTION_NAME_FIELD}, true);
+        MCollection.createUniqueIndex(getDBName(), getCollName(), new String[]{EndpointMcpConfig.COLLECTION_NAME_FIELD}, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{EndpointMcpConfig.UPDATED_DATE_FIELD}, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{EndpointMcpConfig.TEMP_COLLECTION_NAME_FIELD}, false);
     }
 }
