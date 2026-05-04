@@ -43,7 +43,10 @@ AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = "cursor"
+AKTO_CONNECTOR_VALUE = "cursor"
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
+MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
+DEVICE_ID = get_machine_id()
 
 # SSL Configuration
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
@@ -51,9 +54,8 @@ SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 
 # Configure API_URL based on mode
 if MODE == "atlas":
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    API_URL = f"https://{device_id}.ai-agent.cursor" if device_id else "https://api.anthropic.com"
-    logger.info(f"MODE: {MODE}, Device ID: {device_id}, API_URL: {API_URL}")
+    API_URL = f"https://{DEVICE_ID}.ai-agent.{AKTO_CONNECTOR_VALUE}" if DEVICE_ID else "https://api.anthropic.com"
+    logger.info(f"MODE: {MODE}, Device ID: {DEVICE_ID}, API_URL: {API_URL}")
 else:
     API_URL = os.getenv("API_URL", "https://api.anthropic.com")
     logger.info(f"MODE: {MODE}, API_URL: {API_URL}")
@@ -192,50 +194,52 @@ def extract_mcp_server_name(input_data: Dict[str, Any]) -> str:
                 return parts[1]
     return "cursor-unknown"
 
+def mcp_mirror_host(mcp_server_name: str) -> str:
+    return f"{DEVICE_ID}.{AKTO_CONNECTOR_VALUE}.{mcp_server_name}"
+
+
 def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: str) -> Dict[str, Any]:
-    """Build the request body for data ingestion."""
     import time
 
-    # Build tags based on mode
-    tags = {"gen-ai": "Gen AI"}
+    tags = {
+        "mcp-server": "MCP Server",
+        "mcp-client": AKTO_CONNECTOR_VALUE,
+    }
     if MODE == "atlas":
-        tags["ai-agent"] = "cursor"
         tags["source"] = CONTEXT_SOURCE
 
-    # Add MCP server name to tags
-    tags["mcp_server_name"] = mcp_server_name
+    host = mcp_mirror_host(mcp_server_name)
 
-    # Get device ID
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-
-    # Build host from API_URL
-    host = API_URL.replace("https://", "").replace("http://", "")
-
-    # Build request headers as JSON string
     request_headers = json.dumps({
         "host": host,
         "x-cursor-hook": "afterMCPExecution",
-        "content-type": "application/json"
+        "content-type": "application/json",
+        "x-mcp-server": mcp_server_name,
     })
-
-    # Build response headers as JSON string
     response_headers = json.dumps({
         "x-cursor-hook": "afterMCPExecution",
         "content-type": "application/json"
     })
 
-    # Build request payload as JSON string
+    try:
+        tool_input_dict = json.loads(tool_input) if isinstance(tool_input, str) else tool_input
+        if not isinstance(tool_input_dict, dict):
+            tool_input_dict = {}
+    except (json.JSONDecodeError, TypeError):
+        tool_input_dict = {}
     request_payload = json.dumps({
-        "body": tool_input
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "params": {"name": "", "arguments": tool_input_dict},
+        "id": 1,
     })
 
-    # Build response payload as JSON string
     response_payload = json.dumps({
         "body": result_json
     })
 
     return {
-        "path": "/v1/messages",
+        "path": MCP_INGEST_PATH,
         "requestHeaders": request_headers,
         "responseHeaders": response_headers,
         "method": "POST",
@@ -245,10 +249,10 @@ def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: 
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": "200",
-        "type": None,
+        "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
-        "akto_vxlan_id": device_id,
+        "akto_vxlan_id": 0,
         "is_pending": "false",
         "source": "MIRRORING",
         "direction": None,
