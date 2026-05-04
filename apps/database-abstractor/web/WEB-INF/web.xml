@@ -16,6 +16,16 @@
     </filter-mapping>
 
     <filter>
+        <filter-name>BandwidthTrackingFilter</filter-name>
+        <filter-class>com.akto.filter.BandwidthTrackingFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>BandwidthTrackingFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
         <filter-name>ToolsAuthFilter</filter-name>
         <filter-class>com.akto.filter.ToolsAuthFilter</filter-class>
     </filter>
