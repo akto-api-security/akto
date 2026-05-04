@@ -188,7 +188,7 @@ The `mcp_server_name` tag in ingested data is derived from `tool_name`:
 | `AKTO_TIMEOUT` | `5` | Timeout in seconds for API calls |
 | `MODE` | `argus` | Operation mode: `argus` or `atlas` |
 | `DEVICE_ID` | (auto-generated) | Custom device ID for atlas mode |
-| `CLAUDE_API_URL` | `https://api.anthropic.com` | Claude API URL (argus mode only) |
+| `AKTO_HOST` | `https://api.anthropic.com` | Claude API URL (argus mode only) |
 | `LOG_DIR` | `~/.claude/akto/logs` | Directory for log files |
 | `LOG_LEVEL` | `INFO` | Logging verbosity: DEBUG, INFO, WARNING, ERROR |
 | `LOG_PAYLOADS` | `false` | Log request/response payload previews |
