@@ -22,10 +22,61 @@ AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
 MODE = os.getenv("MODE", "argus").lower()
+# /mcp matches Akto's JsonRpcUtils.isMcpPath; non-MCP keeps the legacy /copilot/tool/{name} path.
+MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
 
 # SSL Configuration
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
+
+
+def parse_github_tool(tool_name: str) -> Tuple[bool, str, str]:
+    """GitHub Copilot CLI / VS Code MCP tool naming is `mcp_<server>_<tool>`
+    (per VS Code MCP docs; CLI inherits the convention). Returns (is_mcp, server, mcp_tool).
+    Note: server and tool names containing underscores will be split at the first
+    underscore after the `mcp_` prefix — this is a limitation of the naming convention itself.
+    Override via env var if a more precise mapping is needed."""
+    if not tool_name.startswith("mcp_"):
+        return False, "", ""
+    rest = tool_name[len("mcp_"):]
+    if "_" not in rest:
+        return False, "", ""
+    server, _, mcp_tool = rest.partition("_")
+    if not server or not mcp_tool:
+        return False, "", ""
+    return True, server, mcp_tool
+
+
+def _tool_arguments_for_jsonrpc(tool_input: Any) -> Dict[str, Any]:
+    if isinstance(tool_input, dict):
+        return tool_input
+    if tool_input is None:
+        return {}
+    return {"input": tool_input}
+
+
+def build_tools_call_jsonrpc(mcp_tool_name: str, tool_input: Any, request_id: int = 1) -> str:
+    """JSON-RPC body aligned with MCP tools/call (https://modelcontextprotocol.io)."""
+    return json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {"name": mcp_tool_name, "arguments": _tool_arguments_for_jsonrpc(tool_input)},
+            "id": request_id,
+        }
+    )
+
+
+def build_tools_call_result_jsonrpc(tool_response: Any, request_id: int = 1) -> str:
+    if isinstance(tool_response, dict):
+        result_body: Any = tool_response
+    else:
+        result_body = {"output": tool_response}
+    return json.dumps({"jsonrpc": "2.0", "id": request_id, "result": result_body})
+
+
+def mcp_mirror_host(device_id: str, ai_agent_tag: str, mcp_server_name: str) -> str:
+    return f"{device_id}.{ai_agent_tag}.{mcp_server_name}"
 
 
 def detect_connector(input_data: dict) -> str:
@@ -81,11 +132,13 @@ def create_ssl_context():
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(cfg: dict, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(cfg: dict, *, guardrails: bool = False, response_guardrails: bool = False, ingest_data: bool = False) -> str:
     """Build Akto HTTP proxy URL with query parameters."""
     params = [f"akto_connector={cfg['connector']}"]
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     if ingest_data:
         params.append("ingest_data=true")
     return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
@@ -126,35 +179,65 @@ def post_to_akto(url: str, payload: Dict[str, Any], logger) -> Union[Dict[str, A
         raise
 
 
-def build_akto_request(tool_name: str, tool_args: str, cwd: str, timestamp: int, cfg: dict) -> Dict[str, Any]:
-    """Build request payload for Akto guardrails validation."""
-    tags = {"gen-ai": "Gen AI", "tool-use": "Tool Execution"}
+def build_akto_request(
+    tool_name: str,
+    tool_args: str,
+    cwd: str,
+    timestamp: int,
+    cfg: dict,
+    *,
+    is_mcp: bool,
+    mcp_server_name: str,
+    mcp_tool_name: str,
+) -> Dict[str, Any]:
+    """Build request payload for Akto guardrails validation.
+    Wraps MCP tool calls in JSON-RPC 2.0 tools/call so Akto classifies them as MCP."""
+    if is_mcp:
+        tags = {"mcp-server": "MCP Server", "mcp-client": cfg["ai_agent_tag"]}
+    else:
+        tags = {"gen-ai": "Gen AI", "tool-use": "Tool Execution"}
+        if MODE == "atlas":
+            tags["ai-agent"] = cfg["ai_agent_tag"]
     if MODE == "atlas":
-        tags["ai-agent"] = cfg["ai_agent_tag"]
         tags["source"] = CONTEXT_SOURCE
 
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    host = cfg["api_url"].replace("https://", "").replace("http://", "")
+    if is_mcp:
+        host = mcp_mirror_host(device_id, cfg["ai_agent_tag"], mcp_server_name)
+    else:
+        host = cfg["api_url"].replace("https://", "").replace("http://", "")
     hook_header = cfg["hook_header"]
 
-    request_headers = json.dumps({
+    request_header_dict = {
         "host": host,
         hook_header: "PreToolUse",
-        "content-type": "application/json"
-    })
+        "content-type": "application/json",
+    }
+    if is_mcp and mcp_server_name:
+        request_header_dict["x-mcp-server"] = mcp_server_name
+    request_headers = json.dumps(request_header_dict)
 
     response_headers = json.dumps({
         hook_header: "PreToolUse"
     })
 
-    request_payload = json.dumps({
-        "body": json.dumps({"toolName": tool_name, "toolArgs": tool_args})
-    })
+    if is_mcp:
+        # Cursor-style: tool_args may already be a JSON-encoded string or a raw dict.
+        try:
+            parsed_input = json.loads(tool_args) if isinstance(tool_args, str) else tool_args
+        except (json.JSONDecodeError, TypeError):
+            parsed_input = {"raw": tool_args}
+        request_payload = build_tools_call_jsonrpc(mcp_tool_name, parsed_input)
+    else:
+        request_payload = json.dumps({
+            "body": json.dumps({"toolName": tool_name, "toolArgs": tool_args})
+        })
 
     response_payload = json.dumps({})
 
+    path = MCP_INGEST_PATH if is_mcp else f"/copilot/tool/{tool_name}"
     return {
-        "path": f"/copilot/tool/{tool_name}",
+        "path": path,
         "requestHeaders": request_headers,
         "responseHeaders": response_headers,
         "method": "POST",
@@ -193,16 +276,39 @@ def _is_alert_behaviour(behaviour: Any) -> bool:
     return _guardrails_behaviour_value(behaviour) == "alert"
 
 
-def validate_tool_use(tool_name: str, tool_args: str, cwd: str, timestamp: int, cfg: dict, logger) -> tuple[bool, str, str]:
+def validate_tool_use(
+    tool_name: str,
+    tool_args: str,
+    cwd: str,
+    timestamp: int,
+    cfg: dict,
+    logger,
+    *,
+    is_mcp: bool,
+    mcp_server_name: str,
+    mcp_tool_name: str,
+) -> tuple[bool, str, str]:
     """Validate tool use against Akto guardrails. Returns (allowed, reason, behaviour)."""
-    logger.info(f"Validating tool use: {tool_name}")
+    if is_mcp:
+        logger.info(f"Validating MCP tools/call for {mcp_tool_name} (server={mcp_server_name}, githubTool={tool_name})")
+    else:
+        logger.info(f"Validating tool use: {tool_name}")
     if LOG_PAYLOADS:
         logger.debug(f"Tool args: {tool_args}")
     else:
         logger.info(f"Tool args preview: {tool_args[:100]}...")
 
     try:
-        request_body = build_akto_request(tool_name, tool_args, cwd, timestamp, cfg)
+        request_body = build_akto_request(
+            tool_name,
+            tool_args,
+            cwd,
+            timestamp,
+            cfg,
+            is_mcp=is_mcp,
+            mcp_server_name=mcp_server_name,
+            mcp_tool_name=mcp_tool_name,
+        )
         result = post_to_akto(
             build_http_proxy_url(cfg, guardrails=True, ingest_data=False),
             request_body,
@@ -292,14 +398,35 @@ def apply_warn_resubmit_flow(
     return False, reason
 
 
-def ingest_blocked_tool_use(tool_name: str, tool_args: str, cwd: str, timestamp: int, reason: str, cfg: dict, logger):
+def ingest_blocked_tool_use(
+    tool_name: str,
+    tool_args: str,
+    cwd: str,
+    timestamp: int,
+    reason: str,
+    cfg: dict,
+    logger,
+    *,
+    is_mcp: bool,
+    mcp_server_name: str,
+    mcp_tool_name: str,
+):
     """Ingest blocked tool use to Akto for analytics."""
     if not AKTO_DATA_INGESTION_URL:
         return
 
     logger.info("Ingesting blocked tool use")
     try:
-        request_body = build_akto_request(tool_name, tool_args, cwd, timestamp, cfg)
+        request_body = build_akto_request(
+            tool_name,
+            tool_args,
+            cwd,
+            timestamp,
+            cfg,
+            is_mcp=is_mcp,
+            mcp_server_name=mcp_server_name,
+            mcp_tool_name=mcp_tool_name,
+        )
         request_body["responsePayload"] = json.dumps({
             "body": json.dumps({"x-blocked-by": "Akto Proxy", "reason": reason})
         })
@@ -357,14 +484,28 @@ def main():
 
     cwd = input_data.get("cwd", "")
     timestamp = input_data.get("timestamp", int(time.time() * 1000))
+    is_mcp, mcp_server_name, mcp_tool_name = parse_github_tool(tool_name)
 
-    logger.info(f"Tool: {tool_name}, CWD: {cwd}")
+    if is_mcp:
+        logger.info(f"Tool: {tool_name} (MCP server={mcp_server_name}, mcpTool={mcp_tool_name}), CWD: {cwd}")
+    else:
+        logger.info(f"Tool: {tool_name}, CWD: {cwd}")
 
     if not AKTO_SYNC_MODE or not AKTO_DATA_INGESTION_URL:
         logger.info("Guardrails disabled (sync mode off or no URL)")
         sys.exit(0)
 
-    gr_allowed, gr_reason, behaviour = validate_tool_use(tool_name, tool_args, cwd, timestamp, cfg, logger)
+    gr_allowed, gr_reason, behaviour = validate_tool_use(
+        tool_name,
+        tool_args,
+        cwd,
+        timestamp,
+        cfg,
+        logger,
+        is_mcp=is_mcp,
+        mcp_server_name=mcp_server_name,
+        mcp_tool_name=mcp_tool_name,
+    )
     fingerprint = pretool_fingerprint(tool_name, tool_args)
     allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint, warn_state_path, logger)
 
@@ -389,7 +530,18 @@ def main():
         sys.stdout.write(json.dumps(output))
         sys.stdout.flush()
 
-        ingest_blocked_tool_use(tool_name, tool_args, cwd, timestamp, gr_reason, cfg, logger)
+        ingest_blocked_tool_use(
+            tool_name,
+            tool_args,
+            cwd,
+            timestamp,
+            gr_reason,
+            cfg,
+            logger,
+            is_mcp=is_mcp,
+            mcp_server_name=mcp_server_name,
+            mcp_tool_name=mcp_tool_name,
+        )
         sys.exit(cfg["blocked_exit_code"])
 
     logger.info(f"Tool use PASSED guardrails for {tool_name}")

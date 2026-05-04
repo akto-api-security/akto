@@ -43,17 +43,21 @@ AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = "cursor"
+AKTO_CONNECTOR_VALUE = os.getenv("AKTO_CONNECTOR_VALUE", "cursor")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
+# /mcp matches Akto's JsonRpcUtils.isMcpPath; non-MCP keeps /v1/messages (legacy).
+MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
 
 # SSL Configuration
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 
+DEVICE_ID = os.getenv("DEVICE_ID") or get_machine_id()
+
 # Configure API_URL based on mode
 if MODE == "atlas":
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-    API_URL = f"https://{device_id}.ai-agent.cursor" if device_id else "https://api.anthropic.com"
-    logger.info(f"MODE: {MODE}, Device ID: {device_id}, API_URL: {API_URL}")
+    API_URL = f"https://{DEVICE_ID}.ai-agent.{AKTO_CONNECTOR_VALUE}" if DEVICE_ID else "https://api.anthropic.com"
+    logger.info(f"MODE: {MODE}, Device ID: {DEVICE_ID}, API_URL: {API_URL}")
 else:
     API_URL = os.getenv("API_URL", "https://api.anthropic.com")
     logger.info(f"MODE: {MODE}, API_URL: {API_URL}")
@@ -111,10 +115,17 @@ def create_ssl_context():
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(
+    *,
+    guardrails: bool = False,
+    response_guardrails: bool = False,
+    ingest_data: bool = False,
+) -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
@@ -175,15 +186,56 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         raise
 
 
+# Cache: maps {url|command -> server alias} from ~/.cursor/mcp.json + project .cursor/mcp.json.
+_MCP_CONFIG_CACHE: Dict[str, str] = {}
+
+
+def _load_mcp_config_aliases() -> Dict[str, str]:
+    global _MCP_CONFIG_CACHE
+    if _MCP_CONFIG_CACHE:
+        return _MCP_CONFIG_CACHE
+
+    aliases: Dict[str, str] = {}
+    candidates = [
+        os.path.expanduser("~/.cursor/mcp.json"),
+        os.path.join(os.getcwd(), ".cursor", "mcp.json"),
+    ]
+    for path in candidates:
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            servers = data.get("mcpServers", {}) or {}
+            for alias, server in servers.items():
+                if not isinstance(server, dict):
+                    continue
+                if url := server.get("url"):
+                    aliases[url] = alias
+                if cmd := server.get("command"):
+                    aliases[cmd] = alias
+        except Exception as e:
+            logger.warning(f"Could not parse {path}: {e}")
+    _MCP_CONFIG_CACHE = aliases
+    return aliases
+
+
 def extract_mcp_server_name(input_data: Dict[str, Any]) -> str:
     """Extract MCP server identifier from Cursor hook input."""
-    # Priority: server > url (extract domain) > command > tool_name prefix > default
+    # Priority: configured alias from ~/.cursor/mcp.json > server field > url host > command > tool_name prefix > default
+    aliases = _load_mcp_config_aliases()
+    url = input_data.get("url")
+    command = input_data.get("command")
+    if url and url in aliases:
+        return aliases[url]
+    if command and command in aliases:
+        return aliases[command]
     if server := input_data.get("server"):
         return server
-    if url := input_data.get("url"):
+    if url:
         # Extract domain from URL
         return url.replace("https://", "").replace("http://", "").split("/")[0]
-    if command := input_data.get("command"):
+    if command:
         return command
     if tool_name := input_data.get("tool_name", ""):
         if tool_name.startswith("mcp__"):
@@ -192,29 +244,63 @@ def extract_mcp_server_name(input_data: Dict[str, Any]) -> str:
                 return parts[1]
     return "cursor-unknown"
 
-def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: str) -> Dict[str, Any]:
-    """Build the request body for data ingestion."""
+
+# ---------- JSON-RPC envelope helpers (lifted from claude-cli-hooks) ----------
+
+def _tool_arguments_for_jsonrpc(tool_input: Any) -> Dict[str, Any]:
+    if isinstance(tool_input, dict):
+        return tool_input
+    if tool_input is None:
+        return {}
+    return {"input": tool_input}
+
+
+def build_tools_call_jsonrpc(mcp_tool_name: str, tool_input: Any, request_id: int = 1) -> str:
+    return json.dumps(
+        {
+            "jsonrpc": "2.0",
+            "method": "tools/call",
+            "params": {"name": mcp_tool_name, "arguments": _tool_arguments_for_jsonrpc(tool_input)},
+            "id": request_id,
+        }
+    )
+
+
+def build_tools_call_result_jsonrpc(tool_response: Any, request_id: int = 1) -> str:
+    """JSON-RPC success body for the mirrored response."""
+    if isinstance(tool_response, dict):
+        result_body: Any = tool_response
+    else:
+        result_body = {"output": tool_response}
+    return json.dumps({"jsonrpc": "2.0", "id": request_id, "result": result_body})
+
+
+def mcp_mirror_host(mcp_server_name: str) -> str:
+    return f"{DEVICE_ID}.{AKTO_CONNECTOR_VALUE}.{mcp_server_name}"
+
+
+def build_ingestion_payload(tool_name: str, tool_input_obj: Any, tool_response_obj: Any, mcp_server_name: str) -> Dict[str, Any]:
+    """Build the request body for data ingestion.
+    Wraps the MCP tool call + result in JSON-RPC 2.0 envelopes on path /mcp so Akto
+    classifies this as MCP traffic."""
     import time
 
     # Build tags based on mode
-    tags = {"gen-ai": "Gen AI"}
+    tags = {"mcp-server": "MCP Server", "mcp-client": AKTO_CONNECTOR_VALUE}
     if MODE == "atlas":
-        tags["ai-agent"] = "cursor"
         tags["source"] = CONTEXT_SOURCE
 
     # Add MCP server name to tags
     tags["mcp_server_name"] = mcp_server_name
 
-    # Get device ID
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-
-    # Build host from API_URL
-    host = API_URL.replace("https://", "").replace("http://", "")
+    # MCP traffic: host mirrors (deviceId.connector.serverAlias)
+    host = mcp_mirror_host(mcp_server_name)
 
     # Build request headers as JSON string
     request_headers = json.dumps({
         "host": host,
         "x-cursor-hook": "afterMCPExecution",
+        "x-mcp-server": mcp_server_name,
         "content-type": "application/json"
     })
 
@@ -224,18 +310,14 @@ def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: 
         "content-type": "application/json"
     })
 
-    # Build request payload as JSON string
-    request_payload = json.dumps({
-        "body": tool_input
-    })
+    # JSON-RPC tools/call envelope so Akto recognises this as MCP traffic
+    request_payload = build_tools_call_jsonrpc(tool_name, tool_input_obj)
 
-    # Build response payload as JSON string
-    response_payload = json.dumps({
-        "body": result_json
-    })
+    # JSON-RPC result envelope mirroring the tool response
+    response_payload = build_tools_call_result_jsonrpc(tool_response_obj)
 
     return {
-        "path": "/v1/messages",
+        "path": MCP_INGEST_PATH,
         "requestHeaders": request_headers,
         "responseHeaders": response_headers,
         "method": "POST",
@@ -248,7 +330,7 @@ def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: 
         "type": None,
         "status": "200",
         "akto_account_id": "1000000",
-        "akto_vxlan_id": device_id,
+        "akto_vxlan_id": DEVICE_ID,
         "is_pending": "false",
         "source": "MIRRORING",
         "direction": None,
@@ -262,20 +344,24 @@ def build_ingestion_payload(tool_input: str, result_json: str, mcp_server_name: 
     }
 
 
-def send_ingestion_data(tool_input: str, result_json: str, mcp_server_name: str):
-    if not tool_input.strip() or not result_json.strip():
+def send_ingestion_data(tool_name: str, tool_input_obj: Any, tool_response_obj: Any, mcp_server_name: str):
+    if not tool_input_obj or not tool_response_obj:
         return
 
-    logger.info(f"Ingesting response data for MCP server: {mcp_server_name}")
+    logger.info(f"Ingesting MCP tools/call result for {tool_name} (server={mcp_server_name})")
     if LOG_PAYLOADS:
-        logger.debug(f"Tool input: {tool_input[:500]}...")
-        logger.debug(f"Result: {result_json[:500]}...")
+        logger.debug(f"Tool input: {json.dumps(tool_input_obj)[:500]}...")
+        logger.debug(f"Result: {json.dumps(tool_response_obj)[:500]}...")
 
     try:
-        request_body = build_ingestion_payload(tool_input, result_json, mcp_server_name)
+        request_body = build_ingestion_payload(tool_name, tool_input_obj, tool_response_obj, mcp_server_name)
+        # response_guardrails=true asks Akto to evaluate response-side guardrails on the mirrored result.
+        # afterMCPExecution is observe-only per Cursor docs, so we cannot block — but Akto can still alert
+        # server-side based on the response_guardrails verdict.
         post_payload_json(
             build_http_proxy_url(
-                guardrails=not AKTO_SYNC_MODE,
+                guardrails=False,
+                response_guardrails=True,
                 ingest_data=True,
             ),
             request_body,
@@ -297,20 +383,38 @@ def main():
         print(json.dumps({}))
         sys.exit(0)
 
-    # Extract tool_input and result_json
-    tool_input = json.dumps(input_data.get("tool_input", {}))
-    result_json = input_data.get("result_json", "{}")
+    # Cursor passes tool_input and result_json as JSON-encoded *strings* (cursor.com/docs/hooks.md);
+    # parse both so the JSON-RPC envelopes carry real arguments / result objects.
+    raw_tool_input = input_data.get("tool_input", {})
+    if isinstance(raw_tool_input, str):
+        try:
+            tool_input_obj = json.loads(raw_tool_input) if raw_tool_input.strip() else {}
+        except json.JSONDecodeError:
+            tool_input_obj = {"raw": raw_tool_input}
+    else:
+        tool_input_obj = raw_tool_input or {}
+
+    raw_result = input_data.get("result_json", "{}")
+    if isinstance(raw_result, str):
+        try:
+            tool_response_obj = json.loads(raw_result) if raw_result.strip() else {}
+        except json.JSONDecodeError:
+            tool_response_obj = {"raw": raw_result}
+    else:
+        tool_response_obj = raw_result or {}
+
+    tool_name = str(input_data.get("tool_name") or "")
     mcp_server_name = extract_mcp_server_name(input_data)
 
-    logger.info(f"Processing response from MCP server: {mcp_server_name}")
+    logger.info(f"Processing afterMCPExecution: {tool_name} (server={mcp_server_name})")
 
-    if not tool_input or tool_input == "{}" or not result_json or result_json == "{}":
+    if not tool_input_obj or not tool_response_obj:
         logger.info("Empty input or result, skipping ingestion")
         print(json.dumps({}))
         sys.exit(0)
 
-    # Send data for ingestion
-    send_ingestion_data(tool_input, result_json, mcp_server_name)
+    # Send data for ingestion (with response_guardrails=true so Akto evaluates the response)
+    send_ingestion_data(tool_name, tool_input_obj, tool_response_obj, mcp_server_name)
 
     # After hooks must return empty JSON (cannot modify/block responses)
     logger.info("Response ingestion completed")

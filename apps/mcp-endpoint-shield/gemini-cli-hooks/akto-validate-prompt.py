@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import hashlib
 import json
 import logging
 import os
@@ -7,12 +8,13 @@ import ssl
 import sys
 import time
 import urllib.request
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Set, Tuple, Union
 from akto_machine_id import get_machine_id, get_username
 
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.gemini/akto/chat-logs"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_PAYLOADS = os.getenv("LOG_PAYLOADS", "false").lower() == "true"
+WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_prompt_warn_pending.json")
 
 os.makedirs(LOG_DIR, exist_ok=True)
 
@@ -58,10 +60,12 @@ def uuid_to_ipv6_simple(uuid_str):
     return ":".join(hex_str[i:i+4] for i in range(0, 32, 4))
 
 
-def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(*, guardrails: bool = False, response_guardrails: bool = False, ingest_data: bool = False) -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
@@ -182,9 +186,9 @@ def call_guardrails(
     model: Optional[str] = None,
     streaming: Optional[bool] = None,
     session_metadata: Optional[Dict[str, Any]] = None,
-) -> Tuple[bool, str]:
+) -> Tuple[bool, str, str]:
     if not query.strip():
-        return True, ""
+        return True, "", ""
 
     logger.info("Validating prompt against guardrails")
     if LOG_PAYLOADS:
@@ -203,17 +207,89 @@ def call_guardrails(
         guardrails_result = data.get("guardrailsResult", {})
         allowed = guardrails_result.get("Allowed", True)
         reason = guardrails_result.get("Reason", "")
+        behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get("Behaviour", "")
 
         if allowed:
             logger.info("Prompt ALLOWED by guardrails")
         else:
-            logger.warning(f"Prompt DENIED by guardrails: {reason}")
+            logger.warning(f"Prompt DENIED by guardrails: {reason} (behaviour={behaviour!r})")
 
-        return allowed, reason
+        return allowed, reason, behaviour
 
     except Exception as e:
         logger.error(f"Guardrails validation error: {e}", exc_info=True)
+        return True, "", ""
+
+
+# ---------- Warn / alert behaviour (lifted from claude-cli-hooks) ----------
+
+def _guardrails_behaviour_value(behaviour: Any) -> str:
+    return str(behaviour or "").strip().lower()
+
+
+def _is_warn_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "warn"
+
+
+def _is_alert_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "alert"
+
+
+def prompt_fingerprint(query: str) -> str:
+    canonical = json.dumps({"p": query}, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def load_warn_pending() -> Set[str]:
+    if not os.path.exists(WARN_STATE_PATH):
+        return set()
+    try:
+        with open(WARN_STATE_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return set(data.get("warn_pending", []))
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Could not read warn-pending map: {e}")
+        return set()
+
+
+def save_warn_pending(hashes: Set[str]) -> None:
+    tmp_path = WARN_STATE_PATH + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
+            f.write("\n")
+        os.replace(tmp_path, WARN_STATE_PATH)
+    except OSError as e:
+        logger.error(f"Could not persist warn-pending map: {e}")
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
+def apply_warn_resubmit_flow(
+    gr_allowed: bool,
+    reason: str,
+    behaviour: str,
+    fingerprint: str,
+) -> Tuple[bool, str]:
+    if gr_allowed:
         return True, ""
+    if _is_alert_behaviour(behaviour):
+        logger.info("Alert behaviour: allowing despite violation (server-side alert only)")
+        return True, ""
+    if not _is_warn_behaviour(behaviour):
+        return False, reason
+    pending = load_warn_pending()
+    if fingerprint in pending:
+        pending.discard(fingerprint)
+        save_warn_pending(pending)
+        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
+        return True, ""
+    pending.add(fingerprint)
+    save_warn_pending(pending)
+    return False, reason
 
 
 def ingest_blocked_request(
@@ -287,15 +363,24 @@ def main():
     logger.info(f"Processing prompt (length: {len(prompt)} chars)")
 
     if AKTO_SYNC_MODE:
-        allowed, reason = call_guardrails(
+        gr_allowed, gr_reason, behaviour = call_guardrails(
             prompt, model=model, streaming=streaming, session_metadata=session_metadata
         )
+        fingerprint = prompt_fingerprint(prompt)
+        allowed, _ = apply_warn_resubmit_flow(gr_allowed, gr_reason, behaviour, fingerprint)
         if not allowed:
+            if _is_warn_behaviour(behaviour):
+                deny_reason = (
+                    f"Warning!! Prompt blocked, please review it. Send the same prompt again to bypass. "
+                    f"Reason: {gr_reason or 'Policy violation'}"
+                )
+            else:
+                deny_reason = f"Blocked by Akto Guardrails: {gr_reason or 'Policy violation'}"
             output = {
                 "decision": "deny",
-                "reason": "Blocked by Akto Guardrails"
+                "reason": deny_reason,
             }
-            logger.warning(f"BLOCKING prompt - Reason: {reason}")
+            logger.warning(f"BLOCKING prompt - behaviour={behaviour!r}, Reason: {gr_reason}")
             sys.stdout.write(json.dumps(output))
             ingest_blocked_request(
                 prompt, model=model, streaming=streaming, session_metadata=session_metadata

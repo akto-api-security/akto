@@ -82,11 +82,13 @@ def create_ssl_context():
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(cfg: dict, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(cfg: dict, *, guardrails: bool = False, response_guardrails: bool = False, ingest_data: bool = False) -> str:
     """Build Akto HTTP proxy URL with query parameters."""
     params = [f"akto_connector={cfg['connector']}"]
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     if ingest_data:
         params.append("ingest_data=true")
     return f"{AKTO_DATA_INGESTION_URL}/api/http-proxy?{'&'.join(params)}"
