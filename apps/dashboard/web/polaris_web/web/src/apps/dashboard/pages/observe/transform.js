@@ -705,16 +705,23 @@ const transform = {
         if(category.includes("MCP") || category.includes("Agentic") || category === CATEGORY_ENDPOINT_SECURITY){
             try {
                 const [path, tail = ""] = pathUrl.split(/(?=[?#])/); // keep ? or # in tail
-                const newPath = path
-                  .replace(/^.*?\/calls?(?:\/|$)/i, "/")       // keep only what's after /call or /calls
-                  .replace(/\/{2,}/g, "/");                  // collapse slashes
-                return (newPath.endsWith("/") && newPath !== "/")
-                  ? newPath.slice(0, -1) + tail
-                  : newPath + tail;
+                // if url has v1/hooks, keep everything after hooks
+                const hooksMatch = path.match(/\/v1\/hooks(\/.*)?$/i);
+                if (hooksMatch) {
+                    const afterHooks = hooksMatch[1] || "/";
+                    return afterHooks + tail;
+                } else {
+                    const newPath = path
+                      .replace(/^.*?\/calls?(?:\/|$)/i, "/")       // keep only what's after /call or /calls
+                      .replace(/\/{2,}/g, "/");                  // collapse slashes
+                    return (newPath.endsWith("/") && newPath !== "/")
+                      ? newPath.slice(0, -1) + tail
+                      : newPath + tail;
+                }
             } catch (error) {
                 return url;
             }
-            
+
         }
         return pathUrl;
     },

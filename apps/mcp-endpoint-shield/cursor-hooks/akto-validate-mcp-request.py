@@ -201,9 +201,6 @@ def build_validation_request(tool_input: str, mcp_server_name: str) -> dict:
         tags["ai-agent"] = "cursor"
         tags["source"] = CONTEXT_SOURCE
 
-    # Add MCP server name to tags
-    tags["mcp_server_name"] = mcp_server_name
-
     # Get device ID
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
 
