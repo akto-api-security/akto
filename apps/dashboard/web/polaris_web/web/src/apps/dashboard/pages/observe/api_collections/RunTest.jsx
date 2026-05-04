@@ -26,7 +26,7 @@ const initialAutoTicketingDetails = {
     issueType: "",
 }
 
-function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
+function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable, fromApiDetails }) {
 
     const initialState = {
         categories: [],
@@ -113,6 +113,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     const [openConfigurations, openConfigurationsToggle] = useState(false);
 
     const [testSuiteIds, setTestSuiteIds] = useState([])
+    const [loadingSuggested, setLoadingSuggested] = useState(false)
 
     const [testNameSuiteModal, setTestNameSuiteModal] = useState("")
     const [jiraProjectMap, setJiraProjectMap] = useState(null);
@@ -124,7 +125,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
             setParentActivator(true);
         }
     }, [testMode])
-
     const isMultiCollection = apiCollectionIds && apiCollectionIds.length > 0;
     const apiCollectionName = isMultiCollection
         ? `${apiCollectionIds.length} collections`
@@ -602,6 +602,38 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         return totalTests === 0;
     }
 
+    const handleSuggestedTests = async () => {
+        if (!fromApiDetails || !endpoints?.length || endpoints.length !== 1) return;
+        const { apiCollectionId: collId, endpoint: url, method: m } = endpoints[0];
+        setLoadingSuggested(true);
+        try {
+            const resp = await observeApi.getSuggestedTests(collId, url, m);
+            const ids = Array.isArray(resp) ? resp : (resp?.suggestedTestIds || []);
+            const validIds = Array.isArray(ids) ? ids.filter(id => id != null && String(id).trim() !== '') : [];
+            if (validIds.length === 0) {
+                func.setToast(true, false, "No suggested tests for this API");
+                return;
+            }
+            const idSet = new Set(validIds);
+            setTestRun(prev => {
+                const tests = { ...prev.tests };
+                Object.keys(tests).forEach(category => {
+                    tests[category] = tests[category].map(test => ({
+                        ...test,
+                        selected: idSet.has(test.value)
+                    }));
+                });
+                return { ...prev, tests, testName: createTestName(apiCollectionName, tests) };
+            });
+            func.setToast(true, false, `Applied ${validIds.length} suggested test(s)`);
+        } catch (err) {
+            const msg = err?.response?.data?.error || err?.message || "Failed to get suggested tests";
+            func.setToast(true, true, msg);
+        } finally {
+            setLoadingSuggested(false);
+        }
+    };
+
     async function handleRun() {
         const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, maxAgentTokens, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceNames, slackChannel, doNotMarkIssuesAsFixed, runAutomatedTests } = testRun
         let {testName} = testRun;
@@ -933,13 +965,27 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
                                             onChange={(testName) => setTestRun(prev => ({ ...prev, testName: testName }))}
                                         />
                                     </div>
-                                    <div className="removeAllButton">
+                                    <div className="removeAllButton" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                                         <Button
                                             icon={CancelMajor}
                                             plain
                                             destructive
                                             onClick={handleRemoveAll}
                                             disabled={checkRemoveAll()}><div data-testid="remove_all_tests">Clear selection</div></Button>
+                                        {fromApiDetails && func.checkForFeatureSaas('AKTO_GPT_AI') && func.isDemoAccount() && (
+                                            <Tooltip content="Get AI-suggested tests for this API. AI can make mistakes. Consider reviewing suggestions." dismissOnMouseOut>
+                                                <Button
+                                                    icon={MagicMajor}
+                                                    variant="primary"
+                                                    tone="success"
+                                                    onClick={handleSuggestedTests}
+                                                    loading={loadingSuggested}
+                                                    disabled={loadingSuggested || window.USER_ROLE === "GUEST"}
+                                                >
+                                                    AI suggested tests
+                                                </Button>
+                                            </Tooltip>
+                                        )}
                                     </div>
                                 </div>
                                 <div style={{ display: "grid", gridTemplateColumns: "50% 50%", border: "1px solid #C9CCCF" }}>
