@@ -69,6 +69,8 @@ public class StartTestAction extends UserAction {
 
     private TestingEndpoints.Type type;
     private int apiCollectionId;
+    @Getter
+    @Setter
     private List<Integer> apiCollectionIds;
     private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
     private int testIdConfig;
@@ -99,6 +101,9 @@ public class StartTestAction extends UserAction {
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
+    @Getter
+    @Setter
+    private List<Integer> issueSummaryFilterCollectionIds;
     
     @Getter
     private List<Map<String, Object>> categoryWiseScores = new ArrayList<>();
@@ -608,12 +613,15 @@ public class StartTestAction extends UserAction {
         if(skip < 0){
             skip *= -1;
         }
-
-        if(limit < 0){
-            limit *= -1;
+        int pageLimit = limit;
+        if(limit != -1){
+            if(limit < 0){
+                limit *= -1;
+            }
+            pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
+        }else{
+            pageLimit = 10000000;
         }
-
-        int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
 
         testingRuns = TestingRunDao.instance.findAllWithRbacAndContext(
                 Filters.and(testingRunFilters), skip, pageLimit,
@@ -1271,7 +1279,8 @@ public class StartTestAction extends UserAction {
                 sourceType,
                 startTimestamp, 
                 endTimestamp, 
-                dashboardCategory
+                dashboardCategory,
+                this.apiCollectionIds
             );
             
         } catch (Exception e) {
@@ -1299,7 +1308,11 @@ public class StartTestAction extends UserAction {
 //        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
 //        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
 
-        Map<String,Integer> totalSubcategoriesCountMap = TestingRunIssuesDao.instance.getTotalSubcategoriesCountMap(this.startTimestamp,this.endTimestamp, demoCollections);
+        Map<String,Integer> totalSubcategoriesCountMap = TestingRunIssuesDao.instance.getTotalSubcategoriesCountMap(
+                this.startTimestamp,
+                this.endTimestamp,
+                demoCollections,
+                this.issueSummaryFilterCollectionIds);
         this.issuesSummaryInfoMap = totalSubcategoriesCountMap;
 
         return SUCCESS.toUpperCase();
@@ -1494,6 +1507,11 @@ public class StartTestAction extends UserAction {
                         updates.add(
                                 Updates.set(TestingRun.SEND_MS_TEAMS_ALERT,
                                         editableTestingRunConfig.getSendMsTeamsAlert()));
+                    }
+
+                    if (existingTestingRun.getDoNotMarkIssuesAsFixed() != editableTestingRunConfig.isDoNotMarkIssuesAsFixed()) {
+                        updates.add(Updates.set(TestingRun.DO_NOT_MARK_ISSUES_AS_FIXED,
+                                editableTestingRunConfig.isDoNotMarkIssuesAsFixed()));
                     }
 
                     int periodInSeconds = getPeriodInSeconds(editableTestingRunConfig.getRecurringDaily(), editableTestingRunConfig.getRecurringWeekly(), editableTestingRunConfig.getRecurringMonthly());
@@ -1708,6 +1726,17 @@ public class StartTestAction extends UserAction {
             pipeLine.add(
                 Aggregates.match(Filters.and(Filters.eq(TestingRunResultSummary.STATE, State.COMPLETED.toString()), Filters.gt(TestingRunResultSummary.START_TIMESTAMP, 0)))
             );
+            if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+                pipeLine.add(Aggregates.lookup(
+                        TestingRunDao.instance.getCollName(),
+                        TestingRunResultSummary.TESTING_RUN_ID,
+                        Constants.ID,
+                        "tr"));
+                pipeLine.add(Aggregates.match(Filters.elemMatch("tr", Filters.or(
+                        Filters.in(TestingRun._API_COLLECTION_ID, this.apiCollectionIds),
+                        Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, this.apiCollectionIds),
+                        Filters.in(TestingRun._API_COLLECTION_IDS_MULTI, this.apiCollectionIds)))));
+            }
             pipeLine.add(Aggregates.sort(
                 Sorts.descending(TestingRunResultSummary.START_TIMESTAMP)
             ));
@@ -1744,7 +1773,8 @@ public class StartTestAction extends UserAction {
         this.conversationsList = AgentConversationResultDao.instance.findAll(
                 Filters.eq(GenericAgentConversation._CONVERSATION_ID, this.conversationId),
                 0, 100,
-                Sorts.ascending(GenericAgentConversation._LAST_UPDATED_AT));
+                // TODO: there's inconsistency in this DTO in all branches ??
+                Sorts.ascending(GenericAgentConversation._LAST_UPDATED_AT, GenericAgentConversation._TIMESTAMP));
         return SUCCESS.toUpperCase();
     }
 
@@ -1754,14 +1784,6 @@ public class StartTestAction extends UserAction {
 
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
-    }
-
-    public void setApiCollectionIds(List<Integer> apiCollectionIds) {
-        this.apiCollectionIds = apiCollectionIds;
-    }
-
-    public List<Integer> getApiCollectionIds() {
-        return apiCollectionIds;
     }
 
     public void setApiInfoKeyList(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {

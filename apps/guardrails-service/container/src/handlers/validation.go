@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -133,7 +132,8 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 	// Extract session and request IDs from headers
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
 
-	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/request - requestPayload: %s", req.RequestPayload))
+	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Request received for guardrailing | Path: %s | Method: %s | Account: %s | Session: %s | Payload: %.300s",
+		req.Path, req.Method, req.AktoAccountID, sessionID, req.RequestPayload))
 
 	h.logger.Info("ValidateRequest - received request",
 		zap.String("path", req.Path),
@@ -183,9 +183,12 @@ func (h *ValidationHandler) ValidateRequest(c *gin.Context) {
 		zap.String("behaviour", result.Behaviour),
 		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
 
-	if resultJSON, err := json.Marshal(result); err == nil {
-		go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/request - result: %s", string(resultJSON)))
+	status := "ALLOWED"
+	if !result.Allowed {
+		status = "BLOCKED"
 	}
+	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Request %s | Path: %s | Method: %s | Account: %s | Session: %s | Modified: %v | Payload: %.300s",
+		status, req.Path, req.Method, req.AktoAccountID, sessionID, result.Modified, req.RequestPayload))
 
 	c.JSON(http.StatusOK, result)
 }
@@ -271,7 +274,8 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 	// Extract session and request IDs from headers
 	sessionID, requestID := session.ExtractSessionIDsFromRequest(c.Request)
 
-	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/response - responsePayload: %s", responseBody))
+	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Response received for guardrailing | Path: %s | Method: %s | Account: %s | Session: %s | Payload: %.300s",
+		req.Path, req.Method, req.AktoAccountID, sessionID, responseBody))
 
 	h.logger.Info("ValidateResponse - received request",
 		zap.String("path", req.Path),
@@ -322,9 +326,12 @@ func (h *ValidationHandler) ValidateResponse(c *gin.Context) {
 		zap.String("behaviour", result.Behaviour),
 		zap.Int64("latencyMs", time.Since(start).Milliseconds()))
 
-	if resultJSON, err := json.Marshal(result); err == nil {
-		go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] /validate/response - result: %s", string(resultJSON)))
+	responseStatus := "ALLOWED"
+	if !result.Allowed {
+		responseStatus = "BLOCKED"
 	}
+	go slack.SendAlert(h.logger, fmt.Sprintf("[guardrails] Response %s | Path: %s | Method: %s | Account: %s | Session: %s | Modified: %v | Payload: %.300s",
+		responseStatus, req.Path, req.Method, req.AktoAccountID, sessionID, result.Modified, responseBody))
 
 	c.JSON(http.StatusOK, result)
 }

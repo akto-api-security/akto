@@ -189,26 +189,21 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         return resultMap;
 
     }
-  
-    public Map<String, Integer> getTotalSubcategoriesCountMap(int startTimeStamp, int endTimeStamp, Set<Integer> deactivatedCollections){
+
+    public Map<String, Integer> getTotalSubcategoriesCountMap(int startTimeStamp, int endTimeStamp, Set<Integer> deactivatedCollections, List<Integer> restrictToCollectionIds){
         List<Bson> pipeline = new ArrayList<>();
         if(deactivatedCollections == null) deactivatedCollections = new HashSet<>();
 
-        pipeline.add(Aggregates.match(Filters.and(
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
-                Filters.lte(TestingRunIssues.LAST_SEEN, endTimeStamp),
-                Filters.gte(TestingRunIssues.LAST_SEEN, startTimeStamp),
-                Filters.nin("_id.apiInfoKey.apiCollectionId", deactivatedCollections)
-            )
-        ));
-
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
-            }
-        } catch(Exception e){
+        List<Bson> matchConditions = new ArrayList<>();
+        matchConditions.add(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"));
+        matchConditions.add(Filters.lte(TestingRunIssues.LAST_SEEN, endTimeStamp));
+        matchConditions.add(Filters.gte(TestingRunIssues.LAST_SEEN, startTimeStamp));
+        matchConditions.add(Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, deactivatedCollections));
+        if (restrictToCollectionIds != null && !restrictToCollectionIds.isEmpty()) {
+            matchConditions.add(Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, restrictToCollectionIds));
         }
+
+        pipeline.add(Aggregates.match(addCollectionsFilterForDashboard(Filters.and(matchConditions))));
 
         BasicDBObject groupedId = new BasicDBObject("subCategory", "$_id.testSubCategory");
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));

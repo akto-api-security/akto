@@ -10,6 +10,19 @@ import { useChartOptions } from './hooks/useChartOptions'
 import SystemInfoBox from './components/SystemInfoBox'
 import MetricChart from './components/MetricChart'
 import DropdownSearch from "../../../components/shared/DropdownSearch"
+import { timezonesAvailable } from '../about/About'
+
+function getTimezoneOffsetMinutes(tzValue) {
+    if (!tzValue) return new Date().getTimezoneOffset() * -1;
+    try {
+        const now = new Date();
+        const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+        const tzDate = new Date(now.toLocaleString('en-US', { timeZone: tzValue }));
+        return Math.round((tzDate.getTime() - utcMs) / 60000);
+    } catch {
+        return new Date().getTimezoneOffset() * -1;
+    }
+}
 
 /**
  * Base component for displaying module metrics
@@ -20,6 +33,7 @@ function ModuleMetrics({ config }) {
     const [orderedResult, setOrderedResult] = useState([])
     const [instanceIds, setInstanceIds] = useState([])
     const [selectedInstanceId, setSelectedInstanceId] = useState(null)
+    const [selectedTimezone, setSelectedTimezone] = useState(null)
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
@@ -44,14 +58,27 @@ function ModuleMetrics({ config }) {
             const response = await settingRequests.fetchModuleInfo(filter)
             const modules = response?.moduleInfos || []
 
+            const nowSec = Math.floor(Date.now() / 1000)
+            const ONLINE_THRESHOLD_SEC = 5 * 60
+
             const sorted = modules.sort((a, b) => {
+                const aOnline = (nowSec - (a.lastHeartbeatReceived || 0)) < ONLINE_THRESHOLD_SEC
+                const bOnline = (nowSec - (b.lastHeartbeatReceived || 0)) < ONLINE_THRESHOLD_SEC
+                if (aOnline !== bOnline) return bOnline ? 1 : -1
                 const aTime = a.lastHeartbeatReceived || a.startedTs || 0
                 const bTime = b.lastHeartbeatReceived || b.startedTs || 0
                 return bTime - aTime
             }).map(module => {
+                const isOnline = (nowSec - (module.lastHeartbeatReceived || 0)) < ONLINE_THRESHOLD_SEC
+                const name = module?.name || module?.id
                 return {
-                    label: module?.name || module?.id,
-                    value: module?.name || module?.id,
+                    label: (
+                        <HorizontalStack gap="1" blockAlign="center">
+                            <Text as="span" variant="bodyMd" color={isOnline ? 'success' : 'subdued'}>●</Text>
+                            <Text as="span" variant="bodyMd">{name}</Text>
+                        </HorizontalStack>
+                    ),
+                    value: name,
                 }
             })
 
@@ -165,6 +192,7 @@ function ModuleMetrics({ config }) {
         <Page
             title={config.title}
             divider
+            fullWidth
             backAction={{
                 content: 'Back',
                 onAction: () => window.history.back()
@@ -185,7 +213,14 @@ function ModuleMetrics({ config }) {
                                         alias: dateObj.alias
                                     })}
                                 />
-                                {instanceIds.length > 1 && (
+                                <DropdownSearch
+                                    placeholder="Timezone"
+                                    optionsList={timezonesAvailable}
+                                    setSelected={setSelectedTimezone}
+                                    value={selectedTimezone}
+                                    sliceMaxVal={10}
+                                />
+                                {instanceIds.length > 0 && (
                                     <DropdownSearch
                                         placeholder="Select module"
                                         optionsList={instanceIds}
@@ -193,6 +228,7 @@ function ModuleMetrics({ config }) {
                                         preSelected={[selectedInstanceId]}
                                         value={selectedInstanceId}
                                         sliceMaxVal={10}
+                                        dropdownSearchKey="value"
                                     />
                                 )}
                             </HorizontalStack>
@@ -216,6 +252,7 @@ function ModuleMetrics({ config }) {
                         title={config.metricNames[element.key]?.title}
                         description={config.metricNames[element.key]?.description}
                         chartOptions={getChartOptions()}
+                        timezoneOffsetMinutes={getTimezoneOffsetMinutes(selectedTimezone)}
                     />
                 ))}
             </LegacyCard>

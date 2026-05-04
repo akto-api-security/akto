@@ -30,6 +30,7 @@ import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
@@ -331,11 +332,18 @@ public class ApiCollectionsAction extends UserAction {
             /*
              * Since admin has all access, we don't update any collections for them.
              */
+            //Role
+            String currentScope = Context.contextSource.get().toString();
+            Bson adminFilter =  Filters.nor(
+                    Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN.getName()),
+                    Filters.eq(RBAC.SCOPE_ROLE_MAPPING + "." + currentScope, RBAC.Role.ADMIN.getName())
+                );
+
             RBACDao.instance.getMCollection().updateOne(
                     Filters.and(
                             Filters.eq(RBAC.USER_ID, userId),
                             Filters.eq(RBAC.ACCOUNT_ID, accountId),
-                            Filters.ne(RBAC.ROLE, RBAC.Role.ADMIN.getName())
+                            adminFilter
                     ),
                     Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
                     new UpdateOptions().upsert(false)
@@ -814,7 +822,11 @@ public class ApiCollectionsAction extends UserAction {
 
     // required to measure the count of total tested endpoints per collection.
     public String fetchCoverageInfoInCollections(){
-        this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount();
+        if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+            this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount(this.apiCollectionIds);
+        } else {
+            this.testedEndpointsMaps = ApiInfoDao.instance.getCoverageCount();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -958,6 +970,98 @@ public class ApiCollectionsAction extends UserAction {
 
     @Setter
     private boolean currentIsOutOfTestingScopeVal;
+
+    private boolean isSkillBlocked;
+
+    public void setIsSkillBlocked(boolean isSkillBlocked) {
+        this.isSkillBlocked = isSkillBlocked;
+    }
+
+    @Setter
+    private String skillName;
+
+    public String updateSkillBlockStatus() {
+        try {
+            if (this.apiCollectionIds == null || this.apiCollectionIds.isEmpty()) {
+                addActionError("No collections provided");
+                return ERROR.toUpperCase();
+            }
+            if (this.skillName == null || this.skillName.isEmpty()) {
+                addActionError("Skill name required");
+                return ERROR.toUpperCase();
+            }
+
+            String skillUrl = "/skills/" + this.skillName;
+            UpdateResult result = ApiInfoDao.instance.updateMany(
+                Filters.and(
+                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, this.apiCollectionIds),
+                    Filters.eq(ApiInfo.ID_URL, skillUrl)
+                ),
+                Updates.set(ApiInfo.IS_SKILL_BLOCKED, this.isSkillBlocked)
+            );
+
+            if (result.getMatchedCount() == 0) {
+                addActionError("No valid skill collections found");
+                return ERROR.toUpperCase();
+            }
+
+            response = new BasicDBObject();
+            response.put("success", true);
+            response.put("updatedCollections", result.getMatchedCount());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error updating skill block status: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchBlockedSkillCollections() {
+        try {
+            Set<Integer> blockedIds = ApiInfoDao.instance.findDistinctFields(
+                ApiInfo.ID_API_COLLECTION_ID,
+                Integer.class,
+                Filters.eq(ApiInfo.IS_SKILL_BLOCKED, true)
+            );
+            response = new BasicDBObject();
+            response.put("blockedCollectionIds", new ArrayList<>(blockedIds));
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error fetching blocked skill collections");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchBlockedSkillNames() {
+        try {
+            Set<Integer> blockedCollectionIds = ApiInfoDao.instance.findDistinctFields(
+                ApiInfo.ID_API_COLLECTION_ID,
+                Integer.class,
+                Filters.eq(ApiInfo.IS_SKILL_BLOCKED, true)
+            );
+            Set<String> blockedSkillNames = new HashSet<>();
+            if (!blockedCollectionIds.isEmpty()) {
+                List<String> skillUrls = ApiInfoDao.instance.findDistinctFields(
+                    ApiInfo.ID_URL,
+                    String.class,
+                    Filters.and(
+                        Filters.in(ApiInfo.ID_API_COLLECTION_ID, blockedCollectionIds),
+                        Filters.regex(ApiInfo.ID_URL, "^/skills/")
+                    )
+                ).stream().collect(Collectors.toList());
+                for (String url : skillUrls) {
+                    if (url.startsWith("/skills/")) {
+                        blockedSkillNames.add(url.substring("/skills/".length()));
+                    }
+                }
+            }
+            response = new BasicDBObject();
+            response.put("blockedSkillNames", new ArrayList<>(blockedSkillNames));
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error fetching blocked skill names");
+            return ERROR.toUpperCase();
+        }
+    }
 
     public String toggleCollectionsOutOfTestScope(){
         try{
@@ -1136,7 +1240,20 @@ public class ApiCollectionsAction extends UserAction {
             RBAC rbac = RBACDao.instance.findOne(Filters.and(
                     Filters.eq(RBAC.USER_ID, userId),
                     Filters.eq(RBAC.ACCOUNT_ID, accountId)));
-            String role = rbac.getRole();
+
+            // Get scope-specific role if scopeRoleMapping exists, otherwise use primary role
+            String role = null;
+            if (rbac != null) {
+                RBAC.Role scopeAwareRole = rbac.getRoleForScope(
+                        Context.contextSource.get()
+                );
+                if (scopeAwareRole != null) {
+                    role = scopeAwareRole.name();
+                } else {
+                    role = rbac.getRole();
+                }
+            }
+
             CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
             /*
              * If the role is custom role, only update the user with the delta.

@@ -39,7 +39,7 @@ console_handler.setLevel(logging.ERROR)  # Only show errors in console
 logger.addHandler(console_handler)
 
 MODE = os.getenv("MODE", "argus").lower()
-AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
+AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = "cursor"

@@ -737,17 +737,20 @@ public class ThreatActorService {
 
     long methodStartTime = System.currentTimeMillis();
 
-    Document match = new Document();
-
-    // Filter by time range using lastAttackTs
+    // Build time range filter (reused for both actor_info and malicious_events queries)
+    Document tsFilter = null;
     if (startTs > 0 || endTs > 0) {
-      Document tsFilter = new Document();
+      tsFilter = new Document();
       if (startTs > 0) {
         tsFilter.append("$gte", startTs);
       }
       if (endTs > 0) {
         tsFilter.append("$lte", endTs);
       }
+    }
+
+    Document match = new Document();
+    if (tsFilter != null) {
       match.append("lastAttackTs", tsFilter);
     }
 
@@ -811,12 +814,29 @@ public class ThreatActorService {
         .setCriticalActors((int) criticalActorsCount)
         .build();
 
+    // Build base filter for malicious_events queries (time range + context)
+    Document eventsMatch = new Document();
+    if (tsFilter != null) {
+      eventsMatch.append("detectedAt", tsFilter);
+    }
+    if (!contextFilter.isEmpty()) {
+      eventsMatch.putAll(contextFilter);
+    }
+
+    // Total analysed - all events in time range
+    long totalAnalysed = maliciousEventDao.getCollection(accountId).countDocuments(eventsMatch);
+
+    // Total attacks - successful exploits in time range
+    Document attackMatch = new Document(eventsMatch);
+    attackMatch.append("successfulExploit", true);
+    long totalAttacks = maliciousEventDao.getCollection(accountId).countDocuments(attackMatch);
+
     return DailyActorsCountResponse.newBuilder()
         .addActorsCounts(actorsCount)  // Add single element to array
         .setTotalActive((int) activeActorsCount)
         .setCriticalActorsCount((int) criticalActorsCount)
-        .setTotalAnalysed(0)  // Not calculated from actor_info
-        .setTotalAttacks(0)   // Not calculated from actor_info
+        .setTotalAnalysed((int) totalAnalysed)
+        .setTotalAttacks((int) totalAttacks)
         .setTotalIgnored(0)
         .setTotalUnderReview(0)
         .build();

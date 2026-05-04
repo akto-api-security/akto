@@ -51,10 +51,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -284,8 +281,12 @@ public class AccountAction extends UserAction {
                 loggerMaker.errorAndAddToDb(e, String.format("Error while adding account %d to organization", newAccountId), LogDb.DASHBOARD);
             }
         }
-   
-        User user = initializeAccount(email, newAccountId, newAccountName,true, RBAC.Role.ADMIN.name());
+        Map<String, String> scopeRoleMapping = new HashMap<>();
+        scopeRoleMapping.put("API", RBAC.Role.ADMIN.name());
+        scopeRoleMapping.put("ENDPOINT", RBAC.Role.ADMIN.name());
+        scopeRoleMapping.put("DAST", RBAC.Role.ADMIN.name());
+        scopeRoleMapping.put("AGENTIC", RBAC.Role.ADMIN.name());
+        User user = initializeAccount(email, newAccountId, newAccountName,true, scopeRoleMapping);
         getSession().put("user", user);
         getSession().put("accountId", newAccountId);
         return Action.SUCCESS.toUpperCase();
@@ -300,8 +301,6 @@ public class AccountAction extends UserAction {
         User user = UsersDao.addAccount(email, newAccountId, newAccountName);
         RBAC rbacEntry = new RBAC(user.getId(), null, newAccountId);  // Don't set old role field
         if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
-            // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
-            scopeRoleMapping = RBAC.ensureCompleteScopeRoleMapping(scopeRoleMapping);
             rbacEntry.setScopeRoleMapping(scopeRoleMapping);
         }
         RBACDao.instance.insertOne(rbacEntry);

@@ -16,11 +16,11 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.password_reset.PasswordResetUtils;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Pair;
-import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 import com.opensymphony.xwork2.Action;
@@ -256,10 +256,22 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                             /*
                              * Update the role only. Product scopes are managed through scope-role mapping.
                              */
-                            RBACDao.instance.updateOneNoUpsert(
-                                filterRbac,
-                                Updates.set(RBAC.ROLE, reqUserRole)
-                            );
+
+                            if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
+                                // Update both primary role and scope-role mapping
+                                RBACDao.instance.updateOneNoUpsert(
+                                        filterRbac,
+                                        Updates.combine(
+                                                Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping)
+                                        )
+                                );
+                            } else {
+                                // Update only primary role (backward compatibility)
+                                RBACDao.instance.updateOneNoUpsert(
+                                        filterRbac,
+                                        Updates.set(RBAC.ROLE, reqUserRole)
+                                );
+                            }
 
                             RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
                             UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
@@ -313,7 +325,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
 
             String defaultRole = RBAC.Role.MEMBER.name();
             if (UsageMetricCalculator.isRbacFeatureAvailable(Context.accountId.get())) {
-                defaultRole = Utils.fetchDefaultInviteRole(Context.accountId.get(), Role.NO_ACCESS.name());
+                defaultRole = Utils.fetchDefaultInviteRole(Context.accountId.get(), Role.MEMBER.name());
             }
             this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, defaultRole);
         }
@@ -356,10 +368,14 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                 Filters.eq(RBAC.ACCOUNT_ID, accId)
             );
 
-            // Update the scopeRoleMapping in RBAC
-            RBACDao.instance.updateOneNoUpsert(
-                filterRbac,
-                Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMapping)
+            RBACDao.instance.getMCollection().updateOne(
+                    filterRbac,
+                    Updates.combine(
+                            Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMapping),
+                            Updates.setOnInsert(RBAC.USER_ID, userDetails.getId()),
+                            Updates.setOnInsert(RBAC.ACCOUNT_ID, accId)
+                    ),
+                    new UpdateOptions().upsert(true)
             );
 
             // Clear cache

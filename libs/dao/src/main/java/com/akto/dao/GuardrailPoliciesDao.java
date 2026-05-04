@@ -1,7 +1,6 @@
 package com.akto.dao;
 
 import com.akto.dto.GuardrailPolicies;
-import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dao.context.Context;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;

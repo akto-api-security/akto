@@ -28,6 +28,7 @@ import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
 import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import ModuleInfoPage from "../dashboard/pages/settings/module_info/ModuleInfoPage";
+import JobInfoPage from "../dashboard/pages/settings/job_info/JobInfoPage";
 import About from "../dashboard/pages/settings/about/About";
 import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
@@ -124,11 +125,13 @@ import DastProgress from "../dashboard/pages/observe/api_collections/DastProgres
 import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
 import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
+import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
 import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx";
 import ViolationsPage from "../dashboard/pages/nhi_governance/ViolationsPage.jsx";
 import PoliciesPage from "../dashboard/pages/nhi_governance/PoliciesPage.jsx";
+import AllowedHostsForPac from "../dashboard/pages/settings/allowed_hosts/AllowedHostsForPac.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -212,6 +215,10 @@ const router = createBrowserRouter([
                             {
                                 path: "agentic-assets",
                                 element: <Endpoints/>
+                            },
+                            {
+                                path: "users-and-devices",
+                                element: <UsersAndDevices/>
                             },
                             {
                                 path: "query_mode",
@@ -557,6 +564,10 @@ const router = createBrowserRouter([
                         element: <ModuleInfoPage/>,
                     },
                     {
+                        path: "job-info",
+                        element: <JobInfoPage/>,
+                    },
+                    {
                         path: "auth-types",
                         element: <AuthTypes/>
                     },
@@ -571,6 +582,10 @@ const router = createBrowserRouter([
                     {
                         path: 'proxy-patterns',
                         element: <ProxyPatterns/>
+                    },
+                    {
+                        path: 'allowed-hosts',
+                        element: <AllowedHostsForPac/>
                     },
                     {
                         path: "auth-types/details",

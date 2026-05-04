@@ -256,6 +256,12 @@ button:has(#bulk-run-test-button):hover {
     font-weight: 550 !important;
 }
 
+.badge-wrapper-SUCCESS .Polaris-Badge {
+    background-color: #AEE9D1 !important;
+    color: #202223 !important;
+    font-weight: 550 !important;
+}
+
 .action-item-card-actions .Polaris-Modal-CloseButton{
     margin-left: 0px !important;
     padding: 4px !important;

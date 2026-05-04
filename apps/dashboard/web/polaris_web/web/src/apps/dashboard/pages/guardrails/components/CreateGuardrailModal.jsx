@@ -35,11 +35,12 @@ import {
     ToolsGuardrailsConfig,
     ServerSettingsStep,
     ServerSettingsConfig
-} from './steps';
+} from "./steps";
 import {
     SEVERITY,
     GUARDRAIL_BEHAVIOUR,
     normalizeBehaviourValue,
+    normalizePiiTypesFromPolicy,
     resolveStoredPolicyBehaviour
 } from '../utils';
 import func from "@/util/func";
@@ -448,7 +449,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // PII filters
         const hasPiiTypes = policy.piiTypes && policy.piiTypes.length > 0;
         setEnablePiiTypes(hasPiiTypes);
-        setPiiTypes(policy.piiTypes || []);
+        setPiiTypes(normalizePiiTypesFromPolicy(policy));
 
         // Regex patterns
         let hasRegexPatterns = false;

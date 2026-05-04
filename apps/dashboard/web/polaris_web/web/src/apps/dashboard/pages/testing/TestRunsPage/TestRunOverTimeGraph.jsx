@@ -7,14 +7,14 @@ import api from '../api';
 import func from '@/util/func';
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
-const TestRunOverTimeGraph = ({ showOnlyTable = false }) => {
+const TestRunOverTimeGraph = ({ showOnlyTable = false, apiCollectionIds }) => {
   const [chartData, setChartData] = useState([]);
   const [showTestingComponents, setShowTestingComponents] = useState(false);
 
   async function fetchTestRunsOverTime() {
     setShowTestingComponents(false);
     let tempData = [];
-    await api.allTestsCountsRanges().then((res) => {
+    await api.allTestsCountsRanges(apiCollectionIds).then((res) => {
       Object.keys(res).forEach((key) => {
         const timeInMillis = func.getEpochMillis(key, "weekOfYear");
         const count = res[key] || 0;
@@ -34,7 +34,7 @@ const TestRunOverTimeGraph = ({ showOnlyTable = false }) => {
 
   useEffect(() => {
     fetchTestRunsOverTime();
-  }, [showOnlyTable]);
+  }, [showOnlyTable, apiCollectionIds]);
 
   const testingGraph = (chartData?.length > 0) ? (
     <InfoCard

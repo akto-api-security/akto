@@ -1,7 +1,9 @@
 package com.akto.dao.testing;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -83,6 +85,50 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
         }
 
         return testingSummaryIds;
+    }
+
+    /**
+     * Latest {@link TestingRunResultSummary} id per testing run in the schedule window (same filters as the test runs table),
+     * then {@link TestingRunResultSummariesDao#fetchLatestTestingRunResultSummaries}. Used to scope category-wise scores
+     * to current summary rows only.
+     */
+    public List<ObjectId> getSummaryIdsForCategoryWiseScores(int startTimestamp, int endTimestamp, List<Integer> apiCollectionIds) {
+        List<Bson> filters = new ArrayList<>();
+        filters.add(Filters.ne(TestingRun.TRIGGERED_BY, "test_editor"));
+        if (startTimestamp > 0 && endTimestamp > 0) {
+            filters.add(Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, endTimestamp));
+            filters.add(Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTimestamp));
+        }
+        if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+            filters.add(Filters.or(
+                    Filters.in(TestingRun._API_COLLECTION_ID, apiCollectionIds),
+                    Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, apiCollectionIds),
+                    Filters.in(TestingRun._API_COLLECTION_IDS_MULTI, apiCollectionIds)
+            ));
+        }
+        Bson runFilter = filters.size() == 1 ? filters.get(0) : Filters.and(filters);
+        Bson finalFilter = addCollectionsFilterForDashboard(runFilter);
+        List<ObjectId> runIds = new ArrayList<>();
+        try (MongoCursor<TestingRun> cursor = instance.getMCollection().find(finalFilter)
+                .projection(Projections.include(Constants.ID))
+                .iterator()) {
+            while (cursor.hasNext()) {
+                runIds.add(cursor.next().getId());
+            }
+        }
+        if (runIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Map<ObjectId, TestingRunResultSummary> latestByRun = TestingRunResultSummariesDao.instance
+                .fetchLatestTestingRunResultSummaries(runIds);
+        if (latestByRun.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<ObjectId> summaryIds = new ArrayList<>(latestByRun.size());
+        for (TestingRunResultSummary summary : latestByRun.values()) {
+            summaryIds.add(summary.getId());
+        }
+        return summaryIds;
     }
 
     public boolean isStoredInVulnerableCollection(ObjectId testingRunId){

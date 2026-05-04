@@ -20,22 +20,19 @@ public class CategoryWiseStatsUtils {
         GUARDRAILS
     }
 
-    /**
-     * Generic method to get category-wise scores for any data source
-     * Categories are automatically filtered based on dashboard context
-     */
     public static List<Map<String, Object>> getCategoryWiseScores(
             DataSource dataSource,
             int startTimestamp, 
             int endTimestamp, 
-            String dashboardCategory
+            String dashboardCategory,
+            List<Integer> apiCollectionIds
     ) {
         // Get relevant categories based on data source and dashboard
         List<String> relevantCategories = getRelevantCategories(dataSource, dashboardCategory);
         
         switch (dataSource) {
             case REDTEAMING:
-                return getTestingCategoryWiseScores(startTimestamp, endTimestamp, relevantCategories);
+                return getTestingCategoryWiseScores(startTimestamp, endTimestamp, relevantCategories, apiCollectionIds);
             case THREAT_DETECTION:
                 return getThreatDetectionCategoryWiseScores(startTimestamp, endTimestamp, relevantCategories);
             case GUARDRAILS:
@@ -71,9 +68,10 @@ public class CategoryWiseStatsUtils {
     private static List<Map<String, Object>> getTestingCategoryWiseScores(
             int startTimestamp, 
             int endTimestamp, 
-            List<String> relevantCategories
+            List<String> relevantCategories,
+            List<Integer> apiCollectionIds
     ) {
-        return TestingRunResultDao.instance.getCategoryWiseScores(startTimestamp, endTimestamp, relevantCategories);
+        return TestingRunResultDao.instance.getCategoryWiseScores(startTimestamp, endTimestamp, relevantCategories, apiCollectionIds);
     }
 
     /**
@@ -117,6 +115,15 @@ public class CategoryWiseStatsUtils {
                 break;
             case "Gen AI":
                 contextSource = CONTEXT_SOURCE.GEN_AI;
+                break;
+            case "Agentic Security":
+                contextSource = CONTEXT_SOURCE.AGENTIC;
+                break;
+            case "Endpoint Security":
+                contextSource = CONTEXT_SOURCE.ENDPOINT;
+                break;
+            case "DAST":
+                contextSource = CONTEXT_SOURCE.DAST;
                 break;
             case "API Security":
             default:

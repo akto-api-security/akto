@@ -5,4 +5,5 @@ pydantic==2.5.0
 numpy<2
 torch>=2.4.0
 optimum[onnxruntime]>=1.16.0
+httpx>=0.27.0
 

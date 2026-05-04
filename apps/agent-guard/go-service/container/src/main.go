@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,11 +22,38 @@ var (
 	defaultTimeout   = 120 * time.Second
 )
 
+// Environment variables for the LLM scanner path. All are optional; if
+// SCANNER_LLM_PROVIDER is unset the service behaves exactly as before and
+// requests with use_llm=true fall back to the Python path with a clear error.
+const (
+	EnvScannerLLMProvider = "SCANNER_LLM_PROVIDER" // "openai" | "anthropic"
+	EnvOpenAIAPIKey       = "OPENAI_API_KEY"
+	EnvOpenAIModel        = "OPENAI_MODEL"
+	EnvAnthropicAPIKey    = "ANTHROPIC_API_KEY"
+	EnvAnthropicModel     = "ANTHROPIC_MODEL"
+
+	// EnvForceLLMMode, when truthy ("true"/"1"/"yes"), routes ALL supported
+	// scanners (PromptInjection, BanTopics) through the LLM provider regardless
+	// of whether the client sent config.use_llm. This lets operators switch
+	// centrally without any client-side changes.
+	EnvForceLLMMode = "FORCE_LLM_MODE"
+)
+
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
 	}
 	return defaultValue
+}
+
+// isTruthyEnv reports whether the named env var holds a truthy value.
+func isTruthyEnv(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(name))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 type ScanRequest struct {
@@ -77,6 +105,23 @@ func NewScannerClient(baseURL string) *ScannerClient {
 
 func (c *ScannerClient) ScanText(ctx context.Context, req ScanRequest) (*ScanResponse, error) {
 	startTime := time.Now()
+
+	// use_llm is a transport-only flag consumed in Service.ScanText. Python's
+	// scanner_service does scanner_class(**config), so any unknown key here
+	// blows up scanner instantiation (e.g. Toxicity.__init__ got unexpected
+	// keyword 'use_llm'). Strip it before forwarding. req is a value copy,
+	// but Config is a map (reference) — so allocate a new map rather than
+	// mutate the caller's.
+	if _, leaked := req.Config[ConfigKeyUseLLM]; leaked {
+		cleaned := make(map[string]interface{}, len(req.Config)-1)
+		for k, v := range req.Config {
+			if k == ConfigKeyUseLLM {
+				continue
+			}
+			cleaned[k] = v
+		}
+		req.Config = cleaned
+	}
 
 	reqBody, err := json.Marshal(req)
 	if err != nil {
@@ -133,10 +178,51 @@ func (c *ScannerClient) HealthCheck(ctx context.Context) error {
 
 type Service struct {
 	scannerClient *ScannerClient
+	llmScanner    *LLMScanner // nil when no LLM provider is configured
+	forceLLM      bool        // when true, treat every supported scanner as use_llm=true
 }
 
-func NewService(scannerClient *ScannerClient) *Service {
-	return &Service{scannerClient: scannerClient}
+func NewService(scannerClient *ScannerClient, llmScanner *LLMScanner, forceLLM bool) *Service {
+	return &Service{scannerClient: scannerClient, llmScanner: llmScanner, forceLLM: forceLLM}
+}
+
+// ScanText is the single entry point used by all HTTP handlers. It routes the
+// request to the LLM provider when the client opted in via config.use_llm and
+// the scanner is supported, otherwise it falls through to the Python backend.
+func (s *Service) ScanText(ctx context.Context, req ScanRequest) (*ScanResponse, error) {
+	if (s.forceLLM || useLLMRequested(req.Config)) && supportsLLM(req.ScannerName) {
+		if s.llmScanner == nil {
+			// LLM mode asked for, but the server isn't configured. Fail open
+			// (IsValid=true) and surface the condition so operators can fix
+			// the deployment — matches gateway behavior for provider misconfig.
+			return &ScanResponse{
+				ScannerName:   req.ScannerName,
+				IsValid:       true,
+				RiskScore:     0,
+				SanitizedText: req.Text,
+				Error:         "LLM mode requested but SCANNER_LLM_PROVIDER is not configured on the server",
+			}, nil
+		}
+
+		resp, err := s.llmScanner.Scan(ctx, req)
+		if err == nil {
+			return resp, nil
+		}
+		if err == ErrLLMUnsupportedScanner {
+			// Quietly fall back to Python path for scanners the LLM doesn't handle.
+			return s.scannerClient.ScanText(ctx, req)
+		}
+		// Hard error from the provider (network, auth, parse). Fail open with
+		// an explanatory Error field; do not block traffic on LLM misbehavior.
+		return &ScanResponse{
+			ScannerName:   req.ScannerName,
+			IsValid:       true,
+			RiskScore:     0,
+			SanitizedText: req.Text,
+			Error:         fmt.Sprintf("LLM provider failed: %v", err),
+		}, nil
+	}
+	return s.scannerClient.ScanText(ctx, req)
 }
 
 func (s *Service) RunParallelScans(ctx context.Context, req ParallelScanRequest) (*ParallelScanResponse, error) {
@@ -152,7 +238,7 @@ func (s *Service) RunParallelScans(ctx context.Context, req ParallelScanRequest)
 			defer wg.Done()
 			scanReq.Text = req.Text
 
-			result, err := s.scannerClient.ScanText(ctx, scanReq)
+			result, err := s.ScanText(ctx, scanReq)
 			if err != nil {
 				resultsChan <- ScanResponse{
 					ScannerName:   scanReq.ScannerName,
@@ -203,7 +289,7 @@ func (s *Service) RunStreamingScans(ctx context.Context, req StreamingScanReques
 			defer wg.Done()
 			scanReq.Text = req.Text
 
-			result, err := s.scannerClient.ScanText(ctx, scanReq)
+			result, err := s.ScanText(ctx, scanReq)
 			if err != nil {
 				resultsChan <- ScanResponse{
 					ScannerName:   scanReq.ScannerName,
@@ -248,7 +334,7 @@ func setupRouter(service *Service) *gin.Engine {
 			return
 		}
 
-		result, err := service.scannerClient.ScanText(c.Request.Context(), req)
+		result, err := service.ScanText(c.Request.Context(), req)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -304,7 +390,12 @@ func main() {
 	scannerClient := NewScannerClient(pythonServiceURL)
 	// waitForPythonService(scannerClient);
 
-	service := NewService(scannerClient)
+	llmScanner := buildLLMScanner()
+	forceLLM := isTruthyEnv(EnvForceLLMMode)
+	if forceLLM {
+		log.Printf("[Service] %s=true — all supported scanners will use LLM path", EnvForceLLMMode)
+	}
+	service := NewService(scannerClient, llmScanner, forceLLM)
 	router := setupRouter(service)
 
 	printEnvVariables()
@@ -313,6 +404,41 @@ func main() {
 	if err := router.Run(":" + port); err != nil {
 		log.Fatalf("Failed to start: %v", err)
 	}
+}
+
+// buildLLMScanner constructs an LLMScanner from environment variables. Returns
+// nil (with a log line) when no provider is configured or the configured one
+// is missing credentials — in that case requests with use_llm=true surface a
+// clear error from Service.ScanText instead of crashing the service.
+func buildLLMScanner() *LLMScanner {
+	providerName := strings.ToLower(strings.TrimSpace(os.Getenv(EnvScannerLLMProvider)))
+	if providerName == "" {
+		log.Printf("[LLMScanner] %s not set; LLM mode disabled", EnvScannerLLMProvider)
+		return nil
+	}
+
+	httpClient := &http.Client{Timeout: defaultTimeout}
+
+	var (
+		provider LLMProvider
+		err      error
+	)
+	switch providerName {
+	case LLMProviderOpenAI:
+		provider, err = NewOpenAIProvider(os.Getenv(EnvOpenAIAPIKey), os.Getenv(EnvOpenAIModel), httpClient)
+	case LLMProviderAnthropic:
+		provider, err = NewAnthropicProvider(os.Getenv(EnvAnthropicAPIKey), os.Getenv(EnvAnthropicModel), httpClient)
+	default:
+		log.Printf("[LLMScanner] unknown %s=%q (expected %q or %q); LLM mode disabled",
+			EnvScannerLLMProvider, providerName, LLMProviderOpenAI, LLMProviderAnthropic)
+		return nil
+	}
+
+	if err != nil {
+		log.Printf("[LLMScanner] failed to initialize provider %q: %v; LLM mode disabled", providerName, err)
+		return nil
+	}
+	return NewLLMScanner(provider)
 }
 
 func waitForPythonService(scannerClient *ScannerClient) {
@@ -339,4 +465,10 @@ func printEnvVariables() {
 	log.Printf("PORT: %s", os.Getenv("PORT"))
 	log.Printf("PYTHON_SERVICE_URL: %s", os.Getenv("PYTHON_SERVICE_URL"))
 	log.Printf("GIN_MODE: %s", os.Getenv("GIN_MODE"))
+	log.Printf("%s: %s", EnvScannerLLMProvider, os.Getenv(EnvScannerLLMProvider))
+	log.Printf("%s: %s (default %s)", EnvOpenAIModel, os.Getenv(EnvOpenAIModel), DefaultOpenAIModel)
+	log.Printf("%s: %s (default %s)", EnvAnthropicModel, os.Getenv(EnvAnthropicModel), DefaultAnthropicModel)
+	log.Printf("%s set: %t", EnvOpenAIAPIKey, os.Getenv(EnvOpenAIAPIKey) != "")
+	log.Printf("%s set: %t", EnvAnthropicAPIKey, os.Getenv(EnvAnthropicAPIKey) != "")
+	log.Printf("%s: %s", EnvForceLLMMode, os.Getenv(EnvForceLLMMode))
 }

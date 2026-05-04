@@ -88,6 +88,14 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
                 executeSalesforceConnector(job, config);
                 break;
 
+            case "ANTHROPIC":
+                executeAnthropicConnector(job, config);
+                break;
+
+            case "OPENAI":
+                executeOpenaiConnector(job, config);
+                break;
+
             default:
                 logger.warn("Unknown AI Agent Connector subType: {}. Skipping job execution.", subType);
                 throw new IllegalArgumentException("Unsupported AI Agent Connector subType: " + subType);
@@ -159,6 +167,25 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
         executeBinaryConnector(job, config, BINARY_NAME_DATABRICKS);
 
         logger.info("Databricks connector execution completed: jobId={}", job.getId());
+    }
+
+    /**
+     * Execute Anthropic connector (enterprise).
+     * Downloads anthropic-shield binary and runs with config env vars.
+     */
+    private void executeAnthropicConnector(AccountJob job, Map<String, Object> config) throws Exception {
+        logger.info("Executing Anthropic connector: jobId={}", job.getId());
+        executeBinaryConnector(job, config, BINARY_NAME_ANTHROPIC);
+        logger.info("Anthropic connector execution completed: jobId={}", job.getId());
+    }
+
+    /**
+     * Execute OpenAI connector (enterprise).
+     */
+    private void executeOpenaiConnector(AccountJob job, Map<String, Object> config) throws Exception {
+        logger.info("Executing OpenAI connector: jobId={}", job.getId());
+        executeBinaryConnector(job, config, BINARY_NAME_OPENAI);
+        logger.info("OpenAI connector execution completed: jobId={}", job.getId());
     }
 
     /**
@@ -392,7 +419,7 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
         // Check execution result
         if (!result.isSuccess()) {
             String errorMsg = "Binary execution failed with exit code " + result.getExitCode() +
-                ". Output: " + result.getStdout().substring(0, Math.min(500, result.getStdout().length()));
+                ". Output: " + result.getStdout().substring(0, Math.min(2000, result.getStdout().length()));
             logger.error("Binary execution failed: {}", errorMsg);
             throw new Exception(errorMsg);
         }

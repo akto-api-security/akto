@@ -79,7 +79,8 @@ const initialState = {
     trafficAlerts: [],
     sendEventOnLogin: false,
     tableSelectedTab: {},
-    dashboardCategory: getInitialDashboardCategory() // Persisted across page reloads
+    dashboardCategory: getInitialDashboardCategory(), // Persisted across page reloads
+    selectedCollectionScope: null,
 };
 
 let persistStore = (set, get) => ({
@@ -107,7 +108,7 @@ let persistStore = (set, get) => ({
     },
     setAllCollections: (allCollections) => {
         try {
-            const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs, hostName, name, description, envType, isOutOfTestingScope, urls}) => ({
+            const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs, hostName, name, description, envType, isOutOfTestingScope, urls, skills}) => ({
                 id,
                 displayName,
                 urlsCount,
@@ -121,6 +122,7 @@ let persistStore = (set, get) => ({
                 envType,
                 isOutOfTestingScope,
                 urls,
+                skills,
             }));
             set({ allCollections: optimizedCollections });
         } catch (error) {
@@ -255,6 +257,13 @@ let persistStore = (set, get) => ({
             console.error("Error setting tableSelectedTab:", error);
         }
     },
+    setSelectedCollectionScope: (selectedCollectionScope) => {
+        try {
+            set({ selectedCollectionScope });
+        } catch (error) {
+            console.error("Error setting selectedCollectionScope:", error);
+        }
+    },
     resetAll: () => {
         try {
             set(initialState);
@@ -293,6 +302,7 @@ persistStore = persist(persistStore, {
         sendEventOnLogin: state.sendEventOnLogin,
         tableSelectedTab: state.tableSelectedTab,
         dashboardCategory: state.dashboardCategory, // Persist dashboard category selection across page reloads
+        selectedCollectionScope: state.selectedCollectionScope,
     })
 });
 

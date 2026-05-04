@@ -298,13 +298,14 @@ export default {
         })
     },
 
-    async getSummaryInfo(startTimestamp, endTimestamp){
+    async getSummaryInfo(startTimestamp, endTimestamp, issueSummaryFilterCollectionIds){
         return await request({
             url: '/api/getIssueSummaryInfo',
             method: 'post',
             data: {
                 startTimestamp: startTimestamp,
                 endTimestamp: endTimestamp,
+                issueSummaryFilterCollectionIds: issueSummaryFilterCollectionIds || [],
             }
         })
     },
@@ -630,11 +631,15 @@ export default {
             data: { content }
         })
     },
-    allTestsCountsRanges() {
+    allTestsCountsRanges(apiCollectionIds) {
+        const data = {}
+        if (apiCollectionIds && apiCollectionIds.length > 0) {
+            data.apiCollectionIds = apiCollectionIds
+        }
         return request({
             url: '/api/fetchTestingRunsRanges',
             method: 'post',
-            data: {}
+            data
         })
     },
     getUniqueHostsTested(testingRunId) {
@@ -644,16 +649,20 @@ export default {
             data: { testingRunId }
         })
     },
-    async fetchCategoryWiseScores(startTimestamp, endTimestamp, dashboardCategory, dataSource = 'testing') {
+    async fetchCategoryWiseScores(startTimestamp, endTimestamp, dashboardCategory, dataSource = 'testing', apiCollectionIds) {
+        const data = {
+            startTimestamp,
+            endTimestamp,
+            dashboardCategory,
+            dataSource
+        }
+        if (apiCollectionIds && apiCollectionIds.length > 0) {
+            data.apiCollectionIds = apiCollectionIds
+        }
         const resp = await request({
             url: '/api/fetchCategoryWiseScores',
             method: 'post',
-            data: {
-                startTimestamp,
-                endTimestamp,
-                dashboardCategory,
-                dataSource
-            }
+            data
         })
         return resp
     },

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Box, Badge } from "@shopify/polaris";
+import { IndexFiltersMode, Box, Badge, HorizontalStack, Text } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -22,13 +22,10 @@ import {
     groupCollectionsByAgent,
     groupCollectionsByService,
     groupCollectionsBySkill,
-    createEnvTypeFilter,
-    createHostnameFilter,
     extractEndpointId,
-    ROW_TYPES,
-    SKILL_TAG_KEY
+    buildAgenticInventoryFilterForRow,
 } from "./constants";
-import { CLIENT_TYPES } from "./mcpClientHelper";
+import { CLIENT_TYPES, ROW_TYPES, hasPersonalAccountTag } from "./mcpClientHelper";
 
 const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
 
@@ -56,7 +53,11 @@ function Endpoints() {
         setSelected(selectedIndex);
     };
 
-    const headers = useMemo(() => getHeaders(), []);
+    const headers = useMemo(() => {
+        const h = getHeaders();
+        h[1] = { ...h[1], value: "groupNameDisplay" };
+        return h;
+    }, []);
 
     const getRiskScoreStatus = useCallback((riskScore) => {
         if (riskScore >= 4.5) return "critical";
@@ -69,6 +70,14 @@ function Endpoints() {
     const prettifyGroupData = useCallback((groups) => {
         return groups.map((group) => ({
             ...group,
+            groupNameDisplay: group.hasPersonalAccount && group.rowType !== ROW_TYPES.SKILL
+                ? (
+                    <HorizontalStack gap="2" align="start" wrap={false}>
+                        <Text>{group.groupName}</Text>
+                        <Badge size="small" status="warning">Contains personal account</Badge>
+                    </HorizontalStack>
+                )
+                : group.groupName,
             iconComp: (
                 <Box>
                     <CollectionIcon
@@ -79,11 +88,9 @@ function Endpoints() {
                 </Box>
             ),
             sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || [], false),
-            riskScoreComp: group.riskScore !== null ? (
-                <Badge status={getRiskScoreStatus(group.riskScore)} size="small">
-                    {group.riskScore}
-                </Badge>
-            ) : "-",
+            riskScoreComp: group.riskScore !== null
+                ? <Badge status={getRiskScoreStatus(group.riskScore)} size="small">{group.riskScore}</Badge>
+                : "-",
         }));
     }, [getRiskScoreStatus]);
 
@@ -96,12 +103,12 @@ function Endpoints() {
                 apiCollectionsResp,
                 trafficInfoResp,
                 riskScoreResp,
-                sensitiveInfoResp
+                sensitiveInfoResp,
             ] = await Promise.all([
                 api.getAllCollectionsBasic(),
                 api.getLastTrafficSeen(),
                 api.getRiskScoreInfo(),
-                api.getSensitiveInfoForCollections()
+                api.getSensitiveInfoForCollections(),
             ]);
 
             if (!isMountedRef.current) return;
@@ -115,9 +122,9 @@ function Endpoints() {
             const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
 
             // Group collections by agents (discovery sources), services (discovered endpoints), and skills
-            const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap);
+            const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
             const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
-            const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap);
+            const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap, riskScoreMap);
 
             const prettifiedAgents = prettifyGroupData(agentGroups);
             const prettifiedServices = prettifyGroupData(serviceGroups);
@@ -128,7 +135,7 @@ function Endpoints() {
             const agentGroupKeys = new Set(prettifiedAgents.map((a) => a.groupKey));
             const servicesToShow = prettifiedServices.filter((s) => !agentGroupKeys.has(s.groupKey));
 
-            const allData = [...prettifiedAgents, ...servicesToShow];
+            const allData = [...prettifiedAgents, ...servicesToShow, ...prettifiedSkills];
 
             // Calculate unique endpoint IDs across all collections
             const uniqueEndpointIds = new Set();
@@ -171,21 +178,9 @@ function Endpoints() {
 
     const handleRowClick = useCallback((row) => {
         const updatedFiltersMap = { ...filtersMap };
-
-        if (row.rowType === ROW_TYPES.AGENT) {
-            // Agent row: filter by agent tag so one click shows both gen-ai and mcp-server for that agent
-            if (row.tagKey && row.tagValue) {
-                const filterValue = `${row.tagKey}=${row.tagValue}`;
-                updatedFiltersMap[INVENTORY_FILTER_KEY] = createEnvTypeFilter([filterValue], false);
-            }
-        } else if (row.rowType === ROW_TYPES.SERVICE) {
-            // Service row (e.g. MCP server): filter by hostnames so only that service's collections open
-            if (row.hostNames?.length > 0) {
-                updatedFiltersMap[INVENTORY_FILTER_KEY] = createHostnameFilter(row.hostNames);
-            }
-        } else if (row.rowType === ROW_TYPES.SKILL) {
-            const filterValue = `${SKILL_TAG_KEY}=${row.groupKey}`;
-            updatedFiltersMap[INVENTORY_FILTER_KEY] = createEnvTypeFilter([filterValue], false);
+        const filterPayload = buildAgenticInventoryFilterForRow(row);
+        if (filterPayload) {
+            updatedFiltersMap[INVENTORY_FILTER_KEY] = filterPayload;
         } else {
             delete updatedFiltersMap[INVENTORY_FILTER_KEY];
         }

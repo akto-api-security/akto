@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from typing import Dict, Any, List
 from fastapi import FastAPI, HTTPException
@@ -27,6 +28,7 @@ except:
 
 from llm_guard import input_scanners, output_scanners
 from intent_analyzer import IntentAnalysisScanner
+from llm_scanner import init_llm_scanner, is_truthy, LLM_SUPPORTED_SCANNERS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,6 +42,13 @@ logger.setLevel(logging.INFO)
 
 app = FastAPI(title="Agent Guard Scanner Service", version="1.0.0")
 scanner_cache = {}
+
+# LLM scanner — initialized once from env vars. None if no provider configured.
+_llm_scanner = init_llm_scanner()
+_force_llm = is_truthy(os.getenv("FORCE_LLM_MODE"))
+if _force_llm:
+    logger.info("[Service] FORCE_LLM_MODE=true — PromptInjection/BanTopics will use LLM path")
+
 
 class ScanRequest(BaseModel):
     scanner_type: str
@@ -106,10 +115,12 @@ def get_scanner(scanner_type: str, scanner_name: str, config: Dict[str, Any]):
         raise ValueError(f"Scanner {scanner_name} not found")
     
     try:
-        onnx_scanners = ["Toxicity", "PromptInjection", "Bias", "Relevance", 
+        onnx_scanners = ["Toxicity", "PromptInjection", "Bias", "Relevance",
                         "NoRefusal", "MaliciousURLs", "Sensitive"]
-        
+
         config = config or {}
+        # Strip transport-only flag before passing to scanner constructor
+        config.pop("use_llm", None)
         
         # Apply optimized configurations for best attack coverage
         if scanner_name == "PromptInjection":
@@ -153,6 +164,51 @@ async def scan_text(request: ScanRequest):
 
     try:
         logger.info(f"Starting scan: scanner={request.scanner_name}, type={request.scanner_type}, text_length={len(request.text)}")
+
+        # ── LLM dispatch ─────────────────────────────────────────────
+        use_llm_requested = is_truthy(str(request.config.get("use_llm", "")))
+        if ((_force_llm or use_llm_requested)
+                and request.scanner_name in LLM_SUPPORTED_SCANNERS):
+            if _llm_scanner is None:
+                # No provider configured — fail open
+                total_duration = (time.time() - start_time) * 1000
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=True,
+                    risk_score=0.0,
+                    sanitized_text=request.text,
+                    details={
+                        "error": "LLM mode requested but SCANNER_LLM_PROVIDER is not configured on the server",
+                        "execution_time_ms": round(total_duration, 2),
+                    },
+                )
+            try:
+                result = _llm_scanner.scan(
+                    request.scanner_name, request.scanner_type,
+                    request.text, request.config,
+                )
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=result["is_valid"],
+                    risk_score=result["risk_score"],
+                    sanitized_text=request.text,
+                    details=result.get("details", {}),
+                )
+            except Exception as llm_err:
+                # Provider failure — fail open
+                total_duration = (time.time() - start_time) * 1000
+                logger.error(f"[LLMScanner] Provider failed: {llm_err}")
+                return ScanResponse(
+                    scanner_name=request.scanner_name,
+                    is_valid=True,
+                    risk_score=0.0,
+                    sanitized_text=request.text,
+                    details={
+                        "error": f"LLM provider failed: {llm_err}",
+                        "execution_time_ms": round(total_duration, 2),
+                    },
+                )
+        # ── End LLM dispatch ─────────────────────────────────────────
 
         scanner = get_scanner(request.scanner_type, request.scanner_name, request.config)
 

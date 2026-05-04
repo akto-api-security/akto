@@ -2,7 +2,7 @@ import { Outlet, useLocation, useNavigate} from "react-router-dom"
 import { history } from "@/util/history";
 import Store from "../store";
 import homeFunctions from "./home/module";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Frame, Toast, VerticalStack, Banner, Button, Text } from "@shopify/polaris";
 import "./dashboard.css"
 import func from "@/util/func"
@@ -19,22 +19,6 @@ import threatDetectionRequests from "./threat_detection/api";
 import SessionStore from "../../main/SessionStore";
 import { updateThreatFiltersStore } from "./threat_detection/utils/threatFilters";
 
-/**
- * Maps scope values to dashboard category names
- */
-const scopeToCategoryMap = {
-    'API': 'API Security',
-    'AGENTIC': 'Agentic Security',
-    'ENDPOINT': 'Endpoint Security',
-    'DAST': 'DAST'
-}
-
-/**
- * Gets the dashboard category for a given scope
- */
-const getDashboardCategoryForScope = (scope) => {
-    return scopeToCategoryMap[scope] || 'API Security'
-}
 
 function Dashboard() {
 
@@ -51,9 +35,6 @@ function Dashboard() {
 
     const allCollections = PersistStore(state => state.allCollections)
     const collectionsMap = PersistStore(state => state.collectionsMap)
-
-    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
-    const setDashboardCategory = PersistStore((state) => state.setDashboardCategory);
 
     const subCategoryMap = LocalStore(state => state.subCategoryMap)
     const [eventForUser, setEventForUser] = useState({})
@@ -102,6 +83,7 @@ function Dashboard() {
     // Monitor NO_ACCESS alert flag
     // Skip alert monitoring during onboarding since APIs may return 403 during setup
     useEffect(() => {
+        selectItems([])
         if (location.pathname.includes('/onboarding')) {
             return;
         }
@@ -114,65 +96,6 @@ function Dashboard() {
         }, 100);
 
         return () => clearInterval(checkInterval);
-    }, [location.pathname]);
-
-    /**
-     * Auto-detect user's accessible product scopes based on RBAC scope-role mapping.
-     * If the current dashboard category isn't accessible, switch to the first accessible one.
-     * This prevents 403 errors when user logs in but current scope isn't available to them.
-     * Uses window.scopeRoleMapping from ProfileAction if available, falls back to STIGG feature grants.
-     *
-     * Skip this logic during onboarding since new users may have NO_ACCESS initially.
-     */
-    useEffect(() => {
-        // Skip auto-redirect logic during onboarding
-        if (location.pathname.includes('/onboarding')) {
-            return;
-        }
-
-        let accessibleCategories = ['API Security']; // Default fallback
-
-        // Prefer RBAC scope-role mapping if available
-        const scopeRoleMapping = window?.scopeRoleMapping;
-        if (scopeRoleMapping && typeof scopeRoleMapping === 'object') {
-            accessibleCategories = [];
-            const noAccessRole = 'NO_ACCESS';
-
-            // Check each scope in the mapping
-            for (const [scope, role] of Object.entries(scopeRoleMapping)) {
-                if (role !== noAccessRole) {
-                    const category = getDashboardCategoryForScope(scope);
-                    if (category && !accessibleCategories.includes(category)) {
-                        accessibleCategories.push(category);
-                    }
-                }
-            }
-
-            // If no accessible scopes found in mapping, fall back to empty array
-            if (accessibleCategories.length === 0) {
-                accessibleCategories = [];
-            }
-        } else {
-            // Fallback to feature grants when scopeRoleMapping isn't available
-            const { agenticSecurityGranted, endpointSecurityGranted, dastGranted } = func.getStiggFeatureGrants();
-
-            if (agenticSecurityGranted) {
-                accessibleCategories.push('Agentic Security');
-            }
-
-            if (endpointSecurityGranted) {
-                accessibleCategories.push('Endpoint Security');
-            }
-
-            if (dastGranted) {
-                accessibleCategories.push('DAST');
-            }
-        }
-
-        // If current dashboard category isn't accessible, switch to first accessible one
-        if (accessibleCategories.length > 0 && !accessibleCategories.includes(dashboardCategory)) {
-            setDashboardCategory(accessibleCategories[0]);
-        }
     }, [location.pathname]);
 
     useEffect(() => {
@@ -228,15 +151,6 @@ function Dashboard() {
             cleanUpLocalStorePersistSync();
         };
     }, [])
-
-    useEffect(() => {
-        selectItems([])
-        // Clear NO_ACCESS alert when leaving onboarding
-        if (!location.pathname.includes('/onboarding')) {
-            window.SHOW_NO_ACCESS_ALERT = false;
-            setShowNoAccessAlert(false);
-        }
-    },[location.pathname])
 
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)

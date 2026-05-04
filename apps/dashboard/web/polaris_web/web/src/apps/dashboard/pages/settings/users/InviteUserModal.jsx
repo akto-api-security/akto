@@ -36,10 +36,15 @@ const getAvailableProductScopes = () => {
     return scopes
 }
 
-const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, roleHierarchy, rolesOptions, defaultInviteRole}) => {
+const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, roleHierarchy, rolesOptions, defaultInviteRole, accessibleProductScopes, filteredRoleOptions}) => {
 
-    // Get available scopes based on user's feature access
-    const availableScopes = useMemo(() => getAvailableProductScopes(), [])
+    // Use accessible scopes passed from parent, fallback to all available scopes if not provided (backward compatibility)
+    const availableScopes = useMemo(() => {
+        if (accessibleProductScopes && accessibleProductScopes.length > 0) {
+            return accessibleProductScopes
+        }
+        return getAvailableProductScopes()
+    }, [accessibleProductScopes])
 
     const setToastConfig = Store(state => state.setToastConfig)
     const ref = useRef(null)
@@ -158,12 +163,19 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
         func.copyToClipboard(inviteUser.inviteLink, ref, "Invitation link copied to clipboard")
     }
 
-    const filteredRoleOptions = rolesOptions[0].items.map((c) => {
-        return{
-            label: c?.content,
-            value: c?.role,
+    // Use filtered role options passed from parent, or create locally (backward compatibility)
+    const displayedRoleOptions = useMemo(() => {
+        if (filteredRoleOptions && filteredRoleOptions.length > 0) {
+            return filteredRoleOptions
         }
-    }).filter((c) => roleHierarchy.includes(c.value))
+        // Fallback: create locally
+        return rolesOptions[0].items.map((c) => {
+            return{
+                label: c?.content,
+                value: c?.role,
+            }
+        }).filter((c) => roleHierarchy.includes(c.value))
+    }, [filteredRoleOptions, rolesOptions, roleHierarchy])
     if (inviteUser.state !== "success") {
         return (
             <Modal
@@ -227,7 +239,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
                                         <Dropdown
                                             id={`role-${scope.value}`}
                                             selected={(value) => handleScopeRoleChange(scope.value, value)}
-                                            menuItems={filteredRoleOptions}
+                                            menuItems={displayedRoleOptions}
                                             initial={scopeRoleMapping[scope.value]}
                                         />
                                     </Box>

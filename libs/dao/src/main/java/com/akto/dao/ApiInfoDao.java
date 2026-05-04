@@ -116,6 +116,10 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
     }
 
     public Map<Integer,Integer> getCoverageCount(){
+        return getCoverageCount(null);
+    }
+
+    public Map<Integer,Integer> getCoverageCount(List<Integer> restrictToCollectionIds){
         Map<Integer,Integer> result = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
         int oneMonthAgo = Context.now() - Constants.ONE_MONTH_TIMESTAMP ;
@@ -127,6 +131,10 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
                 pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
             }
         } catch(Exception e){
+        }
+
+        if (restrictToCollectionIds != null && !restrictToCollectionIds.isEmpty()) {
+            pipeline.add(Aggregates.match(Filters.in(ApiInfo.ID_API_COLLECTION_ID, restrictToCollectionIds)));
         }
 
         UnwindOptions unwindOptions = new UnwindOptions();

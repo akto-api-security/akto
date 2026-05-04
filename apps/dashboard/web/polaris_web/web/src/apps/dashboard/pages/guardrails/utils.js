@@ -61,3 +61,13 @@ export const transformPolicyForBackend = (policyData) => {
         contentFiltering: policyData.contentFilters || {}
     };
 };
+
+/** Defaults `minMatchCount` to 1 when loading policies for edit. */
+export const normalizePiiTypesFromPolicy = (policy) =>
+    (policy?.piiTypes || []).map((p) => ({
+        ...p,
+        behavior: typeof p.behavior === "string" ? p.behavior.toLowerCase() : "block",
+        domainCount: p.domainCount ?? 0,
+        minMatchCount:
+            p.minMatchCount != null && Number(p.minMatchCount) >= 1 ? Number(p.minMatchCount) : 1
+    }));

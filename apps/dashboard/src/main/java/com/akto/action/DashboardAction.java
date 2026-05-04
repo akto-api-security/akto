@@ -36,6 +36,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.opensymphony.xwork2.Action;
 
+import lombok.Getter;
 import lombok.Setter;
 
 import static com.akto.dto.test_run_findings.TestingRunIssues.KEY_SEVERITY;
@@ -44,6 +45,9 @@ public class DashboardAction extends UserAction {
 
     private int startTimeStamp;
     private int endTimeStamp;
+    @Getter
+    @Setter
+    private List<Integer> apiCollectionIds;
     private Map<Integer,List<IssueTrendType>> issuesTrendMap = new HashMap<>() ;
     private int skip;
     private List<Activity> recentActivities = new ArrayList<>();
@@ -160,13 +164,16 @@ public class DashboardAction extends UserAction {
 
 
         List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN);
-        Bson issuesFilter = Filters.and(
-                Filters.in(KEY_SEVERITY, severityToFetch),
-                Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
-                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus),
-                Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections)
-        );
+        List<Bson> issueMatchParts = new ArrayList<>();
+        issueMatchParts.add(Filters.in(KEY_SEVERITY, severityToFetch));
+        issueMatchParts.add(Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp));
+        issueMatchParts.add(Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp));
+        issueMatchParts.add(Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus));
+        issueMatchParts.add(Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections));
+        if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+            issueMatchParts.add(Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, apiCollectionIds));
+        }
+        Bson issuesFilter = Filters.and(issueMatchParts);
 
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(issuesFilter));
@@ -267,6 +274,10 @@ public class DashboardAction extends UserAction {
                     basePipeline.add(Aggregates.match(Filters.in(TestingRunIssuesDao.instance.getFilterKeyString(), collectionIds)));
                 }
             } catch (Exception e) {
+            }
+
+            if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+                basePipeline.add(Aggregates.match(Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, apiCollectionIds)));
             }
 
             BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)

@@ -574,6 +574,39 @@ public class AdminSettingsAction extends UserAction {
         }
     }
 
+    @Setter
+    private String hostPattern;
+    @Getter
+    private Map<String, AccountSettings.ProxyPatternInfo> allowedHostsForPac;
+
+    public String addAllowedHostForPac() {
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+
+        if (StringUtils.isEmpty(hostPattern)) {
+            addActionError("Host pattern cannot be empty.");
+            return ERROR.toUpperCase();
+        }
+
+        hostPattern = hostPattern.trim();
+        String key = hostPattern.hashCode() + "";
+        AccountSettings.ProxyPatternInfo info = new AccountSettings.ProxyPatternInfo(hostPattern, user.getLogin(), Context.now());
+        Bson updates = Updates.set(AccountSettings.ALLOWED_HOSTS_FOR_PAC + "." + key, info);
+
+        try {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                updates
+            );
+            AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            this.allowedHostsForPac = settings != null ? settings.getAllowedHostsForPac() : null;
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error adding allowed host for TAC", e);
+            return ERROR.toUpperCase();
+        }
+    }
+
     private String proxyPattern;
     @Getter
     private Map<String, AccountSettings.ProxyPatternInfo> matchingPatternsForProxy;
@@ -745,6 +778,52 @@ public class AdminSettingsAction extends UserAction {
 
     public void setProxyPattern(String proxyPattern) {
         this.proxyPattern = proxyPattern;
+    }
+
+    public enum ConnectorType { PAC, PROXY }
+
+    @Setter
+    private String patternValue;
+    @Setter
+    private ConnectorType connectorType;
+    @Getter
+    private Map<String, AccountSettings.ProxyPatternInfo> deletedPatternResult;
+
+    public String deleteProxyPattern() {
+        User user = getSUser();
+        if (user == null) return ERROR.toUpperCase();
+
+        if (connectorType == null) {
+            addActionError("Connector type cannot be empty.");
+            return ERROR.toUpperCase();
+        }
+
+        if (StringUtils.isEmpty(patternValue)) {
+            addActionError("Pattern value cannot be empty.");
+            return ERROR.toUpperCase();
+        }
+
+        patternValue = patternValue.trim();
+        String key = patternValue.hashCode() + "";
+        String field = connectorType == ConnectorType.PAC
+            ? AccountSettings.ALLOWED_HOSTS_FOR_PAC
+            : AccountSettings.MATCHING_PATTERNS_FOR_PROXY;
+
+        try {
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.unset(field + "." + key)
+            );
+            AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            this.deletedPatternResult = settings == null ? null
+                : connectorType == ConnectorType.PAC
+                    ? settings.getAllowedHostsForPac()
+                    : settings.getMatchingPatternsForProxy();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error deleting proxy pattern for connectorType={}", connectorType, e);
+            return ERROR.toUpperCase();
+        }
     }
 
 }

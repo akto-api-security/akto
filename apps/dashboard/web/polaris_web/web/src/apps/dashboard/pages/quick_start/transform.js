@@ -68,7 +68,19 @@ import {
     DESCRIPTION_SALESFORCE,
     DOCS_URL_SALESFORCE,
     INTERVAL_SALESFORCE,
-    SALESFORCE_FIELDS
+    SALESFORCE_FIELDS,
+    CONNECTOR_TYPE_ANTHROPIC,
+    CONNECTOR_NAME_ANTHROPIC,
+    DESCRIPTION_ANTHROPIC,
+    DOCS_URL_ANTHROPIC,
+    INTERVAL_ANTHROPIC,
+    ANTHROPIC_FIELDS,
+    CONNECTOR_TYPE_OPENAI,
+    CONNECTOR_NAME_OPENAI,
+    DESCRIPTION_OPENAI,
+    DOCS_URL_OPENAI,
+    INTERVAL_OPENAI,
+    OPENAI_FIELDS
 } from "./constants/aiAgentConnectorConstants"
 import DataDogConnector from "./components/DataDogConnector"
 import MicrosoftDefenderConnector from "./components/MicrosoftDefenderConnector"
@@ -1101,6 +1113,38 @@ const salesforceImportObj = {
     />
 }
 
+const anthropicImportObj = {
+    icon: '/public/claude.svg',
+    label: "Anthropic",
+    text: "Use our Anthropic feature to capture traffic from Anthropic and instantly send it to your dashboard for real-time insights.",
+    docsUrl: DOCS_URL_ANTHROPIC,
+    key: "ANTHROPIC",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_ANTHROPIC}
+        connectorName={CONNECTOR_NAME_ANTHROPIC}
+        description={DESCRIPTION_ANTHROPIC}
+        fields={ANTHROPIC_FIELDS}
+        docsUrl={DOCS_URL_ANTHROPIC}
+        recurringIntervalSeconds={INTERVAL_ANTHROPIC}
+    />
+}
+
+const openaiImportObj = {
+    icon: '/public/openai.svg',
+    label: "OpenAI",
+    text: "Use our OpenAI feature to capture traffic from OpenAI and instantly send it to your dashboard for real-time insights.",
+    docsUrl: DOCS_URL_OPENAI,
+    key: "OPENAI",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_OPENAI}
+        connectorName={CONNECTOR_NAME_OPENAI}
+        description={DESCRIPTION_OPENAI}
+        fields={OPENAI_FIELDS}
+        docsUrl={DOCS_URL_OPENAI}
+        recurringIntervalSeconds={INTERVAL_OPENAI}
+    />
+}
+
 const litellmImportObj = {
     icon: '/public/litellm.svg',
     label: "LiteLLM",
@@ -1194,6 +1238,69 @@ const neovimHookObj = {
     component: <BannerComponent
         content="IDE-level protection monitoring AI-powered code completions in Neovim."
         docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/neovim-hooks'
+    />
+}
+
+const openCodeHookObj = {
+    icon: '/public/opencode-logo-light.svg',
+    label: "OpenCode Hook",
+    text: "Monitoring AI coding agent of OpenCode with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/opencode-hooks',
+    key: "OPENCODE_HOOK",
+    component: <BannerComponent
+        content="Monitoring AI coding agent of OpenCode with Akto guardrails."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/opencode-hooks'
+    />
+}
+
+const ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL =
+    'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents'
+
+const sglangHookObj = {
+    icon: '/public/sglang.png',
+    label: "SGLang",
+    text: "Discover and secure locally running models on SGLang, with endpoint discovery and guardrails in Akto.",
+    docsUrl: ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL,
+    key: "SGLANG_HOOK",
+    component: <BannerComponent
+        content="Discover and secure locally running models on SGLang, with endpoint discovery and guardrails in Akto."
+        docsUrl={ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL}
+    />
+}
+
+const vllmHookObj = {
+    icon: '/public/vllm.svg',
+    label: "vLLM",
+    text: "Discover and secure locally running models on vLLM, with endpoint discovery and guardrails in Akto.",
+    docsUrl: ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL,
+    key: "VLLM_HOOK",
+    component: <BannerComponent
+        content="Discover and secure locally running models on vLLM, with endpoint discovery and guardrails in Akto."
+        docsUrl={ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL}
+    />
+}
+
+const dockerModelRunnerHookObj = {
+    icon: '/public/docker.svg',
+    label: "Docker Model Runner",
+    text: "Discover and secure locally running models on Docker Model Runner, with endpoint discovery and guardrails in Akto.",
+    docsUrl: ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL,
+    key: "DOCKER_MODEL_RUNNER_HOOK",
+    component: <BannerComponent
+        content="Discover and secure locally running models on Docker Model Runner, with endpoint discovery and guardrails in Akto."
+        docsUrl={ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL}
+    />
+}
+
+const ollamaHookObj = {
+    icon: '/public/ollama.svg',
+    label: "Ollama",
+    text: "Discover and secure locally running models on Ollama, with endpoint discovery and guardrails in Akto.",
+    docsUrl: ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL,
+    key: "OLLAMA_HOOK",
+    component: <BannerComponent
+        content="Discover and secure locally running models on Ollama, with endpoint discovery and guardrails in Akto."
+        docsUrl={ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL}
     />
 }
 
@@ -1884,7 +1991,8 @@ const quickStartFunc = {
         const aiAgentConnectors = [
             awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
             n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, snowflakeObj,
-            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, salesforceImportObj
+            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, salesforceImportObj,
+            anthropicImportObj, openaiImportObj
         ]
 
         // MCP Scan
@@ -1908,7 +2016,11 @@ const quickStartFunc = {
 
         // Endpoint Agents
         const endpointAgents = [
-            cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, intellijHookObj, antigravityObj,
+            cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, openCodeHookObj, intellijHookObj, antigravityObj,
+        ]
+
+        const localHostedModels = [
+            sglangHookObj, vllmHookObj, dockerModelRunnerHookObj, ollamaHookObj,
         ]
 
         // Endpoint Management
@@ -1945,7 +2057,9 @@ const quickStartFunc = {
                 "Endpoint Agents": endpointAgents,
                 "Endpoint Management": endpointManagement,
                 "Agentic Proxies": agenticProxies,
+                "Platform connectors": [anthropicImportObj, openaiImportObj],
                 "Browser Extension": browserExtensions,
+                "Locally Hosted Models": localHostedModels,
                 "Secure Web Networks": secureWebNetworks,
                 "": hiddenConnectors, // Hidden category for connector lookup
             };
@@ -1979,13 +2093,13 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, neovimHookObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, neovimHookObj, openCodeHookObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, neovimHookObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, neovimHookObj, openCodeHookObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
@@ -1997,7 +2111,7 @@ const quickStartFunc = {
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
                 awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, anthropicImportObj, openaiImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj, openCodeHookObj,
                 apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
                 microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
             ])

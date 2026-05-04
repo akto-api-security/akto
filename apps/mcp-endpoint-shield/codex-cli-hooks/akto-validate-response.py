@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
+import hashlib
 import json
 import logging
 import os
 import ssl
 import sys
-import urllib.request
-from typing import Any, Dict, Union
 import time
-
+import urllib.request
+from typing import Any, Dict, Set, Tuple, Union
 
 from akto_machine_id import get_machine_id, get_username
 
@@ -26,27 +26,29 @@ logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 # File handler
 file_handler = logging.FileHandler(os.path.join(LOG_DIR, "validate-response.log"))
 file_handler.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
-file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 file_handler.setFormatter(file_formatter)
 logger.addHandler(file_handler)
 
 # Console handler
 console_handler = logging.StreamHandler(sys.stderr)
-console_handler.setLevel(logging.ERROR) 
+console_handler.setLevel(logging.ERROR)
 logger.addHandler(console_handler)
 
 MODE = os.getenv("MODE", "argus").lower()
-AKTO_DATA_INGESTION_URL = os.getenv("AKTO_DATA_INGESTION_URL")
+AKTO_DATA_INGESTION_URL = (os.getenv("AKTO_DATA_INGESTION_URL") or "").rstrip("/")
 AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_CONNECTOR = os.getenv("AKTO_CONNECTOR", "codex_cli")
+AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
+WARN_STATE_PATH = os.path.join(LOG_DIR, "akto_response_warn_pending.json")
 
 # SSL Configuration
 SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 
-# Auto-detect Codex API host and path from the same env vars Codex CLI uses
+
 def _detect_codex_api():
     base_url = os.getenv("OPENAI_BASE_URL")
     if base_url:
@@ -55,11 +57,15 @@ def _detect_codex_api():
         return "https://api.openai.com", "/v1/responses"
     return "https://chatgpt.com", "/backend-api/codex/responses"
 
+
 _detected_host, CODEX_API_PATH = _detect_codex_api()
 if MODE == "atlas":
     device_id = os.getenv("DEVICE_ID") or get_machine_id()
     CODEX_API_HOST = f"https://{device_id}.ai-agent.codexcli" if device_id else _detected_host
-    logger.info(f"MODE: {MODE}, Device ID: {device_id}, CODEX_API_HOST: {CODEX_API_HOST}, CODEX_API_PATH: {CODEX_API_PATH}")
+    logger.info(
+        f"MODE: {MODE}, Device ID: {device_id}, CODEX_API_HOST: {CODEX_API_HOST}, "
+        f"CODEX_API_PATH: {CODEX_API_PATH}"
+    )
 else:
     CODEX_API_HOST = _detected_host
     logger.info(f"MODE: {MODE}, CODEX_API_HOST: {CODEX_API_HOST}, CODEX_API_PATH: {CODEX_API_PATH}")
@@ -69,10 +75,17 @@ def create_ssl_context():
     return ssl._create_unverified_context()
 
 
-def build_http_proxy_url(*, guardrails: bool, ingest_data: bool) -> str:
+def build_http_proxy_url(
+    *,
+    guardrails: bool = False,
+    response_guardrails: bool = False,
+    ingest_data: bool = False,
+) -> str:
     params = []
     if guardrails:
         params.append("guardrails=true")
+    if response_guardrails:
+        params.append("response_guardrails=true")
     params.append(f"akto_connector={AKTO_CONNECTOR}")
     if ingest_data:
         params.append("ingest_data=true")
@@ -85,6 +98,8 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         logger.debug(f"Request payload: {json.dumps(payload)[:1000]}...")
 
     headers = {"Content-Type": "application/json"}
+    if AKTO_TOKEN:
+        headers["authorization"] = AKTO_TOKEN
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -100,7 +115,9 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
             status_code = response.getcode()
             raw = response.read().decode("utf-8")
 
-            logger.info(f"API RESPONSE: Status {status_code}, Duration: {duration_ms}ms, Size: {len(raw)} bytes")
+            logger.info(
+                f"API RESPONSE: Status {status_code}, Duration: {duration_ms}ms, Size: {len(raw)} bytes"
+            )
 
             if LOG_PAYLOADS:
                 logger.debug(f"Response body: {raw[:1000]}...")
@@ -115,34 +132,34 @@ def post_payload_json(url: str, payload: Dict[str, Any]) -> Union[Dict[str, Any]
         raise
 
 
-def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, Any]:
+def build_ingestion_payload(
+    user_prompt: str, response_text: str, session_info: dict = None
+) -> Dict[str, Any]:
     tags = {"gen-ai": "Gen AI"}
     if MODE == "atlas":
         tags["ai-agent"] = "codexcli"
         tags["source"] = CONTEXT_SOURCE
 
-    device_id = os.getenv("DEVICE_ID") or get_machine_id()
-
     host = CODEX_API_HOST.replace("https://", "").replace("http://", "")
 
-    request_headers = json.dumps({
+    req_headers = {
         "host": host,
         "x-codex-hook": "Stop",
-        "content-type": "application/json"
-    })
+        "content-type": "application/json",
+    }
+    if session_info:
+        for key, value in session_info.items():
+            if value is not None:
+                req_headers[f"x-akto-installer-{key}"] = str(value)
+    request_headers = json.dumps(req_headers)
 
-    response_headers = json.dumps({
-        "x-codex-hook": "Stop",
-        "content-type": "application/json"
-    })
+    response_headers = json.dumps(
+        {"x-codex-hook": "Stop", "content-type": "application/json"}
+    )
 
-    request_payload = json.dumps({
-        "body": user_prompt
-    })
+    request_payload = json.dumps({"body": user_prompt})
 
-    response_payload = json.dumps({
-        "body": response_text
-    })
+    response_payload = json.dumps({"body": response_text})
 
     return {
         "path": CODEX_API_PATH,
@@ -158,7 +175,7 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
         "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
-        "akto_vxlan_id": device_id,
+        "akto_vxlan_id": 0,
         "is_pending": "false",
         "source": "MIRRORING",
         "direction": None,
@@ -168,20 +185,189 @@ def build_ingestion_payload(user_prompt: str, response_text: str) -> Dict[str, A
         "enabled_graph": None,
         "tag": json.dumps(tags),
         "metadata": json.dumps(tags),
-        "contextSource": CONTEXT_SOURCE
+        "contextSource": CONTEXT_SOURCE,
     }
 
 
+def _guardrails_behaviour_value(behaviour: Any) -> str:
+    return str(behaviour or "").strip().lower()
+
+
+def _is_warn_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "warn"
+
+
+def _is_alert_behaviour(behaviour: Any) -> bool:
+    return _guardrails_behaviour_value(behaviour) == "alert"
+
+
+def call_guardrails(
+    user_prompt: str, response_text: str, session_info: dict = None
+) -> Tuple[bool, str, str]:
+    if not response_text.strip():
+        return True, "", ""
+    if not AKTO_DATA_INGESTION_URL:
+        logger.warning("AKTO_DATA_INGESTION_URL not set, allowing response (fail-open)")
+        return True, "", ""
+
+    logger.info("Validating assistant response against guardrails")
+    if LOG_PAYLOADS:
+        logger.debug(f"Response: {response_text[:200]}...")
+    else:
+        logger.info(f"Response preview: {response_text[:100]}...")
+
+    try:
+        request_body = build_ingestion_payload(
+            user_prompt, response_text, session_info
+        )
+        result = post_payload_json(
+            build_http_proxy_url(
+                guardrails=False,
+                response_guardrails=True,
+                ingest_data=False,
+            ),
+            request_body,
+        )
+
+        data = result.get("data", {}) if isinstance(result, dict) else {}
+        guardrails_result = data.get("guardrailsResult", {})
+        allowed = guardrails_result.get("Allowed", True)
+        reason = guardrails_result.get("Reason", "")
+        behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get(
+            "Behaviour", ""
+        )
+
+        if allowed:
+            logger.info("Response ALLOWED by guardrails")
+        else:
+            logger.warning(f"Response DENIED by guardrails: {reason}")
+
+        return allowed, reason, behaviour
+
+    except Exception as e:
+        logger.error(f"Guardrails validation error: {e}")
+        return True, "", ""
+
+
+def response_fingerprint(user_prompt: str, response_text: str) -> str:
+    canonical = json.dumps(
+        {"p": user_prompt, "r": response_text}, sort_keys=True, ensure_ascii=False
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def load_warn_pending() -> Set[str]:
+    if not os.path.exists(WARN_STATE_PATH):
+        return set()
+    try:
+        with open(WARN_STATE_PATH, encoding="utf-8") as f:
+            data = json.load(f)
+        return set(data.get("warn_pending", []))
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Could not read warn-pending map: {e}")
+        return set()
+
+
+def save_warn_pending(hashes: Set[str]) -> None:
+    tmp_path = WARN_STATE_PATH + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump({"warn_pending": sorted(hashes)}, f, indent=0)
+            f.write("\n")
+        os.replace(tmp_path, WARN_STATE_PATH)
+    except OSError as e:
+        logger.error(f"Could not persist warn-pending map: {e}")
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
+def apply_warn_resubmit_flow(
+    gr_allowed: bool,
+    reason: str,
+    behaviour: str,
+    fingerprint: str,
+) -> Tuple[bool, str]:
+    if gr_allowed:
+        return True, ""
+
+    if _is_alert_behaviour(behaviour):
+        logger.info(
+            "Alert behaviour: allowing despite violation (server-side alert only)"
+        )
+        return True, ""
+
+    if not _is_warn_behaviour(behaviour):
+        return False, reason
+
+    pending = load_warn_pending()
+    if fingerprint in pending:
+        pending.discard(fingerprint)
+        save_warn_pending(pending)
+        logger.info("Warn flow: allowing resubmit; removed fingerprint from map")
+        return True, ""
+
+    pending.add(fingerprint)
+    save_warn_pending(pending)
+    return False, reason
+
+
+def ingest_blocked_response(
+    user_prompt: str,
+    response_text: str,
+    reason: str,
+    session_info: dict = None,
+):
+    if not AKTO_DATA_INGESTION_URL or not AKTO_SYNC_MODE:
+        return
+
+    logger.info("Ingesting blocked request data")
+    try:
+        request_body = build_ingestion_payload(
+            user_prompt, response_text, session_info
+        )
+        request_body["responseHeaders"] = json.dumps(
+            {
+                "x-codex-hook": "Stop",
+                "x-blocked-by": "Akto Proxy",
+                "content-type": "application/json",
+            }
+        )
+        request_body["responsePayload"] = json.dumps(
+            {
+                "body": json.dumps(
+                    {
+                        "x-blocked-by": "Akto Proxy",
+                        "reason": reason or "Policy violation",
+                    }
+                )
+            }
+        )
+        request_body["statusCode"] = "403"
+        request_body["status"] = "403"
+        post_payload_json(
+            build_http_proxy_url(guardrails=False, ingest_data=True),
+            request_body,
+        )
+        logger.info("Blocked request ingestion successful")
+    except Exception as e:
+        logger.error(f"Ingestion error: {e}")
+
+
 def extract_text_from_content(content) -> str:
-    """Extract text from Codex transcript content blocks.
-    Codex uses: [{"type": "input_text", "text": "..."}, {"type": "output_text", "text": "..."}]
-    """
+    """Extract text from Codex transcript content blocks."""
     if isinstance(content, str):
         return content.strip()
     if isinstance(content, list):
         parts = []
         for block in content:
-            if isinstance(block, dict) and block.get("type") in ("input_text", "output_text", "text"):
+            if isinstance(block, dict) and block.get("type") in (
+                "input_text",
+                "output_text",
+                "text",
+            ):
                 text = block.get("text", "")
                 if isinstance(text, str) and text:
                     parts.append(text)
@@ -214,7 +400,9 @@ def get_last_user_prompt(transcript_path: str) -> str:
         return ""
 
 
-def send_ingestion_data(user_prompt: str, response_text: str):
+def send_ingestion_data(
+    user_prompt: str, response_text: str, session_info: dict = None
+):
     if not AKTO_DATA_INGESTION_URL:
         logger.info("AKTO_DATA_INGESTION_URL not set, skipping ingestion")
         return
@@ -231,10 +419,13 @@ def send_ingestion_data(user_prompt: str, response_text: str):
         logger.info(f"Response preview: {response_text[:100]}...")
 
     try:
-        request_body = build_ingestion_payload(user_prompt, response_text)
+        request_body = build_ingestion_payload(
+            user_prompt, response_text, session_info
+        )
         post_payload_json(
             build_http_proxy_url(
-                guardrails=not AKTO_SYNC_MODE,
+                guardrails=False,
+                response_guardrails=not AKTO_SYNC_MODE,
                 ingest_data=True,
             ),
             request_body,
@@ -250,10 +441,25 @@ def main():
 
     try:
         input_data = json.load(sys.stdin)
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON input: {e}")
+        sys.exit(0)
 
-        session_id = input_data.get("session_id", "")
+    session_info = {}
+    for field in (
+        "session_id",
+        "transcript_path",
+        "cwd",
+        "hook_event_name",
+        "model",
+        "turn_id",
+    ):
+        value = input_data.get(field)
+        if value is not None:
+            session_info[field] = value
+
+    try:
         transcript_path = input_data.get("transcript_path")
-        logger.info(f"Session: {session_id}, Hook: {input_data.get('hook_event_name', 'Stop')}")
 
         if not transcript_path:
             logger.info("No transcript path provided")
@@ -263,6 +469,7 @@ def main():
         logger.info(f"Reading transcript from: {transcript_path}")
 
         response_text = input_data.get("last_assistant_message", "").strip()
+        stop_hook_active = bool(input_data.get("stop_hook_active"))
 
         user_prompt = get_last_user_prompt(transcript_path)
 
@@ -270,8 +477,53 @@ def main():
             logger.info("No complete interaction found in transcript")
             sys.exit(0)
 
-        logger.info(f"Extracted interaction - Prompt: {len(user_prompt)} chars, Response: {len(response_text)} chars")
-        send_ingestion_data(user_prompt, response_text)
+        logger.info(
+            f"Extracted interaction - Prompt: {len(user_prompt)} chars, "
+            f"Response: {len(response_text)} chars"
+        )
+
+        if stop_hook_active:
+            logger.info(
+                "stop_hook_active=true: skipping guardrails block to avoid Stop hook loops"
+            )
+
+        if AKTO_SYNC_MODE and not stop_hook_active:
+            gr_allowed, gr_reason, behaviour = call_guardrails(
+                user_prompt, response_text, session_info
+            )
+            fingerprint = response_fingerprint(user_prompt, response_text)
+            allowed, _ = apply_warn_resubmit_flow(
+                gr_allowed, gr_reason, behaviour, fingerprint
+            )
+
+            if not allowed:
+                if _is_warn_behaviour(behaviour):
+                    block_reason = (
+                        "Warning!!, response blocked, please review it. Send again to bypass. "
+                        f"Reason for blocking: {gr_reason}"
+                    )
+                else:
+                    block_reason = f"Response blocked: {gr_reason}"
+
+                # Codex Stop: `decision: "block"` means continue with `reason` as a
+                # synthetic continuation prompt (see OpenAI Codex hooks docs). For
+                # strict denies we must use `continue: false` to end the turn.
+                if _is_warn_behaviour(behaviour):
+                    output = {"decision": "block", "reason": block_reason}
+                else:
+                    output = {
+                        "continue": False,
+                        "stopReason": gr_reason or "Policy violation",
+                        "systemMessage": block_reason,
+                    }
+                logger.warning(f"BLOCKING Stop - Reason: {gr_reason}")
+                print(json.dumps(output))
+                ingest_blocked_response(
+                    user_prompt, response_text, gr_reason, session_info
+                )
+                sys.exit(0)
+
+        send_ingestion_data(user_prompt, response_text, session_info)
 
     except Exception as e:
         logger.error(f"Main error: {e}")
