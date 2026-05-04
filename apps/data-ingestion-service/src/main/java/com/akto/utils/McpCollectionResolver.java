@@ -101,9 +101,8 @@ public class McpCollectionResolver {
         }
         try {
             BasicDBObject tagObj = BasicDBObject.parse(tagJson);
-            for (Map.Entry<String, Object> entry : tagObj.entrySet()) {
-                Object val = entry.getValue();
-                if (val != null && Constants.AKTO_MCP_SERVER_TAG.equals(val.toString())) {
+            for (String key : tagObj.keySet()) {
+                if (Constants.AKTO_MCP_SERVER_TAG.equals(key)) {
                     return true;
                 }
             }
