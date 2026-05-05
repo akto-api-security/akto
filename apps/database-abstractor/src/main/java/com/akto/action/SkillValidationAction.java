@@ -163,9 +163,16 @@ public class SkillValidationAction extends ActionSupport {
             final String finalEvidence = evidence;
             final double finalScore = maliciousScore;
             final double finalMatchScore = matchScore;
+            // Read token on request thread before handing off to background thread
+            String authToken = "";
+            try {
+                javax.servlet.http.HttpServletRequest httpReq = ServletActionContext.getRequest();
+                if (httpReq != null) authToken = httpReq.getHeader("Authorization");
+            } catch (Exception ignored) {}
+            final String finalToken = authToken != null ? authToken : "";
             new Thread(() -> {
                 try {
-                    reportThreat(finalScore, finalMatchScore, finalReason, finalEvidence);
+                    reportThreat(finalScore, finalMatchScore, finalReason, finalEvidence, finalToken);
                 } catch (Exception e) {
                     logger.error("Failed to report threat for skill=" + skillName + ": " + e.getMessage());
                 }
@@ -206,19 +213,9 @@ public class SkillValidationAction extends ActionSupport {
         return content.toString();
     }
 
-    private void reportThreat(double maliciousScore, double matchScore, String reason, String evidence) throws Exception {
-        String token = "";
-        try {
-            javax.servlet.http.HttpServletRequest httpReq = ServletActionContext.getRequest();
-            if (httpReq != null) {
-                String authHeader = httpReq.getHeader("Authorization");
-                if (authHeader != null && !authHeader.isEmpty()) {
-                    token = authHeader;
-                }
-            }
-        } catch (Exception ignored) {}
-        if (token.isEmpty()) {
-            logger.error("No auth token in request — skipping threat report for skill=" + skillName);
+    private void reportThreat(double maliciousScore, double matchScore, String reason, String evidence, String token) throws Exception {
+        if (token == null || token.isEmpty()) {
+            logger.error("No auth token — skipping threat report for skill=" + skillName);
             return;
         }
 
