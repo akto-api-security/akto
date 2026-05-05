@@ -169,7 +169,6 @@ public class SkillValidationAction extends ActionSupport {
                 javax.servlet.http.HttpServletRequest httpReq = ServletActionContext.getRequest();
                 if (httpReq != null) authToken = httpReq.getHeader("Authorization");
             } catch (Exception ignored) {}
-            logger.infoAndAddToDb("[SkillValidation] auth token for threat report: " + authToken, LogDb.DB_ABS);
             final String finalToken = authToken != null ? authToken : "";
             new Thread(() -> {
                 try {
