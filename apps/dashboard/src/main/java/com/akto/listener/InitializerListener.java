@@ -3588,8 +3588,8 @@ public class InitializerListener implements ServletContextListener {
             // AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             // dropSampleDataIfEarlierNotDroped(accountSettings);
 
-            backFillDiscovered();
-            backFillStatusCodeType();
+            // backFillDiscovered();
+            // backFillStatusCodeType();
         } catch (Exception e) {
             logger.errorAndAddToDb(e,"error while setting up dashboard: " + e.toString(), LogDb.DASHBOARD);
         }
