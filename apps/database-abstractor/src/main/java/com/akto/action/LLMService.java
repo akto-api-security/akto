@@ -72,6 +72,9 @@ public class LLMService {
         }
 
         headers.put("api-key", apiKey);
+        if (endpoint.contains("api.openai.com")) {
+            headers.put("Authorization", "Bearer " + apiKey);
+        }
 
         return executeRequest(endpoint, headers, modelNameFinal, llmPayload);
     }
