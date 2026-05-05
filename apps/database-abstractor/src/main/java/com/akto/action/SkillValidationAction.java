@@ -2,7 +2,6 @@ package com.akto.action;
 
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.ComponentRiskAnalysis;
-import com.akto.dto.McpAuditInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -139,25 +138,17 @@ public class SkillValidationAction extends ActionSupport {
                 "[SkillValidation] skill=%s agent=%s flagged=%b maliciousScore=%.2f reason=%s",
                 skillName, agentName, flagged, maliciousScore, reason), LogDb.DB_ABS);
 
-        // Step 4: always update audit DB
+        // Step 4: update audit DB with risk analysis result (same as old Go UpdateMcpAuditInfo)
         try {
             String evidenceText = evidence.isEmpty() ? reason : reason + "\n\n" + evidence;
             if (!skillDescription.isEmpty()) {
                 evidenceText = "Description: " + skillDescription + "\n\n" + evidenceText;
             }
-            McpAuditInfo auditInfo = new McpAuditInfo(
-                    (int) (System.currentTimeMillis() / 1000),
-                    "",
+            DbLayer.updateMcpAuditInfo(
                     "AGENT_SKILL",
-                    0,
                     skillName,
-                    "",
-                    null,
-                    0,
                     agentName,
                     new ComponentRiskAnalysis(matchScore < 0.7, flagged, evidenceText));
-            auditInfo.setContextSource("ENDPOINT");
-            DbLayer.insertMCPAuditDataLog(auditInfo);
         } catch (Exception e) {
             logger.error("Failed to update audit DB for skill=" + skillName + ": " + e.getMessage());
         }
@@ -265,7 +256,7 @@ public class SkillValidationAction extends ActionSupport {
         maliciousEvent.put("type", "Rule-Based");
         maliciousEvent.put("metadata", metadata);
         maliciousEvent.put("contextSource", "ENDPOINT");
-        maliciousEvent.put("host", agentName);
+        maliciousEvent.put("host", collectionName);
         maliciousEvent.put("sessionId", "");
         maliciousEvent.put("successfulExploit", true);
 
