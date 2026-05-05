@@ -218,9 +218,8 @@ public class SkillValidationAction extends ActionSupport {
                 }
             }
         } catch (Exception ignored) {}
-        if (token.isEmpty()) token = AKTO_API_TOKEN;
         if (token.isEmpty()) {
-            logger.error("No auth token available — skipping threat report for skill=" + skillName);
+            logger.error("No auth token in request — skipping threat report for skill=" + skillName);
             return;
         }
 
