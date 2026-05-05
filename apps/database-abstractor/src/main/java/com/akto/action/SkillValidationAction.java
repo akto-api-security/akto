@@ -10,6 +10,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
+import org.apache.struts2.ServletActionContext;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -207,8 +208,19 @@ public class SkillValidationAction extends ActionSupport {
     }
 
     private void reportThreat(double maliciousScore, double matchScore, String reason, String evidence) throws Exception {
-        if (AKTO_API_TOKEN.isEmpty()) {
-            logger.error("AKTO_API_TOKEN not set — skipping threat report for skill=" + skillName);
+        String token = "";
+        try {
+            javax.servlet.http.HttpServletRequest httpReq = ServletActionContext.getRequest();
+            if (httpReq != null) {
+                String authHeader = httpReq.getHeader("authorization");
+                if (authHeader != null && !authHeader.isEmpty()) {
+                    token = authHeader;
+                }
+            }
+        } catch (Exception ignored) {}
+        if (token.isEmpty()) token = AKTO_API_TOKEN;
+        if (token.isEmpty()) {
+            logger.error("No auth token available — skipping threat report for skill=" + skillName);
             return;
         }
 
@@ -279,7 +291,7 @@ public class SkillValidationAction extends ActionSupport {
                 .url(THREAT_DETECTION_API_URL)
                 .method(Method.POST.name(), rb)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("Authorization", "Bearer " + AKTO_API_TOKEN)
+                .addHeader("Authorization", "Bearer " + token)
                 .build();
 
         try (Response resp = httpClient.newCall(req).execute()) {
