@@ -10,6 +10,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
+import org.apache.struts2.ServletActionContext;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,7 +41,6 @@ public class SkillValidationAction extends ActionSupport {
     private static final String THREAT_DETECTION_API_URL = System.getenv().getOrDefault(
             "THREAT_DETECTION_API_URL",
             "https://tbs.akto.io/api/threat_detection/record_malicious_event");
-    private static final String AKTO_API_TOKEN = System.getenv().getOrDefault("AKTO_API_TOKEN", "");
 
     private static final String SKILL_VALIDATION_PROMPT =
         "You are a security analyzer for AI agent skill files. Your ONLY job is to detect\n" +
@@ -85,6 +85,7 @@ public class SkillValidationAction extends ActionSupport {
     private String collectionName;
     private String contextSource;
     private String source;
+    private boolean reportThreat;
 
     // Output field
     private Map<String, Object> validationResult;
@@ -157,15 +158,29 @@ public class SkillValidationAction extends ActionSupport {
             logger.error("Failed to update audit DB for skill=" + skillName + ": " + e.getMessage());
         }
 
-        // Step 5: report threat if malicious (fire-and-forget)
-        if (flagged) {
+        // Step 5: report threat if malicious and caller opted in (fire-and-forget)
+        if (flagged && reportThreat) {
             final String finalReason = reason;
             final String finalEvidence = evidence;
             final double finalScore = maliciousScore;
             final double finalMatchScore = matchScore;
+            // Read token on request thread before handing off to background thread
+            String authToken = "";
+            try {
+                javax.servlet.http.HttpServletRequest httpReq = ServletActionContext.getRequest();
+                if (httpReq != null) authToken = httpReq.getHeader("Authorization");
+            } catch (Exception e) {
+                addActionError("Failed to read Authorization header: " + e.getMessage());
+                return Action.ERROR.toUpperCase();
+            }
+            if (authToken == null || authToken.isEmpty()) {
+                addActionError("Authorization header missing — cannot report threat");
+                return Action.ERROR.toUpperCase();
+            }
+            final String finalToken = authToken;
             new Thread(() -> {
                 try {
-                    reportThreat(finalScore, finalMatchScore, finalReason, finalEvidence);
+                    reportThreat(finalScore, finalMatchScore, finalReason, finalEvidence, finalToken);
                 } catch (Exception e) {
                     logger.error("Failed to report threat for skill=" + skillName + ": " + e.getMessage());
                 }
@@ -206,9 +221,9 @@ public class SkillValidationAction extends ActionSupport {
         return content.toString();
     }
 
-    private void reportThreat(double maliciousScore, double matchScore, String reason, String evidence) throws Exception {
-        if (AKTO_API_TOKEN.isEmpty()) {
-            logger.error("AKTO_API_TOKEN not set — skipping threat report for skill=" + skillName);
+    private void reportThreat(double maliciousScore, double matchScore, String reason, String evidence, String token) throws Exception {
+        if (token == null || token.isEmpty()) {
+            logger.error("No auth token — skipping threat report for skill=" + skillName);
             return;
         }
 
@@ -279,7 +294,7 @@ public class SkillValidationAction extends ActionSupport {
                 .url(THREAT_DETECTION_API_URL)
                 .method(Method.POST.name(), rb)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("Authorization", "Bearer " + AKTO_API_TOKEN)
+                .addHeader("Authorization", "Bearer " + token)
                 .build();
 
         try (Response resp = httpClient.newCall(req).execute()) {
