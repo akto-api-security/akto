@@ -139,7 +139,7 @@ const useAgenticFilter = (normalData) => {
                 plainTitle = true;
             } else {
                 const serviceName = extractServiceName(hostNames[0]);
-                filterTitle = serviceName || hostNames[0];
+                filterTitle = func.stripDeviceSuffix(serviceName || hostNames[0]);
 
                 if (filteredCollections.length > 0) {
                     const firstCollection = filteredCollections[0];

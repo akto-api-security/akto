@@ -141,7 +141,7 @@ export const resourceName = { singular: "Agentic asset", plural: "Agentic assets
 export const extractEndpointId = (hostName) => {
     if (!hostName) return null;
     const parts = hostName.split('.');
-    return parts[0];
+    return func.stripDeviceSuffix(parts[0]);
 };
 
 // Extract service name from hostname format: <endpoint-id>.<source-id>.<service-name>

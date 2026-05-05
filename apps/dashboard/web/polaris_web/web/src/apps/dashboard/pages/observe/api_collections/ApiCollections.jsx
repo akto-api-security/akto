@@ -279,7 +279,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
 
         // Split collection name - always extract endpointId/sourceId/serviceName for agentic collections
         // Pattern: <endpoint-id>.<source-id>.<service-name>
-        let displayText = c.displayName;
+        let displayText = func.stripDeviceSuffix(c.displayName);
         let endpointId = '';
         let sourceId = '';
         let serviceName = '';
@@ -388,7 +388,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
 
     // Split collection name - always extract endpointId/sourceId/serviceName for agentic collections
     // Pattern: <endpoint-id>.<source-id>.<service-name>
-    let splitApiCollectionName = rawCollection.displayName;
+    let splitApiCollectionName = func.stripDeviceSuffix(rawCollection.displayName);
     let endpointId = '';
     let sourceId = '';
     let serviceName = '';

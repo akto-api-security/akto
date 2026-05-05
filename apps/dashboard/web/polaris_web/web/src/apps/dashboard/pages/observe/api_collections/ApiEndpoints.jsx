@@ -256,7 +256,7 @@ function ApiEndpoints(props) {
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setAllCollections = PersistStore(state => state.setAllCollections)
 
-    const [ pageTitle, setPageTitle] = useState(collectionsMap[apiCollectionId] !== undefined ? collectionsMap[apiCollectionId] : "")
+    const [ pageTitle, setPageTitle] = useState(collectionsMap[apiCollectionId] !== undefined ? func.stripDeviceSuffix(collectionsMap[apiCollectionId]) : "")
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])
     const [unusedEndpoints, setUnusedEndpoints] = useState([])
@@ -790,8 +790,8 @@ function ApiEndpoints(props) {
     }, [apiCollectionId, endpointListFromConditions])
 
     useEffect(() => {
-        if (pageTitle !== collectionsMap[apiCollectionId]) { 
-            setPageTitle(collectionsMap[apiCollectionId])
+        if (pageTitle !== collectionsMap[apiCollectionId]) {
+            setPageTitle(func.stripDeviceSuffix(collectionsMap[apiCollectionId]))
         }
 
         setDescription(collectionsObj?.description || "")

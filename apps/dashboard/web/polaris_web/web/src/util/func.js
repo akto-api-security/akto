@@ -789,11 +789,15 @@ prettifyEpoch(epoch) {
       return message.statusCode + " " + message.status
     }
   },
+  stripDeviceSuffix(str) {
+    if (!str) return str;
+    return str.replace(/--[0-9a-fA-F]{8}(?=\.|$)/g, '');
+  },
   mapCollectionIdToName(collections) {
     let collectionsObj = {}
     collections.forEach((collection)=>{
       if(!collectionsObj[collection.id]){
-        collectionsObj[collection.id] = collection.displayName
+        collectionsObj[collection.id] = this.stripDeviceSuffix(collection.displayName)
       }
     })
 
