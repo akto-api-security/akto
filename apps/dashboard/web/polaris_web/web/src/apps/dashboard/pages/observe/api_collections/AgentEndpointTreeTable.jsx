@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import HeadingWithTooltip from '../../../components/shared/HeadingWithTooltip';
 import TooltipText from '../../../components/shared/TooltipText';
 import { FILTER_TYPES } from './useAgenticFilter';
-import { getAgenticCategoryLabel, hasPersonalAccountTag } from '../agentic/mcpClientHelper';
+import { getAgenticCategoryLabel, hasPersonalAccountTag, hasLocalMcpServerTag } from '../agentic/mcpClientHelper';
 
 /** IndexTable adds a leading selection column when `selectable` is true (see AgentEndpointTreeTable). */
 const INDEX_TABLE_SELECTION_COLUMN_COUNT = 1;
@@ -185,6 +185,7 @@ const groupByEndpointId = (collections) => {
                 firstCollection: null,
                 username: '-',
                 hasPersonalAccount: false,
+                hasLocalMcpServer: false,
             };
         }
         groups[endpointId].children.push(collection);
@@ -195,6 +196,9 @@ const groupByEndpointId = (collections) => {
         }
         if (hasPersonalAccountTag(collection.envTypeOriginal)) {
             groups[endpointId].hasPersonalAccount = true;
+        }
+        if (hasLocalMcpServerTag(collection.envTypeOriginal)) {
+            groups[endpointId].hasLocalMcpServer = true;
         }
         
         // Merge values
@@ -238,6 +242,7 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
                     </Box>
                     <Badge size="small" status="new">{childCount}</Badge>
                     {group.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
+                    {group.hasLocalMcpServer && <Badge size="small" status="critical">Local MCP Server</Badge>}
                 </HorizontalStack>
             ),
             username: group.username || '-',
@@ -298,6 +303,7 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
                 <div key={`spacer-${child.id}`} style={{ width: '32px', minWidth: '32px' }} />
             ];
             
+            const childHasLocalMcp = hasLocalMcpServerTag(child.envTypeOriginal);
             childHeaders.forEach((header, idx) => {
                 if (header.value === 'displayNameComp') {
                     cells.push(
@@ -306,9 +312,12 @@ const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSp
                             style={{ cursor: 'pointer', width: header.boxWidth }} 
                             onClick={() => handleChildClick(child)}
                         >
-                            <Box maxWidth="200px">
-                                <TooltipText tooltip={displayValue} text={displayValue} />
-                            </Box>
+                            <HorizontalStack gap="1" align="start" wrap={false}>
+                                <Box maxWidth="200px">
+                                    <TooltipText tooltip={displayValue} text={displayValue} />
+                                </Box>
+                                {childHasLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
+                            </HorizontalStack>
                         </div>
                     );
                 } else if (header.value === 'agenticCategory') {
