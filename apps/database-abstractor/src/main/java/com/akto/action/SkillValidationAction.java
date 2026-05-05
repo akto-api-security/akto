@@ -198,10 +198,10 @@ public class SkillValidationAction extends ActionSupport {
         Map<String, Object> llmResponse = LLMService.callLLM(payload);
         if (llmResponse == null) throw new RuntimeException("Empty LLM response");
 
-        List<?> choices = (List<?>) llmResponse.get("choices");
+        List<Map<String, Object>> choices = (List<Map<String, Object>>) llmResponse.get("choices");
         if (choices == null || choices.isEmpty()) throw new RuntimeException("No choices in LLM response");
-        Map<?, ?> firstChoice = (Map<?, ?>) choices.get(0);
-        Map<?, ?> message = (Map<?, ?>) firstChoice.get("message");
+        Map<String, Object> firstChoice = choices.get(0);
+        Map<String, Object> message = (Map<String, Object>) firstChoice.get("message");
         if (message == null) throw new RuntimeException("No message in LLM response");
         Object content = message.get("content");
         if (content == null) throw new RuntimeException("No content in LLM message");
