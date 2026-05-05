@@ -232,16 +232,16 @@ public class SkillValidationAction extends ActionSupport {
         apiPayload.put("method", "SKILL");
         apiPayload.put("requestPayload", requestPayloadStr);
         apiPayload.put("responsePayload", responsePayloadStr);
-        apiPayload.put("ip", "skill-detector");
-        apiPayload.put("destIp", "skill-detector");
+        apiPayload.put("ip", agentName);
+        apiPayload.put("destIp", agentName);
         apiPayload.put("source", source);
         apiPayload.put("type", "http");
         apiPayload.put("akto_vxlan_id", "");
         apiPayload.put("path", endpoint);
         apiPayload.put("requestHeaders", "{}");
         apiPayload.put("responseHeaders", "{}");
-        apiPayload.put("time", 0);
-        apiPayload.put("akto_account_id", "");
+        apiPayload.put("time", now);
+        apiPayload.put("akto_account_id", String.valueOf(com.akto.dao.context.Context.accountId.get()));
         apiPayload.put("statusCode", 200);
         apiPayload.put("status", "OK");
 
@@ -252,10 +252,10 @@ public class SkillValidationAction extends ActionSupport {
         metadata.put("reason", reason);
 
         JSONObject maliciousEvent = new JSONObject();
-        maliciousEvent.put("actor", "skill-detector");
+        maliciousEvent.put("actor", agentName);
         maliciousEvent.put("filterId", "malicious_skill_detected");
         maliciousEvent.put("detectedAt", String.valueOf(now));
-        maliciousEvent.put("latestApiIp", "skill-detector");
+        maliciousEvent.put("latestApiIp", agentName);
         maliciousEvent.put("latestApiEndpoint", endpoint);
         maliciousEvent.put("latestApiMethod", "SKILL");
         maliciousEvent.put("latestApiCollectionId", now);
