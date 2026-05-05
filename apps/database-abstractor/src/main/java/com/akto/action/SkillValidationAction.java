@@ -145,16 +145,18 @@ public class SkillValidationAction extends ActionSupport {
             if (!skillDescription.isEmpty()) {
                 evidenceText = "Description: " + skillDescription + "\n\n" + evidenceText;
             }
-            McpAuditInfo auditInfo = new McpAuditInfo();
-            auditInfo.setType("AGENT_SKILL");
-            auditInfo.setResourceName(skillName);
-            auditInfo.setMcpHost(agentName);
-            auditInfo.setLastDetected((int) (System.currentTimeMillis() / 1000));
+            McpAuditInfo auditInfo = new McpAuditInfo(
+                    (int) (System.currentTimeMillis() / 1000),
+                    "",
+                    "AGENT_SKILL",
+                    0,
+                    skillName,
+                    "",
+                    null,
+                    0,
+                    agentName,
+                    new ComponentRiskAnalysis(matchScore < 0.7, flagged, evidenceText));
             auditInfo.setContextSource("ENDPOINT");
-            auditInfo.setComponentRiskAnalysis(new ComponentRiskAnalysis(
-                    matchScore < 0.7,
-                    flagged,
-                    evidenceText));
             DbLayer.insertMCPAuditDataLog(auditInfo);
         } catch (Exception e) {
             logger.error("Failed to update audit DB for skill=" + skillName + ": " + e.getMessage());
