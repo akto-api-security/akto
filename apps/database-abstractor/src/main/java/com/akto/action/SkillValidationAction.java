@@ -169,8 +169,15 @@ public class SkillValidationAction extends ActionSupport {
             try {
                 javax.servlet.http.HttpServletRequest httpReq = ServletActionContext.getRequest();
                 if (httpReq != null) authToken = httpReq.getHeader("Authorization");
-            } catch (Exception ignored) {}
-            final String finalToken = authToken != null ? authToken : "";
+            } catch (Exception e) {
+                addActionError("Failed to read Authorization header: " + e.getMessage());
+                return Action.ERROR.toUpperCase();
+            }
+            if (authToken == null || authToken.isEmpty()) {
+                addActionError("Authorization header missing — cannot report threat");
+                return Action.ERROR.toUpperCase();
+            }
+            final String finalToken = authToken;
             new Thread(() -> {
                 try {
                     reportThreat(finalScore, finalMatchScore, finalReason, finalEvidence, finalToken);
