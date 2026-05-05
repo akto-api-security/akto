@@ -41,7 +41,6 @@ public class SkillValidationAction extends ActionSupport {
     private static final String THREAT_DETECTION_API_URL = System.getenv().getOrDefault(
             "THREAT_DETECTION_API_URL",
             "https://tbs.akto.io/api/threat_detection/record_malicious_event");
-    private static final String AKTO_API_TOKEN = System.getenv().getOrDefault("AKTO_API_TOKEN", "");
 
     private static final String SKILL_VALIDATION_PROMPT =
         "You are a security analyzer for AI agent skill files. Your ONLY job is to detect\n" +
@@ -212,7 +211,7 @@ public class SkillValidationAction extends ActionSupport {
         try {
             javax.servlet.http.HttpServletRequest httpReq = ServletActionContext.getRequest();
             if (httpReq != null) {
-                String authHeader = httpReq.getHeader("authorization");
+                String authHeader = httpReq.getHeader("Authorization");
                 if (authHeader != null && !authHeader.isEmpty()) {
                     token = authHeader;
                 }
