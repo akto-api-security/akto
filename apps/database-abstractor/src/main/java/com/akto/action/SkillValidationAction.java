@@ -158,9 +158,10 @@ public class SkillValidationAction extends ActionSupport {
             final String finalReason = reason;
             final String finalEvidence = evidence;
             final double finalScore = maliciousScore;
+            final double finalMatchScore = matchScore;
             new Thread(() -> {
                 try {
-                    reportThreat(finalScore, finalReason, finalEvidence);
+                    reportThreat(finalScore, finalMatchScore, finalReason, finalEvidence);
                 } catch (Exception e) {
                     logger.error("Failed to report threat for skill=" + skillName + ": " + e.getMessage());
                 }
@@ -201,7 +202,7 @@ public class SkillValidationAction extends ActionSupport {
         return content.toString();
     }
 
-    private void reportThreat(double maliciousScore, String reason, String evidence) throws Exception {
+    private void reportThreat(double maliciousScore, double matchScore, String reason, String evidence) throws Exception {
         if (AKTO_API_TOKEN.isEmpty()) {
             logger.error("AKTO_API_TOKEN not set — skipping threat report for skill=" + skillName);
             return;
@@ -213,6 +214,32 @@ public class SkillValidationAction extends ActionSupport {
         else if (maliciousScore >= 0.3) severity = "MEDIUM";
 
         long now = System.currentTimeMillis() / 1000;
+        String endpoint = "/skills/" + skillName;
+
+        String requestPayloadStr = String.format(
+                "{\"skill_name\":\"%s\",\"skill_description\":\"%s\",\"agent\":\"%s\",\"file_path\":\"%s\",\"content_length\":%d}",
+                escape(skillName), escape(skillDescription), escape(agentName), escape(filePath), skillContent.length());
+
+        String responsePayloadStr = String.format(
+                "{\"is_malicious\":true,\"malicious_score\":%.2f,\"match_score\":%.2f,\"reason\":\"%s\",\"severity\":\"%s\",\"evidence\":\"%s\"}",
+                maliciousScore, matchScore, escape(reason), severity, escape(evidence));
+
+        JSONObject apiPayload = new JSONObject();
+        apiPayload.put("method", "VALIDATE");
+        apiPayload.put("requestPayload", requestPayloadStr);
+        apiPayload.put("responsePayload", responsePayloadStr);
+        apiPayload.put("ip", "skill-detector");
+        apiPayload.put("destIp", "skill-detector");
+        apiPayload.put("source", "OTHER");
+        apiPayload.put("type", "http");
+        apiPayload.put("akto_vxlan_id", "");
+        apiPayload.put("path", endpoint);
+        apiPayload.put("requestHeaders", "{}");
+        apiPayload.put("responseHeaders", "{}");
+        apiPayload.put("time", 0);
+        apiPayload.put("akto_account_id", "");
+        apiPayload.put("statusCode", 200);
+        apiPayload.put("status", "OK");
 
         JSONObject metadata = new JSONObject();
         metadata.put("policy_name", "malicious_skill_detected");
@@ -220,32 +247,12 @@ public class SkillValidationAction extends ActionSupport {
         metadata.put("risk_score", maliciousScore);
         metadata.put("reason", reason);
 
-        JSONObject requestPayload = new JSONObject();
-        requestPayload.put("skill_name", skillName);
-        requestPayload.put("skill_description", skillDescription);
-        requestPayload.put("agent", agentName);
-        requestPayload.put("file_path", filePath);
-
-        JSONObject responsePayload = new JSONObject();
-        responsePayload.put("is_malicious", true);
-        responsePayload.put("malicious_score", maliciousScore);
-        responsePayload.put("reason", reason);
-        responsePayload.put("severity", severity);
-        responsePayload.put("evidence", evidence);
-
-        JSONObject apiPayload = new JSONObject();
-        apiPayload.put("request", requestPayload.toString());
-        apiPayload.put("response", responsePayload.toString());
-        apiPayload.put("method", "VALIDATE");
-        apiPayload.put("actor", "skill-detector");
-        apiPayload.put("endpoint", "/skills/" + skillName);
-
         JSONObject maliciousEvent = new JSONObject();
         maliciousEvent.put("actor", "skill-detector");
         maliciousEvent.put("filterId", "malicious_skill_detected");
         maliciousEvent.put("detectedAt", String.valueOf(now));
         maliciousEvent.put("latestApiIp", "skill-detector");
-        maliciousEvent.put("latestApiEndpoint", "/skills/" + skillName);
+        maliciousEvent.put("latestApiEndpoint", endpoint);
         maliciousEvent.put("latestApiMethod", "VALIDATE");
         maliciousEvent.put("latestApiCollectionId", now);
         maliciousEvent.put("latestApiPayload", apiPayload.toString());
@@ -278,6 +285,11 @@ public class SkillValidationAction extends ActionSupport {
                 logger.infoAndAddToDb("Threat reported for skill=" + skillName + " severity=" + severity, LogDb.DB_ABS);
             }
         }
+    }
+
+    private static String escape(String s) {
+        if (s == null) return "";
+        return s.replace("\"", "\\\"");
     }
 
     private static String extractJson(String raw) {
