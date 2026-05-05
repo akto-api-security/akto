@@ -83,6 +83,8 @@ public class SkillValidationAction extends ActionSupport {
     private String agentName;
     private String filePath;
     private String collectionName;
+    private String contextSource;
+    private String source;
 
     // Output field
     private Map<String, Object> validationResult;
@@ -100,6 +102,8 @@ public class SkillValidationAction extends ActionSupport {
         if (agentName == null) agentName = "";
         if (filePath == null) filePath = "";
         if (collectionName == null) collectionName = "";
+        if (contextSource == null || contextSource.isEmpty()) contextSource = "AGENTIC";
+        if (source == null || source.isEmpty()) source = "AGENT_SKILL";
 
         // Step 1: build prompt
         String prompt = String.format(SKILL_VALIDATION_PROMPT, skillName, skillDescription, skillContent);
@@ -214,7 +218,7 @@ public class SkillValidationAction extends ActionSupport {
         else if (maliciousScore >= 0.3) severity = "MEDIUM";
 
         long now = System.currentTimeMillis() / 1000;
-        String endpoint = "/skills/" + skillName;
+        String endpoint = "/skill/" + skillName;
 
         String requestPayloadStr = String.format(
                 "{\"skill_name\":\"%s\",\"skill_description\":\"%s\",\"agent\":\"%s\",\"file_path\":\"%s\",\"content_length\":%d}",
@@ -225,12 +229,12 @@ public class SkillValidationAction extends ActionSupport {
                 maliciousScore, matchScore, escape(reason), severity, escape(evidence));
 
         JSONObject apiPayload = new JSONObject();
-        apiPayload.put("method", "VALIDATE");
+        apiPayload.put("method", "SKILL");
         apiPayload.put("requestPayload", requestPayloadStr);
         apiPayload.put("responsePayload", responsePayloadStr);
         apiPayload.put("ip", "skill-detector");
         apiPayload.put("destIp", "skill-detector");
-        apiPayload.put("source", "OTHER");
+        apiPayload.put("source", source);
         apiPayload.put("type", "http");
         apiPayload.put("akto_vxlan_id", "");
         apiPayload.put("path", endpoint);
@@ -253,7 +257,7 @@ public class SkillValidationAction extends ActionSupport {
         maliciousEvent.put("detectedAt", String.valueOf(now));
         maliciousEvent.put("latestApiIp", "skill-detector");
         maliciousEvent.put("latestApiEndpoint", endpoint);
-        maliciousEvent.put("latestApiMethod", "VALIDATE");
+        maliciousEvent.put("latestApiMethod", "SKILL");
         maliciousEvent.put("latestApiCollectionId", now);
         maliciousEvent.put("latestApiPayload", apiPayload.toString());
         maliciousEvent.put("eventType", "EVENT_TYPE_SINGLE");
@@ -262,7 +266,7 @@ public class SkillValidationAction extends ActionSupport {
         maliciousEvent.put("severity", severity);
         maliciousEvent.put("type", "Rule-Based");
         maliciousEvent.put("metadata", metadata);
-        maliciousEvent.put("contextSource", "ENDPOINT");
+        maliciousEvent.put("contextSource", contextSource);
         maliciousEvent.put("host", collectionName);
         maliciousEvent.put("sessionId", "");
         maliciousEvent.put("successfulExploit", true);

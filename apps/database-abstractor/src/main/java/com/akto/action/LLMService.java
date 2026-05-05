@@ -8,7 +8,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import com.mongodb.client.model.Filters;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -19,7 +18,6 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 import org.apache.commons.collections.MapUtils;
-import org.json.JSONObject;
 
 /**
  * Shared LLM invocation logic consumed by LLMAction and SkillValidationAction.
@@ -62,7 +60,6 @@ public class LLMService {
         if (model != null) {
             endpoint = model.getParams().getOrDefault("azureOpenAIEndpoint", "");
             apiKey = model.getParams().getOrDefault("apiKey", "");
-            headers.put("authorization", apiKey);
             String modelName = model.getParams().getOrDefault("model", "");
             if (modelName != null && !modelName.isEmpty()) {
                 modelNameFinal = modelName;
@@ -71,9 +68,11 @@ public class LLMService {
             endpoint = buildAzureOpenAIUrl();
         }
 
-        headers.put("api-key", apiKey);
         if (endpoint.contains("api.openai.com")) {
             headers.put("Authorization", "Bearer " + apiKey);
+        } else {
+            headers.put("api-key", apiKey);
+            headers.put("authorization", apiKey);
         }
 
         return executeRequest(endpoint, headers, modelNameFinal, llmPayload);
@@ -81,11 +80,12 @@ public class LLMService {
 
     private static Map<String, Object> executeRequest(String endpoint, Map<String, String> extraHeaders,
                                                        String modelName, Map<String, Object> llmPayload) throws Exception {
-        JSONObject payload = new JSONObject(llmPayload);
+        Map<String, Object> payloadMap = new java.util.LinkedHashMap<>(llmPayload);
         if (modelName != null && !modelName.isEmpty()) {
-            payload.put("model", modelName);
+            payloadMap.put("model", modelName);
         }
-        RequestBody body = RequestBody.create(payload.toString(), MediaType.parse("application/json"));
+        String payloadJson = gson.toJson(payloadMap);
+        RequestBody body = RequestBody.create(payloadJson, MediaType.parse("application/json"));
 
         Request.Builder builder = new Request.Builder()
                 .url(endpoint)
@@ -106,7 +106,7 @@ public class LLMService {
             ResponseBody responseBody = response.body();
             if (responseBody == null) throw new RuntimeException("LLM response body is null");
             String raw = responseBody.string();
-            Map<String, Object> result = gson.fromJson(raw, new com.google.gson.reflect.TypeToken<Map<String, Object>>() {}.getType());
+            Map<String, Object> result = gson.fromJson(raw, new com.google.gson.reflect.TypeToken<Map<String, Object>>(){}.getType());
             logger.debug("LLM response: {}", result);
             return result;
         }
