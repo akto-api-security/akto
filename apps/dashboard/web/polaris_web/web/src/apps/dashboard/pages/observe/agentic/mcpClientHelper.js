@@ -168,6 +168,18 @@ const hasPersonalAccountTag = (envType) => {
     });
 };
 
+const LOCAL_MCP_SERVER_TAG_KEY = 'local-mcp-server';
+
+const hasLocalMcpServerTag = (envType) => {
+    if (!Array.isArray(envType)) return false;
+    return envType.some((tag) => {
+        if (typeof tag === 'string') {
+            return tag === LOCAL_MCP_SERVER_TAG_KEY || tag.startsWith(`${LOCAL_MCP_SERVER_TAG_KEY}=`);
+        }
+        return tag.keyName === LOCAL_MCP_SERVER_TAG_KEY;
+    });
+};
+
 export {
     formatDisplayName,
     getDomainForFavicon,
@@ -179,6 +191,7 @@ export {
     getAgentTypeFromValue,
     getAgenticCategoryLabel,
     hasPersonalAccountTag,
+    hasLocalMcpServerTag,
     CLIENT_TYPES,
     TYPE_TAG_KEYS,
     ASSET_TAG_KEYS,

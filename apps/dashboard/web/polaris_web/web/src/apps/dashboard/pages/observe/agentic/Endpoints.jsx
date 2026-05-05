@@ -68,16 +68,21 @@ function Endpoints() {
     }, []);
 
     const prettifyGroupData = useCallback((groups) => {
-        return groups.map((group) => ({
-            ...group,
-            groupNameDisplay: group.hasPersonalAccount && group.rowType !== ROW_TYPES.SKILL
+        return groups.map((group) => {
+            const showPersonal = group.hasPersonalAccount && group.rowType !== ROW_TYPES.SKILL;
+            const showLocalMcp = group.hasLocalMcpServer && group.rowType !== ROW_TYPES.SKILL;
+            const groupNameDisplay = (showPersonal || showLocalMcp)
                 ? (
                     <HorizontalStack gap="2" align="start" wrap={false}>
                         <Text>{group.groupName}</Text>
-                        <Badge size="small" status="warning">Contains personal account</Badge>
+                        {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
+                        {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
                     </HorizontalStack>
                 )
-                : group.groupName,
+                : group.groupName;
+            return ({
+            ...group,
+            groupNameDisplay,
             iconComp: (
                 <Box>
                     <CollectionIcon
@@ -91,7 +96,8 @@ function Endpoints() {
             riskScoreComp: group.riskScore !== null
                 ? <Badge status={getRiskScoreStatus(group.riskScore)} size="small">{group.riskScore}</Badge>
                 : "-",
-        }));
+            });
+        });
     }, [getRiskScoreStatus]);
 
     async function fetchData(isMountedRef = { current: true }) {

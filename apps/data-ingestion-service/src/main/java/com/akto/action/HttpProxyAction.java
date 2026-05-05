@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
+import com.akto.utils.McpCollectionResolver;
 import com.akto.utils.SlackUtils;
 import com.akto.utils.TagRewriter;
 import com.mongodb.BasicDBObject;
@@ -66,6 +67,7 @@ public class HttpProxyAction extends ActionSupport {
             this.tag = TagRewriter.rewriteForOllama(this.requestHeaders, this.tag);
 
             Map<String, Object> requestData = buildRequestData();
+            applyMcpHostRewrite(requestData);
             Map<String, Object> result = gateway.processHttpProxy(requestData);
 
             success = Boolean.TRUE.equals(result.get("success"));
@@ -126,6 +128,32 @@ public class HttpProxyAction extends ActionSupport {
         } catch (Exception e) {
             return headers;
         }
+    }
+
+    private void applyMcpHostRewrite(Map<String, Object> requestData) {
+        Object tagObj = requestData.get("tag");
+        String tagJson = tagObj != null ? tagObj.toString() : null;
+        if (!McpCollectionResolver.isMcpTag(tagJson)) {
+            return;
+        }
+
+        Object headersObj = requestData.get("requestHeaders");
+        String headersJson = headersObj != null ? headersObj.toString() : null;
+        String host = McpCollectionResolver.extractHost(headersJson);
+        if (host == null || host.isEmpty()) {
+            return;
+        }
+
+        String tempCollectionName = host.toLowerCase().trim();
+        String realCollectionName = McpCollectionResolver.getInstance().resolve(tempCollectionName);
+        if (realCollectionName == null) {
+            loggerMaker.warn("MCP host cache miss for tempCollectionName=" + tempCollectionName);
+            return;
+        }
+
+        String rewritten = McpCollectionResolver.rewriteHostInHeaders(headersJson, realCollectionName);
+        requestData.put("requestHeaders", rewritten);
+        loggerMaker.info("MCP host rewrite: " + tempCollectionName + " -> " + realCollectionName);
     }
 
     private Map<String, Object> buildRequestData() {

@@ -70,6 +70,16 @@ export function getServerActionFlags(auditItem, { registryConfigured, addHandler
     return { allow, block, conditional, add }
 }
 
+// Registry-precedence override: when an MCP registry is configured, a server
+// not present in it is implicitly blocked regardless of its stored remarks.
+// Returns null when no override applies, otherwise { remarks, markedBy }.
+export function getRegistryOverride(item, registryConfigured) {
+    if (!registryConfigured) return null;
+    if (item?.verified) return null;
+    if (item?.type && item.type !== 'mcp-server') return null;
+    return { remarks: 'Rejected', markedBy: 'MCP Registry' };
+}
+
 export function intersectServerActionFlags(rows, ctx) {
     if (!rows?.length) return { allow: false, block: false, conditional: false, add: false }
     let allow = true

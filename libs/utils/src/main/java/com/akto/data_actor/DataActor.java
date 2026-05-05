@@ -115,4 +115,6 @@ public abstract class DataActor {
 
     public abstract void ingestMetricData(List<MetricData> metricData);
 
+    public abstract List<EndpointMcpConfig> fetchEndpointMcpConfigs(String tempCollectionName, int updatedDate);
+
 }

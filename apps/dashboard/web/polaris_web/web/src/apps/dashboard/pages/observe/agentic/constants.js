@@ -11,6 +11,7 @@ import {
     findTypeTag,
     getAgentTypeFromValue,
     hasPersonalAccountTag,
+    hasLocalMcpServerTag,
 } from "./mcpClientHelper";
 import func from "@/util/func";
 import { getResolvedUsernameForCollection, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
@@ -187,12 +188,14 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
                 hasPersonalAccount: false,
+                hasLocalMcpServer: false,
             };
         }
 
         agents[key].collections.push(c);
         if (!agents[key].firstCollection) agents[key].firstCollection = c;
         if (hasPersonalAccountTag(c.envType)) agents[key].hasPersonalAccount = true;
+        if (hasLocalMcpServerTag(c.envType)) agents[key].hasLocalMcpServer = true;
         
         // Track unique endpoint IDs
         if (endpointId) {
@@ -265,6 +268,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
                 hasPersonalAccount: false,
+                hasLocalMcpServer: false,
             };
         }
 
@@ -274,6 +278,7 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
         }
         if (!services[key].firstCollection) services[key].firstCollection = c;
         if (hasPersonalAccountTag(c.envType)) services[key].hasPersonalAccount = true;
+        if (hasLocalMcpServerTag(c.envType)) services[key].hasLocalMcpServer = true;
         
         // Track unique endpoint IDs
         if (endpointId) {
