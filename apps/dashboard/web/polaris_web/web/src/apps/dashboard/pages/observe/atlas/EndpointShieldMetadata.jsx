@@ -103,8 +103,8 @@ function EndpointShieldMetadata() {
             setAllowedEnvFields(response.allowedEnvFields || []);
             const agents = endpointShieldModules.map(module => ({
                 agentId: module.id,
-                hostname: module.name,
-                deviceId: module.additionalData?.deviceId || DEFAULT_VALUE,
+                hostname: func.stripDeviceSuffix(module.name),
+                deviceId: func.stripDeviceSuffix(module.additionalData?.deviceId) || DEFAULT_VALUE,
                 agentVersion: module.currentVersion || DEFAULT_VALUE,
                 username: module.additionalData?.username || DEFAULT_VALUE,
                 lastHeartbeat: module.lastHeartbeatReceived || 0,
@@ -128,8 +128,8 @@ function EndpointShieldMetadata() {
         setAllowedEnvFields(response.allowedEnvFields || []);
         const agents = endpointShieldModules.map(module => ({
             agentId: module.id,
-            hostname: module.name,
-            deviceId: module.additionalData?.deviceId || DEFAULT_VALUE,
+            hostname: func.stripDeviceSuffix(module.name),
+            deviceId: func.stripDeviceSuffix(module.additionalData?.deviceId) || DEFAULT_VALUE,
             agentVersion: module.currentVersion || DEFAULT_VALUE,
             username: module.additionalData?.username || DEFAULT_VALUE,
             lastHeartbeat: module.lastHeartbeatReceived || 0,

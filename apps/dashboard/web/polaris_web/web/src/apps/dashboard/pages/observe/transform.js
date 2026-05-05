@@ -562,7 +562,7 @@ const transform = {
             // - ai-agent: show serviceName (<3>)
             // - mcp-server: show sourceId (<2>)
             // - default: show splitApiCollectionName (<2>.<3>)
-            let displayText = isEndpointSecurity ? splitApiCollectionName : c.displayName;
+            let displayText = isEndpointSecurity ? splitApiCollectionName : func.stripDeviceSuffix(c.displayName);
             if (filterType === 'browser-llm' || filterType === 'mcp-server') {
                 displayText = sourceId || c.sourceId || splitApiCollectionName;
             } else if (filterType === 'ai-agent') {
@@ -630,7 +630,7 @@ const transform = {
             // Create displayNameComp if it doesn't exist (for lazy-loaded items)
             const displayNameComp = c.displayNameComp || (
                 <HorizontalStack gap="2" align="start">
-                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>
+                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{func.stripDeviceSuffix(c.displayName)}</Text></Box>
                     {c.registryStatus === "available" && <Badge>Registry</Badge>}
                 </HorizontalStack>
             );
@@ -951,10 +951,10 @@ const transform = {
         }
         const parts = collectionName.split('.');
         return {
-            endpointId: parts[0],                    // <1>
-            sourceId: parts[1] || '',                // <2>
-            serviceName: parts.slice(2).join('.'),   // <3> (can contain dots)
-            apiCollectionName: parts.slice(1).join('.') // <2>.<3> for backward compatibility
+            endpointId: func.stripDeviceSuffix(parts[0]),  // <1>
+            sourceId: parts[1] || '',                      // <2>
+            serviceName: parts.slice(2).join('.'),         // <3> (can contain dots)
+            apiCollectionName: parts.slice(1).join('.')    // <2>.<3> for backward compatibility
         };
     },
 
