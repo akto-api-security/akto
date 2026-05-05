@@ -6,6 +6,7 @@ import java.util.List;
 import com.akto.dto.IngestDataBatch;
 import com.akto.log.LoggerMaker;
 import com.akto.utils.KafkaUtils;
+import com.akto.utils.TagRewriter;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.mongodb.BasicDBObject;
@@ -67,6 +68,8 @@ public class IngestionAction extends ActionSupport {
                 if(ACCOUNT_ID_TO_ADD_DEFAULT_DATA == 1745303931 && StringUtils.isEmpty(payload.getPath())) {
                     payload.setPath("/");
                 }
+
+                payload.setTag(TagRewriter.rewriteForOllama(payload.getRequestHeaders(), payload.getTag()));
 
                 KafkaUtils.insertData(payload, Boolean.TRUE.equals(payload.getPublishToGuardrails()));
             }

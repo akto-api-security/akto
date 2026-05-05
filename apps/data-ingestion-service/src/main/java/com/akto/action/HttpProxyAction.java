@@ -4,6 +4,7 @@ import com.akto.gateway.Gateway;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
 import com.akto.utils.SlackUtils;
+import com.akto.utils.TagRewriter;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -61,6 +62,8 @@ public class HttpProxyAction extends ActionSupport {
         long start = System.currentTimeMillis();
         try {
             loggerMaker.info("HTTP Proxy API called - path: " + path + ", method: " + method + ", account: " + akto_account_id);
+
+            this.tag = TagRewriter.rewriteForOllama(this.requestHeaders, this.tag);
 
             Map<String, Object> requestData = buildRequestData();
             Map<String, Object> result = gateway.processHttpProxy(requestData);
