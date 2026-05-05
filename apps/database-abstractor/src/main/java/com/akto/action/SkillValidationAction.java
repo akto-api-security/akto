@@ -85,6 +85,7 @@ public class SkillValidationAction extends ActionSupport {
     private String collectionName;
     private String contextSource;
     private String source;
+    private boolean reportThreat;
 
     // Output field
     private Map<String, Object> validationResult;
@@ -157,8 +158,8 @@ public class SkillValidationAction extends ActionSupport {
             logger.error("Failed to update audit DB for skill=" + skillName + ": " + e.getMessage());
         }
 
-        // Step 5: report threat if malicious (fire-and-forget)
-        if (flagged) {
+        // Step 5: report threat if malicious and caller opted in (fire-and-forget)
+        if (flagged && reportThreat) {
             final String finalReason = reason;
             final String finalEvidence = evidence;
             final double finalScore = maliciousScore;
