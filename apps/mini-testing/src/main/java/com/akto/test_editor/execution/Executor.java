@@ -229,7 +229,11 @@ public class Executor {
                     if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
                         // execute agentic test here
                         requestAttempted = true;
-                        agenticResults = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId());
+                        String testingRunResultSummaryIdHex = null;
+                        if (testingRunConfig != null && testingRunConfig.getTestRunResultSummaryId() != null) {
+                            testingRunResultSummaryIdHex = testingRunConfig.getTestRunResultSummaryId().toHexString();
+                        }
+                        agenticResults = agentClient.executeAgenticTest(testReq, apiInfoKey.getApiCollectionId(), testingRunResultSummaryIdHex);
                         if (agenticResults != null && !agenticResults.isEmpty()) {
                             result.addAll(agenticResults);
                             // needed to check for vulnerable 

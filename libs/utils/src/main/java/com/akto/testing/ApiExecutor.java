@@ -33,6 +33,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
@@ -314,6 +315,7 @@ public class ApiExecutor {
         if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
             calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
         }
+        removeAktoInternalHeaders(request);
 
         boolean executeScript = testingRunConfig != null;
         String tempPayload = ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript, testingRunConfig);
@@ -634,6 +636,22 @@ public class ApiExecutor {
         );
     }
 
+    private static void removeAktoInternalHeaders(OriginalHttpRequest request) {
+        Map<String, List<String>> headers = request.getHeaders();
+        if (headers == null || headers.isEmpty()) return;
+
+        Set<String> toRemove = headers.keySet().stream()
+            .filter(h -> h != null && h.startsWith("x-akto-")
+                      && !h.equals(Constants.AKTO_IGNORE_FLAG)
+                      && !h.equals(Constants.AKTO_ATTACH_FILE))  // consumed by sendWithRequestBody before the wire
+            .collect(Collectors.toSet());
+
+        if (!toRemove.isEmpty()) {
+            loggerMaker.info("Removing akto internal headers before sending test request: " + toRemove);
+            toRemove.forEach(headers::remove);
+        }
+    }
+
     private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
@@ -915,6 +933,7 @@ public class ApiExecutor {
         }
 
         // Open SSE session with dynamic endpoint and request headers
+        removeAktoInternalHeaders(request);
         Headers headers = request.toOkHttpHeaders();
         SseSession session = openSseSession(host, sseEndpoint, headers, debug);
 

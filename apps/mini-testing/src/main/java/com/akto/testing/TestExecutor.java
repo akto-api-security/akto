@@ -1180,6 +1180,10 @@ public class TestExecutor {
         loggerMaker.infoAndAddToDb("triggering test run for apiInfoKey " + apiInfoKey + "test " + 
             testSubType + " logId " + testExecutionLogId);
 
+        if (testingRunConfig != null && testRunResultSummaryId != null) {
+            testingRunConfig.setTestRunResultSummaryId(testRunResultSummaryId);
+        }
+
         com.akto.test_editor.execution.Executor executor = new Executor();
         executor.overrideTestUrl(rawApi, testingRunConfig);
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
