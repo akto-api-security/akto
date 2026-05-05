@@ -90,6 +90,7 @@ public class AktoCallbacks {
     private static final boolean SYNC_MODE =
             "true".equalsIgnoreCase(getEnvDefault("SYNC_MODE", "true"));
     private static final double TIMEOUT = parseDouble(getEnvDefault("TIMEOUT", "5"), 5.0);
+    private static final String AKTO_TOKEN = getEnvDefault("AKTO_TOKEN", "");
     private static final String AKTO_CONNECTOR_NAME = "vertex-ai-adk";
     private static final String HTTP_PROXY_PATH = "/api/http-proxy";
 
@@ -351,10 +352,14 @@ public class AktoCallbacks {
         String queryString = buildQueryString(guardrails, ingestData);
         URI uri = URI.create(endpoint + "?" + queryString);
 
-        HttpRequest request = HttpRequest.newBuilder()
+        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(uri)
                 .timeout(Duration.ofSeconds((long) TIMEOUT))
-                .header("Content-Type", "application/json")
+                .header("Content-Type", "application/json");
+        if (!AKTO_TOKEN.isEmpty()) {
+            requestBuilder.header("authorization", AKTO_TOKEN);
+        }
+        HttpRequest request = requestBuilder
                 .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(payload)))
                 .build();
 

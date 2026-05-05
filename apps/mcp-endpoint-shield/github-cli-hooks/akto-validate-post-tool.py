@@ -21,6 +21,7 @@ AKTO_TIMEOUT = float(os.getenv("AKTO_TIMEOUT", "5"))
 AKTO_SYNC_MODE = os.getenv("AKTO_SYNC_MODE", "true").lower() == "true"
 AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 CONTEXT_SOURCE = os.getenv("CONTEXT_SOURCE", "ENDPOINT")
+AKTO_TOKEN = os.getenv("AKTO_TOKEN", "")
 MODE = os.getenv("MODE", "argus").lower()
 
 # SSL Configuration

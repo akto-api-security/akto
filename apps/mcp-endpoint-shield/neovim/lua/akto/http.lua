@@ -5,6 +5,7 @@ local M = {}
 
 M._akto_url = ""
 M._timeout = 5
+M._akto_token = ""
 
 local CONNECTOR = "neovim"
 
@@ -40,12 +41,17 @@ function M.post_sync(params, payload)
   local qs = {}
   for k, v in pairs(params) do qs[#qs + 1] = k .. "=" .. v end
   local url = M._akto_url .. "/api/http-proxy?" .. table.concat(qs, "&")
-  local result = vim.fn.system({
+  local args = {
     "curl", "-s", "-X", "POST", url,
     "-H", "Content-Type: application/json",
     "--max-time", tostring(M._timeout),
     "-d", payload,
-  })
+  }
+  if M._akto_token ~= "" then
+    table.insert(args, "-H")
+    table.insert(args, "authorization: " .. M._akto_token)
+  end
+  local result = vim.fn.system(args)
   if result and result ~= "" then
     local ok, data = pcall(vim.fn.json_decode, result)
     if ok then return data end
@@ -58,12 +64,17 @@ function M.post_async(params, payload)
   local qs = {}
   for k, v in pairs(params) do qs[#qs + 1] = k .. "=" .. v end
   local url = M._akto_url .. "/api/http-proxy?" .. table.concat(qs, "&")
-  vim.fn.jobstart({
+  local args = {
     "curl", "-s", "-X", "POST", url,
     "-H", "Content-Type: application/json",
     "--max-time", tostring(M._timeout),
     "-d", payload,
-  }, { detach = true })
+  }
+  if M._akto_token ~= "" then
+    table.insert(args, "-H")
+    table.insert(args, "authorization: " .. M._akto_token)
+  end
+  vim.fn.jobstart(args, { detach = true })
 end
 
 function M.parse_guardrails(resp)
@@ -90,6 +101,7 @@ end
 function M.configure(cfg)
   M._akto_url = cfg.akto_url or ""
   M._timeout = cfg.timeout or 5
+  M._akto_token = cfg.akto_token or os.getenv("AKTO_TOKEN") or ""
 end
 
 return M
