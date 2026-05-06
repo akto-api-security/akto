@@ -13,8 +13,8 @@ import (
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
-	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
-	"github.com/akto-api-security/mcp-endpoint-shield/mcp/types"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"go.uber.org/zap"
 )
 
