@@ -1,5 +1,5 @@
-github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260506142254-295bbe1e3775 h1:1WlFbXCUV0LQYd1aqQrc5v4XGeQGp0HkZJvpz0VQXhI=
-github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260506142254-295bbe1e3775/go.mod h1:3e+pnphFyYeF9c65nPPQFngicNJ16R1EPsJGVCrOW/E=
+github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260506165441-01c1576f475d h1:lopL4WK8bu6YTxFVHvGYvZi//6Q2fPmSyU9lvjf69bg=
+github.com/akto-api-security/akto-gateway/mcp-endpoint-shield v0.0.0-20260506165441-01c1576f475d/go.mod h1:3e+pnphFyYeF9c65nPPQFngicNJ16R1EPsJGVCrOW/E=
 github.com/andybalholm/brotli v1.2.0 h1:ukwgCxwYrmACq68yiUqwIWnGY0cTPox/M94sVwToPjQ=
 github.com/andybalholm/brotli v1.2.0/go.mod h1:rzTDkvFWvIrjDXZHkuS16NPggd91W3kUSvPlQ1pLaKY=
 github.com/aymerick/douceur v0.2.0 h1:Mv+mAeH1Q+n9Fr+oyamOlAkUNPWPlA8PPGR0QAaYuPk=
