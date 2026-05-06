@@ -476,7 +476,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
       SampleMaliciousRequest seqReq = Utils.buildSampleMaliciousRequest(
           actor, responseParam, SEQUENCE_ANOMALY_FILTER, null, null, false, false, redactionType);
       generateAndPushMaliciousEventRequest(
-          SEQUENCE_ANOMALY_FILTER, actor, responseParam, seqReq, EventType.EVENT_TYPE_SINGLE);
+          SEQUENCE_ANOMALY_FILTER, actor, responseParam, seqReq, EventType.EVENT_TYPE_SINGLE, "Anomaly");
     }
   }
 
@@ -486,6 +486,16 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
       HttpResponseParams responseParam,
       SampleMaliciousRequest maliciousReq,
       EventType eventType) {
+    generateAndPushMaliciousEventRequest(apiFilter, actor, responseParam, maliciousReq, eventType, "Rule-Based");
+  }
+
+  private void generateAndPushMaliciousEventRequest(
+      FilterConfig apiFilter,
+      String actor,
+      HttpResponseParams responseParam,
+      SampleMaliciousRequest maliciousReq,
+      EventType eventType,
+      String detectionType) {
     
     // Extract host from request headers
     String host = null;
@@ -515,7 +525,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
             .setSubCategory(apiFilter.getInfo().getSubCategory())
             .setSeverity(apiFilter.getInfo().getSeverity())
             .setMetadata(maliciousReq.getMetadata())
-            .setType("Rule-Based")
+            .setType(detectionType)
             .setSuccessfulExploit(maliciousReq.getSuccessfulExploit())
             .setStatus(maliciousReq.getStatus())
             .setHost(host != null ? host : "")
