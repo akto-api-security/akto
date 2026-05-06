@@ -59,6 +59,7 @@ public class SequenceCache {
      * and also resets on any normal (expected) transition.
      */
     public boolean checkSequenceAnomaly(String actor, String currentApiKey) {
+        refresh();
         if (transitionProbabilities.size() < MIN_CACHE_SIZE) return false;
 
         String prevApiKey = actorLastApi.getIfPresent(actor);
