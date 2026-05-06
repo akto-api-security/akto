@@ -89,7 +89,7 @@ public class SequenceCache {
 
     public void refresh() {
         int now = (int) (System.currentTimeMillis() / 1000);
-        if (!transitionProbabilities.isEmpty() && now - lastUpdatedAt < REFRESH_INTERVAL_SEC) {
+        if (lastUpdatedAt != 0 && now - lastUpdatedAt < REFRESH_INTERVAL_SEC) {
             return;
         }
 
