@@ -12,9 +12,12 @@ import {
   Tabs,
   LegacyTabs,
   Text,
-  Link} from '@shopify/polaris';
+  Link,
+  Button,
+  Tooltip} from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useMemo, useRef, useReducer } from 'react';
+import { createPortal } from 'react-dom';
 import "./style.css"
 import transform from '../../pages/observe/transform';
 import DropdownSearch from '../shared/DropdownSearch';
@@ -30,6 +33,7 @@ import values from "@/util/values"
 import { produce } from 'immer';
 import DateRangePicker from '../layouts/DateRangePicker';
 import SpinnerCentered from '../progress/SpinnerCentered';
+import { ImportMinor } from '@shopify/polaris-icons';
 
 function GithubServerTable(props) {
 
@@ -44,6 +48,8 @@ function GithubServerTable(props) {
 
   const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
   const [hideFilter, setHideFilter] = useState(false)
+  const filtersWrapRef = useRef(null)
+  const [exportPortalTarget, setExportPortalTarget] = useState(null)
 
   const filtersMap = PersistStore(state => state.filtersMap)
   const setFiltersMap = PersistStore(state => state.setFiltersMap)
@@ -99,6 +105,22 @@ function GithubServerTable(props) {
   let filterOperators = props.headers.reduce((map, e) => { map[e.sortKey || e.filterKey || e.value] = 'OR'; return map }, {})
 
   useEffect(() => {
+    if (!filtersWrapRef.current) return
+    const actionWrap = filtersWrapRef.current.querySelector('[class*="ActionWrap"]')
+    if (!actionWrap) return
+
+    const target = document.createElement('div')
+    target.style.display = 'inline-flex'
+    actionWrap.insertBefore(target, actionWrap.firstChild)
+    setExportPortalTarget(target)
+
+    return () => {
+      target.remove()
+      setExportPortalTarget(null)
+    }
+  }, [mode])
+
+  useEffect(() => {
     const handleEsc = (event) => {
       if (event.key === "Escape") {
         setMode(IndexFiltersMode.Default)
@@ -118,7 +140,7 @@ function GithubServerTable(props) {
     }else{
       queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
     }
-    const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
+    const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)    
     setAppliedFilters((prev) => {
       if(func.deepComparison(prev, currentFilters)){
         return prev
@@ -488,13 +510,43 @@ function GithubServerTable(props) {
   const resourceIDResolver = (data) => {
     return data.id;
   };
-  
 
-  const {selectedResources, allResourcesSelected, handleSelectionChange } =
+  const [allDataIds, setAllDataIds] = useState([])
+
+  const {selectedResources: rawSelectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(fullDataIds!== undefined ? fullDataIds : data , {
       resourceIDResolver,
     });
 
+  useEffect(() => {
+    if(!window.location.pathname.includes("testing")){
+      return
+    }
+    if (!allResourcesSelected || (data && data.length >= total) || (fullDataIds && fullDataIds.length >= total) || (rawSelectedResources && rawSelectedResources.length >= total)) {
+      setAllDataIds([])
+      return
+    }
+    let [sortKey, sortOrder] = sortSelected.length === 0 ? ["", ""] : sortSelected[0].split(" ");
+    let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
+    appliedFilters.forEach((filter) => {
+      const value = filter.value;
+      if (value && typeof value === 'object' && value.values !== undefined) {
+        filters[filter.key] = props.supportsNegationFilter ? value : value.values;
+      } else if (Array.isArray(value)) {
+        filters[filter.key] = props.supportsNegationFilter ? { values: value, negated: false } : value;
+      } else {
+        filters[filter.key] = value;
+      }
+    });
+    props.fetchData(sortKey, sortOrder === 'asc' ? -1 : 1, 0, 1000000, filters, filterOperators, queryValue).then((result) => {
+      if (result?.value) {
+        setAllDataIds(result.value.map(resourceIDResolver).filter(Boolean))
+      }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allResourcesSelected])
+
+  const selectedResources = allResourcesSelected && allDataIds.length > 0 ? allDataIds : rawSelectedResources;
   const customSelectionChange = (selectionType,toggleType, selection) => {
     if(props?.treeView || props?.isMultipleItemsSelected === true){
       let tempItems = selection;
@@ -515,7 +567,6 @@ function GithubServerTable(props) {
           selectItems([])
           TableStore.getState().setSelectedItems([])
         }else{
-        //todo: handle
           if (data) {
             if (toggleType) {
               let allItemsSet = new Set()
@@ -623,6 +674,32 @@ function GithubServerTable(props) {
       props.setSelectedResourcesForPrimaryAction(bulkActionResources)
     }
   }, [bulkActionResources, props.setSelectedResourcesForPrimaryAction])
+
+
+  const handleExportCsv = useCallback(async () => {
+    if (props.onExportCsv) return props.onExportCsv()
+    const fileName = props.csvFileName || props.resourceName?.plural || "export"
+
+    // Fetch all data (not just current page) for export
+    let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
+    let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
+    appliedFilters.forEach((filter) => {
+      const value = filter.value;
+      if (value && typeof value === 'object' && value.values !== undefined) {
+        filters[filter.key] = props.supportsNegationFilter ? value : value.values;
+      } else if (Array.isArray(value)) {
+        filters[filter.key] = props.supportsNegationFilter ? { values: value, negated: false } : value;
+      } else {
+        filters[filter.key] = value;
+      }
+    });
+
+    func.setToast(true, false, "Exporting CSV, please wait...")
+    const exportLimit = Math.max(total || 0, 10000);
+    const allData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, 0, exportLimit, filters, filterOperators, queryValue);
+    func.exportTableAsCSV(props.headers, allData?.value || data, fileName)
+  }, [props.onExportCsv, props.headers, props.csvFileName, data, sortSelected, appliedFilters, total, queryValue, props.fetchData])
+
   return (
     <div className={tableClass} style={{display: "flex", flexDirection: "column", gap: "20px"}}>
       <LegacyCard>
@@ -630,32 +707,42 @@ function GithubServerTable(props) {
         {props.tabs && props.tabs[props.selected].component ? props.tabs[props.selected].component :
           <div>
             <LegacyCard.Section flush>
-              <IndexFilters
-                sortOptions={props.sortOptions}
-                sortSelected={sortSelected}
-                queryValue={queryValue}
-                queryPlaceholder={`Search in ${transform.formatNumberWithCommas(total)} ${total === 1 ? props.resourceName.singular : props.resourceName.plural}`}
-                onQueryChange={handleFiltersQueryChange}
-                onQueryClear={handleFiltersQueryClear}
-                {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}
-                onSort={setSortSelected}
-                cancelAction={{
-                  onAction: () => {},
-                  disabled: false,
-                  loading: false,
-                }}
-                tabs={props.tableTabs ? props.tableTabs : []}
-                canCreateNewView={false}
-                filters={filters}
-                appliedFilters={appliedFilters}
-                onClearAll={handleFiltersClearAll}
-                mode={mode}
-                setMode={setMode}
-                loading={props.loading || false}
-                selected={props?.selected}
-                onSelect={(x) => handleTabChange(x)}
-                hideFilters={hideFilter}
-              ></IndexFilters>
+              <span ref={filtersWrapRef}>
+                <IndexFilters
+                  sortOptions={props.sortOptions}
+                  sortSelected={sortSelected}
+                  queryValue={queryValue}
+                  queryPlaceholder={`Search in ${transform.formatNumberWithCommas(total)} ${total === 1 ? props.resourceName.singular : props.resourceName.plural}`}
+                  onQueryChange={handleFiltersQueryChange}
+                  onQueryClear={handleFiltersQueryClear}
+                  {...(props.hideQueryField ? { hideQueryField: props.hideQueryField } : {})}
+                  onSort={setSortSelected}
+                  cancelAction={{
+                    onAction: () => {
+                      handleFiltersQueryClear();
+                    },
+                    disabled: false,
+                    loading: false,
+                  }}
+                  tabs={props.tableTabs ? props.tableTabs : []}
+                  canCreateNewView={false}
+                  filters={filters}
+                  appliedFilters={appliedFilters}
+                  onClearAll={handleFiltersClearAll}
+                  mode={mode}
+                  setMode={setMode}
+                  loading={props.loading || false}
+                  selected={props?.selected}
+                  onSelect={(x) => handleTabChange(x)}
+                  hideFilters={hideFilter}
+                />
+              </span>
+              {exportPortalTarget && data.length > 0 && createPortal(
+                <Tooltip content="Export as CSV" dismissOnMouseOut>
+                  <Button size="slim" icon={ImportMinor} onClick={handleExportCsv} accessibilityLabel="Export as CSV" />
+                </Tooltip>,
+                exportPortalTarget
+              )}
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               <div className={tableHeightClass}>
               {props.loading && props.loadingText ? (

@@ -149,6 +149,12 @@ function Integrations() {
       source: '/public/splunk.svg'
     }
 
+    let datadogObj = {
+      id: 'datadog',
+      name: 'Datadog',
+      source: '/public/datadog-1.svg'
+    }
+
     let agentConfigObj ={
       id: 'agents',
       name:'Agents',
@@ -158,7 +164,8 @@ function Integrations() {
     let mcpRegistryObj ={
       id: 'mcp_registry',
       name:'MCP Registry',
-      source: '/public/mcp.svg'
+      source: '/public/mcp.svg',
+      badge: 'Beta'
     }
 
     let awsWafObj ={
@@ -243,7 +250,7 @@ function Integrations() {
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj, adxObj, serviceNowObj, devRevObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
-    const siemItems = [splunkObj];
+    const siemItems = [splunkObj, datadogObj];
     switch (tabId) {
       case 'traffic':
         return trafficItems;
@@ -311,7 +318,7 @@ function Integrations() {
     }
 
     function renderItem(item) {
-        const {id, source, name, link} = item;
+        const {id, source, name, link, badge} = item;
         const media = <Avatar customer size="medium" name={name} source={source}/>;
         const sourceActions = (item) => {
             return [
@@ -321,7 +328,7 @@ function Integrations() {
               },
             ];
           };
-    
+
         return (
           <ResourceItem
             id={id}
@@ -330,9 +337,12 @@ function Integrations() {
             persistActions
             onClick={() => handleTab(id, link)}
           >
-            <Text fontWeight="bold" as="h3">
-              {name}
-            </Text>
+            <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+              <Text fontWeight="bold" as="h3">
+                {name}
+              </Text>
+              {badge && <Badge status="info">{badge}</Badge>}
+            </div>
           </ResourceItem>
         );
       }

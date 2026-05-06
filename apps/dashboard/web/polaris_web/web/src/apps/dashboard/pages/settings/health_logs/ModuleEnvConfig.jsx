@@ -73,11 +73,15 @@ const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields
                     {filteredEnvFields && filteredEnvFields.map((field) => {
                         const fieldValue = envData[field.key] || "";
                         const isBoolean = field.type === "boolean";
+                        const isSecret = field.type === "secret";
 
                         return (
                             <HorizontalGrid key={field.key} columns={2} gap="4">
                                 <Box>
-                                    <Text variant="bodyMd" as="p" fontWeight="medium">
+                                    <Text variant="bodyMd" as="p" fontWeight="semibold">
+                                        {field.key}
+                                    </Text>
+                                    <Text variant="bodySm" tone="subdued">
                                         {field.label}
                                     </Text>
                                     {field.helpText && (
@@ -105,9 +109,10 @@ const ModuleEnvConfigComponent = ({ title, description, module, allowedEnvFields
                                     </ButtonGroup>
                                 ) : (
                                     <TextField
+                                        type={isSecret ? "password" : "text"}
                                         value={fieldValue}
                                         onChange={(value) => handleInputChange(field.key, value)}
-                                        placeholder={`Enter ${field.label}`}
+                                        placeholder={isSecret ? "Enter new value to update" : `Enter ${field.label}`}
                                     />
                                 )}
                             </HorizontalGrid>

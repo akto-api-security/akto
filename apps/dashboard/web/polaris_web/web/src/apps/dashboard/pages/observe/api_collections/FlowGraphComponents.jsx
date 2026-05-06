@@ -60,17 +60,36 @@ export const createCustomEdge = (markerId, strokeColor = 'grey', useColorVariati
 
 export const createCustomNode = (borderColor = '#ccc', borderWidth = '1px', handleColor = '#555', boxShadow = '0 1px 3px rgba(0,0,0,0.1)') => {
   return ({ data }) => {
-    const { method, url, incomingCount, outgoingCount, showCounts } = data;
+    const { method, url, incomingCount, outgoingCount, showCounts, isSelected } = data;
+
+    // Apply highlight styles if this is the selected node
+    const nodeBorderColor = isSelected ? '#5c6ac4' : borderColor;
+    const nodeBorderWidth = isSelected ? '3px' : borderWidth;
+    const nodeBackground = isSelected ? '#f4f6ff' : '#ffffff';
+    const nodeBoxShadow = isSelected ? '0 4px 12px rgba(92,106,196,0.3)' : boxShadow;
+
     return (
       <div style={{
-        background: '#ffffff',
-        border: `${borderWidth} solid ${borderColor}`,
+        background: nodeBackground,
+        border: `${nodeBorderWidth} solid ${nodeBorderColor}`,
         borderRadius: '4px',
         padding: '10px',
         minWidth: '200px',
-        boxShadow: boxShadow
+        boxShadow: nodeBoxShadow
       }}>
         <Handle type="target" position={Position.Top} id="t" style={{ background: handleColor }} />
+        {isSelected && (
+          <div style={{
+            fontSize: '10px',
+            fontWeight: '600',
+            color: '#5c6ac4',
+            marginBottom: '6px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+          }}>
+            Selected API
+          </div>
+        )}
         <GetPrettifyEndpoint
           method={method}
           url={url}

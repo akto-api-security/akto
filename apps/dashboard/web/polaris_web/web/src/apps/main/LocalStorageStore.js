@@ -1,5 +1,11 @@
 import {create} from "zustand"
-import { devtools, persist, createJSONStorage } from "zustand/middleware"
+import { devtools, persist } from "zustand/middleware"
+
+import pako from "pako"; // Gzip Compression
+import { createGzipStorage } from "./PersistStore";
+
+// Custom Storage with Gzip Compression for localStorage
+const gzipLocalStorage = createGzipStorage(localStorage);
 
 const initialState = {
     subCategoryMap: {},
@@ -62,7 +68,10 @@ let localStore = (set) => ({
 });
 
 localStore = devtools(localStore)
-localStore = persist(localStore,{name: 'Akto-tests-store',storage: createJSONStorage(() => localStorage)})
+localStore = persist(localStore, {
+    name: 'Akto-tests-store',
+    storage: gzipLocalStorage
+})
 
 const LocalStore = create(localStore);
 
@@ -71,7 +80,15 @@ export const localStorePersistSync = (store) => {
    const hasNonEmptySubCategoryMap = (newValue) => {
         // Rehydration should only occur if the persisted LocalStore has been updated with a non-empty subCategoryMap
         try {
-            const parsedNewValue = JSON.parse(newValue);
+            // Decompress the gzip data first
+            const binaryData = atob(newValue);
+            const uint8Array = new Uint8Array(binaryData.length);
+            for (let i = 0; i < binaryData.length; i++) {
+                uint8Array[i] = binaryData.charCodeAt(i);
+            }
+            const decompressed = pako.inflate(uint8Array, { to: "string" });
+            const parsedNewValue = JSON.parse(decompressed);
+
             const state = parsedNewValue?.state; // zustand persists state under 'state' key
             const subCategoryMap = state?.subCategoryMap;
 
@@ -79,7 +96,7 @@ export const localStorePersistSync = (store) => {
         } catch (err) {
             // do nothing
         }
-        
+
         return false; // default to false if any error or unexpected structure
     }
 

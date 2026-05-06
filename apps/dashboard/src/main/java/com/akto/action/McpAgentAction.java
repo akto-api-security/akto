@@ -29,6 +29,8 @@ import java.util.UUID;
 public class McpAgentAction extends UserAction {
 
     private static final Logger logger = LoggerFactory.getLogger(McpAgentAction.class);
+    /** Guardrail: very large context breaks MCP /chat or gateway limits and yields 422 (ERROR). */
+    private static final int MAX_TEST_RESULT_CONTEXT_CHARS = 120_000;
     private String message;
     private String conversationId;
     private BasicDBObject response;
@@ -41,6 +43,13 @@ public class McpAgentAction extends UserAction {
 
     public String chatAndStoreConversation() {
         try {
+
+            String userId = getSUser().getLogin();
+            if (userId != null && userId.startsWith("akash+") && userId.endsWith("@akto.io")) {
+                addActionError("You are not allowed to use this feature");
+                return ERROR.toUpperCase();
+            }
+
             // check for conversation type
             if(conversationType == null) {
                 addActionError("Conversation type is required");
@@ -72,6 +81,7 @@ public class McpAgentAction extends UserAction {
             }
             AgentClient agentClient = new AgentClient(Constants.AKTO_MCP_SERVER_URL);
             String contextString = "";
+            int tokensLimit = 20000;
 
             if(metaData != null) {
                 String type = (String) metaData.get("type");
@@ -89,10 +99,56 @@ public class McpAgentAction extends UserAction {
                             contextString = "Current context: " + latestSampleData;
                         }
                     }
+                } else if(StringUtils.isNotEmpty(type) && type.equals("dashboard_collections")) {
+                    // Dashboard collections data sent from UI
+                    Object data = metaData.get("data");
+                    if(data != null && data instanceof List) {
+                        List<Map<String, Object>> collections = (List<Map<String, Object>>) data;
+                        contextString = "Dashboard API Collections Data:\n" +
+                            "Total collections analyzed: " + collections.size() + "\n" +
+                            "Collections with their metrics (endpoints count and risk scores):\n" +
+                            collections.toString();
+                        // Increase timeout for large data
+                        tokensLimit = 60000; // 60 seconds
+                    }
+                } else if(StringUtils.isNotEmpty(type) && type.equals("test_execution_result")) {
+                    Object data = metaData.get("data");
+                    if(data != null && data instanceof Map) {
+                        Map<String, Object> dataMap = (Map<String, Object>) data;
+                        StringBuilder sb = new StringBuilder("Test Execution Result Context:\n");
+                        sb.append("Test Name: ").append(dataMap.getOrDefault("testName", "")).append("\n");
+                        sb.append("Test Category: ").append(dataMap.getOrDefault("testCategory", "")).append("\n");
+                        sb.append("Vulnerable: ").append(dataMap.getOrDefault("vulnerable", false)).append("\n");
+                        sb.append("Severity: ").append(dataMap.getOrDefault("severity", "")).append("\n");
+                        sb.append("URL: ").append(dataMap.getOrDefault("url", "")).append("\n");
+                        Object originalMsg = dataMap.get("originalMessage");
+                        if(originalMsg != null) {
+                            sb.append("Original API Request+Response: ").append(originalMsg).append("\n");
+                        }
+                        Object attemptMsg = dataMap.get("attemptMessage");
+                        if(attemptMsg != null) {
+                            sb.append("Test Attempt Request+Response: ").append(attemptMsg).append("\n");
+                        }
+                        Object agenticCtx = dataMap.get("agenticConversationContext");
+                        if(agenticCtx != null) {
+                            String agenticStr = agenticCtx instanceof String ? (String) agenticCtx : String.valueOf(agenticCtx);
+                            if(StringUtils.isNotEmpty(agenticStr)) {
+                                sb.append("Agent / LLM Test Conversation:\n").append(agenticStr).append("\n");
+                            }
+                        }
+                        contextString = sb.toString();
+                        if(contextString.length() > MAX_TEST_RESULT_CONTEXT_CHARS) {
+                            contextString = contextString.substring(0, MAX_TEST_RESULT_CONTEXT_CHARS)
+                                + "\n\n[... truncated server-side ...]";
+                        }
+                        tokensLimit = 40000;
+                    }
                 }
             }
 
-            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, 20000, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString);
+            String userEmail = getSUser() != null ? getSUser().getLogin() : null;
+            String contextSource = Context.contextSource.get() != null ? Context.contextSource.get().toString() : null;
+            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail, contextSource);
             if(responseFromMcpServer != null) {
                 responseFromMcpServer.setCreatedAt(timeNow);
                 AgentConversationDao.instance.insertOne(responseFromMcpServer);

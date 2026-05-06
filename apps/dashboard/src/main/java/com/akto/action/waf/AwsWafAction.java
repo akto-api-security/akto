@@ -25,6 +25,7 @@ public class AwsWafAction extends UserAction {
     private String ruleSetName;
     Config.AwsWafConfig wafConfig;
     private List<String> severityLevels;
+    private List<String> threatPolicies;
 
     public String addAwsWafIntegration() {
 
@@ -69,11 +70,12 @@ public class AwsWafAction extends UserAction {
                 Updates.set("region", region),
                 Updates.set("ruleSetName", ruleSetName),
                 Updates.set("ruleSetId", ruleSetId),
-                 Updates.set("severityLevels", severityLevels)
+                Updates.set("severityLevels", severityLevels),
+                Updates.set("threatPolicies", threatPolicies)
             );
             ConfigsDao.instance.updateOne(filters, updates);
         } else {
-            Config.AwsWafConfig config = new Config.AwsWafConfig(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, accId,severityLevels);
+            Config.AwsWafConfig config = new Config.AwsWafConfig(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, accId, severityLevels, threatPolicies);
             ConfigsDao.instance.insertOne(config);
         }
 
@@ -155,6 +157,14 @@ public class AwsWafAction extends UserAction {
 
     public void setSeverityLevels(List<String> severityLevels) {
         this.severityLevels = severityLevels;
+    }
+
+    public List<String> getThreatPolicies() {
+        return threatPolicies;
+    }
+
+    public void setThreatPolicies(List<String> threatPolicies) {
+        this.threatPolicies = threatPolicies;
     }
 
 }

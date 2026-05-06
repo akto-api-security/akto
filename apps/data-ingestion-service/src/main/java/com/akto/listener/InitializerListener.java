@@ -9,6 +9,7 @@ import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.utils.KafkaUtils;
+import com.akto.utils.McpCollectionResolver;
 import com.akto.utils.TopicPublisher;
 
 
@@ -34,9 +35,24 @@ public class InitializerListener implements ServletContextListener {
         );
         KafkaUtils.setTopicPublisher(topicPublisher);
 
+        String tcpEnv = System.getenv("SYSLOG_TCP_ENABLED");
+        boolean tcpEnabled = tcpEnv == null || Boolean.parseBoolean(tcpEnv.trim());
+        if (tcpEnabled) {
+            Thread syslogTcpThread = new Thread(new SyslogTcpListener());
+            syslogTcpThread.setDaemon(true);
+            syslogTcpThread.setName("syslog-tcp-listener");
+            syslogTcpThread.start();
+            logger.infoAndAddToDb("Syslog TCP listener thread started", LoggerMaker.LogDb.DATA_INGESTION);
+        } else {
+            logger.infoAndAddToDb("Syslog TCP listener disabled via SYSLOG_TCP_ENABLED", LoggerMaker.LogDb.DATA_INGESTION);
+        }
+
         // Initialize DataActor
         DataActor dataActor = DataActorFactory.fetchInstance();
         ModuleInfoWorker.init(ModuleInfo.ModuleType.DATA_INGESTION, dataActor);
+
+        // Warm the MCP collection-name cache and start the periodic refresher
+        McpCollectionResolver.getInstance().start();
     }
 
     @Override

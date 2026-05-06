@@ -20,7 +20,7 @@ public class DeveloperRoleStrategy implements RoleStrategy{
             ReadWriteAccess access = ReadWriteAccess.READ ;
             if(group == AccessGroups.SETTINGS ){
                 access = ReadWriteAccess.READ_WRITE;
-            }else if(group == AccessGroups.PII_DATA){
+            }else if(group == AccessGroups.PII_DATA || group == AccessGroups.THREAT_PROTECTION){
                 access = ReadWriteAccess.NO_ACCESS;
             }
             for (Feature feature : Feature.getFeaturesForAccessGroup(group)) {

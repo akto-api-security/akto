@@ -1,6 +1,6 @@
 # Akto Guardrails for Claude CLI
 
-Validate your prompts against Akto AI Guardrails before they're sent to Claude.
+Validate prompts and MCP tool calls against Akto AI Guardrails in Claude CLI.
 
 ## Setup
 
@@ -11,52 +11,92 @@ mkdir -p ~/.claude/hooks
 cd ~/.claude/hooks
 ```
 
+Copy the following files to this directory:
+
+- `akto-validate-prompt.py`
+- `akto-validate-response.py`
+- `akto-validate-mcp-request.py`
+- `akto-validate-mcp-response.py`
+- `akto-validate-prompt-wrapper.sh`
+- `akto-validate-response-wrapper.sh`
+- `akto-validate-mcp-request-wrapper.sh`
+- `akto-validate-mcp-response-wrapper.sh`
+- `akto_machine_id.py`
+
 ### 2. Configure environment
 
-Add the following environment variables to your shell configuration file (e.g. `~/.bashrc`, `~/.zshrc`, or `~/.profile`):
+Add the following environment variables to your shell configuration file (for example `~/.zshrc`):
 
 ```bash
-# Add these to ~/.zshrc
 export AKTO_DATA_INGESTION_URL="ingestion-service-url"
-export AKTO_SYNC_MODE="true" # Set to false if you want to allow prompts if guardrails blocks them but still send them to Claude
+export AKTO_SYNC_MODE="true"
+export MODE="argus" # argus (default) or atlas
+export DEVICE_ID="" # Optional: custom device ID in atlas mode
+
+# Optional logging configuration
+export LOG_DIR="~/.claude/akto/logs"
+export LOG_LEVEL="INFO"
+export LOG_PAYLOADS="false"
 ```
 
-Then reload your shell configuration (or open a new terminal) before running Claude Code:
+Then reload your shell config:
 
 ```bash
 source ~/.zshrc
 ```
 
-### 3. Add hook to Claude CLI
+### 3. Add hooks to Claude CLI
 
 Edit `~/.claude/settings.json`:
 
 ```json
 {
-    "hooks": {
-        "UserPromptSubmit": [
-            {
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "python3 ~/.claude/hooks/validate-prompt.py",
-                        "timeout": 10
-                    }
-                ]
-            }
-        ],
-        "Stop": [
-            {
-                "hooks": [
-                    {
-                        "type": "command",
-                        "command": "python3 ~/.claude/hooks/validate-response.py",
-                        "timeout": 10
-                    }
-                ]
-            }
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-validate-prompt-wrapper.sh",
+            "timeout": 10
+          }
         ]
-    }
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-validate-response-wrapper.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-validate-mcp-request-wrapper.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/akto-validate-mcp-response-wrapper.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
 }
 ```
 
@@ -64,4 +104,129 @@ Edit `~/.claude/settings.json`:
 
 ```bash
 claude
+```
+
+## How It Works
+
+### Prompt Hooks
+
+#### Before Prompt Submit (`akto-validate-prompt.py`)
+
+- Trigger: `UserPromptSubmit`
+- Validates user prompts against Akto guardrails
+- Can block prompts
+
+Block response format:
+
+```json
+{
+  "decision": "block",
+  "reason": "Blocked by Akto Guardrails"
+}
+```
+
+#### After Response (`akto-validate-response.py`)
+
+- Trigger: `Stop`
+- Captures prompt/response data from transcript and ingests it to Akto
+- Observational only (cannot block)
+
+### MCP Tool Hooks
+
+#### Before Tool Execution (`akto-validate-mcp-request.py`)
+
+- Trigger: `PreToolUse`
+- Validates tool input against Akto guardrails before execution
+- Can block tool execution
+
+Input contract:
+
+- Reads `tool_name` and `tool_input` directly from hook input (snake_case, top-level)
+
+Block response contract:
+
+```json
+{
+  "decision": "block",
+  "reason": "Blocked by Akto Guardrails: <reason>"
+}
+```
+
+Allow contract:
+
+- Prints no output and exits `0`
+
+#### After Tool Execution (`akto-validate-mcp-response.py`)
+
+- Trigger: `PostToolUse`
+- Reads tool input/output and ingests to Akto for observability
+- Encodes `requestPayload` as `{"body": {"toolName": ..., "toolArgs": {...}}}`
+- Encodes `responsePayload` as `{"body": {"result": {...}}}`
+- Observational only (never blocks)
+
+Input contract:
+
+- Reads `tool_name`, `tool_input`, `tool_response` directly from hook input (snake_case, top-level)
+
+Response contract:
+
+- Prints no output and exits `0`
+
+#### Tool source tagging
+
+The `mcp_server_name` tag in ingested data is derived from `tool_name`:
+
+- MCP tools (`mcp__<server>__<tool>`) → tagged with the server name (e.g. `filesystem`, `github`)
+- Built-in tools (`Bash`, `Write`, `Read`, etc.) → tagged as `claude-built-in`
+
+## Configuration Options
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AKTO_DATA_INGESTION_URL` | (required) | Akto data ingestion service URL |
+| `AKTO_SYNC_MODE` | `true` | Synchronous guardrails mode for blocking hooks |
+| `AKTO_TIMEOUT` | `5` | Timeout in seconds for API calls |
+| `MODE` | `argus` | Operation mode: `argus` or `atlas` |
+| `DEVICE_ID` | (auto-generated) | Custom device ID for atlas mode |
+| `CLAUDE_API_URL` | `https://api.anthropic.com` | Claude API URL (argus mode only) |
+| `LOG_DIR` | `~/.claude/akto/logs` | Directory for log files |
+| `LOG_LEVEL` | `INFO` | Logging verbosity: DEBUG, INFO, WARNING, ERROR |
+| `LOG_PAYLOADS` | `false` | Log request/response payload previews |
+
+## Viewing Logs
+
+Default log directory: `~/.claude/akto/logs/`
+
+- `validate-prompt.log` - prompt validation
+- `validate-response.log` - conversation ingestion
+- `validate-mcp-request.log` - MCP request validation
+- `validate-mcp-response.log` - MCP response ingestion
+
+Tail all logs:
+
+```bash
+tail -f ~/.claude/akto/logs/*.log
+```
+
+## Troubleshooting
+
+### Hooks not executing
+
+1. Verify hook config path: `~/.claude/settings.json`
+2. Ensure Python 3 is installed: `python3 --version`
+3. Verify environment vars: `echo $AKTO_DATA_INGESTION_URL`
+4. Ensure scripts are executable: `chmod +x ~/.claude/hooks/*.py ~/.claude/hooks/*.sh`
+5. Check logs: `tail -f ~/.claude/akto/logs/*.log`
+
+### Service unavailable errors
+
+If Akto is unavailable:
+
+- With `AKTO_SYNC_MODE=true`: blocking hooks may block requests
+- With `AKTO_SYNC_MODE=false`: hooks fail open and allow execution
+
+Inspect failures:
+
+```bash
+grep "API CALL FAILED" ~/.claude/akto/logs/*.log
 ```

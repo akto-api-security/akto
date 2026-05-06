@@ -44,7 +44,7 @@ function SchemaValidationError({ sampleData}) {
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = []} = props;
 
     const [page, setPage] = useState(0);
 
@@ -108,6 +108,7 @@ function SampleDataList(props) {
                       isNewDiff={isNewDiff}
                       metadata={metadata}
                       readOnly={true}
+                      redactHeaders={redactHeaders}
                     />
                   </LegacyCard>
                 </Box>

@@ -17,6 +17,7 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -25,6 +26,8 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import org.apache.commons.collections.CollectionUtils;
 
 public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection> {
 
@@ -72,6 +75,30 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         List<ApiCollection> ret = ApiCollectionsDao.instance.findAll(Filters.eq("_id", apiCollectionId), Projections.exclude("urls"));
 
         return (ret != null && ret.size() > 0) ? ret.get(0) : null;
+    }
+
+    /**
+     * If the collection has no env tags in DB but hostname matches env rules, persist the derived
+     * env type to DB so that env type always comes from DB.
+     */
+    public void ensureEnvTypeFromHostname(ApiCollection apiCollection) {
+        if (apiCollection == null) {
+            return;
+        }
+        if (apiCollection.getHostName() == null || apiCollection.getHostName().isEmpty()) {
+            return;
+        }
+        List<CollectionTags> tagsList = apiCollection.getTagsList();
+        if (!CollectionUtils.isEmpty(tagsList)) {
+            return;
+        }
+        CollectionTags derived = apiCollection.computeEnvTypeFromHostname();
+        if (derived == null) {
+            return;
+        }
+        Bson filter = Filters.eq(ApiCollection.ID, apiCollection.getId());
+        instance.getMCollection().updateOne(filter, Updates.addToSet(ApiCollection.TAGS_STRING, derived));
+        apiCollection.setTagsList(new ArrayList<>(Collections.singletonList(derived)));
     }
 
     public void updateTransportType(ApiCollection apiCollection, String transportType) {

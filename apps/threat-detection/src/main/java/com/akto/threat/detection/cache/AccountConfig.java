@@ -18,16 +18,19 @@ import java.util.Set;
 public class AccountConfig {
     private final int accountId;
     private final boolean isRedacted;
+    private final boolean isHyperscanEnabled;
     private final Map<Integer, Boolean> apiCollections;
     private final List<ApiInfo> apiInfos;
     private final Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates;
     private final Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods;
 
-    public AccountConfig(int accountId, boolean isRedacted, List<ApiCollection> apiCollections,
+    public AccountConfig(int accountId, boolean isRedacted, boolean isHyperscanEnabled,
+                         List<ApiCollection> apiCollections,
                          List<ApiInfo> apiInfos, Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates,
                          Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods) {
         this.accountId = accountId;
         this.isRedacted = isRedacted;
+        this.isHyperscanEnabled = isHyperscanEnabled;
         this.apiCollections  = new HashMap<>();
         initMapApiCollectionsFromList(apiCollections);
         // Guarantee non-null collections - use empty collections if null
@@ -54,6 +57,13 @@ public class AccountConfig {
      */
     public boolean isRedacted() {
         return isRedacted;
+    }
+
+    /**
+     * Check if Hyperscan detection mode is enabled via Stigg feature flag
+     */
+    public boolean isHyperscanEnabled() {
+        return isHyperscanEnabled;
     }
 
     /**
@@ -101,6 +111,7 @@ public class AccountConfig {
         return "AccountConfig{" +
                 "accountId=" + accountId +
                 ", isRedacted=" + isRedacted +
+                ", isHyperscanEnabled=" + isHyperscanEnabled +
                 ", apiCollectionsCount=" + (apiCollections != null ? apiCollections.size() : 0) +
                 ", apiInfosCount=" + (apiInfos != null ? apiInfos.size() : 0) +
                 ", apiInfoUrlToMethodsCount=" + (apiInfoUrlToMethods != null ? apiInfoUrlToMethods.size() : 0) +

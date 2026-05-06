@@ -1,6 +1,6 @@
 package com.akto.testing;
 
-import java.io.IOException;
+import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -55,7 +55,7 @@ public class HostValidator {
             HTTPClientHandler.initHttpClientHandler(IS_SAAS);
         }
 
-        OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects, requestProtocol);
+        OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(request.url().isHttps(), followRedirects, requestProtocol);
 
         if (!SKIP_SSRF_CHECK && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
@@ -65,9 +65,9 @@ public class HostValidator {
         Response response = null;
         try {
             response = call.execute();
-        } catch (IOException e) {
-            if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
-                loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
+        } catch (ConnectException e) {
+            if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog") || request.url().toString().contains("insertAgenticTestingLog"))) {
+                loggerMaker.errorAndAddToDb(e, "Error while executing request " + request.url() + ": " + e);
             } else {
                 System.out.println("Error while executing request " + request.url() + ": " + e);
             }
@@ -130,7 +130,7 @@ public class HostValidator {
                             hostReachabilityMap.put(attemptUrl, reachable);
                         }
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("", LogDb.TESTING);
+                        loggerMaker.errorAndAddToDb(e, "Error in host validation task " + e.getMessage());
                     }
                     return null;
                 })

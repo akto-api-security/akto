@@ -23,10 +23,11 @@ import static com.akto.dto.type.KeyTypes.patternToSubType;
 public class MergingLogic {
 
     public static final int STRING_MERGING_THRESHOLD = 10;
+    public static final Pattern VERSION_PATTERN = Pattern.compile("\\bv([1-9][0-9]?|100)\\b");
     private static final LoggerMaker loggerMaker = new LoggerMaker(MergingLogic.class);
 
-    public static void mergeUrlsAndSave(int apiCollectionId, boolean mergeUrlsBasic) {
-        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, mergeUrlsBasic);
+    public static void mergeUrlsAndSave(int apiCollectionId, boolean mergeUrlsBasic, boolean skipMergingOnKnownStaticURLsForVersionedApis) {
+        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, mergeUrlsBasic, skipMergingOnKnownStaticURLsForVersionedApis);
 
         String deletedStaticUrlsString = "";
         int counter = 0;
@@ -185,7 +186,7 @@ public class MergingLogic {
         }
     }
 
-    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, boolean mergeUrlsBasic) {
+    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, boolean mergeUrlsBasic, boolean skipMergingOnKnownStaticURLsForVersionedApis) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
         Bson filterQ = null;
@@ -265,7 +266,7 @@ public class MergingLogic {
 
 
             for(int size: sizeToUrlToSti.keySet()) {
-                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), !mergeUrlsBasic);
+                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), !mergeUrlsBasic, skipMergingOnKnownStaticURLsForVersionedApis);
                 finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
             }
 
@@ -296,7 +297,7 @@ public class MergingLogic {
         return sizeToURL;
     }
 
-    private static ApiMergerResult tryMergingWithKnownStrictURLs(Map<String, Set<String>> pendingRequests, boolean doBodyMatch) {
+    private static ApiMergerResult tryMergingWithKnownStrictURLs(Map<String, Set<String>> pendingRequests, boolean doBodyMatch, boolean skipMergingOnKnownStaticURLsForVersionedApis) {
         Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
 
         Iterator<Map.Entry<String, Set<String>>> iterator = pendingRequests.entrySet().iterator();
@@ -308,6 +309,10 @@ public class MergingLogic {
             Set<String> newTemplate = entry.getValue();
             URLMethods.Method newMethod = URLMethods.Method.fromString(newUrl.split(" ")[0]);
             String newEndpoint = newUrl.split(" ")[1];
+
+            if(skipMergingOnKnownStaticURLsForVersionedApis && VERSION_PATTERN.matcher(newEndpoint).find()){
+                continue;
+            }
 
             boolean matchedInDeltaTemplate = false;
             for(URLTemplate urlTemplate: templateToStaticURLs.keySet()){
@@ -353,6 +358,10 @@ public class MergingLogic {
             }
 
             if (countSimilarURLs >= STRING_MERGING_THRESHOLD) {
+                if(skipMergingOnKnownStaticURLsForVersionedApis && VERSION_PATTERN.matcher(newEndpoint).find()){
+                    continue;
+                }
+
                 URLTemplate mergedTemplate = potentialMerges.keySet().iterator().next();
                 Set<String> matchedStaticURLs = templateToStaticURLs.get(mergedTemplate);
 

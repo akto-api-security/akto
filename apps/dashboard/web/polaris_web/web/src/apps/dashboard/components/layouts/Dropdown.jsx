@@ -107,7 +107,7 @@ function Dropdown(props) {
 
 
     useEffect(() => {
-        if (props.initial) {
+        if (props.initial !== undefined) {
             getLabel(props.initial);
         }
 

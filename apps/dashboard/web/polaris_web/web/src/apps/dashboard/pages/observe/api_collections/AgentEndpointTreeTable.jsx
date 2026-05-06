@@ -9,9 +9,13 @@ import { useNavigate } from 'react-router-dom';
 import HeadingWithTooltip from '../../../components/shared/HeadingWithTooltip';
 import TooltipText from '../../../components/shared/TooltipText';
 import { FILTER_TYPES } from './useAgenticFilter';
+import { getAgenticCategoryLabel, hasPersonalAccountTag, hasLocalMcpServerTag } from '../agentic/mcpClientHelper';
 
-// Headers for the parent rows (grouped by endpoint ID)
-const parentHeaders = [
+/** IndexTable adds a leading selection column when `selectable` is true (see AgentEndpointTreeTable). */
+const INDEX_TABLE_SELECTION_COLUMN_COUNT = 1;
+
+// Parent rows (grouped by endpoint ID). Users & devices adds Type before Username (same column count +1 when scoped).
+const parentHeadersBase = [
     {
         title: "",
         text: "",
@@ -79,6 +83,23 @@ const parentHeaders = [
     },
 ];
 
+const parentHeadersScoped = [...parentHeadersBase.slice(0, 2), { title: "Type", text: "Type", value: "parentTypeComp", textValue: "parentTypeComp", isText: CellType.TEXT, boxWidth: "120px" }, ...parentHeadersBase.slice(2)];
+
+const sortOptions = [
+    { label: 'Endpoint ID', value: 'endpointId asc', directionLabel: 'A-Z', sortKey: 'endpointId', columnIndex: 2 },
+    { label: 'Endpoint ID', value: 'endpointId desc', directionLabel: 'Z-A', sortKey: 'endpointId', columnIndex: 2 },
+    { label: 'Username', value: 'username asc', directionLabel: 'A-Z', sortKey: 'username', columnIndex: 3 },
+    { label: 'Username', value: 'username desc', directionLabel: 'Z-A', sortKey: 'username', columnIndex: 3 },
+    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 4 },
+    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore', columnIndex: 4 },
+    { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'detectedTimestamp' },
+    { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'detectedTimestamp' },
+    { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detectedTimestamp', columnIndex: 6 },
+    { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detectedTimestamp', columnIndex: 6 },
+    { label: 'Discovered', value: 'discovered asc', directionLabel: 'Recent first', sortKey: 'startTs', columnIndex: 7 },
+    { label: 'Discovered', value: 'discovered desc', directionLabel: 'Oldest first', sortKey: 'startTs', columnIndex: 7 },
+];
+
 // Get child column title and display field based on filter type
 const getChildColumnConfig = (filterType) => {
     switch (filterType) {
@@ -86,6 +107,7 @@ const getChildColumnConfig = (filterType) => {
             return { title: "MCP Server source", displayField: 'sourceId' };
         case FILTER_TYPES.BROWSER_LLM:
             return { title: "LLM source", displayField: 'sourceId' };
+        case FILTER_TYPES.SKILL:
         case FILTER_TYPES.AI_AGENT:
         default:
             return { title: "Agentic resource name", displayField: 'serviceName' };
@@ -93,16 +115,23 @@ const getChildColumnConfig = (filterType) => {
 };
 
 // Get child headers based on filter type
-const getChildHeaders = (filterType) => {
+const getChildHeaders = (filterType, showCategoryColumn) => {
     const config = getChildColumnConfig(filterType);
-    return [
-        {
-            title: config.title,
-            text: config.title,
-            value: "displayNameComp",
-            textValue: config.displayField,
-            boxWidth: '200px'
-        },
+    const nameCol = {
+        title: config.title,
+        text: config.title,
+        value: "displayNameComp",
+        textValue: config.displayField,
+        boxWidth: '200px'
+    };
+    const categoryCol = {
+        title: "Type",
+        text: "Type",
+        value: "agenticCategory",
+        textValue: "agenticCategory",
+        boxWidth: "120px"
+    };
+    const rest = [
         {
             title: "Risk score",
             text: "Risk score",
@@ -128,22 +157,8 @@ const getChildHeaders = (filterType) => {
             boxWidth: '80px'
         },
     ];
+    return showCategoryColumn ? [nameCol, categoryCol, ...rest] : [nameCol, ...rest];
 };
-
-const sortOptions = [
-    { label: 'Endpoint ID', value: 'endpointId asc', directionLabel: 'A-Z', sortKey: 'endpointId', columnIndex: 2 },
-    { label: 'Endpoint ID', value: 'endpointId desc', directionLabel: 'Z-A', sortKey: 'endpointId', columnIndex: 2 },
-    { label: 'Username', value: 'username asc', directionLabel: 'A-Z', sortKey: 'username', columnIndex: 3 },
-    { label: 'Username', value: 'username desc', directionLabel: 'Z-A', sortKey: 'username', columnIndex: 3 },
-    { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: 4 },
-    { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore', columnIndex: 4 },
-    { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'detectedTimestamp' },
-    { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'detectedTimestamp' },
-    { label: 'Last traffic seen', value: 'detected asc', directionLabel: 'Recent first', sortKey: 'detectedTimestamp', columnIndex: 6 },
-    { label: 'Last traffic seen', value: 'detected desc', directionLabel: 'Oldest first', sortKey: 'detectedTimestamp', columnIndex: 6 },
-    { label: 'Discovered', value: 'discovered asc', directionLabel: 'Recent first', sortKey: 'startTs', columnIndex: 7 },
-    { label: 'Discovered', value: 'discovered desc', directionLabel: 'Oldest first', sortKey: 'startTs', columnIndex: 7 },
-];
 
 const resourceName = {
     singular: 'endpoint',
@@ -162,25 +177,28 @@ const groupByEndpointId = (collections) => {
             groups[endpointId] = {
                 endpointId,
                 children: [],
-                // Initialize merge-able fields
                 riskScore: 0,
                 sensitiveInRespTypes: [],
                 detectedTimestamp: 0,
                 startTs: Infinity,
                 apiCollectionIds: [],
-                // First collection for icon reference
                 firstCollection: null,
-                // Username from first collection (all collections in same endpoint should have same username)
                 username: '-',
+                hasPersonalAccount: false,
+                hasLocalMcpServer: false,
             };
         }
         groups[endpointId].children.push(collection);
         groups[endpointId].apiCollectionIds.push(collection.id);
-        
-        // Store first collection for icon lookup and username
         if (!groups[endpointId].firstCollection) {
             groups[endpointId].firstCollection = collection;
             groups[endpointId].username = collection.username || '-';
+        }
+        if (hasPersonalAccountTag(collection.envTypeOriginal)) {
+            groups[endpointId].hasPersonalAccount = true;
+        }
+        if (hasLocalMcpServerTag(collection.envTypeOriginal)) {
+            groups[endpointId].hasLocalMcpServer = true;
         }
         
         // Merge values
@@ -205,11 +223,11 @@ const groupByEndpointId = (collections) => {
 /**
  * Prettifies the grouped endpoint data for display
  */
-const prettifyGroupedData = (groupedData, filterType) => {
+const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expandedColSpan) => {
     return groupedData.map(group => {
         const childCount = group.children.length;
         const riskScore = group.riskScore || 0;
-        
+
         return {
             ...group,
             // Use first collection ID as the row ID (table expects scalar, not array)
@@ -223,9 +241,12 @@ const prettifyGroupedData = (groupedData, filterType) => {
                         <TooltipText tooltip={group.endpointId} text={group.endpointId} textProps={{variant: 'headingSm'}} />
                     </Box>
                     <Badge size="small" status="new">{childCount}</Badge>
+                    {group.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
+                    {group.hasLocalMcpServer && <Badge size="small" status="critical">Local MCP Server</Badge>}
                 </HorizontalStack>
             ),
             username: group.username || '-',
+            ...(showCategoryColumn ? { parentTypeComp: "-" } : {}),
             riskScoreComp: <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
             sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || []),
             sensitiveSubTypesVal: (group.sensitiveInRespTypes || []).join(' ') || '-',
@@ -233,7 +254,14 @@ const prettifyGroupedData = (groupedData, filterType) => {
             discovered: func.prettifyEpoch(group.startTs === Infinity ? 0 : group.startTs),
             isTerminal: false,
             // Function to create expandable children row
-            collapsibleRow: <ChildrenTable children={group.children} filterType={filterType} />,
+            collapsibleRow: (
+                <ChildrenTable
+                    children={group.children}
+                    filterType={filterType}
+                    showCategoryColumn={showCategoryColumn}
+                    expandedColSpan={expandedColSpan}
+                />
+            ),
         };
     });
 };
@@ -241,9 +269,9 @@ const prettifyGroupedData = (groupedData, filterType) => {
 /**
  * Children table component for expanded rows
  */
-const ChildrenTable = ({ children, filterType }) => {
+const ChildrenTable = ({ children, filterType, showCategoryColumn, expandedColSpan }) => {
     const navigate = useNavigate();
-    const childHeaders = getChildHeaders(filterType);
+    const childHeaders = getChildHeaders(filterType, showCategoryColumn);
     const columnConfig = getChildColumnConfig(filterType);
     
     const handleChildClick = useCallback((collection) => {
@@ -259,6 +287,7 @@ const ChildrenTable = ({ children, filterType }) => {
             const childRiskScore = child.riskScore || 0;
             const prettifiedChild = {
                 ...child,
+                agenticCategory: showCategoryColumn ? getAgenticCategoryLabel(child) : undefined,
                 riskScoreComp: <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>,
                 sensitiveSubTypes: transform.prettifySubtypes(child.sensitiveInRespTypes || []),
                 lastTraffic: func.prettifyEpoch(child.detectedTimestamp || 0),
@@ -274,6 +303,7 @@ const ChildrenTable = ({ children, filterType }) => {
                 <div key={`spacer-${child.id}`} style={{ width: '32px', minWidth: '32px' }} />
             ];
             
+            const childHasLocalMcp = hasLocalMcpServerTag(child.envTypeOriginal);
             childHeaders.forEach((header, idx) => {
                 if (header.value === 'displayNameComp') {
                     cells.push(
@@ -282,9 +312,22 @@ const ChildrenTable = ({ children, filterType }) => {
                             style={{ cursor: 'pointer', width: header.boxWidth }} 
                             onClick={() => handleChildClick(child)}
                         >
-                            <Box maxWidth="200px">
-                                <TooltipText tooltip={displayValue} text={displayValue} />
-                            </Box>
+                            <HorizontalStack gap="1" align="start" wrap={false}>
+                                <Box maxWidth="200px">
+                                    <TooltipText tooltip={displayValue} text={displayValue} />
+                                </Box>
+                                {childHasLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
+                            </HorizontalStack>
+                        </div>
+                    );
+                } else if (header.value === 'agenticCategory') {
+                    cells.push(
+                        <div
+                            key={`${header.value}-${child.id}`}
+                            style={{ cursor: 'pointer', width: header.boxWidth }}
+                            onClick={() => handleChildClick(child)}
+                        >
+                            <Text variant="bodyMd" as="span">{prettifiedChild.agenticCategory || '-'}</Text>
                         </div>
                     );
                 } else {
@@ -302,16 +345,23 @@ const ChildrenTable = ({ children, filterType }) => {
             
             return cells;
         });
-    }, [children, handleChildClick, childHeaders, columnConfig]);
-    
+    }, [children, handleChildClick, childHeaders, columnConfig, showCategoryColumn]);
+
+    const columnContentTypes = useMemo(
+        () => ["text", ...childHeaders.map(() => "text")],
+        [childHeaders],
+    );
+
     return (
-        <td colSpan={parentHeaders.length} style={{ padding: '0px !important' }} className="control-row">
-            <DataTable
-                rows={rows}
-                hasZebraStripingOnData
-                headings={[]}
-                columnContentTypes={['text', ...childHeaders.map(() => 'text')]}
-            />
+        <td colSpan={expandedColSpan} style={{ padding: '0px !important' }} className="control-row">
+            <Box width="100%">
+                <DataTable
+                    rows={rows}
+                    hasZebraStripingOnData
+                    headings={[]}
+                    columnContentTypes={columnContentTypes}
+                />
+            </Box>
         </td>
     );
 };
@@ -320,25 +370,28 @@ const ChildrenTable = ({ children, filterType }) => {
  * AgentEndpointTreeTable component
  * Displays collections grouped by endpoint ID with expandable rows showing agentic resources
  */
-function AgentEndpointTreeTable({ collections, promotedBulkActions, filterType }) {
+function AgentEndpointTreeTable({ collections, promotedBulkActions, filterType, showCategoryColumn = false }) {
     const [groupedData, setGroupedData] = useState([]);
-    
+
+    const parentHeaders = showCategoryColumn ? parentHeadersScoped : parentHeadersBase;
+
     useEffect(() => {
         if (collections && collections.length > 0) {
             const grouped = groupByEndpointId(collections);
-            const prettified = prettifyGroupedData(grouped, filterType);
-            // Sort by endpoint ID by default
+            const expandedColSpan =
+                parentHeadersBase.length + (showCategoryColumn ? 1 : 0) + INDEX_TABLE_SELECTION_COLUMN_COUNT;
+            const prettified = prettifyGroupedData(grouped, filterType, showCategoryColumn, expandedColSpan);
             const sorted = func.sortFunc(prettified, 'endpointId', 1);
             setGroupedData(sorted);
         } else {
             setGroupedData([]);
         }
-    }, [collections, filterType]);
-    
+    }, [collections, filterType, showCategoryColumn]);
+
     const disambiguateLabel = useCallback((key, value) => {
         return func.convertToDisambiguateLabelObj(value, null, 2);
     }, []);
-    
+
     return (
         <GithubSimpleTable
             key={`agent-endpoint-tree-${groupedData.length}`}

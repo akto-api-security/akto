@@ -1,5 +1,5 @@
 import { Link, Text } from '@shopify/polaris';
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import InfoCard from '../../dashboard/new_components/InfoCard';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import testingApi from "../../testing/api.js"
@@ -7,9 +7,13 @@ import testingFunc from "../../testing/transform.js"
 import BarGraph from '../../../components/charts/BarGraph.jsx';
 import LocalStore from "../../../../main/LocalStorageStore";
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
+import { getCategoriesBasedOnDashboardCategory } from '../../test_editor/tests_table/categoryUtil';
+import issuesTransform from '../transform.js';
 
-const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl, complianceMode }) => {
+const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl, complianceMode, onBarClick, filterCollectionsId }) => {
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
+    const categoryMap = LocalStore(state => state.categoryMap);
+    const dashboardCategory = getDashboardCategory();
 
     const [criticalFindingsData, setCriticalFindingsData] = useState([])
     const [showTestingComponents, setShowTestingComponents] = useState(false)
@@ -22,33 +26,46 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
         })
         entries.sort((a, b) => b.text - a.text);
         const topEntries = entries.slice(0, 5);
-        const data = topEntries.map(entry => {return {text: entry.key, value: entry.text, color: entry.color}});
+        const data = topEntries.map(entry => {return {text: entry.key, value: entry.text, color: entry.color, filterKey: entry.filterKey}});
         setCriticalFindingsData(data)
     }
 
-    const fetchGraphData = async () => {
+    const fetchGraphData = useCallback(async () => {
         setShowTestingComponents(false)
-        const subcategoryDataResp = await testingApi.getSummaryInfo(startTimestamp, endTimestamp)
+        const subcategoryDataResp = await testingApi.getSummaryInfo(startTimestamp, endTimestamp, filterCollectionsId)
+        const allowedCategories = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMap);
+        const filteredResp = Object.fromEntries(
+            Object.entries(subcategoryDataResp).filter(([testId]) => {
+                const superCategoryName = subCategoryMap[testId]?.superCategory?.name;
+                return superCategoryName ? allowedCategories.includes(superCategoryName) : true;
+            })
+        );
         let tempResultSubCategoryMap = {}
         if (complianceMode) {
-            Object.entries(subcategoryDataResp).forEach(([testId, count]) => {
-                let clauses = (subCategoryMap[testId]?.compliance?.mapComplianceToListClauses || {})[complianceMode] || []
+            if (!subCategoryMap || Object.keys(subCategoryMap).length === 0) {
+                setCriticalFindingsData([])
+                setShowTestingComponents(false)
+                return
+            }
+            Object.entries(filteredResp).forEach(([testId, count]) => {
+                const mapComplianceToListClauses = subCategoryMap[testId]?.compliance?.mapComplianceToListClauses || {}
+                const clauses = issuesTransform.getClausesForCompliance(mapComplianceToListClauses, complianceMode)
                 clauses.forEach(clause => {
                     tempResultSubCategoryMap[clause] = tempResultSubCategoryMap[clause] || {text: 0, key: clause}
                     tempResultSubCategoryMap[clause].text += count
                 });
             })
         } else {
-            const result = await testingFunc.convertSubIntoSubcategory(subcategoryDataResp);
+            const result = await testingFunc.convertSubIntoSubcategory(filteredResp);
             tempResultSubCategoryMap = result.subCategoryMap;
         }
         convertSubCategoryInfo(tempResultSubCategoryMap)
         setShowTestingComponents(true)
-    }
+    }, [startTimestamp, endTimestamp, complianceMode, subCategoryMap, categoryMap, dashboardCategory, filterCollectionsId])
 
     useEffect(() => {
         fetchGraphData()
-    }, [startTimestamp, endTimestamp, complianceMode])
+    }, [fetchGraphData])
 
     const defaultChartOptions = {
         "legend": {
@@ -71,6 +88,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
                 showYAxis={true}
                 yAxisTitle="Number of Issues"
                 barWidth={30}
+                onBarClick={!complianceMode && onBarClick ? (name, custom) => onBarClick('issueCategory', custom?.filterKey || name) : undefined}
             />
         }
         title={complianceMode ? (complianceMode + " clauses") : "Vulnerabilities findings"}

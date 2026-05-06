@@ -15,7 +15,8 @@ public class RawApiMetadataFactory {
     public RawApiMetadata buildFromHttp(OriginalHttpRequest request, OriginalHttpResponse response) {
 
         String countryCode = this.ipLookupClient.getCountryISOCodeGivenIp(request.getSourceIp()).orElse("");
-        RawApiMetadata metadata = new RawApiMetadata(countryCode);
+        String destCountryCode = this.ipLookupClient.getCountryISOCodeGivenIp(request.getDestinationIp()).orElse("");
+        RawApiMetadata metadata = new RawApiMetadata(countryCode, destCountryCode);
         return metadata;
     }
 }

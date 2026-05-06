@@ -100,8 +100,8 @@ public class ResourceAnalyserTest extends MongoBasedTest {
 
         // to add new single type info of urlParams
         httpCallParser.syncFunction(responseParams, true, true, null);
-        APICatalogSync.mergeUrlsAndSave(0, true, false, httpCallParser.apiCatalogSync.existingAPIsInDb, false, false);
-        APICatalogSync.mergeUrlsAndSave(1, true, false, httpCallParser.apiCatalogSync.existingAPIsInDb, false, false);
+        APICatalogSync.mergeUrlsAndSave(0, true, false, httpCallParser.apiCatalogSync.existingAPIsInDb, false, false, false);
+        APICatalogSync.mergeUrlsAndSave(1, true, false, httpCallParser.apiCatalogSync.existingAPIsInDb, false, false, false);
 
         List<SingleTypeInfo> singleTypeInfoList = SingleTypeInfoDao.instance.fetchAll();
         assertEquals(13, singleTypeInfoList.size()); // 3 per api (url3 and url4 merged) and 1 url param

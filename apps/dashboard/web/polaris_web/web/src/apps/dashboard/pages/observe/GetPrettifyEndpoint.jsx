@@ -1,4 +1,4 @@
-import { Badge, Box, HorizontalStack, Text, Tooltip } from '@shopify/polaris'
+import { Badge, Box, HorizontalStack, Text, Tooltip, Icon } from '@shopify/polaris'
 import { useRef, useState } from 'react'
 import func from '@/util/func'
 import transform from '../onboarding/transform'
@@ -9,12 +9,16 @@ export const getMethod = (url, method) => {
     if(isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()){
         if(url.includes("tool")){
             return "TOOL";
+        }else if(url.includes("skill")){
+            return "SKILL";
         }else if(url.includes("resource")){
             return "RESOURCE";
         }else if(url.includes("prompt")){
             return "PROMPT";
         }else if(url.includes("server")){
             return "SERVER";
+        }else if(url.includes("settings")){
+            return "CONFIG";
         }
     }
     return method;
@@ -22,6 +26,7 @@ export const getMethod = (url, method) => {
 
 export function MethodBox({method, methodBoxWidth, url}){
     const finalMethod = getMethod(url, method);
+    // Use TOOL color for CONFIG as well
     return (
       <Box width={methodBoxWidth || "64px"}>
         <HorizontalStack align="end">
@@ -40,7 +45,7 @@ export function MethodBox({method, methodBoxWidth, url}){
     )
 }
 
-function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth}){
+function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth, guardrailEnabled}){
     const ref = useRef(null)
     const localUrl = url || "/"
     const [copyActive, setCopyActive] = useState(false)
@@ -60,12 +65,19 @@ function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth}){
               gap: "24px",
             }}
           >
-            <div style={{ display: "flex" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <Box>
                 <Text variant="bodyMd" fontWeight="medium" breakWord>
                   {observeFunc.getTruncatedUrl(localUrl)}
                 </Text>
               </Box>
+              {guardrailEnabled ? (
+                <Tooltip content="Guardrails enabled for this endpoint" dismissOnMouseOut>
+                  <div style={{ display: "inline-flex", alignItems: "center", cursor: "help" }}>
+                    <img src="/public/mcp.svg" alt="Guardrails enabled" style={{ width: "24px", height: "24px" }} />
+                  </div>
+                </Tooltip>
+              ) : null}
               {copyActive ? (
                 <div
                   onClick={(e) => {

@@ -30,16 +30,17 @@ const isSignupPage = signupPages.some(page => currentPath.startsWith(page));
 const isWhitelisted = func.isWhiteListedOrganization();
 
 let free = false
-if(window.IS_SAAS == 'false'){
-  free = !(isWhitelisted || isSignupPage);
-if(func.isTempAccount() && window.PLAN_TYPE && ALLOWED_PLANS.includes(window.PLAN_TYPE.toLowerCase())) {
-  free = false;
-}else if(!window.PLAN_TYPE && func.isTempAccount()) {
-  free = false;
-}else{
-  free &= func.isTempAccount();
+if(isWhitelisted || isSignupPage) {
+  free = false; // Whitelisted users & Signup pages should not block user
+} else {
+  // For non-whitelisted, non-signup users, check plan type
+  if(window.PLAN_TYPE && ALLOWED_PLANS.includes(window.PLAN_TYPE.toLowerCase())) {
+    free = false; // Valid plan type = no restrictions
+  } else {
+    free = true; // No valid plan = Block user
+  }
 }
-}
+
 
 if (expired) {
 

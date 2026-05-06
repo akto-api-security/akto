@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { EmptySearchResult, VerticalStack, Button, Badge, Text } from '@shopify/polaris';
+import { EmptySearchResult, VerticalStack, Button, Badge, Text, Tag, HorizontalStack } from '@shopify/polaris';
 import { CancelMinor, ViewMinor, ChecklistMajor } from '@shopify/polaris-icons';
-import CreateGuardrailModal from "./components/CreateGuardrailModal";
+import CreateGuardrailPage from "./components/CreateGuardrailPage";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
@@ -9,6 +9,7 @@ import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import api from "./api";
+import { transformPolicyForBackend, SEVERITY, normalizeBehaviourValue } from "./utils";
 
 const resourceName = {
   singular: "policy",
@@ -112,6 +113,16 @@ const sortOptions = [
   },
 ];
 
+const isSystemPolicy = (row) => (row.createdBy || "").toLowerCase().includes("system");
+
+const sortPinnedSystemPolicies = (systemRows) =>
+  [...systemRows].sort((a, b) => {
+    if (a.status !== b.status) return a.status === "Active" ? -1 : 1;
+    const tsA = a.originalData?.updatedTimestamp ?? a.originalData?.createdTimestamp ?? 0;
+    const tsB = b.originalData?.updatedTimestamp ?? b.originalData?.createdTimestamp ?? 0;
+    return tsB - tsA;
+  });
+
 function GuardrailPolicies() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [policyData, setPolicyData] = useState([]);
@@ -129,25 +140,24 @@ function GuardrailPolicies() {
         try {
             const response = await api.fetchGuardrailPolicies();
             if (response && response.guardrailPolicies) {
-                const formattedPolicies = response.guardrailPolicies
-                    .sort((a, b) => {
-                        // First sort by active status (active first)
-                        if (a.active !== b.active) {
-                            return b.active - a.active;
-                        }
-                        // Then by timestamp (latest first)
-                        return (b.updatedTimestamp || b.createdTimestamp) - (a.updatedTimestamp || a.createdTimestamp);
-                    })
-                    .map(policy => ({
+                const showSystemTag = func.isDemoAccount();
+                let formattedPolicies = response.guardrailPolicies.map(policy => ({
                         id: policy.hexId,
-                        policy: policy.name,
+                        policy: showSystemTag && (policy.createdBy || "").toLowerCase().includes("system")
+                            ? (
+                                <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                                    <Tag>Default</Tag>
+                                    <Text as="span" style={{ fontWeight: "medium" }}>{policy.name}</Text>
+                                </HorizontalStack>
+                            )
+                            : policy.name,
                         category: determineCategoryFromPolicy(policy),
                         status: policy.active ? "Active" : "Inactive",
                         statusWithSummary: generateStatusWithSummary(policy),
-                        severity: policy.severity,
+                        severity: policy.severity || SEVERITY.MEDIUM.value,
                         severityComp: (
-                            <div className={`badge-wrapper-${policy.severity.toUpperCase()}`}>
-                                <Badge size="small">{policy.severity.toUpperCase()}</Badge>
+                            <div className={`badge-wrapper-${(policy.severity || SEVERITY.MEDIUM.value).toUpperCase()}`}>
+                                <Badge size="small">{(policy.severity || SEVERITY.MEDIUM.value).toUpperCase()}</Badge>
                             </div>
                         ),
                         createdTs: func.prettifyEpoch(policy.createdTimestamp),
@@ -156,14 +166,36 @@ function GuardrailPolicies() {
                         updatedBy: policy.updatedBy || "-",
                         originalData: policy
                     }));
+                if (!func.isDemoAccount()) {
+                    formattedPolicies = formattedPolicies.sort((a, b) => {
+                        if (a.status !== b.status) return a.status === "Active" ? -1 : 1;
+                        return (b.originalData?.updatedTimestamp ?? b.originalData?.createdTimestamp ?? 0) -
+                            (a.originalData?.updatedTimestamp ?? a.originalData?.createdTimestamp ?? 0);
+                    });
+                }
                 setPolicyData(formattedPolicies);
             }
         } catch (error) {
-            console.error("Error fetching guardrail policies:", error);
             func.setToast(true, true, "Failed to load guardrail policies");
         } finally {
             setLoading(false);
         }
+    };
+
+    const modifyData = (filters, dataSortKey, sortOrder) => {
+        const systemRows = policyData.filter(isSystemPolicy);
+        const customRows = policyData.filter((row) => !isSystemPolicy(row));
+        const pinned = sortPinnedSystemPolicies(systemRows);
+        const custom =
+            dataSortKey && customRows.length > 0
+                ? func.sortFunc([...customRows], dataSortKey, sortOrder, false)
+                : [...customRows].sort((a, b) => {
+                        if (a.status !== b.status) return a.status === "Active" ? -1 : 1;
+                        const tsA = a.originalData?.updatedTimestamp ?? a.originalData?.createdTimestamp ?? 0;
+                        const tsB = b.originalData?.updatedTimestamp ?? b.originalData?.createdTimestamp ?? 0;
+                        return tsB - tsA;
+                    });
+        return [...pinned, ...custom];
     };
 
     const determineCategoryFromPolicy = (policy) => {
@@ -258,9 +290,15 @@ function GuardrailPolicies() {
 
         // PII types
         if (policy.piiTypes?.length > 0) {
-            const piiNames = policy.piiTypes.map(pii => pii.type).slice(0, 2);
+            const piiParts = policy.piiTypes.slice(0, 2).map((pii) => {
+                const t = pii.type;
+                const m = pii.minMatchCount != null && Number(pii.minMatchCount) > 1
+                    ? ` (${Number(pii.minMatchCount)}+)`
+                    : "";
+                return `${t}${m}`;
+            });
             const moreCount = policy.piiTypes.length > 2 ? ` +${policy.piiTypes.length - 2} more PIIs` : '';
-            sensitiveInfoFilters.push(`${piiNames.join(", ")}${moreCount}`);
+            sensitiveInfoFilters.push(`${piiParts.join(", ")}${moreCount}`);
         }
 
         // Regex patterns
@@ -278,18 +316,22 @@ function GuardrailPolicies() {
         }
 
         // Server configuration details using effective methods
-        const serverDetails = [];
-        const effectiveMcpServers = getEffectiveSelectedMcpServers(policy);
-        const effectiveAgentServers = getEffectiveSelectedAgentServers(policy);
-        
-        if (effectiveMcpServers.length > 0) {
-            serverDetails.push(`${effectiveMcpServers.length} MCP Server${effectiveMcpServers.length > 1 ? 's' : ''}`);
-        }
-        if (effectiveAgentServers.length > 0) {
-            serverDetails.push(`${effectiveAgentServers.length} Agent Server${effectiveAgentServers.length > 1 ? 's' : ''}`);
-        }
-        if (serverDetails.length > 0) {
-            details.push({ label: "Target Servers", value: serverDetails.join(", ") });
+        if (policy.applyToAllServers || policy.applyToAllServers == null) {
+            details.push({ label: "Target Servers", value: "All servers" });
+        } else {
+            const serverDetails = [];
+            const effectiveMcpServers = getEffectiveSelectedMcpServers(policy);
+            const effectiveAgentServers = getEffectiveSelectedAgentServers(policy);
+
+            if (effectiveMcpServers.length > 0) {
+                serverDetails.push(`${effectiveMcpServers.length} MCP Server${effectiveMcpServers.length > 1 ? 's' : ''}`);
+            }
+            if (effectiveAgentServers.length > 0) {
+                serverDetails.push(`${effectiveAgentServers.length} Agent Server${effectiveAgentServers.length > 1 ? 's' : ''}`);
+            }
+            if (serverDetails.length > 0) {
+                details.push({ label: "Target Servers", value: serverDetails.join(", ") });
+            }
         }
 
         // Application scope
@@ -343,13 +385,12 @@ function GuardrailPolicies() {
             };
             
             await api.createGuardrailPolicy(requestPayload);
-            
+
             func.setToast(true, false, `Guardrail ${newStatus ? 'activated' : 'deactivated'} successfully`);
-            // Refresh the page to ensure data gets updated on screen
-            window.location.reload();
+            await fetchGuardrailPolicies();
         } catch (error) {
-            console.error("Error toggling guardrail status:", error);
             func.setToast(true, true, "Failed to update guardrail status");
+        } finally {
             setLoading(false);
         }
     };
@@ -381,9 +422,8 @@ function GuardrailPolicies() {
                         try {
                             await api.deleteGuardrailPolicies(selectedPolicies);
                             func.setToast(true, false, `${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"} deleted successfully`);
-                            window.location.reload();
+                            await fetchGuardrailPolicies();
                         } catch (error) {
-                            console.error("Error deleting policies:", error);
                             func.setToast(true, true, "Failed to delete policies");
                         }
                     });
@@ -420,31 +460,27 @@ function GuardrailPolicies() {
         try {
             setLoading(true);
 
-            // Determine severity based on configuration
-            let severity = "Low";
-            if (guardrailData.contentFilters?.harmfulCategories || guardrailData.contentFilters?.promptAttacks || guardrailData.contentFilters?.code) {
-                severity = "High";
-            } else if (guardrailData.deniedTopics?.length > 0 || guardrailData.piiFilters?.length > 0) {
-                severity = "Medium";
-            }
-
             // Prepare GuardrailPolicies object for backend
+            // Transform field names using shared utility (same as playground)
+            guardrailData = transformPolicyForBackend(guardrailData);
+            
             const guardrailPolicyObject = {
                 name: guardrailData.name,
                 description: guardrailData.description || '',
                 blockedMessage: guardrailData.blockedMessage || '',
-                severity: severity.toUpperCase(),
+                severity: guardrailData.severity || SEVERITY.MEDIUM.value,
                 selectedMcpServers: guardrailData.selectedMcpServers || [],
                 selectedAgentServers: guardrailData.selectedAgentServers || [],
                 // Add V2 fields for enhanced server data
                 selectedMcpServersV2: guardrailData.selectedMcpServersV2 || [],
                 selectedAgentServersV2: guardrailData.selectedAgentServersV2 || [],
                 deniedTopics: guardrailData.deniedTopics || [],
-                piiTypes: guardrailData.piiFilters || [],
                 regexPatterns: guardrailData.regexPatterns || [],
                 // Add V2 field for enhanced regex data
                 regexPatternsV2: guardrailData.regexPatternsV2 || [],
-                contentFiltering: guardrailData.contentFilters || {},
+                // Use transformed field names from shared utility
+                piiTypes: guardrailData.piiTypes,
+                contentFiltering: guardrailData.contentFiltering,
                 // Add LLM policy if present
                 ...(guardrailData.llmRule ? { llmRule: guardrailData.llmRule } : {}),
                 // Add Base Prompt Rule if present
@@ -457,8 +493,12 @@ function GuardrailPolicies() {
                 ...(guardrailData.secretsDetection ? { secretsDetection: guardrailData.secretsDetection } : {}),
                 ...(guardrailData.sentimentDetection ? { sentimentDetection: guardrailData.sentimentDetection } : {}),
                 ...(guardrailData.tokenLimitDetection ? { tokenLimitDetection: guardrailData.tokenLimitDetection } : {}),
+                applyToAllServers: guardrailData.applyToAllServers ?? true,
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
+                behaviour: guardrailData.behaviour != null
+                    ? normalizeBehaviourValue(guardrailData.behaviour)
+                    : null,
                 url: guardrailData.url || '',
                 confidenceScore: guardrailData.confidenceScore || 0,
                 active: true
@@ -470,38 +510,18 @@ function GuardrailPolicies() {
                 hexId: isEditMode && guardrailData.hexId ? guardrailData.hexId : null
             };
 
-            let response;
-
-                if (isEditMode && guardrailData.hexId) {
-                    // Update existing policy
-                    response = await api.createGuardrailPolicy(requestPayload);
-                    if (response) {
-                        func.setToast(true, false, "Guardrail updated successfully");
-                    }
-                } else {
-                    // Create new policy
-
-                    response = await api.createGuardrailPolicy(requestPayload);
-                    if (response) {
-                        func.setToast(true, false, "Guardrail created successfully");
-                    }
-                }
-
-            
-            if (response) {
-                setShowCreateModal(false);
-                setEditingPolicy(null);
-                setIsEditMode(false);
-                // Refresh the page to ensure data gets updated on screen
-                if (isEditMode) {
-                    window.location.reload();
-                } else {
-                    // For create, just refresh the policy list
-                    await fetchGuardrailPolicies();
-                }
-            }
+            const wasEdit = isEditMode && guardrailData.hexId;
+            await api.createGuardrailPolicy(requestPayload);
+            func.setToast(
+                true,
+                false,
+                wasEdit ? "Guardrail updated successfully" : "Guardrail created successfully"
+            );
+            setShowCreateModal(false);
+            setEditingPolicy(null);
+            setIsEditMode(false);
+            await fetchGuardrailPolicies();
         } catch (error) {
-            console.error("Error saving guardrail policy:", error);
             func.setToast(true, true, isEditMode ? "Failed to update guardrail" : "Failed to create guardrail");
         } finally {
             setLoading(false);
@@ -509,9 +529,25 @@ function GuardrailPolicies() {
     };
 
 
-      const components = [
+    // If showing create/edit page, render the full page component
+    if (showCreateModal) {
+        return (
+            <CreateGuardrailPage
+                onClose={() => {
+                    setShowCreateModal(false);
+                    setEditingPolicy(null);
+                    setIsEditMode(false);
+                }}
+                onSave={handleCreateGuardrail}
+                editingPolicy={editingPolicy}
+                isEditMode={isEditMode}
+            />
+        );
+    }
+
+    const components = [
         <GithubSimpleTable
-            key={`policies-table-${policyData.length}`}
+            key={`policies-table-${JSON.stringify(policyData.map((row) => row.originalData))}`}
             resourceName={resourceName}
             useNewRow={true}
             headers={headings}
@@ -530,19 +566,7 @@ function GuardrailPolicies() {
             loading={loading}
             selectable={true}
             promotedBulkActions={promotedBulkActions}
-
-        />,   
-        <CreateGuardrailModal
-            key={2}
-            isOpen={showCreateModal}
-            onClose={() => {
-                setShowCreateModal(false);
-                setEditingPolicy(null);
-                setIsEditMode(false);
-            }}
-            onSave={handleCreateGuardrail}
-            editingPolicy={editingPolicy}
-            isEditMode={isEditMode}
+            {...(func.isDemoAccount() && { customFilters: true, modifyData })}
         />
     ];
 

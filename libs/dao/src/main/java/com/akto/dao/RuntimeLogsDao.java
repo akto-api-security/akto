@@ -37,7 +37,7 @@ public class RuntimeLogsDao extends AccountsContextDao<Log> {
             }
         }
 
-        String[] fieldNames = {Log.TIMESTAMP};
+        String[] fieldNames = {Log.TIMESTAMP, Log.KEY};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
 
     }

@@ -372,4 +372,191 @@ public class ThreatDetectorTest {
         // No host header → no threat
         assertFalse(threatDetector.isUserAuthMismatchThreat(params, null));
     }
+
+    // Tests for isInternalIp function
+    @Test
+    public void testIsInternalIp_class_a_private() {
+        // RFC 1918: 10.0.0.0 - 10.255.255.255
+        assertTrue(threatDetector.isInternalIp("10.0.0.0"));
+        assertTrue(threatDetector.isInternalIp("10.0.0.1"));
+        assertTrue(threatDetector.isInternalIp("10.255.255.255"));
+        assertTrue(threatDetector.isInternalIp("10.100.50.25"));
+    }
+
+    @Test
+    public void testIsInternalIp_class_a_private_with_port() {
+        // RFC 1918 with port
+        assertTrue(threatDetector.isInternalIp("10.0.0.1:8080"));
+        assertTrue(threatDetector.isInternalIp("10.255.255.255:443"));
+        assertTrue(threatDetector.isInternalIp("10.100.50.25:3000"));
+    }
+
+    @Test
+    public void testIsInternalIp_loopback() {
+        // Loopback: 127.x.x.x
+        assertTrue(threatDetector.isInternalIp("127.0.0.1"));
+        assertTrue(threatDetector.isInternalIp("127.0.0.0"));
+        assertTrue(threatDetector.isInternalIp("127.255.255.255"));
+        assertTrue(threatDetector.isInternalIp("127.1.1.1"));
+    }
+
+    @Test
+    public void testIsInternalIp_loopback_with_port() {
+        // Loopback with port
+        assertTrue(threatDetector.isInternalIp("127.0.0.1:8080"));
+        assertTrue(threatDetector.isInternalIp("127.0.0.1:443"));
+        assertTrue(threatDetector.isInternalIp("127.255.255.255:3000"));
+    }
+
+    @Test
+    public void testIsInternalIp_link_local() {
+        // Link-local: 169.254.x.x
+        assertTrue(threatDetector.isInternalIp("169.254.0.0"));
+        assertTrue(threatDetector.isInternalIp("169.254.169.254"));
+        assertTrue(threatDetector.isInternalIp("169.254.255.255"));
+        assertTrue(threatDetector.isInternalIp("169.254.1.1"));
+    }
+
+    @Test
+    public void testIsInternalIp_link_local_with_port() {
+        // Link-local with port
+        assertTrue(threatDetector.isInternalIp("169.254.169.254:8080"));
+        assertTrue(threatDetector.isInternalIp("169.254.0.0:443"));
+        assertTrue(threatDetector.isInternalIp("169.254.255.255:9000"));
+    }
+
+    @Test
+    public void testIsInternalIp_class_b_private() {
+        // RFC 1918: 172.16.0.0 - 172.31.255.255
+        assertTrue(threatDetector.isInternalIp("172.16.0.0"));
+        assertTrue(threatDetector.isInternalIp("172.16.0.1"));
+        assertTrue(threatDetector.isInternalIp("172.31.255.255"));
+        assertTrue(threatDetector.isInternalIp("172.20.100.50"));
+    }
+
+    @Test
+    public void testIsInternalIp_class_b_private_with_port() {
+        // RFC 1918: 172.16-31 with port
+        assertTrue(threatDetector.isInternalIp("172.16.0.1:8080"));
+        assertTrue(threatDetector.isInternalIp("172.31.255.255:443"));
+        assertTrue(threatDetector.isInternalIp("172.20.100.50:3000"));
+    }
+
+    @Test
+    public void testIsInternalIp_class_c_private() {
+        // RFC 1918: 192.168.x.x
+        assertTrue(threatDetector.isInternalIp("192.168.0.0"));
+        assertTrue(threatDetector.isInternalIp("192.168.0.1"));
+        assertTrue(threatDetector.isInternalIp("192.168.255.255"));
+        assertTrue(threatDetector.isInternalIp("192.168.1.100"));
+    }
+
+    @Test
+    public void testIsInternalIp_class_c_private_with_port() {
+        // RFC 1918: 192.168 with port
+        assertTrue(threatDetector.isInternalIp("192.168.0.1:8080"));
+        assertTrue(threatDetector.isInternalIp("192.168.255.255:443"));
+        assertTrue(threatDetector.isInternalIp("192.168.1.100:3000"));
+    }
+
+    @Test
+    public void testIsInternalIp_shared_address_space() {
+        // RFC 6598: Shared Address Space 100.64.0.0 - 100.127.255.255
+        assertTrue(threatDetector.isInternalIp("100.64.0.0"));
+        assertTrue(threatDetector.isInternalIp("100.64.0.1"));
+        assertTrue(threatDetector.isInternalIp("100.127.255.255"));
+        assertTrue(threatDetector.isInternalIp("100.100.100.100"));
+    }
+
+    @Test
+    public void testIsInternalIp_shared_address_space_with_port() {
+        // RFC 6598 with port
+        assertTrue(threatDetector.isInternalIp("100.64.0.1:8080"));
+        assertTrue(threatDetector.isInternalIp("100.127.255.255:443"));
+        assertTrue(threatDetector.isInternalIp("100.100.100.100:3000"));
+    }
+
+    @Test
+    public void testIsInternalIp_this_network() {
+        // This network: 0.0.0.0
+        assertTrue(threatDetector.isInternalIp("0.0.0.0"));
+    }
+
+    @Test
+    public void testIsInternalIp_this_network_with_port() {
+        // This network with port
+        assertTrue(threatDetector.isInternalIp("0.0.0.0:8080"));
+        assertTrue(threatDetector.isInternalIp("0.0.0.0:443"));
+    }
+
+    @Test
+    public void testIsInternalIp_public_addresses() {
+        // Public addresses should NOT match
+        assertFalse(threatDetector.isInternalIp("8.8.8.8"));
+        assertFalse(threatDetector.isInternalIp("1.1.1.1"));
+        assertFalse(threatDetector.isInternalIp("208.67.222.222"));
+    }
+
+    @Test
+    public void testIsInternalIp_public_addresses_with_port() {
+        // Public addresses with port should NOT match
+        assertFalse(threatDetector.isInternalIp("8.8.8.8:8080"));
+        assertFalse(threatDetector.isInternalIp("1.1.1.1:443"));
+        assertFalse(threatDetector.isInternalIp("208.67.222.222:53"));
+    }
+
+    @Test
+    public void testIsInternalIp_invalid_ranges_class_b() {
+        // 172.15 and 172.32 are outside the private range
+        assertFalse(threatDetector.isInternalIp("172.15.0.0"));
+        assertFalse(threatDetector.isInternalIp("172.32.0.0"));
+        assertFalse(threatDetector.isInternalIp("172.15.255.255"));
+        assertFalse(threatDetector.isInternalIp("172.32.255.255"));
+    }
+
+    @Test
+    public void testIsInternalIp_invalid_shared_address_space() {
+        // 100.63 and 100.128 are outside the shared address space
+        assertFalse(threatDetector.isInternalIp("100.63.0.0"));
+        assertFalse(threatDetector.isInternalIp("100.128.0.0"));
+    }
+
+    @Test
+    public void testIsInternalIp_invalid_link_local() {
+        // 169.253 and 169.255 are not link-local
+        assertFalse(threatDetector.isInternalIp("169.253.0.0"));
+        assertFalse(threatDetector.isInternalIp("169.255.0.0"));
+    }
+
+    @Test
+    public void testIsInternalIp_empty_string() {
+        // Empty string should not match
+        assertFalse(threatDetector.isInternalIp(""));
+    }
+
+    @Test
+    public void testIsInternalIp_invalid_format() {
+        // Invalid formats should not match
+        assertFalse(threatDetector.isInternalIp("192.168.1"));
+        assertFalse(threatDetector.isInternalIp("192.168"));
+        assertFalse(threatDetector.isInternalIp("192"));
+        assertFalse(threatDetector.isInternalIp("invalid"));
+        assertFalse(threatDetector.isInternalIp("not-an-ip"));
+    }
+
+    @Test
+    public void testIsInternalIp_edge_case_broadcast() {
+        // Broadcast addresses in private ranges should match if in range
+        assertTrue(threatDetector.isInternalIp("192.168.1.255"));
+        assertTrue(threatDetector.isInternalIp("10.0.0.255"));
+        assertTrue(threatDetector.isInternalIp("172.16.0.255"));
+    }
+
+    @Test
+    public void testIsInternalIp_edge_case_network_addresses() {
+        // Network addresses in private ranges should match
+        assertTrue(threatDetector.isInternalIp("192.168.0.0"));
+        assertTrue(threatDetector.isInternalIp("10.0.0.0"));
+        assertTrue(threatDetector.isInternalIp("172.16.0.0"));
+    }
 }

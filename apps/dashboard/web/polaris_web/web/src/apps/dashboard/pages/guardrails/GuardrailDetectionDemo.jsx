@@ -8,6 +8,7 @@ import values from "@/util/values";
 import { produce } from "immer"
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 import SessionStore from "../../../main/SessionStore";
+import { SEVERITY } from "./utils";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { labelMap } from '../../../main/labelHelperMap';
 import PersistStore from '@/apps/main/PersistStore';
@@ -89,7 +90,7 @@ function GuardrailDetectionDemo() {
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
 
     const data = guardRailData.guardRailDummyData.maliciousEvents.map((x) => {
-      const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
+      const severity = threatFiltersMap[x?.filterId]?.severity || SEVERITY.MEDIUM.value
       return {
         ...x,
         id: x.id,

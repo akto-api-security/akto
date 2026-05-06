@@ -12,7 +12,8 @@ const PageWithMultipleCards = (props) => {
 
     const location = useLocation();
     const navigate = useNavigate()
-    const isNewTab = location.key==='default' || !(window.history.state && window.history.state.idx > 0)
+    const stack = JSON.parse(sessionStorage.getItem('pathnameStack') || '[]');
+    const isNewTab = location.key === 'default' || stack.length <= 1
 
     const prevPathRef = useRef();
 

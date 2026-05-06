@@ -9,6 +9,7 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
     const headerConditions = dataObj.headerKVPairs || {}
     const headerKey = Object.keys(headerConditions).length > 0 ? Object.keys(headerConditions)[0] : ''
     const headerValue = headerKey.length > 0 ? headerConditions[headerKey] : ''
+    const urlRegex = dataObj.urlRegex && String(dataObj.urlRegex).trim() ? dataObj.urlRegex : null
 
     function TitleComponent ({title}){
         return (
@@ -53,8 +54,13 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                 <VerticalStack gap={3}>
 
                     {headerKey.length > 0 ? <VerticalStack gap={2}>
-                        <TitleComponent title={"Api header conditions"} />
+                        <TitleComponent title={"API header conditions"} />
                         <Box paddingInlineStart={4}>{headerKey.length > 0 ? <LineComponent title={headerKey + " :"} value={headerValue}/> : <Text variant="headingMd">-</Text>}</Box>
+                    </VerticalStack> : null}
+
+                    {urlRegex ? <VerticalStack gap={2}>
+                        <TitleComponent title={"URL path regex"} />
+                        <Box paddingInlineStart={4}><LineComponent title="Regex :" value={urlRegex} /></Box>
                     </VerticalStack> : null}
 
                     <VerticalStack gap={2}>

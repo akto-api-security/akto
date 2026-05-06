@@ -1,142 +1,180 @@
 import api from "@/apps/dashboard/pages/observe/api"
+import IconPersistStore from "@/apps/main/IconPersistStore"
 
 /**
- * Icon Cache Service
- * Loads collection icons from backend once per page load
+ * Simple Icon Cache Service
+ * Uses localStorage cache with intelligent batching
  */
 class IconCacheService {
     constructor() {
-        // Cache storage - fresh on each instance
-        this.hostnameToObjectIdCache = {};
-        this.objectIdToIconDataCache = {};
-        
-        // Single load promise to prevent multiple API calls
-        this.loadPromise = null;
+        this.store = IconPersistStore;
+        this.pendingRequests = new Set();
+        this.activeRequests = new Map();
+        this.batchTimeout = null;
+        this.BATCH_DELAY = 50;   // ms - reduced for faster loading
+        this.BATCH_SIZE = 100;    // hostnames per batch
     }
 
     /**
-     * Load icon caches from backend once
-     * @returns {Promise} Promise that resolves when caches are loaded
-     */
-    async loadAllIcons() {
-        // If already loading, return the existing promise
-        if (this.loadPromise) {
-            return this.loadPromise;
-        }
-        
-        // If already loaded, return immediately
-        if (Object.keys(this.hostnameToObjectIdCache).length > 0) {
-            return Promise.resolve();
-        }
-        
-        // Load data from backend
-        this.loadPromise = (async () => {
-            try {
-                const response = await api.getAllIconsCache();
-                if (response && response.hostnameToObjectIdCache && response.objectIdToIconDataCache) {
-                    this.hostnameToObjectIdCache = response.hostnameToObjectIdCache;
-                    this.objectIdToIconDataCache = response.objectIdToIconDataCache;
-                }
-            } catch (error) {
-
-                throw error;
-            }
-        })();
-        
-        return this.loadPromise;
-    }
-
-    /**
-     * Get icon data for a specific hostname
-     * @param {string} hostname - The hostname to get icon for
-     * @returns {string|null} Base64 icon data or null if not found
+     * Get icon data for hostname
      */
     async getIconData(hostname) {
-        if (!hostname || hostname.trim() === '') {
-            return null;
-        }
+        if (!hostname?.trim()) return null;
 
-        // Ensure caches are loaded
-        await this.loadAllIcons();
+        const cleanHostname = hostname.trim();
         
-        const trimmedHostName = hostname.trim();
-
+        // Check cache first
+        const cached = this.store.getState().getIcon(cleanHostname);
+        if (cached) return cached;
         
-        // Find matching hostname in cache
-        let objectId = null;
-        for (const [key, value] of Object.entries(this.hostnameToObjectIdCache)) {
-            // key is a string like "mcp.twilio.com,twilio.com"
-            // Parse it to extract the hostname (first part)
-            const parts = key.split(',');
-
-            if (parts.length >= 1 && parts[0].trim() === trimmedHostName) {
-                objectId = value;
-                break;
-            }
-        }
-        
-        if (objectId && this.objectIdToIconDataCache[objectId]) {
-            const iconDataObj = this.objectIdToIconDataCache[objectId];
-            // Return imageData only if it's not empty
-            if (iconDataObj.imageData && iconDataObj.imageData.trim() !== '') {
-                return iconDataObj.imageData;
-            } else {
-                return null;
-            }
-        }
-        return null;
+        // Queue for batch processing
+        return this.queueForBatch(cleanHostname);
     }
 
     /**
-     * Search for icon by keyword in cached hostnames
-     * Useful for finding icons by client name (e.g., "claude", "copilot")
-     * @param {string} keyword - The keyword to search for in hostnames
-     * @returns {string|null} Base64 icon data or null if not found
+     * Queue hostname for batch processing with immediate processing for small batches
      */
-    async getIconByKeyword(keyword) {
-        if (!keyword || keyword.trim() === '') {
-            return null;
+    queueForBatch(hostname) {
+        if (this.activeRequests.has(hostname)) {
+            return this.activeRequests.get(hostname);
         }
 
-        // Ensure caches are loaded
-        await this.loadAllIcons();
-        
-        const lowerKeyword = keyword.toLowerCase().trim();
-        
-        // Search for keyword in cached hostnames
-        let objectId = null;
-        for (const [key, value] of Object.entries(this.hostnameToObjectIdCache)) {
-            // key is a string like "mcp.twilio.com,twilio.com"
-            const lowerKey = key.toLowerCase();
+        const promise = new Promise((resolve) => {
+            this.activeRequests.set(hostname, { resolve, hostname });
+            this.pendingRequests.add(hostname);
             
-            // Check if keyword is found in any part of the hostname key
-            if (lowerKey.includes(lowerKeyword)) {
-                objectId = value;
-                break;
+            if (this.batchTimeout) {
+                clearTimeout(this.batchTimeout);
             }
-        }
+            
+            // If we have only a few pending requests, process immediately for faster UX
+            if (this.pendingRequests.size <= 3) {
+                this.batchTimeout = setTimeout(() => this.processBatch(), 10); // Very short delay
+            } else {
+                this.batchTimeout = setTimeout(() => this.processBatch(), this.BATCH_DELAY);
+            }
+        });
         
-        if (objectId && this.objectIdToIconDataCache[objectId]) {
-            const iconDataObj = this.objectIdToIconDataCache[objectId];
-            if (iconDataObj.imageData && iconDataObj.imageData.trim() !== '') {
-                return iconDataObj.imageData;
-            }
-        }
-        return null;
+        this.activeRequests.set(hostname, promise);
+        return promise;
     }
 
     /**
-     * Get favicon URL for a domain using external service
-     * Returns a URL that can be used directly in img src
-     * @param {string} domain - The domain to get favicon for
-     * @returns {string} Favicon URL
+     * Process batch requests
+     */
+    async processBatch() {
+        if (this.pendingRequests.size === 0) return;
+
+        const hostnamesToFetch = Array.from(this.pendingRequests).slice(0, this.BATCH_SIZE);
+        this.pendingRequests.clear();
+
+        try {
+            const response = await api.fetchIconsForHostnames(hostnamesToFetch);
+            
+            if (response?.icons) {
+                this.store.getState().setIcons(response.icons);
+                
+                hostnamesToFetch.forEach(hostname => {
+                    const resolver = this.activeRequests.get(hostname);
+                    if (resolver?.resolve) {
+                        const iconData = response.icons[hostname]?.imageData || null;
+                        resolver.resolve(iconData);
+                    }
+                    this.activeRequests.delete(hostname);
+                });
+            } else {
+                // No icons - resolve with null
+                hostnamesToFetch.forEach(hostname => {
+                    const resolver = this.activeRequests.get(hostname);
+                    if (resolver?.resolve) {
+                        resolver.resolve(null);
+                    }
+                    this.activeRequests.delete(hostname);
+                });
+            }
+        } catch (error) {
+
+            // Resolve with null on error
+            hostnamesToFetch.forEach(hostname => {
+                const resolver = this.activeRequests.get(hostname);
+                if (resolver?.resolve) {
+                    resolver.resolve(null);
+                }
+                this.activeRequests.delete(hostname);
+            });
+        }
+    }
+
+    /**
+     * Preload icons for multiple hostnames
+     */
+    async preloadIcons(hostnames) {
+        if (!hostnames?.length) return {};
+
+        const cleanHostnames = hostnames
+            .filter(h => h?.trim())
+            .map(h => h.trim());
+
+        const cached = this.store.getState().getIcons(cleanHostnames);
+        const uncachedHostnames = cleanHostnames.filter(h => !cached[h]);
+
+        if (uncachedHostnames.length === 0) {
+            return cached;
+        }
+
+        try {
+            const response = await api.fetchIconsForHostnames(uncachedHostnames);
+            
+            if (response?.icons) {
+                this.store.getState().setIcons(response.icons);
+                
+                return {
+                    ...cached,
+                    ...Object.entries(response.icons).reduce((acc, [hostname, data]) => {
+                        acc[hostname] = data.imageData;
+                        return acc;
+                    }, {})
+                };
+            }
+        } catch (error) {
+
+        }
+
+        return cached;
+    }
+
+    /**
+     * Get favicon URL for external domains
      */
     getFaviconUrl(domain) {
         if (!domain) return null;
-        // Use Google's favicon service - reliable and fast
         return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+    }
+
+    /**
+     * Search by keyword - not supported
+     */
+    async getIconByKeyword(keyword) {
+        return null;
+    }
+
+    /**
+     * Clear cache - follows existing codebase pattern
+     */
+    clearCache() {
+        try {
+            this.store.getState().clearAll();
+            this.pendingRequests.clear();
+            this.activeRequests.clear();
+            
+            if (this.batchTimeout) {
+                clearTimeout(this.batchTimeout);
+                this.batchTimeout = null;
+            }
+        } catch (error) {
+
+        }
     }
 }
 
-// Export the class, not an instance
 export default IconCacheService;

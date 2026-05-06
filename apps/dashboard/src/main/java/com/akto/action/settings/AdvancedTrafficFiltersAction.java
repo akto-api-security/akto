@@ -176,12 +176,9 @@ public class AdvancedTrafficFiltersAction extends UserAction {
     BasicDBObject response;
 
     public String deleteOptionAndSlashApis(){
-        List<ApiCollection> apiCollectionList = ApiCollectionsDao.fetchAllHosts();
+        List<ApiCollection> apiCollectionList = ApiCollectionsDao.fetchAllActiveHosts();
         response = new BasicDBObject();
         for (ApiCollection apiCollection: apiCollectionList) {
-            if(apiCollection.isDeactivated()) {
-                continue;
-            }
             List<Key> toBeDeleted = new ArrayList<>();
             if (apiCollection.getHostName() == null) {
                 continue;

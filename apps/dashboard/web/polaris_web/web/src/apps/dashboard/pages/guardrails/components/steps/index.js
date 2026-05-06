@@ -6,4 +6,6 @@ export { default as SensitiveInfoStep, SensitiveInfoConfig } from './SensitiveIn
 export { default as CodeDetectionStep, CodeDetectionConfig } from './CodeDetectionStep';
 export { default as CustomGuardrailsStep, CustomGuardrailsConfig } from './CustomGuardrailsStep';
 export { default as UsageGuardrailsStep, UsageGuardrailsConfig } from './UsageGuardrailsStep';
+export { default as AnomalyDetectionStep, AnomalyDetectionConfig } from './AnomalyDetectionStep';
+export { default as ToolsGuardrailsStep, ToolsGuardrailsConfig } from './ToolsGuardrailsStep';
 export { default as ServerSettingsStep, ServerSettingsConfig } from './ServerSettingsStep';

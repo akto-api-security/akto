@@ -3,7 +3,6 @@ package com.akto.interceptor;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.akto.dao.RBACDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.User;
 import com.akto.dto.billing.FeatureAccess;
@@ -41,7 +40,13 @@ public class UsageInterceptor extends AbstractInterceptor {
             }
 
             Map<String, Object> session = invocation.getInvocationContext().getSession();
-            int sessionAccId = (Integer) session.get(UserDetailsFilter.ACCOUNT_ID);
+            Object accountIdObj = session.get(UserDetailsFilter.ACCOUNT_ID);
+            if (accountIdObj == null) {
+                throw new Exception("Account id not found in session");
+            }
+            int sessionAccId = accountIdObj instanceof Integer
+                    ? (Integer) accountIdObj
+                    : Integer.parseInt(String.valueOf(accountIdObj));
 
             Organization organization = OrganizationsDao.instance.findOne(
                     Filters.in(Organization.ACCOUNTS, sessionAccId));
@@ -99,12 +104,6 @@ public class UsageInterceptor extends AbstractInterceptor {
             User user = (User) session.get(RoleAccessInterceptor.USER);
             if(user == null) {
                 throw new Exception("User not found in session, returning from interceptor");
-            }
-
-            if(!RBACDao.hasAccessToFeature(user.getId(), sessionAccId, featureLabel)){
-                ((ActionSupport) invocation.getAction())
-                                .addActionError("This role doesn't have access to the feature: " + featureLabel);
-                        return UNAUTHORIZED;
             }
 
         } catch (Exception e) {

@@ -51,7 +51,7 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 import com.slack.api.Slack;
-
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -69,12 +69,16 @@ public class StartTestAction extends UserAction {
 
     private TestingEndpoints.Type type;
     private int apiCollectionId;
+    @Getter
+    @Setter
+    private List<Integer> apiCollectionIds;
     private List<ApiInfo.ApiInfoKey> apiInfoKeyList;
     private int testIdConfig;
     private int workflowTestId;
     private int startTimestamp;
     private int testRunTime;
     private int maxConcurrentRequests;
+    private int maxAgentTokens = -1;
     boolean recurringDaily;
     boolean recurringWeekly;
     boolean recurringMonthly;
@@ -97,6 +101,9 @@ public class StartTestAction extends UserAction {
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
+    @Getter
+    @Setter
+    private List<Integer> issueSummaryFilterCollectionIds;
     
     @Getter
     private List<Map<String, Object>> categoryWiseScores = new ArrayList<>();
@@ -121,6 +128,13 @@ public class StartTestAction extends UserAction {
 
     private static final Gson gson = new Gson();
 
+
+    private BasicDBObject response = new BasicDBObject();
+
+    public BasicDBObject getResponse() {
+        return response;
+    }
+
     @Getter
     int misConfiguredTestsCount;
 
@@ -141,7 +155,13 @@ public class StartTestAction extends UserAction {
     }
 
     public List<ObjectId> getCicdTests(){
-        return getTestingRunListFromSummary(Filters.exists(TestingRunResultSummary.METADATA_STRING));
+        // Include documents with metadata string, but exclude those where metadata.error exists 
+        // CICD issues with error field will not be shown in CICD 
+        Bson filter = Filters.and(
+        Filters.exists(TestingRunResultSummary.METADATA_STRING, true),
+        Filters.exists(TestingRunResultSummary.METADATA_STRING + ".error", false)
+        );
+        return getTestingRunListFromSummary(filter);
     }
 
     private static List<ObjectId> getTestsWithSeverity(List<String> severities) {
@@ -158,6 +178,7 @@ public class StartTestAction extends UserAction {
     private boolean sendSlackAlert = false;
     private boolean sendMsTeamsAlert = false;
     private boolean doNotMarkIssuesAsFixed = false;
+    private boolean runAutomatedTests = false;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName, int selectedSlackChannelId) {
         User user = getSUser();
@@ -189,6 +210,13 @@ public class StartTestAction extends UserAction {
             case COLLECTION_WISE:
                 testingEndpoints = new CollectionWiseTestingEndpoints(apiCollectionId);
                 break;
+            case MULTI_COLLECTION:
+                if (this.apiCollectionIds == null || this.apiCollectionIds.isEmpty()) {
+                    addActionError("API Collection IDs list can't be empty");
+                    return null;
+                }
+                testingEndpoints = new MultiCollectionTestingEndpoints(this.apiCollectionIds);
+                break;  
             case WORKFLOW:
                 WorkflowTest workflowTest = WorkflowTestsDao.instance.findOne(Filters.eq("_id", this.workflowTestId));
                 if (workflowTest == null) {
@@ -217,14 +245,19 @@ public class StartTestAction extends UserAction {
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
 
+        // Get dashboard context from Context.contextSource (set by UserDetailsFilter from x-context-source header)
+        CONTEXT_SOURCE dashboardContext = Context.contextSource.get();
+
         TestingRun testingRun = new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId);
+                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId, dashboardContext);
         testingRun.setDoNotMarkIssuesAsFixed(this.doNotMarkIssuesAsFixed);
+        testingRun.setMaxAgentTokens(this.maxAgentTokens);
+        testingRun.setRunAutomatedTests(this.runAutomatedTests);
         return testingRun;
     }
 
-    String selectedMiniTestingServiceName;
+    List<String> selectedMiniTestingServiceNames;
     int selectedSlackWebhook;
     private List<String> selectedTests;
     private List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings;
@@ -272,7 +305,11 @@ public class StartTestAction extends UserAction {
         }
         if (localTestingRun == null) {
             try {
-                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly), selectedMiniTestingServiceName, selectedSlackWebhook);
+                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly), null, selectedSlackWebhook);
+                // Set the new list field
+                if (selectedMiniTestingServiceNames != null && !selectedMiniTestingServiceNames.isEmpty()) {
+                    localTestingRun.setAllowedMiniTestingServiceNames(selectedMiniTestingServiceNames);
+                }
                 // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
                 if (this.continuousTesting) {
                     localTestingRun.setPeriodInSeconds(-1);
@@ -553,7 +590,8 @@ public class StartTestAction extends UserAction {
             filterList.add(
                 Filters.or(
                     Filters.in(TestingRun._API_COLLECTION_ID, apiCollectionIds),
-                    Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, apiCollectionIds)
+                    Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, apiCollectionIds),
+                    Filters.in(TestingRun._API_COLLECTION_IDS_MULTI, apiCollectionIds)
                 )
             );
         }
@@ -575,14 +613,17 @@ public class StartTestAction extends UserAction {
         if(skip < 0){
             skip *= -1;
         }
-
-        if(limit < 0){
-            limit *= -1;
+        int pageLimit = limit;
+        if(limit != -1){
+            if(limit < 0){
+                limit *= -1;
+            }
+            pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
+        }else{
+            pageLimit = 10000000;
         }
 
-        int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
-
-        testingRuns = TestingRunDao.instance.findAll(
+        testingRuns = TestingRunDao.instance.findAllWithRbacAndContext(
                 Filters.and(testingRunFilters), skip, pageLimit,
                 prepareSort());
 
@@ -595,7 +636,7 @@ public class StartTestAction extends UserAction {
         latestTestingRunResultSummaries = TestingRunResultSummariesDao.instance
                 .fetchLatestTestingRunResultSummaries(testingRunHexIds);
 
-        testingRunsCount = TestingRunDao.instance.count(Filters.and(testingRunFilters));
+        testingRunsCount = TestingRunDao.instance.countWithRbacAndContext(Filters.and(testingRunFilters));
 
         return SUCCESS.toUpperCase();
     }
@@ -660,6 +701,11 @@ public class StartTestAction extends UserAction {
         );
 
         this.testingRun.setTestingRunConfig(runConfig);
+
+        response.put("testingRunResultSummaries", this.testingRunResultSummaries);
+        response.put("testingRun", this.testingRun);
+        response.put("testingRunType", this.testingRunType);
+        response.put("workflowTest", this.workflowTest);
 
         return SUCCESS.toUpperCase();
     }
@@ -916,6 +962,12 @@ public class StartTestAction extends UserAction {
         timeNow = Context.now();
         loggerMaker.debugAndAddToDb("fetchTestingRunResults completed in: " + (Context.now() - timeNow), LogDb.DASHBOARD);
 
+        response.put("testingRunResults", this.testingRunResults);
+        response.put("errorEnums", this.errorEnums);
+        response.put("issuesDescriptionMap", this.issuesDescriptionMap);
+        response.put("jiraIssuesMapForResults", this.jiraIssuesMapForResults);
+        response.put("devrevIssuesMapForResults", this.devrevIssuesMapForResults);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -1045,6 +1097,9 @@ public class StartTestAction extends UserAction {
     private TestingRunResult testingRunResult;
 
     public String fetchTestRunResultDetails() {
+        if (testingRunResultHexId == null || testingRunResultHexId.isEmpty() || !ObjectId.isValid(testingRunResultHexId)) {
+            return Action.ERROR;
+        }
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
         this.testingRunResult = VulnerableTestingRunResultDao.instance.findOneWithComparison(Filters.eq(Constants.ID, testingRunResultId), null);
         List<GenericTestResult> runResults = new ArrayList<>();
@@ -1065,6 +1120,9 @@ public class StartTestAction extends UserAction {
     private TestingRunIssues runIssues;
 
     public String fetchIssueFromTestRunResultDetails() {
+        if (testingRunResultHexId == null || testingRunResultHexId.isEmpty() || !ObjectId.isValid(testingRunResultHexId)) {
+            return Action.ERROR;
+        }
         ObjectId testingRunResultId = new ObjectId(testingRunResultHexId);
         TestingRunResult result = VulnerableTestingRunResultDao.instance.findOneWithComparison(Filters.eq(Constants.ID, testingRunResultId), null);
         try {
@@ -1081,7 +1139,8 @@ public class StartTestAction extends UserAction {
                 if (isTestRunByTestEditor) {
                     issuesId.setTestErrorSource(TestErrorSource.TEST_EDITOR);
                 }
-                runIssues = TestingRunIssuesDao.instance.findOne(Filters.eq(Constants.ID, issuesId));
+                // Use findOneNoRbacFilter to allow access to issues from deleted collections
+                runIssues = TestingRunIssuesDao.instance.findOneNoRbacFilter(Filters.eq(Constants.ID, issuesId), null);
             }
         } catch (Exception ignore) {
         }
@@ -1093,7 +1152,7 @@ public class StartTestAction extends UserAction {
         Bson filterQ = Filters.and(
                 Filters.eq("testingEndpoints.workflowTest._id", workflowTestId),
                 Filters.eq("state", TestingRun.State.SCHEDULED));
-        this.testingRuns = TestingRunDao.instance.findAll(filterQ);
+        this.testingRuns = TestingRunDao.instance.findAllWithRbacAndContext(filterQ, 0, 0, null);
         return SUCCESS.toUpperCase();
     }
 
@@ -1155,6 +1214,8 @@ public class StartTestAction extends UserAction {
         List<String> filterFields = new ArrayList<>(Arrays.asList("branch", "repository"));
         metadataFilters = TestingRunResultSummariesDao.instance.fetchMetadataFilters(filterFields);
 
+        response.put("metadataFilters", this.metadataFilters);
+
         return SUCCESS.toUpperCase();
     }
 
@@ -1166,22 +1227,22 @@ public class StartTestAction extends UserAction {
         filters.addAll(prepareFilters(startTimestamp, endTimestamp));
         filters.addAll(getTableFilters());
 
-        long totalCount = TestingRunDao.instance.count(Filters.and(filters));
+        long totalCount = TestingRunDao.instance.countWithRbacAndContext(Filters.and(filters));
 
         ArrayList<Bson> filterForCicd = new ArrayList<>(filters); // Create a copy of filters
         filterForCicd.add(getTestingRunTypeFilter(TestingRunType.CI_CD));
-        long cicdCount = TestingRunDao.instance.count(Filters.and(filterForCicd));
+        long cicdCount = TestingRunDao.instance.countWithRbacAndContext(Filters.and(filterForCicd));
 
         filters.add(getTestingRunTypeFilter(TestingRunType.ONE_TIME));
 
-        long oneTimeCount = TestingRunDao.instance.count(Filters.and(filters));
+        long oneTimeCount = TestingRunDao.instance.countWithRbacAndContext(Filters.and(filters));
 
         ArrayList<Bson> continuousTestsFilter = new ArrayList<>(); // Create a copy of filters
         continuousTestsFilter.add(getTestingRunTypeFilter(TestingRunType.CONTINUOUS_TESTING));
         continuousTestsFilter.add(Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTimestamp));
         continuousTestsFilter.addAll(getTableFilters());
 
-        long continuousTestsCount = TestingRunDao.instance.count(Filters.and(continuousTestsFilter));
+        long continuousTestsCount = TestingRunDao.instance.countWithRbacAndContext(Filters.and(continuousTestsFilter));
 
         long scheduleCount = totalCount - oneTimeCount - cicdCount - continuousTestsCount;
 
@@ -1218,7 +1279,8 @@ public class StartTestAction extends UserAction {
                 sourceType,
                 startTimestamp, 
                 endTimestamp, 
-                dashboardCategory
+                dashboardCategory,
+                this.apiCollectionIds
             );
             
         } catch (Exception e) {
@@ -1246,7 +1308,11 @@ public class StartTestAction extends UserAction {
 //        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
 //        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
 
-        Map<String,Integer> totalSubcategoriesCountMap = TestingRunIssuesDao.instance.getTotalSubcategoriesCountMap(this.startTimestamp,this.endTimestamp, demoCollections);
+        Map<String,Integer> totalSubcategoriesCountMap = TestingRunIssuesDao.instance.getTotalSubcategoriesCountMap(
+                this.startTimestamp,
+                this.endTimestamp,
+                demoCollections,
+                this.issueSummaryFilterCollectionIds);
         this.issuesSummaryInfoMap = totalSubcategoriesCountMap;
 
         return SUCCESS.toUpperCase();
@@ -1340,7 +1406,7 @@ public class StartTestAction extends UserAction {
                 totalRunningTests += currentTestsStoredForSummary;
                 currentTestsRunningList.add(new StatusForIndividualTest(summary.getTestingRunId().toHexString(), totalInitiatedTests, totalRunningTests));
             }
-            int totalTestsQueued = (int) TestingRunDao.instance.count(
+            int totalTestsQueued = (int) TestingRunDao.instance.countWithRbacAndContext(
                 Filters.eq(TestingRun.STATE, State.SCHEDULED)
             );
 
@@ -1443,6 +1509,11 @@ public class StartTestAction extends UserAction {
                                         editableTestingRunConfig.getSendMsTeamsAlert()));
                     }
 
+                    if (existingTestingRun.getDoNotMarkIssuesAsFixed() != editableTestingRunConfig.isDoNotMarkIssuesAsFixed()) {
+                        updates.add(Updates.set(TestingRun.DO_NOT_MARK_ISSUES_AS_FIXED,
+                                editableTestingRunConfig.isDoNotMarkIssuesAsFixed()));
+                    }
+
                     int periodInSeconds = getPeriodInSeconds(editableTestingRunConfig.getRecurringDaily(), editableTestingRunConfig.getRecurringWeekly(), editableTestingRunConfig.getRecurringMonthly());
                     if (editableTestingRunConfig.getContinuousTesting()) {
                         periodInSeconds = -1;
@@ -1462,6 +1533,14 @@ public class StartTestAction extends UserAction {
 
                     if(editableTestingRunConfig.getMiniTestingServiceName() != null && !editableTestingRunConfig.getMiniTestingServiceName().isEmpty()){
                         updates.add(Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, editableTestingRunConfig.getMiniTestingServiceName()));
+                    }
+                    
+                    if (editableTestingRunConfig.getAllowedMiniTestingServiceNames() != null
+                            && !editableTestingRunConfig.getAllowedMiniTestingServiceNames().isEmpty()) {
+                        updates.add(Updates.set(
+                            TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES,
+                            editableTestingRunConfig.getAllowedMiniTestingServiceNames()
+                        ));
                     }
 
                     updates.add(Updates.set(TestingRun.SELECTED_SLACK_CHANNEL_ID, editableTestingRunConfig.getSelectedSlackChannelId()));
@@ -1647,6 +1726,17 @@ public class StartTestAction extends UserAction {
             pipeLine.add(
                 Aggregates.match(Filters.and(Filters.eq(TestingRunResultSummary.STATE, State.COMPLETED.toString()), Filters.gt(TestingRunResultSummary.START_TIMESTAMP, 0)))
             );
+            if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
+                pipeLine.add(Aggregates.lookup(
+                        TestingRunDao.instance.getCollName(),
+                        TestingRunResultSummary.TESTING_RUN_ID,
+                        Constants.ID,
+                        "tr"));
+                pipeLine.add(Aggregates.match(Filters.elemMatch("tr", Filters.or(
+                        Filters.in(TestingRun._API_COLLECTION_ID, this.apiCollectionIds),
+                        Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, this.apiCollectionIds),
+                        Filters.in(TestingRun._API_COLLECTION_IDS_MULTI, this.apiCollectionIds)))));
+            }
             pipeLine.add(Aggregates.sort(
                 Sorts.descending(TestingRunResultSummary.START_TIMESTAMP)
             ));
@@ -1676,11 +1766,15 @@ public class StartTestAction extends UserAction {
     String conversationId;
 
     public String fetchConversationsFromConversationId() {
-        if(this.conversationId == null || this.conversationId.isEmpty()){
+        if (this.conversationId == null || this.conversationId.isEmpty()) {
             addActionError("Conversation id is required");
             return ERROR.toUpperCase();
         }
-        this.conversationsList = AgentConversationResultDao.instance.findAll(Filters.eq("conversationId", this.conversationId));
+        this.conversationsList = AgentConversationResultDao.instance.findAll(
+                Filters.eq(GenericAgentConversation._CONVERSATION_ID, this.conversationId),
+                0, 100,
+                // TODO: there's inconsistency in this DTO in all branches ??
+                Sorts.ascending(GenericAgentConversation._LAST_UPDATED_AT, GenericAgentConversation._TIMESTAMP));
         return SUCCESS.toUpperCase();
     }
 
@@ -1818,6 +1912,14 @@ public class StartTestAction extends UserAction {
 
     public void setMaxConcurrentRequests(int maxConcurrentRequests) {
         this.maxConcurrentRequests = maxConcurrentRequests;
+    }
+
+    public int getMaxAgentTokens() {
+        return maxAgentTokens;
+    }
+
+    public void setMaxAgentTokens(int maxAgentTokens) {
+        this.maxAgentTokens = maxAgentTokens;
     }
 
     public Map<String, String> getMetadata() {
@@ -2070,6 +2172,14 @@ public class StartTestAction extends UserAction {
         return doNotMarkIssuesAsFixed;
     }
 
+    public void setRunAutomatedTests(boolean runAutomatedTests) {
+        this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public boolean getRunAutomatedTests() {
+        return runAutomatedTests;
+    }
+
     public void setRecurringWeekly(boolean recurringWeekly) {
         this.recurringWeekly = recurringWeekly;
     }
@@ -2094,8 +2204,8 @@ public class StartTestAction extends UserAction {
         this.miniTestingServiceNames = miniTestingServiceNames;
     }
 
-    public void setSelectedMiniTestingServiceName(String selectedMiniTestingServiceName) {
-        this.selectedMiniTestingServiceName = selectedMiniTestingServiceName;
+    public void setSelectedMiniTestingServiceNames(List<String> selectedMiniTestingServiceNames) {
+        this.selectedMiniTestingServiceNames = selectedMiniTestingServiceNames;
     }
 
     public Map<String, String> getIssuesDescriptionMap() {

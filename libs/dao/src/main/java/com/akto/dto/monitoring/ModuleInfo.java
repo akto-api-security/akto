@@ -3,9 +3,15 @@ package com.akto.dto.monitoring;
 import java.util.Map;
 import java.util.UUID;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder(toBuilder = true)
 public class ModuleInfo {
 
     public static final String MODULE_TYPE = "moduleType";
@@ -103,7 +109,9 @@ public class ModuleInfo {
         MCP_ENDPOINT_SHIELD,
         DATA_INGESTION,
         TRAFFIC_COLLECTOR,
-        DAST
+        AKTO_AGENT_GATEWAY,
+        DAST,
+        AGENTIC_TESTING
     }
 
 }

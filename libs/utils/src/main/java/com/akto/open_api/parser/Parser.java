@@ -41,7 +41,11 @@ public class Parser {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Parser.class, LogDb.DASHBOARD);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    public static ParserResult convertOpenApiToAkto(OpenAPI openAPI, String uploadId, boolean useHost, List<String> urlsList ) {
+    public static ParserResult convertOpenApiToAkto(OpenAPI openAPI, String uploadId, boolean useHost, List<String> urlsList) {
+        return convertOpenApiToAkto(openAPI, uploadId, useHost, urlsList, false);
+    }
+
+    public static ParserResult convertOpenApiToAkto(OpenAPI openAPI, String uploadId, boolean useHost, List<String> urlsList, boolean skipLiveReplay) {
 
         List<FileUploadError> fileLevelErrors = new ArrayList<>();
         List<SwaggerUploadLog> uploadLogs = new ArrayList<>();
@@ -249,6 +253,9 @@ public class Parser {
                         String statusCode;
                         String status;
                         try {
+                            if (skipLiveReplay) {
+                                throw new Exception("Live replay skipped by user, falling back to spec examples");
+                            }
                             OriginalHttpResponse res = ApiExecutor.sendRequest(originalHttpRequest, true, null, false, new ArrayList<>());
                             responseHeadersString = convertHeaders(res.getHeaders());
                             responsePayload =  res.getBody();
@@ -264,7 +271,9 @@ public class Parser {
                             responseObject.put(mKeys.statusCode, statusCode);
                             responseObjectList.add(responseObject);
                         } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.getMessage());
+                            if (!skipLiveReplay) {
+                                loggerMaker.errorAndAddToDb(e, "Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.getMessage());
+                            }
                             ApiResponses responses = operation.getResponses();
                             if (responses != null) {
                                 for (String responseCode : responses.keySet()) {

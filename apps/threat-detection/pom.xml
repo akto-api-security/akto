@@ -248,6 +248,13 @@
             <version>2.9.6</version>
         </dependency>
 
+        <!-- Hyperscan for high-performance regex matching -->
+        <dependency>
+            <groupId>com.gliwka.hyperscan</groupId>
+            <artifactId>hyperscan</artifactId>
+            <version>5.4.11-3.1.0</version>
+        </dependency>
+
     </dependencies>
     <build>
         <plugins>
@@ -282,12 +289,17 @@
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>version.txt</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
                 <filtering>false</filtering>
-                <!-- <includes>
-                    <include>**/version.txt</include>
-                    <include>**/db/migration/*.sql</include>
-                    <include>**/log4j2.properties</include>
-                </includes> -->
+                <excludes>
+                    <exclude>version.txt</exclude>
+                </excludes>
             </resource>
         </resources>
     </build>

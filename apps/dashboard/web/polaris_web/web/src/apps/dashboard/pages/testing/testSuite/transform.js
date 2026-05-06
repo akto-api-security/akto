@@ -37,24 +37,25 @@ const transform  = {
                 subCategories: fetchedData.subCategories,
             }
         }
-        const activeTests = metaDataObj?.subCategories?.filter((subCategory) => {return !subCategory.inactive});
-        const subCategoryMap = {};
+        const activeSubCategoryMap = {};
+        const inactiveSubCategoryMap = {};
 
-        activeTests.forEach(subCategory => {
-            if (!subCategoryMap[subCategory?.superCategory?.name]) {
-                subCategoryMap[subCategory.superCategory?.name] = [];
+        metaDataObj?.subCategories?.forEach(subCategory => {
+            const targetMap = subCategory.inactive ? inactiveSubCategoryMap : activeSubCategoryMap;
+            const key = subCategory?.superCategory?.name;
+            if (!targetMap[key]) {
+                targetMap[key] = [];
             }
-            let obj = {
+            targetMap[key].push({
                 label: subCategory.testName,
                 value: subCategory.name,
                 author: subCategory.author,
                 categoryName: subCategory.superCategory.displayName,
-                selected: true
-            }
-            subCategoryMap[subCategory.superCategory?.name].push(obj);
+                selected: true,
+            });
         });
 
-        return subCategoryMap;
+        return { activeSubCategoryMap, inactiveSubCategoryMap };
     }
 }
 

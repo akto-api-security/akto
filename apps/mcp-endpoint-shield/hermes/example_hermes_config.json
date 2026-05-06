@@ -1,0 +1,24 @@
+{
+  "model": "claude-3-5-sonnet-20241022",
+  "platform": "cli",
+  "max_iterations": 10,
+  "timeout": 300,
+  "verbose": false,
+  "plugins": {
+    "akto-guardrails": {
+      "enabled": true,
+      "config": {
+        "AKTO_DATA_INGESTION_URL": "https://your-akto-instance.com/guardrails",
+        "AKTO_SYNC_MODE": "true",
+        "AKTO_TIMEOUT": "5",
+        "LOG_LEVEL": "INFO",
+        "LOG_PAYLOADS": false,
+        "LOG_DIR": "~/.config/hermes/akto/logs",
+        "MODE": "argus",
+        "CONTEXT_SOURCE": "ENDPOINT",
+        "AKTO_CONNECTOR": "hermes",
+        "SSL_VERIFY": "true"
+      }
+    }
+  }
+}

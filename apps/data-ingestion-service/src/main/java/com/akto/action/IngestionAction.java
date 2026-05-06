@@ -68,7 +68,7 @@ public class IngestionAction extends ActionSupport {
                     payload.setPath("/");
                 }
 
-                KafkaUtils.insertData(payload);
+                KafkaUtils.insertData(payload, Boolean.TRUE.equals(payload.getPublishToGuardrails()));
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while inserting data to Kafka: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
@@ -112,6 +112,11 @@ public class IngestionAction extends ActionSupport {
     }
 
     public String healthCheck() {
+        success = true;
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String authCheck() {
         success = true;
         return Action.SUCCESS.toUpperCase();
     }

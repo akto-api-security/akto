@@ -27,6 +27,7 @@ import com.akto.notifications.slack.SlackAlerts;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.RecordedLoginFlowUtil;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.mongodb.BasicDBList;
@@ -87,6 +88,7 @@ public class AktoJaxAction extends UserAction {
 
     private boolean runTestAfterCrawling;
     private String selectedMiniTestingService;
+    private String collectionName;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoJaxAction.class, LogDb.DASHBOARD);
 
@@ -102,8 +104,13 @@ public class AktoJaxAction extends UserAction {
             URL parsedUrl = new URL(hostname);
             String host = parsedUrl.getHost();
 
+            // Use custom collection name if provided, otherwise use hostname
+            String finalCollectionName = (collectionName != null && !collectionName.trim().isEmpty())
+                ? collectionName.trim()
+                : host;
+
             ApiCollectionsAction collectionsAction = new ApiCollectionsAction();
-            collectionsAction.setCollectionName(host);
+            collectionsAction.setCollectionName(finalCollectionName);
             String collectionStatus = collectionsAction.createCollection();
             int collectionId = 0;
             ApiCollection apiCollection = null;
@@ -113,13 +120,13 @@ public class AktoJaxAction extends UserAction {
                     apiCollection = apiCollections.get(0);
                     collectionId = apiCollection.getId();
                 } else {
-                    apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, host));
+                    apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, finalCollectionName));
                     if (apiCollection != null) {
                         collectionId = apiCollection.getId();
                     }
                 }
             } else {
-                apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, host));
+                apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.NAME, finalCollectionName));
                 if (apiCollection != null) {
                     collectionId = apiCollection.getId();
                 }
@@ -177,7 +184,11 @@ public class AktoJaxAction extends UserAction {
                         List<AuthParam> authParamsToUse = authMechanismForRole.getAuthParamsFromAuthMechanism();
                         AuthParam authParam = authParamsToUse.get(0);
 
-                        cookies = "Bearer " + authParam.getValue();
+                        if (authParam.getValue() != null && !authParam.getValue().isEmpty() && !authParam.getValue().toLowerCase().startsWith("bearer")) {
+                            cookies = "Bearer " + authParam.getValue();
+                        } else {
+                            cookies = authParam.getValue();
+                        }
                     } catch (Exception ex) {
                         addActionError(ex.getMessage());
                         loggerMaker.errorAndAddToDb("Error while fetching cookies/token from test role using loginStepBuilder. Error: " + ex.getMessage());
@@ -487,6 +498,9 @@ public class AktoJaxAction extends UserAction {
 
             // Create testing run with the config ID
             String testName = "Auto-test after crawl: " + crawlerRun.getHostname();
+            // Get dashboard context from Context.contextSource
+            CONTEXT_SOURCE dashboardContext = Context.contextSource.get();
+            
             TestingRun testingRun = new TestingRun(
                 Context.now(),                  // scheduleTimestamp
                 crawlerRun.getStartedBy(),      // userEmail
@@ -500,7 +514,8 @@ public class AktoJaxAction extends UserAction {
                 false,                          // sendSlackAlert
                 false,                          // sendMsTeamsAlert
                 miniTestingServiceName,         // miniTestingServiceName (can be null)
-                0                               // selectedSlackChannelId
+                0,                              // selectedSlackChannelId
+                dashboardContext               // dashboardContext (can be null if unknown)
             );
 
             testingRun.setTriggeredBy("DAST_CRAWLER_AUTO_TEST");
@@ -841,5 +856,13 @@ public class AktoJaxAction extends UserAction {
 
     public void setSelectedMiniTestingService(String selectedMiniTestingService) {
         this.selectedMiniTestingService = selectedMiniTestingService;
+    }
+
+    public String getCollectionName() {
+        return collectionName;
+    }
+
+    public void setCollectionName(String collectionName) {
+        this.collectionName = collectionName;
     }
 }

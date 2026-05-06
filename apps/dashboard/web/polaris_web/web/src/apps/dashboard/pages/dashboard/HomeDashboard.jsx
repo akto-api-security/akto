@@ -30,7 +30,7 @@ import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 import values from "@/util/values";
 import { ActionItemsContent } from './components/ActionItemsContent';
 import { fetchActionItemsData } from './components/actionItemsTransform';
-import { getDashboardCategory, isMCPSecurityCategory, mapLabel } from '../../../main/labelHelper';
+import { getDashboardCategory, isMCPSecurityCategory, isApiSecurityCategory, mapLabel } from '../../../main/labelHelper';
 import GraphMetric from '../../components/GraphMetric';
 import Dropdown from '../../components/layouts/Dropdown';
 
@@ -69,7 +69,7 @@ function HomeDashboard() {
     ];
 
     const ALL_COLLECTION_INVENTORY_ID = 111111121
-
+    const EXPLORE_MODE_QUERY_PATH = '/dashboard/observe/query_mode'
 
     const allCollections = PersistStore(state => state.allCollections)
     const hostNameMap = PersistStore(state => state.hostNameMap)
@@ -123,7 +123,7 @@ function HomeDashboard() {
         navigate('/dashboard/observe/audit');
     }, [navigate])
 
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[4]);
 
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
@@ -463,25 +463,30 @@ function HomeDashboard() {
 
     const fetchData = async () => {
         setLoading(true)
-        // all apis
+        // Fast-loading APIs - page will load with these first
         let apiPromises = [
             observeApi.getUserEndpoints(),
             api.findTotalIssues(startTimestamp, endTimestamp),
             api.fetchApiStats(startTimestamp, endTimestamp),
             api.fetchEndpointsCount(startTimestamp, endTimestamp),
-            testingApi.fetchSeverityInfoForIssues({}, [], 0),
-            api.getApiInfoForMissingData(0, endTimestamp),
-            api.fetchMcpdata('TOTAL_APIS'),
-            api.fetchMcpdata('THIRD_PARTY_APIS'),
-            api.fetchMcpdata('RECENT_OPEN_ALERTS'),
-            api.fetchMcpdata('CRITICAL_APIS'),
-            api.fetchMcpdata('TOOLS'),
-            api.fetchMcpdata('PROMPTS'),
-            api.fetchMcpdata('RESOURCES'),
-            api.fetchMcpdata('MCP_SERVER'),
-            api.fetchMcpdata('POLICY_GUARDRAIL_APIS'),
-            api.fetchMcpdata('TOP_3_APPLICATIONS_BY_TRAFFIC')
+            testingApi.fetchSeverityInfoForIssues({}, [], 0)
         ];
+
+        // Only fetch MCP data if not in API Security category
+        if (!isApiSecurityCategory()) {
+            apiPromises.push(
+                api.fetchMcpdata('TOTAL_APIS'),
+                api.fetchMcpdata('THIRD_PARTY_APIS'),
+                api.fetchMcpdata('RECENT_OPEN_ALERTS'),
+                api.fetchMcpdata('CRITICAL_APIS'),
+                api.fetchMcpdata('TOOLS'),
+                api.fetchMcpdata('PROMPTS'),
+                api.fetchMcpdata('RESOURCES'),
+                api.fetchMcpdata('MCP_SERVER'),
+                api.fetchMcpdata('POLICY_GUARDRAIL_APIS'),
+                api.fetchMcpdata('TOP_3_APPLICATIONS_BY_TRAFFIC')
+            );
+        }
 
         let results = await Promise.allSettled(apiPromises);
 
@@ -490,19 +495,35 @@ function HomeDashboard() {
         let apisStatsResp = results[2].status === 'fulfilled' ? results[2].value : {}
         let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
         let issueSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {}
-        let missingApiInfoData = results[5].status === 'fulfilled' ? results[5].value : {}
-        let mcpTotalApis = results[6]?.status === 'fulfilled' ? (results[6].value?.mcpDataCount ?? null) : null
-        let mcpThirdParty = results[7]?.status === 'fulfilled' ? (results[7].value?.mcpDataCount ?? null) : null
-        let mcpOpenAlertsDetails = results[8]?.status === 'fulfilled' ? (results[8].value?.response?.alertDetails ?? []) : []
-        let mcpCriticalApis = results[9]?.status === 'fulfilled' ? (results[9].value?.mcpDataCount ?? null) : null
-        let mcpTools = results[10]?.status === 'fulfilled' ? (results[10].value?.mcpDataCount ?? null) : null
-        let mcpPrompts = results[11]?.status === 'fulfilled' ? (results[11].value?.mcpDataCount ?? null) : null
-        let mcpResources = results[12]?.status === 'fulfilled' ? (results[12].value?.mcpDataCount ?? null) : null
-        let mcpServer = results[13]?.status === 'fulfilled' ? (results[13].value?.mcpDataCount ?? null) : null
-        let mcpPolicyGuardrailApis = results[14]?.status === 'fulfilled' ? (results[14].value?.mcpDataCount ?? null) : null
-        let mcpTopApps = results[15]?.status === 'fulfilled' ? (results[15].value?.response?.topApplications ?? []) : []
-        const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
-        const totalMissingApis = missingApiInfoData?.totalMissing|| 0
+
+        // MCP data is only fetched if not in API Security category
+        let mcpTotalApis = null
+        let mcpThirdParty = null
+        let mcpOpenAlertsDetails = []
+        let mcpCriticalApis = null
+        let mcpTools = null
+        let mcpPrompts = null
+        let mcpResources = null
+        let mcpServer = null
+        let mcpPolicyGuardrailApis = null
+        let mcpTopApps = []
+
+        if (!isApiSecurityCategory()) {
+            mcpTotalApis = results[5]?.status === 'fulfilled' ? (results[5].value?.mcpDataCount ?? null) : null
+            mcpThirdParty = results[6]?.status === 'fulfilled' ? (results[6].value?.mcpDataCount ?? null) : null
+            mcpOpenAlertsDetails = results[7]?.status === 'fulfilled' ? (results[7].value?.response?.alertDetails ?? []) : []
+            mcpCriticalApis = results[8]?.status === 'fulfilled' ? (results[8].value?.mcpDataCount ?? null) : null
+            mcpTools = results[9]?.status === 'fulfilled' ? (results[9].value?.mcpDataCount ?? null) : null
+            mcpPrompts = results[10]?.status === 'fulfilled' ? (results[10].value?.mcpDataCount ?? null) : null
+            mcpResources = results[11]?.status === 'fulfilled' ? (results[11].value?.mcpDataCount ?? null) : null
+            mcpServer = results[12]?.status === 'fulfilled' ? (results[12].value?.mcpDataCount ?? null) : null
+            mcpPolicyGuardrailApis = results[13]?.status === 'fulfilled' ? (results[13].value?.mcpDataCount ?? null) : null
+            mcpTopApps = results[14]?.status === 'fulfilled' ? (results[14].value?.response?.topApplications ?? []) : []
+        }
+
+        // Initial load with default values (0) for missing API info
+        let totalRedundantApis = 0
+        let totalMissingApis = 0
 
         setShowBannerComponent(!userEndpoints)
 
@@ -510,10 +531,10 @@ function HomeDashboard() {
         // TODO: Fix apiStats API to return the correct total apis
         buildMetrics(apisStatsResp.apiStatsEnd, fetchEndpointsCountResp)
         testSummaryData()
-        mapAccessTypes(apisStatsResp, totalMissingApis, totalRedundantApis, missingApiInfoData?.accessTypeNotCalculated || 0)
-        mapAuthTypes(apisStatsResp, totalMissingApis, totalRedundantApis, (missingApiInfoData?.authNotCalculated || 0))
-        buildAPITypesData(apisStatsResp.apiStatsEnd, totalMissingApis, totalRedundantApis, (missingApiInfoData?.apiTypeMissing || 0))
-        buildSetRiskScoreData(apisStatsResp.apiStatsEnd, Math.max(0, totalMissingApis - totalRedundantApis)) //todo
+        mapAccessTypes(apisStatsResp, totalMissingApis, totalRedundantApis, 0)
+        mapAuthTypes(apisStatsResp, totalMissingApis, totalRedundantApis, 0)
+        buildAPITypesData(apisStatsResp.apiStatsEnd, totalMissingApis, totalRedundantApis, 0)
+        buildSetRiskScoreData(apisStatsResp.apiStatsEnd, Math.max(0, totalMissingApis - totalRedundantApis))
         getCollectionsWithCoverage()
         buildSeverityMap(issueSeverityMap.severityInfo)
         buildIssuesSummary(findTotalIssuesResp)
@@ -528,6 +549,29 @@ function HomeDashboard() {
         setMcpTopApplications(Array.isArray(mcpTopApps) ? mcpTopApps : [])
         fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
         setLoading(false)
+
+        // Fetch slow API in background and update charts when it returns
+        fetchMissingApiInfoData(apisStatsResp)
+    }
+
+    const fetchMissingApiInfoData = async (apisStatsResp) => {
+        try {
+            const missingApiInfoData = await api.getApiInfoForMissingData(0, endTimestamp)
+
+            if (missingApiInfoData) {
+                const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
+                const totalMissingApis = missingApiInfoData?.totalMissing || 0
+
+                // Update charts with accurate missing data
+                mapAccessTypes(apisStatsResp, totalMissingApis, totalRedundantApis, missingApiInfoData?.accessTypeNotCalculated || 0)
+                mapAuthTypes(apisStatsResp, totalMissingApis, totalRedundantApis, missingApiInfoData?.authNotCalculated || 0)
+                buildAPITypesData(apisStatsResp.apiStatsEnd, totalMissingApis, totalRedundantApis, missingApiInfoData?.apiTypeMissing || 0)
+                buildSetRiskScoreData(apisStatsResp.apiStatsEnd, Math.max(0, totalMissingApis - totalRedundantApis))
+            }
+        } catch (error) {
+            // Silently fail - page already loaded with default values
+            console.log('Failed to fetch missing API info data:', error)
+        }
     }
 
     const fetchThreatData = async () => {
@@ -799,6 +843,15 @@ function HomeDashboard() {
         if(!func.checkForFeatureSaas("AKTO_API_GROUP_CRONS")){
             return undefined;
         }
+        if (!baseUrl) return undefined
+        if (!filterValue) {
+            return baseUrl
+        }
+        const separator = baseUrl.includes('?') ? '&' : '?'
+        return `${baseUrl}${separator}filters=${baseFilter}__${encodeURIComponent(filterValue)}`
+    }, [])
+
+    const buildExploreModeAuthFiltersUrl = useCallback((baseUrl, filterValue, baseFilter) => {
         if (!baseUrl) return undefined
         if (!filterValue) {
             return baseUrl
@@ -1082,13 +1135,13 @@ function HomeDashboard() {
         <InfoCard
             component={
                 <div style={{ marginTop: showTestingComponents ? '0px' : '20px' }}>
-                    <ChartypeComponent data={authMap} navUrl={inventoryAllCollectionBaseUrl} navUrlBuilder={(baseUrl, filterValue) => buildAuthFiltersUrl(baseUrl, filterValue, "auth_type")} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%"/>
+                    <ChartypeComponent data={authMap} navUrl={EXPLORE_MODE_QUERY_PATH} navUrlBuilder={(baseUrl, filterValue) => buildExploreModeAuthFiltersUrl(baseUrl, filterValue, "auth_type")} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%"/>
                 </div>
             }
             title={`${mapLabel("APIs", getDashboardCategory())} by Authentication`}
             titleToolTip={`Breakdown of ${mapLabel("APIs", getDashboardCategory())} by the authentication methods they use, including unauthenticated APIs which may pose security risks.`}
             linkText="Check out"
-            linkUrl={inventoryAllCollectionBaseUrl}
+            linkUrl={EXPLORE_MODE_QUERY_PATH}
         />
 
     const apisByTypeComponent = (!isMCPSecurityCategory()) ? <InfoCard
@@ -1529,15 +1582,15 @@ function HomeDashboard() {
         />
     );
 
+    const showForAccount = func.isDemoAccount();
     const threatComponents = func.checkForFeatureSaas('THREAT_DETECTION') ? [
-        {id: 'threat-timeline', component: threatActorsTimelineComponent},
+        ...(showForAccount ? [{id: 'threat-timeline', component: threatActorsTimelineComponent}] : []),
         {id: 'threat-severity', component: threatSeverityComponent},
         {id: 'threat-categories', component: threatCategoryComponent},
     ] : [];
-
     let gridComponents = showTestingComponents ?
         [
-            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            ...(showForAccount ? [{id: 'critical-apis', component: criticalUnsecuredAPIsOverTime}] : []),
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
             ...threatComponents,
@@ -1552,7 +1605,7 @@ function HomeDashboard() {
             {id: 'access-type', component: apisByAccessTypeComponent},
             {id: 'auth-type', component: apisByAuthTypeComponent},
             {id: 'new-domains', component: newDomainsComponent},
-            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            ...(showForAccount ? [{id: 'critical-apis', component: criticalUnsecuredAPIsOverTime}] : []),
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
             {id: 'critical-findings', component: criticalFindings},
             ...threatComponents,

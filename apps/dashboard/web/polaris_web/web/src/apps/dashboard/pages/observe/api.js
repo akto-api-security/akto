@@ -32,28 +32,60 @@ export default {
             data: { startTimestamp, endTimestamp }
         })
     },
-    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers = false, aiAgentName = null, mcpServerName = null) {
+        const data = { sortKey, sortOrder, skip, limit, filters, filterOperators, searchString, mergeMcpServers };
+        if (typeof aiAgentName === 'string' && aiAgentName.length > 0) data.aiAgentName = aiAgentName;
+        if (typeof mcpServerName === 'string' && mcpServerName.length > 0) data.mcpServerName = mcpServerName;
         const resp = await request({
             url: '/api/fetchAuditData',
             method: 'post',
-            data: { sortKey, sortOrder, skip, limit, filters, filterOperators }
+            data
         });
         return resp;
     },
-    async updateAuditData(hexId, remarks, approvalData = null) {
+    async updateAuditData(hexId, remarks, approvalData = null, hexIds = null, cascadeHostCollectionIds = null, mcpServerForAllAgents = null) {
         const data = { hexId };
+        if (Array.isArray(hexIds) && hexIds.length > 0) {
+            data.hexIds = hexIds;
+        }
+        if (Array.isArray(cascadeHostCollectionIds) && cascadeHostCollectionIds.length > 0) {
+            data.cascadeHostCollectionIds = cascadeHostCollectionIds;
+        }
+        if (typeof mcpServerForAllAgents === 'string' && mcpServerForAllAgents.length > 0) {
+            data.mcpServerForAllAgents = mcpServerForAllAgents;
+        }
         if (approvalData) {
             data.approvalData = approvalData;
         } else {
             data.remarks = remarks;
         }
-        
+
         const resp = await request({
             url: '/api/updateAuditData',
             method: 'post',
             data: data
         });
         return resp;
+    },
+    async addMcpAllowlistUrls(mcpServerUrls) {
+        const list = Array.isArray(mcpServerUrls) ? mcpServerUrls : [mcpServerUrls];
+        const urls = [...new Set(list.map((u) => String(u ?? '').trim()).filter(Boolean))];
+        if (!urls.length) return null;
+        return request({
+            url: '/api/addMcpAllowlistEntry',
+            method: 'post',
+            data: { mcpServerUrls: urls },
+        });
+    },
+
+    async fetchMcpAuditInfoByCollection(apiCollectionId) {
+        const id = typeof apiCollectionId === 'string' ? parseInt(apiCollectionId, 10) : apiCollectionId;
+        const resp = await request({
+            url: '/api/fetchMcpAuditInfoByCollection',
+            method: 'post',
+            data: { apiCollectionId: id }
+        });
+        return resp?.mcpAuditInfoList || [];
     },
 
     async fetchDataTypeNames() {
@@ -198,6 +230,14 @@ export default {
             data: { apiCollections: items }
         })
     },
+
+    async deleteUntrackedCollections(apiCollectionIds) {
+        return await request({
+            url: '/api/deleteUntrackedCollections',
+            method: 'post',
+            data: { apiCollectionIds }
+        })
+    },
     
     async updateUserCollections(userCollectionMap) {
         return await request({
@@ -274,6 +314,15 @@ export default {
             method: 'post',
             data: {
                 apiInfoKeyList, apiCollectionId
+            }
+        })
+    },
+    fetchOpenApiSchema(apiCollectionId) {
+        return request({
+            url: '/api/fetchOpenApiSchema',
+            method: 'post',
+            data: {
+                apiCollectionId
             }
         })
     },
@@ -429,6 +478,14 @@ export default {
             data: {
                 apiCollectionId
             }
+        })
+        return resp
+    },
+    async bulkAgentProxyGuardrail(apiInfoIds, enabled, schemaConfig = {}) {
+        const resp = await request({
+            url: '/api/apiInfo/bulkAgentProxyGuardrail',
+            method: 'post',
+            data: { apiInfoIds, enabled, ...schemaConfig }
         })
         return resp
     },
@@ -588,23 +645,32 @@ export default {
             data: {}
         })
     },
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens = -1, runAutomatedTests = false) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed}
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests}
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed) {
+    scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests = false) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceName, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed}
+            data: { apiCollectionIds, type: "MULTI_COLLECTION", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests}
         }).then((resp) => {
             return resp
-        })        
+        })
+    },
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens = -1, runAutomatedTests = false) {
+        return request({
+            url: '/api/startTest',
+            method: 'post',
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceNames, selectedSlackWebhook, autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests}
+        }).then((resp) => {
+            return resp
+        })
     },
     async loadParamsOfEndpoint (apiCollectionId, url, method) {
         const resp = await request({
@@ -751,11 +817,35 @@ export default {
         })
     },
 
-    async getCoverageInfoForCollections(){
+    fetchLatestTraces(apiCollectionId) {
+        return request({
+            url: '/api/fetchLatestTraces',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
+
+    fetchSpansForTrace(traceId) {
+        return request({
+            url: '/api/fetchSpansForTrace',
+            method: 'post',
+            data: {
+                traceId
+            }
+        })
+    },
+
+    async getCoverageInfoForCollections(apiCollectionIds){
+        const data = {}
+        if (apiCollectionIds && apiCollectionIds.length > 0) {
+            data.apiCollectionIds = apiCollectionIds
+        }
         return await request({
             url: '/api/getCoverageInfoForCollections',
             method: 'post',
-            data:{},
+            data,
         })
     },
 
@@ -950,11 +1040,15 @@ export default {
             }
         })
     },
-    allApisTestedRanges() {
+    allApisTestedRanges(apiCollectionIds) {
+        const data = {}
+        if (apiCollectionIds && apiCollectionIds.length > 0) {
+            data.apiCollectionIds = apiCollectionIds
+        }
         return request({
             url: '/api/fetchTestedApisRanges',
             method: 'post',
-            data: {}
+            data
         })
     },
 
@@ -991,10 +1085,11 @@ export default {
         return resp
     },
 
-    getAllIconsCache(){
+    fetchIconsForHostnames(hostnames){
         return request({
-            url: '/api/getAllIconsCache',
-            method: 'get'
+            url: '/api/fetchIconsForHostnames',
+            method: 'post',
+            data: { hostnames }
         })
     }
 

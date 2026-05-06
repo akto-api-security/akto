@@ -3,25 +3,25 @@ import { DeleteMajor } from "@shopify/polaris-icons";
 import TooltipText from "./TooltipText";
 import func from "@/util/func"
 import { useState } from "react";
+import { ENV_TYPE_OPTIONS } from "@/apps/dashboard/components/shared/envTypeConstants";
 
-const EnvSelector = ({ selectedEnvType, handleEnvChange }) => {
-
-    return (
-        <Popover.Section>
-            <VerticalStack gap={2}>
-                <Text variant='headingXs'>Environment</Text>
-                <RadioButton label="Staging" id="staging" name="envType"
-                    checked={selectedEnvType === 'staging'} 
-                    onChange={() => handleEnvChange('staging')}
+const EnvSelector = ({ selectedEnvType, handleEnvChange }) => (
+    <Popover.Section>
+        <VerticalStack gap={2}>
+            <Text variant='headingXs'>Environment</Text>
+            {ENV_TYPE_OPTIONS.map((opt) => (
+                <RadioButton
+                    key={opt.value}
+                    label={opt.label}
+                    id={opt.value}
+                    name="envType"
+                    checked={selectedEnvType === opt.value}
+                    onChange={() => handleEnvChange(opt.value)}
                 />
-                <RadioButton label="Production" id="production" name="envType"
-                    checked={selectedEnvType === 'production'} 
-                    onChange={() => handleEnvChange('production')}
-                />
-            </VerticalStack>
-        </Popover.Section>
-    )
-}
+            ))}
+        </VerticalStack>
+    </Popover.Section>
+);
 
 const TagList = ({ tagList, isKvTypeTag, displayConfirmationModals, tagDeletionHandler }) => {
 
@@ -42,7 +42,7 @@ const TagList = ({ tagList, isKvTypeTag, displayConfirmationModals, tagDeletionH
                                         value = tag.value;
 
                                         if (!keyName || !value || typeof keyName !== "string" || typeof value !== "string") return null;
-                                        if (["staging", "production"].includes(value.toLowerCase())) return null;     
+                                        if (ENV_TYPE_OPTIONS.some(opt => opt.value === value?.toLowerCase())) return null;     
                                     }
 
                                     return (

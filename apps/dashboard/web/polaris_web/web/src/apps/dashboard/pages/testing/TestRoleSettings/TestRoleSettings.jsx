@@ -5,6 +5,7 @@ import TestRolesConditionsPicker from '../../../components/TestRolesConditionsPi
 import func from "@/util/func";
 import api from '../api';
 import transform from '../transform';
+import settingFunctions from '../../settings/module';
 import DetailsPage from '../../../components/DetailsPage';
 import {produce} from "immer"
 import { useSearchParams } from 'react-router-dom';
@@ -71,6 +72,39 @@ function TestRoleSettings() {
   const [editableDoc, setEditableDocs] = useState(-1)
   const [openAuth, setOpenAuth] = useState(HARDCODED);
   const [advancedHeaderSettingsOpen, setAdvancedHeaderSettingsOpen] = useState(false)
+
+  const [hybridTestingEnabled, setHybridTestingEnabled] = useState(false)
+  const [miniTestingServiceNameOptions, setMiniTestingServiceNameOptions] = useState([])
+  const [selectedMiniTestingServiceName, setSelectedMiniTestingServiceName] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { accountSettingsDetails } = await settingFunctions.fetchAdminInfo()
+        if (cancelled) return
+        const hybrid = !!accountSettingsDetails?.hybridTestingEnabled
+        setHybridTestingEnabled(hybrid)
+        if (hybrid) {
+          const { miniTestingServiceNames } = await api.fetchMiniTestingServiceNames()
+          if (cancelled) return
+          setMiniTestingServiceNameOptions(
+            (miniTestingServiceNames || []).map((name) => ({ label: name, value: name }))
+          )
+        } else {
+          setMiniTestingServiceNameOptions([])
+        }
+      } catch {
+        if (!cancelled) {
+          setHybridTestingEnabled(false)
+          setMiniTestingServiceNameOptions([])
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function getAuthWithCondList() {
     return  initialItems?.authWithCondList
@@ -286,6 +320,11 @@ function TestRoleSettings() {
       setOpenAuth={setOpenAuth}
       advancedHeaderSettingsOpen={advancedHeaderSettingsOpen}
       setAdvancedHeaderSettingsOpen={setAdvancedHeaderSettingsOpen}
+      roleName={roleName}
+      hybridTestingEnabled={hybridTestingEnabled}
+      miniTestingServiceNameOptions={miniTestingServiceNameOptions}
+      selectedMiniTestingServiceName={selectedMiniTestingServiceName}
+      setSelectedMiniTestingServiceName={setSelectedMiniTestingServiceName}
     />
   );
 

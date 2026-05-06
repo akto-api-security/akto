@@ -6,7 +6,8 @@ import func from "@/util/func"
 import DropdownSearch from '../../../components/shared/DropdownSearch';
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, generateLabelForJiraIntegration}) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, generateLabelForJiraIntegration}) => {
+    console.log("isAgenticCategory in config", isAgenticCategory)
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
@@ -204,21 +205,40 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             }));
                         }} />
             </HorizontalGrid>
+            {isAgenticCategory && (
+                <HorizontalGrid gap={"4"} columns={"3"}>
+                    <Dropdown
+                        menuItems={maxAgentTokensOptions}
+                        label="Max Agent Tokens"
+                        initial={getLabel(maxAgentTokensOptions, (testRun.maxAgentTokens ?? -1).toString()).label}
+                        selected={(val) => {
+                            setTestRun(prev => ({
+                                ...prev,
+                                maxAgentTokens: parseInt(val)
+                            }));
+                        }} />
+                </HorizontalGrid>
+            )}
             {
                 miniTestingServiceNames?.length > 0 ?
-                <Dropdown
-                    label="Select Testing Module"
-                    menuItems={miniTestingServiceNames}
-                    initial={testRun?.miniTestingServiceName || miniTestingServiceNames?.[0]?.value}
-                    selected={(requests) => {
-                        const miniTestingServiceNameOption = getLabel(miniTestingServiceNames, requests)
+                <DropdownSearch
+                    label="Select Testing Module(s)"
+                    optionsList={miniTestingServiceNames}
+                    placeholder="Select one or more testing modules"
+                    setSelected={(selected) => {
                         setTestRun(prev => ({
                             ...prev,
-                            miniTestingServiceName: miniTestingServiceNameOption.value
+                            miniTestingServiceNames: selected
                         }))
                     }}
+                    allowMultiple={true}
+                    showSelectAllMinOptions={1}
+                    value={testRun?.miniTestingServiceNames?.length > 0 
+                        ? `${testRun.miniTestingServiceNames.length} module(s) selected` 
+                        : "Any module"}
+                    preSelected={testRun?.miniTestingServiceNames || []}
                 /> : <></>
-            }
+            } 
 
             <HorizontalStack gap={4}>
             <Checkbox
@@ -312,6 +332,13 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 checked={!testRun.doNotMarkIssuesAsFixed}
                 onChange={() => setTestRun(prev => ({ ...prev, doNotMarkIssuesAsFixed: !prev.doNotMarkIssuesAsFixed }))}
             />
+            { (window?.STIGG_FEATURE_WISE_ALLOWED?.AUTOMATED_AGENTIC_TEST_RUN?.isGranted === true || window?.USER_NAME?.indexOf("@akto.io") !== -1) && (
+                <Checkbox
+                    label="Smart Automated Testing"
+                    checked={testRun.runAutomatedTests}
+                    onChange={(val) => setTestRun(prev => ({ ...prev, runAutomatedTests: val }))}
+                />
+            )}
         </VerticalStack>
     );
 };

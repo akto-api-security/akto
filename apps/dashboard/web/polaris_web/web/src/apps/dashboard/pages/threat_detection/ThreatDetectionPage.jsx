@@ -25,7 +25,8 @@ import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 import { LABELS } from "./constants";
 import useThreatReportDownload from "../../hooks/useThreatReportDownload";
 import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
-
+import { updateThreatFiltersStore } from "./utils/threatFilters";
+import { redactSampleDataByKeywords } from "./utils/redactSampleData";
 const convertToGraphData = (severityMap) => {
     let dataArr = []
     Object.keys(severityMap).forEach((x) => {
@@ -239,8 +240,64 @@ function ThreatDetectionPage() {
     
     const [eventState, setEventState] = useState(initialEventState);
     const [triggerTableRefresh, setTriggerTableRefresh] = useState(0)
-    const initialVal = values.ranges[2]
+    const initialVal = useMemo(() => {
+        // Support navigation from dashboard with period passed via location state
+        const period = location.state?.period;
+        if (period?.since != null && period?.until != null) {
+            return {
+                alias: 'custom',
+                title: 'Custom',
+                period: {
+                    since: period.since instanceof Date ? period.since : new Date(period.since),
+                    until: period.until instanceof Date ? period.until : new Date(period.until)
+                }
+            };
+        }
+        // Support range alias preset (e.g. ?range=last7days)
+        const rangeAlias = searchParams.get('range');
+        if (rangeAlias) {
+            const preset = values.ranges.find((r) => r.alias === rangeAlias);
+            if (preset) return preset;
+        }
+        // Support startTimestamp/endTimestamp params
+        const startTs = searchParams.get('startTimestamp');
+        const endTs = searchParams.get('endTimestamp');
+        if (startTs && endTs) {
+            const since = new Date(parseInt(startTs, 10) * 1000);
+            const until = new Date(parseInt(endTs, 10) * 1000);
+            if (!Number.isNaN(since.getTime()) && !Number.isNaN(until.getTime())) {
+                return { alias: 'custom', title: 'Custom', period: { since, until } };
+            }
+        }
+        // Support since/until params with formatted title
+        const sinceParam = searchParams.get('since');
+        const untilParam = searchParams.get('until');
+        if (sinceParam != null && untilParam != null) {
+            const sinceTs = parseInt(sinceParam, 10);
+            const untilTs = parseInt(untilParam, 10);
+            if (!Number.isNaN(sinceTs) && !Number.isNaN(untilTs)) {
+                const sinceDate = new Date(sinceTs * 1000);
+                const untilDate = new Date(untilTs * 1000);
+                const title = sinceDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) + " - " + untilDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+                return { alias: 'custom', title, period: { since: sinceDate, until: untilDate } };
+            }
+        }
+        const specialAccounts = [1776384040, 1776625569, 1776626846];
+        return specialAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? values.ranges[4] : values.ranges[2];
+    }, [location.state, searchParams]);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
+
+    useEffect(() => {
+        const startTs = searchParams.get('startTimestamp');
+        const endTs = searchParams.get('endTimestamp');
+        if (startTs && endTs) {
+            const since = new Date(parseInt(startTs, 10) * 1000);
+            const until = new Date(parseInt(endTs, 10) * 1000);
+            if (!Number.isNaN(since.getTime()) && !Number.isNaN(until.getTime())) {
+                dispatchCurrDateRange({ type: 'update', period: { since, until }, title: 'Custom', alias: 'custom' });
+            }
+        }
+    }, [searchParams]);
     const [showDetails, setShowDetails] = useState(false);
     const [sampleData, setSampleData] = useState([])
     const [showNewTab, setShowNewTab] = useState(false)
@@ -255,6 +312,22 @@ function ThreatDetectionPage() {
     const [pendingRowContext, setPendingRowContext] = useState(null);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const resp = await api.fetchFilterYamlTemplate();
+                const templates = Array.isArray(resp?.templates) ? resp.templates : [];
+                if (!cancelled && templates.length > 0) {
+                    updateThreatFiltersStore(templates);
+                }
+            } catch (e) {
+                if (!cancelled) console.error(`Failed to load threat filter templates: ${e?.message}`);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
 
     const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000)
     const endTimestamp = parseInt(currDateRange.period.until.getTime()/1000)
@@ -361,7 +434,12 @@ function ThreatDetectionPage() {
             const tempData = tempFunc.getSampleDataOfUrl(data.url);
             const sameRow = func.deepComparison(tempData, sampleData);
             if (!sameRow) {
-                setSampleData([{ "message": JSON.stringify(tempData), "highlightPaths": [] }]);
+                let redactedSample = tempData ;
+                try {
+                    redactedSample = redactSampleDataByKeywords(tempData);
+                } catch {
+                }
+                setSampleData([{ "message": JSON.stringify(redactedSample), "highlightPaths": [] }]);
                 setShowDetails(true);
             } else {
                 setShowDetails(!showDetails);
@@ -378,7 +456,9 @@ function ThreatDetectionPage() {
             status: data.status || '',
             eventId: data.id || '',
             jiraTicketUrl: data.jiraTicketUrl || '',
-            severity: data.severity || ''
+            severity: data.severity || '',
+            sessionId: data.sessionId || '',
+            ruleViolated: data.ruleViolated || '-'
         });
 
         setShowDetails(true);
@@ -393,6 +473,8 @@ function ThreatDetectionPage() {
                 apiCollectionId: data.apiCollectionId,
                 templateId: data.filterId,
                 severity: data.severity || '',
+                sessionId: data.sessionId || '',
+                ruleViolated: data.ruleViolated || '-'
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
@@ -480,7 +562,11 @@ function ThreatDetectionPage() {
           if (!isMountedRef.current) {
               return;
           }
-          const maliciousPayloads = payloadResponse?.maliciousPayloadsResponses || [];
+          const rawPayloads = payloadResponse?.maliciousPayloadsResponses || [];
+          const maliciousPayloads = rawPayloads.map((p) => ({
+            ...p,
+            orig: redactSampleDataByKeywords(p.orig),
+          }));
 
           setEventState({
             currentRefId: queryParams.refId,
@@ -491,6 +577,8 @@ function ThreatDetectionPage() {
               apiCollectionId: rowContext?.apiCollectionId,
               templateId: queryParams.filterId,
               severity: rowContext?.severity || '',
+              sessionId: rowContext?.sessionId || '',
+              ruleViolated: rowContext?.ruleViolated || '-'
             },
             currentEventId: rowContext?.eventId || '',
             currentEventStatus: queryParams.status || rowContext?.status || '',
@@ -613,7 +701,10 @@ function ThreatDetectionPage() {
             type: ev.type,
             refId: ev.refId,
             severity: ev.severity,
-            latestApiOrig: ev.payload || ev.latestApiOrig,
+            latestApiOrig:
+              ev.payload != null || ev.latestApiOrig != null
+                ? redactSampleDataByKeywords(ev.payload ?? ev.latestApiOrig)
+                : ev.payload ?? ev.latestApiOrig,
             metadata: ev.metadata,
         }));
 
@@ -717,7 +808,7 @@ function ThreatDetectionPage() {
                                                         setWebhookIntegrationData({
                                                             url: integ.url || '',
                                                             customHeaders: headers.length > 0 ? headers : [{ key: '', value: '' }],
-                                                            contextSources: Array.isArray(integ.contextSources) ? integ.contextSources : ['API'],
+                                                            useGzip: Boolean(integ.useGzip),
                                                             lastSyncTime: integ.lastSyncTime || 0
                                                         });
                                                     } else {
@@ -756,11 +847,11 @@ function ThreatDetectionPage() {
                 onClose={() => setWebhookIntegrationModalOpen(false)}
                 initialEndpoint={webhookIntegrationData?.url ?? ''}
                 initialHeaders={webhookIntegrationData?.customHeaders ?? [{ key: '', value: '' }]}
-                initialContextSources={webhookIntegrationData?.contextSources ?? ['API']}
+                initialUseGzip={webhookIntegrationData?.useGzip ?? false}
                 lastSyncTime={webhookIntegrationData?.lastSyncTime ?? 0}
                 onSave={async (config) => {
                     try {
-                        await api.addThreatActivityWebhookIntegration(config.webhookEndpoint, config.customHeaders, config.contextSources);
+                        await api.addThreatActivityWebhookIntegration(config.webhookEndpoint, config.customHeaders, config.useGzip);
                         func.setToast(true, false, 'Webhook integration saved');
                         setWebhookIntegrationModalOpen(false);
                     } catch (e) {

@@ -9,14 +9,14 @@ import { Hono } from "hono";
  */
 
 type Environment = {
-  readonly AKTO_AGENT_GUARD_ENGINE_CONTAINER_DEV: DurableObjectNamespace<AktoAgentGuardEngineContainerDev>;
+  readonly AKTO_AGENT_GUARD_ENGINE_CONTAINER: DurableObjectNamespace<AktoAgentGuardEngineContainer>;
 }
 
 /**
  * Durable Object with Container binding
  * The container runs the Go service defined in the Dockerfile
  */
-export class AktoAgentGuardEngineContainerDev extends Container {
+export class AktoAgentGuardEngineContainer extends Container {
   defaultPort = 8091; // pass requests to port 8091 in the container
   sleepAfter = "2h"; // Keep container alive for 2 hours
 
@@ -24,7 +24,13 @@ export class AktoAgentGuardEngineContainerDev extends Container {
   envVars = {
     PORT: "8091",
     GIN_MODE: "release",
-    PYTHON_SERVICE_URL: "https://akto-agent-guard-executor-dev.billing-53a.workers.dev",
+    PYTHON_SERVICE_URL: "https://akto-agent-guard-executor.billing-53a.workers.dev",
+    // LLM guardrails — set SCANNER_LLM_PROVIDER + API key to enable.
+    // FORCE_LLM_MODE routes all PromptInjection/BanTopics through the LLM
+    // without clients needing to send use_llm in each request.
+    SCANNER_LLM_PROVIDER: "anthropic",
+    ANTHROPIC_API_KEY: "", // TODO: set via wrangler secret or replace before deploy
+    FORCE_LLM_MODE: "true",
   };
 
   override onStart() {
@@ -75,7 +81,7 @@ export default {
       console.log('[Scan Request] Received scan request');
 
       // Get or create a Durable Object ID for the container
-      const stub = getContainer(env.AKTO_AGENT_GUARD_ENGINE_CONTAINER_DEV, "main");
+      const stub = getContainer(env.AKTO_AGENT_GUARD_ENGINE_CONTAINER, "main");
       console.log('[Scan Request] Got container stub');
 
       // Start container and wait for it to be ready before forwarding requests

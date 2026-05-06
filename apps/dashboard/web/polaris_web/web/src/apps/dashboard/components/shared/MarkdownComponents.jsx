@@ -1,4 +1,5 @@
 import ReactMarkdown from 'react-markdown'
+import ChartRenderer from './ChartRenderer'
 
 // Shared markdown components for consistent styling across AIMessage and MarkdownViewer
 export const markdownComponents = {
@@ -12,6 +13,14 @@ export const markdownComponents = {
     li: ({ children }) => <li className="markdown-li">{children}</li>,
     code: ({ children, className }) => {
         const isInline = !className;
+
+        // Check if this is a chart code block
+        // Format: language-chart:pie, language-chart:bar, language-chart:line
+        if (className && className.startsWith('language-chart:')) {
+            const chartType = className.replace('language-chart:', '');
+            return <ChartRenderer chartType={chartType} data={children} />;
+        }
+
         return isInline ? (
             <code className="markdown-inline-code">{children}</code>
         ) : (

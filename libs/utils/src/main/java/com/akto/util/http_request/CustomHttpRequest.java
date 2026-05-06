@@ -4,6 +4,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.mongodb.BasicDBObject;
 
 import okhttp3.FormBody;
@@ -13,7 +14,10 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.apache.http.*;
 import org.apache.http.client.HttpResponseException;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class CustomHttpRequest {
@@ -23,13 +27,34 @@ public class CustomHttpRequest {
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
 
     public static Map<String, Object> getRequest(String url, String authHeader) throws HttpResponseException {
+        return getRequest(url, authHeader, true);
+    }
+
+    /**
+     * @param logResponseDetails when false, response body/headers are not logged (e.g. sensitive payloads).
+     */
+    public static Map<String, Object> getRequest(String url, String authHeader, boolean logResponseDetails)
+            throws HttpResponseException {
         Request request = new Request.Builder()
                 .url(url)
                 .header(HttpHeaders.CONTENT_TYPE, "application/json")
                 .header(HttpHeaders.AUTHORIZATION, authHeader)
                 .build();
 
-        return s(request);
+        return s(request, logResponseDetails);
+    }
+
+    /** Does not log HTTP response (list payloads are often large or sensitive). */
+    public static List<Map<String, Object>> getRequestAsList(String url, String authHeader) throws HttpResponseException {
+        Request request = new Request.Builder()
+                .url(url)
+                .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                .header(HttpHeaders.AUTHORIZATION, authHeader)
+                .build();
+        String jsonData = executeAndGetBody(request, false);
+        if (jsonData == null) return new ArrayList<>();
+        Type listType = new TypeToken<List<Map<String, Object>>>(){}.getType();
+        return new Gson().fromJson(jsonData, listType);
     }
 
     public static RequestBody createFormEncodedRequestBody(BasicDBObject params) {
@@ -43,6 +68,11 @@ public class CustomHttpRequest {
     }
 
     public static Map<String, Object> postRequest(String url, BasicDBObject params) throws HttpResponseException {
+        return postRequest(url, params, true);
+    }
+
+    public static Map<String, Object> postRequest(String url, BasicDBObject params, boolean logResponseDetails)
+            throws HttpResponseException {
         RequestBody requestBody = createFormEncodedRequestBody(params);
         Request request = new Request.Builder()
                 .url(url)
@@ -50,11 +80,16 @@ public class CustomHttpRequest {
                 .header("Accept", "application/json")
                 .build();
 
-        return s(request);
+        return s(request, logResponseDetails);
     }
 
     public static Map<String, Object> postRequestEncodedType(String url, BasicDBObject params)
             throws HttpResponseException {
+        return postRequestEncodedType(url, params, true);
+    }
+
+    public static Map<String, Object> postRequestEncodedType(String url, BasicDBObject params,
+            boolean logResponseDetails) throws HttpResponseException {
         RequestBody requestBody = createFormEncodedRequestBody(params);
         Request request = new Request.Builder()
                 .url(url)
@@ -63,42 +98,7 @@ public class CustomHttpRequest {
                 .header("Content-Type", FORM_URL_ENCODED_CONTENT_TYPE)
                 .build();
 
-        return s(request);
-    }
-
-    private static void logRequestDetails(Request request) {
-        try {
-            loggerMaker.infoAndAddToDb("=== HTTP REQUEST DETAILS ===");
-            loggerMaker.infoAndAddToDb("Request URL: " + request.url().toString());
-            loggerMaker.infoAndAddToDb("Request Method: " + request.method());
-
-            // Log headers
-            StringBuilder headersLog = new StringBuilder("Request Headers: {");
-            request.headers().toMultimap().forEach((key, values) -> {
-                headersLog.append(key).append(": ").append(String.join(", ", values)).append(", ");
-            });
-            if (headersLog.length() > 25) {
-                headersLog.setLength(headersLog.length() - 2); // Remove trailing comma and space
-            }
-            headersLog.append("}");
-            loggerMaker.infoAndAddToDb(headersLog.toString());
-
-            // Log request body if available
-            if (request.body() != null) {
-                try {
-                    okio.Buffer buffer = new okio.Buffer();
-                    request.body().writeTo(buffer);
-                    String bodyString = buffer.readUtf8();
-                    loggerMaker.infoAndAddToDb("Request Body: " + bodyString);
-                } catch (Exception e) {
-                    loggerMaker.infoAndAddToDb("Request Body: (unable to read body - " + e.getMessage() + ")");
-                }
-            } else {
-                loggerMaker.infoAndAddToDb("Request Body: (empty)");
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error logging request details: " + e.getMessage());
-        }
+        return s(request, logResponseDetails);
     }
 
     private static void logResponseDetails(Response response, String responseBody) {
@@ -130,39 +130,37 @@ public class CustomHttpRequest {
         }
     }
 
-    public static Map<String, Object> s(Request request) throws HttpResponseException {
-        // Log request details before executing
-        logRequestDetails(request);
-
-        //Execute and get the response.
+    private static String executeAndGetBody(Request request, boolean logResponseDetails) throws HttpResponseException {
         Response response = null;
-        Map<String, Object> jsonMap = new HashMap<>();
-        String jsonData = null;
         try {
             response = httpClient.newCall(request).execute();
-            if (response == null) {
-                loggerMaker.infoAndAddToDb("response null");
-                return null;
+            if (response == null) return null;
+            String jsonData = response.body().string();
+            if (logResponseDetails) {
+                logResponseDetails(response, jsonData);
             }
-
-            jsonData = response.body().string();
-
-            // Log response details
-            logResponseDetails(response, jsonData);
-
             if (!response.isSuccessful()) {
                 throw new HttpResponseException(response.code(), response.message());
             }
-
-            jsonMap = new Gson().fromJson(jsonData, Map.class);
-
+            return jsonData;
+        } catch (HttpResponseException e) {
+            throw e;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in sending requests in SSO auth");
+            return null;
         } finally {
-            if (response != null) {
-                response.close();
-            }
+            if (response != null) response.close();
         }
-        return jsonMap;
+    }
+
+    public static Map<String, Object> s(Request request) throws HttpResponseException {
+        return s(request, true);
+    }
+
+    public static Map<String, Object> s(Request request, boolean logResponseDetails) throws HttpResponseException {
+        String jsonData = executeAndGetBody(request, logResponseDetails);
+        if (jsonData == null) return new HashMap<>();
+        Type mapType = new TypeToken<Map<String, Object>>(){}.getType();
+        return new Gson().fromJson(jsonData, mapType);
     }
 }

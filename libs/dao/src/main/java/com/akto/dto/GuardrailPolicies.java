@@ -65,7 +65,6 @@ public class GuardrailPolicies {
     private SentimentDetection sentimentDetection;
     private TokenLimitDetection tokenLimitDetection;
 
-
     // Step 7: Server and application settings (old format - backward compatibility)
     private List<String> selectedMcpServers;
     private List<String> selectedAgentServers;
@@ -75,7 +74,11 @@ public class GuardrailPolicies {
     private List<SelectedServer> selectedAgentServersV2;
     private boolean applyOnResponse;
     private boolean applyOnRequest;
-    
+    private boolean applyToAllServers;
+
+    /** Policy-wide rule behaviour: {@code "block"}, {@code "warn"}, or {@code "alert"}. */
+    private String behaviour;
+
     // Step 7: URL and Confidence Score
     private String url;
     private double confidenceScore;
@@ -192,11 +195,14 @@ public class GuardrailPolicies {
     @NoArgsConstructor
     public static class PiiType {
         private String type;
-        private String behavior; // "Block" or "Mask"
+        private String behavior; // "Block" or "Mask" or "Warn"
+        /** Minimum matches for this data type in the prompt (inclusive) to trigger; e.g. 20 means fire when 20+ of this type are present. */
+        private int minMatchCount = 1;
 
-        public PiiType(String type, String behavior) {
+        public PiiType(String type, String behavior, int minMatchCount) {
             this.type = type;
             this.behavior = behavior;
+            this.minMatchCount = minMatchCount >= 1 ? minMatchCount : 1;
         }
     }
 
@@ -205,7 +211,7 @@ public class GuardrailPolicies {
     @NoArgsConstructor
     public static class RegexPattern {
         private String pattern;
-        private String behavior; // "Block" or "Mask"
+        private String behavior; // "Block" or "Mask" or "Warn"
 
         public RegexPattern(String pattern, String behavior) {
             this.pattern = pattern;
@@ -332,4 +338,5 @@ public class GuardrailPolicies {
             this.confidenceScore = confidenceScore;
         }
     }
+
 }

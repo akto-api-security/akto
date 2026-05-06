@@ -37,6 +37,7 @@ import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.CollectionWiseTestingEndpoints;
 import com.akto.dto.testing.CustomTestingEndpoints;
+import com.akto.dto.testing.MultiCollectionTestingEndpoints;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
@@ -146,13 +147,13 @@ public class ReportAction extends UserAction {
                 // Handle collection-wise testing endpoints
                 CollectionWiseTestingEndpoints collectionWiseEndpoints = (CollectionWiseTestingEndpoints) testingEndpoints;
                 int apiCollectionId = collectionWiseEndpoints.getApiCollectionId();
-                
+
                 // Get the API collection to check if it has a hostname
                 ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(
                     Filters.eq(Constants.ID, apiCollectionId),
                     Projections.include(ApiCollection.HOST_NAME)
                 );
-                
+
                 if (apiCollection != null && apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
                     // If collection has hostname, return it
                     this.uniqueHostsTestedForRun = apiCollection.getHostName();
@@ -168,11 +169,42 @@ public class ReportAction extends UserAction {
                         uniqueApiCollectionIds.add(apiInfoKey.getApiCollectionId());
                     }
                 }
+            } else if (testingEndpoints.getType().equals(TestingEndpoints.Type.MULTI_COLLECTION)) {
+                // Handle multi-collection testing endpoints
+                MultiCollectionTestingEndpoints multiCollectionEndpoints = (MultiCollectionTestingEndpoints) testingEndpoints;
+                List<Integer> apiCollectionIds = multiCollectionEndpoints.getApiCollectionIds();
+
+                if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
+                    // Get hostnames from all collections
+                    List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+                        Filters.in(Constants.ID, apiCollectionIds),
+                        Projections.include(ApiCollection.HOST_NAME)
+                    );
+
+                    for (ApiCollection apiCollection : apiCollections) {
+                        if (apiCollection != null && apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
+                            uniqueHosts.add(apiCollection.getHostName());
+                        }
+                    }
+
+                    uniqueApiCollectionIds.addAll(apiCollectionIds);
+
+                    // If no hostnames found in collections, get from API info keys
+                    if (uniqueHosts.isEmpty()) {
+                        List<ApiInfo.ApiInfoKey> apiInfoKeys = testingEndpoints.returnApis();
+                        for (ApiInfo.ApiInfoKey apiInfoKey : apiInfoKeys) {
+                            String hostname = extractHostnameFromUrl(apiInfoKey.getUrl());
+                            if (hostname != null && !hostname.isEmpty()) {
+                                uniqueHosts.add(hostname);
+                            }
+                        }
+                    }
+                }
             } else if (testingEndpoints.getType() == TestingEndpoints.Type.CUSTOM) {
                 // Handle custom testing endpoints
                 CustomTestingEndpoints customEndpoints = (CustomTestingEndpoints) testingEndpoints;
                 List<ApiInfo.ApiInfoKey> apisList = customEndpoints.getApisList();
-                
+
                 if (apisList != null) {
                     for (ApiInfo.ApiInfoKey apiInfoKey : apisList) {
                         String hostname = extractHostnameFromUrl(apiInfoKey.getUrl());

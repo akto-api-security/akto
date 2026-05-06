@@ -1,188 +1,144 @@
 package com.akto.threat.detection.ip_api_counter;
 
-import java.io.IOException;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.stream.Collectors;
 
-import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.threat.detection.cache.ApiCountCacheLayer;
-import com.akto.threat.detection.cache.CounterCache;
-import com.akto.threat.detection.constants.RedisKeyInfo;
-import com.clearspring.analytics.stream.frequency.CountMinSketch;
 
 import io.lettuce.core.RedisClient;
+import io.lettuce.core.ScriptOutputType;
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.api.sync.RedisCommands;
 
+/**
+ * CMS Counter Layer backed entirely by Redis (RedisBloom CMS).
+ * No in-memory state. All CMS operations are performed via Lua scripts
+ * for atomicity and minimal round trips.
+ */
 public class CmsCounterLayer {
 
-    private static final double EPSILON = 0.01; // 1% error
-    private static final double CONFIDENCE = 0.99; // 99% confidence
-    private static final int SEED = 12345; // fixed seed for reproducibility
-    private static final int CMS_DATA_RETENTION_MINUTES = 480; // retain last 8 hours
+    private static final double EPSILON = 0.01;
+    private static final double DELTA = 0.01;
+    private static final int TTL_SECONDS = 8 * 60 * 60; // 8 hours
 
-    /*
-     * 12:01 -> CMS
-     * 12:02 -> CMS
-     * 12:03 -> CMS
-     * Each CMS stores: IP|API -> Count of calls for this API from this IP
-     */
-    private final ConcurrentHashMap<String, CountMinSketch> sketches = new ConcurrentHashMap<>();
-    private final CounterCache cache;
-    private final String redisKeyPrefix;
+    private static final String CMS_KEY_PREFIX = "cms|";
+    private static final String PARAM_CMS_KEY_PREFIX = "paramCms|";
+
+    private final StatefulRedisConnection<String, String> connection;
+    private final String incrementAndQuerySha;
+    private final String rangeQuerySha;
+    private final String keyPrefix;
     private final LoggerMaker logger;
 
-    // Default singleton for backward compatibility
     private static CmsCounterLayer DEFAULT_INSTANCE;
 
-    /**
-     * Constructor for creating new instances with custom cache and Redis key prefix.
-     */
-    public CmsCounterLayer(CounterCache cache, String redisKeyPrefix) {
-        this.cache = cache;
-        this.redisKeyPrefix = redisKeyPrefix;
+    public CmsCounterLayer(RedisClient redisClient, String keyPrefix) {
+        this.connection = redisClient.connect();
+        this.keyPrefix = keyPrefix;
         this.logger = new LoggerMaker(CmsCounterLayer.class, LogDb.THREAT_DETECTION);
+
+        RedisCommands<String, String> sync = connection.sync();
+        this.incrementAndQuerySha = sync.scriptLoad(loadLuaScript("lua/cms_increment_and_query.lua"));
+        this.rangeQuerySha = sync.scriptLoad(loadLuaScript("lua/cms_range_query.lua"));
+
+        logger.infoAndAddToDb("CmsCounterLayer initialized with prefix: " + keyPrefix);
     }
 
-    /**
-     * Backward compatible singleton access.
-     */
+    public static void initialize(RedisClient redisClient) {
+        if (redisClient == null) {
+            DEFAULT_INSTANCE = null;
+            return;
+        }
+        DEFAULT_INSTANCE = new CmsCounterLayer(redisClient, CMS_KEY_PREFIX);
+    }
+
     public static CmsCounterLayer getInstance() {
         return DEFAULT_INSTANCE;
     }
 
-    /**
-     * Initialize the default instance (called from Main).
-     * This maintains backward compatibility with existing code.
-     */
-    public static void initialize(RedisClient redisClient) {
-        CounterCache cache = redisClient != null ? new ApiCountCacheLayer(redisClient) : null;
-        DEFAULT_INSTANCE = new CmsCounterLayer(cache, RedisKeyInfo.IP_API_CMS_DATA_PREFIX);
-        DEFAULT_INSTANCE.startScheduledTasks();
+    public static CmsCounterLayer createForParamEnum(RedisClient redisClient) {
+        return new CmsCounterLayer(redisClient, PARAM_CMS_KEY_PREFIX);
     }
 
     /**
-     * Factory method for creating new instances with custom configuration.
+     * Increment CMS for current minute AND query across a sliding window range.
+     * Single Redis round trip via Lua.
+     *
+     * @param itemKey     the string to increment/query in CMS (e.g., "ipApiCmsData|123|1.2.3.4|/api|GET")
+     * @param currentMin  current epoch minute
+     * @param windowStart start of sliding window (epoch minute)
+     * @param windowEnd   end of sliding window (epoch minute)
+     * @return total estimated count across the window (includes the just-incremented value)
      */
-    public static CmsCounterLayer create(CounterCache cache, String redisKeyPrefix) {
-        return new CmsCounterLayer(cache, redisKeyPrefix);
+    public long incrementAndQueryRange(String itemKey, long currentMin, long windowStart, long windowEnd) {
+        int windowSize = (int) (windowEnd - windowStart + 1);
+        String[] keys = new String[windowSize + 1];
+        keys[0] = keyPrefix + currentMin;
+        for (int i = 0; i < windowSize; i++) {
+            keys[i + 1] = keyPrefix + (windowStart + i);
+        }
+
+        String[] argv = new String[]{
+            itemKey,
+            String.valueOf(TTL_SECONDS),
+            String.valueOf(EPSILON),
+            String.valueOf(DELTA)
+        };
+
+        try {
+            Long result = connection.sync().evalsha(
+                incrementAndQuerySha, ScriptOutputType.INTEGER, keys, argv
+            );
+            return result != null ? result : 0L;
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error in incrementAndQueryRange for " + itemKey);
+            return 0L;
+        }
     }
 
     /**
-     * Start scheduled tasks for cleanup and Redis sync.
+     * Query-only across a range. No increment.
+     * Used by ParamEnumerationDetector for threshold checks.
+     *
+     * @param itemKey     the string to query
+     * @param windowStart start of range (epoch minute)
+     * @param windowEnd   end of range (epoch minute)
+     * @return total estimated count across the range
      */
-    public void startScheduledTasks() {
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
-        scheduler.scheduleAtFixedRate(this::cleanupOldWindows, 0, 1, TimeUnit.MINUTES);
-        scheduler.scheduleAtFixedRate(this::syncToRedis, 0, 1, TimeUnit.MINUTES);
+    public long estimateCountInRange(String itemKey, long windowStart, long windowEnd) {
+        int windowSize = (int) (windowEnd - windowStart + 1);
+        String[] keys = new String[windowSize];
+        for (int i = 0; i < windowSize; i++) {
+            keys[i] = keyPrefix + (windowStart + i);
+        }
+
+        String[] argv = new String[]{itemKey};
+
+        try {
+            Long result = connection.sync().evalsha(
+                rangeQuerySha, ScriptOutputType.INTEGER, keys, argv
+            );
+            return result != null ? result : 0L;
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error in estimateCountInRange for " + itemKey);
+            return 0L;
+        }
     }
 
-    public void increment(String key, String windowKey) {
-        CountMinSketch cms = sketches.computeIfAbsent(windowKey, k ->
-            new CountMinSketch(EPSILON, CONFIDENCE, SEED)
-        );
-        cms.add(key, 1);
-    }
-
-    public long estimateCount(String key, String windowKey) {
-        CountMinSketch cms = sketches.get(windowKey);
-        if (cms == null) {
-            cms = fetchFromRedis(redisKeyPrefix + "|" + windowKey);
-            if (cms != null) {
-                sketches.put(windowKey, cms);
-            } else {
-                return 0;
+    private static String loadLuaScript(String resourcePath) {
+        try (InputStream is = CmsCounterLayer.class.getClassLoader().getResourceAsStream(resourcePath)) {
+            if (is == null) {
+                throw new RuntimeException("Lua script not found: " + resourcePath);
             }
-        }
-        return cms.estimateCount(key);
-    }
-
-    /**
-     *   Estimate count across a sliding window range.
-     *   Sliding because we are storing CMS for each minute.
-     *   [12:01-12:05] [12:06-12:10] [12:11-12:15]
-     *   ↑             ↑             ↑
-     *   All requests   All requests  All requests
-     *   at 12:03       at 12:08      at 12:13
-     *   check here     check here    check here
-     */
-    public long estimateCountInWindow(String key, long windowStart, long windowEnd) {
-        long sum = 0;
-        for (long min = windowStart; min <= windowEnd; min++) {
-            sum += estimateCount(key, String.valueOf(min));
-        }
-        return sum;
-    }
-
-    /**
-     * Cleanup CMS from in-memory HashMap that are more than 8 hours old.
-     * Redis will automatically handle the expiration of keys.
-     */
-    public void cleanupOldWindows() {
-        logger.debug("cleanupOldWindows triggered at " + Context.now());
-        long currentEpochMin = Context.now() / 60;
-        long startWindow = currentEpochMin - 540; // ~9 hours ago
-        long endWindow = currentEpochMin - 481; // 8 hours + 1 minute ago
-
-        for (long i = startWindow; i < endWindow; i++) {
-            String windowKey = String.valueOf(i);
-            if (sketches.containsKey(windowKey)) {
-                sketches.remove(windowKey);
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                return reader.lines().collect(Collectors.joining("\n"));
             }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load Lua script: " + resourcePath, e);
         }
     }
-
-    private void syncToRedis() {
-        if (cache == null) {
-            return;
-        }
-        logger.debug("syncToRedis triggered at " + Context.now());
-        long currentEpochMin = Context.now()/60;
-        long startWindow = currentEpochMin - 5;
-
-        for (long i = startWindow; i < currentEpochMin; i++) {
-            String windowKey = String.valueOf(i);
-            CountMinSketch cms = sketches.get(windowKey);
-            if (cms == null || cms.size() == 0) continue;
-
-            try {
-                byte[] serialized = CountMinSketch.serialize(cms);
-                String redisKey = redisKeyPrefix + "|" + windowKey;
-                cache.setBytesWithExpiry(redisKey, serialized, CMS_DATA_RETENTION_MINUTES * 60);
-            } catch (Exception e) {
-                logger.errorAndAddToDb(e, "Error in sync to redis CountMinSketch for window " + windowKey);
-            }
-
-        }
-    }
-
-    private CountMinSketch fetchFromRedis(String windowKey) {
-        if (cache == null) {
-            return null;
-        }
-        byte[] val = cache.fetchDataBytes(windowKey);
-        if (val != null) {
-            return CountMinSketch.deserialize(val);
-        }
-        return null;
-    }
-
-    public CountMinSketch getSketch(String windowKey) {
-        return sketches.get(windowKey);
-    }
-
-    public byte[] serializeSketch(CountMinSketch cms) throws IOException {
-        return CountMinSketch.serialize(cms);
-    }
-
-    public CountMinSketch deserializeSketch(byte[] data) throws IOException {
-        return CountMinSketch.deserialize(data);
-    }
-
-    public void reset() {
-        sketches.clear();
-    }
-
 }

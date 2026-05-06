@@ -63,10 +63,17 @@ public class AgentClient {
 
         try {
             List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode);
-            
+
             boolean isVulnerable = conversationResults.get(conversationResults.size() - 1).isValidation();
             List<String> errors = new ArrayList<>();
-            
+
+            // Calculate total external API tokens across all conversations
+            int totalExternalApiTokens = 0;
+            for (AgentConversationResult result : conversationResults) {
+                int tokens = result.getExternalApiTokens();
+                totalExternalApiTokens += tokens;
+            }
+
             TestResult testResult = new TestResult();
             // TODO: Fill in message field
             testResult.setMessage(null);
@@ -76,10 +83,12 @@ public class AgentClient {
             testResult.setConfidence(TestResult.Confidence.HIGH);
             testResult.setErrors(errors);
             testResult.setPercentageMatch(isVulnerable ? 0.0 : 100.0);
-            
+            testResult.setExternalApiTokens(totalExternalApiTokens);
+            loggerMaker.info("TestResult.externalApiTokens set to: " + testResult.getExternalApiTokens());
+
             // Store conversation results in MongoDB
             storeConversationResults(conversationResults);
-            
+
             return testResult;
             
         } catch (Exception e) {
@@ -117,7 +126,7 @@ public class AgentClient {
     }
     
     private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, null, ConversationType.TEST_EXECUTION_RESULT, "", "");
+        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, null, ConversationType.TEST_EXECUTION_RESULT, "", "", "", null);
         
         try (Response response = agentHttpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
@@ -130,7 +139,7 @@ public class AgentClient {
         }
     }
     
-    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String chatUrl, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString) {
+    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String chatUrl, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString, String userEmail, String contextSource) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("prompt", prompt);
         requestBody.put("conversationId", conversationId);
@@ -138,8 +147,13 @@ public class AgentClient {
         requestBody.put("conversationType", conversationType);
         requestBody.put("contextString", contextString);
 
+        // Add user email to request body if available
+        if (userEmail != null && !userEmail.isEmpty()) {
+            requestBody.put("userEmail", userEmail);
+        }
+
         String url = agentBaseUrl + (chatUrl != null ? chatUrl :  "/chat");
-        
+
         String body;
         try {
             body = objectMapper.writeValueAsString(requestBody);
@@ -147,21 +161,27 @@ public class AgentClient {
             loggerMaker.errorAndAddToDb("Error serializing request body: " + e.getMessage());
             body = "{\"prompt\":\"" + prompt.replace("\"", "\\\"") + "\"}";
         }
-        
+
         RequestBody requestBodyObj = RequestBody.create(body, MediaType.parse("application/json"));
-        
-        return new Request.Builder()
+
+        Request.Builder builder = new Request.Builder()
                 .url(url)
                 .post(requestBodyObj)
                 .addHeader("Content-Type", "application/json")
                 .addHeader("Accept", "application/json")
-                .addHeader("x-akto-token", accessTokenForRequest)
-                .build();
+                .addHeader("x-akto-token", accessTokenForRequest);
+
+        if (contextSource != null && !contextSource.isEmpty()) {
+            builder.addHeader("x-context-source", contextSource);
+        }
+
+        return builder.build();
     }
     
     
     private AgentConversationResult parseResponse(String responseBody, String conversationId, String originalPrompt) throws Exception {
         try {
+            loggerMaker.info("RAW RESPONSE BODY: " + responseBody);
             JsonNode jsonNode = objectMapper.readTree(responseBody);
             
             String response = jsonNode.has("response") ? jsonNode.get("response").asText() : null;
@@ -189,8 +209,26 @@ public class AgentClient {
             if(jsonNode.has("finalSentPrompt")) {
                 finalSentPrompt = jsonNode.get("finalSentPrompt").asText();
             }
-            
-            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage);
+
+            int externalApiTokens = 0;
+            if(jsonNode.has("externalApiTokens")) {
+                externalApiTokens = jsonNode.get("externalApiTokens").intValue();
+                loggerMaker.infoAndAddToDb("EXTRACTED externalApiTokens: " + externalApiTokens);
+            } else {
+                loggerMaker.infoAndAddToDb("externalApiTokens field NOT FOUND in response");
+            }
+
+            Map<String,Object> toolsMetadata = new HashMap<>();
+            if(jsonNode.has("toolsMetadata") && jsonNode.get("toolsMetadata").isObject()) {
+                jsonNode.get("toolsMetadata").fields().forEachRemaining(entry ->
+                    toolsMetadata.put(entry.getKey(), entry.getValue())
+                );
+            }
+            AgentConversationResult result = new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage, externalApiTokens);
+            if(toolsMetadata != null && !toolsMetadata.isEmpty()) {
+                result.getToolsMetadata().putAll(toolsMetadata);
+            }
+            return result;
             
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error parsing agent response: " + e.getMessage() + ", response body: " + responseBody);
@@ -231,11 +269,12 @@ public class AgentClient {
         initializeAgent(requestBody);
     }
 
-    public void initializeAgent(String sessionUrl, String requestHeaders, String apiRequestBody, String conversationId) {
+    public void initializeAgent(String sessionUrl, String requestHeaders, String apiRequestBody, String requestMethod, String conversationId) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("sessionUrl", sessionUrl);
         requestBody.put("requestHeaders", requestHeaders);
         requestBody.put("requestBody", apiRequestBody);
+        requestBody.put("requestMethod", requestMethod != null && !requestMethod.isEmpty() ? requestMethod : "POST");
         requestBody.put("conversationId", conversationId);
         initializeAgent(requestBody);
     }
@@ -283,8 +322,8 @@ public class AgentClient {
     }
 
     // call akto's mcp server (centralized)
-    public GenericAgentConversation getResponseFromMcpServer(String prompt, String conversationId, int tokensLimit, String storedTitle, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, false, "/generic_chat", conversationType, accessTokenForRequest, contextString);
+    public GenericAgentConversation getResponseFromMcpServer(String prompt, String conversationId, int tokensLimit, String storedTitle, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString, String userEmail, String contextSource) throws Exception {
+        Request request = buildOkHttpChatRequest(prompt, conversationId, false, "/generic_chat", conversationType, accessTokenForRequest, contextString, userEmail, contextSource);
         try (Response response = agentHttpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
@@ -300,7 +339,9 @@ public class AgentClient {
             if(storedTitle != null) {
                 title = storedTitle;
             }
-            return new GenericAgentConversation(title, conversationId, prompt, responseFromMcpServer, finalSentPrompt, timestamp, timestamp, tokensUsed, tokensLimit, conversationType);
+            // externalApiTokens is 0 for non-agentic conversations (e.g., ask_akto, docs_agent)
+            int externalApiTokens = 0;
+            return new GenericAgentConversation(title, conversationId, prompt, responseFromMcpServer, finalSentPrompt, timestamp, timestamp, tokensUsed, externalApiTokens, tokensLimit, conversationType);
         } catch (Exception e) {
             throw new Exception("Failed to get response from MCP server: " + e.getMessage());
         }

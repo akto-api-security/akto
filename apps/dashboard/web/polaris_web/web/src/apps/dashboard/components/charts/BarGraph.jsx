@@ -4,7 +4,7 @@ import Highcharts from "highcharts"
 import { useRef } from "react";
 import observeFunc from "../../pages/observe/transform"
 
-function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xAxisTitle,barWidth, yAxisTitle, barGap, showGridLines, showYAxis}) {
+function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xAxisTitle,barWidth, yAxisTitle, barGap, showGridLines, showYAxis, onBarClick}) {
 
     const chartComponentRef = useRef(null)
     let xCategories = []
@@ -14,7 +14,8 @@ function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xA
         seriesData.push({
             y: x.value,
             color: x.color,
-            name: x.text
+            name: x.text,
+            custom: { ...(x.id !== undefined ? { id: x.id } : {}), ...(x.filterKey !== undefined ? { filterKey: x.filterKey } : {}), ...(x.url !== undefined ? { url: x.url } : {}), ...(x.method !== undefined ? { method: x.method } : {}) }
         })
     })
     const chartOptions = {
@@ -62,10 +63,16 @@ function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xA
         },
         plotOptions: {
             series: {
-                pointWidth: barWidth || 20, 
-                pointPadding: barGap || 5,      
-                groupPadding: 0,            
+                pointWidth: barWidth || 20,
+                pointPadding: barGap || 5,
+                groupPadding: 0,
                 borderWidth: 0,
+                cursor: onBarClick ? 'pointer' : undefined,
+                point: {
+                    events: {
+                        click: onBarClick ? function() { onBarClick(this.name, this.options.custom) } : undefined
+                    }
+                }
             },
         },
         credits:{

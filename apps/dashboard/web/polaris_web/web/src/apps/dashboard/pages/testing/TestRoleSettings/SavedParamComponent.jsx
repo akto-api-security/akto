@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { LegacyCard, Text, Divider, VerticalStack } from "@shopify/polaris";
 import ParamsCard from "./ParamsCard";
 import DeleteModal from "./DeleteModal";
-import { HARDCODED, LOGIN_REQUEST, SAMPLE_DATA, TLS_AUTH } from "./TestRoleConstants";
+import { HARDCODED, LOGIN_REQUEST, SAMPLE_DATA, TLS_AUTH, DIGEST_AUTH } from "./TestRoleConstants";
 
 
 const SavedParamComponent = ({
@@ -13,7 +13,7 @@ const SavedParamComponent = ({
   initialItems,
   setAuthMechanism,
   setOpenAuth,
-  setAdvancedHeaderSettingsOpen
+  setAdvancedHeaderSettingsOpen,
 }) => {
 
   const [deletedIndex, setDeletedIndex] = useState(-1);
@@ -23,8 +23,9 @@ const SavedParamComponent = ({
   const handleOpenEdit = (authObj, index) => {
     setAuthMechanism(authObj.authMechanism);
     const headerKVPairs = authObj.headerKVPairs || {};
+    const hasUrlConditions = authObj.urlRegex && String(authObj.urlRegex).trim() !== "";
 
-    if (Object.keys(headerKVPairs).length > 0) {
+    if (Object.keys(headerKVPairs).length > 0 || hasUrlConditions) {
       setAdvancedHeaderSettingsOpen(true);
     }
     setShowAuthComponent(true);
@@ -36,6 +37,8 @@ const SavedParamComponent = ({
       setOpenAuth(TLS_AUTH)
   } else if (authObj?.authMechanism?.type === "SAMPLE_DATA") {
       setOpenAuth(SAMPLE_DATA)
+  } else if (authObj?.authMechanism?.type === "DIGEST_AUTH") {
+      setOpenAuth(DIGEST_AUTH)
   }
     setEditableDocs(index);
   };

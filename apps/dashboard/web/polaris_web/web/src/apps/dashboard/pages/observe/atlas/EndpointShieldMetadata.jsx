@@ -1,0 +1,296 @@
+import { Text, HorizontalStack } from "@shopify/polaris"
+import { useEffect, useReducer, useState, useCallback } from "react"
+import values from "@/util/values";
+import { produce } from "immer"
+import func from "@/util/func"
+import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
+import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
+import GithubServerTable from "../../../components/tables/GithubServerTable";
+import { CellType } from "../../../components/tables/rows/GithubRow";
+import settingRequests from "../../settings/api";
+import PersistStore from "../../../../main/PersistStore";
+import { mapLabel } from "../../../../main/labelHelper";
+import AgentDetails from "./AgentDetails";
+import { MODULE_TYPE, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
+
+const createHeading = (text, value = null, sortKey = null) => ({
+    text,
+    value: value || text.toLowerCase().replace(/ /g, ''),
+    title: text,
+    type: CellType.TEXT,
+    sortActive: true,
+    sortKey: sortKey || (value || text.toLowerCase().replace(/ /g, ''))
+});
+
+const headings = [
+    createHeading("Agent ID", "agentId"),
+    createHeading("Hostname", "hostname"),
+    createHeading("Device ID", "deviceId"),
+    createHeading("Agent Version", "agentVersion"),
+    createHeading("Username", "username"),
+    createHeading("Last Heartbeat", "lastHeartbeatComp", "lastHeartbeat"),
+    createHeading("Last Deployed", "lastDeployedComp", "lastDeployed")
+];
+
+const createSortOptions = (label, sortKey, columnIndex, isTimeField = false) => {
+    const descLabel = isTimeField ? 'Newest' : 'Z-A';
+    const ascLabel = isTimeField ? 'Oldest' : 'A-Z';
+    return [
+        { label, value: `${sortKey} asc`, directionLabel: descLabel, sortKey, columnIndex },
+        { label, value: `${sortKey} desc`, directionLabel: ascLabel, sortKey, columnIndex }
+    ];
+};
+
+const sortOptions = [
+    ...createSortOptions('Agent ID', 'agentId', 1),
+    ...createSortOptions('Hostname', 'hostname', 2),
+    ...createSortOptions('Device ID', 'deviceId', 3),
+    ...createSortOptions('Agent Version', 'agentVersion', 4),
+    ...createSortOptions('Username', 'username', 5),
+    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 6, true),
+    ...createSortOptions('Last Deployed', 'lastDeployed', 7, true)
+];
+
+const createFilter = (key, label) => ({
+    key,
+    label,
+    title: label,
+    choices: []
+});
+
+const resourceName = {
+    singular: 'agent',
+    plural: 'agents',
+};
+
+const convertDataIntoTableFormat = (agentData) => ({
+    ...agentData,
+    id: agentData?.agentId,
+    lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
+    lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed)
+});
+
+function EndpointShieldMetadata() {
+
+    const [loading, setLoading] = useState(false);
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
+    const allCollections = PersistStore((state) => state.allCollections) || [];
+    const [selectedAgent, setSelectedAgent] = useState(null);
+    const [showFlyout, setShowFlyout] = useState(false);
+    const [endpointShieldData, setEndpointShieldData] = useState(null);
+    const [allowedEnvFields, setAllowedEnvFields] = useState([]);
+    const [filters, setFilters] = useState([
+        createFilter('username', 'Username'),
+        createFilter('hostname', 'Hostname'),
+        createFilter('deviceId', 'Device ID')
+    ]);
+
+    const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
+    const startTimestamp = getTimeEpoch("since");
+    const endTimestamp = getTimeEpoch("until");
+
+    function disambiguateLabel(key, value) {
+        return func.convertToDisambiguateLabelObj(value, null, 2);
+    }
+
+    const fetchModuleInfo = useCallback(async () => {
+        try {
+            const response = await settingRequests.fetchModuleInfo({
+                moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD
+            });
+            const endpointShieldModules = response.moduleInfos || [];
+            setAllowedEnvFields(response.allowedEnvFields || []);
+            const agents = endpointShieldModules.map(module => ({
+                agentId: module.id,
+                hostname: module.name,
+                deviceId: module.additionalData?.deviceId || DEFAULT_VALUE,
+                agentVersion: module.currentVersion || DEFAULT_VALUE,
+                username: module.additionalData?.username || DEFAULT_VALUE,
+                lastHeartbeat: module.lastHeartbeatReceived || 0,
+                lastDeployed: module.startedTs || 0,
+                _moduleData: module
+            }));
+            setEndpointShieldData({ agents });
+        } catch (error) {
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchModuleInfo();
+    }, [fetchModuleInfo]);
+
+    const handleSaveEnv = useCallback(async (moduleId, moduleName, envData) => {
+        await settingRequests.updateModuleEnvAndReboot(moduleId, moduleName, envData);
+        func.setToast(true, false, "Configuration saved. Agent will pick up changes shortly.");
+        const response = await settingRequests.fetchModuleInfo({ moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD });
+        const endpointShieldModules = response.moduleInfos || [];
+        setAllowedEnvFields(response.allowedEnvFields || []);
+        const agents = endpointShieldModules.map(module => ({
+            agentId: module.id,
+            hostname: module.name,
+            deviceId: module.additionalData?.deviceId || DEFAULT_VALUE,
+            agentVersion: module.currentVersion || DEFAULT_VALUE,
+            username: module.additionalData?.username || DEFAULT_VALUE,
+            lastHeartbeat: module.lastHeartbeatReceived || 0,
+            lastDeployed: module.startedTs || 0,
+            _moduleData: module
+        }));
+        setEndpointShieldData({ agents });
+        setSelectedAgent(prev => {
+            if (!prev) return prev;
+            const fresh = agents.find(a => a.agentId === prev.agentId);
+            return fresh || prev;
+        });
+    }, []);
+
+    useEffect(() => {
+        if (endpointShieldData?.agents) {
+            const agentsData = endpointShieldData.agents;
+            const uniqueUsernames = [...new Set(agentsData.map(a => a.username).filter(Boolean))];
+            const uniqueHostnames = [...new Set(agentsData.map(a => a.hostname).filter(Boolean))];
+            const uniqueDeviceIds = [...new Set(agentsData.map(a => a.deviceId).filter(Boolean))];
+            setFilters([
+                { ...createFilter('username', 'Username'), choices: uniqueUsernames.map(u => ({ label: u, value: u })) },
+                { ...createFilter('hostname', 'Hostname'), choices: uniqueHostnames.map(h => ({ label: h, value: h })) },
+                { ...createFilter('deviceId', 'Device ID'), choices: uniqueDeviceIds.map(d => ({ label: d, value: d })) }
+            ]);
+        }
+    }, [endpointShieldData]);
+
+    const fetchData = useCallback(async (sortKey, sortOrder, skip, limit, filters, _filterOperators, queryValue) => {
+        setLoading(true);
+        let ret = [];
+        let total = 0;
+        try {
+            const agentsData = endpointShieldData?.agents || [];
+            const filteredData = agentsData.filter(agent => {
+                if (agent.lastHeartbeat < startTimestamp || agent.lastHeartbeat > endTimestamp) return false;
+                if (filters.username?.length > 0 && !filters.username.includes(agent.username)) return false;
+                if (filters.hostname?.length > 0 && !filters.hostname.includes(agent.hostname)) return false;
+                if (filters.deviceId?.length > 0 && !filters.deviceId.includes(agent.deviceId)) return false;
+                if (queryValue) {
+                    const q = queryValue.toLowerCase();
+                    if (!agent.agentId?.toLowerCase().includes(q) &&
+                        !agent.hostname?.toLowerCase().includes(q) &&
+                        !agent.deviceId?.toLowerCase().includes(q) &&
+                        !agent.username?.toLowerCase().includes(q)) return false;
+                }
+                return true;
+            });
+
+            if (sortKey) {
+                filteredData.sort((a, b) => {
+                    const aVal = a[sortKey], bVal = b[sortKey];
+                    if (aVal == null && bVal == null) return 0;
+                    if (aVal == null) return 1;
+                    if (bVal == null) return -1;
+                    if (typeof aVal === 'number' && typeof bVal === 'number') return sortOrder * (aVal - bVal);
+                    if (typeof aVal === 'string' && typeof bVal === 'string') return sortOrder * (bVal.toLowerCase().localeCompare(aVal.toLowerCase()));
+                    return 0;
+                });
+            }
+
+            total = filteredData.length;
+            ret = filteredData.slice(skip, skip + limit).map(convertDataIntoTableFormat);
+        } catch (error) {
+            console.error("Error fetching MCP Endpoint Shield metadata:", error);
+        } finally {
+            setLoading(false);
+        }
+        return { value: ret, total };
+    }, [endpointShieldData, startTimestamp, endTimestamp]);
+
+    const allowBulkActions = window.USER_NAME && window.USER_NAME.endsWith("@akto.io");
+
+    const promotedBulkActions = (selectedAgents) => {
+        const actions = [];
+        if (allowBulkActions) {
+            actions.push({
+                content: `Delete ${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"}`,
+                onAction: async () => {
+                    const msg = `Are you sure you want to delete ${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"}?`;
+                    func.showConfirmationModal(msg, "Delete", async () => {
+                        try {
+                            await settingRequests.deleteModuleInfo(selectedAgents);
+                            func.setToast(true, false, `${selectedAgents.length} agent info entr${selectedAgents.length > 1 ? "ies" : "y"} deleted successfully`);
+                            window.location.reload();
+                        } catch (error) {
+                            console.error("Error deleting agent info:", error);
+                            func.setToast(true, true, "Failed to delete agent info");
+                        }
+                    });
+                },
+            });
+        }
+        return actions;
+    };
+
+    const handleRowClick = useCallback((agent) => {
+        const freshAgent = endpointShieldData?.agents?.find(a => a.agentId === agent.agentId) || agent;
+        setSelectedAgent(freshAgent);
+        setShowFlyout(true);
+    }, [endpointShieldData]);
+
+    const primaryActions = (
+        <HorizontalStack gap={"2"}>
+            <DateRangeFilter
+                initialDispatch={currDateRange}
+                dispatch={(dateObj) => dispatchCurrDateRange({
+                    type: "update",
+                    period: dateObj.period,
+                    title: dateObj.title,
+                    alias: dateObj.alias
+                })}
+            />
+        </HorizontalStack>
+    );
+
+    return (
+        <>
+            <PageWithMultipleCards
+                title={
+                    <Text as="div" variant="headingLg">
+                        {mapLabel("Endpoint Shield", dashboardCategory)}
+                    </Text>
+                }
+                isFirstPage={true}
+                primaryAction={primaryActions}
+                components={[
+                    <GithubServerTable
+                        key={startTimestamp + endTimestamp + (endpointShieldData ? "loaded" : "loading") + filters[0]?.choices?.length}
+                        headers={headings}
+                        resourceName={resourceName}
+                        appliedFilters={[]}
+                        sortOptions={sortOptions}
+                        disambiguateLabel={disambiguateLabel}
+                        loading={loading}
+                        fetchData={fetchData}
+                        filters={filters}
+                        hideQueryField={false}
+                        useNewRow={true}
+                        condensedHeight={true}
+                        pageLimit={20}
+                        headings={headings}
+                        onRowClick={handleRowClick}
+                        rowClickable={true}
+                        selectable={allowBulkActions}
+                        promotedBulkActions={promotedBulkActions}
+                    />
+                ]}
+            />
+            <AgentDetails
+                show={showFlyout}
+                setShow={setShowFlyout}
+                selectedAgent={selectedAgent}
+                allCollections={allCollections}
+                allowedEnvFields={allowedEnvFields}
+                onSaveEnv={handleSaveEnv}
+                startTimestamp={startTimestamp}
+                endTimestamp={endTimestamp}
+            />
+        </>
+    );
+}
+
+export default EndpointShieldMetadata;

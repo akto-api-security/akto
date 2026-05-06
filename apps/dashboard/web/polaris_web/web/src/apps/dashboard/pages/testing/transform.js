@@ -25,7 +25,8 @@ import LocalStore from "../../../main/LocalStorageStore";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import JiraTicketDisplay from "../../components/shared/JiraTicketDisplay";
 import { getMethod } from "../observe/GetPrettifyEndpoint";
-import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, CATEGORY_API_SECURITY, CATEGORY_DAST } from "../../../main/labelHelper";
+import TooltipWithLink from "../../components/shared/TooltipWithLink";
 
 let headers = [
   {
@@ -65,6 +66,7 @@ let headers = [
   },
 ]
 
+const SKIPPED_TESTS_DOCS_URL = "https://docs.akto.io/api-security-testing/concepts/skipped-test-cases";
 const MAX_SEVERITY_THRESHOLD = 100000;
 
 function getStatus(state) {
@@ -192,10 +194,11 @@ function getScanFrequency(periodInSeconds) {
 const transform = {
 
   tagList: (list, linkType) => {
+    const items = Array.isArray(list) ? list : []
 
-    let ret = list?.map((tag, index) => {
-
+    return items.map((tag, index) => {
       let linkUrl = ""
+      let badgeContent = tag
       switch (linkType) {
         case "CWE":
           linkUrl = getCweLink(tag)
@@ -203,17 +206,20 @@ const transform = {
         case "CVE":
           linkUrl = getCveLink(tag)
           break;
+        case "ASI":
+          linkUrl = typeof tag === "object" && tag?.url ? tag.url : ""
+          badgeContent = typeof tag === "object" && tag?.label != null ? tag.label : (typeof tag === "string" ? tag : "")
+          break;
         default:
           break;
       }
 
       return (
         <Link key={index} url={linkUrl} target="_blank">
-          <Badge progress="complete" key={index}>{tag}</Badge>
+          <Badge progress="complete" key={index}>{badgeContent}</Badge>
         </Link>
       )
     })
-    return ret;
   },
   prepareDataFromSummary: (data, testRunState) => {
     let obj = {};
@@ -284,6 +290,8 @@ const transform = {
         apiCollectionId = data?.testingEndpoints?.apiCollectionId
       } else if (data?.testingEndpoints?.workflowTest?.apiCollectionId !== undefined) {
         apiCollectionId = data?.testingEndpoints?.workflowTest?.apiCollectionId
+      } else if (data?.testingEndpoints?.apiCollectionIds !== undefined && Array.isArray(data?.testingEndpoints?.apiCollectionIds) && data?.testingEndpoints?.apiCollectionIds.length > 0) {
+        apiCollectionId = data?.testingEndpoints?.apiCollectionIds[0]
       } else {
         apiCollectionId = data?.testingEndpoints?.apisList[0]?.apiCollectionId
       }
@@ -298,24 +306,33 @@ const transform = {
     obj['name'] = data.name || "Test"
     obj['number_of_tests'] = data.testIdConfig == 1 ? "-" : getTestsInfo(testingRunResultSummary?.testResultsCount, state)
     obj['run_type'] = getTestingRunType(data, testingRunResultSummary, cicd);
-    obj['run_time_epoch'] = Math.max(data.scheduleTimestamp, (cicd ? testingRunResultSummary.endTimestamp : data.endTimestamp))
+    obj['run_time_epoch'] = Math.max(data.scheduleTimestamp, (cicd ? (testingRunResultSummary?.endTimestamp) : (data.endTimestamp)))
     obj['scheduleTimestamp'] = data.scheduleTimestamp
     obj['pickedUpTimestamp'] = data.pickedUpTimestamp
-    obj['run_time'] = getRuntime(data.scheduleTimestamp, (cicd ? testingRunResultSummary.endTimestamp : getStatus(state) === "SCHEDULED" ? data.scheduledTimestamp : data.endTimestamp), state)
-    obj['severity'] = func.getSeverity(testingRunResultSummary.countIssues)
-    obj['total_severity'] = getTotalSeverity(testingRunResultSummary.countIssues);
-    obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary.countIssues)
+    obj['run_time'] = getRuntime(data.scheduleTimestamp, (cicd ? (testingRunResultSummary?.endTimestamp) : (getStatus(state) === "SCHEDULED" ? data.scheduledTimestamp : data.endTimestamp)), state)
+    obj['severity'] = func.getSeverity(testingRunResultSummary?.countIssues)
+    obj['total_severity'] = getTotalSeverity(testingRunResultSummary?.countIssues);
+    obj['severityStatus'] = func.getSeverityStatus(testingRunResultSummary?.countIssues)
     obj['runTypeStatus'] = [obj['run_type']]
     obj['nextUrl'] = "/dashboard/testing/" + data.hexId
     obj['testRunState'] = state
-    obj['summaryState'] = testingRunResultSummary.state
+    obj['summaryState'] = testingRunResultSummary?.state
     obj['startTimestamp'] = testingRunResultSummary?.startTimestamp
     obj['endTimestamp'] = testingRunResultSummary?.endTimestamp
-    obj['metadata'] = func.flattenObject(testingRunResultSummary?.metadata)
+    
+    // Extract auth error for clean display at the top, filter it from metadata section
+    const authError = testingRunResultSummary?.metadata?.error;
+    const filteredMetadata = testingRunResultSummary?.metadata ? Object.fromEntries(
+      Object.entries(testingRunResultSummary.metadata).filter(([key]) => key !== 'error')
+    ) : testingRunResultSummary?.metadata;
+    
+    obj['authError'] = authError; // For clean display near title/created by
+    obj['metadata'] = func.flattenObject(filteredMetadata)
     obj['apiCollectionId'] = apiCollectionId
+    obj['testingEndpoints'] = data?.testingEndpoints
     obj['userEmail'] = data.userEmail
     obj['scan_frequency'] = getScanFrequency(data.periodInSeconds)
-    obj['total_apis'] = testingRunResultSummary.totalApis
+    obj['total_apis'] = testingRunResultSummary?.totalApis
     obj['miniTestingServiceName'] = data?.miniTestingServiceName
     if (prettified) {
 
@@ -365,9 +382,11 @@ const transform = {
     obj['cweDisplay'] = minimizeTagList(obj['cwe'])
     obj['cve'] = subCategoryMap[data.testSubType]?.cve ? subCategoryMap[data.testSubType]?.cve : []
     obj['cveDisplay'] = minimizeTagList(obj['cve'])
+    obj['superCategoryName'] = subCategoryMap[data.testSubType]?.superCategory?.name || data.testSuperType || ""
     obj['errorsList'] = data.errorsList || []
     obj['testCategoryId'] = data.testSubType
     obj['conversationId'] = data?.conversationId
+    obj['startTimestamp'] = data?.startTimestamp
 
     let testingRunResultHexId = data.hexId;
 
@@ -527,6 +546,18 @@ const transform = {
             </HorizontalStack>
           )
           break;
+        case "ASI Category": {
+          const agenticOwasp = func.agenticCategoryMapping[category?.superCategory?.name]
+          if (!agenticOwasp?.label) {
+            return
+          }
+          sectionLocal.content = (
+            <HorizontalStack gap="2">
+              {transform.tagList([agenticOwasp], "ASI")}
+            </HorizontalStack>
+          )
+          break
+        }
         case "Compliance":
           if (category?.compliance?.mapComplianceToListClauses && Object.keys(category?.compliance?.mapComplianceToListClauses).length > 0) {
             sectionLocal.content = (
@@ -766,7 +797,8 @@ const transform = {
         ...obj,
         prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues || { "CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0 }),
         startTime: date.toLocaleString('en-US', { timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE }) + " on " + date.toLocaleDateString('en-US', { timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE }),
-        id: obj.hexId
+        id: obj.hexId,
+        totalExternalApiTokens: obj.totalExternalApiTokens || 0
       }
     })
     return summaries;
@@ -815,6 +847,12 @@ const transform = {
         title: "References",
         content: "",
         tooltipContent: "References for the above test"
+      },
+      {
+        icon: FraudProtectMajor,
+        title: "ASI Category",
+        content: "",
+        tooltipContent: "OWASP Agentic Security Top 10 (ASI) categories applicable to this test"
       },
       {
         icon: ResourcesMajor,
@@ -922,6 +960,9 @@ const transform = {
                     <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline>
                       {transform.getUrlComp(ele.url)}
                     </Link>
+                    <HorizontalStack gap={1}>
+                      <Text color="subdued" fontWeight="semibold">Time taken: {(ele.endTimestamp - ele.startTimestamp)}ms</Text>
+                    </HorizontalStack>
                     {ele.jiraIssueUrl && <JiraTicketDisplay jiraTicketUrl={ele.jiraIssueUrl} jiraKey={jiraKey} />}
                     {ele.devrevWorkUrl && devrevKey && (
                       <Tag>
@@ -1017,7 +1058,7 @@ const transform = {
       if (testRunResultsObj.hasOwnProperty(key)) {
         let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
         let urls = testRunResultsObj[key].urls
-        urls.push({ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl })
+        urls.push({ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl, startTimestamp: test?.startTimestamp || 0, endTimestamp: test?.endTimestamp || 0 })
         let obj = {
           ...test,
           urls: urls,
@@ -1029,7 +1070,7 @@ const transform = {
         delete obj["errorsList"]
         testRunResultsObj[key] = obj
       } else {
-        let urls = [{ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl }]
+        let urls = [{ url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl, devrevWorkUrl: test.devrevWorkUrl, startTimestamp: test?.startTimestamp || 0, endTimestamp: test?.endTimestamp || 0 }]
         let obj = {
           ...test,
           urls: urls,
@@ -1046,7 +1087,7 @@ const transform = {
       let obj = testRunResultsObj[key]
       let prettifiedObj = {
         ...obj,
-        nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{ fontWeight: 'medium' }} /></Box></div>,
+        nameComp: <div data-testid={obj.name}><Box><TooltipText tooltip={obj.name} text={obj.name} textProps={{ fontWeight: 'medium' }} /></Box></div>,
         severityComp: obj?.vulnerable === true ? <div className={`badge-wrapper-${obj?.severity[0].toUpperCase()}`}>
           <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge>
         </div> : <Text>-</Text>,
@@ -1331,14 +1372,36 @@ const transform = {
       case "no_vulnerability_found":
         return headers.filter((header) => header.title !== "Severity")
 
-      case "skipped":
+      case "skipped": {
+        const category = getDashboardCategory();
+        // Add agentic security docsUrl here when available
+        const docsUrl = [CATEGORY_API_SECURITY, CATEGORY_DAST].includes(category)
+          ? SKIPPED_TESTS_DOCS_URL
+          : null;
         return headers.filter((header) => header.title !== "CWE tags").map((header) => {
           if (header.title === "Severity") {
-            // Modify the object as needed
-            return { type: CellType.TEXT, title: "Error message", value: 'errorMessage' };
+            return {
+              type: CellType.TEXT,
+              title: "Error message",
+              titleNode: docsUrl
+                ? <HorizontalStack gap="1" blockAlign="center">
+                    <span>Error message</span>
+                    <TooltipWithLink
+                      content={<Link url={docsUrl} target="_blank">Common reasons for skipped tests</Link>}
+                      preferredPosition="top"
+                    >
+                      <div className='reduce-size'>
+                        <Avatar shape="round" size="extraSmall" source='/public/info_filled_icon.svg'/>
+                      </div>
+                    </TooltipWithLink>
+                  </HorizontalStack>
+                : undefined,
+              value: 'errorMessage'
+            };
           }
           return header;
-        })
+        });
+      }
 
       case "need_configurations":
         return headers.filter((header) => header.title !== "CWE tags").map((header) => {
@@ -1413,9 +1476,11 @@ const transform = {
       recurringWeekly: testRun.recurringWeekly,
       recurringMonthly: testRun.recurringMonthly,
       miniTestingServiceName: testRun.miniTestingServiceName,
+      allowedMiniTestingServiceNames: testRun.miniTestingServiceNames,
       testSuiteIds: testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
       selectedSlackChannelId: testRun?.slackChannel || 0,
+      doNotMarkIssuesAsFixed: Boolean(testRun.doNotMarkIssuesAsFixed),
     }
   },
   prepareTestingEndpointsApisList(apiEndpoints) {
@@ -1431,6 +1496,7 @@ const transform = {
   prepareConversationsList(agentConversationResults, isGeneric = false) {
     let conversationsListCopy = []
     let extractedRemediationText = ''
+    let toolsCalls = {}
 
     agentConversationResults.forEach(conversation => {
 
@@ -1442,29 +1508,36 @@ const transform = {
         ...commonObj,
         _id: "user_" + conversation.prompt,
         message: conversation?.finalSentPrompt || conversation.prompt,
+        originalPrompt: conversation.prompt,
         validation:conversation?.validation,
         role: "user"
       })
 
-      // Check if response contains "## ROOT CAUSE ANALYSIS"
       let systemMessage = conversation.response
       if(!isGeneric) {
-        extractedRemediationText = conversation.remediationMessage || "";
+        let currentRemediation = conversation.remediationMessage || "";
 
         if (systemMessage && typeof systemMessage === 'string') {
           const rootCauseIndex = systemMessage.indexOf('ROOT CAUSE ANALYSIS')
           if (rootCauseIndex !== -1) {
-            // Extract remediation text (from "## ROOT CAUSE ANALYSIS" to the end)
-            if (!extractedRemediationText) {
-              extractedRemediationText = systemMessage.substring(rootCauseIndex)
+            if (!currentRemediation) {
+              currentRemediation = systemMessage.substring(rootCauseIndex)
             }
-            // Keep only the part before "## ROOT CAUSE ANALYSIS" for the conversation
             systemMessage = systemMessage.substring(0, rootCauseIndex).trim()
           }
         }
+
+        if (currentRemediation && currentRemediation.trim().toLowerCase() !== 'null') {
+          extractedRemediationText = currentRemediation
+        }
   
-        if (conversation?.validationMessage !== null && conversation?.validationMessage !== undefined && conversation?.validationMessage?.length > 0) {
-          systemMessage += ("\n\n### VALIDATION MESSAGE ###\n" + conversation?.validationMessage);
+        const validationMessage = conversation?.validationMessage;
+        const hasValidValidationMessage = validationMessage &&
+          typeof validationMessage === 'string' &&
+          validationMessage.trim().length > 0 &&
+          validationMessage.toLowerCase() !== 'null';
+        if (hasValidValidationMessage) {
+          systemMessage += ("\n\n### VALIDATION MESSAGE ###\n" + validationMessage);
         }
       }
       
@@ -1473,13 +1546,30 @@ const transform = {
         ...commonObj,
         _id: "system_" + conversation.response,
         message: systemMessage,
-        role: "system"
+        role: "system",
+        toolsMetadata: conversation.toolsMetadata || {}
       })
+
+      // toolsMetadata contains the tools calls for that conversation
+      if (conversation.toolsMetadata && Object.keys(conversation.toolsMetadata).length > 0) {
+        Object.keys(conversation.toolsMetadata).forEach(tool => {
+          // get agent name
+          let agentName = tool['agentName'];
+          if(!agentName){
+            agentName = 'agenticTools';
+          }
+          if (!toolsCalls[agentName]) {
+            toolsCalls[agentName] = []
+          }
+          toolsCalls[agentName].push(tool)
+        })
+      }
     })
 
     return {
       conversations: conversationsListCopy,
-      remediationText: extractedRemediationText
+      remediationText: extractedRemediationText,
+      toolsCalls: toolsCalls
     }
   }
 }

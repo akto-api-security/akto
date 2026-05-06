@@ -1,15 +1,16 @@
 import request from "@/util/request"
+import { ALL_STORED_LOG_KEYS } from "./health_logs/logKeysConstants"
 
 const settingRequests = {
     inviteUsers(apiSpec) {
         return request({
             url: '/api/inviteUsers',
             method: 'post',
-            data: { 
+            data: {
                 inviteeName: apiSpec.inviteeName,
                 inviteeEmail: apiSpec.inviteeEmail,
                 websiteHostName: apiSpec.websiteHostName,
-                inviteeRole: apiSpec.inviteeRole,
+                scopeRoleMapping: apiSpec.scopeRoleMapping
             }
         })
     },
@@ -29,18 +30,30 @@ const settingRequests = {
             }
         })
     },
-    makeAdmin(email, roleVal) {
+    makeAdmin(email, roleVal, productScopes) {
         return request({
             url: '/api/makeAdmin',
             method: 'post',
             data: {
                 email: email,
-                userRole: roleVal
+                userRole: roleVal,
+                productScopes: productScopes || ["API"]
             }
         })
     },
 
-    
+    updateUserScopeRoleMapping(email, scopeRoleMapping) {
+        return request({
+            url: '/api/updateUserScopeRoleMapping',
+            method: 'post',
+            data: {
+                email: email,
+                scopeRoleMapping: scopeRoleMapping
+            }
+        })
+    },
+
+
     fetchApiTokens() {
         return request({
             url: '/api/fetchApiTokens',
@@ -105,14 +118,16 @@ const settingRequests = {
             }
         })
     },
-    fetchLogsFromDb(startTime, endTime, logDb) {
+    fetchLogsFromDb(startTime, endTime, logDb, logKeys) {
+        const sendKeys = Array.isArray(logKeys) && logKeys.length > 0 && logKeys.length < ALL_STORED_LOG_KEYS.length
         return request({
             url: '/api/fetchLogsFromDb',
             method: 'post',
             data: {
                 startTime,
                 endTime,
-                logDb
+                logDb,
+                ...(sendKeys ? { logKeys } : {}),
             }
         })
     },
@@ -154,6 +169,19 @@ const settingRequests = {
     fetchMetrics(startTimestamp, endTimestamp, metricIdPrefix, instanceId) {
         const data = {startTime:startTimestamp, endTime:endTimestamp}
         if (metricIdPrefix) data.metricIdPrefix = metricIdPrefix
+        if (instanceId) data.instanceId = instanceId
+        return request({
+            url: '/api/metrics',
+            method: 'post',
+            data
+        })
+    },
+    fetchMetricsByModule(startTimestamp, endTimestamp, moduleType, instanceId) {
+        const data = {
+            startTime: startTimestamp,
+            endTime: endTimestamp,
+            moduleType: moduleType
+        }
         if (instanceId) data.instanceId = instanceId
         return request({
             url: '/api/metrics',
@@ -344,11 +372,13 @@ const settingRequests = {
         })
     },
 
-    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
+    addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri, managementApiToken) {
+        const data = { clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri }
+        if (managementApiToken) data.managementApiToken = managementApiToken
         return request({
             url: '/api/addOktaSso',
             method: 'post',
-            data: {clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri}
+            data
         })
     },
 
@@ -357,6 +387,28 @@ const settingRequests = {
             url: '/api/deleteOktaSso',
             method: 'post',
             data: {}
+        })
+    },
+
+    fetchOktaGroups() {
+        return request({
+            url: '/api/fetchOktaGroups',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    saveOktaGroupRoleMapping(oktaGroupToAktoUserRoleMap, opts = {}) {
+        const data = { oktaGroupToAktoUserRoleMap }
+        if (Object.prototype.hasOwnProperty.call(opts, 'managementApiToken')) {
+            const t = opts.managementApiToken
+            // Struts cannot distinguish JSON null from omitted String fields; send "" to mean "clear stored token".
+            data.managementApiToken = t == null || String(t).trim() === '' ? '' : t
+        }
+        return request({
+            url: '/api/saveOktaGroupRoleMapping',
+            method: 'post',
+            data
         })
     },
 
@@ -423,6 +475,15 @@ const settingRequests = {
             method: 'post',
             data: {
                 newMergingEnabled
+            }
+        });
+    },
+    toggleDoBodyMatch(doBodyMatch) {
+        return request({
+            url: '/api/toggleDoBodyMatch',
+            method: 'post',
+            data: {
+                doBodyMatch
             }
         });
     },
@@ -599,11 +660,11 @@ const settingRequests = {
             data: {roleName}
         })
     },
-    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName,severityLevels) {
+    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies) {
         return request({
             url: '/api/addAwsWafIntegration',
             method: 'post',
-            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName,severityLevels}
+            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies}
         })
     },
     fetchAwsWafIntegration() {
@@ -625,6 +686,34 @@ const settingRequests = {
             url: '/api/fetchSplunkIntegration',
             method: 'post',
             data: {}
+        })
+    },
+    fetchDatadogIntegration() {
+        return request({
+            url: '/api/fetchDatadogIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addDatadogIntegration(apiKey, datadogSite, enabled) {
+        return request({
+            url: '/api/addDatadogIntegration',
+            method: 'post',
+            data: { apiKey, datadogSite, enabled }
+        })
+    },
+    deleteDatadogIntegration() {
+        return request({
+            url: '/api/deleteDatadogIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    testDatadogIntegration(apiKey, datadogSite) {
+        return request({
+            url: '/api/testDatadogIntegration',
+            method: 'post',
+            data: { apiKey, datadogSite }
         })
     },
 
@@ -748,6 +837,20 @@ const settingRequests = {
             data: {email}
         })
     },
+    async fetchAccountJobs() {
+        return await request({
+            url: '/api/fetchAccountJobs',
+            method: 'post',
+            data: {}
+        })
+    },
+    async deleteAccountJob(jobId) {
+        return await request({
+            url: '/api/deleteAccountJob',
+            method: 'post',
+            data: { jobId }
+        })
+    },
     async fetchModuleInfo(filter = {}) {
         return await request({
             url: '/api/fetchModuleInfo',
@@ -760,6 +863,13 @@ const settingRequests = {
             url: '/api/deleteModuleInfo',
             method: 'post',
             data: { moduleIds }
+        })
+    },
+    async updateUserDeviceTag(username, team, userRole) {
+        return await request({
+            url: '/api/updateUserDeviceTag',
+            method: 'post',
+            data: { username, team, userRole }
         })
     },
     async fetchCloudflareWafIntegration() {
@@ -776,11 +886,11 @@ const settingRequests = {
             data: {}
         })
     },
-    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType,severityLevels) {
+    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels, threatPolicies) {
         return await request({
             url: '/api/addCloudflareWafIntegration',
             method: 'post',
-            data: {accountOrZoneId, apiKey, email, integrationType,severityLevels}
+            data: {accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels, threatPolicies}
         })
     },
     async getDeMergedApis() {
@@ -807,6 +917,13 @@ const settingRequests = {
     async deleteAllMaliciousEvents() {
         return await request({
             url: '/api/deleteAllMaliciousEvents',
+            method: 'post',
+            data: {}
+        })
+    },
+    async resetCollectionAccessTypes() {
+        return await request({
+            url: '/api/resetCollectionAccessTypes',
             method: 'post',
             data: {}
         })
@@ -855,11 +972,56 @@ const settingRequests = {
             }
         })
     },
+    getUserAnalysis(agentId, deviceId) {
+        return request({
+            url: '/api/getUserAnalysis',
+            method: 'post',
+            data: {
+                agentId,
+                deviceId
+            }
+        })
+    },
     addMcpRegistryIntegration(registries) {
         return request({
             url: '/api/addMcpRegistryIntegration',
             method: 'post',
             data: {registries}
+        })
+    },
+    fetchMcpRegistries() {
+        return request({
+            url: '/api/fetchMcpRegistries',
+            method: 'post',
+            data: {}
+        })
+    },
+    addMcpRegistry(registryUrl, headers, registryType) {
+        return request({
+            url: '/api/addMcpRegistry',
+            method: 'post',
+            data: { registryUrl, headers, registryType }
+        })
+    },
+    syncMcpRegistry(registryId) {
+        return request({
+            url: '/api/syncMcpRegistry',
+            method: 'post',
+            data: { registryId }
+        })
+    },
+    fetchMcpAllowlistEntries(registryId) {
+        return request({
+            url: '/api/fetchMcpAllowlistEntries',
+            method: 'post',
+            data: { registryId }
+        })
+    },
+    deleteMcpRegistry(registryId) {
+        return request({
+            url: '/api/deleteMcpRegistry',
+            method: 'post',
+            data: { registryId }
         })
     },
     updateBlockLogs(blockLogs) {
@@ -888,6 +1050,34 @@ const settingRequests = {
             url: '/api/updateModuleEnvAndReboot',
             method: 'post',
             data: {moduleId, moduleName, envData}
+        })
+    },
+    fetchFilterYamlTemplate() {
+        return request({
+            url: '/api/fetchFilterYamlTemplate',
+            method: 'post',
+            data: {}
+        })
+    },
+    addMatchingPatternForProxy(proxyPattern, switchProxyMode) {
+        return request({
+            url: '/api/addMatchingPatternForProxy',
+            method: 'post',
+            data: {proxyPattern, switchProxyMode}
+        })
+    },
+    addAllowedHostForPac(hostPattern) {
+        return request({
+            url: '/api/addAllowedHostForPac',
+            method: 'post',
+            data: {hostPattern}
+        })
+    },
+    deleteProxyPattern(patternValue, connectorType) {
+        return request({
+            url: '/api/deleteProxyPattern',
+            method: 'post',
+            data: {patternValue, connectorType}
         })
     }
 }

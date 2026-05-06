@@ -56,9 +56,36 @@ import {
     DESCRIPTION_SNOWFLAKE,
     DOCS_URL_SNOWFLAKE,
     INTERVAL_SNOWFLAKE,
-    SNOWFLAKE_FIELDS
+    SNOWFLAKE_FIELDS,
+    CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
+    CONNECTOR_NAME_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
+    DESCRIPTION_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
+    DOCS_URL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
+    INTERVAL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL,
+    VERTEX_AI_CUSTOM_DEPLOYED_MODEL_FIELDS,
+    CONNECTOR_TYPE_SALESFORCE,
+    CONNECTOR_NAME_SALESFORCE,
+    DESCRIPTION_SALESFORCE,
+    DOCS_URL_SALESFORCE,
+    INTERVAL_SALESFORCE,
+    SALESFORCE_FIELDS,
+    CONNECTOR_TYPE_ANTHROPIC,
+    CONNECTOR_NAME_ANTHROPIC,
+    DESCRIPTION_ANTHROPIC,
+    DOCS_URL_ANTHROPIC,
+    INTERVAL_ANTHROPIC,
+    ANTHROPIC_FIELDS,
+    CONNECTOR_TYPE_OPENAI,
+    CONNECTOR_NAME_OPENAI,
+    DESCRIPTION_OPENAI,
+    DOCS_URL_OPENAI,
+    INTERVAL_OPENAI,
+    OPENAI_FIELDS
 } from "./constants/aiAgentConnectorConstants"
 import DataDogConnector from "./components/DataDogConnector"
+import MicrosoftDefenderConnector from "./components/MicrosoftDefenderConnector"
+import MicrosoftDefenderRunQueriesConnector from "./components/MicrosoftDefenderRunQueriesConnector"
+import SentinelOneConnector from "./components/SentinelOneConnector"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -262,7 +289,7 @@ const fargateObj = {
     label: 'AWS Fargate',
     text: "AWS Fargate allows you to use Amazon ECS to run containers without having to manage servers or clusters of Amazon EC2 instances.", 
     docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-fargate',
-    component: <FargateSource docsUrl='https://docs.akto.io/traffic-connector/aws-services/aws-fargate' bannerTitle="Setup using Fargate" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/aws-fargate#add-akto-traffic-collector-container"/>,
+    component: <FargateSource docsUrl='https://docs.akto.io/traffic-connector/aws-services/aws-fargate' bannerTitle="Setup using Fargate" innerUrl="https://docs.akto.io/traffic-connector/aws-services/aws-fargate"/>,
     key: "FARGATE"
 }
 const burpObj = {
@@ -522,9 +549,36 @@ const agenticShieldObj = {
     icon: '/public/mcp.svg',
     label: "Agentic Shield",
     text: "Agentic Shield provides runtime protection and discovery of LLMs/AI Agents on your local environment.",
-    docsUrl: 'https://docs.akto.io/agentic-shield',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/agentic-shield',
     key: "AGENTIC_SHIELD",
     component: <AgenticShield/>
+}
+
+const sentinelOneObj = {
+    icon: '/public/sentinelone.svg',
+    label: "SentinelOne",
+    text: "Connect SentinelOne to Akto to detect AI coding tools (Claude, Cursor) running on managed endpoints.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-sentinelone',
+    key: "SENTINELONE",
+    component: <SentinelOneConnector/>
+}
+
+const microsoftDefenderObj = {
+    icon: '/public/microsoft_defender.svg',
+    label: "Microsoft Defender for Endpoint",
+    text: "Connect your Microsoft Defender for Endpoint account to Akto for enhanced security insights.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
+    key: "MICROSOFT_DEFENDER",
+    component: <MicrosoftDefenderConnector/>
+}
+
+const microsoftDefenderRunQueriesObj = {
+    icon: '/public/microsoft_defender.svg',
+    label: "Microsoft Defender Run Queries",
+    text: "Select devices from your Microsoft Defender inventory and run live responses and KQL queries",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/deploy-via-microsoft-defender',
+    key: "MICROSOFT_DEFENDER_RUN_QUERIES",
+    component: <MicrosoftDefenderRunQueriesConnector/>
 }
 
 const mcpScanObj = {
@@ -584,7 +638,7 @@ const dockerObj = {
     label: "Docker",
     text: "This setup is recommended only if other setups for AWS or GCP don't work.",
     docsUrl: 'https://docs.akto.io/traffic-connector/virtual-machines/docker',
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/virtual-machines/docker" bannerTitle="Setup using Docker"innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/docker#adding-akto-docker-service"/>,
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/virtual-machines/docker" bannerTitle="Setup using Docker" innerUrl="https://docs.akto.io/traffic-connector/virtual-machines/docker"/>,
     key: "DOCKER"
 }
 
@@ -707,7 +761,7 @@ const tcpObj = {
     text: ' This setup is recommended only if other setups for AWS or GCP do not work.',
     docsUrl: 'https://docs.akto.io/traffic-connector/virtual-machines/tcp-agent',
     key: "NGINX",
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/virtual-machines/tcp-agent" bannerTitle="Setup using TCP Agent" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/tcp-agent#adding-akto-traffic-collector-container" />
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/virtual-machines/tcp-agent" bannerTitle="Setup using TCP Agent" innerUrl="https://docs.akto.io/traffic-connector/virtual-machines/tcp-agent" />
 }
 
 const hybridSaasObj = {
@@ -748,7 +802,7 @@ const ebpfMTLSObj = {
     text: 'Akto-eBPF-mTLS setup is recommended for mTLS systems where TLS termination occurs at the application.',
     docsUrl: 'https://docs.akto.io/traffic-connector/ebpf/ebpf-mtls',
     key: "EBPF_MTLS",
-    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/ebpf/ebpf-mtls" bannerTitle="Setup using eBPF mTLS" innerUrl="https://docs.akto.io/traffic-connections/traffic-data-sources/ebpf-mtls#adding-akto-traffic-collector"/>,
+    component: <FargateSource docsUrl="https://docs.akto.io/traffic-connector/ebpf/ebpf-mtls" bannerTitle="Setup using eBPF mTLS" innerUrl="https://docs.akto.io/traffic-connector/ebpf/ebpf-mtls"/>,
 }
 
 const istioObj = {
@@ -1015,7 +1069,7 @@ const databricksImportObj = {
     icon: '/public/databricks.svg',
     label: "Databricks",
     text: "Import Databricks agents seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/databrics',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/databricks',
     key: "DATABRICKS_IMPORT",
     component: <AIAgentConnectorImport
         connectorType={CONNECTOR_TYPE_DATABRICKS}
@@ -1027,27 +1081,238 @@ const databricksImportObj = {
     />
 }
 
+const vertexAICustomDeployedModelImportObj = {
+    icon: '/public/vertex_ai.svg',
+    label: "Vertex AI Custom Deployed Model",
+    text: "Import your Vertex AI Custom Deployed Model traffic seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/vertex-ai',
+    key: "VERTEX_AI_CUSTOM_DEPLOYED_MODEL_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL}
+        connectorName={CONNECTOR_NAME_VERTEX_AI_CUSTOM_DEPLOYED_MODEL}
+        description={DESCRIPTION_VERTEX_AI_CUSTOM_DEPLOYED_MODEL}
+        fields={VERTEX_AI_CUSTOM_DEPLOYED_MODEL_FIELDS}
+        docsUrl={DOCS_URL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL}
+        recurringIntervalSeconds={INTERVAL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL}
+    />
+}
+
+const salesforceImportObj = {
+    icon: '/public/salesforce.svg',
+    label: "Salesforce",
+    text: "Import Salesforce agents seamlessly into AKTO.",
+    docsUrl: DOCS_URL_SALESFORCE,
+    key: "SALESFORCE_IMPORT",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_SALESFORCE}
+        connectorName={CONNECTOR_NAME_SALESFORCE}
+        description={DESCRIPTION_SALESFORCE}
+        fields={SALESFORCE_FIELDS}
+        docsUrl={DOCS_URL_SALESFORCE}
+        recurringIntervalSeconds={INTERVAL_SALESFORCE}
+    />
+}
+
+const anthropicImportObj = {
+    icon: '/public/claude.svg',
+    label: "Anthropic",
+    text: "Use our Anthropic feature to capture traffic from Anthropic and instantly send it to your dashboard for real-time insights.",
+    docsUrl: DOCS_URL_ANTHROPIC,
+    key: "ANTHROPIC",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_ANTHROPIC}
+        connectorName={CONNECTOR_NAME_ANTHROPIC}
+        description={DESCRIPTION_ANTHROPIC}
+        fields={ANTHROPIC_FIELDS}
+        docsUrl={DOCS_URL_ANTHROPIC}
+        recurringIntervalSeconds={INTERVAL_ANTHROPIC}
+    />
+}
+
+const openaiImportObj = {
+    icon: '/public/openai.svg',
+    label: "OpenAI",
+    text: "Use our OpenAI feature to capture traffic from OpenAI and instantly send it to your dashboard for real-time insights.",
+    docsUrl: DOCS_URL_OPENAI,
+    key: "OPENAI",
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_OPENAI}
+        connectorName={CONNECTOR_NAME_OPENAI}
+        description={DESCRIPTION_OPENAI}
+        fields={OPENAI_FIELDS}
+        docsUrl={DOCS_URL_OPENAI}
+        recurringIntervalSeconds={INTERVAL_OPENAI}
+    />
+}
+
 const litellmImportObj = {
     icon: '/public/litellm.svg',
     label: "LiteLLM",
     text: "Import your LiteLLM proxy traffic, seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/litellm',
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/litellm',
     key: "LITELLM",
     component: <BannerComponent
         content="Import your LiteLLM proxy traffic, seamlessly in AKTO."
-        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/litellm'
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/litellm'
     />
 }
 
-const claudeCodeCliImportObj = {
+const claudeCodeCliHookObj = {
     icon: '/public/claudeCodeCli.svg',
-    label: "Claude Code CLI",
+    label: "Claude Code CLI Hook",
     text: "Import your Claude Code CLI proxy traffic, seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/claude-code-cli',
-    key: "CLAUDECODECLI",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-cli-hooks',
+    key: "CLAUDE_CODE_CLI_HOOK",
     component: <BannerComponent
         content="Import your Claude Code CLI proxy traffic, seamlessly in AKTO."
-        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/claude-code-cli'
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/claude-cli-hooks'
+    />
+}
+
+const geminiCliHookObj = {
+    icon: '/public/gemini-cli.svg',
+    label: "Gemini CLI Hook",
+    text: "Import your Gemini CLI proxy traffic, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/gemini-cli-hooks',
+    key: "GEMINI_CLI_HOOK",
+    component: <BannerComponent
+        content="Import your Gemini CLI proxy traffic, seamlessly in AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/gemini-cli-hooks'
+    />
+}
+
+const githubCopilotHookObj = {
+    icon: '/public/githubCopilot.svg',
+    label: "GitHub Copilot CLI Hook",
+    text: "Import your GitHub Copilot CLI proxy traffic, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/copilot-cli-hooks',
+    key: "GITHUB_COPILOT_CLI_HOOK",
+    component: <BannerComponent
+        content="Import your GitHub Copilot CLI proxy traffic, seamlessly into AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/copilot-cli-hooks'
+    />
+}
+
+const codexHookObj = {
+    icon: '/public/openai.svg',
+    label: "Codex CLI Hook",
+    text: "Monitor and secure OpenAI Codex CLI interactions with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/codex-cli-hooks',
+    key: "CODEX_CLI_HOOK",
+    component: <BannerComponent
+        content="Monitor and secure OpenAI Codex CLI interactions with Akto guardrails."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/codex-cli-hooks'
+    />
+}
+
+const intellijHookObj = {
+    icon: '/public/intellij.svg',
+    label: "IntelliJ/JetBrains Hook (Coming Soon)",
+    text: "IDE-level protection monitoring AI-powered code completions in JetBrains IDEs.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/intellij-hooks',
+    key: "INTELLIJ_HOOK",
+    component: <BannerComponent
+        content="IDE-level protection monitoring AI-powered code completions in JetBrains IDEs."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/intellij-hooks'
+    />
+}
+
+const antigravityObj = {
+    icon: '/public/antigravity.svg',
+    label: "Antigravity Hook (Coming Soon)",
+    text: "Secure your Antigravity AI agent interactions with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/antigravity-hooks',
+    key: "ANTIGRAVITY_HOOK",
+    component: <BannerComponent
+        content="Secure your Antigravity AI agent interactions with Akto guardrails."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/antigravity-hooks'
+    />
+}
+
+const neovimHookObj = {
+    icon: '/public/neovim.svg',
+    label: "Neovim Hook",
+    text: "IDE-level protection monitoring AI-powered code completions in Neovim.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/neovim-hooks',
+    key: "NEOVIM_HOOK",
+    component: <BannerComponent
+        content="IDE-level protection monitoring AI-powered code completions in Neovim."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/neovim-hooks'
+    />
+}
+
+const openCodeHookObj = {
+    icon: '/public/opencode-logo-light.svg',
+    label: "OpenCode Hook",
+    text: "Monitoring AI coding agent of OpenCode with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/opencode-hooks',
+    key: "OPENCODE_HOOK",
+    component: <BannerComponent
+        content="Monitoring AI coding agent of OpenCode with Akto guardrails."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/opencode-hooks'
+    />
+}
+
+const hermesHookObj = {
+    icon: '/public/hermes-agent.svg',
+    label: "Hermes Agent Hook",
+    text: "Monitoring Hermes Agent with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/hermes-hooks',
+    key: "HERMES_HOOK",
+    component: <BannerComponent
+        content="Monitoring Hermes Agent with Akto guardrails."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/hermes-hooks'
+    />
+}
+
+const ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL =
+    'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents'
+
+const sglangHookObj = {
+    icon: '/public/sglang.png',
+    label: "SGLang",
+    text: "Discover and secure locally running models on SGLang, with endpoint discovery and guardrails in Akto.",
+    docsUrl: ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL,
+    key: "SGLANG_HOOK",
+    component: <BannerComponent
+        content="Discover and secure locally running models on SGLang, with endpoint discovery and guardrails in Akto."
+        docsUrl={ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL}
+    />
+}
+
+const vllmHookObj = {
+    icon: '/public/vllm.svg',
+    label: "vLLM",
+    text: "Discover and secure locally running models on vLLM, with endpoint discovery and guardrails in Akto.",
+    docsUrl: ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL,
+    key: "VLLM_HOOK",
+    component: <BannerComponent
+        content="Discover and secure locally running models on vLLM, with endpoint discovery and guardrails in Akto."
+        docsUrl={ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL}
+    />
+}
+
+const dockerModelRunnerHookObj = {
+    icon: '/public/docker.svg',
+    label: "Docker Model Runner",
+    text: "Discover and secure locally running models on Docker Model Runner, with endpoint discovery and guardrails in Akto.",
+    docsUrl: ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL,
+    key: "DOCKER_MODEL_RUNNER_HOOK",
+    component: <BannerComponent
+        content="Discover and secure locally running models on Docker Model Runner, with endpoint discovery and guardrails in Akto."
+        docsUrl={ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL}
+    />
+}
+
+const ollamaHookObj = {
+    icon: '/public/ollama.svg',
+    label: "Ollama",
+    text: "Discover and secure locally running models on Ollama, with endpoint discovery and guardrails in Akto.",
+    docsUrl: ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL,
+    key: "OLLAMA_HOOK",
+    component: <BannerComponent
+        content="Discover and secure locally running models on Ollama, with endpoint discovery and guardrails in Akto."
+        docsUrl={ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL}
     />
 }
 
@@ -1057,6 +1322,30 @@ const dataDogConnectorObj = {
     text: "Connect your Datadog account to Akto to visualize your traces in the dashboard.",
     key: "DATA_DOG_CONNECTOR",
     component: <DataDogConnector />
+}
+
+const trueFoundryImportObj = {
+    icon: '/public/trueFoundry.svg',
+    label: "TrueFoundry",
+    text: "Import your TrueFoundry proxy traffic, seamlessly into AKTO.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/truefoundry',
+    key: "TRUEFOUNDRY",
+    component: <BannerComponent
+        content="Import your TrueFoundry proxy traffic, seamlessly in AKTO."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/truefoundry'
+    />
+}
+
+const arcadeImportObj = {
+    icon: '/public/arcade.svg',
+    label: "Arcade",
+    text: "Secure your Arcade AI agent tool calls with Akto guardrails.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/arcade',
+    key: "ARCADE",
+    component: <BannerComponent
+        content="Secure your Arcade AI agent tool calls with Akto guardrails."
+        docsUrl='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/arcade'
+    />
 }
 
 
@@ -1713,7 +2002,9 @@ const quickStartFunc = {
 
         const aiAgentConnectors = [
             awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj,
-            n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, snowflakeObj
+            n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, snowflakeObj,
+            trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, salesforceImportObj,
+            anthropicImportObj, openaiImportObj
         ]
 
         // MCP Scan
@@ -1737,7 +2028,16 @@ const quickStartFunc = {
 
         // Endpoint Agents
         const endpointAgents = [
-            cursorHookObj
+            cursorHookObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, neovimHookObj, openCodeHookObj, hermesHookObj,intellijHookObj, antigravityObj,
+        ]
+
+        const localHostedModels = [
+            sglangHookObj, vllmHookObj, dockerModelRunnerHookObj, ollamaHookObj,
+        ]
+
+        // Endpoint Management
+        const endpointManagement = [
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
         ]
 
        if(func.checkLocal() || func.isLimitedAccount()){
@@ -1767,8 +2067,11 @@ const quickStartFunc = {
 
             connectors = {
                 "Endpoint Agents": endpointAgents,
+                "Endpoint Management": endpointManagement,
                 "Agentic Proxies": agenticProxies,
+                "Platform connectors": [anthropicImportObj, openaiImportObj],
                 "Browser Extension": browserExtensions,
+                "Locally Hosted Models": localHostedModels,
                 "Secure Web Networks": secureWebNetworks,
                 "": hiddenConnectors, // Hidden category for connector lookup
             };
@@ -1802,25 +2105,27 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal() || func.isLimitedAccount()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, databricksImportObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, neovimHookObj, openCodeHookObj, hermesHookObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, databricksImportObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj, n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, databricksImportObj, trueFoundryImportObj, arcadeImportObj, vertexAICustomDeployedModelImportObj, neovimHookObj, openCodeHookObj,hermesHookObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
-            cloudflareWarpObj, zscalerObj, snowflakeObj
+            cloudflareWarpObj, zscalerObj, snowflakeObj,
+            microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
         ]
 
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj, huggingFaceObj,
-                awsBedrockObj, azureAIFoundryObj, databricksImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
-                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj,
-                apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
+                awsBedrockObj, azureAIFoundryObj, databricksImportObj, vertexAICustomDeployedModelImportObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj,
+                n8nImportObj, langchainImportObj, copilotStudioImportObj, litellmImportObj, claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, intellijHookObj, antigravityObj, trueFoundryImportObj, arcadeImportObj, salesforceImportObj, anthropicImportObj, openaiImportObj, kubernetesObj, openshiftObj, ebpfObj, ebpfMTLSObj, neovimHookObj, openCodeHookObj,hermesHookObj,
+                apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj,
+                microsoftDefenderObj, microsoftDefenderRunQueriesObj, sentinelOneObj
             ])
         }
 

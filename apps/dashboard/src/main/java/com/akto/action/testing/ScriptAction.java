@@ -11,7 +11,6 @@ import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dto.User;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.util.DashboardMode;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
@@ -24,6 +23,7 @@ public class ScriptAction extends UserAction {
     }
 
     private TestScript testScript;
+    private String scriptType;
 
     public boolean aktoUser(){
         User user = getSUser();
@@ -48,11 +48,12 @@ public class ScriptAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
+        TestScript.Type type = resolveScriptType(this.testScript.getType(), this.scriptType, TestScript.Type.PRE_REQUEST);
         TestScriptsDao.instance.insertOne(
             new TestScript(
                 UUID.randomUUID().toString(),
                 this.testScript.getJavascript(),
-                TestScript.Type.PRE_REQUEST,
+                type,
                 getSUser().getLogin(),
                 Context.now()
             )
@@ -62,8 +63,23 @@ public class ScriptAction extends UserAction {
     }
     
     public String fetchScript() {
-        this.testScript = TestScriptsDao.instance.findOne(new BasicDBObject());
+        TestScript.Type type = resolveScriptType(this.testScript != null ? this.testScript.getType() : null, this.scriptType, TestScript.Type.PRE_REQUEST);
+        this.testScript = TestScriptsDao.instance.fetchTestScript(type);
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private static TestScript.Type resolveScriptType(TestScript.Type fromTestScript, String scriptTypeStr, TestScript.Type defaultType) {
+        if (fromTestScript != null) {
+            return fromTestScript;
+        }
+        if (scriptTypeStr != null && !scriptTypeStr.isEmpty()) {
+            try {
+                return TestScript.Type.valueOf(scriptTypeStr);
+            } catch (IllegalArgumentException e) {
+                return defaultType;
+            }
+        }
+        return defaultType;
     }
     
     public String updateScript() {
@@ -93,5 +109,13 @@ public class ScriptAction extends UserAction {
 
     public void setTestScript(TestScript testScript) {
         this.testScript = testScript;
-    }   
+    }
+
+    public String getScriptType() {
+        return scriptType;
+    }
+
+    public void setScriptType(String scriptType) {
+        this.scriptType = scriptType;
+    }
 }

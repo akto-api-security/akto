@@ -1,11 +1,23 @@
-import { Button, ButtonGroup, LegacyCard, Text, VerticalStack, DataTable, Checkbox, HorizontalStack, RadioButton, Modal, Link } from "@shopify/polaris"
-import { useEffect, useState } from "react";
+import {
+    Box,
+    Button,
+    ButtonGroup,
+    Checkbox,
+    HorizontalStack,
+    LegacyCard,
+    Popover,
+    Spinner,
+    Text,
+    TextField,
+    VerticalStack,
+} from "@shopify/polaris"
+import { useCallback, useEffect, useMemo, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import LogsContainer from "./LogsContainer";
 import Dropdown from "../../../components/layouts/Dropdown"
 import { saveAs } from 'file-saver'
-import ModuleEnvConfigComponent from "./ModuleEnvConfig"
+import { ALL_STORED_LOG_KEYS, STORED_LOG_KEY_OPTIONS } from "./logKeysConstants"
 
 const Logs = () => {
     const fiveMins = 1000 * 60 * 5
@@ -16,63 +28,78 @@ const Logs = () => {
         logGroup: 'DASHBOARD',
         logData: []
     })
+    const [ selectedLogKeys, setSelectedLogKeys ] = useState(() => [...ALL_STORED_LOG_KEYS])
+    const [ logKeysPopoverOpen, setLogKeysPopoverOpen ] = useState(false)
+    const [ pendingLogKeys, setPendingLogKeys ] = useState(() => [...ALL_STORED_LOG_KEYS])
     const [ loading, setLoading ] = useState(false)
-    const [ moduleInfos, setModuleInfos ] = useState([])
-    const [ allowedEnvFields, setAllowedEnvFields ] = useState([])
-    const [ selectedModules, setSelectedModules ] = useState([])
-    const [ modalActive, setModalActive ] = useState(false)
-    const [ selectedModule, setSelectedModule ] = useState(null)
+    const [ logSearchQuery, setLogSearchQuery ] = useState('')
     const logGroupSelected = logs.logGroup !== ''
     const hasAccess = func.checkUserValidForIntegrations()
 
+    const selectedLogKeysSignature = useMemo(
+        () => [...selectedLogKeys].sort().join(','),
+        [selectedLogKeys]
+    )
+
     const logGroupOptions = [
-        { label: "Runtime", value: "RUNTIME" },
         { label: "Dashboard", value: "DASHBOARD" },
+        { label: "Runtime", value: "RUNTIME" },
         { label: "Testing", value: "TESTING" },
+        { label: "Agentic Testing", value: "AGENTIC_TESTING" },
         { label: "Puppeteer", value: "PUPPETEER" },
         { label: "Threat", value: "THREAT_DETECTION" },
         { label: "Data Ingestion", value: "DATA_INGESTION" },
+        { label: "AWS API Gateway", value: "AWS_API_GATEWAY" },
     ];
   
     const handleSelectLogGroup = (logGroup) => {
+       setLogSearchQuery('')
        setLogs(previousState => ({ ...previousState, logData: [], logGroup: logGroup }))
     }
-    
-    const fetchLogsFromDb = async (startTime, endTime, refresh = false) => {
-        if (logs.logGroup !== '') {
-            setLoading(true)
+
+    const displayedLogData = useMemo(() => {
+        const q = logSearchQuery.trim().toLowerCase()
+        if (!q) {
+            return logs.logData
+        }
+        return logs.logData.filter((entry) => {
+            const line = `${func.epochToDateTime(entry.timestamp)} ${entry.log ?? ''}`.toLowerCase()
+            return line.includes(q)
+        })
+    }, [logs.logData, logSearchQuery])
+
+    const fetchLogsFromDb = useCallback(async (startTime, endTime, refresh = false) => {
+        if (logs.logGroup === '') {
+            return
+        }
+        setLoading(true)
+        try {
             const logsResponse = await settingRequests.fetchLogsFromDb(
                 Math.floor(startTime / 1000), 
                 Math.floor(endTime  / 1000),
-                logs.logGroup
+                logs.logGroup,
+                selectedLogKeys
             )
-            
-            setLogs(previousState => (
-                {
-                    ...logs,
-                    startTime: startTime,
-                    endTime: endTime,
-                    logData: refresh ? [...logsResponse.logs] : [...logsResponse.logs, ...previousState.logData]
-                }))
-
+            setLogs(previousState => ({
+                ...previousState,
+                startTime,
+                endTime,
+                logData: refresh
+                    ? (logsResponse.logs ?? [])
+                    : [...(logsResponse.logs ?? []), ...previousState.logData],
+            }))
+        } finally {
             setLoading(false)
         }
-    }
-
-    const fetchModuleInfo = async () => {
-        const response = await settingRequests.fetchModuleInfo();
-        setModuleInfos(response.moduleInfos || []);
-        setAllowedEnvFields(response.allowedEnvFields || []);
-    }
-
+    }, [logs.logGroup, selectedLogKeysSignature])
+    
     useEffect(() => {
         const startTime = Date.now() - fiveMins
-        const endTime = Date.now() 
-        if(hasAccess){
-            fetchLogsFromDb(startTime, endTime)
-            fetchModuleInfo()
+        const endTime = Date.now()
+        if (hasAccess && logs.logGroup !== '') {
+            fetchLogsFromDb(startTime, endTime, true)
         }
-    }, [logs.logGroup])
+    }, [logs.logGroup, selectedLogKeysSignature, hasAccess, fetchLogsFromDb])
 
    const exportLogsCsv = () => {
         let headers = ['timestamp', 'log'];
@@ -91,7 +118,6 @@ const Logs = () => {
         const endTime = Date.now();
         if(hasAccess){
             fetchLogsFromDb(startTime, endTime, true)
-            fetchModuleInfo()
         }
     }
 
@@ -103,184 +129,108 @@ const Logs = () => {
         }
     }
 
-    const handleRebootModules = async (deleteTopicAndReboot) => {
-        if (selectedModules.length === 0) {
-            func.setToast(true, true, "Please select at least one module to reboot");
-            return;
+    const toggleLogKeysPopover = () => {
+        if (!logKeysPopoverOpen) {
+            setPendingLogKeys([...selectedLogKeys])
         }
-        try {
-            await settingRequests.rebootModules(selectedModules, deleteTopicAndReboot);
-            const rebootType = deleteTopicAndReboot ? "Container reboot" : "Restart process";
-            func.setToast(true, false, `${rebootType} flag set for eligible modules`);
-            setSelectedModules([]);
-            await fetchModuleInfo(); // Refresh the module list
-        } catch (error) {
-            func.setToast(true, true, "Failed to set reboot flag for modules");
-        }
+        setLogKeysPopoverOpen((open) => !open)
     }
 
-    const toggleModuleSelection = (moduleId) => {
-        setSelectedModules(prev => {
-            if (prev.includes(moduleId)) {
-                return prev.filter(id => id !== moduleId);
-            } else {
-                return [...prev, moduleId];
+    const togglePendingKey = (key, checked) => {
+        setPendingLogKeys((prev) => {
+            if (checked) {
+                return prev.includes(key) ? prev : [...prev, key]
             }
-        });
+            return prev.filter((k) => k !== key)
+        })
     }
 
-    const canRebootModule = (module) => {
-        const twoMinutesAgo = Math.floor(Date.now() / 1000) - 120;
-        return module.lastHeartbeatReceived >= twoMinutesAgo &&
-               module.name &&
-               (module.name.startsWith('Default_') || module.moduleType === 'TRAFFIC_COLLECTOR');
+    const applyLogKeys = () => {
+        const next = pendingLogKeys.length > 0 ? [...pendingLogKeys] : [...ALL_STORED_LOG_KEYS]
+        setSelectedLogKeys(next)
+        setLogKeysPopoverOpen(false)
     }
-
-    const handleModuleTypeClick = (module) => {
-        setSelectedModule(module);
-        setModalActive(true);
-    }
-
-    const handleModalClose = () => {
-        setModalActive(false);
-        setSelectedModule(null);
-    }
-
-    const handleSaveEnv = async (moduleId, moduleName, envData) => {
-        try {
-            await settingRequests.updateModuleEnvAndReboot(moduleId, moduleName, envData);
-            func.setToast(true, false, "Environment config saved successfully. Module will reboot.");
-            handleModalClose();
-            await fetchModuleInfo();
-        } catch (error) {
-            func.setToast(true, true, "Failed to update environment config");
-        }
-    }
-
-    // Sort moduleInfos by lastHeartbeatReceived in descending order
-    const sortedModuleInfos = [...moduleInfos].sort((a, b) => (b.lastHeartbeatReceived || 0) - (a.lastHeartbeatReceived || 0));
-
-    const CONFIGURABLE_MODULE_TYPES = ['TRAFFIC_COLLECTOR', 'THREAT_DETECTION'];
-
-    const moduleInfoRows = sortedModuleInfos.map(module => {
-        const isEligible = canRebootModule(module);
-        const isSelected = selectedModules.includes(module.id);
-        const isConfigurable = CONFIGURABLE_MODULE_TYPES.includes(module.moduleType);
-
-        return [
-            isConfigurable ? (
-                <Link onClick={() => handleModuleTypeClick(module)} removeUnderline>{module.moduleType || '-'}</Link>
-            ) : (
-                module.moduleType || '-'
-            ),
-            module.name || '-',
-            module.currentVersion || '-',
-            func.epochToDateTime(module.startedTs),
-            func.epochToDateTime(module.lastHeartbeatReceived),
-            isEligible ? 'Yes' : 'No',
-            <Checkbox
-                checked={isSelected}
-                onChange={() => toggleModuleSelection(module.id)}
-                disabled={!isEligible}
-            />,
-        ];
-    });
 
     return (
-        <VerticalStack>
-            <LegacyCard
-                sectioned
-                title="Logs"
-                actions={[
-                    { content: 'Export', onAction: exportLogsCsv },
-                    { content: 'Configure log level'}
-                ]}
-            >
-                <Text variant="bodyMd">
-                    API logs capture detailed records of API requests and responses, including metadata such as timestamps, request headers, payload data, and authentication details.
-                </Text>
-                <br />
-
-                <div style={{ display: "grid", gridTemplateColumns: "auto max-content", gap: "10px"}}>
-                    <Dropdown
-                        menuItems={logGroupOptions}
-                        initial="Dashboard"
-                        selected={handleSelectLogGroup}
-                        />
+        <LegacyCard>
+            <LegacyCard.Section>
+                <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
+                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        <Text variant="headingMd" as="h2">Logs</Text>
+                        {loading ? (
+                            <Spinner size="small" accessibilityLabel="Loading logs" />
+                        ) : null}
+                    </HorizontalStack>
                     <ButtonGroup segmented>
-                        <Button onClick={handleRefresh} disabled={!logGroupSelected}>Refresh</Button>
-                        <Button onClick={handlePreviousFiveMinutesLogs} disabled={!logGroupSelected}>-5 minutes</Button>
+                        <Popover
+                            active={logKeysPopoverOpen}
+                            activator={
+                                <Button disclosure onClick={toggleLogKeysPopover}>
+                                    Configure log level
+                                </Button>
+                            }
+                            onClose={() => setLogKeysPopoverOpen(false)}
+                            autofocusTarget="first-node"
+                        >
+                            <Popover.Section>
+                                <Box minWidth="300px" paddingInline="3" paddingBlock="3">
+                                    <VerticalStack gap="2">
+                                        {STORED_LOG_KEY_OPTIONS.map(({ key, label }) => (
+                                            <Checkbox
+                                                key={key}
+                                                label={label}
+                                                checked={pendingLogKeys.includes(key)}
+                                                onChange={(checked) => togglePendingKey(key, checked)}
+                                            />
+                                        ))}
+                                        <Button fullWidth monochrome onClick={applyLogKeys}>
+                                            Apply
+                                        </Button>
+                                    </VerticalStack>
+                                </Box>
+                            </Popover.Section>
+                        </Popover>
+                        <Button onClick={exportLogsCsv}>Export</Button>
                     </ButtonGroup>
-                </div>
-              
-                <br />
+                </HorizontalStack>
+            </LegacyCard.Section>
+            <LegacyCard.Section>
+                <Box paddingBlockEnd="3">
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr max-content", gap: "10px", width: "100%" }}>
+                        <Dropdown
+                            menuItems={logGroupOptions}
+                            initial="Dashboard"
+                            selected={handleSelectLogGroup}
+                            />
+                        <ButtonGroup segmented>
+                            <Button onClick={handleRefresh} disabled={!logGroupSelected}>Refresh</Button>
+                            <Button onClick={handlePreviousFiveMinutesLogs} disabled={!logGroupSelected || logs.startTime == null}>-5 minutes</Button>
+                        </ButtonGroup>
+                    </div>
+                </Box>
 
                 {
-                    logGroupSelected ? 
-                        // loading ? <SpinnerCentered/> : <LogsContainer logs={logs} />  
-                        <LogsContainer logs={logs} />  
+                    logGroupSelected ?
+                        <VerticalStack gap="2">
+                            <TextField
+                                id="health-logs-search"
+                                label="Search loaded logs"
+                                value={logSearchQuery}
+                                onChange={(value) => setLogSearchQuery(value)}
+                                placeholder="Filter by text in timestamp or message"
+                                clearButton
+                                onClearButtonClick={() => setLogSearchQuery('')}
+                                autoComplete="off"
+                            />
+                            <LogsContainer
+                                logs={logs}
+                                displayedLogData={displayedLogData}
+                            />
+                        </VerticalStack>
                         : <Text variant="bodyMd">Select log group to fetch logs</Text>
                 }
-            </LegacyCard>
-
-            {moduleInfos && moduleInfos.length > 0 ? (
-                <LegacyCard
-                    sectioned
-                    title="Module Information"
-                    actions={[
-                        {
-                            content: 'Restart process',
-                            onAction: () => handleRebootModules(false),
-                            disabled: selectedModules.length === 0
-                        },
-                        {
-                            content: 'Delete topic and restart process',
-                            onAction: () => handleRebootModules(true),
-                            disabled: selectedModules.length === 0
-                        }
-                    ]}
-                >
-                    <DataTable
-                        columnContentTypes={[
-                            'text',
-                            'text',
-                            'text',
-                            'text',
-                            'text',
-                            'text',
-                            'text'
-                        ]}
-                        headings={[
-                            'Type',
-                            'Name',
-                            'Version',
-                            'Started At',
-                            'Last Heartbeat',
-                            'Reboot Eligible',
-                            'Select'
-                        ]}
-                        rows={moduleInfoRows}
-                    />
-                </LegacyCard>
-            ) : <></>}
-
-            <Modal
-                open={modalActive}
-                onClose={handleModalClose}
-                title={`Configure ${selectedModule?.moduleType || 'Module'}`}
-                large
-            >
-                <Modal.Section>
-                    <ModuleEnvConfigComponent
-                        title="Environment Variables"
-                        description={`Configure environment variables for ${selectedModule?.name || 'module'}`}
-                        module={selectedModule}
-                        allowedEnvFields={allowedEnvFields}
-                        onSaveEnv={handleSaveEnv}
-                    />
-                </Modal.Section>
-            </Modal>
-        </VerticalStack>
+            </LegacyCard.Section>
+        </LegacyCard>
     )
 }
 

@@ -26,7 +26,7 @@ const initialAutoTicketingDetails = {
     issueType: "",
 }
 
-function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
+function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
 
     const initialState = {
         categories: [],
@@ -44,6 +44,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         testRunTimeLabel: "30 minutes",
         runTypeLabel: "Once",
         maxConcurrentRequests: -1,
+        maxAgentTokens: -1,
         testName: "",
         authMechanismPresent: false,
         testRoleLabel: "No test role selected",
@@ -52,8 +53,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         sendMsTeamsAlert: false,
         cleanUpTestingResources: false,
         doNotMarkIssuesAsFixed: false,
+        runAutomatedTests: false,
         autoTicketingDetails: initialAutoTicketingDetails,
-        miniTestingServiceName: "",
+        miniTestingServiceNames: [],
         slackChannel: ""
     }
     const navigate = useNavigate()
@@ -92,6 +94,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [slackChannels, setSlackChannels] = useState([])
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
 
+    // Set all modules as default selection when modules are loaded (for new tests only)
+    useEffect(() => {
+        if (miniTestingServiceNames && miniTestingServiceNames.length > 0 && !testIdConfig) {
+            setTestRun(prev => ({
+                ...prev,
+                miniTestingServiceNames: miniTestingServiceNames.map(m => m.value)
+            }));
+        }
+    }, [miniTestingServiceNames, testIdConfig]);
+
     const localCategoryMap = LocalStore.getState().categoryMap
     const dashboardCategory = getDashboardCategory();
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
@@ -113,7 +125,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
     }, [testMode])
 
-    const apiCollectionName = collectionsMap[apiCollectionId]
+    const isMultiCollection = apiCollectionIds && apiCollectionIds.length > 0;
+    const apiCollectionName = isMultiCollection
+        ? `${apiCollectionIds.length} collections`
+        : collectionsMap[apiCollectionId]
 
     async function fetchData() {
         setLoading(true)
@@ -152,6 +167,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             testSourceConfigs: []
         }
 
+        let categoryMapForFiltering = localCategoryMap;
         if ((localCategoryMap && Object.keys(localCategoryMap).length > 0) && (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)) {
             metaDataObj = {
                 categories: Object.values(localCategoryMap),
@@ -161,11 +177,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
         } else {
             metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
+
+            if (!localCategoryMap || Object.keys(localCategoryMap).length === 0) {
+                categoryMapForFiltering = {};
+                metaDataObj.categories.forEach(category => {
+                    categoryMapForFiltering[category.name] = category;
+                });
+            }
         }
-        if (func.isDemoAccount()) {
-            let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, localCategoryMap);
-            metaDataObj.subCategories = filterSubCategoriesBasedOnCategories(metaDataObj.subCategories, categoriesName);
-        }
+        let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMapForFiltering);
+        metaDataObj.subCategories = filterSubCategoriesBasedOnCategories(metaDataObj.subCategories, categoriesName);
         let categories = metaDataObj.categories
         categories = func.sortByCategoryPriority(categories, 'name')
         const categoriesNames = categories.map(category => category.name)
@@ -291,8 +312,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     scheduleTimestamp: testIdConfig?.scheduleTimestamp,
                     startTimestamp: testIdConfig?.scheduleTimestamp,
                     runTypeParentLabel: testRunType,
-                    miniTestingServiceName: testIdConfig?.miniTestingServiceName || "",
+                    miniTestingServiceNames: testIdConfig?.allowedMiniTestingServiceNames || [],
                     slackChannel: testIdConfig?.selectedSlackChannelId || 0,
+                    doNotMarkIssuesAsFixed: testIdConfig?.doNotMarkIssuesAsFixed ?? false,
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")
@@ -328,14 +350,15 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             if (!ret[x.superCategory.name]) {
                 ret[x.superCategory.name] = { selected: [], all: [] }
             }
-
+            
             let obj = {
                 label: x.testName,
                 value: x.name,
                 author: x.author,
                 nature: x?.attributes?.nature?._name || "",
                 severity: x?.superCategory?.severity?._name || "",
-                duration: x?.attributes?.duration?._name || ""
+                duration: x?.attributes?.duration?._name || "",
+                estimatedTokens: 2 * x.estimatedTokens || 0
             }
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)
@@ -453,10 +476,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         testRows = filteredTests.map(test => {
             const isCustom = test?.author !== "AKTO"
             const label = (
-                <span style={{ display: 'flex', gap: '4px', alignItems: 'flex-start' }}>
-                    <Text variant="bodyMd">{test.label}</Text>
-                    {isCustom ? <Box paddingBlockStart={"050"}><Badge status="warning" size="small">Custom</Badge></Box> : null}
-                </span>
+                <VerticalStack gap="1">
+                    <HorizontalStack gap="1" blockAlign="start" wrap>
+                        <Text variant="bodyMd">{test.label}</Text>
+                        {isCustom ? <Badge status="warning" size="small">Custom</Badge> : null}
+                        {test.estimatedTokens > 0 ? <Badge status="info" size="small">~{test.estimatedTokens.toLocaleString()} tokens</Badge> : null}
+                    </HorizontalStack>
+                </VerticalStack>
             )
             return ([(
                 <Checkbox
@@ -513,6 +539,17 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const maxConcurrentRequestsOptions = [{ label: "Default", value: "-1" }, ...maxRequests, {label: '200', value: '200'}, {label: '300', value: '300'}, {label: '500', value: '500'}]
 
+    const maxAgentTokensOptions = [
+        { label: "No limit", value: "-1" },
+        { label: "1K", value: "1000" },
+        { label: "2K", value: "2000" },
+        { label: "3K", value: "3000" },
+        { label: "10K", value: "10000" },
+        { label: "50K", value: "50000" },
+        { label: "100K", value: "100000" },
+        { label: "500K", value: "500000" },
+    ]
+
     function scheduleString() {
         if (testRun.hourlyLabel === "Now") {
             if (testRun.recurringDaily) {
@@ -566,10 +603,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceName, slackChannel, doNotMarkIssuesAsFixed } = testRun
+        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, maxAgentTokens, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceNames, slackChannel, doNotMarkIssuesAsFixed, runAutomatedTests } = testRun
         let {testName} = testRun;
         const autoTicketingDetails = jiraProjectMap ? testRun.autoTicketingDetails : null;
         const collectionId = parseInt(apiCollectionId)
+        const isMultiCollection = apiCollectionIds && apiCollectionIds.length > 0;
 
         const tests = testRun.tests
 
@@ -614,9 +652,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value) ,autoTicketingDetails, doNotMarkIssuesAsFixed)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value) ,autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests)
+        } else if (isMultiCollection) {
+            await observeApi.scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests)
         }
 
         setActive(false)
@@ -665,6 +705,24 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         });
         return count;
     }
+
+    function computeTokenEstimation() {
+        let totalTokens = 0;
+        const tests = { ...testRun.tests };
+        Object.keys(tests).forEach(category => {
+            (tests[category] || []).filter(t => t.selected && t.estimatedTokens > 0).forEach(t => {
+                totalTokens += t.estimatedTokens;
+            });
+        });
+
+        const totalApis = (selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0)
+            ? selectedResourcesForPrimaryAction.length
+            : (endpoints ? endpoints.length : 0);
+            
+        return totalTokens * totalApis;
+    }
+
+    const estimatedTotalTokens = computeTokenEstimation();
 
     function toggleTestsSelection(val) {
         let copyTestRun = testRun
@@ -762,6 +820,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             testRunTimeOptions={testRunTimeOptions}
             testRolesArr={testRolesArr}
             maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
+            maxAgentTokensOptions={maxAgentTokensOptions}
+            isAgenticCategory={isAgenticCategory}
             slackIntegrated={slackIntegrated}
             teamsTestingWebhookIntegrated={teamsTestingWebhookIntegrated}
             generateLabelForSlackIntegration={generateLabelForSlackIntegration}
@@ -797,7 +857,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     return (
         <div>
-            {!parentActivator ? activator : null}
+            {!parentActivator && !runTestFromOutside ? activator : null}
             {showEditableSettings ? editableConfigsComp : null}
             <Modal
 
@@ -949,6 +1009,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         </div>
                                     </div>
                                 </div>
+                                {estimatedTotalTokens > 0 && (
+                                    <Box paddingBlockStart="2">
+                                        <HorizontalStack align="end" gap="1">
+                                            <Text variant="bodySm" color="subdued">Estimated Usage:</Text>
+                                            <Text variant="bodySm" fontWeight="semibold">~{estimatedTotalTokens.toLocaleString()} tokens</Text>
+                                        </HorizontalStack>
+                                    </Box>
+                                )}
                                 {RunTestConfigurationComponent}
                             </VerticalStack>
                             <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />

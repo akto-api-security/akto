@@ -36,6 +36,16 @@ public class ModuleInfoAction extends UserAction {
     @Setter
     private Map<String, String> envData;
 
+    @Getter
+    @Setter
+    private String username;
+    @Getter
+    @Setter
+    private String team;
+    @Getter
+    @Setter
+    private String userRole;
+
     @Override
     public String execute() {
         return SUCCESS;
@@ -61,6 +71,11 @@ public class ModuleInfoAction extends UserAction {
                     isEndpointShield = true;
                 }
                 filters.add(Filters.eq(ModuleInfo.MODULE_TYPE, moduleTypeStr));
+            }
+
+            if (filter.containsKey("id")) {
+                String idValue = (String) filter.get("id");
+                filters.add(Filters.eq(ModuleInfoDao.ID, idValue));
             }
 
             if (filter.containsKey(ModuleInfo.LAST_HEARTBEAT_RECEIVED)) {
@@ -116,11 +131,17 @@ public class ModuleInfoAction extends UserAction {
     }
 
     private String getFieldType(String key) {
-        if (key.equals("AKTO_IGNORE_ENVOY_PROXY_CALLS") ||
-            key.equals("AKTO_IGNORE_IP_TRAFFIC") ||
-            key.equals("AKTO_K8_METADATA_CAPTURE") ||
-            key.equals("AKTO_THREAT_ENABLED") ||
-            key.equals("AGGREGATION_RULES_ENABLED")) {
+        if (ModuleInfoConstants.SECRET_ENV_KEYS.contains(key)) {
+            return "secret";
+        }
+        if (key.startsWith("ENABLE_") ||
+                key.equals("AKTO_IGNORE_ENVOY_PROXY_CALLS") ||
+                key.equals("AKTO_IGNORE_IP_TRAFFIC") ||
+                key.equals("AKTO_K8_METADATA_CAPTURE") ||
+                key.equals("AKTO_THREAT_ENABLED") ||
+                key.equals("AGGREGATION_RULES_ENABLED") ||
+                key.equals("SKIP_THREAT") ||
+                key.equals("APPLY_GUARDRAILS_TO_SSE")) {
             return "boolean";
         }
         return "text";
@@ -132,35 +153,32 @@ public class ModuleInfoAction extends UserAction {
         }
 
         for (ModuleInfo module : modules) {
-            if (module.getAdditionalData() == null) {
-                continue;
-            }
-
-            Map<String, Object> additionalData = module.getAdditionalData();
-            Object envObj = additionalData.get("env");
-
-            if (!(envObj instanceof Map)) {
-                continue;
-            }
-
-            @SuppressWarnings("unchecked")
-            Map<String, Object> env = (Map<String, Object>) envObj;
-
-            // Create filtered env map with only allowed keys for the module's type
-            Map<String, Object> filteredEnv = new HashMap<>();
             ModuleType moduleType = module.getModuleType();
-
             Map<String, String> allowedKeys = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.get(moduleType);
-            if (allowedKeys != null) {
-                for (String key : allowedKeys.keySet()) {
-                    if (env.containsKey(key)) {
-                        filteredEnv.put(key, env.get(key));
-                    }
+            if (allowedKeys == null) {
+                continue;
+            }
+
+            // Go module writes env vars to additionalData.env once at startup (no heartbeat overwrite).
+            // Dashboard writes desired changes to the same field. Read from there directly.
+            @SuppressWarnings("unchecked")
+            Map<String, Object> actualEnv = (module.getAdditionalData() != null
+                    && module.getAdditionalData().get("env") instanceof Map)
+                    ? (Map<String, Object>) module.getAdditionalData().get("env")
+                    : null;
+
+            Map<String, Object> filteredEnv = new HashMap<>();
+            for (String key : allowedKeys.keySet()) {
+                if (actualEnv != null && actualEnv.containsKey(key)) {
+                    boolean isSecret = ModuleInfoConstants.SECRET_ENV_KEYS.contains(key);
+                    filteredEnv.put(key, isSecret ? ModuleInfoConstants.REDACTED_PLACEHOLDER : actualEnv.get(key));
                 }
             }
 
-            // Replace env with filtered version
-            additionalData.put("env", filteredEnv);
+            if (module.getAdditionalData() == null) {
+                module.setAdditionalData(new HashMap<>());
+            }
+            module.getAdditionalData().put("env", filteredEnv);
         }
     }
 
@@ -192,6 +210,7 @@ public class ModuleInfoAction extends UserAction {
                 Filters.or(
                     Filters.regex(ModuleInfo.NAME, _DEFAULT_PREFIX_REGEX_STRING),
                     Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.TRAFFIC_COLLECTOR.toString()),
+                    Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.AKTO_AGENT_GATEWAY.toString()),
                     Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.THREAT_DETECTION.toString())
                 )
             );
@@ -232,8 +251,27 @@ public class ModuleInfoAction extends UserAction {
         this.moduleIds = moduleIds;
     }
 
+    public String updateUserDeviceTag() {
+        if (username == null || username.trim().isEmpty()) {
+            addActionError("Username is required");
+            return ERROR.toUpperCase();
+        }
+
+        List<Bson> updates = new ArrayList<>();
+        updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".team", team != null ? team.trim() : ""));
+        updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".userRole", userRole != null ? userRole.trim() : ""));
+
+        Bson filter = Filters.and(
+            Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD),
+            Filters.eq(ModuleInfo.ADDITIONAL_DATA + ".username", username)
+        );
+
+        ModuleInfoDao.instance.updateMany(filter, Updates.combine(updates));
+        return SUCCESS.toUpperCase();
+    }
+
     public String updateModuleEnvAndReboot() {
-        if (moduleName == null || moduleName.isEmpty()) {
+        if (moduleId == null || moduleId.isEmpty()) {
             return ERROR.toUpperCase();
         }
 
@@ -242,25 +280,23 @@ public class ModuleInfoAction extends UserAction {
         }
 
         try {
-            int deltaTimeForReboot = Context.now() - rebootThresholdSeconds;
-
-
-            Bson moduleFilter = Filters.and(
-                Filters.eq(ModuleInfo.NAME, moduleName),
-                Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, deltaTimeForReboot),
-                Filters.ne(ModuleInfo.ADDITIONAL_DATA, null)
-            );
+            Bson moduleFilter = Filters.eq(ModuleInfoDao.ID, moduleId);
 
 
             List<Bson> updates = new ArrayList<>();
 
-            // Update each environment variable individually to preserve other env vars
-            // Only allow whitelisted keys for security
+            // Write directly to additionalData.env — same field the Go module writes at startup.
+            // Go module only writes env vars once at startup (not on every heartbeat), so no race condition.
             for (Map.Entry<String, String> entry : envData.entrySet()) {
                 boolean isAllowedKey = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.values().stream()
                     .anyMatch(moduleEnvMap -> moduleEnvMap.containsKey(entry.getKey()));
 
                 if (isAllowedKey) {
+                    // Skip secret fields if the user submitted the redacted placeholder unchanged
+                    if (ModuleInfoConstants.SECRET_ENV_KEYS.contains(entry.getKey())
+                            && ModuleInfoConstants.REDACTED_PLACEHOLDER.equals(entry.getValue())) {
+                        continue;
+                    }
                     updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".env." + entry.getKey(), entry.getValue()));
                 }
             }

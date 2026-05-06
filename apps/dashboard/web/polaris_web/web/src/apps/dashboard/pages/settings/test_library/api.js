@@ -22,6 +22,13 @@ const testLibraryRequests = {
             data: {repositoryUrl: repositoryUrl}
         })
     },
+    syncAllDefaultTestLibraries() {
+        return request({
+            url: '/api/syncAllDefaultTestLibraries',
+            method: 'post',
+            data: {}
+        })
+    },
     fetchCustomTestsCount() {
         return request({
             url: '/api/fetchCustomTestsCount',

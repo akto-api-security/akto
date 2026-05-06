@@ -28,6 +28,7 @@ message MaliciousEventMessage {
   string host = 17;   // Host header from the request
   string status = 18;
   string context_source = 19;  // Context source: API, MCP, GEN_AI, AGENTIC, DAST, ENDPOINT
+  string session_id = 20;  // Session identifier for tracking user sessions
 }
 
 message MaliciousEventKafkaEnvelope {

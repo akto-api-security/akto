@@ -12,6 +12,7 @@ message Metadata {
   string rule_violated = 4;
   string risk_score = 5;
   string reason = 6;
+  string dest_country_code = 7;
 }
 
 message SchemaConformanceError {

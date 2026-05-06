@@ -10,6 +10,7 @@ public class SampleData {
     public static final String SAMPLES = "samples";
     List<String> samples;
     List<Integer> collectionIds;
+    List<String> traces;
 
     public SampleData() {
     }
@@ -47,6 +48,14 @@ public class SampleData {
 
     public void setCollectionIds(List<Integer> collectionIds) {
         this.collectionIds = collectionIds;
+    }
+
+    public List<String> getTraces() {
+        return traces;
+    }
+
+    public void setTraces(List<String> traces) {
+        this.traces = traces;
     }
 
     @Override

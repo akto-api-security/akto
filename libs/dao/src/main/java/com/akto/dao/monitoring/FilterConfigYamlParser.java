@@ -108,6 +108,24 @@ public class FilterConfigYamlParser {
             filterConfig.setIgnore(ignoreResult);
         }
 
+        // Parse success_filter and failure_filter if present
+        if (filterConfig != null) {
+            Object successFilterMap = config.get(FilterConfig.SUCCESS_FILTER);
+            if (successFilterMap != null) {
+                ConfigParserResult successResult = configParser.parse(successFilterMap);
+                if (successResult != null) {
+                    filterConfig.setSuccessFilter(successResult);
+                }
+            }
+            Object failureFilterMap = config.get(FilterConfig.FAILURE_FILTER);
+            if (failureFilterMap != null) {
+                ConfigParserResult failureResult = configParser.parse(failureFilterMap);
+                if (failureResult != null) {
+                    filterConfig.setFailureFilter(failureResult);
+                }
+            }
+        }
+
         return filterConfig;
     }
 
