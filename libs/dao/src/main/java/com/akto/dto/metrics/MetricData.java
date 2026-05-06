@@ -2,6 +2,10 @@ package com.akto.dto.metrics;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.monitoring.ModuleInfo;
+
+import lombok.Getter;
+import lombok.Setter;
+
 import org.bson.types.ObjectId;
 
 public class MetricData {
@@ -12,6 +16,8 @@ public class MetricData {
     private String instanceId; // module id
     private int timestamp;
     private String moduleType;
+
+    @Getter @Setter
     private ModuleInfo moduleInfo;
 
     public MetricType getMetricType() {
@@ -182,13 +188,5 @@ public class MetricData {
 
     public void setModuleType(String moduleType) {
         this.moduleType = moduleType;
-    }
-
-    public ModuleInfo getModuleInfo() {
-        return moduleInfo;
-    }
-
-    public void setModuleInfo(ModuleInfo moduleInfo) {
-        this.moduleInfo = moduleInfo;
     }
 } 
