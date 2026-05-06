@@ -283,4 +283,10 @@ public class DbActor extends DataActor {
         return all;
     }
 
+    public List<EndpointMcpConfig> fetchEndpointMcpConfigs(String tempCollectionName, int updatedDate) {
+        // TODO: wire to DbLayer when EndpointMcpConfigDao is added to main akto/libs/dao.
+        // data-ingestion-service uses ClientActor in hybrid/SaaS deployments, so this path is unused for now.
+        return Collections.emptyList();
+    }
+
 }

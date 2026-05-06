@@ -23,7 +23,7 @@ import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadge
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable"
 import { CellType } from "../../components/tables/rows/GithubRow"
 import GithubCell from "../../components/tables/cells/GithubCell"
-import { getServerActionFlags } from "./auditServerActionFlags"
+import { getServerActionFlags, getRegistryOverride } from "./auditServerActionFlags"
 
 const childResourceName = { singular: "item", plural: "items" }
 
@@ -243,6 +243,10 @@ function AuditDataDrawer({
         { content: "Conditionally allow", onAction: () => requestChildrenConditional(selectedHexIds) },
     ])
 
+    // Registry-precedence override: when registry is configured but parent server
+    // is not verified, every child inherits Rejected/MCP Registry display.
+    const parentOverride = getRegistryOverride(auditItem, registryConfigured)
+
     // Pre-format children into table-ready rows. id mirrors hexId so the table
     // selection state references the same key our update helpers look up by.
     const childRows = children.map((child) => ({
@@ -251,10 +255,12 @@ function AuditDataDrawer({
         typeComp: <Text variant="bodySm">{childTypeLabel(child.type)}</Text>,
         riskAnalysisComp: <ComponentRiskAnalysisBadges componentRiskAnalysis={child?.componentRiskAnalysis} />,
         apiAccessTypesComp: (child.apiAccessTypes || []).join(", ") || "-",
-        remarksComp: child?.remarks
-            ? <Text variant="bodySm">{child.remarks}</Text>
-            : <Text variant="bodySm">Approved</Text>,
-        markedBy: child.markedBy || "-",
+        remarksComp: parentOverride
+            ? <Text variant="bodySm" color="critical">{parentOverride.remarks}</Text>
+            : (child?.remarks
+                ? <Text variant="bodySm">{child.remarks}</Text>
+                : <Text variant="bodySm">Approved</Text>),
+        markedBy: parentOverride ? parentOverride.markedBy : (child.markedBy || "-"),
     }))
 
     const flags = getServerActionFlags(auditItem, {
@@ -338,10 +344,10 @@ function AuditDataDrawer({
     const auditCellData = auditItem ? {
         resourceName: auditItem.resourceName,
         typeBadge: [auditItem.type].filter(Boolean),
-        remarksBadge: [auditItem.remarks || "Approved"],
+        remarksBadge: [parentOverride ? parentOverride.remarks : (auditItem.remarks || "Approved")],
         lastDetected: auditItem.lastDetected ? func.prettifyEpoch(auditItem.lastDetected) : "-",
         updatedTimestamp: auditItem.updatedTimestamp ? func.prettifyEpoch(auditItem.updatedTimestamp) : "-",
-        markedBy: auditItem.markedBy || "-",
+        markedBy: parentOverride ? parentOverride.markedBy : (auditItem.markedBy || "-"),
         mcpHost: auditItem.mcpHost || "-",
         aiAgentName: (isEndpointSecurity && auditItem.aiAgentName && auditItem.aiAgentName !== "-")
             ? auditItem.aiAgentName

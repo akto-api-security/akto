@@ -9,6 +9,7 @@ import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.utils.KafkaUtils;
+import com.akto.utils.McpCollectionResolver;
 import com.akto.utils.TopicPublisher;
 
 
@@ -49,6 +50,9 @@ public class InitializerListener implements ServletContextListener {
         // Initialize DataActor
         DataActor dataActor = DataActorFactory.fetchInstance();
         ModuleInfoWorker.init(ModuleInfo.ModuleType.DATA_INGESTION, dataActor);
+
+        // Warm the MCP collection-name cache and start the periodic refresher
+        McpCollectionResolver.getInstance().start();
     }
 
     @Override

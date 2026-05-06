@@ -1,6 +1,6 @@
 
-import { Text, HorizontalStack, VerticalStack, Box, Icon } from "@shopify/polaris"
-import { CircleTickMajor, CircleCancelMajor, SettingsMajor } from "@shopify/polaris-icons";
+import { Text, HorizontalStack, VerticalStack, Box, Icon, Tooltip } from "@shopify/polaris"
+import { CircleTickMajor, CircleCancelMajor, SettingsMajor, ClockMinor } from "@shopify/polaris-icons";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
@@ -20,7 +20,7 @@ import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 import AuditDataDrawer from "./AuditDataDrawer";
 import CollectionIcon from "../../components/shared/CollectionIcon";
 import settingsApi from "../settings/api";
-import { intersectServerActionFlags } from "./auditServerActionFlags";
+import { intersectServerActionFlags, getRegistryOverride } from "./auditServerActionFlags";
 import "../../components/shared/style.css";
 
 const headingsEndpointSecurity = [
@@ -298,8 +298,13 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
         });
     })() : null
     temp['remarksComp'] = (
-        (temp?.remarks === null || temp?.remarks === "" || !temp?.remarks) ? 
-            <Text variant="bodyMd">Approved</Text> : 
+        (temp?.remarks === null || temp?.remarks === "" || !temp?.remarks) ?
+            <HorizontalStack gap="1" blockAlign="center">
+                <Text variant="bodyMd">Approved</Text>
+                <Tooltip content="Audit Pending">
+                    <Icon source={ClockMinor} color="warning" />
+                </Tooltip>
+            </HorizontalStack> :
             <VerticalStack gap="1">
                 <Text variant="bodyMd">{temp?.remarks}</Text>
                 {temp?.approvalConditions && (
@@ -675,6 +680,13 @@ function AuditData() {
                         collectionName,
                         collectionRegistryStatus
                     )
+                    const override = getRegistryOverride(dataObj, registryConfigured);
+                    if (override) {
+                        dataObj.markedBy = override.markedBy;
+                        dataObj.remarksComp = (
+                            <Text variant="bodyMd" color="critical">{override.remarks}</Text>
+                        );
+                    }
                     ret.push(dataObj);
                     endpointRowCacheRef.current[String(dataObj.hexId || dataObj.id)] = dataObj;
                 })
@@ -753,7 +765,7 @@ function AuditData() {
             primaryAction={primaryActions}
             components = {[
                 <GithubServerTable
-                        key={startTimestamp + endTimestamp + (isEndpointSecurity ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(isEndpointSecurity)}
+                        key={startTimestamp + endTimestamp + (isEndpointSecurity ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(isEndpointSecurity) + String(registryConfigured)}
                         headers={headings}
                         resourceName={resourceName}
                         appliedFilters={[]}
