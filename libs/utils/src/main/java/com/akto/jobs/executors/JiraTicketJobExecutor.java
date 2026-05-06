@@ -255,7 +255,11 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         String projId) throws Exception {
         boolean isDataCenter = jira.getJiraType() == JiraIntegration.JiraType.DATA_CENTER;
         String endpoint = isDataCenter ? "/rest/api/2/issue/bulk" : "/rest/api/3/issue/bulk";
-        String url = jira.getBaseUrl() + endpoint;
+        String baseUrl = jira.getBaseUrl();
+        if (baseUrl != null && baseUrl.endsWith("/")) {
+            baseUrl = baseUrl.substring(0, baseUrl.length() - 1);
+        }
+        String url = (baseUrl == null ? "" : baseUrl) + endpoint;
 
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Authorization", Collections.singletonList(JiraApiClient.getAuthorizationHeader(jira)));
