@@ -9,23 +9,23 @@ import (
 	"sync"
 	"time"
 
+	"github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/models"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"github.com/akto-api-security/guardrails-service/pkg/dbabstractor"
 	"github.com/akto-api-security/guardrails-service/pkg/session"
-	"github.com/akto-api-security/akto-endpoint-shield/mcp"
-	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"go.uber.org/zap"
 )
 
 // policyCache holds cached policies and their metadata
 type policyCache struct {
-	policies             []types.Policy
-	auditPolicies        map[string]*types.AuditPolicy
-	compiledRules        map[string]*regexp.Regexp
-	hasAuditRules        bool
-	lastFetched          time.Time
-	mu                   sync.RWMutex
+	policies      []types.Policy
+	auditPolicies map[string]*types.AuditPolicy
+	compiledRules map[string]*regexp.Regexp
+	hasAuditRules bool
+	lastFetched   time.Time
+	mu            sync.RWMutex
 }
 
 // collectionTag represents a single key-value tag on a collection
@@ -49,15 +49,15 @@ type mcpListCache struct {
 
 // Service handles payload validation using akto-gateway library
 type Service struct {
-	config             *config.Config
-	dbClient           *dbabstractor.Client
-	processor          mcp.RequestProcessor // Default processor (skipThreat=false)
-	logger             *zap.Logger
-	cache              *policyCache
-	mcpListCache       *mcpListCache
+	config              *config.Config
+	dbClient            *dbabstractor.Client
+	processor           mcp.RequestProcessor // Default processor (skipThreat=false)
+	logger              *zap.Logger
+	cache               *policyCache
+	mcpListCache        *mcpListCache
 	collectionTagsCache *collectionTagsCache
-	sessionMgr         *session.SessionManager // Our session manager implementation for session tracking
-	schemaFetcher      *SchemaFetcher
+	sessionMgr          *session.SessionManager // Our session manager implementation for session tracking
+	schemaFetcher       *SchemaFetcher
 }
 
 // NewService creates a new validator service
