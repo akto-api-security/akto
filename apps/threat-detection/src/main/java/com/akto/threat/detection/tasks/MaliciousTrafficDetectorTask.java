@@ -265,7 +265,10 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
     // Sequence anomaly detection — pure in-memory, no Redis, no locking (single-threaded loop)
-    checkSequenceAnomaly(actor, apiCollectionId, urlForAggregation, method, responseParam);
+    boolean isSequenceEnabled = accountConfig != null && accountConfig.isBehavioralSequenceEnabled();
+    if(isSequenceEnabled){
+      checkSequenceAnomaly(actor, apiCollectionId, urlForAggregation, method, responseParam);
+    }
 
     // Increment API count using template URL for proper aggregation (skip for default collection)
     String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, urlForAggregation, method.toString());
