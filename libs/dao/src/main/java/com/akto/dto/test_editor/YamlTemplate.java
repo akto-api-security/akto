@@ -19,6 +19,8 @@ public class YamlTemplate {
     public static final String CONTENT = "content";
     private Info info;
     public static final String INFO = "info";
+    /** Mongo dotted path for YAML template category name ({@link Info#getCategory()} name). */
+    public static final String INFO_CATEGORY_NAME = "info.category.name";
     private boolean inactive;
     public static final String INACTIVE = "inactive";
     private String repositoryUrl;

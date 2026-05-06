@@ -120,6 +120,20 @@ public class GlobalEnums {
         HUMAN_AGENT_TRUST_EXPLOITATION("HUMAN_AGENT_TRUST_EXPLOITATION", Severity.HIGH, "Human-Agent Trust Exploitation", "HUMAN_AGENT_TRUST_EXPLOITATION"),
         ROGUE_AGENTS("ROGUE_AGENTS", Severity.HIGH, "Rogue Agents", "ROGUE_AGENTS");
 
+        /** OWASP Agentic Top 10 probe categories ({@code info.category.name} in tests-library agentic-pro YAML). */
+        public static final TestCategory[] OWASP_AGENTIC_TOP10_PROBE_CATEGORIES = {
+                AGENT_GOAL_HIJACK,
+                TOOL_MISUSE_AND_EXPLOITATION,
+                IDENTITY_AND_PRIVILEGE_ABUSE,
+                AGENTIC_SUPPLY_CHAIN,
+                UNEXPECTED_CODE_EXECUTION,
+                MEMORY_AND_CONTEXT_POISONING,
+                INSECURE_INTER_AGENT_COMMUNICATION,
+                CASCADING_FAILURES,
+                HUMAN_AGENT_TRUST_EXPLOITATION,
+                ROGUE_AGENTS
+        };
+
         private final String name;
         private final Severity severity;
         private final String displayName;

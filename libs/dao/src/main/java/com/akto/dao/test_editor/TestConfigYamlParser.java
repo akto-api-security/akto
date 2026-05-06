@@ -178,6 +178,60 @@ public class TestConfigYamlParser {
         return wordListMap;
     }
 
+    /**
+     * Counts YAML list entries under {@code execute.requests[].req[].conversations_list.conversations}
+     * (agentic probe templates from tests-library / Argus). Returns {@code -1} when that structure is absent.
+     */
+    @SuppressWarnings("unchecked")
+    public static int countAgenticConversationTurns(String yamlContent) {
+        if (yamlContent == null || yamlContent.trim().isEmpty()) {
+            return -1;
+        }
+        try {
+            ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
+            Map<String, Object> root = mapper.readValue(yamlContent, Map.class);
+            return countConversationsInExecuteMap(root.get("execute"));
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static int countConversationsInExecuteMap(Object execute) {
+        if (!(execute instanceof Map)) {
+            return -1;
+        }
+        Map<String, Object> execMap = (Map<String, Object>) execute;
+        Object requests = execMap.get("requests");
+        if (!(requests instanceof List) || ((List<?>) requests).isEmpty()) {
+            return -1;
+        }
+        Object firstReqWrapper = ((List<?>) requests).get(0);
+        if (!(firstReqWrapper instanceof Map)) {
+            return -1;
+        }
+        Object req = ((Map<String, Object>) firstReqWrapper).get("req");
+        if (!(req instanceof List)) {
+            return -1;
+        }
+        for (Object step : (List<?>) req) {
+            if (!(step instanceof Map)) {
+                continue;
+            }
+            Map<String, Object> stepMap = (Map<String, Object>) step;
+            Object cl = stepMap.get("conversations_list");
+            if (!(cl instanceof Map)) {
+                continue;
+            }
+            Object conv = ((Map<String, Object>) cl).get("conversations");
+            if (conv instanceof List) {
+                return ((List<?>) conv).size();
+            }
+            return 0;
+        }
+        return -1;
+    }
+
     public static Object getFieldIfExists(String content, String field) throws Exception {
 
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
