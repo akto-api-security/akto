@@ -511,6 +511,8 @@ public class Main {
         if(Constants.IS_NEW_TESTING_ENABLED){
             currentTestInfo = checkIfAlreadyTestIsRunningOnMachine();
         }
+        
+        AllMetrics.instance.init(LogDb.TESTING, false, dataActor, Context.getActualAccountId(), customMiniTestingServiceName, ModuleInfo.ModuleType.MINI_TESTING.name());
 
         if(currentTestInfo != null){
             try {
