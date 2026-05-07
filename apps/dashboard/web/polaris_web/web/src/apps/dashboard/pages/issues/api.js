@@ -44,18 +44,26 @@ export default {
             data: {issueId}
         })
     },
-    findTotalIssuesByDay (startTimeStamp, endTimeStamp) {
+    findTotalIssuesByDay (startTimeStamp, endTimeStamp, filterCollectionsId) {
+        const data = { startEpoch: startTimeStamp, endTimeStamp }
+        if (filterCollectionsId && filterCollectionsId.length > 0) {
+            data.filterCollectionsId = filterCollectionsId
+        }
         return request({
             url: 'api/findTotalIssuesByDay',
             method: 'post',
-            data: {startEpoch: startTimeStamp, endTimeStamp}
+            data
         })
     },
-    fetchTestCoverageData (startTimeStamp, endTimeStamp) {
+    fetchTestCoverageData (startTimeStamp, endTimeStamp, filterCollectionsId) {
+        const data = { startEpoch: startTimeStamp, endTimeStamp }
+        if (filterCollectionsId && filterCollectionsId.length > 0) {
+            data.filterCollectionsId = filterCollectionsId
+        }
         return request({
             url: 'api/fetchTestCoverageData',
             method: 'post',
-            data: {startTimeStamp, endTimeStamp}
+            data
         })
     },
     bulkCreateJiraTickets(issuesIds, aktoDashboardHost, projId, issueType, jiraMetaData){
@@ -107,11 +115,15 @@ export default {
             data: payload
         })
     },
-    fetchIssuesByApis() {
+    fetchIssuesByApis(apiCollectionIds) {
+        const data = {}
+        if (apiCollectionIds && apiCollectionIds.length > 0) {
+            data.apiCollectionIds = apiCollectionIds
+        }
         return request({
             url: 'api/fetchIssuesByApis',
             method: 'post',
-            data: {}
+            data
         })
     },
     createServiceNowTicket(testingIssuesId, tableName) {

@@ -48,7 +48,7 @@ public class MaliciousEventService {
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
 
   private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
-  private static final List<String> IGNORED_POLICIES_FOR_ACCOUNT = Arrays.asList("WeakOrMissingAuth", "PIIDataLeak");
+  private static final List<String> IGNORED_POLICIES_FOR_ACCOUNT = Arrays.asList("SQLInjection", "SSRF");
 
   private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
       System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
@@ -125,26 +125,8 @@ public class MaliciousEventService {
 
     MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder();
     String severity = evt.getSeverity();
-    // Skip recording for specific policies on specific account
-    if("1763355072".equals(accountId)){
-      if (IGNORED_POLICIES_FOR_ACCOUNT.contains(filterId)) {
-        return;
-      }
-
-      if ("OSCommandInjection".equals(filterId) && evt.getLatestApiEndpoint().contains("api-transactions")) {
-        return;
-      }
-
-      if (("WeakAuthentication").equals(filterId)) {
-        String host = evt.getHost() != null ? evt.getHost() : "";
-        String hostWithoutPort = host.replaceAll(":\\d+$", "");
-        boolean isInternalHost = host.contains(".svc") ||
-            !hostWithoutPort.matches(".*\\.[a-zA-Z]{2,}$");
-        if (isInternalHost) {
-          severity = "LOW";
-        }
-      }
-    }
+    // Skip recording for specific policies on specific account.
+    // TODO: Remove once policy is fixed.
 
     String refId = UUID.randomUUID().toString();
     logger.debug("received malicious event " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());

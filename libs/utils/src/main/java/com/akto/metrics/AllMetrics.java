@@ -99,6 +99,15 @@ public class AllMetrics {
             try {
                 Context.accountId.set(accountId);
 
+                ModuleInfo currentModuleInfo = ModuleInfoWorker.getModuleInfo();
+                ModuleInfo moduleInfo = null;
+                if (currentModuleInfo != null) {
+                    ModuleInfo.ModuleInfoBuilder moduleInfoBuilder = currentModuleInfo.toBuilder();
+
+                    // additionalData intentionally excluded to reduce the size of object stored in MetricData
+                    moduleInfo = moduleInfoBuilder.additionalData(null).build();
+                }
+
                 // Collect infrastructure metrics from MXBeans
                 collectInfraMetrics();
 
@@ -138,7 +147,8 @@ public class AllMetrics {
                             m.orgId,
                             instance_id,
                             type,
-                            m.moduleType
+                            m.moduleType,
+                            moduleInfo
                     );
                     metricDataList.add(metricData);
                 }

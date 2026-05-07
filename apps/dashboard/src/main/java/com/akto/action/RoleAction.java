@@ -151,7 +151,6 @@ public class RoleAction extends UserAction {
 
         if(allowedFeaturesForUser != null && !allowedFeaturesForUser.isEmpty()) {
             allowedFeaturesForUser = allowedFeaturesForUser.stream()
-                .filter(feature -> RBAC.SPECIAL_FEATURES_FOR_RBAC.contains(feature))
                 .collect(Collectors.toList());
         }
 
@@ -185,7 +184,6 @@ public class RoleAction extends UserAction {
 
         if(allowedFeaturesForUser != null && !allowedFeaturesForUser.isEmpty()) {
             allowedFeaturesForUser = allowedFeaturesForUser.stream()
-                .filter(feature -> RBAC.SPECIAL_FEATURES_FOR_RBAC.contains(feature))
                 .collect(Collectors.toList());
         }
 
@@ -210,7 +208,14 @@ public class RoleAction extends UserAction {
 
         List<RBAC> usersWithRole = RBACDao.instance.findAll(Filters.eq(RBAC.ROLE, roleName));
 
-        if(!usersWithRole.isEmpty()){
+        List<RBAC> newUsersWithRole = RBACDao.instance.findAll(
+                        Filters.exists(RBAC.SCOPE_ROLE_MAPPING)
+                ).stream()
+                .filter(rbac -> rbac.getScopeRoleMapping() != null &&
+                        rbac.getScopeRoleMapping().containsValue(roleName))
+                .collect(Collectors.toList());
+
+        if(!usersWithRole.isEmpty() || !newUsersWithRole.isEmpty()){
             addActionError("Role is associated with users. Cannot delete.");
             return ERROR.toUpperCase();
         }
@@ -228,11 +233,6 @@ public class RoleAction extends UserAction {
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 
         return SUCCESS.toUpperCase();
-    }
-
-    public String allowedFeaturesForRBAC(){
-        this.allowedFeaturesForRBAC = RBAC.SPECIAL_FEATURES_FOR_RBAC;
-        return SUCCESS.toUpperCase();
-    }
+    }   
 
 }

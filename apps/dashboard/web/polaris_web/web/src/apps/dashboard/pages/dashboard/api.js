@@ -32,11 +32,15 @@ const api = {
         })
     },
 
-    fetchCriticalIssuesTrend: async (startTimeStamp, endTimeStamp, severityToFetch = []) => {
+    fetchCriticalIssuesTrend: async (startTimeStamp, endTimeStamp, severityToFetch = [], apiCollectionIds) => {
+        const data = { startTimeStamp, endTimeStamp, severityToFetch }
+        if (apiCollectionIds && apiCollectionIds.length > 0) {
+            data.apiCollectionIds = apiCollectionIds
+        }
         return await request({
             url: '/api/fetchCriticalIssuesTrend',
             method: 'post',
-            data: { startTimeStamp, endTimeStamp, severityToFetch }
+            data
         })
     },
 

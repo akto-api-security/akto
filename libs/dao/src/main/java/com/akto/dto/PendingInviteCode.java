@@ -1,12 +1,14 @@
 package com.akto.dto;
 
 import org.bson.types.ObjectId;
+import java.util.List;
+import java.util.Map;
 
 public class PendingInviteCode {
 
     private ObjectId id;
     private String inviteCode;
-    public static final String INVITE_CODE = "inviteCode";    
+    public static final String INVITE_CODE = "inviteCode";
     private int issuer;
     public static final String _ISSUER = "issuer";
     private String inviteeEmailId;
@@ -17,6 +19,8 @@ public class PendingInviteCode {
     public static final String ACCOUNT_ID = "accountId";
     private String inviteeRole;
     public static final String INVITEE_ROLE = "inviteeRole";
+    private Map<String, String> scopeRoleMapping;
+    public static final String SCOPE_ROLE_MAPPING = "scopeRoleMapping";
 
     public PendingInviteCode() {
     }
@@ -92,5 +96,13 @@ public class PendingInviteCode {
 
     public void setInviteeRole(String inviteeRole) {
         this.inviteeRole = inviteeRole;
+    }
+
+    public Map<String, String> getScopeRoleMapping() {
+        return scopeRoleMapping;
+    }
+
+    public void setScopeRoleMapping(Map<String, String> scopeRoleMapping) {
+        this.scopeRoleMapping = scopeRoleMapping;
     }
 }

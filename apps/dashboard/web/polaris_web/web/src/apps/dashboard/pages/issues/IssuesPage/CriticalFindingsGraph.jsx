@@ -10,7 +10,7 @@ import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import { getCategoriesBasedOnDashboardCategory } from '../../test_editor/tests_table/categoryUtil';
 import issuesTransform from '../transform.js';
 
-const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl, complianceMode }) => {
+const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl, complianceMode, onBarClick, filterCollectionsId }) => {
     const subCategoryMap = LocalStore(state => state.subCategoryMap);
     const categoryMap = LocalStore(state => state.categoryMap);
     const dashboardCategory = getDashboardCategory();
@@ -26,13 +26,13 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
         })
         entries.sort((a, b) => b.text - a.text);
         const topEntries = entries.slice(0, 5);
-        const data = topEntries.map(entry => {return {text: entry.key, value: entry.text, color: entry.color}});
+        const data = topEntries.map(entry => {return {text: entry.key, value: entry.text, color: entry.color, filterKey: entry.filterKey}});
         setCriticalFindingsData(data)
     }
 
     const fetchGraphData = useCallback(async () => {
         setShowTestingComponents(false)
-        const subcategoryDataResp = await testingApi.getSummaryInfo(startTimestamp, endTimestamp)
+        const subcategoryDataResp = await testingApi.getSummaryInfo(startTimestamp, endTimestamp, filterCollectionsId)
         const allowedCategories = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMap);
         const filteredResp = Object.fromEntries(
             Object.entries(subcategoryDataResp).filter(([testId]) => {
@@ -61,7 +61,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
         }
         convertSubCategoryInfo(tempResultSubCategoryMap)
         setShowTestingComponents(true)
-    }, [startTimestamp, endTimestamp, complianceMode, subCategoryMap, categoryMap, dashboardCategory])
+    }, [startTimestamp, endTimestamp, complianceMode, subCategoryMap, categoryMap, dashboardCategory, filterCollectionsId])
 
     useEffect(() => {
         fetchGraphData()
@@ -88,6 +88,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
                 showYAxis={true}
                 yAxisTitle="Number of Issues"
                 barWidth={30}
+                onBarClick={!complianceMode && onBarClick ? (name, custom) => onBarClick('issueCategory', custom?.filterKey || name) : undefined}
             />
         }
         title={complianceMode ? (complianceMode + " clauses") : "Vulnerabilities findings"}

@@ -41,7 +41,7 @@ public abstract class Config {
 
     public enum ConfigType {
         SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF, RSA_KP, MCP_REGISTRY,
-        SLACK_ALERT_INTERNAL, ABUSEIPDB, DATA_DOG, BLOCK_ACCESS_WEBHOOK, DATADOG_FORWARDER;
+        SLACK_ALERT_INTERNAL, ABUSEIPDB, DATA_DOG, BLOCK_ACCESS_WEBHOOK, DATADOG_FORWARDER, NEW_RELIC_FORWARDER;
     }
 
     public ConfigType configType;
@@ -1278,5 +1278,27 @@ public abstract class Config {
             this.slack_app_name = slack_app_name;
         }
 
+    }
+
+    @BsonDiscriminator
+    public static class NewRelicForwarderConfig extends Config {
+        public static final String API_KEY = "apiKey";
+        private String apiKey;
+
+        public static final String CONFIG_ID = ConfigType.NEW_RELIC_FORWARDER.name() + CONFIG_SALT;
+
+        public NewRelicForwarderConfig() {
+            this.configType = ConfigType.NEW_RELIC_FORWARDER;
+            this.id = CONFIG_ID;
+        }
+
+        public NewRelicForwarderConfig(String apiKey) {
+            this.configType = ConfigType.NEW_RELIC_FORWARDER;
+            this.id = CONFIG_ID;
+            this.apiKey = apiKey;
+        }
+
+        public String getApiKey() { return apiKey; }
+        public void setApiKey(String apiKey) { this.apiKey = apiKey; }
     }
 }

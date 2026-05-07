@@ -4,7 +4,7 @@ import SampleData from "../../../components/shared/SampleData"
 import api from "../api";
 import func from "@/util/func"
 
-function LoginForm({ step, setSteps }) {
+function LoginForm({ step, setSteps, miniTestingServiceName = '' }) {
 
     const [ selectedApiResponseTab, setSelectedApiResponseTab] = useState(0)
     const [testDisable, setTestDisable] = useState(false)
@@ -31,7 +31,12 @@ function LoginForm({ step, setSteps }) {
         setTestDisable(true)
         func.setToast(true,  false,  "Running login flow")
         try {
-            const response = await api.triggerSingleStep('LOGIN_REQUEST', step.id, [{ ...step }])
+            const response = await api.triggerSingleStep(
+                'LOGIN_REQUEST',
+                step.id,
+                [{ ...step }],
+                miniTestingServiceName || undefined
+            )
             if (response) {
                 func.setToast(true,  false,  <div data-testid="login_flow_ran_message">Login flow ran successfully!</div>)
                 const testResponse = JSON.parse(response.responses[0])

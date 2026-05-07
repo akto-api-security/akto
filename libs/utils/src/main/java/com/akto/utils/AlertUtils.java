@@ -78,6 +78,38 @@ public class AlertUtils {
     }
     
     /**
+     * Check if we should send a Slack alert for NO_ACCESS scope denial
+     * Uses composite cache key: userEmail:scope:accountId
+     * Returns true if alert was never sent for this combination
+     *
+     * @param userEmail the user's email address
+     * @param scope the denied scope (e.g., "ENDPOINT", "AGENTIC")
+     * @param accountId the account ID
+     * @return true if alert should be sent, false if already sent
+     */
+    public static boolean shouldSendNoAccessAlert(String userEmail, String scope, String accountId) {
+        if (userEmail == null || scope == null || accountId == null) {
+            return false;
+        }
+
+        String alertKey = userEmail + ":" + scope + ":" + accountId;
+
+        // If combination doesn't exist in cache, send alert and add to cache
+        if (!alertCache.containsKey(alertKey)) {
+            alertCache.put(alertKey, true);
+
+            // Periodic cleanup - remove entries periodically for memory management
+            if (alertCache.size() % 100 == 0) { // Clean up every 100 entries
+                performCacheCleanup();
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Check if the given plan type is valid
      * 
      * @param planType the plan type to validate

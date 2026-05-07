@@ -330,6 +330,8 @@ public class DaoInit {
         ClassModel<ApiSequences> apiSequencesClassModel = ClassModel.builder(ApiSequences.class).enableDiscriminator(true).build();
         ClassModel<EndpointShieldLog> endpointShieldLogClassModel = ClassModel.builder(EndpointShieldLog.class).enableDiscriminator(true).build();
         ClassModel<GuardrailPolicies> guardrailPoliciesClassModel = ClassModel.builder(GuardrailPolicies.class).enableDiscriminator(true).build();
+        ClassModel<McpAllowlist> mcpAllowlistClassModel = ClassModel.builder(McpAllowlist.class).enableDiscriminator(true).build();
+        ClassModel<McpRegistryConfig> mcpRegistryConfigClassModel = ClassModel.builder(McpRegistryConfig.class).enableDiscriminator(true).build();
         ClassModel<IpReputationScore> ipReputationScoreClassModel = ClassModel.builder(IpReputationScore.class).enableDiscriminator(true).build();
         ClassModel<ApiDependenciesFromSwagger.APIIdentifier> apiIdentifierClassModel = ClassModel.builder(ApiDependenciesFromSwagger.APIIdentifier.class)
                 .enableDiscriminator(true).build();
@@ -343,6 +345,7 @@ public class DaoInit {
         ClassModel<WizIntegration> wizIntegrationClassModel = ClassModel.builder(WizIntegration.class).enableDiscriminator(true).build();
         ClassModel<WizEndpointAsset> wizEndpointAssetClassModel = ClassModel.builder(WizEndpointAsset.class).enableDiscriminator(true).build();
         ClassModel<WizFinding> wizFindingClassModel = ClassModel.builder(WizFinding.class).enableDiscriminator(true).build();
+        ClassModel<EndpointMcpConfig> endpointMcpConfigClassModel = ClassModel.builder(EndpointMcpConfig.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -386,7 +389,8 @@ public class DaoInit {
                 ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
-                wizIntegrationClassModel, wizFindingClassModel, wizEndpointAssetClassModel)
+                wizIntegrationClassModel, wizFindingClassModel, wizEndpointAssetClassModel,
+                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -444,7 +448,10 @@ public class DaoInit {
                 new EnumCodec<>(ReputationSource.class),
                 new EnumCodec<>(ReputationScore.class),
                 new EnumCodec<>(JiraIntegration.JiraType.class),
-                new EnumCodec<>(WizFinding.Status.class)
+                new EnumCodec<>(WizFinding.Status.class),
+                new EnumCodec<>(GlobalEnums.DashboardCategory.class),
+                new EnumCodec<>(McpRegistryConfig.RegistryType.class),
+                new EnumCodec<>(McpAllowlist.Source.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -529,11 +536,15 @@ public class DaoInit {
         McpAuditInfoDao.instance.createIndicesIfAbsent();
         McpReconRequestDao.instance.createIndicesIfAbsent();
         GuardrailPoliciesDao.instance.createIndicesIfAbsent();
+        McpAllowlistDao.instance.createIndicesIfAbsent();
+        McpRegistryConfigDao.instance.createIndicesIfAbsent();
+        HistoricalDataDao.instance.createIndicesIfAbsent();
         EndpointShieldLogsDao.instance.createIndicesIfAbsent();
         ModuleInfoDao.instance.createIndicesIfAbsent();
         AgentConversationDao.instance.createIndexIfAbsent();
         AgentConversationResultDao.instance.createIndexIfAbsent();
         IpReputationScoreDao.instance.createIndicesIfAbsent();
         ApiCollectionIconsDao.instance.createIndicesIfAbsent();
+
     }
 }

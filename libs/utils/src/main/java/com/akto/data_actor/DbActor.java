@@ -270,4 +270,23 @@ public class DbActor extends DataActor {
         DbLayer.ingestMetric(metricData);
     }
 
+    @Override
+    public List<ApiSequences> fetchApiSequences() {
+        List<ApiSequences> all = new ArrayList<>();
+        int skip = 0;
+        List<ApiSequences> batch;
+        do {
+            batch = DbLayer.fetchApiSequences(skip);
+            all.addAll(batch);
+            skip += batch.size();
+        } while (!batch.isEmpty());
+        return all;
+    }
+
+    public List<EndpointMcpConfig> fetchEndpointMcpConfigs(String tempCollectionName, int updatedDate) {
+        // TODO: wire to DbLayer when EndpointMcpConfigDao is added to main akto/libs/dao.
+        // data-ingestion-service uses ClientActor in hybrid/SaaS deployments, so this path is unused for now.
+        return Collections.emptyList();
+    }
+
 }

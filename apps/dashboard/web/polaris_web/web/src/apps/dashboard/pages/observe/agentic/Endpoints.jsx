@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { IndexFiltersMode, Box, Badge } from "@shopify/polaris";
+import { IndexFiltersMode, Box, Badge, HorizontalStack, Text } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -18,21 +18,21 @@ import {
     resourceName,
     INVENTORY_PATH,
     INVENTORY_FILTER_KEY,
+    PAGE_LIMIT,
     groupCollectionsByAgent,
     groupCollectionsByService,
-    createEnvTypeFilter,
-    createHostnameFilter,
+    groupCollectionsBySkill,
     extractEndpointId,
-    ROW_TYPES
+    buildAgenticInventoryFilterForRow,
 } from "./constants";
-import { CLIENT_TYPES } from "./mcpClientHelper";
+import { CLIENT_TYPES, ROW_TYPES, hasPersonalAccountTag } from "./mcpClientHelper";
 
-const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs'];
+const definedTableTabs = ['All', 'AI Agents', 'MCP Servers', 'LLMs', 'Skills'];
 
 function Endpoints() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
-    const [data, setData] = useState({ all: [], 'ai_agents': [], 'mcp_servers': [], llms: [] });
+    const [data, setData] = useState({ all: [], 'ai_agents': [], 'mcp_servers': [], llms: [], skills: [] });
     const [summaryData, setSummaryData] = useState({ totalAssets: 0, totalEndpoints: 0 });
 
     const { tabsInfo } = useTable();
@@ -53,7 +53,11 @@ function Endpoints() {
         setSelected(selectedIndex);
     };
 
-    const headers = useMemo(() => getHeaders(), []);
+    const headers = useMemo(() => {
+        const h = getHeaders();
+        h[1] = { ...h[1], value: "groupNameDisplay" };
+        return h;
+    }, []);
 
     const getRiskScoreStatus = useCallback((riskScore) => {
         if (riskScore >= 4.5) return "critical";
@@ -64,8 +68,21 @@ function Endpoints() {
     }, []);
 
     const prettifyGroupData = useCallback((groups) => {
-        return groups.map((group) => ({
+        return groups.map((group) => {
+            const showPersonal = group.hasPersonalAccount && group.rowType !== ROW_TYPES.SKILL;
+            const showLocalMcp = group.hasLocalMcpServer && group.rowType !== ROW_TYPES.SKILL;
+            const groupNameDisplay = (showPersonal || showLocalMcp)
+                ? (
+                    <HorizontalStack gap="2" align="start" wrap={false}>
+                        <Text>{group.groupName}</Text>
+                        {showPersonal && <Badge size="small" status="warning">Contains personal account</Badge>}
+                        {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
+                    </HorizontalStack>
+                )
+                : group.groupName;
+            return ({
             ...group,
+            groupNameDisplay,
             iconComp: (
                 <Box>
                     <CollectionIcon
@@ -76,12 +93,11 @@ function Endpoints() {
                 </Box>
             ),
             sensitiveSubTypes: transform.prettifySubtypes(group.sensitiveInRespTypes || [], false),
-            riskScoreComp: group.riskScore !== null ? (
-                <Badge status={getRiskScoreStatus(group.riskScore)} size="small">
-                    {group.riskScore}
-                </Badge>
-            ) : "-",
-        }));
+            riskScoreComp: group.riskScore !== null
+                ? <Badge status={getRiskScoreStatus(group.riskScore)} size="small">{group.riskScore}</Badge>
+                : "-",
+            });
+        });
     }, [getRiskScoreStatus]);
 
     async function fetchData(isMountedRef = { current: true }) {
@@ -93,12 +109,12 @@ function Endpoints() {
                 apiCollectionsResp,
                 trafficInfoResp,
                 riskScoreResp,
-                sensitiveInfoResp
+                sensitiveInfoResp,
             ] = await Promise.all([
                 api.getAllCollectionsBasic(),
                 api.getLastTrafficSeen(),
                 api.getRiskScoreInfo(),
-                api.getSensitiveInfoForCollections()
+                api.getSensitiveInfoForCollections(),
             ]);
 
             if (!isMountedRef.current) return;
@@ -111,19 +127,21 @@ function Endpoints() {
             const riskScoreMap = riskScoreResp?.riskScoreOfCollectionsMap || {};
             const sensitiveMap = sensitiveInfoResp?.sensitiveSubtypesInCollection || {};
 
-            // Group collections by agents (discovery sources) and services (discovered endpoints)
-            const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap);
+            // Group collections by agents (discovery sources), services (discovered endpoints), and skills
+            const agentGroups = groupCollectionsByAgent(collections, trafficMap, sensitiveMap, riskScoreMap);
             const serviceGroups = groupCollectionsByService(collections, trafficMap, sensitiveMap, riskScoreMap);
+            const skillGroups = groupCollectionsBySkill(collections, trafficMap, sensitiveMap, riskScoreMap);
 
             const prettifiedAgents = prettifyGroupData(agentGroups);
             const prettifiedServices = prettifyGroupData(serviceGroups);
+            const prettifiedSkills = prettifyGroupData(skillGroups);
 
             // For AI Agent: agent row already represents both gen-ai and mcp-server for that agent.
             // Don't show a separate service row with the same key (would show as "2 columns").
             const agentGroupKeys = new Set(prettifiedAgents.map((a) => a.groupKey));
             const servicesToShow = prettifiedServices.filter((s) => !agentGroupKeys.has(s.groupKey));
 
-            const allData = [...prettifiedAgents, ...servicesToShow];
+            const allData = [...prettifiedAgents, ...servicesToShow, ...prettifiedSkills];
 
             // Calculate unique endpoint IDs across all collections
             const uniqueEndpointIds = new Set();
@@ -146,6 +164,7 @@ function Endpoints() {
                 ai_agents: allData.filter(r => r.clientType === CLIENT_TYPES.AI_AGENT),
                 mcp_servers: allData.filter(r => r.clientType === CLIENT_TYPES.MCP_SERVER),
                 llms: allData.filter(r => r.clientType === CLIENT_TYPES.LLM),
+                skills: prettifiedSkills,
             });
             setLoading(false);
         } catch {
@@ -165,21 +184,15 @@ function Endpoints() {
 
     const handleRowClick = useCallback((row) => {
         const updatedFiltersMap = { ...filtersMap };
-
-        if (row.rowType === ROW_TYPES.AGENT) {
-            // Agent row: filter by agent tag so one click shows both gen-ai and mcp-server for that agent
-            if (row.tagKey && row.tagValue) {
-                const filterValue = `${row.tagKey}=${row.tagValue}`;
-                updatedFiltersMap[INVENTORY_FILTER_KEY] = createEnvTypeFilter([filterValue], false);
-            }
-        } else if (row.rowType === ROW_TYPES.SERVICE) {
-            // Service row (e.g. MCP server): filter by hostnames so only that service's collections open
-            if (row.hostNames?.length > 0) {
-                updatedFiltersMap[INVENTORY_FILTER_KEY] = createHostnameFilter(row.hostNames);
-            }
+        const filterPayload = buildAgenticInventoryFilterForRow(row);
+        if (filterPayload) {
+            updatedFiltersMap[INVENTORY_FILTER_KEY] = filterPayload;
         } else {
             delete updatedFiltersMap[INVENTORY_FILTER_KEY];
         }
+        // The agent-tree subview keeps its own filter slot; clear it so the
+        // previous row's hostnames don't leak into this row's view.
+        delete updatedFiltersMap[`${INVENTORY_FILTER_KEY}agent-tree/`];
 
         setFiltersMap(updatedFiltersMap);
         
@@ -207,27 +220,29 @@ function Endpoints() {
         <SummaryCardInfo summaryItems={summaryItems} key="summary" />
     ), [summaryItems]);
 
-    const tableComponent = useMemo(() => (
-        <GithubSimpleTable
-            pageLimit={100}
-            data={data[selectedTab]}
-            sortOptions={sortOptions}
-            resourceName={resourceName}
-            filters={[]}
-            headers={headers}
-            selectable={false}
-            mode={IndexFiltersMode.Default}
-            headings={headers}
-            useNewRow={true}
-            condensedHeight={true}
-            disambiguateLabel={disambiguateLabel}
-            prettifyPageData={(pageData) => pageData}
-            onRowClick={handleRowClick}
-            tableTabs={tableTabs}
-            onSelect={handleSelectedTab}
-            selected={selected}
-        />
-    ), [data, selectedTab, headers, disambiguateLabel, handleRowClick, tableTabs, selected]);
+    const tableComponent = useMemo(() => {
+        const commonTabProps = { tableTabs, onSelect: handleSelectedTab, selected };
+        return (
+            <GithubSimpleTable
+                key="table"
+                pageLimit={PAGE_LIMIT}
+                data={data[selectedTab]}
+                sortOptions={sortOptions}
+                resourceName={resourceName}
+                filters={[]}
+                headers={headers}
+                selectable={false}
+                mode={IndexFiltersMode.Default}
+                headings={headers}
+                useNewRow={true}
+                condensedHeight={true}
+                disambiguateLabel={disambiguateLabel}
+                prettifyPageData={(pageData) => pageData}
+                onRowClick={handleRowClick}
+                {...commonTabProps}
+            />
+        );
+    }, [data, selectedTab, headers, disambiguateLabel, handleRowClick, tableTabs, selected]);
 
     const pageTitle = useMemo(() => (
         <TitleWithInfo

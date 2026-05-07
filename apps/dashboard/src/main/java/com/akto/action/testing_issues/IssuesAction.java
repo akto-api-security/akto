@@ -39,6 +39,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.util.ComplianceResolutionUtils;
 import com.akto.utils.ApiInfoKeyResult;
 import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
@@ -81,6 +82,8 @@ public class IssuesAction extends UserAction {
     private int skip;
     private int limit;
     private List<TestRunIssueStatus> filterStatus;
+    @Getter
+    @Setter
     private List<Integer> filterCollectionsId;
     private List<Severity> filterSeverity;
     private List<String> filterCompliance;
@@ -430,6 +433,9 @@ public class IssuesAction extends UserAction {
                 Filters.gte(TestingRunIssues.CREATION_TIME, startEpoch),
                 Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp)
         );
+        if (filterCollectionsId != null && !filterCollectionsId.isEmpty()) {
+            baseFilters = Filters.and(baseFilters, Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, filterCollectionsId));
+        }
         
         // Apply dashboard filtering (handles API Security backward compatibility internally)
         Bson dashboardFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(baseFilters);
@@ -488,6 +494,9 @@ public class IssuesAction extends UserAction {
                 Filters.gte("time", startEpoch),
                 Filters.lte("time", endTimeStamp)
         );
+        if (filterCollectionsId != null && !filterCollectionsId.isEmpty()) {
+            filter = Filters.and(filter, Filters.in(HistoricalData.API_COLLECTION_ID, filterCollectionsId));
+        }
 
         pipeline.add(Aggregates.match(filter));
 
@@ -699,11 +708,7 @@ public class IssuesAction extends UserAction {
         BasicDBObject superCategory = new BasicDBObject();
         BasicDBObject severity = new BasicDBObject();
 
-        ComplianceMapping complianceMapping = info.getCompliance();
-
-        if (complianceMapping == null) {
-            complianceMapping = new ComplianceMapping(new HashMap<>(), "", "", 0);
-        }
+        ComplianceMapping complianceMapping = ComplianceResolutionUtils.resolveComplianceForTestConfig(testConfig);
 
         infoObj.put("issueDescription", info.getDescription());
         infoObj.put("issueDetails", info.getDetails());
@@ -1567,14 +1572,6 @@ public class IssuesAction extends UserAction {
 
     public void setFilterStatus(List<TestRunIssueStatus> filterStatus) {
         this.filterStatus = filterStatus;
-    }
-
-    public List<Integer> getFilterCollectionsId() {
-        return filterCollectionsId;
-    }
-
-    public void setFilterCollectionsId(List<Integer> filterCollectionsId) {
-        this.filterCollectionsId = filterCollectionsId;
     }
 
     public List<Severity> getFilterSeverity() {

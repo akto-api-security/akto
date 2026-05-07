@@ -4,8 +4,36 @@ import DonutChart from '../../../components/shared/DonutChart'
 import ConcentricCirclesChart from '../../../components/shared/ConcentricCirclesChart'
 import observeFunc from "../../observe/transform"
 import TooltipText from '../../../components/shared/TooltipText'
+import { useNavigate } from 'react-router-dom'
+import PersistStore from '../../../../main/PersistStore'
 
 function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl, isRequest, chartOnLeft, dataTableWidth, boxPadding, pieInnerSize, chartSize, spaceBetween, navUrlBuilder, onSegmentClick}) {
+    const navigate = useNavigate()
+    const filtersMap = PersistStore(state => state.filtersMap)
+    const setFiltersMap = PersistStore(state => state.setFiltersMap)
+
+    const isLabelClickable = !!(navUrl === '/dashboard/issues' || onSegmentClick)
+
+    function handleLabelClick(key) {
+        const item = data[key]
+        if (onSegmentClick) {
+            onSegmentClick(item?.filterValue || key)
+            return
+        }
+        if (navUrl === '/dashboard/issues') {
+            const filterKey = item?.filterKey || key
+            const filterType = ['CRITICAL','HIGH','MEDIUM','LOW'].includes(filterKey.toUpperCase()) ? 'severity' : 'issueCategory'
+            const filterObj = [{ key: filterType, label: filterKey, value: [filterType === 'severity' ? filterKey.toUpperCase() : filterKey] }]
+            const updated = {
+                ...filtersMap,
+                '/dashboard/issues/#open': { filters: filterObj, sort: [] },
+                '/dashboard/issues//#open': { filters: filterObj, sort: [] },
+            }
+            setFiltersMap(updated)
+            navigate(navUrl)
+        }
+    }
+
     let tableRows = []
     if(data && Object.keys(data).length > 0)
     {
@@ -14,8 +42,9 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                 (
                     <Box>
                         <div
-                            style={{display: "flex", gap: "8px", alignItems: "center", maxWidth: '200px'}}
+                            style={{display: "flex", gap: "8px", alignItems: "center", maxWidth: '200px', cursor: isLabelClickable ? 'pointer' : undefined}}
                             key={index}
+                            onClick={isLabelClickable ? () => handleLabelClick(key) : undefined}
                         >
                             <span style={{background: data[key]?.color, borderRadius: "50%", width: "8px", height: "8px"}} />
                             <Box width='150px'>

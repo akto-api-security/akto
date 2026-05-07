@@ -25,7 +25,11 @@ public class EditableTestingRunConfig extends TestingRunConfig {
     @Getter
     @Setter
     private List<String> allowedMiniTestingServiceNames;
-    
+
+    @Getter
+    @Setter
+    private boolean doNotMarkIssuesAsFixed;
+
     public EditableTestingRunConfig() {
 
     }

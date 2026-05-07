@@ -32,6 +32,8 @@ public class Info {
 
     private ComplianceMapping compliance;
 
+    private Boolean agenticTestingAllowed;
+
     public Info(String name, String description, String details, String impact, String remediation, Category category, String subCategory,
             String severity, List<String> tags, List<String> references, List<String> cwe, List<String> cve, ComplianceMapping compliance) {
         this.name = name;
@@ -154,6 +156,14 @@ public class Info {
 
     public void setCompliance(ComplianceMapping compliance) {
         this.compliance = compliance;
+    }
+
+    public Boolean getAgenticTestingAllowed() {
+        return agenticTestingAllowed;
+    }
+
+    public void setAgenticTestingAllowed(Boolean agenticTestingAllowed) {
+        this.agenticTestingAllowed = agenticTestingAllowed;
     }
 
 }

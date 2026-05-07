@@ -161,6 +161,9 @@ public class ApiCollection {
     List<CollectionTags> tagsList;
     public static final String TAGS_STRING = "tagsList";
 
+    List<String> skills;
+    public static final String SKILLS = "skills";
+
     public static final String DEFAULT_TAG_KEY = "userSetEnvType";
 
     // Service tag for service-tag based collections
@@ -534,6 +537,14 @@ public class ApiCollection {
         }
 
         this.tagsList.addAll(tagsList);
+    }
+
+    public List<String> getSkills() {
+        return skills;
+    }
+
+    public void setSkills(List<String> skills) {
+        this.skills = skills;
     }
 
     public boolean isMcpCollection() {

@@ -133,6 +133,34 @@ public class TestTemplateUtils {
             TestCategory.ROGUE_AGENTS,
         };
 
+        TestCategory[] apiAgenticCategories = {
+            TestCategory.BOLA_AGENTIC,
+            TestCategory.NO_AUTH_AGENTIC,
+            TestCategory.BFLA_AGENTIC,
+            TestCategory.IAM_AGENTIC,
+            TestCategory.EDE_AGENTIC,
+            TestCategory.RL_AGENTIC,
+            TestCategory.MA_AGENTIC,
+            TestCategory.INJ_AGENTIC,
+            TestCategory.ILM_AGENTIC,
+            TestCategory.SM_AGENTIC,
+            TestCategory.SSRF_AGENTIC,
+            TestCategory.UC_AGENTIC,
+            TestCategory.UHM_AGENTIC,
+            TestCategory.VEM_AGENTIC,
+            TestCategory.MHH_AGENTIC,
+            TestCategory.SVD_AGENTIC,
+            TestCategory.CORS_AGENTIC,
+            TestCategory.COMMAND_INJECTION_AGENTIC,
+            TestCategory.CRLF_AGENTIC,
+            TestCategory.SSTI_AGENTIC,
+            TestCategory.LFI_AGENTIC,
+            TestCategory.XSS_AGENTIC,
+            TestCategory.IIM_AGENTIC,
+            TestCategory.INJECT_AGENTIC,
+            TestCategory.INPUT_AGENTIC,
+        };
+
         switch (contextSource) {
             case MCP:
                 return mcpCategories;
@@ -145,7 +173,8 @@ public class TestTemplateUtils {
                 // ARGUS / ATLAS should include both MCP and LLM/Agentic probe libraries,
                 // while excluding classic API-only categories.
                 return Arrays.stream(allCategories)
-                    .filter(category -> Arrays.asList(mcpCategories).contains(category) || Arrays.asList(llmCategories).contains(category))
+                    .filter(category -> Arrays.asList(mcpCategories).contains(category) || Arrays.asList(llmCategories).contains(category)
+                            || Arrays.asList(apiAgenticCategories).contains(category))
                     .toArray(TestCategory[]::new);
 
             // for DAST and API security
@@ -153,7 +182,8 @@ public class TestTemplateUtils {
             case API:
             default:
                 return Arrays.stream(allCategories)
-                    .filter(category -> !Arrays.asList(mcpCategories).contains(category) && !Arrays.asList(llmCategories).contains(category))
+                    .filter(category -> !Arrays.asList(mcpCategories).contains(category) && !Arrays.asList(llmCategories).contains(category)
+                            && !Arrays.asList(apiAgenticCategories).contains(category))
                     .toArray(TestCategory[]::new);
         }
     }

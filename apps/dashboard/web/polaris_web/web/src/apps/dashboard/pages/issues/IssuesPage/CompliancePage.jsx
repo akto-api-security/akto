@@ -665,6 +665,18 @@ function CompliancePage() {
     }, [])
   
 
+    const handleVulnCategoryClick = (filterType, filterValue) => {
+        const pageKey = window.location.pathname + "/" + (window.location.hash || '');
+        const prev = PersistStore.getState().filtersMap;
+        const existing = (prev[pageKey]?.filters || []).filter(f => f.key !== filterType);
+        PersistStore.getState().setFiltersMap({
+            ...prev,
+            [pageKey]: { filters: [...existing, { key: filterType, value: [filterValue] }], sort: prev[pageKey]?.sort || [] }
+        });
+        func.setToast(true, false, `Table filtered by "${filterValue}" - scroll down to view results`);
+        setKey(k => !k);
+    };
+
     const onSelectCompliance = (compliance) => {
         setComplianceView(compliance)
         resetResourcesSelected()
@@ -679,8 +691,16 @@ function CompliancePage() {
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
         const apiCollectionId = filters.apiCollectionId || []
         let filterCollectionsId = apiCollectionId.concat(filters.collectionIds)
-        let filterSubCategory = calcFilteredTestIds(complianceView)
-        
+        let filterSubCategory
+        if (filters?.issueCategory?.length > 0) {
+            filterSubCategory = []
+            filters.issueCategory.forEach(cat => {
+                filterSubCategory = filterSubCategory.concat(categoryToSubCategories[cat] || [])
+            })
+        } else {
+            filterSubCategory = calcFilteredTestIds(complianceView)
+        }
+
         const collectionIdsArray = filterCollectionsId.map((x) => {return x.toString()})
 
         let obj = {
@@ -761,7 +781,7 @@ function CompliancePage() {
     const components = (
         <>
             <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
-                <CriticalFindingsGraph startTimestamp={getTimeEpoch("since")} endTimestamp={getTimeEpoch("until")} linkText={""} linkUrl={""}/>
+                <CriticalFindingsGraph startTimestamp={getTimeEpoch("since")} endTimestamp={getTimeEpoch("until")} linkText={""} linkUrl={""} onBarClick={handleVulnCategoryClick}/>
                 <CriticalFindingsGraph startTimestamp={getTimeEpoch("since")} endTimestamp={getTimeEpoch("until")} linkText={""} linkUrl={""} complianceMode={complianceView}/>
             </HorizontalGrid>
 

@@ -23,10 +23,6 @@ const McpHoverPanel = ({ metadata }) => {
   const toolName = metadata?.toolName;
   const description = metadata?.description;
 
-  const MAX_TOOLS = 10;
-  const visibleTools = tools.slice(0, MAX_TOOLS);
-  const overflow = tools.length - MAX_TOOLS;
-
   return (
 
     <Card>
@@ -70,12 +66,9 @@ const McpHoverPanel = ({ metadata }) => {
                 Tools List({tools.length}):
               </Text>
               <HorizontalStack gap="1">
-                {visibleTools.map((tool) => (
+                {tools.map((tool) => (
                   <Text key={tool} variant="bodySm">{tool}, </Text>
                 ))}
-                {overflow > 0 && (
-                  <Text variant="bodySm" color="subdued">+{overflow} more</Text>
-                )}
               </HorizontalStack>
             </VerticalStack>
           )}
@@ -86,7 +79,7 @@ const McpHoverPanel = ({ metadata }) => {
 };
 
 // Custom Node Component following ApiDependencyNode pattern - memoized to prevent re-renders
-const AgentNode = memo(function AgentNode({ data }) {
+export const AgentNode = memo(function AgentNode({ data }) {
   const { component, onNodeClick } = data;
   const [panelPos, setPanelPos] = useState(null);
   const nodeRef = useRef(null);
@@ -209,7 +202,7 @@ const AgentNode = memo(function AgentNode({ data }) {
 });
 
 // Custom Edge Component following ApiDependencyEdge pattern - memoized to prevent re-renders
-const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
+export const AgentEdge = memo(function AgentEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) {
   const { edgeParam } = data || {};
   let displayData = edgeParam;
   
@@ -627,7 +620,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
     ? 400
     : vscodeGraphData
       ? 520
-      : Math.max(500, Math.min(800, Object.keys(serviceGraphEdges).length * 120 + 200));
+      : Math.max(420, Math.min(900, Object.keys(serviceGraphEdges).length * 110 + 200));
 
   return (
     <Card>

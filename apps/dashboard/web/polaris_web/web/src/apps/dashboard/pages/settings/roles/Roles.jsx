@@ -10,11 +10,30 @@ import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
 import Dropdown from "../../../components/layouts/Dropdown";
 
 const rolesOptions = [
-    { label: 'Admin', value: 'ADMIN' },
-    { label: 'Security Engineer', value: 'MEMBER' },
-    { label: 'Developer', value: 'DEVELOPER' },
-    { label: 'Guest', value: 'GUEST' },
-]
+    {
+        label: 'Admin',
+        value: 'ADMIN',
+    },
+    {
+        label: 'Security Engineer',
+        value: 'MEMBER',
+    },
+    {
+        label: 'Developer',
+        value: 'DEVELOPER',
+    },
+    {
+        label: 'Guest',
+        value: 'GUEST',
+    },
+    {
+        label: 'Threat Engineer',
+        value: 'THREAT_ENGINEER',
+    },
+    {
+        label: 'Threat Viewer',
+        value: 'THREAT_VIEWER',
+    }]
 
 function getRoleDisplayName(role) {
     for (const item of rolesOptions) {
@@ -44,19 +63,26 @@ const Roles = () => {
     }
 
     const getRoleData = async () => {
-        setLoading(true);
-        const roleResponse = await settingRequests.getCustomRoles()
-        if (roleResponse.roles) {
-            setRoles(roleResponse.roles)
-            setTempRoles(roleResponse.roles)
+        try {
+            setLoading(true);
+            const roleResponse = await settingRequests.getCustomRoles()
+            if (roleResponse && roleResponse.roles) {
+                setRoles(roleResponse.roles)
+                setTempRoles(roleResponse.roles)
+            }
+            setLoading(false)
+        } catch (error) {
+            setLoading(false)
         }
-        setLoading(false)
     };
 
     const getAllAllowedFeatures = async () => {
-        const featuresResponse = await settingRequests.getAllowedFeaturesForRBAC()
-        if (featuresResponse) {
-            setAllowedFeatures(featuresResponse);
+        try {
+            const featuresResponse = await settingRequests.getAllowedFeaturesForRBAC()
+            if (featuresResponse) {
+                setAllowedFeatures(featuresResponse);
+            }
+        } catch (error) {
         }
     }
 

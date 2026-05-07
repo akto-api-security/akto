@@ -39,10 +39,10 @@ public class GuardrailsClient {
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, Object> callValidateRequest(Map<String, Object> request) {
+    public Map<String, Object> callValidate(Map<String, Object> request, String endpoint) {
         try {
             String jsonRequest = objectMapper.writeValueAsString(request);
-            String url = guardrailsServiceUrl + "/api/validate/request";
+            String url = guardrailsServiceUrl + endpoint;
 
             logger.info("Calling guardrails service at: {}", url);
 
@@ -75,6 +75,14 @@ public class GuardrailsClient {
             SlackUtils.sendAlert(alertMsg);
             return buildErrorResponse(e.getMessage());
         }
+    }
+
+    public Map<String, Object> callValidateRequest(Map<String, Object> request) {
+        return callValidate(request, "/api/validate/request");
+    }
+
+    public Map<String, Object> callValidateResponse(Map<String, Object> request) {
+        return callValidate(request, "/api/validate/response");
     }
 
     private Map<String, Object> buildErrorResponse(String errorMessage) {

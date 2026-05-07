@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/akto-api-security/mcp-endpoint-shield/mcp"
-	"github.com/akto-api-security/mcp-endpoint-shield/mcp/types"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"go.uber.org/zap"
 )
 

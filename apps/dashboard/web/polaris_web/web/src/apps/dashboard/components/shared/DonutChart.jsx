@@ -155,7 +155,7 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
                                 const filterObj = [{
                                     key: key,
                                     label: point.filterKey,
-                                    value: [point.filterKey]
+                                    value: [key === 'severity' ? point.filterKey.toUpperCase() : point.filterKey]
                                 }
                                ]
 

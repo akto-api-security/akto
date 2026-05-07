@@ -6,11 +6,11 @@ const settingRequests = {
         return request({
             url: '/api/inviteUsers',
             method: 'post',
-            data: { 
+            data: {
                 inviteeName: apiSpec.inviteeName,
                 inviteeEmail: apiSpec.inviteeEmail,
                 websiteHostName: apiSpec.websiteHostName,
-                inviteeRole: apiSpec.inviteeRole,
+                scopeRoleMapping: apiSpec.scopeRoleMapping
             }
         })
     },
@@ -30,18 +30,30 @@ const settingRequests = {
             }
         })
     },
-    makeAdmin(email, roleVal) {
+    makeAdmin(email, roleVal, productScopes) {
         return request({
             url: '/api/makeAdmin',
             method: 'post',
             data: {
                 email: email,
-                userRole: roleVal
+                userRole: roleVal,
+                productScopes: productScopes || ["API"]
             }
         })
     },
 
-    
+    updateUserScopeRoleMapping(email, scopeRoleMapping) {
+        return request({
+            url: '/api/updateUserScopeRoleMapping',
+            method: 'post',
+            data: {
+                email: email,
+                scopeRoleMapping: scopeRoleMapping
+            }
+        })
+    },
+
+
     fetchApiTokens() {
         return request({
             url: '/api/fetchApiTokens',
@@ -825,6 +837,20 @@ const settingRequests = {
             data: {email}
         })
     },
+    async fetchAccountJobs() {
+        return await request({
+            url: '/api/fetchAccountJobs',
+            method: 'post',
+            data: {}
+        })
+    },
+    async deleteAccountJob(jobId) {
+        return await request({
+            url: '/api/deleteAccountJob',
+            method: 'post',
+            data: { jobId }
+        })
+    },
     async fetchModuleInfo(filter = {}) {
         return await request({
             url: '/api/fetchModuleInfo',
@@ -837,6 +863,13 @@ const settingRequests = {
             url: '/api/deleteModuleInfo',
             method: 'post',
             data: { moduleIds }
+        })
+    },
+    async updateUserDeviceTag(username, team, userRole) {
+        return await request({
+            url: '/api/updateUserDeviceTag',
+            method: 'post',
+            data: { username, team, userRole }
         })
     },
     async fetchCloudflareWafIntegration() {
@@ -956,6 +989,41 @@ const settingRequests = {
             data: {registries}
         })
     },
+    fetchMcpRegistries() {
+        return request({
+            url: '/api/fetchMcpRegistries',
+            method: 'post',
+            data: {}
+        })
+    },
+    addMcpRegistry(registryUrl, headers, registryType) {
+        return request({
+            url: '/api/addMcpRegistry',
+            method: 'post',
+            data: { registryUrl, headers, registryType }
+        })
+    },
+    syncMcpRegistry(registryId) {
+        return request({
+            url: '/api/syncMcpRegistry',
+            method: 'post',
+            data: { registryId }
+        })
+    },
+    fetchMcpAllowlistEntries(registryId) {
+        return request({
+            url: '/api/fetchMcpAllowlistEntries',
+            method: 'post',
+            data: { registryId }
+        })
+    },
+    deleteMcpRegistry(registryId) {
+        return request({
+            url: '/api/deleteMcpRegistry',
+            method: 'post',
+            data: { registryId }
+        })
+    },
     updateBlockLogs(blockLogs) {
         return request({
             url: '/api/updateBlockLogs',
@@ -1012,11 +1080,25 @@ const settingRequests = {
             data: {}
         })
     },
-    addMatchingPatternForProxy(proxyPattern) {
+    addMatchingPatternForProxy(proxyPattern, switchProxyMode) {
         return request({
             url: '/api/addMatchingPatternForProxy',
             method: 'post',
-            data: {proxyPattern}
+            data: {proxyPattern, switchProxyMode}
+        })
+    },
+    addAllowedHostForPac(hostPattern) {
+        return request({
+            url: '/api/addAllowedHostForPac',
+            method: 'post',
+            data: {hostPattern}
+        })
+    },
+    deleteProxyPattern(patternValue, connectorType) {
+        return request({
+            url: '/api/deleteProxyPattern',
+            method: 'post',
+            data: {patternValue, connectorType}
         })
     }
 }

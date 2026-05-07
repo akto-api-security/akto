@@ -31,9 +31,11 @@ import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.ip_api_counter.DistributionDataForwardLayer;
+import com.akto.threat.detection.ip_api_counter.DistributionStreamConsumer;
 import com.akto.threat.detection.tasks.ConfigPoller;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
+import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.utils.Utils;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
@@ -87,7 +89,7 @@ public class Main {
         }
     }
 
-    KafkaConfig trafficKafka = createKafkaConfig("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER", 500, 100);
+    KafkaConfig trafficKafka = createKafkaConfig("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER", 500, 100, 100 * 1024 * 1024);
     KafkaConfig internalKafka = createKafkaConfig("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER", 100, 100);
 
     startModuleConfigPoller();
@@ -95,12 +97,25 @@ public class Main {
     initCustomDataTypeScheduler();
 
     CmsCounterLayer.initialize(localRedis);
-    DistributionCalculator distributionCalculator = new DistributionCalculator();
-    DistributionDataForwardLayer distributionDataForwardLayer = new DistributionDataForwardLayer(localRedis, distributionCalculator);
+
+    DistributionCalculator distributionCalculator = localRedis != null
+        ? new DistributionCalculator(localRedis)
+        : null;
+    DistributionDataForwardLayer distributionDataForwardLayer = localRedis != null
+        ? new DistributionDataForwardLayer(localRedis)
+        : null;
 
     boolean apiDistributionEnabled = Utils.apiDistributionEnabled(localRedis != null, System.getenv().getOrDefault("API_DISTRIBUTION_ENABLED", "true").equals("true"));
 
     triggerDistributionDataForwardCron(apiDistributionEnabled, distributionDataForwardLayer);
+
+    KafkaProtoProducer internalKafkaProducer =
+        new KafkaProtoProducer(internalKafka);
+
+    // Start threat stream consumers (background threads)
+    if (localRedis != null && apiDistributionEnabled && distributionCalculator != null) {
+        startDistributionStreamConsumers(localRedis, internalKafkaProducer, instanceId);
+    }
 
     String currentTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yy-MM-dd HH:mm:ss"));
     logger.warnAndAddToDb("Initialization finished starting DetectorTask at " + currentTime);
@@ -148,6 +163,14 @@ public class Main {
     }
   }
 
+  public static void startDistributionStreamConsumers(RedisClient redisClient,
+      KafkaProtoProducer internalKafkaProducer, String instanceId) {
+    java.util.concurrent.ExecutorService streamExecutor = Executors.newFixedThreadPool(1);
+    streamExecutor.submit(new DistributionStreamConsumer(
+        redisClient, instanceId, internalKafkaProducer));
+    logger.infoAndAddToDb("Started threat stream consumer: " + instanceId);
+  }
+
   public static RedisClient createLocalRedisClient() {
     RedisClient redisClient = RedisClient.create(System.getenv("AKTO_THREAT_DETECTION_LOCAL_REDIS_URI"));
     try {
@@ -178,6 +201,10 @@ public class Main {
   }
 
   private static KafkaConfig createKafkaConfig(String bootstrapServerEnvVar, int maxPollRecords, int pollDurationMilli) {
+    return createKafkaConfig(bootstrapServerEnvVar, maxPollRecords, pollDurationMilli, 0);
+  }
+
+  private static KafkaConfig createKafkaConfig(String bootstrapServerEnvVar, int maxPollRecords, int pollDurationMilli, int fetchMaxBytes) {
     return KafkaConfig.newBuilder()
         .setGroupId(CONSUMER_GROUP_ID)
         .setBootstrapServers(System.getenv(bootstrapServerEnvVar))
@@ -185,6 +212,7 @@ public class Main {
             KafkaConsumerConfig.newBuilder()
                 .setMaxPollRecords(maxPollRecords)
                 .setPollDurationMilli(pollDurationMilli)
+                .setFetchMaxBytes(fetchMaxBytes)
                 .build())
         .setProducerConfig(
             KafkaProducerConfig.newBuilder().setBatchSize(16384).setLingerMs(100).build())

@@ -98,10 +98,9 @@ function ThreatDashboardPage() {
                             activeActorsValue = last.totalActors
                         }
                     }
-
-                    const showForAccount = window.ACTIVE_ACCOUNT !== 1669322524;
-                    const totalAnalysedValue = showForAccount ? 885 : (summaryResponse.totalAnalysed || 0);
-                    const totalAttacksValue = showForAccount ? 476 : (summaryResponse.totalAttacks || 0);
+                    
+                    const totalAnalysedValue = func.isDemoAccount() ? 885 : (summaryResponse.totalAnalysed || 0);
+                    const totalAttacksValue = func.isDemoAccount() ? 476 : (summaryResponse.totalAttacks || 0);
 
                     setSummaryMetrics({
                         currentPeriod: {

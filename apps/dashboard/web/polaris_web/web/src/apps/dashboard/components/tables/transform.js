@@ -63,8 +63,14 @@ const tableFunc = {
 
         let localFilters = func.prepareFilters(tempData,props.filters);
 
-        // Create cache key based on data length, headers, and filter properties
-        const cacheKey = `${props.data.length}_${props.headers.map(h => `${h.value}:${h.filterKey || ''}:${h.filterLabel || ''}`).join('_')}`;
+        // Create cache key based on data identity, headers, and filter properties.
+        // Including a row-id fingerprint prevents collisions across different scopes
+        // (e.g., two users that each happen to produce 1 grouped row would otherwise
+        // share the same cache entry and show stale dropdown choices).
+        const dataFingerprint = tempData.length > 0
+          ? `${tempData.length}:${tempData[0]?.id ?? ''}:${tempData[tempData.length - 1]?.id ?? ''}`
+          : '0';
+        const cacheKey = `${dataFingerprint}_${props.headers.map(h => `${h.value}:${h.filterKey || ''}:${h.filterLabel || ''}`).join('_')}`;
 
         let filtersFromHeaders;
         if (filterChoicesCache.has(cacheKey)) {

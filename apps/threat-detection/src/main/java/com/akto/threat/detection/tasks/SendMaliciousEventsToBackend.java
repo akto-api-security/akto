@@ -26,7 +26,7 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
   private static final LoggerMaker logger = new LoggerMaker(SendMaliciousEventsToBackend.class, LogDb.THREAT_DETECTION);
 
   public SendMaliciousEventsToBackend(KafkaConfig trafficConfig, String topic) {
-    super(trafficConfig, topic);
+    super(trafficConfig, topic, SendMaliciousEventsToBackend.class.getSimpleName());
   }
 
   protected void processRecords(ConsumerRecords<String, byte[]> records) {

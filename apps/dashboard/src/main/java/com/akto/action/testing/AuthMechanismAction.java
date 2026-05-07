@@ -1,10 +1,15 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.dao.AccountsDao;
 import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
+import com.akto.dto.Account;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.AuthParamData;
@@ -24,13 +29,19 @@ import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.result.InsertOneResult;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
+import org.bson.types.ObjectId;
 
 
 public class AuthMechanismAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class, LogDb.DASHBOARD);;
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class, LogDb.DASHBOARD);
+
+    private static final long LOGIN_FLOW_PLAYGROUND_POLL_MS = 500L;
+    private static final long LOGIN_FLOW_PLAYGROUND_TIMEOUT_MS = 120_000L;
 
     //todo: rename requestData, also add len check
     private ArrayList<RequestData> requestData;
@@ -49,6 +60,55 @@ public class AuthMechanismAction extends UserAction {
 
     private BasicDBObject authMechanismDoc;
 
+    private String miniTestingServiceName;
+
+    private boolean shouldRunLoginFlowOnMiniTesting() {
+        if (StringUtils.isBlank(miniTestingServiceName)) {
+            return false;
+        }
+        Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, Context.accountId.get()));
+        return account != null && account.getHybridTestingEnabled();
+    }
+
+    private LoginFlowResponse executeLoginFlowWithOptionalMiniTesting(AuthMechanism authMechanism, LoginFlowParams loginFlowParams) throws Exception {
+        if (!shouldRunLoginFlowOnMiniTesting()) {
+            return TestExecutor.executeLoginFlow(authMechanism, loginFlowParams, null);
+        }
+        TestingRunPlayground playground = new TestingRunPlayground();
+        playground.setTestingRunPlaygroundType(TestingRunPlayground.TestingRunPlaygroundType.LOGIN_FLOW_TEST);
+        playground.setState(TestingRun.State.SCHEDULED);
+        playground.setCreatedAt(Context.now());
+        playground.setMiniTestingName(miniTestingServiceName.trim());
+        playground.setLoginFlowAuthMechanism(authMechanism);
+        if (loginFlowParams != null && Boolean.TRUE.equals(loginFlowParams.getFetchValueMap())) {
+            playground.setLoginFlowSingleStepOnly(true);
+            playground.setLoginFlowNodeId(loginFlowParams.getNodeId());
+            playground.setLoginFlowUserId(loginFlowParams.getUserId());
+        } else {
+            playground.setLoginFlowSingleStepOnly(false);
+            playground.setLoginFlowUserId(0);
+        }
+        InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(playground);
+        ObjectId insertedId = insertOne.getInsertedId().asObjectId().getValue();
+        long deadline = System.currentTimeMillis() + LOGIN_FLOW_PLAYGROUND_TIMEOUT_MS;
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(LOGIN_FLOW_PLAYGROUND_POLL_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new Exception("Interrupted while waiting for mini-testing");
+            }
+            TestingRunPlayground updated = TestingRunPlaygroundDao.instance.findOne(Filters.eq(Constants.ID, insertedId));
+            if (updated != null && updated.getState() == TestingRun.State.COMPLETED) {
+                LoginFlowResponse lr = updated.getLoginFlowResponse();
+                if (lr == null) {
+                    throw new Exception("Mini-testing completed login flow with no response");
+                }
+                return lr;
+            }
+        }
+        throw new Exception("Timed out waiting for mini-testing to run login flow");
+    }
 
     public String addAuthMechanism() {
         // todo: add more validations
@@ -115,9 +175,8 @@ public class AuthMechanismAction extends UserAction {
 
         AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type, null);
 
-        TestExecutor testExecutor = new TestExecutor();
         try {
-            LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism, null, null);
+            LoginFlowResponse loginFlowResponse = executeLoginFlowWithOptionalMiniTesting(authMechanism, null);
             responses = loginFlowResponse.getResponses();
             if (!loginFlowResponse.getSuccess()) {
                 throw new Exception(loginFlowResponse.getError());
@@ -141,10 +200,9 @@ public class AuthMechanismAction extends UserAction {
 
         AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type, null);
 
-        TestExecutor testExecutor = new TestExecutor();
         try {
             LoginFlowParams loginFlowParams = new LoginFlowParams(getSUser().getId(), true, nodeId);
-            LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism, loginFlowParams, null);
+            LoginFlowResponse loginFlowResponse = executeLoginFlowWithOptionalMiniTesting(authMechanism, loginFlowParams);
             responses = loginFlowResponse.getResponses();
             if (!loginFlowResponse.getSuccess()) {
                 throw new Exception(loginFlowResponse.getError());
@@ -256,5 +314,13 @@ public class AuthMechanismAction extends UserAction {
     public void setAuthMechanismDoc(BasicDBObject authMechanismDoc) {
         this.authMechanismDoc = authMechanismDoc;
     }
-    
+
+    public String getMiniTestingServiceName() {
+        return miniTestingServiceName;
+    }
+
+    public void setMiniTestingServiceName(String miniTestingServiceName) {
+        this.miniTestingServiceName = miniTestingServiceName;
+    }
+
 }

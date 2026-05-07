@@ -2275,10 +2275,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
 
   shouldShowIpReputation() {
-    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1745303931
+    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1745303931 || window.ACTIVE_ACCOUNT === 1758787662
   },
 
-  
   isSameDateAsToday (givenDate) {
       const today = new Date();
       return (
@@ -2491,6 +2490,22 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       hour12: true
     });
   },
+  /**
+   * Share of count in total (e.g. pass rate). When oppositeCount > 0, avoids rounding
+   * to 100% at low precision (e.g. 14196/14197 → not "100.0%" with one failure shown).
+   */
+  formatSplitSharePercent(count, total, oppositeCount) {
+    if (total === 0) return 0;
+    if (oppositeCount === 0) return Number(((count / total) * 100).toFixed(1));
+    const pct = (count / total) * 100;
+    let decimals = 2;
+    let rounded = Number(pct.toFixed(decimals));
+    while (rounded >= 100 && decimals < 10) {
+      decimals += 1;
+      rounded = Number(pct.toFixed(decimals));
+    }
+    return rounded;
+  },
   extractEmailDetails(email) {
     // Define the regex pattern
     const pattern = /^(.*?)@([\w.-]+)\.[a-z]{2,}$/;
@@ -2515,6 +2530,23 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return { error: "Invalid email format" };
     }
   },
+
+   getStiggFeatureGrants() {
+      const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED || {}
+      const agenticSecurityGranted = stiggFeatures?.SECURITY_TYPE_AGENTIC?.isGranted || false
+      const mcpSecurityGranted = stiggFeatures?.MCP_SECURITY?.isGranted || true
+      const dastGranted = func.checkForFeatureSaas("AKTO_DAST")
+      const endpointSecurityFromStigg = stiggFeatures?.ENDPOINT_SECURITY?.isGranted
+      const endpointSecurityGranted = (stiggFeatures != null && stiggFeatures.hasOwnProperty("ENDPOINT_SECURITY")) ? endpointSecurityFromStigg : true
+
+      return {
+        agenticSecurityGranted,
+        endpointSecurityGranted,
+        dastGranted,
+        mcpSecurityGranted,
+        stiggFeatures
+      }
+    }
 }
 
 export default func

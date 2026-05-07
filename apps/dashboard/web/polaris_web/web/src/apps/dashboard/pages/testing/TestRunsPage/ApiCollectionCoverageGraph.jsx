@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo,useRef, useState } from 'react';
 import { Text } from '@shopify/polaris';
 import InfoCard from '../../dashboard/new_components/InfoCard';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
@@ -10,18 +10,29 @@ import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 const TESTED_COLOR = '#007F5F'; 
 const UNTESTED_COLOR = '#E4E5E7'; 
 
-const ApiCollectionCoverageGraph = () => {
+const ApiCollectionCoverageGraph = ({ apiCollectionIds }) => {
   const [chartData, setChartData] = useState([]);
   const [collectionNames, setCollectionNames] = useState([]);
   const [showTestingComponents, setShowTestingComponents] = useState(false);
-  const allCollections = PersistStore.getState().allCollections || [];
+  const allCollections = PersistStore((state) => state.allCollections) || []
+  const filterKey = useMemo(
+    () => (apiCollectionIds?.length ? apiCollectionIds.join(',') : 'all'),
+    [apiCollectionIds],
+  )
+  const sortedCollectionsRef = useRef([]);
 
   const fetchCoverageData = async () => {
     setShowTestingComponents(false);
     try {
-      const coverageInfo = await api.getCoverageInfoForCollections();
+      const coverageInfo = await api.getCoverageInfoForCollections(apiCollectionIds)
 
-      const sortedCollections = allCollections.filter(col => col?.type !== "API_GROUP")
+      let baseCollections = allCollections.filter(col => col?.type !== "API_GROUP")
+      if (apiCollectionIds?.length) {
+        const idSet = new Set(apiCollectionIds)
+        baseCollections = baseCollections.filter((col) => idSet.has(col.id))
+      }
+
+      const sortedCollections = baseCollections
         .map(col => {
           const tested = Math.min(coverageInfo[col.id] || 0, col.urlsCount);
           const ratio = col.urlsCount > 0 ? tested / col.urlsCount : 0;
@@ -34,6 +45,8 @@ const ApiCollectionCoverageGraph = () => {
           return a.ratio - b.ratio; // lower ratio first
         })
         .slice(0, 5);
+
+      sortedCollectionsRef.current = sortedCollections;
 
       const results = sortedCollections.map(col => ({
         name: col.displayName,
@@ -56,14 +69,19 @@ const ApiCollectionCoverageGraph = () => {
       ]);
       setShowTestingComponents(true);
     } catch (error) {
-      console.error('Error fetching coverage data:', error);
       setShowTestingComponents(true);
     }
   };
 
   useEffect(() => {
     fetchCoverageData();
-  }, []);
+  }, [filterKey, allCollections]);
+
+  const handleBarClick = function() {
+    const clickedName = this.category;
+    const col = sortedCollectionsRef.current?.find(c => c.displayName === clickedName);
+    if (col) window.open('/dashboard/observe/inventory/' + col.id, '_blank');
+  };
 
   const coverageGraph = (chartData && chartData.length > 0) ? (
     <InfoCard
@@ -72,6 +90,7 @@ const ApiCollectionCoverageGraph = () => {
           type="column"
           height="280px"
           data={chartData}
+          graphPointClick={handleBarClick}
           yAxisTitle={`Number of ${mapLabel("APIs", getDashboardCategory())}`}
           text={true}
           showGridLines={true}

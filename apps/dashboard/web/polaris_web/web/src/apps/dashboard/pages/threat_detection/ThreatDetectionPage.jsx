@@ -26,6 +26,7 @@ import { LABELS } from "./constants";
 import useThreatReportDownload from "../../hooks/useThreatReportDownload";
 import WebhookIntegrationModal from "./components/WebhookIntegrationModal";
 import { updateThreatFiltersStore } from "./utils/threatFilters";
+import { redactSampleDataByKeywords } from "./utils/redactSampleData";
 const convertToGraphData = (severityMap) => {
     let dataArr = []
     Object.keys(severityMap).forEach((x) => {
@@ -281,7 +282,8 @@ function ThreatDetectionPage() {
                 return { alias: 'custom', title, period: { since: sinceDate, until: untilDate } };
             }
         }
-        return values.ranges[2];
+        const specialAccounts = [1776384040, 1776625569, 1776626846];
+        return specialAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? values.ranges[4] : values.ranges[2];
     }, [location.state, searchParams]);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
 
@@ -432,7 +434,12 @@ function ThreatDetectionPage() {
             const tempData = tempFunc.getSampleDataOfUrl(data.url);
             const sameRow = func.deepComparison(tempData, sampleData);
             if (!sameRow) {
-                setSampleData([{ "message": JSON.stringify(tempData), "highlightPaths": [] }]);
+                let redactedSample = tempData ;
+                try {
+                    redactedSample = redactSampleDataByKeywords(tempData);
+                } catch {
+                }
+                setSampleData([{ "message": JSON.stringify(redactedSample), "highlightPaths": [] }]);
                 setShowDetails(true);
             } else {
                 setShowDetails(!showDetails);
@@ -555,7 +562,11 @@ function ThreatDetectionPage() {
           if (!isMountedRef.current) {
               return;
           }
-          const maliciousPayloads = payloadResponse?.maliciousPayloadsResponses || [];
+          const rawPayloads = payloadResponse?.maliciousPayloadsResponses || [];
+          const maliciousPayloads = rawPayloads.map((p) => ({
+            ...p,
+            orig: redactSampleDataByKeywords(p.orig),
+          }));
 
           setEventState({
             currentRefId: queryParams.refId,
@@ -690,7 +701,10 @@ function ThreatDetectionPage() {
             type: ev.type,
             refId: ev.refId,
             severity: ev.severity,
-            latestApiOrig: ev.payload || ev.latestApiOrig,
+            latestApiOrig:
+              ev.payload != null || ev.latestApiOrig != null
+                ? redactSampleDataByKeywords(ev.payload ?? ev.latestApiOrig)
+                : ev.payload ?? ev.latestApiOrig,
             metadata: ev.metadata,
         }));
 

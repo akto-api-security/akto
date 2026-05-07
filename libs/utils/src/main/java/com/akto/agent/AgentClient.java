@@ -218,7 +218,17 @@ public class AgentClient {
                 loggerMaker.infoAndAddToDb("externalApiTokens field NOT FOUND in response");
             }
 
-            return new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage, externalApiTokens);
+            Map<String,Object> toolsMetadata = new HashMap<>();
+            if(jsonNode.has("toolsMetadata") && jsonNode.get("toolsMetadata").isObject()) {
+                jsonNode.get("toolsMetadata").fields().forEachRemaining(entry ->
+                    toolsMetadata.put(entry.getKey(), entry.getValue())
+                );
+            }
+            AgentConversationResult result = new AgentConversationResult(conversationId, originalPrompt, response, conversation, timestamp, validation, validationMessage, finalSentPrompt, remediationMessage, externalApiTokens);
+            if(toolsMetadata != null && !toolsMetadata.isEmpty()) {
+                result.getToolsMetadata().putAll(toolsMetadata);
+            }
+            return result;
             
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error parsing agent response: " + e.getMessage() + ", response body: " + responseBody);
@@ -259,11 +269,12 @@ public class AgentClient {
         initializeAgent(requestBody);
     }
 
-    public void initializeAgent(String sessionUrl, String requestHeaders, String apiRequestBody, String conversationId) {
+    public void initializeAgent(String sessionUrl, String requestHeaders, String apiRequestBody, String requestMethod, String conversationId) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("sessionUrl", sessionUrl);
         requestBody.put("requestHeaders", requestHeaders);
         requestBody.put("requestBody", apiRequestBody);
+        requestBody.put("requestMethod", requestMethod != null && !requestMethod.isEmpty() ? requestMethod : "POST");
         requestBody.put("conversationId", conversationId);
         initializeAgent(requestBody);
     }

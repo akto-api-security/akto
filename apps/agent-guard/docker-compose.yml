@@ -42,6 +42,14 @@ services:
       - GIN_MODE=release
       - PORT=8091
       - PYTHON_SERVICE_URL=http://python-service:8092
+      # Optional LLM scanner config (PromptInjection / BanTopics).
+      # When SCANNER_LLM_PROVIDER is unset, all requests use the Python ML path.
+      # When set, requests with config.use_llm=true are routed to the provider.
+      - SCANNER_LLM_PROVIDER=${SCANNER_LLM_PROVIDER:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-}
     networks:
       - agent-guard-network
 

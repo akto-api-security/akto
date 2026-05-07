@@ -41,6 +41,10 @@ function Get-IngestionUrl {
     )
     
     if ($ProvidedUrl) {
+        # Strip KEY=VALUE prefix if caller passed the full env var line (e.g. "AKTO_DATA_INGESTION_URL=https://...")
+        if ($ProvidedUrl -match "^[A-Z_]+=(.+)$") {
+            return $Matches[1].Trim()
+        }
         return $ProvidedUrl
     }
     
@@ -53,7 +57,7 @@ function Get-IngestionUrl {
         }
     }
     
-    return "https://guardrails.akto.io"
+    return "https://1764882677-guardrails.akto.io"
 }
 
 function Get-DeviceId {
@@ -132,11 +136,23 @@ function New-WrapperScript {
 `$env:CONTEXT_SOURCE = "ENDPOINT"
 `$env:DEVICE_ID = "$DeviceId"
 
-# Log configuration for debugging
-Write-Host "[Cursor Hook] Data Ingestion URL: `$env:AKTO_DATA_INGESTION_URL" -ForegroundColor Gray
-Write-Host "[Cursor Hook] Device ID: `$env:DEVICE_ID" -ForegroundColor Gray
+[Console]::Error.WriteLine("[Cursor Hook] Data Ingestion URL: `$env:AKTO_DATA_INGESTION_URL")
+[Console]::Error.WriteLine("[Cursor Hook] Device ID: `$env:DEVICE_ID")
 
-& python "$pythonScript" `$args
+# Read stdin from Cursor, strip preamble bytes before JSON, write to temp file
+# then use Python -c to override sys.stdin with the file (avoids all Windows pipe issues)
+`$stdinContent = [Console]::In.ReadToEnd()
+`$jsonStart = `$stdinContent.IndexOf('{')
+if (`$jsonStart -gt 0) { `$stdinContent = `$stdinContent.Substring(`$jsonStart) }
+`$tempIn = [System.IO.Path]::GetTempFileName()
+[System.IO.File]::WriteAllText(`$tempIn, `$stdinContent, [System.Text.Encoding]::UTF8)
+`$hooksDir = Split-Path -Parent "$pythonScript"
+`$pyCode = "import sys; sys.path.insert(0, r'`$hooksDir'); sys.stdin = open(r'`$tempIn', encoding='utf-8-sig'); exec(open(r'$pythonScript', encoding='utf-8').read())"
+`$output = & python -c `$pyCode 2>&1
+Remove-Item `$tempIn -ErrorAction SilentlyContinue
+foreach (`$line in `$output) {
+    if (`$line -match '^\{') { Write-Output `$line } else { [Console]::Error.WriteLine(`$line) }
+}
 "@
         [System.IO.File]::WriteAllText($wrapperFile, $wrapperContent, [System.Text.Encoding]::UTF8)
         return
@@ -145,6 +161,8 @@ Write-Host "[Cursor Hook] Device ID: `$env:DEVICE_ID" -ForegroundColor Gray
     $content = Get-Content $tempFile -Raw
     $content = $content -replace '\{\{AKTO_DATA_INGESTION_URL\}\}', $IngestionUrl
     $content = $content -replace '\{\{DEVICE_ID \(optional\)\}\}', $DeviceId
+    # Ensure Write-Host lines go to stderr so Cursor can parse stdout as JSON
+    $content = $content -replace 'Write-Host "\[Cursor Hook\][^"]*"[^\n]*\n?', ''
     [System.IO.File]::WriteAllText($wrapperFile, $content, [System.Text.Encoding]::UTF8)
     Remove-Item $tempFile -ErrorAction SilentlyContinue
     
@@ -265,10 +283,9 @@ function Install-ForUser {
         
         $files = @(
             "akto-validate-chat-prompt.py",
-            "akto-validate-chat-response.py",
-            "akto_machine_id.py"
+            "akto-validate-chat-response.py"
         )
-        
+
         foreach ($file in $files) {
             $url = "$GITHUB_RAW_BASE/$file"
             $dest = Join-Path $hooksDir $file
@@ -278,6 +295,15 @@ function Install-ForUser {
             }
             Write-Log "Downloaded $file"
         }
+
+        # akto_machine_id.py is fetched from master branch (has Windows-compatible import pwd fix)
+        $machineIdUrl = "https://raw.githubusercontent.com/akto-api-security/akto/master/apps/mcp-endpoint-shield/cursor-hooks/akto_machine_id.py"
+        $machineIdDest = Join-Path $hooksDir "akto_machine_id.py"
+        if (-not (Get-FileFromUrl $machineIdUrl $machineIdDest)) {
+            Write-LogError "Failed to download akto_machine_id.py"
+            return $false
+        }
+        Write-Log "Downloaded akto_machine_id.py"
         
         Write-Log "Creating wrapper scripts with environment variables..."
         
@@ -309,7 +335,7 @@ function Install-ForUser {
 
 # Main execution
 # If an explicit TARGET_USER_HOME was passed, use it directly.
-# Otherwise scan C:\Users\* — this is the correct path when running as SYSTEM
+# Otherwise scan C:\Users\* - this is the correct path when running as SYSTEM
 # since $env:USERPROFILE under SYSTEM resolves to the system profile, not a real user.
 if ($TargetUserHome -and (Test-Path $TargetUserHome)) {
     $success = Install-ForUser $TargetUserHome

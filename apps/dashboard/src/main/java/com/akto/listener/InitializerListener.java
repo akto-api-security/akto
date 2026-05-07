@@ -341,7 +341,20 @@ public class InitializerListener implements ServletContextListener {
 
         DashboardMode dashboardMode = DashboardMode.getDashboardMode();
 
-        RBAC record = RBACDao.instance.findOne("role", Role.ADMIN.name());
+        RBAC record = null;
+        //check scopeRoleMapping for ADMIN in current scope
+        String currentScope = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+        if (!currentScope.isEmpty()) {
+            // Query for RBAC with scopeRoleMapping containing ADMIN role for current scope
+            Bson filter = Filters.and(
+                    Filters.eq(RBAC.SCOPE_ROLE_MAPPING + "." + currentScope, Role.ADMIN.name())
+            );
+            record = RBACDao.instance.findOne(filter);
+        }
+
+        if(record == null) {
+             record = RBACDao.instance.findOne("role", Role.ADMIN.name());
+        }
 
         if (record == null) {
             return;
@@ -2224,7 +2237,20 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
 
-        RBAC rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
+        RBAC rbac = null;
+        //check scopeRoleMapping for ADMIN in current scope
+        rbac = RBACDao.instance.findAll(
+                        Filters.eq(RBAC.ACCOUNT_ID, accountId)
+                ).stream()
+                .filter(r -> r.getScopeRoleMapping() != null &&
+                        r.getScopeRoleMapping().containsValue(Role.ADMIN.name()))
+                .findFirst()
+                .orElse(null);
+
+        //backward compatibility of role
+        if (rbac == null) {
+            rbac = RBACDao.instance.findOne(RBAC.ACCOUNT_ID, accountId, RBAC.ROLE, Role.ADMIN.name());
+        }
 
         if (rbac == null) {
             logger.debugAndAddToDb("Admin is missing in DB", LogDb.DASHBOARD);
@@ -3393,11 +3419,17 @@ public class InitializerListener implements ServletContextListener {
             }
 
             RBAC firstUserAdminRbac = RBACDao.instance.findOne(Filters.and(
-                Filters.eq(RBAC.USER_ID, firstUser.getId()),
-                Filters.eq(RBAC.ROLE, Role.ADMIN.name())
+                Filters.eq(RBAC.USER_ID, firstUser.getId())
             ));
 
-            if(firstUserAdminRbac != null){
+            // RBAC exists - ensure it has ADMIN in scopeRoleMapping
+            Map<String, String> existingScopeRoleMapping = firstUserAdminRbac.getScopeRoleMapping();
+            boolean hasAdmin = existingScopeRoleMapping != null && existingScopeRoleMapping.containsValue(Role.ADMIN.name());
+            if(!hasAdmin){
+                hasAdmin = (firstUserAdminRbac.getRole() != null && firstUserAdminRbac.getRole().equals(Role.ADMIN.name()));
+            }
+
+            if(hasAdmin){
                 logger.debugAndAddToDb("Found admin rbac for first user: " + firstUser.getLogin() + " , thus deleting it's member role RBAC", LogDb.DASHBOARD);
                 RBACDao.instance.deleteAll(Filters.and(
                     Filters.eq(RBAC.USER_ID, firstUser.getId()),
@@ -3580,6 +3612,7 @@ public class InitializerListener implements ServletContextListener {
             );
         }
     }
+
 
     private static void cleanupRbacEntriesForDeveloperRole(BackwardCompatibility backwardCompatibility){
         if(backwardCompatibility.getCleanupRbacEntries() == 0){
