@@ -15,7 +15,6 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExtractOperator;
 import com.akto.dao.test_editor.TestEditorEnums.OperandTypes;
-import com.akto.data_actor.DataActor;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
 import com.akto.dto.billing.FeatureAccess;
@@ -26,7 +25,11 @@ import com.akto.dto.test_editor.FilterNode;
 import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
 import com.akto.gpt.handlers.gpt_prompts.TestFilterModifier;
 import com.akto.log.LoggerMaker;
+import com.akto.mcp.McpJsonRpcModel;
+import com.akto.mcp.McpRequestResponseUtils;
+import com.akto.mcp.McpToolDescriptionsRegistry;
 import com.akto.test_editor.Utils;
+import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 
 public class Filter {
@@ -181,7 +184,6 @@ public class Filter {
             int accountId = Context.getActualAccountId();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess.getIsGranted()) {
-
                 if (querySet instanceof String) {
                     String query = (String) querySet;
                     if (query.startsWith(Utils._MAGIC)) {
