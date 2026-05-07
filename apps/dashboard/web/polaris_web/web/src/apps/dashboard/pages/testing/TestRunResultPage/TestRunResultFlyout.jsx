@@ -408,7 +408,7 @@ function TestRunResultFlyout(props) {
     const handleWizFindingCreation = async () => {
         const items = [issueDetails?.id]
         await issuesApi.createWizFindings(items).then((res) => {
-            func.setToast(true, false, "Wiz finding created")
+            func.setToast(true, false, "Wiz finding creation initiated.")
         }).catch((err) => {
             func.setToast(true, true, "Error creating wiz finding")
         })
