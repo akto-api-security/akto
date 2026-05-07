@@ -115,8 +115,6 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
 
     Context.accountId.set(ClientActor.getAccountId());
 
-    KafkaConfig.addAuthenticationFromEnv(properties);
-
     logger.warnAndAddToDb(instanceId + ": Creating Kafka consumer with bootstrap servers: " + trafficConfig.getBootstrapServers() +
                           ", groupId: " + trafficConfig.getGroupId() +
                           ", maxPollRecords: " + trafficConfig.getConsumerConfig().getMaxPollRecords());
