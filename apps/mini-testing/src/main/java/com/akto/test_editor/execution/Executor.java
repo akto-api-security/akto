@@ -38,7 +38,11 @@ import static com.akto.test_editor.Utils.getSsrfWebhookServiceBase;
 import static com.akto.test_editor.Utils.sendRequestToWebhookService;
 import static com.akto.test_editor.utils.Utils.storeSsrfWebhookMapping;
 import com.akto.util.Constants;
+import com.akto.mcp.McpJsonRpcModel;
+import com.akto.mcp.McpRequestResponseUtils;
+import com.akto.mcp.McpToolDescriptionsRegistry;
 import com.akto.util.HttpRequestResponseUtils;
+import com.akto.util.JSONUtils;
 import com.akto.util.McpSseEndpointHelper;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -503,40 +507,65 @@ public class Executor {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess.getIsGranted()) {
 
-                String request = com.akto.test_editor.Utils.buildRequestIHttpFormat(rawApi);
-
-                String operationPrompt = "";
-                boolean isMagicContext = false;
-                // for $magic_context - no request is passed as context.
-                if (key.equals(com.akto.test_editor.Utils.MAGIC_CONTEXT)) {
-                    operationPrompt = value.toString();
-                    isMagicContext = true;
-                } else if (key.toString().startsWith(com.akto.test_editor.Utils.MAGIC_CONTEXT)) {
-                    operationPrompt = key.toString().replace(com.akto.test_editor.Utils.MAGIC_CONTEXT, "").trim();
-                    isMagicContext = true;
+                // MCP request: always invoke TestExecutorModifier enriched with tool context
+                if (McpRequestResponseUtils.isMcpRequest(rawApi)) {
+                    McpJsonRpcModel mcpModel = JSONUtils.fromJson(rawApi.getRequest().getBody(), McpJsonRpcModel.class);
+                    if (mcpModel != null && mcpModel.getParams() != null) {
+                        String toolName = mcpModel.getParams().getName();
+                        if (toolName != null && !toolName.isEmpty()) {
+                            String toolDescription = McpToolDescriptionsRegistry.get(toolName);
+                            String operationTypeLower = operationType.toLowerCase();
+                            String operationContext = "Tool: " + toolName  + "\nParam under test: " + key + "\nTest intent: " + value;
+                            if (toolDescription != null && !toolDescription.isEmpty()) {
+                                operationContext += "\nDescription: " + toolDescription;
+                            }
+                            BasicDBObject queryData = new BasicDBObject();
+                            queryData.put(TestExecutorModifier._REQUEST, com.akto.test_editor.Utils.buildRequestIHttpFormat(rawApi));
+                            queryData.put(TestExecutorModifier._TOOL_CONTEXT, operationContext);
+                            queryData.put(TestExecutorModifier._OPERATION, operationTypeLower + ": " + value);
+                            BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
+                            generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
+                        }
+                    }
                 }
 
-                if (!isMagicContext) {
-                    if (key.equals(com.akto.test_editor.Utils._MAGIC)) {
+                // $magic detection — only runs when MCP path did not already fire
+                if (generatedOperationKeyValuePairs == null || generatedOperationKeyValuePairs.isEmpty()) {
+                    String request = com.akto.test_editor.Utils.buildRequestIHttpFormat(rawApi);
+
+                    String operationPrompt = "";
+                    boolean isMagicContext = false;
+                    // for $magic_context - no request is passed as context.
+                    if (key.equals(com.akto.test_editor.Utils.MAGIC_CONTEXT)) {
                         operationPrompt = value.toString();
-                    } else if (key.toString().startsWith(com.akto.test_editor.Utils._MAGIC)) {
-                        operationPrompt = key.toString().replace(com.akto.test_editor.Utils._MAGIC, "").trim();
+                        isMagicContext = true;
+                    } else if (key.toString().startsWith(com.akto.test_editor.Utils.MAGIC_CONTEXT)) {
+                        operationPrompt = key.toString().replace(com.akto.test_editor.Utils.MAGIC_CONTEXT, "").trim();
+                        isMagicContext = true;
                     }
-                }
 
-                if (!operationPrompt.isEmpty()) {
-                    String operationTypeLower = operationType.toLowerCase();
-                    String operation = operationTypeLower + ": " + operationPrompt;
-
-                    BasicDBObject queryData = new BasicDBObject();
                     if (!isMagicContext) {
-                        queryData.put(TestExecutorModifier._REQUEST, request);
+                        if (key.equals(com.akto.test_editor.Utils._MAGIC)) {
+                            operationPrompt = value.toString();
+                        } else if (key.toString().startsWith(com.akto.test_editor.Utils._MAGIC)) {
+                            operationPrompt = key.toString().replace(com.akto.test_editor.Utils._MAGIC, "").trim();
+                        }
                     }
-                    queryData.put(TestExecutorModifier._IS_EXTERNAL_CONTEXT_IN_OPERATION, isMagicContext);
-                    queryData.put(TestExecutorModifier._OPERATION, operation);
-                    BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
-                    generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
-                }
+
+                    if (!operationPrompt.isEmpty()) {
+                        String operationTypeLower = operationType.toLowerCase();
+                        String operation = operationTypeLower + ": " + operationPrompt;
+
+                        BasicDBObject queryData = new BasicDBObject();
+                        if (!isMagicContext) {
+                            queryData.put(TestExecutorModifier._REQUEST, request);
+                        }
+                        queryData.put(TestExecutorModifier._IS_EXTERNAL_CONTEXT_IN_OPERATION, isMagicContext);
+                        queryData.put(TestExecutorModifier._OPERATION, operation);
+                        BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
+                        generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
+                    }
+                } // end: skip $magic when MCP already fired
             }
 
         } catch (Exception e) {
