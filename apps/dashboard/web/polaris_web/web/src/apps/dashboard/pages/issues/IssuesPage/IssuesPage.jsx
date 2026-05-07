@@ -623,14 +623,13 @@ function IssuesPage() {
             })
         }
 
-
         async function createWizFindings() {
             await api.createWizFindings(items).then((res) => {
-                setToast(true, false, `${items.length} Wiz finding${items.length === 1 ? "" : "s"} created.`)
+                setToast(true, false, `${items.length} Wiz finding${items.length === 1 ? "" : "s"} creation initiated.`)
 
                 resetResourcesSelected()
             }).catch((err) => {
-                func.setToast(true, true, "Error creating Wiz finding(s)")
+                func.setToast(true, true, "Error initiating Wiz finding(s) creation")
             })
         }
 
