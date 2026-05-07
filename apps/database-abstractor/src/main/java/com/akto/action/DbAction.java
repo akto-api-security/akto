@@ -29,6 +29,7 @@ import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
+import com.akto.dao.ApiSequencesDao;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -69,6 +70,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.dto.ApiSequences;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.APITestStatusAlert;
@@ -99,6 +101,7 @@ import com.opensymphony.xwork2.ActionSupport;
 
 
 import org.apache.struts2.ServletActionContext;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -135,6 +138,7 @@ public class DbAction extends ActionSupport {
     String name;
     List<String> cidrList;
     List<BasicDBObject> apiInfoList;
+    List<ApiSequences> apiSequencesList;
     List<BulkUpdates> writesForFilterSampleData;
     List<BulkUpdates> writesForSti;
     List<BulkUpdates> writesForSampleData;
@@ -708,6 +712,71 @@ public class DbAction extends ActionSupport {
             if (kafkaUtils.isWriteEnabled()) {
                 kafkaUtils.insertDataSecondary(apiInfoList, "bulkWriteApiInfo", Context.accountId.get());
             }
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String writeApiSequences() {
+        if (apiSequencesList == null || apiSequencesList.isEmpty()) {
+            return Action.SUCCESS.toUpperCase();
+        }
+        try {
+            List<WriteModel<ApiSequences>> writeModels = new ArrayList<>();
+            for (ApiSequences seq : apiSequencesList) {
+                Bson filter = Filters.and(
+                        Filters.eq(ApiSequences.API_COLLECTION_ID, seq.getApiCollectionId()),
+                        Filters.eq(ApiSequences.PATHS, seq.getPaths())
+                );
+                int now = Context.now();
+                List<Bson> pipeline = Arrays.asList(
+                        new Document("$set", new Document()
+                                .append(ApiSequences.TRANSITION_COUNT, new Document("$add", Arrays.asList(
+                                        new Document("$ifNull", Arrays.asList("$" + ApiSequences.TRANSITION_COUNT, 0)),
+                                        seq.getTransitionCount()
+                                )))
+                                .append(ApiSequences.PREV_STATE_COUNT, new Document("$add", Arrays.asList(
+                                        new Document("$ifNull", Arrays.asList("$" + ApiSequences.PREV_STATE_COUNT, 0)),
+                                        seq.getPrevStateCount()
+                                )))
+                                .append(ApiSequences.LAST_STATE_COUNT, new Document("$add", Arrays.asList(
+                                        new Document("$ifNull", Arrays.asList("$" + ApiSequences.LAST_STATE_COUNT, 0)),
+                                        seq.getLastStateCount()
+                                )))
+                                .append(ApiSequences.LAST_UPDATED_AT, now)
+                                .append(ApiSequences.CREATED_AT, new Document("$ifNull", Arrays.asList("$" + ApiSequences.CREATED_AT, now)))
+                                .append(ApiSequences.IS_ACTIVE, new Document("$ifNull", Arrays.asList("$" + ApiSequences.IS_ACTIVE, true)))
+                        ),
+                        new Document("$set", new Document()
+                                .append(ApiSequences.PROBABILITY,
+                                        new Document("$cond", Arrays.asList(
+                                                new Document("$gt", Arrays.asList("$" + ApiSequences.PREV_STATE_COUNT, 0)),
+                                                new Document("$divide", Arrays.asList("$" + ApiSequences.TRANSITION_COUNT, "$" + ApiSequences.PREV_STATE_COUNT)),
+                                                0
+                                        )))
+                                .append(ApiSequences.PRECEDENCE_SCORE,
+                                        new Document("$cond", Arrays.asList(
+                                                new Document("$gt", Arrays.asList("$" + ApiSequences.LAST_STATE_COUNT, 0)),
+                                                new Document("$divide", Arrays.asList("$" + ApiSequences.TRANSITION_COUNT, "$" + ApiSequences.LAST_STATE_COUNT)),
+                                                0
+                                        )))
+                        )
+                );
+                writeModels.add(new UpdateOneModel<>(filter, pipeline, new UpdateOptions().upsert(true)));
+            }
+            ApiSequencesDao.instance.getMCollection().bulkWrite(writeModels, new BulkWriteOptions().ordered(false));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in writeApiSequences: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchApiSequences() {
+        try {
+            apiSequencesList = ApiSequencesDao.instance.findAll(new BasicDBObject(), skip, 1000, null);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchApiSequences: " + e.getMessage());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -3080,6 +3149,13 @@ public class DbAction extends ActionSupport {
                     DbLayer.insertMCPAuditDataLog(auditInfo);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error creating or inserting MCP audit info: " + e.toString());
+                }
+            }
+            if (mcpServerCollectionInfo != null) {
+                try {
+                    DbLayer.upsertEndpointMcpConfig(mcpServerCollectionInfo);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error upserting endpoint mcp config: " + e.toString());
                 }
             }
         } catch (Exception e) {
@@ -5589,6 +5665,36 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    // Fields for fetchMcpAllowlist API
+    private List<McpAllowlist> mcpAllowlist;
+    private Integer timestamp;
+
+    public List<McpAllowlist> getMcpAllowlist() {
+        return mcpAllowlist;
+    }
+
+    public void setMcpAllowlist(List<McpAllowlist> mcpAllowlist) {
+        this.mcpAllowlist = mcpAllowlist;
+    }
+
+    public Integer getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(Integer timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public String fetchMcpAllowlist() {
+        try {
+            this.mcpAllowlist = DbLayer.fetchMcpAllowlist(timestamp);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchMcpAllowlist: " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public Map<String, Integer> getTestedApisMap() {
         return testedApisMap;
     }
@@ -5871,5 +5977,61 @@ public class DbAction extends ActionSupport {
 
     public void setServiceGraphEdges(Map<String, ApiCollection.ServiceGraphEdgeInfo> serviceGraphEdges) {
         this.serviceGraphEdges = serviceGraphEdges;
+    }
+
+    public List<ApiSequences> getApiSequencesList() {
+        return apiSequencesList;
+    }
+
+    public void setApiSequencesList(List<ApiSequences> apiSequencesList) {
+        this.apiSequencesList = apiSequencesList;
+    }
+
+    McpServerCollectionInfo mcpServerCollectionInfo;
+
+    public McpServerCollectionInfo getMcpServerCollectionInfo() {
+        return mcpServerCollectionInfo;
+    }
+
+    public void setMcpServerCollectionInfo(McpServerCollectionInfo mcpServerCollectionInfo) {
+        this.mcpServerCollectionInfo = mcpServerCollectionInfo;
+    }
+
+    private List<EndpointMcpConfig> endpointMcpConfigs;
+    private String tempCollectionName;
+    private Integer updatedDate;
+
+    public List<EndpointMcpConfig> getEndpointMcpConfigs() {
+        return endpointMcpConfigs;
+    }
+
+    public void setEndpointMcpConfigs(List<EndpointMcpConfig> endpointMcpConfigs) {
+        this.endpointMcpConfigs = endpointMcpConfigs;
+    }
+
+    public String getTempCollectionName() {
+        return tempCollectionName;
+    }
+
+    public void setTempCollectionName(String tempCollectionName) {
+        this.tempCollectionName = tempCollectionName;
+    }
+
+    public Integer getUpdatedDate() {
+        return updatedDate;
+    }
+
+    public void setUpdatedDate(Integer updatedDate) {
+        this.updatedDate = updatedDate;
+    }
+
+    public String fetchEndpointMcpConfig() {
+        try {
+            this.endpointMcpConfigs = DbLayer.fetchEndpointMcpConfig(tempCollectionName, updatedDate);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchEndpointMcpConfig: " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
     }
 }

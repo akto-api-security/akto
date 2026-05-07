@@ -171,7 +171,9 @@
         <action name="api/fetchApiInfosByCollection" class="com.akto.action.DbAction" method="fetchApiInfosByCollection">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="root">apiInfos</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -251,6 +253,30 @@
             <result name="SUCCESS" type="json">
                 <param name="excludeProperties">.*</param>
             </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/writeApiSequences" class="com.akto.action.DbAction" method="writeApiSequences">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchApiSequences" class="com.akto.action.DbAction" method="fetchApiSequences">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -2092,6 +2118,19 @@
         </result>
       </action>
 
+      <action name="api/validateAndReportSkill" class="com.akto.action.SkillValidationAction" method="validateAndReportSkill">
+        <interceptor-ref name="json"/>
+        <interceptor-ref name="defaultStack"/>
+        <result name="SUCCESS" type="json">
+          <param name="root">validationResult</param>
+        </result>
+        <result name="ERROR" type="json">
+          <param name="statusCode">422</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+      </action>
+
          <action name="api/getSlackWebhooks" class="com.akto.action.DbAction" method="fetchSlackWebhooks">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2177,6 +2216,32 @@
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^mcpAuditInfoList.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchMcpAllowlist" class="com.akto.action.DbAction" method="fetchMcpAllowlist">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^mcpAllowlist.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEndpointMcpConfig" class="com.akto.action.DbAction" method="fetchEndpointMcpConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^endpointMcpConfigs.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
