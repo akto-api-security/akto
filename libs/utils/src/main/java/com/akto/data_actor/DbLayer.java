@@ -44,7 +44,6 @@ import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
-import com.akto.new_relic.NewRelicUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -272,15 +271,6 @@ public class DbLayer {
            updateModuleEnvAndReboot(moduleInfo);
         }
 
-        try {
-            int accountId = Context.accountId.get();
-            newRelicExecutorService.submit(() -> {
-                Context.accountId.set(accountId);
-                NewRelicUtils.forwardModuleHeartbeatEvent(moduleInfo);
-            });
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error submitting module heartbeat forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
-        }
         
         List<Bson> updateList = new ArrayList<>();
         updateList.add(Updates.setOnInsert("_t", moduleInfo.getClass().getName()));
@@ -2240,16 +2230,6 @@ public class DbLayer {
             loggerMaker.infoAndAddToDb("Deleted " + deletedCount + " old metrics records", LogDb.DASHBOARD);
         }
         MetricDataDao.instance.insertMany(metricData);
-
-        try {
-            int accountId = Context.accountId.get();
-            newRelicExecutorService.submit(() -> {
-                Context.accountId.set(accountId);
-                NewRelicUtils.forwardMetrics(metricData);
-            });
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error submitting metrics forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
-        }
     }
     public static void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Integer accountId = Context.accountId.get();

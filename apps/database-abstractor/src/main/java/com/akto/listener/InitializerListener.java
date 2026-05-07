@@ -11,12 +11,9 @@ import org.slf4j.LoggerFactory;
 
 import com.akto.DaoInit;
 import com.akto.dao.AccountsDao;
-import com.akto.dao.ConfigsDao;
 import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.Config;
 import com.akto.merging.Cron;
-import com.akto.new_relic.NewRelicUtils;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.TagMismatchCron;
@@ -58,21 +55,6 @@ public class InitializerListener implements ServletContextListener {
                             TagMismatchCron tagsMismatchCron = new TagMismatchCron();
                             logger.info("triggering tags mismatch cron for db abstractor " + Context.now());
                             tagsMismatchCron.runCron();
-                        }
-
-                        // Initialize New Relic forwarder if config is present in DB
-                        if (connectedToMongo) {
-                            try {
-                                Config.NewRelicForwarderConfig newRelicConfig = (Config.NewRelicForwarderConfig) ConfigsDao.instance.findOne(
-                                        "_id", Config.NewRelicForwarderConfig.CONFIG_ID);
-                                if (newRelicConfig != null && newRelicConfig.getApiKey() != null) {
-                                    NewRelicUtils.init(newRelicConfig.getApiKey(), "DatabaseAbstractor", "production");
-                                } else {
-                                    logger.warn("New Relic config not found in db, skipping telemetry init");
-                                }
-                            } catch (Exception e) {
-                                logger.error("Failed to load New Relic config from db, skipping telemetry init", e);
-                            }
                         }
                     } catch (Exception e) {
                         logger.error("error running initializer method for db abstractor", e);
