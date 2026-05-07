@@ -42,7 +42,9 @@ import com.akto.util.JSONUtils;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
+import com.akto.mcp.McpToolDescriptionsRegistry;
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -488,6 +490,7 @@ public class TestExecutor {
                     }
                 }
             }
+            buildMcpToolDescriptions();
             try {
                 if(!Constants.IS_NEW_TESTING_ENABLED){
                     int waitTs = Context.now();
@@ -550,6 +553,41 @@ public class TestExecutor {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+        }
+    }
+
+    private void buildMcpToolDescriptions() {
+        Map<String, String> toolDescriptions = new HashMap<>();
+        for (Map.Entry<ApiInfo.ApiInfoKey, RawApi> entry : TestingConfigurations.getInstance().getRawApiMap().entrySet()) {
+            String url = entry.getKey().getUrl();
+            if (url == null || !url.contains("tools/list")) {
+                continue;
+            }
+            RawApi rawApi = entry.getValue();
+            if (rawApi.getResponse() == null) continue;
+            String body = rawApi.getResponse().getBody();
+            if (body == null || body.isEmpty()) continue;
+            try {
+                com.alibaba.fastjson2.JSONObject jsonRpc = JSON.parseObject(body);
+                com.alibaba.fastjson2.JSONObject result = jsonRpc.getJSONObject("result");
+                if (result == null) continue;
+                JSONArray tools = result.getJSONArray("tools");
+                if (tools == null) continue;
+                for (int i = 0; i < tools.size(); i++) {
+                    com.alibaba.fastjson2.JSONObject tool = tools.getJSONObject(i);
+                    String name = tool.getString("name");
+                    String description = tool.getString("description");
+                    if (name != null && description != null) {
+                        toolDescriptions.put(name, description);
+                    }
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed to parse tools/list response for MCP tool descriptions");
+            }
+            break;
+        }
+        if (!toolDescriptions.isEmpty()) {
+            McpToolDescriptionsRegistry.set(toolDescriptions);
         }
     }
 
