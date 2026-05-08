@@ -1,8 +1,7 @@
 package com.akto.gateway;
 
+import com.akto.log.LoggerMaker;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -16,23 +15,23 @@ import java.util.Map;
  */
 public class StandardGuardrailsAdapter implements GuardrailsAdapter {
 
-    private static final Logger logger = LogManager.getLogger(StandardGuardrailsAdapter.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(StandardGuardrailsAdapter.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     public StandardGuardrailsAdapter(GuardrailsClient guardrailsClient) {
-        logger.info("StandardGuardrailsAdapter initialized");
+        loggerMaker.infoAndAddToDb("StandardGuardrailsAdapter initialized");
     }
 
     @Override
     public Map<String, Object> formatRequest(String url, String path,
                                               Map<String, Object> request,
                                               Map<String, Object> response) {
-        logger.info("Standard adapter: extracting payload and formatting API request");
+        loggerMaker.infoAndAddToDb("Standard adapter: extracting payload and formatting API request");
 
         // Extract payload from request body
         String payload = extractPayload(request);
 
-        logger.debug("Extracted standard payload (length: {})",
+        loggerMaker.debugAndAddToDb("Extracted standard payload (length: {})",
                 payload != null ? payload.length() : 0);
 
         // Extract contextSource from request, default to "AGENTIC" if not provided
@@ -43,7 +42,7 @@ public class StandardGuardrailsAdapter implements GuardrailsAdapter {
         apiRequest.put("payload", payload != null ? payload : "");
         apiRequest.put("contextSource", contextSource);
 
-        logger.debug("Formatted API request for guardrails service with contextSource: {}", contextSource);
+        loggerMaker.debugAndAddToDb("Formatted API request for guardrails service with contextSource: {}", contextSource);
         return apiRequest;
     }
 
@@ -74,7 +73,7 @@ public class StandardGuardrailsAdapter implements GuardrailsAdapter {
                 return objectMapper.writeValueAsString(body);
             }
         } catch (Exception e) {
-            logger.warn("Failed to extract payload: {}", e.getMessage());
+            loggerMaker.warnAndAddToDb("Failed to extract payload: {}", e.getMessage());
             return null;
         }
     }

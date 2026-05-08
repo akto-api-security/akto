@@ -7,6 +7,7 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.util.enums.GlobalEnums.GuardrailSource;
 
 import lombok.NoArgsConstructor;
 import lombok.Getter;
@@ -88,6 +89,12 @@ public class GuardrailPolicies {
 
     // Context source - to identify which dashboard created this guardrail
     private CONTEXT_SOURCE contextSource;
+
+    // Source of this policy (e.g. GITHUB_WORKFLOW for CI/CD-pushed policies)
+    private GuardrailSource source;
+
+    // Unique hash from the source system; used for idempotent upserts from GITHUB_WORKFLOW
+    private String sourceHash;
 
     public String getHexId() {
         if (this.id != null) {

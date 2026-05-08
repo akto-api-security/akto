@@ -28,6 +28,7 @@ import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
 import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import ModuleInfoPage from "../dashboard/pages/settings/module_info/ModuleInfoPage";
+import JobInfoPage from "../dashboard/pages/settings/job_info/JobInfoPage";
 import About from "../dashboard/pages/settings/about/About";
 import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
@@ -561,6 +562,10 @@ const router = createBrowserRouter([
                     {
                         path: "module-info",
                         element: <ModuleInfoPage/>,
+                    },
+                    {
+                        path: "job-info",
+                        element: <JobInfoPage/>,
                     },
                     {
                         path: "auth-types",

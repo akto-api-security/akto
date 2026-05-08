@@ -22,6 +22,7 @@ import com.akto.utils.JsonUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
 import java.net.URI;
 import java.util.*;
@@ -268,7 +269,23 @@ public final class McpRequestResponseUtils {
                 logger.info("Updated existing MCP audit record for type: " + auditInfo.getType() +
                            ", resourceName: " + auditInfo.getResourceName());
             } else {
-                // Insert new record
+                // Before inserting, check if any mcp-server record for this mcpHost has
+                // blockAll=true — if so, auto-block the new record immediately.
+                if (StringUtils.isNotBlank(auditInfo.getMcpHost())) {
+                    McpAuditInfo blockAllSentinel = McpAuditInfoDao.instance.findOne(
+                        Filters.and(
+                            Filters.eq(McpAuditInfo.MCP_HOST, auditInfo.getMcpHost()),
+                            Filters.eq(McpAuditInfo.BLOCK_ALL, true)
+                        )
+                    );
+                    if (blockAllSentinel != null) {
+                        auditInfo.setRemarks("Rejected");
+                        auditInfo.setMarkedBy(blockAllSentinel.getMarkedBy());
+                        auditInfo.setUpdatedTimestamp(Context.now());
+                        logger.info("Auto-blocking new MCP audit record for mcpHost: " + auditInfo.getMcpHost()
+                            + " resourceName: " + auditInfo.getResourceName() + " due to blockAll flag");
+                    }
+                }
                 McpAuditInfoDao.instance.insertOne(auditInfo);
                 logger.info("Inserted new MCP audit record for type: " + auditInfo.getType() +
                            ", resourceName: " + auditInfo.getResourceName());

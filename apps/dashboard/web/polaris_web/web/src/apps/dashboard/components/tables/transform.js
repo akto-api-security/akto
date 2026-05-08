@@ -63,8 +63,14 @@ const tableFunc = {
 
         let localFilters = func.prepareFilters(tempData,props.filters);
 
-        // Create cache key based on data length, headers, and filter properties
-        const cacheKey = `${props.data.length}_${props.headers.map(h => `${h.value}:${h.filterKey || ''}:${h.filterLabel || ''}`).join('_')}`;
+        // Create cache key based on data identity, headers, and filter properties.
+        // Including a row-id fingerprint prevents collisions across different scopes
+        // (e.g., two users that each happen to produce 1 grouped row would otherwise
+        // share the same cache entry and show stale dropdown choices).
+        const dataFingerprint = tempData.length > 0
+          ? `${tempData.length}:${tempData[0]?.id ?? ''}:${tempData[tempData.length - 1]?.id ?? ''}`
+          : '0';
+        const cacheKey = `${dataFingerprint}_${props.headers.map(h => `${h.value}:${h.filterKey || ''}:${h.filterLabel || ''}`).join('_')}`;
 
         let filtersFromHeaders;
         if (filterChoicesCache.has(cacheKey)) {
@@ -131,9 +137,17 @@ const tableFunc = {
           return {value:final2Data,total:tempData.length, fullDataIds: tempData.map((x) => {return {id: x?.id}})}
         }
 
-        // Optimized filter application - fix the bug where singleFilterData resets to props.data
-        const filterKeys = Object.keys(filters || {});
-        
+        // Drop filter keys that aren't columns on this table (e.g. a `hostName`
+        // filter leaked from a sibling table's URL). Without this, the filter
+        // would never match any item and exclude every row. Server-side tables
+        // are unaffected because they don't go through fetchDataSync.
+        const validHeaderKeys = new Set(
+          (props.headers || []).map(h => h.filterKey || h.value)
+        );
+        const filterKeys = Object.keys(filters || {}).filter(
+          k => validHeaderKeys.has(k) || (k && k.includes('dateRange'))
+        );
+
         if (filterKeys.length > 0) {
           // Apply all filters in a single pass for better performance
           tempData = tempData.filter((item) => {

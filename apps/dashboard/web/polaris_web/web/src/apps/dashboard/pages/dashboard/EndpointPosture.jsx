@@ -294,7 +294,7 @@ function EndpointPosture() {
                 const summaryData = [
                     {
 
-                        title: "Total Agentic Assests",
+                        title: "Total Agentic Assets",
                         data: totalEndpoints.toString(),
                         variant: 'heading2xl',
                     },

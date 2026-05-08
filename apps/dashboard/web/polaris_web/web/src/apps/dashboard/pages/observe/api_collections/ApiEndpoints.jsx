@@ -2,7 +2,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon } from "@shopify/polaris"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import api from "../api"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {useLocation, useNavigate, useParams } from "react-router-dom"
@@ -252,6 +252,7 @@ function ApiEndpoints(props) {
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const allCollections = PersistStore(state => state.allCollections);
     const hostNameMap = PersistStore(state => state.hostNameMap);
+
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setAllCollections = PersistStore(state => state.setAllCollections)
 
@@ -306,11 +307,15 @@ function ApiEndpoints(props) {
     const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS');
 
 
+    const isSkillCollection = (apiInfoList || []).some(info => info?.id?.url?.startsWith('/skills/'))
+
     // the values used here are defined at the server.
-    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie'] )
+    const baseTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie'] )
+    const definedTableTabs = isSkillCollection ? [...baseTableTabs, 'Blocked Skills'] : baseTableTabs
 
     const { tabsInfo } = useTable()
-    const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
+    const blockedSkillsCount = (apiInfoList || []).filter(info => info?.id?.url?.startsWith('/skills/') && info.isSkillBlocked).length
+    const tableCountObj = { ...func.getTabsCount(definedTableTabs, endpointData), ...(isSkillCollection ? { blocked_skills: blockedSkillsCount } : {}) }
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
     async function fetchData() {
@@ -1167,6 +1172,7 @@ function ApiEndpoints(props) {
     }
 
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
+
     const isApiGroup = collectionsObj?.type === 'API_GROUP'
     const isHostnameCollection = hostNameMap[collectionsObj?.id] !== null && hostNameMap[collectionsObj?.id] !== undefined
     const collectionTypeListComp = getCollectionTypeListComp(collectionsObj)
@@ -1492,6 +1498,35 @@ function ApiEndpoints(props) {
             })
         }
 
+        if (isSkillCollection) {
+            const selectedSkillEndpoints = selectedResources.map(id =>
+                (endpointData["all"] || []).find(e => e.id === id)
+            ).filter(e => e?.endpoint?.startsWith('/skills/'))
+
+            if (selectedSkillEndpoints.length > 0) {
+                const blockedUrlsSet = new Set(
+                    (apiInfoList || [])
+                        .filter(i => i?.id?.url?.startsWith('/skills/') && i.isSkillBlocked)
+                        .map(i => i.id.url)
+                )
+                const hasUnblocked = selectedSkillEndpoints.some(e => !blockedUrlsSet.has(e.endpoint))
+                const hasBlocked = selectedSkillEndpoints.some(e => blockedUrlsSet.has(e.endpoint))
+
+                if (hasUnblocked) {
+                    ret.push({
+                        content: 'Block Skills',
+                        onAction: () => handleBulkSkillBlock(selectedResources, true)
+                    })
+                }
+                if (hasBlocked) {
+                    ret.push({
+                        content: 'Unblock Skills',
+                        onAction: () => handleBulkSkillBlock(selectedResources, false)
+                    })
+                }
+            }
+        }
+
         if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
             ret.push({
                 content: 'Delete ' + mapLabel('APIs', getDashboardCategory()),
@@ -1500,6 +1535,28 @@ function ApiEndpoints(props) {
         }
 
         return ret;
+    }
+
+    async function handleBulkSkillBlock(selectedResources, block) {
+        const selectedSkillEndpoints = selectedResources.map(id =>
+            (endpointData["all"] || []).find(e => e.id === id)
+        ).filter(e => e?.endpoint?.startsWith('/skills/'))
+
+        if (selectedSkillEndpoints.length === 0) return
+
+        try {
+            await Promise.all(selectedSkillEndpoints.map(endpoint => {
+                const skillName = endpoint.endpoint.replace('/skills/', '')
+                return api.updateSkillBlockStatus([Number(apiCollectionId)], skillName, block)
+            }))
+            const skillUrls = new Set(selectedSkillEndpoints.map(e => e.endpoint))
+            setApiInfoList(prev => prev.map(info =>
+                skillUrls.has(info?.id?.url) ? { ...info, isSkillBlocked: block } : info
+            ))
+            func.setToast(true, false, `Skills ${block ? 'blocked' : 'unblocked'} successfully`)
+        } catch (e) {
+            func.setToast(true, true, e.message || 'Something went wrong')
+        }
     }
 
     function handleBulkGuardrail(selectedResources, enabled) {
@@ -1707,11 +1764,22 @@ function ApiEndpoints(props) {
         return actions.length > 0 ? [{ items: actions }] : []
     }
 
+    const blockedSkillsData = useMemo(() => {
+        const blockedUrls = new Set(
+            (apiInfoList || [])
+                .filter(info => info?.id?.url?.startsWith('/skills/') && info.isSkillBlocked)
+                .map(info => info.id.url)
+        )
+        return (endpointData['all'] || []).filter(e => blockedUrls.has(e.endpoint))
+    }, [endpointData, apiInfoList])
+
+    const activeTabData = selectedTab === 'blocked_skills' ? blockedSkillsData : endpointData[selectedTab]
+
     const apiEndpointTable = [<GithubSimpleTable
         key={currentKey}
         pageLimit={50}
-        data={endpointData[selectedTab]}
-        prettifyPageData={endpointData[selectedTab]?._prettifyPageData}
+        data={activeTabData}
+        prettifyPageData={activeTabData?._prettifyPageData}
         sortOptions={sortOptions}
         resourceName={resourceName}
         filters={[]}

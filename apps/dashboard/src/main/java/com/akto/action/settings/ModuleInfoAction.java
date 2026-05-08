@@ -36,6 +36,16 @@ public class ModuleInfoAction extends UserAction {
     @Setter
     private Map<String, String> envData;
 
+    @Getter
+    @Setter
+    private String username;
+    @Getter
+    @Setter
+    private String team;
+    @Getter
+    @Setter
+    private String userRole;
+
     @Override
     public String execute() {
         return SUCCESS;
@@ -239,6 +249,25 @@ public class ModuleInfoAction extends UserAction {
 
     public void setModuleIds(List<String> moduleIds) {
         this.moduleIds = moduleIds;
+    }
+
+    public String updateUserDeviceTag() {
+        if (username == null || username.trim().isEmpty()) {
+            addActionError("Username is required");
+            return ERROR.toUpperCase();
+        }
+
+        List<Bson> updates = new ArrayList<>();
+        updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".team", team != null ? team.trim() : ""));
+        updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + ".userRole", userRole != null ? userRole.trim() : ""));
+
+        Bson filter = Filters.and(
+            Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD),
+            Filters.eq(ModuleInfo.ADDITIONAL_DATA + ".username", username)
+        );
+
+        ModuleInfoDao.instance.updateMany(filter, Updates.combine(updates));
+        return SUCCESS.toUpperCase();
     }
 
     public String updateModuleEnvAndReboot() {

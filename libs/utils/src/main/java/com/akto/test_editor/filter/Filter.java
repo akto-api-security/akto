@@ -1,10 +1,14 @@
 package com.akto.test_editor.filter;
 
 import com.akto.gpt.handlers.gpt_prompts.TestValidatorModifier;
+import com.akto.jsonrpc.McpToolDescriptionsRegistry;
+
 import java.util.*;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpJsonRpcModel;
+import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
@@ -21,6 +25,7 @@ import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
 import com.akto.gpt.handlers.gpt_prompts.TestFilterModifier;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONArray;
@@ -49,7 +54,9 @@ public class Filter {
         try {
             int accountId = Context.accountId.get();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
+            // FeatureAccess featureAccess = FeatureAccess.fullAccess;
             if (featureAccess.getIsGranted()) {
+
                 if (querySet instanceof String) {
                     String query = (String) querySet;
                     if (query.startsWith(Utils._MAGIC)) {

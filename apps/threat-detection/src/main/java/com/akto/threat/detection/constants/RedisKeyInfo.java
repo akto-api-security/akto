@@ -10,5 +10,6 @@ public class RedisKeyInfo {
     public static final String API_DISTRIBUTION_DATA_LAST_SENT_PREFIX = "apiDistributionDataSent";
     public static final String API_DISTRIBUTION_WINDOW_SENT_PREFIX = "apiDistributionWindowSent";
     public static final String PARAM_ENUM_CMS_PREFIX = "paramEnumCms";
+    public static final String THREAT_INPUT_STREAM = "threat_input_stream";
 
 }

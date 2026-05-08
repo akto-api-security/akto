@@ -56,21 +56,14 @@ jobs:
         run: |
           wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
 
-      - name: Prepare Dashboard polaris UI
-        working-directory: ./apps/dashboard/web/polaris_web
-        run: npm install && export RELEASE_VERSION=${{steps.docker_tag.outputs.IMAGE_TAG}} && npm run build
-
-      - name: Configure AWS Credentials
+      - name: Configure AWS Credentials (dashboard only)
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
           aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
           aws-region: ap-south-1
 
-      - name: Deploy polaris site to S3 bucket
-        run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/${{steps.docker_tag.outputs.IMAGE_TAG}}/dist --delete
-
-      - run: mvn package -Dakto-image-tag=${{ github.event.inputs.Tag }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
+      - run: mvn package -Dakto-image-tag=${{ steps.docker_tag.outputs.IMAGE_TAG }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{steps.docker_tag.outputs.IMAGE_TAG}}
 
       - name: DockerHub login
         env:
@@ -84,26 +77,60 @@ jobs:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
           IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
-          IMAGE_TAG_DASHBOARD: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-security-dashboard:flash' || '' }}
-          IMAGE_TAG_TESTING: ${{ github.event.inputs.Deploy == 'true' && '-t aktosecurity/akto-api-testing:flash' || '' }}
         run: |
+          set -euo pipefail
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
-          # Build a docker container and push it to DockerHub 
-          cd apps/dashboard
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG $IMAGE_TAG_DASHBOARD . --push
-          cd ../testing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG $IMAGE_TAG_TESTING . --push
-          cd ../billing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG . --push
-          cd ../internal
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG . --push
-          cd ../threat-detection
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG . --push
-          cd ../threat-detection-backend
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG . --push
-          cd ../account-job-executor
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_TAG . --push
+          # Build non-dashboard images in parallel.
+          (
+            cd apps/testing
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-testing:$IMAGE_TAG . --push
+          ) &
+          PID_TESTING=$!
+          (
+            cd apps/billing
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-billing:$IMAGE_TAG . --push
+          ) &
+          PID_BILLING=$!
+          (
+            cd apps/internal
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG . --push
+          ) &
+          PID_INTERNAL=$!
+          (
+            cd apps/threat-detection
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG . --push
+          ) &
+          PID_THREAT=$!
+          (
+            cd apps/threat-detection-backend
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG . --push
+          ) &
+          PID_THREAT_BACKEND=$!
+          (
+            cd apps/account-job-executor
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-account-job-executor:$IMAGE_TAG . --push
+          ) &
+          PID_ACCOUNT_EXECUTOR=$!
+          (
+            cd apps/data-ingestion-service
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/data-ingestion-service:$IMAGE_TAG . --push
+          ) &
+          PID_DATA_INGESTION=$!
+
+          # Dashboard-only UI prep and deploy.
+          (
+            cd apps/dashboard/web/polaris_web
+            npm install
+            RELEASE_VERSION=$IMAGE_TAG npm run build
+          )
+          aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/$IMAGE_TAG/dist --delete
+          (
+            cd apps/dashboard
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG . --push
+          )
+
+          wait $PID_TESTING $PID_BILLING $PID_INTERNAL $PID_THREAT $PID_THREAT_BACKEND $PID_ACCOUNT_EXECUTOR $PID_DATA_INGESTION
 
       - name: Cache Maven packages
         uses: actions/cache@v4

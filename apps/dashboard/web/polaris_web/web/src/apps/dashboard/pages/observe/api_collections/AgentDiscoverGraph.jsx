@@ -620,7 +620,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
     ? 400
     : vscodeGraphData
       ? 520
-      : Math.max(500, Math.min(800, Object.keys(serviceGraphEdges).length * 120 + 200));
+      : Math.max(420, Math.min(900, Object.keys(serviceGraphEdges).length * 110 + 200));
 
   return (
     <Card>

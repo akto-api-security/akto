@@ -1,9 +1,8 @@
 package com.akto.gateway;
 
 import com.akto.dto.IngestDataBatch;
+import com.akto.log.LoggerMaker;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.net.URL;
 import java.util.HashMap;
@@ -11,7 +10,7 @@ import java.util.Map;
 
 public class AktoIngestAdapter {
 
-    private static final Logger logger = LogManager.getLogger(AktoIngestAdapter.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AktoIngestAdapter.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     // Constants for Akto ingest configuration
@@ -21,13 +20,13 @@ public class AktoIngestAdapter {
     private static final String AKTO_IP = "0.0.0.0";
 
     public AktoIngestAdapter() {
-        logger.info("AktoIngestAdapter initialized - AccountId: {}, VxlanId: {}, Source: {}",
+        loggerMaker.infoAndAddToDb("AktoIngestAdapter initialized - AccountId: {}, VxlanId: {}, Source: {}",
                 AKTO_ACCOUNT_ID, AKTO_VXLAN_ID, AKTO_SOURCE);
     }
 
     @SuppressWarnings("unchecked")
     public IngestDataBatch convertToIngestDataBatch(Map<String, Object> proxyData) {
-        logger.info("Converting proxy data to IngestDataBatch format");
+        loggerMaker.infoAndAddToDb("Converting proxy data to IngestDataBatch format");
 
         try {
             IngestDataBatch batch = new IngestDataBatch();
@@ -61,7 +60,7 @@ public class AktoIngestAdapter {
                             requestHeaders.put("host", host);
                         }
                     } catch (Exception e) {
-                        logger.warn("Failed to parse URL for host extraction: {}", url);
+                        loggerMaker.warnAndAddToDb("Failed to parse URL for host extraction: {}", url);
                     }
                 }
 
@@ -157,11 +156,11 @@ public class AktoIngestAdapter {
             // Set is_pending to false
             batch.setIs_pending("false");
 
-            logger.info("Successfully converted to IngestDataBatch - path: {}, method: {}", path, batch.getMethod());
+            loggerMaker.infoAndAddToDb("Successfully converted to IngestDataBatch - path: {}, method: {}", path, batch.getMethod());
             return batch;
 
         } catch (Exception e) {
-            logger.error("Error converting to IngestDataBatch: {}", e.getMessage(), e);
+            loggerMaker.errorAndAddToDb(e, "Error converting to IngestDataBatch: {}", e.getMessage());
             throw new RuntimeException("Failed to convert to IngestDataBatch: " + e.getMessage(), e);
         }
     }

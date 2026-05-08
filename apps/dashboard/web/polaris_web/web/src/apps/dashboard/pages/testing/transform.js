@@ -1087,7 +1087,7 @@ const transform = {
       let obj = testRunResultsObj[key]
       let prettifiedObj = {
         ...obj,
-        nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{ fontWeight: 'medium' }} /></Box></div>,
+        nameComp: <div data-testid={obj.name}><Box><TooltipText tooltip={obj.name} text={obj.name} textProps={{ fontWeight: 'medium' }} /></Box></div>,
         severityComp: obj?.vulnerable === true ? <div className={`badge-wrapper-${obj?.severity[0].toUpperCase()}`}>
           <Badge size="small" status={func.getTestResultStatus(obj?.severity[0])}>{obj?.severity[0]}</Badge>
         </div> : <Text>-</Text>,
@@ -1480,6 +1480,7 @@ const transform = {
       testSuiteIds: testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
       selectedSlackChannelId: testRun?.slackChannel || 0,
+      doNotMarkIssuesAsFixed: Boolean(testRun.doNotMarkIssuesAsFixed),
     }
   },
   prepareTestingEndpointsApisList(apiEndpoints) {

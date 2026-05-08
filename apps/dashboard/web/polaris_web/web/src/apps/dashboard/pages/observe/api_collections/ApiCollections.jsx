@@ -37,7 +37,7 @@ import ReactFlow, {
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../../main/labelHelper";
 import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
-import { AGENTIC_OBSERVE_BACK_PATHS } from "../agentic/constants";
+import { AGENTIC_OBSERVE_BACK_PATHS, INVENTORY_FILTER_KEY } from "../agentic/constants";
 import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
 import { sendQuery } from "../../agentic/services/agenticService";
@@ -536,6 +536,7 @@ function ApiCollections(props) {
     const [analysisConversationId, setAnalysisConversationId] = useState(null);
     const [showMultiCollectionRunTest, setShowMultiCollectionRunTest] = useState(false);
     const [selectedCollectionIdsForTest, setSelectedCollectionIdsForTest] = useState([]);
+    const [blockedSkillCollectionIds, setBlockedSkillCollectionIds] = useState(new Set());
 
     // const dummyData = dummyJson;
 
@@ -1095,6 +1096,15 @@ function ApiCollections(props) {
     // Use custom hook for Agentic filter detection and summary calculation
     const { filteredSummaryData, activeFilterTitle, activeFilterType, filteredCollections, activeFilterPlainTitle } = useAgenticFilter(normalData);
 
+    const filtersMap = PersistStore(state => state.filtersMap);
+
+    useEffect(() => {
+        if (activeFilterType !== FILTER_TYPES.SKILL) return;
+        collectionApi.fetchBlockedSkillCollections()
+            .then(resp => setBlockedSkillCollectionIds(new Set(resp.blockedCollectionIds || [])))
+            .catch(() => {});
+    }, [activeFilterType]);
+
     useEffect(() => {
         const isMountedRef = { current: true };
 
@@ -1123,6 +1133,31 @@ function ApiCollections(props) {
         resetResourcesSelected();
         fetchData({ current: true }, true) // Force refresh after mutations
     }
+
+    const getActiveSkillName = () => {
+        const filterValue = filtersMap[INVENTORY_FILTER_KEY]?.filters?.find(f => f.key === 'envType')?.value?.values?.[0] || '';
+        const eq = filterValue.indexOf('=');
+        return eq >= 0 ? filterValue.slice(eq + 1) : '';
+    };
+
+    async function handleSkillUpdateAction(collectionIds, isSkillBlocked) {
+        const ids = collectionIds.map(id => parseInt(id));
+        const skillName = getActiveSkillName();
+        const toastContent = isSkillBlocked ? 'blocked' : 'unblocked';
+        await collectionApi.updateSkillBlockStatus(ids, skillName, isSkillBlocked)
+            .then(() => {
+                func.setToast(true, false, `Skill ${toastContent} successfully`);
+                setBlockedSkillCollectionIds(prev => {
+                    const next = new Set(prev);
+                    ids.forEach(id => isSkillBlocked ? next.add(id) : next.delete(id));
+                    return next;
+                });
+            })
+            .catch((e) => func.setToast(true, true, e.message || 'Something went wrong!'));
+        resetResourcesSelected();
+        fetchData({ current: true }, true);
+    }
+
     async function handleUntrackedDelete(apiCollectionIds) {
         await api.deleteUntrackedCollections(apiCollectionIds).then(() => {
             func.setToast(true, false, `${apiCollectionIds.length} untracked collection${func.addPlurality(apiCollectionIds.length)} deleted successfully`)
@@ -1203,6 +1238,37 @@ function ApiCollections(props) {
             });
             return actions;
         }
+
+        if (activeFilterType === FILTER_TYPES.SKILL) {
+            const selectedSet = new Set(selectedResources.map(id => parseInt(id)));
+            const selectedEndpointIds = new Set(
+                filteredCollections.filter(c => selectedSet.has(c.id)).map(c => c.endpointId)
+            );
+            const resolvedCollectionIds = filteredCollections
+                .filter(c => selectedEndpointIds.has(c.endpointId))
+                .map(c => c.id);
+
+            const allBlocked = resolvedCollectionIds.length > 0 && resolvedCollectionIds.every(id => blockedSkillCollectionIds.has(id));
+            const allUnblocked = resolvedCollectionIds.every(id => !blockedSkillCollectionIds.has(id));
+
+            if (allUnblocked) {
+                actions.push({
+                    content: `Block skill`,
+                    onAction: () => func.showConfirmationModal(
+                        "Blocking this skill will flag it as blocked. Are you sure?",
+                        "Block Skill",
+                        () => handleSkillUpdateAction(resolvedCollectionIds, true)
+                    )
+                });
+            } else if (allBlocked) {
+                actions.push({
+                    content: `Unblock skill`,
+                    onAction: () => handleSkillUpdateAction(resolvedCollectionIds, false)
+                });
+            }
+            return actions;
+        }
+
         const defaultApiGroups = allCollections.filter(x => x.type === "API_GROUP" && x.automated).map(x => x.id);
         const deactivated = deactivateCollections.map(x => x.id);
         const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);

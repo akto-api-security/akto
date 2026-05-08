@@ -13,6 +13,7 @@ import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.jsonrpc.McpToolDescriptionsRegistry;
 import com.akto.store.TestingUtil;
 
 public class TestingConfigurations {
@@ -30,6 +31,7 @@ public class TestingConfigurations {
     private boolean doNotMarkIssuesAsFixed;
     private int maxAgentTokens = -1;
     private final AtomicLong runningAgentTokenCount = new AtomicLong(0);
+    private Map<String, String> mcpToolDescriptions = new HashMap<>();
 
     private TestingConfigurations() {
     }
@@ -47,6 +49,7 @@ public class TestingConfigurations {
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
         this.maxAgentTokens = maxAgentTokens;
         this.runningAgentTokenCount.set(0);
+        this.mcpToolDescriptions = new HashMap<>();
     }
 
     public void addAgentTokens(int tokens) {
@@ -79,6 +82,14 @@ public class TestingConfigurations {
 
     public void setMaxConcurrentRequest(int maxConcurrentRequest) {
         this.maxConcurrentRequest = maxConcurrentRequest;
+    }
+
+    public Map<ApiInfoKey, RawApi> getRawApiMap() {
+        return rawApiMap;
+    }
+
+    public void setRawApiMap(Map<ApiInfoKey, RawApi> rawApiMap) {
+        this.rawApiMap = rawApiMap;
     }
 
     public List<TestingRunResult> getTestingRunResultList() {

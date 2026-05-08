@@ -1,6 +1,11 @@
 package com.akto.dto.metrics;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.monitoring.ModuleInfo;
+
+import lombok.Getter;
+import lombok.Setter;
+
 import org.bson.types.ObjectId;
 
 public class MetricData {
@@ -8,9 +13,12 @@ public class MetricData {
     private String metricId;
     private float value;
     private String orgId;
-    private String instanceId;
+    private String instanceId; // module id
     private int timestamp;
     private String moduleType;
+
+    @Getter @Setter
+    private ModuleInfo moduleInfo;
 
     public MetricType getMetricType() {
         return metricType;
@@ -119,6 +127,17 @@ public class MetricData {
         this.timestamp = Context.now();
         this.metricType = metricType;
         this.moduleType = moduleType;
+    }
+
+    public MetricData(String metricId, float value, String orgId, String instanceId, MetricType metricType, String moduleType, ModuleInfo moduleInfo) {
+        this.metricId = metricId;
+        this.value = value;
+        this.orgId = orgId;
+        this.instanceId = instanceId;
+        this.timestamp = Context.now();
+        this.metricType = metricType;
+        this.moduleType = moduleType;
+        this.moduleInfo = moduleInfo;
     }
 
     public ObjectId getId() {

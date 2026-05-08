@@ -837,6 +837,20 @@ const settingRequests = {
             data: {email}
         })
     },
+    async fetchAccountJobs() {
+        return await request({
+            url: '/api/fetchAccountJobs',
+            method: 'post',
+            data: {}
+        })
+    },
+    async deleteAccountJob(jobId) {
+        return await request({
+            url: '/api/deleteAccountJob',
+            method: 'post',
+            data: { jobId }
+        })
+    },
     async fetchModuleInfo(filter = {}) {
         return await request({
             url: '/api/fetchModuleInfo',
@@ -849,6 +863,13 @@ const settingRequests = {
             url: '/api/deleteModuleInfo',
             method: 'post',
             data: { moduleIds }
+        })
+    },
+    async updateUserDeviceTag(username, team, userRole) {
+        return await request({
+            url: '/api/updateUserDeviceTag',
+            method: 'post',
+            data: { username, team, userRole }
         })
     },
     async fetchCloudflareWafIntegration() {
@@ -966,6 +987,41 @@ const settingRequests = {
             url: '/api/addMcpRegistryIntegration',
             method: 'post',
             data: {registries}
+        })
+    },
+    fetchMcpRegistries() {
+        return request({
+            url: '/api/fetchMcpRegistries',
+            method: 'post',
+            data: {}
+        })
+    },
+    addMcpRegistry(registryUrl, headers, registryType) {
+        return request({
+            url: '/api/addMcpRegistry',
+            method: 'post',
+            data: { registryUrl, headers, registryType }
+        })
+    },
+    syncMcpRegistry(registryId) {
+        return request({
+            url: '/api/syncMcpRegistry',
+            method: 'post',
+            data: { registryId }
+        })
+    },
+    fetchMcpAllowlistEntries(registryId) {
+        return request({
+            url: '/api/fetchMcpAllowlistEntries',
+            method: 'post',
+            data: { registryId }
+        })
+    },
+    deleteMcpRegistry(registryId) {
+        return request({
+            url: '/api/deleteMcpRegistry',
+            method: 'post',
+            data: { registryId }
         })
     },
     updateBlockLogs(blockLogs) {

@@ -9,7 +9,9 @@ import {
     getTypeFromTags,
     findAssetTag,
     findTypeTag,
-    getAgentTypeFromValue
+    getAgentTypeFromValue,
+    hasPersonalAccountTag,
+    hasLocalMcpServerTag,
 } from "./mcpClientHelper";
 import func from "@/util/func";
 import { getResolvedUsernameForCollection, DEFAULT_VALUE } from "../api_collections/endpointShieldHelper";
@@ -33,6 +35,7 @@ export const getHeaders = (options = {}) => {
     const primaryTitle = options.primaryColumnTitle ?? "Agentic asset";
     const primaryText = options.primaryColumnText ?? primaryTitle;
     const includeIconColumn = options.includeIconColumn !== false;
+    const includeUserColumns = options.includeUserColumns === true;
     const endpointsColumnLabel = options.endpointsColumnLabel ?? "Endpoints";
     const endpointsColumnBoxWidth = options.endpointsColumnBoxWidth ?? "80px";
     const headers = [
@@ -60,9 +63,9 @@ export const getHeaders = (options = {}) => {
             mergeType: (a, b) => Math.max(a || 0, b || 0),
             shouldMerge: true
         },
-        { 
-            title: "Sensitive data", 
-            text: "Sensitive data", 
+        {
+            title: "Sensitive data",
+            text: "Sensitive data",
             value: "sensitiveSubTypes", 
             numericValue: "sensitiveInRespTypes",
             textValue: "sensitiveSubTypesVal", 
@@ -70,17 +73,39 @@ export const getHeaders = (options = {}) => {
             mergeType: (a, b) => [...new Set([...(a || []), ...(b || [])])],
             shouldMerge: true
         },
-        { 
-            title: "Last traffic seen", 
-            text: "Last traffic seen", 
-            value: "lastTraffic", 
-            numericValue: "detectedTimestamp", 
-            isText: CellType.TEXT, 
-            sortActive: true, 
+        {
+            title: "Last traffic seen",
+            text: "Last traffic seen",
+            value: "lastTraffic",
+            numericValue: "detectedTimestamp",
+            isText: CellType.TEXT,
+            sortActive: true,
             boxWidth: "120px",
             mergeType: (a, b) => Math.max(a || 0, b || 0),
             shouldMerge: true
         },
+        ...(includeUserColumns ? [
+            {
+                title: "Team",
+                text: "Team",
+                value: "team",
+                filterKey: "team",
+                textValue: "team",
+                isText: CellType.TEXT,
+                showFilter: true,
+                boxWidth: "120px",
+            },
+            {
+                title: "User role",
+                text: "User role",
+                value: "userRole",
+                filterKey: "userRole",
+                textValue: "userRole",
+                isText: CellType.TEXT,
+                showFilter: true,
+                boxWidth: "120px",
+            },
+        ] : []),
     ];
     if (!includeIconColumn) {
         return headers.filter((h) => h.value !== "iconComp");
@@ -162,11 +187,15 @@ export const groupCollectionsByAgent = (collections, trafficMap = {}, sensitiveM
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
+                hasPersonalAccount: false,
+                hasLocalMcpServer: false,
             };
         }
-        
+
         agents[key].collections.push(c);
         if (!agents[key].firstCollection) agents[key].firstCollection = c;
+        if (hasPersonalAccountTag(c.envType)) agents[key].hasPersonalAccount = true;
+        if (hasLocalMcpServerTag(c.envType)) agents[key].hasLocalMcpServer = true;
         
         // Track unique endpoint IDs
         if (endpointId) {
@@ -238,15 +267,18 @@ export const groupCollectionsByService = (collections, trafficMap = {}, sensitiv
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
+                hasPersonalAccount: false,
+                hasLocalMcpServer: false,
             };
         }
-        
+
         services[key].collections.push(c);
-        // Track all hostnames for this service for filtering
         if (!services[key].hostNames.includes(hostName)) {
             services[key].hostNames.push(hostName);
         }
         if (!services[key].firstCollection) services[key].firstCollection = c;
+        if (hasPersonalAccountTag(c.envType)) services[key].hasPersonalAccount = true;
+        if (hasLocalMcpServerTag(c.envType)) services[key].hasLocalMcpServer = true;
         
         // Track unique endpoint IDs
         if (endpointId) {
@@ -308,11 +340,13 @@ export const groupCollectionsBySkill = (collections, trafficMap = {}, sensitiveM
                     sensitiveTypes: new Set(),
                     maxTrafficTimestamp: 0,
                     maxRiskScore: 0,
+                    hasPersonalAccount: false,
                 };
             }
 
             skills[skillValue].collections.push(c);
             if (!skills[skillValue].firstCollection) skills[skillValue].firstCollection = c;
+            if (hasPersonalAccountTag(c.envType)) skills[skillValue].hasPersonalAccount = true;
             if (hostName && !skills[skillValue].hostNames.includes(hostName)) {
                 skills[skillValue].hostNames.push(hostName);
             }
@@ -383,6 +417,8 @@ const finalizeHostGroupedRow = (g, idSegment) => {
         detectedTimestamp: g.maxTrafficTimestamp,
         lastTraffic: func.prettifyEpoch(g.maxTrafficTimestamp),
         riskScore: g.maxRiskScore,
+        team: g.team || '',
+        userRole: g.userRole || '',
     };
 };
 
@@ -421,7 +457,7 @@ export const groupCollectionsByDevice = (collections, trafficMap = {}, sensitive
 };
 
 /** Group by Endpoint Shield username. Row opens inventory via hostname filter. Skips collections without a resolved username. */
-export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}, usernameMap = {}) => {
+export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMap = {}, riskScoreMap = {}, usernameMap = {}, userMetadataMap = {}) => {
     const users = {};
 
     collections.forEach((c) => {
@@ -430,6 +466,7 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
         if (!username || username === DEFAULT_VALUE) return;
 
         if (!users[username]) {
+            const meta = userMetadataMap[username] || {};
             users[username] = {
                 rowType: ROW_TYPES.SERVICE,
                 groupName: username,
@@ -441,15 +478,36 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
+                uniqueSkillNames: new Set(),
+                nonSkillCollectionsCount: 0,
+                team: meta.team || '',
+                userRole: meta.userRole || '',
             };
         }
         const g = users[username];
         g.collections.push(c);
-        g.clientTypes.add(getTypeFromTags(c.envType));
+        const category = getTypeFromTags(c.envType);
+        g.clientTypes.add(category);
+        if (category !== CLIENT_TYPES.SKILL) {
+            g.nonSkillCollectionsCount += 1;
+        }
+        // Skills bundled inside an AI Agent / MCP Server collection still make the user a Skill
+        // owner for the Type column, even when the user has no standalone Skill-type collection.
+        if (Array.isArray(c.skills) && c.skills.length > 0) {
+            g.clientTypes.add(CLIENT_TYPES.SKILL);
+            c.skills.forEach(s => { if (s) g.uniqueSkillNames.add(String(s).toLowerCase()); });
+        }
         accumulateHostGroupedCollection(g, c, trafficMap, sensitiveMap, riskScoreMap);
     });
 
-    return Object.values(users).map((g) => finalizeHostGroupedRow(g, "user"));
+    // Per-user "Agentic assets" count uses the same semantic as the Agentic assets totals page:
+    // non-Skill collections + unique skill names (from c.skills[] across all the user's collections).
+    // Counting hostNames alone hides skills bundled inside AI Agent / MCP Server collections.
+    return Object.values(users).map((g) => {
+        const row = finalizeHostGroupedRow(g, "user");
+        row.endpointsCount = g.nonSkillCollectionsCount + g.uniqueSkillNames.size;
+        return row;
+    });
 };
 
 export const createEnvTypeFilter = (values, negated = false) => ({

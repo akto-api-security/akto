@@ -1,9 +1,15 @@
 package com.akto.threat.detection.tasks;
 
+import com.akto.data_actor.DataActor;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
+import com.akto.threat.detection.cache.AccountConfig;
+import com.akto.threat.detection.cache.AccountConfigurationCache;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -513,6 +519,62 @@ public class RequestValidator {
       logger.errorAndAddToDb(e, "Error conforming to schema for api info key" + apiInfoKey);
       return errors;
     }
+  }
+
+  public static List<SchemaConformanceError> handleSchemaConformFilter(HttpResponseParams responseParam, ApiInfo.ApiInfoKey apiInfoKey, List<SchemaConformanceError> errors, DataActor dataActor) {
+    if (responseParam.getStatusCode() < 200 || responseParam.getStatusCode() >= 300) {
+      return errors;
+    }
+
+    AccountConfig config = AccountConfigurationCache.getInstance().getConfig(dataActor);
+    Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods = config.getApiInfoUrlToMethods();
+    Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates = config.getApiCollectionUrlTemplates();
+
+    if (apiInfoUrlToMethods.isEmpty() && apiCollectionUrlTemplates.isEmpty()) {
+      logger.infoAndAddToDb("No api infos found for validating schema");
+      return errors;
+    }
+
+    int apiCollectionId = apiInfoKey.getApiCollectionId();
+    String url = apiInfoKey.getUrl();
+    URLMethods.Method method = apiInfoKey.getMethod();
+
+    url = ApiInfo.getNormalizedUrl(url);
+
+    String urlKey = apiCollectionId + ":" + url;
+    Set<URLMethods.Method> methods = apiInfoUrlToMethods.get(urlKey);
+
+    if (methods != null && methods.contains(method)) {
+      return errors;
+    } else if (methods != null && !methods.contains(method)) {
+      addError("#/paths" + url, method.name(), "method",
+          String.format("Method %s not available for path %s in discovered traffic",
+              method.name(), responseParam.getRequestParams().getURL()));
+      return getErrors();
+    }
+
+    List<URLTemplate> urlTemplates = apiCollectionUrlTemplates.get(apiCollectionId);
+    if (urlTemplates == null || urlTemplates.isEmpty()) {
+      logger.debugAndAddToDb("Schema conformance error: URL not found in discovered traffic - " + url + " " + method);
+      addError("#/paths", url, "url", "API not found in discovered traffic: " + method + " " + url);
+      return getErrors();
+    }
+
+    for (URLTemplate urlTemplate : urlTemplates) {
+      URLTemplate.MatchResult result = urlTemplate.matchTemplate(url, method);
+      if (result == URLTemplate.MatchResult.FULL_MATCH) {
+        return errors;
+      }
+      if (result == URLTemplate.MatchResult.URL_MATCH_METHOD_MISMATCH) {
+        addError("#/paths" + url, method.name(), "method",
+            String.format("Method %s not available for path %s template %s in discovered traffic",
+                method.name(), responseParam.getRequestParams().getURL(), urlTemplate.getTemplateString()));
+        return getErrors();
+      }
+    }
+
+    addError("#/paths", url, "url", "API not found in discovered traffic: " + method + " " + url);
+    return getErrors();
   }
 
 }

@@ -164,7 +164,8 @@ function Integrations() {
     let mcpRegistryObj ={
       id: 'mcp_registry',
       name:'MCP Registry',
-      source: '/public/mcp.svg'
+      source: '/public/mcp.svg',
+      badge: 'Beta'
     }
 
     let awsWafObj ={
@@ -317,7 +318,7 @@ function Integrations() {
     }
 
     function renderItem(item) {
-        const {id, source, name, link} = item;
+        const {id, source, name, link, badge} = item;
         const media = <Avatar customer size="medium" name={name} source={source}/>;
         const sourceActions = (item) => {
             return [
@@ -327,7 +328,7 @@ function Integrations() {
               },
             ];
           };
-    
+
         return (
           <ResourceItem
             id={id}
@@ -336,9 +337,12 @@ function Integrations() {
             persistActions
             onClick={() => handleTab(id, link)}
           >
-            <Text fontWeight="bold" as="h3">
-              {name}
-            </Text>
+            <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
+              <Text fontWeight="bold" as="h3">
+                {name}
+              </Text>
+              {badge && <Badge status="info">{badge}</Badge>}
+            </div>
           </ResourceItem>
         );
       }

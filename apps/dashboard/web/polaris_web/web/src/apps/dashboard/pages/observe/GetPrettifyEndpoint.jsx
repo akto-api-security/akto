@@ -9,6 +9,8 @@ export const getMethod = (url, method) => {
     if(isMCPSecurityCategory() || isAgenticSecurityCategory() || isEndpointSecurityCategory()){
         if(url.includes("tool")){
             return "TOOL";
+        }else if(url.includes("skill")){
+            return "SKILL";
         }else if(url.includes("resource")){
             return "RESOURCE";
         }else if(url.includes("prompt")){

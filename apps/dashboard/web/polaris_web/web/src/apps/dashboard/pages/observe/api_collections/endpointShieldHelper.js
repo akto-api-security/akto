@@ -49,9 +49,8 @@ const registerDeviceKeys = (usernameMap, username, rawIds) => {
 
 /**
  * Fetches endpoint shield module info and builds username map from additionalData.
- * moduleInfo already contains mcpServers with collectionName under additionalData,
- * so no per-agent API calls are needed.
- * @returns {Promise<Object>} - Map of collection name (lowercase) to username
+ * Also returns a userMetadataMap with team and userRole per username.
+ * @returns {Promise<{usernameMap: Object, userMetadataMap: Object}>}
  */
 const fetchEndpointShieldUsernameMap = async () => {
     const usernameMap = {};
@@ -82,6 +81,46 @@ const fetchEndpointShieldUsernameMap = async () => {
         return usernameMap;
     } catch (e) {
         return {};
+    }
+};
+
+const fetchEndpointShieldUserMetadata = async () => {
+    const usernameMap = {};
+    const userMetadataMap = {};
+
+    try {
+        const response = await settingRequests.fetchModuleInfo({ moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD });
+        const moduleInfos = response?.moduleInfos || [];
+
+        moduleInfos.forEach((module) => {
+            const username = resolveModuleUsername(module);
+            if (!username) return;
+
+            const ad = module.additionalData || {};
+            registerDeviceKeys(usernameMap, username, [
+                module.name,
+                ad.deviceId,
+                ad.endpointId,
+            ]);
+
+            const mcpServers = ad.mcpServers || {};
+            Object.values(mcpServers).forEach((server) => {
+                if (server.collectionName) {
+                    usernameMap[server.collectionName.toLowerCase()] = username;
+                }
+            });
+
+            if (!userMetadataMap[username]) {
+                userMetadataMap[username] = {
+                    team: ad.team || '',
+                    userRole: ad.userRole || '',
+                };
+            }
+        });
+
+        return { usernameMap, userMetadataMap };
+    } catch (e) {
+        return { usernameMap: {}, userMetadataMap: {} };
     }
 };
 
@@ -150,6 +189,7 @@ const getResolvedUsernameForCollection = (collection, usernameMap) => {
 
 export {
     fetchEndpointShieldUsernameMap,
+    fetchEndpointShieldUserMetadata,
     getUsernameForCollection,
     getResolvedUsernameForCollection,
     MODULE_TYPE,
