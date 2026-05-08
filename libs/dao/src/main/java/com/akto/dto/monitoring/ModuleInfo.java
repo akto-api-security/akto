@@ -3,17 +3,43 @@ package com.akto.dto.monitoring;
 import java.util.Map;
 import java.util.UUID;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder(toBuilder = true)
 public class ModuleInfo {
+
     public static final String MODULE_TYPE = "moduleType";
     private ModuleType moduleType;
+    public static final String CURRENT_VERSION = "currentVersion";
     private String currentVersion;
     private String id;//UUID
+    public static final String STARTED_TS = "startedTs";
     private int startedTs;
     public static final String LAST_HEARTBEAT_RECEIVED = "lastHeartbeatReceived";
     private int lastHeartbeatReceived;
+    public static final String NAME = "name";
     private String name;
     public static final String ADDITIONAL_DATA = "additionalData";
     private Map<String, Object> additionalData;
+
+    @Getter @Setter
+    private boolean reboot;
+    public static final String _REBOOT = "reboot";
+
+    @Getter @Setter
+    private boolean deleteTopicAndReboot;
+    public static final String DELETE_TOPIC_AND_REBOOT = "deleteTopicAndReboot";
+
+    public static final String MINI_RUNTIME_NAME = "miniRuntimeName";
+
+    @Getter @Setter
+    private String miniRuntimeName;
 
     public ModuleType getModuleType() {
         return moduleType;
@@ -81,7 +107,11 @@ public class ModuleInfo {
         EBPF,
         THREAT_DETECTION,
         MCP_ENDPOINT_SHIELD,
-        DATA_INGESTION
+        DATA_INGESTION,
+        TRAFFIC_COLLECTOR,
+        AKTO_AGENT_GATEWAY,
+        DAST,
+        AGENTIC_TESTING
     }
 
 }
