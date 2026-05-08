@@ -33,6 +33,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -98,6 +99,8 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.EventsMetricsDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
@@ -1390,6 +1393,46 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 1, TimeUnit.HOURS);
     }
 
+    public void setUpThreatDetectionRollingRebootScheduler() {
+        Random random = new Random();
+        int jitterSeconds = random.nextInt(5 * 60);
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        if (t.getId() != 1758787662) {
+                            return;
+                        }
+                        try {
+                            List<ModuleInfo> liveModules = ModuleInfoDao.instance.fetchLiveModulesByType(ModuleInfo.ModuleType.THREAT_DETECTION);
+                            if (liveModules == null || liveModules.isEmpty()) {
+                                logger.infoAndAddToDb("No live THREAT_DETECTION modules found, skipping rolling reboot");
+                                return;
+                            }
+                            logger.infoAndAddToDb("Starting rolling reboot for " + liveModules.size() + " THREAT_DETECTION module(s)");
+                            for (int i = 0; i < liveModules.size(); i++) {
+                                String moduleId = liveModules.get(i).getId();
+                                ModuleInfoDao.instance.triggerReboot(moduleId, ModuleInfo.ModuleType.THREAT_DETECTION);
+                                logger.infoAndAddToDb("Triggered reboot for THREAT_DETECTION module: " + moduleId);
+                                if (i < liveModules.size() - 1) {
+                                    int gapSeconds = 60 + random.nextInt(121); // random between 60 and 180 seconds
+                                    Thread.sleep(gapSeconds * 1000L);
+                                }
+                            }
+                            logger.infoAndAddToDb("Completed rolling reboot for THREAT_DETECTION modules");
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            logger.errorAndAddToDb("Rolling reboot interrupted: " + e.getMessage());
+                        } catch (Exception e) {
+                            logger.errorAndAddToDb("Error during rolling reboot of THREAT_DETECTION modules: " + e.getMessage());
+                        }
+                    }
+                }, "threat-detection-rolling-reboot");
+            }
+        }, jitterSeconds, 2 * 60 * 60, TimeUnit.SECONDS);
+    }
+
     static class ChangesInfo {
         public Map<String, String> newSensitiveParams = new HashMap<>();
         public List<BasicDBObject> newSensitiveParamsObject = new ArrayList<>();
@@ -2444,6 +2487,8 @@ public class InitializerListener implements ServletContextListener {
                     }, "context-initializer-secondary");
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
                     setUpWebhookScheduler();
+                    logger.warn("Started threat detection rolling reboot scheduler", LogDb.DASHBOARD);
+                    setUpThreatDetectionRollingRebootScheduler();
                     logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
                     setUpTrafficAlertScheduler();
                     logger.warn("Started daily schedulers", LogDb.DASHBOARD);
