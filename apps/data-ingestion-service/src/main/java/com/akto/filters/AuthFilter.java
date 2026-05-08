@@ -1,6 +1,7 @@
 package com.akto.filters;
 
 import com.akto.dao.context.Context;
+import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.log.LoggerMaker;
 
 import io.jsonwebtoken.Claims;
@@ -12,49 +13,45 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.security.KeyFactory;
-import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
-import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
 public class AuthFilter implements Filter {
 
-    private static final LoggerMaker logger = new LoggerMaker(AuthFilter.class);
+    private static final LoggerMaker logger = new LoggerMaker(AuthFilter.class, LoggerMaker.LogDb.DATA_INGESTION);
 
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
     }
 
-    private static Jws<Claims> authenticate(String jwsString)
-            throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
-
-         PublicKey publicKey = getPublicKey();
-         return Jwts.parserBuilder()
-                 .setSigningKey(publicKey)
-                 .build()
-                 .parseClaimsJws(jwsString);
+    private static boolean useEnvironmentPublicKey() {
+        String rsaPublicKey = System.getenv("RSA_PUBLIC_KEY");
+        return rsaPublicKey != null && !rsaPublicKey.trim().isEmpty();
     }
 
-    private static PublicKey getPublicKey() throws NoSuchAlgorithmException, InvalidKeySpecException, IOException {
-       String rsaPublicKey = System.getenv("RSA_PUBLIC_KEY");
-        if(rsaPublicKey == null || rsaPublicKey.isEmpty()) {
+    private static Jws<Claims> authenticateUsingEnvironmentPublicKey(String jwsString) throws Exception {
+        PublicKey publicKey = getPublicKeyFromEnvironment();
+        return Jwts.parserBuilder()
+                .setSigningKey(publicKey)
+                .build()
+                .parseClaimsJws(jwsString);
+    }
+
+    private static PublicKey getPublicKeyFromEnvironment() throws Exception {
+        String rsaPublicKey = System.getenv("RSA_PUBLIC_KEY");
+        if (rsaPublicKey == null || rsaPublicKey.trim().isEmpty()) {
             throw new IllegalArgumentException("RSA_PUBLIC_KEY environment variable is not set");
         }
 
-        rsaPublicKey = rsaPublicKey.replace("-----BEGIN PUBLIC KEY-----","");
-        rsaPublicKey = rsaPublicKey.replace("-----END PUBLIC KEY-----","");
-        rsaPublicKey = rsaPublicKey.replace("\n","");
-        byte [] decoded = Base64.getDecoder().decode(rsaPublicKey);
+        String cleanedPublicKey = rsaPublicKey
+                .replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
+                .replace("\n", "");
+        byte[] decoded = Base64.getDecoder().decode(cleanedPublicKey);
         X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
-        KeyFactory kf = KeyFactory.getInstance("RSA");
-
-        try {
-            return kf.generatePublic(keySpec);
-        } catch (Exception e) {
-            System.out.println(e);
-            throw e;
-        }
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        return keyFactory.generatePublic(keySpec);
     }
 
     @Override
@@ -70,7 +67,12 @@ public class AuthFilter implements Filter {
         String accessTokenFromRequest = httpServletRequest.getHeader("authorization");
 
         try {
-            Jws<Claims> claims = authenticate(accessTokenFromRequest);
+            Jws<Claims> claims;
+            if (useEnvironmentPublicKey()) {
+                claims = authenticateUsingEnvironmentPublicKey(accessTokenFromRequest);
+            } else {
+                claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
+            }
             Context.accountId.set((int) claims.getBody().get("accountId"));
         } catch (Exception e) {
             logger.error("Authentication failed: {}", e.getMessage());

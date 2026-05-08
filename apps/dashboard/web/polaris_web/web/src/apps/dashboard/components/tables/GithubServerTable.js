@@ -187,11 +187,7 @@ function GithubServerTable(props) {
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
 
-    // Skip filters whose key isn't a column on this table (e.g., a `hostName` filter
-    // leaked from a sibling table's URL). Otherwise fetchDataSync would exclude every
-    // row because the unknown key is undefined on the items.
     const processFilter = (filter) => {
-      if (!(filter.key in filters) && !filter.key?.includes("dateRange")) return;
       const value = filter.value;
       if (value && typeof value === 'object' && value.values !== undefined) {
         // New format - pass as is for client-side, extract values for server-side
@@ -203,7 +199,7 @@ function GithubServerTable(props) {
         filters[filter.key] = value;
       }
     };
-    
+
     if(tempFilters.length === 0){
       appliedFilters.forEach(processFilter);
     }else{
@@ -532,7 +528,6 @@ function GithubServerTable(props) {
     let [sortKey, sortOrder] = sortSelected.length === 0 ? ["", ""] : sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
     appliedFilters.forEach((filter) => {
-      if (!(filter.key in filters) && !filter.key?.includes("dateRange")) return;
       const value = filter.value;
       if (value && typeof value === 'object' && value.values !== undefined) {
         filters[filter.key] = props.supportsNegationFilter ? value : value.values;
@@ -688,7 +683,6 @@ function GithubServerTable(props) {
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
     appliedFilters.forEach((filter) => {
-      if (!(filter.key in filters) && !filter.key?.includes("dateRange")) return;
       const value = filter.value;
       if (value && typeof value === 'object' && value.values !== undefined) {
         filters[filter.key] = props.supportsNegationFilter ? value : value.values;

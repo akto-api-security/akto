@@ -3,8 +3,6 @@ package com.akto.data_actor;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.metrics.MetricData;
 import com.akto.testing.ApiExecutor;
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.interfaces.DecodedJWT;
 import com.akto.dto.*;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.billing.Organization;
@@ -28,6 +26,8 @@ import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
@@ -60,7 +60,7 @@ public class ClientActor extends DataActor {
     private static ExecutorService logThreadPool = Executors.newFixedThreadPool(50);
     private static AccountSettings accSettings;
     private static final LoggerMaker logger = new LoggerMaker(ClientActor.class);
-    
+
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
 
     public static String buildDbAbstractorUrl() {
@@ -75,37 +75,40 @@ public class ClientActor extends DataActor {
         return dbAbsHost + "/api";
     }
 
-    public static int getAccountId() {
-        try {
-            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
-            DecodedJWT jwt = JWT.decode(token);
-            String payload = jwt.getPayload();
-            byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
-            String decodedPayload = new String(decodedBytes);
-            BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
-            int accId = (int) basicDBObject.getInt("accountId");
-            return accId;
-        } catch (Exception e) {
-            return 1000000;
+    private static int parseAccountIdFromAbstractorToken(String token) throws Exception {
+        DecodedJWT jwt = JWT.decode(token);
+        String payload = jwt.getPayload();
+        byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
+        String decodedPayload = new String(decodedBytes);
+        BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
+        return basicDBObject.getInt("accountId");
+    }
+
+    /** Parses {@code accountId} from JWT in env {@code DATABASE_ABSTRACTOR_SERVICE_TOKEN}; {@code null} if unset or invalid. */
+    public static Integer getAbstractorAccountIdFromEnvOrNull() {
+        String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        if (token == null || token.isEmpty()) {
+            return null;
         }
-        
+        try {
+            return parseAccountIdFromAbstractorToken(token);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public static int getAccountId() {
+        Integer id = getAbstractorAccountIdFromEnvOrNull();
+        return id != null ? id : 1000000;
     }
 
     public static boolean checkAccount() {
-        try {
-            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
-            DecodedJWT jwt = JWT.decode(token);
-            String payload = jwt.getPayload();
-            byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
-            String decodedPayload = new String(decodedBytes);
-            BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
-            int accId = (int) basicDBObject.getInt("accountId");
-            System.out.println("checkaccount accountId log " + accId);
-            return accId == 1000000 || accId == 1752722331;
-        } catch (Exception e) {
-            System.out.println("checkaccount error" + e.getStackTrace());
+        Integer accId = getAbstractorAccountIdFromEnvOrNull();
+        if (accId == null) {
+            return false;
         }
-        return false;
+        System.out.println("checkAccount accountId log " + accId);
+        return accId == 1000000 || accId == 1752722331;
     }
 
     public AccountSettings fetchAccountSettings() {

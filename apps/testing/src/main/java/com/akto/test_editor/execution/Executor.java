@@ -29,14 +29,18 @@ import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.type.KeyTypes;
 import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
+import com.akto.jsonrpc.McpToolDescriptionsRegistry;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpJsonRpcModel;
+import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.TestingUtilsSingleton;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
 import com.akto.util.CookieTransformer;
 import com.akto.util.HttpRequestResponseUtils;
+import com.akto.util.JSONUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -496,6 +500,27 @@ public class Executor {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             // FeatureAccess featureAccess = FeatureAccess.fullAccess;
             if (featureAccess.getIsGranted()) {
+
+                if (McpRequestResponseUtils.isMcpRequest(rawApi)) {
+                    McpJsonRpcModel mcpModel = JSONUtils.fromJson(rawApi.getRequest().getBody(), McpJsonRpcModel.class);
+                    if (mcpModel != null && mcpModel.getParams() != null) {
+                        String toolName = mcpModel.getParams().getName();
+                        if (toolName != null && !toolName.isEmpty()) {
+                            String toolDescription = McpToolDescriptionsRegistry.get(toolName);
+                            String operationTypeLower = operationType.toLowerCase();
+                            String operationContext = "Tool: " + toolName  + "\nParam under test: " + key + "\nTest intent: " + value;
+                            if (toolDescription != null && !toolDescription.isEmpty()) {
+                                operationContext += "\nDescription: " + toolDescription;
+                            }
+                            BasicDBObject queryData = new BasicDBObject();
+                            queryData.put(TestExecutorModifier._REQUEST, com.akto.test_editor.Utils.buildRequestIHttpFormat(rawApi));
+                            queryData.put(TestExecutorModifier._TOOL_CONTEXT, operationContext);
+                            queryData.put(TestExecutorModifier._OPERATION, operationTypeLower + ": " + value);
+                            BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
+                            generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
+                        }
+                    }
+                }
 
                 String request = Utils.buildRequestIHttpFormat(rawApi);
 

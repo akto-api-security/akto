@@ -208,6 +208,22 @@ public class GlobalEnums {
 
     /* ********************************************************************** */
 
+    public enum GuardrailSource {
+        GITHUB_WORKFLOW("Github Workflow");
+
+        private final String displayName;
+
+        GuardrailSource(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+    }
+
+    /* ********************************************************************** */
+
     public enum DashboardCategory {
         // FeatureLabel(DashboardCategory)
         API_SECURITY("API Security"),

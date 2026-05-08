@@ -137,9 +137,17 @@ const tableFunc = {
           return {value:final2Data,total:tempData.length, fullDataIds: tempData.map((x) => {return {id: x?.id}})}
         }
 
-        // Optimized filter application - fix the bug where singleFilterData resets to props.data
-        const filterKeys = Object.keys(filters || {});
-        
+        // Drop filter keys that aren't columns on this table (e.g. a `hostName`
+        // filter leaked from a sibling table's URL). Without this, the filter
+        // would never match any item and exclude every row. Server-side tables
+        // are unaffected because they don't go through fetchDataSync.
+        const validHeaderKeys = new Set(
+          (props.headers || []).map(h => h.filterKey || h.value)
+        );
+        const filterKeys = Object.keys(filters || {}).filter(
+          k => validHeaderKeys.has(k) || (k && k.includes('dateRange'))
+        );
+
         if (filterKeys.length > 0) {
           // Apply all filters in a single pass for better performance
           tempData = tempData.filter((item) => {
