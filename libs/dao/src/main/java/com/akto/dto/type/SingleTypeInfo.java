@@ -13,7 +13,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
 import io.swagger.v3.oas.models.media.*;
-import lombok.Setter;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
@@ -44,6 +43,13 @@ public class SingleTypeInfo {
         } else {
             return new HashMap<>();
         }
+    }
+
+        public static boolean isCustomDataTypeAvailable(int accountId){
+        if(accountToDataTypesInfo.containsKey(accountId)){
+            return !accountToDataTypesInfo.get(accountId).getRedactedDataTypes().isEmpty();
+        }
+        return false;
     }
 
     public static List<CustomAuthType> getCustomAuthType (int accountId) {
@@ -161,12 +167,16 @@ public class SingleTypeInfo {
         Map<String, CustomDataType> newMap = new HashMap<>();
         List<CustomDataType> sensitiveCustomDataType = new ArrayList<>();
         List<CustomDataType> nonSensitiveCustomDataType = new ArrayList<>();
+        Set<String> redactedDataTypes = new HashSet<>();
         for (CustomDataType customDataType: customDataTypes) {
             newMap.put(customDataType.getName(), customDataType);
             if (customDataType.isSensitiveAlways() || customDataType.getSensitivePosition().size()>0) {
                 sensitiveCustomDataType.add(customDataType);
             } else {
                 nonSensitiveCustomDataType.add(customDataType);
+            }
+            if (customDataType.isRedacted()) {
+                redactedDataTypes.add(customDataType.getName());
             }
         }
 
@@ -186,6 +196,7 @@ public class SingleTypeInfo {
             }
         }
         info.setAktoDataTypeMap(newAktoMap);
+        info.setRedactedDataTypes(redactedDataTypes);
     }
 
     public static boolean isRedacted(String dataTypeName){
@@ -235,6 +246,8 @@ public class SingleTypeInfo {
     public static SubType SSN = new SubType("SSN", true, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
     public static SubType CREDIT_CARD = new SubType("CREDIT_CARD", true, SuperType.STRING, StringSchema.class,
+            Collections.emptyList());
+    public static SubType VIN = new SubType("VIN", true, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
     public static SubType PHONE_NUMBER = new SubType("PHONE_NUMBER", true, SuperType.STRING, StringSchema.class,
             Collections.emptyList());
@@ -596,6 +609,7 @@ public class SingleTypeInfo {
         subTypeMap.put("ADDRESS", ADDRESS);
         subTypeMap.put("SSN", SSN);
         subTypeMap.put("CREDIT_CARD", CREDIT_CARD);
+        subTypeMap.put("VIN", VIN);
         subTypeMap.put("PHONE_NUMBER", PHONE_NUMBER);
         subTypeMap.put("UUID", UUID);
         subTypeMap.put("GENERIC", GENERIC);

@@ -35,12 +35,12 @@ const SettingsLeftNav = () => {
             selected: page === "logs",
             onClick: () => navigate("/dashboard/settings/logs")
         }] : []
-    const metricsArr = [{
+    const metricsArr = window.DASHBOARD_MODE !== 'ON_PREM' ? [{
         label: 'Metrics',
         icon: ReportFilledMinor,
         selected: page === "metrics",
         onClick: () => navigate("/dashboard/settings/metrics")
-    }]
+    }] : []
     const selfHostedArr = window.IS_SAAS === 'true' ? [{
         label: 'Self hosted',
         icon: PlanMajor,
@@ -128,12 +128,6 @@ const SettingsLeftNav = () => {
                         selected: page === "advanced-filters",
                         onClick: () => navigate("/dashboard/settings/advanced-filters")
                     }, 
-                    {
-                        label: 'Tags',
-                        icon: CollectionsFilledMajor,
-                        selected: page === "tags",
-                        onClick: () => navigate("/dashboard/settings/tags")
-                    },
                     {
                         label: 'Test library',
                         icon: VocabularyMajor,

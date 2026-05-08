@@ -6,11 +6,11 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import settingRequests from '../api'
 import { DeleteMajor, FileFilledMinor } from "@shopify/polaris-icons"
 import TooltipText from "../../../components/shared/TooltipText"
-import { isIP } from "is-ip"
-import isCidr from "is-cidr"
 import func from "@/util/func"
 import TextFieldWithInfo from '../../../components/shared/TextFieldWithInfo'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
+import { handleIpsChange } from '../../../components/shared/ipUtils'
+import UpdateIpsComponent from '../../../components/shared/UpdateIpsComponent'
 
 function About() {
 
@@ -52,8 +52,11 @@ function About() {
     const [miniTesting, setMiniTesting] = useState(false)
     const [mergingOnVersions, setMergingOnVersions] = useState(false)
     const [retrospective, setRetrospective] = useState(false)
-
-    const [pdf, setPdf] = useState("")
+    const [compulsoryDescription, setCompulsoryDescription] = useState({
+        falsePositive: false,
+        noTimeToFix: false,
+        acceptableFix: false
+    })
 
     const setupOptions = settingFunctions.getSetupOptions()
 
@@ -72,7 +75,7 @@ function About() {
         setNewMerging(resp.urlRegexMatchingEnabled)
         setTrafficThreshold(resp.trafficAlertThresholdSeconds)
         setObjectArr(arr)
-        setEnableTelemetry(resp.telemetrySettings.customerEnabled)
+        setEnableTelemetry(resp.telemetrySettings?.customerEnabled || false)
         if (resp.filterHeaderValueMap)
             setTrafficFiltersMap(resp.filterHeaderValueMap)
 
@@ -84,6 +87,9 @@ function About() {
         setSelectedUrlsList(resp.allowRedundantEndpointsList || [])
         setToggleCaseSensitiveApis(resp.handleApisCaseInsensitive || false)
         setMergingOnVersions(resp.allowMergingOnVersions || false)
+        if(resp?.compulsoryDescription && Object.keys(resp?.compulsoryDescription).length > 0) {
+            setCompulsoryDescription(resp.compulsoryDescription)
+        }
     }
 
     useEffect(()=>{
@@ -249,31 +255,13 @@ function About() {
     }
 
     
-    const handleIpsChange = async(ip, isAdded, type) => {
-        let ipList = ip.split(",")
-        ipList = ipList.map((x) => x.replace(/\s+/g, '') )
+    const handleCidrIpsChange = async(ip, isAdded, type) => {
         if(type === 'cidr'){
-            let updatedIps = []
-            if(isAdded){
-                updatedIps = [...privateCidrList, ...ipList]
-                
-            }else{
-                updatedIps = privateCidrList.filter(item => item !== ip);
-            }
-            updatedIps = Array.from(new Set(updatedIps))
-            setPrivateCidrList(updatedIps)
+            const updatedIps = handleIpsChange(ip, isAdded, privateCidrList, setPrivateCidrList);
             await settingRequests.configPrivateCidr(updatedIps)
             func.setToast(true, false, "Updated private CIDR ranges")
         }else{
-            let updatedIps = []
-            if(isAdded){
-                updatedIps = [...partnerIpsList, ...ipList]
-                
-            }else{
-                updatedIps = partnerIpsList.filter(item => item !== ip);
-            }
-            updatedIps = Array.from(new Set(updatedIps))
-            setPartnerIpsList(updatedIps)
+            const updatedIps = handleIpsChange(ip, isAdded, partnerIpsList, setPartnerIpsList);
             await settingRequests.configPartnerIps(updatedIps)
             func.setToast(true, false, "Updated partner IPs list")
         }
@@ -394,6 +382,48 @@ function About() {
             func.setToast(true, true, "Something went wrong. Please try again.")
         })
     }
+
+    const handleCompulsoryToggle = async (key, checked) => {
+        const updated = { ...compulsoryDescription, [key]: checked };
+        setCompulsoryDescription(updated);
+        try {
+            await settingRequests.updateCompulsoryDescription(updated);
+            func.setToast(true, false, "Compulsory description settings updated successfully.");
+            // Re-fetch to ensure UI is fully in sync
+            await fetchDetails();
+        } catch (error) {
+            func.setToast(true, true, "Failed to update compulsory description settings.");
+        }
+    }
+
+    const compulsoryDescriptionComponent = (
+        <VerticalStack gap={4}>
+            <Text variant="headingSm">Compulsory Description Settings</Text>
+            <Text variant="bodyMd" color="subdued">
+                Configure which issue status changes require mandatory descriptions to be provided.
+            </Text>
+            <VerticalStack gap={3}>
+                <Checkbox
+                    label="False Positive - Require description when marking issues as false positive"
+                    checked={compulsoryDescription.falsePositive}
+                    onChange={(checked) => handleCompulsoryToggle('falsePositive', checked)}
+                    disabled={window.USER_ROLE !== 'ADMIN'}
+                />
+                <Checkbox
+                    label="No Time To Fix - Require description when marking issues as no time to fix"
+                    checked={compulsoryDescription.noTimeToFix}
+                    onChange={(checked) => handleCompulsoryToggle('noTimeToFix', checked)}
+                    disabled={window.USER_ROLE !== 'ADMIN'}
+                />
+                <Checkbox
+                    label="Acceptable Risk - Require description when marking issues as acceptable risk"
+                    checked={compulsoryDescription.acceptableFix}
+                    onChange={(checked) => handleCompulsoryToggle('acceptableFix', checked)}
+                    disabled={window.USER_ROLE !== 'ADMIN'}
+                />
+            </VerticalStack>
+        </VerticalStack>
+    )
 
     const redundantUrlComp = (
         <VerticalStack gap={"4"}>
@@ -574,6 +604,7 @@ function About() {
                                   <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
                                   {redundantUrlComp}
+                                  {compulsoryDescriptionComponent}
                                   <VerticalStack gap={1}>
                                       <Text color="subdued">Traffic alert threshold</Text>
                                       <Box width='120px'>
@@ -595,6 +626,7 @@ function About() {
                   </LegacyCard.Section>
                   :<LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
                     {redundantUrlComp}
+                    {compulsoryDescriptionComponent}
                   </LegacyCard.Section>
               }
             <LegacyCard.Section subdued>
@@ -603,63 +635,6 @@ function About() {
         </LegacyCard>
     )
 
-    function UpdateIpsComponent({onSubmit, title, labelText, description, ipsList, onRemove, type, onApply}){
-        const [value, setValue] = useState('')
-        const onFormSubmit = (ip) => {
-            if(checkError(ip, type)){
-                func.setToast(true, true, "Invalid ip address")
-            }else{
-                setValue('')
-                onSubmit(ip)
-            }
-        }
-
-        const checkError = (localVal, localType) => {
-            localVal = localVal.replace(/\s+/g, '')
-            if (localVal.length === 0) return false
-            const values = localVal.split(",")
-            let valid = true;
-            for (let v of values) {
-                if(v.length === 0){
-                    return true
-                }
-                if(localType=== "cidr"){
-                    valid = valid && (isCidr(v) !== 0)
-                }else{
-                    valid = valid && (isIP(v))
-                }
-            }
-
-            return !valid
-        }
-
-        const isError = checkError(value, type)
-        return(
-            <LegacyCard title={<TitleComponent title={title} description={description} />}
-                actions={[
-                    { content: 'Apply', onAction: onApply }
-                ]}
-            >
-                <Divider />
-                <LegacyCard.Section>
-                    <VerticalStack gap={"2"}>
-                        <Form onSubmit={() => onFormSubmit(value)}>
-                            <TextField onChange={setValue} value={value} label={<Text color="subdued" fontWeight="medium" variant="bodySm">{labelText}</Text>} {...isError ? {error: "Invalid address"} : {}}/>
-                        </Form>
-                        <HorizontalStack gap={"2"}>
-                            {ipsList && ipsList.length > 0 && ipsList.map((ip, index) => {
-                                return(
-                                    <Tag key={index} onRemove={() => onRemove(ip)}>
-                                        <Text>{ip}</Text>
-                                    </Tag>
-                                )
-                            })}
-                        </HorizontalStack>
-                    </VerticalStack>
-                </LegacyCard.Section>
-            </LegacyCard>
-        )
-    }
 
     const components = [accountInfoComponent, 
                         !func.checkLocal() ? <UpdateIpsComponent 
@@ -668,8 +643,8 @@ function About() {
                             title={"Private CIDRs list"}
                             labelText="Add CIDR"
                             ipsList={privateCidrList}
-                            onSubmit={(val) => handleIpsChange(val,true,"cidr")}
-                            onRemove={(val) => handleIpsChange(val, false, "cidr")}
+                            onSubmit={(val) => handleCidrIpsChange(val,true,"cidr")}
+                            onRemove={(val) => handleCidrIpsChange(val, false, "cidr")}
                             onApply={() => applyIps()}
                             type={"cidr"}
                         /> : null,
@@ -679,12 +654,13 @@ function About() {
                             title={"Third parties IPs list"}
                             labelText="Add IP"
                             ipsList={partnerIpsList}
-                            onSubmit={(val) => handleIpsChange(val,true,"partner")}
-                            onRemove={(val) => handleIpsChange(val, false, "partner")}
+                            onSubmit={(val) => handleCidrIpsChange(val,true,"partner")}
+                            onRemove={(val) => handleCidrIpsChange(val, false, "partner")}
                             onApply={() => applyIps()}
                             type={"partner"}
                         /> : null,
                         <Modal
+                            key="merging-on-versions-modal"
                             open={modalOpen}
                             onClose={() => setModalOpen(false)}
                             title={mergingOnVersions ? "Do not merge on versions" : "Allow merging on versions"}

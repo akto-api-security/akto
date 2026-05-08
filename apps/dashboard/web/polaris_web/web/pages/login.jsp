@@ -52,6 +52,7 @@
                     window.ACCOUNTS = JSON.parse('${requestScope.accounts}' || '{}');
                     window.ACTIVE_ACCOUNT = +'${requestScope.activeAccount}';
                     window.DASHBOARD_MODE = '${requestScope.dashboardMode}';
+                    window.DASHBOARD_CATEGORY = '${requestScope.dashboardCategory}';
                     window.ACCESS_TOKEN = '${accessToken}';
                     window.SIGNUP_INVITATION_CODE = '${signupInvitationCode}'
                     window.SIGNUP_EMAIL_ID = '${signupEmailId}'
@@ -82,15 +83,16 @@
 
                 </script>
                 <script>
-                    var beamer_config = {
-                        product_id : 'TEEsyHNL42222', //DO NOT CHANGE: This is your product code on Beamer
+                   var beamer_config = {
+                        product_id: 'cJtNevEq80216',
+                        filter: 'filterTag',
                         selector: '#beamer-btn',
                         top: 0,
                         left: 0,
                         lazy: true
                     };
                 </script>
-                <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>                
+                <script type="text/javascript" src="https://app.getbeamer.com/js/beamer-embed.js" defer="defer"></script>
                 <div id="root"></div>
                 <script src="/dist/main.js"></script>
             </body>

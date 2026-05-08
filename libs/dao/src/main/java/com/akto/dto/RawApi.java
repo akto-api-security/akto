@@ -10,6 +10,9 @@ import com.mongodb.BasicDBList;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 
+import lombok.Getter;
+import lombok.Setter;
+
 
 public class RawApi {
 
@@ -17,6 +20,10 @@ public class RawApi {
     private OriginalHttpResponse response;
     private RawApiMetadata metadata;
     private String originalMessage;
+
+    @Getter
+    @Setter
+    private List<String> conversationsList;
 
     static ObjectMapper om = new ObjectMapper();
 

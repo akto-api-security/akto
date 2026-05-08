@@ -50,4 +50,25 @@ export default {
             data: { apiCollectionIds, currentIsOutOfTestingScopeVal }
         })
     },
+    fetchAllDastScans(){
+        return request({
+            url: '/api/fetchAllDastScans',
+            method: 'post',
+            data: {}
+        })
+    },
+    fetchDastScan(crawlId){
+        return request({
+            url: '/api/fetchDastScan',
+            method: 'post',
+            data: { crawlId }
+        })
+    },
+    findMissingUrls(missingUrls){
+        return request({
+            url: '/api/findMissingUrls',
+            method: 'post',
+            data: { missingUrls }
+        })
+    },
 }

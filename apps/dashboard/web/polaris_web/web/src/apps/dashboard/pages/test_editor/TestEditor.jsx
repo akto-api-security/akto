@@ -20,6 +20,7 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import LocalStore from "../../../main/LocalStorageStore"
 import func from "../../../../util/func"
 import transform from "../testing/transform"
+import { getDashboardCategory, mapLabel } from "../../../main/labelHelper"
 
 const TestEditor = () => {
     const navigate = useNavigate()
@@ -32,7 +33,7 @@ const TestEditor = () => {
     const setSubCategoryMap = LocalStore(state => state.setSubCategoryMap)
 
     const [loading, setLoading] = useState(true)
-
+    const [testsLoaded, setTestsLoaded] = useState(0)
 
     const handleExit = () => {
         navigate("/dashboard/test-library/tests")
@@ -59,7 +60,7 @@ const TestEditor = () => {
     }
 
     const fetchSubcategories = async () => {
-        const metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
+        const metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor", setTestsLoaded)
         return metaDataObj.subCategories
     }
 
@@ -121,7 +122,7 @@ const TestEditor = () => {
             <HorizontalStack gap="5">
                 <Button onClick={handleExit} icon={ExitMajor} plain/>
                 <HorizontalStack gap={"2"}>
-                    <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} />
+                    <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={mapLabel("Test Editor", getDashboardCategory())} />
                 </HorizontalStack>
             </HorizontalStack>
 
@@ -150,7 +151,7 @@ const TestEditor = () => {
 
     return (
         loading ?
-            <SpinnerCentered />
+            <SpinnerCentered height="100vh" text={`Loading tests... ${testsLoaded} tests loaded`}/>
         : 
         <Frame topBar={
             headerEditor

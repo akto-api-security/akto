@@ -50,6 +50,8 @@ public abstract class DataActor {
 
     public abstract List<ApiInfo> fetchApiInfos();
 
+    public abstract List<ApiInfo> fetchApiRateLimits(ApiInfo.ApiInfoKey lastApiInfoKey);
+
     public abstract List<ApiInfo> fetchNonTrafficApiInfos();
 
     public abstract void bulkWriteApiInfo(List<ApiInfo> apiInfoList);
@@ -102,4 +104,7 @@ public abstract class DataActor {
     public abstract String fetchOpenApiSchema(int apiCollectionId);
 
     public abstract void insertDataIngestionLog(Log log);
+
+    public abstract List<ApiCollection> fetchAllApiCollections();
+
 }

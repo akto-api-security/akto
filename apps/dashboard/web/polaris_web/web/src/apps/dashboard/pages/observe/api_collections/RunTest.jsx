@@ -1,5 +1,5 @@
 import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner, HorizontalStack, Link, VerticalStack, Tooltip, Popover, OptionList, ButtonGroup } from "@shopify/polaris";
-import { TickMinor, CancelMajor, SearchMinor, NoteMinor, AppsFilledMajor } from "@shopify/polaris-icons";
+import { TickMinor, CancelMajor, SearchMinor, NoteMinor, AppsFilledMajor, MagicMajor } from "@shopify/polaris-icons";
 import api, { default as observeApi } from "../api";
 import { useEffect, useReducer, useRef, useState } from "react";
 import { default as testingApi } from "../../testing/api";
@@ -10,12 +10,14 @@ import PersistStore from "../../../../main/PersistStore";
 import transform from "../../testing/transform";
 import LocalStore from "../../../../main/LocalStorageStore";
 import AdvancedSettingsComponent from "./component/AdvancedSettingsComponent";
+import { mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 
 import { produce } from "immer"
 import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 import {createTestName,convertToLowerCaseWithUnderscores} from "./Utils"
 import settingsApi from "../../settings/api";
+import {getCategoriesBasedOnDashboardCategory, filterSubCategoriesBasedOnCategories } from "../../test_editor/tests_table/categoryUtil";
 
 const initialAutoTicketingDetails = {
     shouldCreateTickets: false,
@@ -49,6 +51,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         sendSlackAlert: false,
         sendMsTeamsAlert: false,
         cleanUpTestingResources: false,
+        doNotMarkIssuesAsFixed: false,
         autoTicketingDetails: initialAutoTicketingDetails,
         miniTestingServiceName: "",
         slackChannel: ""
@@ -90,6 +93,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
 
     const localCategoryMap = LocalStore.getState().categoryMap
+    const dashboardCategory = getDashboardCategory();
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
     const [testMode, setTestMode] = useState(true)
     const [shouldRuntestConfig, setShouldRuntestConfig] = useState(false)
@@ -100,6 +104,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const [testNameSuiteModal, setTestNameSuiteModal] = useState("")
     const [jiraProjectMap, setJiraProjectMap] = useState(null);
+    const isAgenticCategory = getDashboardCategory() !== 'API Security'
+    const [agenticMode, setAgenticMode] = useState(false)
 
     useEffect(() => {
         if (preActivator) {
@@ -156,7 +162,13 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         } else {
             metaDataObj = await transform.getAllSubcategoriesData(true, "runTests")
         }
+        if (func.isDemoAccount()) {
+            let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, localCategoryMap);
+            metaDataObj.subCategories = filterSubCategoriesBasedOnCategories(metaDataObj.subCategories, categoriesName);
+        }
         let categories = metaDataObj.categories
+        categories = func.sortByCategoryPriority(categories, 'name')
+        const categoriesNames = categories.map(category => category.name)
         let businessLogicSubcategories = metaDataObj.subCategories.filter((subCategory) => {return !subCategory.inactive})
         const testRolesResponse = await testingApi.fetchTestRoles()
         var testRoles = testRolesResponse.testRoles.map(testRole => {
@@ -177,20 +189,27 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         Object.keys(processMapCategoryToSubcategory).map(category => {
-            const selectedTests = []
+            if(categoriesNames.includes(category)){
+                const selectedTests = []
 
-            mapCategoryToSubcategory[category]["selected"].map(test => selectedTests.push(test.value))
-            processMapCategoryToSubcategory[category].forEach((test, index, arr) => {
-                arr[index]["selected"] = selectedTests.includes(test.value)
-            })
+                mapCategoryToSubcategory[category]["selected"].map(test => selectedTests.push(test.value))
+                processMapCategoryToSubcategory[category].forEach((test, index, arr) => {
+                    arr[index]["selected"] = selectedTests.includes(test.value)
+                })
+            }else{
+                delete processMapCategoryToSubcategory[category];
+            }
+            
         })
         const testName = createTestName(apiCollectionName, processMapCategoryToSubcategory);
+        // determine selectedCategory based on the same priority ordering
+        const sortedCategoryKeys = func.sortByCategoryPriority(Object.keys(processMapCategoryToSubcategory))
         //Auth Mechanism
         let authMechanismPresent = false
         const authMechanismDataResponse = await testingApi.fetchAuthMechanismData()
         if (authMechanismDataResponse.authMechanism)
             authMechanismPresent = true
-        testingApi.fetchMiniTestingServiceNames().then(({miniTestingServiceNames}) => {
+            testingApi.fetchMiniTestingServiceNames().then(({miniTestingServiceNames}) => {
             const miniTestingServiceNamesOptions = (miniTestingServiceNames || []).map(name => {
                 return {
                     label: name,
@@ -205,7 +224,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 ...prev,
                 categories: categories,
                 tests: processMapCategoryToSubcategory,
-                selectedCategory: Object.keys(processMapCategoryToSubcategory).length > 0 ? Object.keys(processMapCategoryToSubcategory)[0] : "",
+                selectedCategory: sortedCategoryKeys.length > 0 ? sortedCategoryKeys[0] : "",
                 testName: testName,
                 authMechanismPresent: authMechanismPresent
             };
@@ -330,7 +349,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled || testRun.selectedCategory.length === 0} ><div data-testid="run_test_button">Run test</div></Button>
+            <Button onClick={toggleRunTest} primary disabled={disabled || testRun.selectedCategory.length === 0} ><div data-testid="run_test_button">{mapLabel('Run test', getDashboardCategory())}</div></Button>
         </div>
     );
 
@@ -547,7 +566,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceName, slackChannel } = testRun
+        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceName, slackChannel, doNotMarkIssuesAsFixed } = testRun
         let {testName} = testRun;
         const autoTicketingDetails = jiraProjectMap ? testRun.autoTicketingDetails : null;
         const collectionId = parseInt(apiCollectionId)
@@ -595,9 +614,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value) ,autoTicketingDetails)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value) ,autoTicketingDetails, doNotMarkIssuesAsFixed)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed)
         }
 
         setActive(false)
@@ -702,6 +721,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const handleButtonClick = (check) => {
         setTestMode(check);
+        setAgenticMode(false);
     }
 
     // only for configurations
@@ -784,10 +804,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 activator={runTestRef}
                 open={active || activeFromTesting}
                 onClose={toggleRunTest}
-                title={<HorizontalStack gap={4}><Text as="h2" fontWeight="semibold">Configure test</Text>
+                title={<HorizontalStack gap={4}><Text as="h2" fontWeight="semibold">{ "Configure " + mapLabel("test", getDashboardCategory())}</Text>
                     <ButtonGroup segmented>
-                        <Button monochrome pressed={testMode} icon={NoteMinor} onClick={() => handleButtonClick(true)}></Button>
-                        <Button monochrome pressed={!testMode} icon={AppsFilledMajor} onClick={() => handleButtonClick(false)}></Button>
+                        <Button monochrome pressed={testMode && !agenticMode} icon={NoteMinor} onClick={() => handleButtonClick(true)}></Button>
+                        <Button monochrome pressed={!testMode && !agenticMode} icon={AppsFilledMajor} onClick={() => handleButtonClick(false)}></Button>
+                        {isAgenticCategory && <Button monochrome pressed={agenticMode} icon={MagicMajor} onClick={() => {setAgenticMode(true); setTestMode(false)}}></Button>}
                     </ButtonGroup>
                 </HorizontalStack>}
                 primaryAction={{
@@ -797,7 +818,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 }}
                 secondaryActions={[
                     countAllSelectedTests() && testMode ? {
-                        content: `${countAllSelectedTests()} tests selected` ,
+                        content: `${countAllSelectedTests()} ${mapLabel("tests selected", getDashboardCategory())}` ,
                         disabled: true,
                         plain: true,
                     } : null,
@@ -810,7 +831,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
                 large
 
-                footer={testMode ? null : openConfigurations ? <Button onClick={() => openConfigurationsToggle(false)} plain><Text as="p" fontWeight="regular">Go back to test selection</Text></Button> : <Button onClick={() => openConfigurationsToggle(true)} plain><Text as="p" fontWeight="regular">Change Configurations</Text></Button>}
+                footer={testMode || agenticMode ? null : openConfigurations ? <Button onClick={() => openConfigurationsToggle(false)} plain><Text as="p" fontWeight="regular">Go back to test selection</Text></Button> : <Button onClick={() => openConfigurationsToggle(true)} plain><Text as="p" fontWeight="regular">Change Configurations</Text></Button>}
             >
                 {loading ? <SpinnerCentered /> :
                     testMode ?
@@ -932,7 +953,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </VerticalStack>
                             <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
 
-                        </Modal.Section> : <Modal.Section>
+                        </Modal.Section> : 
+                        !agenticMode ? <Modal.Section>
                             {!openConfigurations ? <RunTestSuites
                                 testRun={testRun}
                                 setTestRun={setTestRun}
@@ -949,6 +971,23 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                                 </>
                             }
+                        </Modal.Section>
+                        : <Modal.Section>
+                            <VerticalStack gap={"3"}>
+                                <HorizontalStack gap={"3"} align="start" wrap={false}>
+                                    <Text variant="headingMd">Name:</Text>
+                                    <div style={{ width: "60%" }}>
+                                        <TextField
+                                            placeholder="Enter test name"
+                                            value={testRun.testName}
+                                            disabled={activeFromTesting}
+                                            onChange={(testName) => setTestRun(prev => ({ ...prev, testName: testName }))}
+                                        />
+                                    </div>
+                                </HorizontalStack>
+                                {RunTestConfigurationComponent}
+                                <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
+                            </VerticalStack>
                         </Modal.Section>
                 }
             </Modal>

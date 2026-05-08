@@ -50,16 +50,16 @@ public class GlobalEnums {
         INJECT("INJECT", Severity.MEDIUM, "Injection Attacks (INJECT)", "Injection Attacks"),
         INPUT("INPUT", Severity.MEDIUM, "Input Validation (INPUT)", "Input Validation"),
         LLM("LLM",Severity.HIGH,"LLM (Large Language Models) Top 10","LLM"),
-        LLM01("LLM01", Severity.HIGH, "LLM01 - Prompt Injection", "LLM01"),
-        LLM02("LLM02", Severity.HIGH, "LLM02 - Sensitive Information Disclosure", "LLM02"),
-        LLM03("LLM03", Severity.HIGH, "LLM03 - Supply Chain", "LLM03"),
-        LLM04("LLM04", Severity.HIGH, "LLM04 - Data and Model Poisoning", "LLM04"),
-        LLM05("LLM05", Severity.HIGH, "LLM05 - Improper Output Handling", "LLM05"),
-        LLM06("LLM06", Severity.HIGH, "LLM06 - Excessive Agency", "LLM06"),
-        LLM07("LLM07", Severity.HIGH, "LLM07 - System Prompt Leakage", "LLM07"),
-        LLM08("LLM08", Severity.HIGH, "LLM08 - Vector and Embedding Weaknesses", "LLM08"),
-        LLM09("LLM09", Severity.HIGH, "LLM09 - Misinformation", "LLM09"),
-        LLM10("LLM10", Severity.HIGH, "LLM10 - Unbounded Consumption", "LLM10"),
+        PROMPT_INJECTION("PROMPT_INJECTION", Severity.HIGH, "Prompt Injection", "PromptInjection"),
+        SENSITIVE_INFORMATION_DISCLOSURE("SENSITIVE_INFORMATION_DISCLOSURE", Severity.HIGH, "Sensitive Information Disclosure", "SensitiveInformationDisclosure"),
+        SUPPLY_CHAIN("SUPPLY_CHAIN", Severity.HIGH, "Supply Chain", "SupplyChain"),
+        DATA_AND_MODEL_POISONING("DATA_AND_MODEL_POISONING", Severity.HIGH, "DataAndModelPoisoning", "DataAndModelPoisoning"),
+        IMPROPER_OUTPUT_HANDLING("IMPROPER_OUTPUT_HANDLING", Severity.HIGH, "ImproperOutputHandling", "ImproperOutputHandling"),
+        EXCESSIVE_AGENCY("EXCESSIVE_AGENCY", Severity.HIGH, "Excessive Agency", "ExcessiveAgency"),
+        SYSTEM_PROMPT_LEAKAGE("SYSTEM_PROMPT_LEAKAGE", Severity.HIGH, "System Prompt Leakage", "SystemPromptLeakage"),
+        VECTOR_AND_EMBEDDING_WEAKNESSES("VECTOR_AND_EMBEDDING_WEAKNESSES", Severity.HIGH, "Vector and Embedding Weaknesses", "VectorAndEmbeddingWeaknesses"),
+        MISINFORMATION("MISINFORMATION", Severity.HIGH, "Misinformation", "Misinformation"),
+        UNBOUNDED_CONSUMPTION("UNBOUNDED_CONSUMPTION", Severity.HIGH, "Unbounded Consumption", "UnboundedConsumption"),
         MCP_PROMPT_INJECTION("MCP_PROMPT_INJECTION", Severity.HIGH, "MCP - Prompt Injection", "MCP_PROMPT_INJECTION"),
         MCP_TOOL_POISONING("MCP_TOOL_POISONING", Severity.HIGH, "MCP - Tool Poisoning", "MCP_TOOL_POISONING"),
         MCP_PRIVILEGE_ABUSE("MCP_PRIVILEGE_ABUSE", Severity.HIGH, "MCP - Privilege Abuse", "MCP_PRIVILEGE_ABUSE"),
@@ -69,7 +69,13 @@ public class GlobalEnums {
         MCP_AUTH("MCP_AUTH", Severity.HIGH, "MCP - Broken Authentication", "MCP_AUTH"),
         MCP_MALICIOUS_CODE_EXECUTION("MCP_MALICIOUS_CODE_EXECUTION", Severity.HIGH, "MCP - Malicious Code Execution", "MCP_MALICIOUS_CODE_EXECUTION"),
         MCP("MCP", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP"),
-        MCP_INPUT_VALIDATION("MCP_INPUT_VALIDATION", Severity.HIGH, "MCP - Input Validation", "MCP_INPUT_VALIDATION");
+        MCP_INPUT_VALIDATION("MCP_INPUT_VALIDATION", Severity.HIGH, "MCP - Input Validation", "MCP_INPUT_VALIDATION"),
+        MCP_FUNCTION_MANIPULATION("MCP_FUNCTION_MANIPULATION", Severity.CRITICAL, "Model Context Protocol (MCP) Security - Function Call Manipulation", "MCP_FUNC_MANIP"),
+        MCP_SECURITY("MCP_SECURITY", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP_SEC"),
+        AGENTIC_BUSINESS_ALIGNMENT("AGENTIC_BUSINESS_ALIGNMENT", Severity.HIGH, "Agent Business Alignment", "AGENTIC_BUSINESS_ALIGNMENT"),
+        AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS("AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS", Severity.HIGH, "Agent Hallucination and Trustworthiness", "AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS"),
+        AGENTIC_SAFETY("AGENTIC_SAFETY", Severity.HIGH, "Agent Safety", "AGENTIC_SAFETY"),
+        AGENTIC_SECURITY("AGENTIC_SECURITY", Severity.HIGH, "Agent Security", "AGENTIC_SECURITY");
 
         private final String name;
         private final Severity severity;
@@ -150,11 +156,11 @@ public class GlobalEnums {
     }
 
     public enum TicketSource {
-        JIRA, AZURE_BOARDS
+        JIRA, AZURE_BOARDS, SERVICENOW, DEVREV
     }
 
     public enum CONTEXT_SOURCE {
-        API, MCP, GEN_AI
+        API, MCP, GEN_AI, AGENTIC, DAST
     }
 
     /* ********************************************************************** */

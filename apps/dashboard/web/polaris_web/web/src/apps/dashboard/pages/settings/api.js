@@ -606,6 +606,70 @@ const settingRequests = {
             data: {}
         })
     },
+
+    fetchServiceNowIntegration() {
+        return request({
+            url: '/api/fetchServiceNowIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchServiceNowTables(instanceUrl, clientId, clientSecret) {
+        return request({
+            url: '/api/fetchServiceNowTables',
+            method: 'post',
+            data: {instanceUrl, clientId, clientSecret}
+        })
+    },
+
+    addServiceNowIntegration(instanceUrl, clientId, clientSecret, tableNames) {
+        return request({
+            url: '/api/addServiceNowIntegration',
+            method: 'post',
+            data: {instanceUrl, clientId, clientSecret, tableNames}
+        })
+    },
+
+    removeServiceNowIntegration() {
+        return request({
+            url: '/api/removeServiceNowIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchDevRevIntegration() {
+        return request({
+            url: '/api/fetchDevRevIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchDevRevParts(personalAccessToken) {
+        return request({
+            url: '/api/fetchDevRevParts',
+            method: 'post',
+            data: { personalAccessToken }
+        })
+    },
+
+    addDevRevIntegration(orgUrl, personalAccessToken, partsIdToNameMap) {
+        return request({
+            url: '/api/addDevRevIntegration',
+            method: 'post',
+            data: { orgUrl, personalAccessToken, partsIdToNameMap }
+        })
+    },
+
+    removeDevRevIntegration() {
+        return request({
+            url: '/api/removeDevRevIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     removeInvitation(email) {
         return request({
             url: '/api/removeInvitation',
@@ -613,11 +677,18 @@ const settingRequests = {
             data: {email}
         })
     },
-    async fetchModuleInfo() {
+    async fetchModuleInfo(filter = {}) {
         return await request({
             url: '/api/fetchModuleInfo',
             method: 'post',
-            data: {}
+            data: { filter }
+        })
+    },
+    async deleteModuleInfo(moduleIds) {
+        return await request({
+            url: '/api/deleteModuleInfo',
+            method: 'post',
+            data: { moduleIds }
         })
     },
     async fetchCloudflareWafIntegration() {
@@ -681,6 +752,43 @@ const settingRequests = {
             url: '/api/deleteDuplicateEntries',
             method: 'post',
             data: {}
+        })
+    },
+    updateCompulsoryDescription(compulsoryDescription) {
+        return request({
+            url: '/api/updateCompulsoryDescription',
+            method: 'post',
+            data: {
+                compulsoryDescription
+            }
+        })
+    },
+    getMcpServersByAgent(agentId, deviceId) {
+        return request({
+            url: '/api/getMcpServersByAgent',
+            method: 'post',
+            data: {
+                agentId,
+                deviceId
+            }
+        })
+    },
+    getAgentLogs(agentId, startTime, endTime) {
+        return request({
+            url: '/api/getAgentLogs',
+            method: 'post',
+            data: {
+                agentId,
+                startTime,
+                endTime
+            }
+        })
+    },
+    addMcpRegistryIntegration(registries) {
+        return request({
+            url: '/api/addMcpRegistryIntegration',
+            method: 'post',
+            data: {registries}
         })
     }
 }

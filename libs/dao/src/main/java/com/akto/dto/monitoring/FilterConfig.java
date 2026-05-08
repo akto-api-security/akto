@@ -14,6 +14,8 @@ public class FilterConfig {
     public static final String ID = "id";
     private ConfigParserResult filter;
     public static final String FILTER = "filter";
+    private ConfigParserResult ignore;
+    public static final String IGNORE = "ignore";
     private Map<String, List<String>> wordLists;
     public static final String WORD_LISTS = "wordLists";
     public static final String CREATED_AT = "createdAt";
@@ -134,5 +136,13 @@ public class FilterConfig {
 
     public void setInfo(Info info) {
         this.info = info;
+    }
+
+    public ConfigParserResult getIgnore() {
+        return ignore;
+    }
+
+    public void setIgnore(ConfigParserResult ignore) {
+        this.ignore = ignore;
     }
 }

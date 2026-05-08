@@ -311,14 +311,13 @@ public class HttpCallParser {
     }
 
     public static boolean useHostCondition(String hostName, HttpResponseParams.Source source) {
-        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING);
         boolean hostNameCondition;
         if (hostName == null) {
             hostNameCondition = false;
         } else {
             hostNameCondition = ! ( hostName.toLowerCase().equals(hostName.toUpperCase()) );
         }
-        return whiteListSource.contains(source) &&  hostNameCondition && ApiCollection.useHost;
+        return hostNameCondition && ApiCollection.useHost;
     }
 
     public static int getBucketStartEpoch() {
@@ -365,8 +364,9 @@ public class HttpCallParser {
         }
 
         int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
+        boolean useHostConditionResult = useHostCondition(hostName, httpResponseParam.getSource());
 
-        if (useHostCondition(hostName, httpResponseParam.getSource())) {
+        if (useHostConditionResult) {
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
 
@@ -399,6 +399,7 @@ public class HttpCallParser {
 
             apiCollectionId = vxlanId;
         }
+
         return apiCollectionId;
     }
 

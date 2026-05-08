@@ -3,18 +3,13 @@ package com.akto.testing;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
-import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.junit.Test;
-import org.springframework.security.access.method.P;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
@@ -22,21 +17,10 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
-import com.akto.dto.test_editor.ExecutorSingleOperationResp;
-import com.akto.dto.test_editor.Util;
-import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.type.URLMethods.Method;
-import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.filter.Filter;
-import com.fasterxml.jackson.core.JsonPointer;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.mongodb.BasicDBList;
-import com.mongodb.BasicDBObject;
 
 public class FilterValidationTests {
     

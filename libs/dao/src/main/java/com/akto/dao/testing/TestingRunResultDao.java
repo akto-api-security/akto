@@ -70,10 +70,6 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         );
     }
 
-    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters) {
-        return fetchLatestTestingRunResult(filters, 10_000);
-    }
-
     private Bson getLatestTestingRunResultProjections() {
         return Projections.include(
                 TestingRunResult.TEST_RUN_ID,
@@ -96,7 +92,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 getLatestTestingRunResultProjections()
             );
 
-        return fetchLatestTestingRunResult(filters, limit, 0, Arrays.asList(Aggregates.project(projections)));
+        return fetchLatestTestingRunResult(filters, limit, 0, Arrays.asList(Aggregates.project(projections)), false);
     }
 
     public List<TestingRunResult> fetchLatestTestingRunResultWithCustomAggregations(Bson filters, int limit, int skip, Bson customSort) {
@@ -120,23 +116,25 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 ))
         );
 
-        return fetchLatestTestingRunResult(filters, limit, skip, Arrays.asList(Aggregates.project(projections), addSeverityValueStage, customSort));
+        return fetchLatestTestingRunResult(filters, limit, skip, Arrays.asList(Aggregates.project(projections), addSeverityValueStage, customSort), true);
     }
 
-    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, List<Bson> customAggregation) {
+    public List<TestingRunResult> fetchLatestTestingRunResult(Bson filters, int limit, int skip, List<Bson> customAggregation, boolean skipCollectionFilter) {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(filters));
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if (collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(getFilterKeyString(), collectionIds)));
+        if (!skipCollectionFilter) {
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if (collectionIds != null) {
+                    pipeline.add(Aggregates.match(Filters.in(getFilterKeyString(), collectionIds)));
+                }
+            } catch (Exception e) {
             }
-        } catch (Exception e) {
         }
         pipeline.add(Aggregates.sort(Sorts.descending(Constants.ID)));
+        pipeline.addAll(customAggregation);
         pipeline.add(Aggregates.skip(skip));
         pipeline.add(Aggregates.limit(limit));
-        pipeline.addAll(customAggregation);
         MongoCursor<BasicDBObject> cursor = this.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).cursor();
         List<TestingRunResult> testingRunResults = new ArrayList<>();
@@ -275,6 +273,11 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
 
         fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        // Index for querying by apiInfoKey + testSubType (without testRunResultSummaryId)
+        // Used by bulkUpdateTestResultsSeverity endpoint
+        fieldNames = new String[]{TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
     public MongoCollection<Document> getRawCollection() {
@@ -286,5 +289,88 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         this.convertToCappedCollection(sizeInBytes);
         this.createIndicesIfAbsent();
     }
+
+    /**
+     * Aggregates testing results by category (testSuperType) with pass/fail/skip counts
+     * OPTIMIZED VERSION: Simplified skip detection and better performance
+     * @param startTimestamp Start time filter (0 to ignore)
+     * @param endTimestamp End time filter (0 to ignore)
+     * @param relevantCategories List of categories to filter by (null/empty for all)
+     * @return List of category-wise statistics
+     */
+    public List<Map<String, Object>> getCategoryWiseScores(int startTimestamp, int endTimestamp, List<String> relevantCategories) {
+        List<Bson> pipeline = new ArrayList<>();
+        
+        // Stage 1: Match filters for time range and category filtering (INDEXED)
+        List<Bson> matchFilters = new ArrayList<>();
+        
+        // Time range filter
+        if (startTimestamp > 0 && endTimestamp > 0) {
+            matchFilters.add(Filters.gte(TestingRunResult.END_TIMESTAMP, startTimestamp));
+            matchFilters.add(Filters.lte(TestingRunResult.END_TIMESTAMP, endTimestamp));
+        }
+        
+        // Filter by relevant categories if provided (INDEXED)
+        if (relevantCategories != null && !relevantCategories.isEmpty()) {
+            matchFilters.add(Filters.in(TestingRunResult.TEST_SUPER_TYPE, relevantCategories));
+        }
+        
+        if (!matchFilters.isEmpty()) {
+            pipeline.add(Aggregates.match(Filters.and(matchFilters)));
+        }
+        
+        // Stage 2: Group by testSuperType - calculate all counts in one stage
+        pipeline.add(Aggregates.group(
+            "$testSuperType",
+            // Pass count: not vulnerable
+            Accumulators.sum("passCount", new BasicDBObject("$cond", Arrays.asList(
+                new BasicDBObject("$eq", Arrays.asList("$vulnerable", false)), 1, 0))),
+            // Fail count: vulnerable  
+            Accumulators.sum("failCount", new BasicDBObject("$cond", Arrays.asList(
+                new BasicDBObject("$eq", Arrays.asList("$vulnerable", true)), 1, 0))),
+            // Skip detection: check if testResults.errors exists and has elements
+            Accumulators.sum("skipCount", new BasicDBObject("$cond", Arrays.asList(
+                new BasicDBObject("$and", Arrays.asList(
+                    new BasicDBObject("$isArray", "$testResults.errors"),
+                    new BasicDBObject("$gt", Arrays.asList(new BasicDBObject("$size", "$testResults.errors"), 0))
+                )), 1, 0)))
+        ));
+        
+        // Stage 3: Project the results in the desired format
+        pipeline.add(Aggregates.project(
+            Projections.fields(
+                Projections.computed("categoryName", "$_id"),
+                Projections.include("passCount"),
+                Projections.include("failCount"), 
+                Projections.include("skipCount"),
+                Projections.exclude("_id")
+            )
+        ));
+        
+        // Stage 4: Sort by category name
+        pipeline.add(Aggregates.sort(Sorts.ascending("categoryName")));
+        
+        // Execute aggregation with optimizations
+        List<Map<String, Object>> results = new ArrayList<>();
+        try (MongoCursor<BasicDBObject> cursor = this.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class)
+                .allowDiskUse(true) // Allow disk usage for large datasets
+                .cursor()) {
+            
+            while (cursor.hasNext()) {
+                BasicDBObject result = cursor.next();
+                String categoryName = result.getString("categoryName");
+                Map<String, Object> categoryScore = new HashMap<>();
+                categoryScore.put("categoryName", categoryName);
+                categoryScore.put("pass", result.getInt("passCount", 0));
+                categoryScore.put("fail", result.getInt("failCount", 0));
+                categoryScore.put("skip", result.getInt("skipCount", 0));
+                results.add(categoryScore);
+            }
+        }
+        
+        return results;
+    }
+
 
 }

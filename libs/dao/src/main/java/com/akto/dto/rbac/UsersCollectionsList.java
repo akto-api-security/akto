@@ -134,7 +134,8 @@ public class UsersCollectionsList {
             Filters.exists(ApiCollection.TAGS_STRING, false),
             Filters.nor(
                 Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_DAST_TAG))
             )
         );
         switch (source) {
@@ -148,6 +149,23 @@ public class UsersCollectionsList {
                 finalFilter = Filters.and(
                     Filters.exists(ApiCollection.TAGS_STRING),
                     Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
+                );
+                break;
+            case AGENTIC:
+                // For agentic context, include both MCP and GenAI collections
+                // This should only be used when user has full agentic access (both limits configured)
+                finalFilter = Filters.and(
+                    Filters.exists(ApiCollection.TAGS_STRING),
+                    Filters.or(
+                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
+                    )
+                );
+                break;
+            case DAST:
+                finalFilter = Filters.and(
+                    Filters.exists(ApiCollection.TAGS_STRING),
+                    Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_DAST_TAG))
                 );
                 break;
             default:

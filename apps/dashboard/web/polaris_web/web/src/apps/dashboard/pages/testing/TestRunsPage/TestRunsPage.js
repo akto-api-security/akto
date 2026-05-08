@@ -1,13 +1,11 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
-import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider, VerticalStack} from '@shopify/polaris';
-import { ChevronDownMinor , ChevronUpMinor } from '@shopify/polaris-icons';
+import {Text,IndexFiltersMode} from '@shopify/polaris';
 import api from "../api";
 import testingApi from "../../testing/api";
 import { useEffect, useReducer, useState } from 'react';
 import transform from "../transform";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func"
-import ChartypeComponent from "./ChartypeComponent";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter";
 import {produce} from "immer"
@@ -16,10 +14,8 @@ import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
 import useTable from "../../../components/tables/TableContext";
 import PersistStore from "../../../../main/PersistStore";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
-import ApiCollectionCoverageGraph from "./ApiCollectionCoverageGraph";
-import ApisTestedOverTimeGraph from './ApisTestedOverTimeGraph';
-import TestRunOverTimeGraph from './TestRunOverTimeGraph';
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import SummaryCardComponent from "./SummaryCardComponent";
 /*
   {
     text:"", // req. -> The text to be shown wherever the header is being shown
@@ -40,14 +36,14 @@ import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 const headers = [
   {
-    text:"Test name",
-    title: 'Test run name',
+    text:mapLabel("Test", getDashboardCategory()) + " name",
+    title: mapLabel("Test", getDashboardCategory()) + " run name",
     value:"testName",
     itemOrder:1,
   },
   {
-    text: "Number of tests",
-    title: "Number of tests",
+    text: mapLabel("Number of tests", getDashboardCategory()),
+    title: mapLabel("Number of tests", getDashboardCategory()),
     value: "number_of_tests",
     itemOrder: 3,
     type: CellType.TEXT,
@@ -93,8 +89,8 @@ const sortOptions = [
 ];
 
 const resourceName = {
-  singular: 'test run',
-  plural: 'test runs',
+  singular: mapLabel("Test", getDashboardCategory()) + " run",
+  plural: mapLabel("Test", getDashboardCategory()) + " runs",
 };
 
 let filters = [
@@ -111,8 +107,8 @@ let filters = [
   },
   {
     key: 'apiCollectionId',
-    label: 'Api collection name',
-    title: 'Api collection name',
+    label: mapLabel('API', getDashboardCategory()) + ' collection name',
+    title: mapLabel('API', getDashboardCategory()) + ' collection name',
     choices: [],
 },
 ]
@@ -149,7 +145,7 @@ const [loading, setLoading] = useState(true);
 const [updateTable, setUpdateTable] = useState("");
 const [countMap, setCountMap] = useState({});
 
-const definedTableTabs = ['All', 'One time', 'Continuous Testing', 'Scheduled', 'CI/CD']
+const definedTableTabs = ['All', 'One time', mapLabel("Continuous Testing", getDashboardCategory()), 'Scheduled', 'CI/CD']
 const initialCount = [countMap['allTestRuns'], countMap['oneTime'], countMap['continuous'], countMap['scheduled'], countMap['cicd']]
 
 const { tabsInfo } = useTable()
@@ -166,6 +162,8 @@ const [severityMap, setSeverityMap] = useState({})
 const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
 const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
+const [totalNumberOfTests, setTotalNumberOfTests] = useState(0)
+const [summaryLoading, setSummaryLoading] = useState(false)
 
   async function fetchTableData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
     setLoading(true);
@@ -205,6 +203,7 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
         });
         break;
       case "continuous_testing":
+      case "continuous_scanning":
         await api.fetchTestingDetails(
           startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CONTINUOUS_TESTING",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
@@ -232,6 +231,13 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
       return true
     })
 
+    // Calculate total number of tests
+    const sumOfTests = ret.reduce((sum, item) => {
+      const numTests = item?.number_of_tests;
+      return sum + (typeof numTests === 'number' ? numTests : 0);
+    }, 0);
+    setTotalNumberOfTests(sumOfTests);
+
     setLoading(false);
     return { value: ret, total: total };
 
@@ -248,8 +254,8 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
   }
 
   const fetchSummaryInfo = async()=>{
-    await api.getSummaryInfo(startTimestamp, endTimestamp).then((resp)=>{
-      const severityObj = transform.convertSubIntoSubcategory(resp)
+    await api.getSummaryInfo(startTimestamp, endTimestamp).then(async (resp)=>{
+      const severityObj = await transform.convertSubIntoSubcategory(resp)
       setSubCategoryInfo(severityObj.subCategoryMap)
     })
     await testingApi.fetchSeverityInfoForIssues({}, [], 0).then(({ severityInfo }) => {
@@ -291,18 +297,23 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
     })
   }
 
-  const fetchTotalCount = () =>{
+  const fetchTotalCount = async () =>{
     setLoading(true)
-    api.getUserTestRuns().then((resp)=> {
+    await api.getUserTestRuns().then((resp)=> {
       setHasUserInitiatedTestRuns(resp)
     })
     setLoading(false)    
   }
 
   useEffect(()=>{
-    fetchTotalCount()
-    fetchCountsMap()
-    fetchSummaryInfo()
+    async function fetchData() {
+      setSummaryLoading(true)
+      await fetchTotalCount()
+      await fetchCountsMap()
+      await fetchSummaryInfo()
+      setSummaryLoading(false)
+    }
+    fetchData()
   },[currDateRange])
 
   const handleSelectedTab = (selectedIndex) => {
@@ -313,44 +324,6 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
     },200)
 }
 
-const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
-const SummaryCardComponent = () =>{
-  let totalVulnerabilities = severityMap?.CRITICAL?.text + severityMap?.HIGH?.text + severityMap?.MEDIUM?.text + severityMap?.LOW?.text
-  return(
-    <LegacyCard>
-      <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
-        <HorizontalStack align="space-between">
-          <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
-          <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
-        </HorizontalStack>
-        {totalVulnerabilities > 0 ? 
-        <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
-          <LegacyCard.Subsection>
-            <Box paddingBlockStart={3}><Divider/></Box>
-            <VerticalStack gap={"5"}>
-              <HorizontalGrid columns={2} gap={6}>
-                <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
-                <ChartypeComponent
-                    data={severityMap}
-                    navUrl={"/dashboard/issues/"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
-                    pieInnerSize="50%"
-                    chartOnLeft={false}
-                    chartSize={190}
-                />
-              </HorizontalGrid>
-              <HorizontalGrid columns={2} gap={4}>
-                <ApiCollectionCoverageGraph />
-                <TestRunOverTimeGraph />
-              </HorizontalGrid>
-              <ApisTestedOverTimeGraph />
-            </VerticalStack>
-          </LegacyCard.Subsection>
-        </Collapsible>
-        : null }
-      </LegacyCard.Section>
-    </LegacyCard>
-  )
-}
 
   const handleTestRunDeletion = async (selectedTestRuns) => {
     await api.deleteTestRuns(selectedTestRuns);
@@ -402,12 +375,37 @@ if (showOnlyTable) {
   return coreTable
 }
 
-const components = !hasUserInitiatedTestRuns ? [<SummaryCardComponent key={"summary"}/>,<TestrunsBannerComponent key={"banner-comp"}/>, coreTable] : [<SummaryCardComponent key={"summary"}/>, coreTable]
+const components = !hasUserInitiatedTestRuns ? [
+  <SummaryCardComponent 
+    key={"summary"}
+    severityMap={severityMap}
+    subCategoryInfo={subCategoryInfo}
+    collapsible={collapsible}
+    setCollapsible={setCollapsible}
+    startTimestamp={startTimestamp}
+    endTimestamp={endTimestamp}
+    loading={summaryLoading}
+  />,
+  <TestrunsBannerComponent key={"banner-comp"}/>, 
+  coreTable
+] : [
+  <SummaryCardComponent 
+    key={"summary"}
+    severityMap={severityMap}
+    subCategoryInfo={subCategoryInfo}
+    collapsible={collapsible}
+    setCollapsible={setCollapsible}
+    startTimestamp={startTimestamp}
+    endTimestamp={endTimestamp}
+    loading={summaryLoading}
+  />, 
+  coreTable
+]
   return (
     <PageWithMultipleCards
       title={
         <TitleWithInfo
-          titleText={"Test results"}
+          titleText={mapLabel('Test results', getDashboardCategory())}
           tooltipContent={"See testing run results along with compact summary of issues."}
         />
       }

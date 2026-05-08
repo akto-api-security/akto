@@ -7,6 +7,7 @@ import func from "@/util/func"
 import AktoDastOptions from './AktoDastOptions';
 import Dropdown from '../../../components/layouts/Dropdown';
 import testingApi from '../../testing/api'
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 const AktoJax = () => {
     const [loading, setLoading] = useState(false)
@@ -63,7 +64,6 @@ const AktoJax = () => {
                 }
             })
         setTestRolesArr(testRoles)
-        setTestRole(testRoles?.[0]?.["value"])
     }
 
     useEffect(() => {
@@ -134,7 +134,7 @@ const AktoJax = () => {
                     <>
                         <Dropdown
                             menuItems={testRolesArr}
-                            label="Select Test Role"
+                            label={"Select " + mapLabel("Test", getDashboardCategory()) + " Role"}
                             initial={testRole}
                             selected={(role) => setTestRole(role)}
                         />

@@ -41,7 +41,7 @@ public class Parser {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Parser.class, LogDb.DASHBOARD);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    public static ParserResult convertOpenApiToAkto(OpenAPI openAPI, String uploadId, boolean useHost ) {
+    public static ParserResult convertOpenApiToAkto(OpenAPI openAPI, String uploadId, boolean useHost, List<String> urlsList ) {
 
         List<FileUploadError> fileLevelErrors = new ArrayList<>();
         List<SwaggerUploadLog> uploadLogs = new ArrayList<>();
@@ -208,11 +208,21 @@ public class Parser {
                     }
 
                     String requestHeadersString = "";
-                    URL url = new URL(path);
-                    // without host/server.
-                    String urlPath = url.getPath() + (url.getQuery() != null ? "?" + url.getQuery() : "");
-                    // Get the domain (including scheme)
-                    requestHeaders.putIfAbsent("Host", url.getHost());
+                    String urlPath = path;
+                    try {
+                        URL url = new URL(path);
+                        // without host/server.
+                        urlPath = url.getPath() + (url.getQuery() != null ? "?" + url.getQuery() : "");
+                        // Get the domain (including scheme)
+                        requestHeaders.putIfAbsent("Host", url.getHost());
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "unable to parse url for " + path + " " + method + " " + e.toString());
+                    }
+
+                    if (requestHeaders == null) {
+                        requestHeaders = new HashMap<>();
+                    }
+
                     if (requestHeaders != null && !requestHeaders.isEmpty()) {
                         try {
                             requestHeadersString = mapper.writeValueAsString(requestHeaders);
@@ -323,7 +333,32 @@ public class Parser {
                     if(useHost){
                         messageObject.put(mKeys.path, path);
                     } else {
-                        messageObject.put(mKeys.path, urlPath);
+                        /*
+                         * In case of existing API collection, we need to check if the URL is already
+                         * present in the existing API collection.
+                         * If it is, we need to use the URL from the existing API collection.
+                         * If it is not, we need to use the URL from the uploaded file.
+                         */
+
+                        String matchingUrl = urlPath;
+                        int matchesFound = 0;
+                        for (String collectionUrl : urlsList) {
+                            if (collectionUrl.contains(urlPath)) {
+                                matchesFound++;
+                                matchingUrl = collectionUrl;
+                            }
+                        }
+
+                        /*
+                         * If there is only one match, we use the matching URL.
+                         * If there are multiple matches, we use the URL from the uploaded file, because
+                         * of ambiguity.
+                         */
+                        if (matchesFound == 1) {
+                            messageObject.put(mKeys.path, matchingUrl);
+                        } else {
+                            messageObject.put(mKeys.path, urlPath);
+                        }
                     }
                     messageObject.put(mKeys.method, method.toString().toUpperCase());
                     messageObject.put(mKeys.requestHeaders, requestHeadersString);
@@ -385,7 +420,7 @@ public class Parser {
     }
 
     // message keys for akto format.
-    private interface mKeys {
+    public interface mKeys {
         String akto_account_id = "akto_account_id";
         String path = "path";
         String method = "method";

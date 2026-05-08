@@ -3,11 +3,15 @@ package com.akto.testing_issues;
 import static com.akto.util.Constants.ID;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
@@ -43,7 +47,8 @@ public class TestingIssuesHandler {
 
     private void writeUpdateQueryIntoWriteModel(List<WriteModel<TestingRunIssues>> writeModelList,
                                                 Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap,
-                                                List<TestingRunIssues> testingRunIssuesList) {
+                                                List<TestingRunIssues> testingRunIssuesList,
+                                                boolean doNotMarkIssuesAsFixed) {
         int lastSeen = Context.now();
 
         testingRunIssuesList.forEach(testingRunIssues -> {
@@ -61,6 +66,9 @@ public class TestingIssuesHandler {
                 updateStatusFields = new BsonDocument();
             } else if (runResult.isVulnerable()) {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN);
+            } else if (doNotMarkIssuesAsFixed) {
+                // Don't mark as FIXED if the test run has the "do not mark issues as fixed" flag set
+                updateStatusFields = new BsonDocument();
             } else {
                 updateStatusFields = Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED);
             }
@@ -183,9 +191,21 @@ public class TestingIssuesHandler {
         Bson inQuery = Filters.in(ID, testingIssuesIdsMap.keySet().toArray());
         List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(inQuery);
 
+        // Fetch TestingRun to check if doNotMarkIssuesAsFixed flag is set
+        boolean doNotMarkIssuesAsFixed = false;
+        if (testingRunResultList != null && !testingRunResultList.isEmpty()) {
+            TestingRunResult firstResult = testingRunResultList.get(0);
+            if (firstResult != null && firstResult.getTestRunId() != null) {
+                TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(ID, firstResult.getTestRunId()));
+                if (testingRun != null) {
+                    doNotMarkIssuesAsFixed = testingRun.getDoNotMarkIssuesAsFixed();
+                }
+            }
+        }
+
         List<WriteModel<TestingRunIssues>> writeModelList = new ArrayList<>();
         // this will create only the updates {status and summaryId change} for existing issues only
-        writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
+        writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, testingRunIssuesList, doNotMarkIssuesAsFixed);
 
 
         insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, testingRunIssuesList);

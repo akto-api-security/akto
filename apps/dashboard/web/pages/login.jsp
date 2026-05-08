@@ -54,6 +54,7 @@
                     window.ACCOUNTS = JSON.parse('${requestScope.accounts}' || '{}');
                     window.ACTIVE_ACCOUNT = +'${requestScope.activeAccount}';
                     window.DASHBOARD_MODE = '${requestScope.dashboardMode}';
+                    window.DASHBOARD_CATEGORY = '${requestScope.dashboardCategory}';
                     window.CLOUD_TYPE = '${requestScope.cloudType}';
                     window.IS_SAAS = '${requestScope.isSaas}';
                     window.ACCESS_TOKEN = '${accessToken}';
@@ -70,6 +71,7 @@
                     window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
                     window.JIRA_INTEGRATED ='${requestScope.jiraIntegrated}'
                     window.AZURE_BOARDS_INTEGRATED ='${requestScope.azureBoardsIntegrated}'
+                    window.SERVICENOW_INTEGRATED ='${requestScope.servicenowIntegrated}'
                     window.USER_ROLE ='${requestScope.userRole}'
                     window.TIME_ZONE = '${requestScope.currentTimeZone}'
                     window.USER_FULL_NAME = '${requestScope.userFullName}'
@@ -179,8 +181,9 @@
                  <!-- needed for react -->
                 <div id="root"></div>
                 <script>
-                    var beamer_config = {
-                        product_id : 'TEEsyHNL42222', //DO NOT CHANGE: This is your product code on Beamer
+                        var beamer_config = {
+                        product_id: 'cJtNevEq80216',
+                        filter: 'filterTag',
                         selector: '#beamer-btn',
                         top: 0,
                         left: 0,

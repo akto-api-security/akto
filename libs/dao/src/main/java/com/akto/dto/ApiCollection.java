@@ -66,6 +66,15 @@ public class ApiCollection {
     String sseCallbackUrl;
     public static final String SSE_CALLBACK_URL = "sseCallbackUrl";
 
+    String mcpTransportType;
+    public static final String MCP_TRANSPORT_TYPE = "mcpTransportType";
+
+    String registryStatus;
+    public static final String REGISTRY_STATUS = "registryStatus";
+
+    int mcpMaliciousnessLastCheck;
+    public static final String MCP_MALICIOUSNESS_LAST_CHECK = "mcpMaliciousnessLastCheck";
+
     private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
         "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
         "localhost", "local", "intranet", "lan", "example", "invalid", 
@@ -417,9 +426,23 @@ public class ApiCollection {
         return false;
     }
 
+    public boolean isDastCollection() {
+        if (!CollectionUtils.isEmpty(this.getTagsList())) {
+            return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_DAST_TAG.equals(t.getKeyName()));
+        }
+        return false;
+    }
+
     public boolean isGenAICollection() {
         if (!CollectionUtils.isEmpty(this.getTagsList())) {
             return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_GEN_AI_TAG.equals(t.getKeyName()));
+        }
+        return false;
+    }
+
+    public boolean isGuardRailCollection() {
+        if (!CollectionUtils.isEmpty(this.getTagsList())) {
+            return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_GUARD_RAIL_TAG.equals(t.getKeyName()));
         }
         return false;
     }
@@ -430,5 +453,29 @@ public class ApiCollection {
 
     public void setSseCallbackUrl(String sseCallbackUrl) {
         this.sseCallbackUrl = sseCallbackUrl;
+    }
+
+    public String getMcpTransportType() {
+        return mcpTransportType;
+    }
+
+    public void setMcpTransportType(String mcpTransportType) {
+        this.mcpTransportType = mcpTransportType;
+    }
+
+    public String getRegistryStatus() {
+        return registryStatus;
+    }
+
+    public void setRegistryStatus(String registryStatus) {
+        this.registryStatus = registryStatus;
+    }
+
+    public int getMcpMaliciousnessLastCheck() {
+        return mcpMaliciousnessLastCheck;
+    }
+
+    public void setMcpMaliciousnessLastCheck(int mcpMaliciousnessLastCheck) {
+        this.mcpMaliciousnessLastCheck = mcpMaliciousnessLastCheck;
     }
 }

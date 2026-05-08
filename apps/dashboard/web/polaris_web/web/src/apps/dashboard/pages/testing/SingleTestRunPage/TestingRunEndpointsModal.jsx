@@ -4,6 +4,7 @@ import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 import TestingStore from "../testingStore";
 import PersistStore from "../../../../main/PersistStore";
 import { labelMap } from "../../../../main/labelHelperMap";
+import { mapLabel } from "../../../../main/labelHelper";
 
 
 const TestingEndpointsModal = ({ showTestingEndpointsModal, setShowTestingEndpointsModal }) => {
@@ -26,8 +27,8 @@ const TestingEndpointsModal = ({ showTestingEndpointsModal, setShowTestingEndpoi
             value: 'apiEndpointComp'
         },
         {
-            text: 'API collection name',
-            title: 'API collection name',
+            text: mapLabel(dashboardCategory, 'API') + ' collection name',
+            title: mapLabel(dashboardCategory, 'API') + ' collection name',
             value: 'apiCollectionName',
             isText: CellType.TEXT
         }

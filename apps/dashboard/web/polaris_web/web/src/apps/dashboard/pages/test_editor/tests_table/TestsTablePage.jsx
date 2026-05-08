@@ -13,6 +13,8 @@ import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip";
 import TooltipText from "../../../components/shared/TooltipText";
 import LocalStore from "../../../../main/LocalStorageStore";
 import ShowListInBadge from "../../../components/shared/ShowListInBadge";
+import { getDashboardCategory } from "../../../../main/labelHelper";
+import {getCategoriesBasedOnDashboardCategory, filterSubCategoriesBasedOnCategories} from "./categoryUtil";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severityVal', columnIndex: 2 },
@@ -102,8 +104,11 @@ let headers = JSON.parse(JSON.stringify(headings))
 function TestsTablePage() {
     const [selectedTest, setSelectedTest] = useState({})
     const [data, setData] = useState({ 'all': [], 'by_akto': [], 'custom': [], 'inactive': [] })
-    const localSubCategoryMap = LocalStore.getState().subCategoryMap
+    let localSubCategoryMap = LocalStore.getState().subCategoryMap
     const categoryMap = LocalStore.getState().categoryMap;
+    const dashboardCategory = getDashboardCategory();
+    const [loading, setLoading] = useState(false)
+    const [testsLoaded, setTestsLoaded] = useState(0);
 
     const severityOrder = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, dynamic_severity: 1 };
 
@@ -156,28 +161,32 @@ function TestsTablePage() {
 
     const fetchAllTests = async () => {
         try {
-            let categoriesName = Object.keys(categoryMap);
+            let categoriesName = getCategoriesBasedOnDashboardCategory(dashboardCategory, categoryMap);
             let metaDataObj = {
                 subCategories: [],
                 categories: []
             }
+
+            if (localSubCategoryMap == undefined || localSubCategoryMap == null || Object.keys(localSubCategoryMap).length === 0) {
+                await transform.setTestMetadata("testEditor", setTestsLoaded)
+                localSubCategoryMap = LocalStore.getState().subCategoryMap
+            }
+
             if ((localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0 ) && categoriesName.length > 0) {
                 metaDataObj = {
                     subCategories: Object.values(localSubCategoryMap),
                     categories: Object.keys(categoryMap)
                 }
-                
             } else { 
-                metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
+                metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor", setTestsLoaded)
                 categoriesName = metaDataObj?.categories.map(x => x.name)
             }
             if (!metaDataObj?.subCategories?.length) return;
             try {
-                metaDataObj.subCategories = metaDataObj.subCategories.filter(
-                    (subCategory) => categoriesName.includes(subCategory.superCategory.name)
-                )
+                metaDataObj.subCategories = filterSubCategoriesBasedOnCategories(metaDataObj.subCategories, categoriesName);
             } catch (error) {
             }
+
 
             const obj = convertFunc.mapCategoryToSubcategory(metaDataObj.subCategories);
             const [allData, aktoData, customData, deactivatedData] = mapTestData(obj);
@@ -193,8 +202,13 @@ function TestsTablePage() {
     };
 
     useEffect(() => {
-        fetchAllTests()
-    }, [])
+        async function fetchData() {
+            setLoading(true)
+            await fetchAllTests()
+            setLoading(false)
+        }
+        fetchData()
+    }, [dashboardCategory])
 
 
     const resourceName = {
@@ -242,6 +256,8 @@ function TestsTablePage() {
             headings={headings}
             data={data[selectedTab]}
             filters={[]}
+            loading={loading}
+            loadingText={`Loading tests... ${testsLoaded} tests loaded`}
         />,
         <TestsFlyLayout data={selectedTest} setShowDetails={setShowDetails} showDetails={showDetails} ></TestsFlyLayout>
     ]

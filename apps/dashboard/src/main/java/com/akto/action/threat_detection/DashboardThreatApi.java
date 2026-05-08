@@ -9,14 +9,16 @@ public class DashboardThreatApi {
   private int actorsCount;
   private int requestsCount;
   private long discoveredAt;
+  private String host;
 
   public DashboardThreatApi(
-      String api, URLMethods.Method method, int actorsCount, int requestsCount, long discoveredAt) {
+      String api, URLMethods.Method method, int actorsCount, int requestsCount, long discoveredAt, String host) {
     this.api = api;
     this.method = method;
     this.actorsCount = actorsCount;
     this.requestsCount = requestsCount;
     this.discoveredAt = discoveredAt;
+    this.host = host;
   }
 
   public String getApi() {
@@ -57,5 +59,13 @@ public class DashboardThreatApi {
 
   public void setDiscoveredAt(long discoveredAt) {
     this.discoveredAt = discoveredAt;
+  }
+
+  public String getHost() {
+    return host;
+  }
+
+  public void setHost(String host) {
+    this.host = host;
   }
 }

@@ -4,6 +4,8 @@ import { devtools, persist, createJSONStorage } from "zustand/middleware"
 const initialState = {
     threatFiltersMap: {},
     accessToken: null,
+    currentAgentConversationId: '',
+    agentConversation: {},
 };
 
 let sessionStore = (set) => ({
@@ -20,6 +22,20 @@ let sessionStore = (set) => ({
             set({ threatFiltersMap });
         } catch (error) {
             console.error("Error setting threatFiltersMap:", error);
+        }
+    },
+    setCurrentAgentConversationId: (currentAgentConversationId) => {
+        try {
+            set({ currentAgentConversationId });
+        } catch (error) {
+            console.error("Error setting currentAgentConversationId:", error);
+        }
+    },
+    setAgentConversation: (agentConversation) => {
+        try {
+            set({ agentConversation });
+        } catch (error) {
+            console.error("Error setting agentConversation:", error);
         }
     },
     resetStore: () => {

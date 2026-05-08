@@ -130,6 +130,11 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
                         "AccountId: %d Running update unauthenticated data collection for %d endpoints: %d skip: %d",
                         Context.accountId.get(), apiCollectionId, apiInfoKeysTemp.size(), skip));
                 unauthenticatedEndpoint.setApiInfos(apiInfoKeysTemp);
+                if (apiInfoKeysTemp == null || apiInfoKeysTemp.size() == 0) {
+                    logger.info(String.format("AccountId: %d Finished update unauthenticated data collection for %d , found no api infos",
+                            Context.accountId.get(), apiCollectionId));
+                    break;
+                }
                 ApiCollectionUsers.addToCollectionsForCollectionId(Collections.singletonList(unauthenticatedEndpoint), UNAUTHENTICATED_GROUP_ID);
                 skip += limit;
 

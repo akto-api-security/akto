@@ -13,7 +13,7 @@ import transform from './customDiffEditor';
 
 function SampleDataComponent(props) {
 
-    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata } = props;
+    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true } = props;
     const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [popoverActive, setPopoverActive] = useState({});
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
@@ -24,6 +24,8 @@ function SampleDataComponent(props) {
     const ref = useRef(null)
 
     useEffect(()=>{
+
+        // Metadata parsing: JSON only
         let parsed;
         try{
           parsed = JSON.parse(sampleData?.message)
@@ -33,9 +35,8 @@ function SampleDataComponent(props) {
         if (parsed?.ip != null && parsed?.destIp != null) {
             setIpObj({sourceIP: parsed?.ip, destIP: parsed?.destIp})
         }
-        
-        let responseJson = func.responseJson(parsed, sampleData?.highlightPaths, metadata)
-        let requestJson = func.requestJson(parsed, sampleData?.highlightPaths, metadata)
+        let responseJson = showResponse ? func.responseJson(parsed, sampleData?.highlightPaths || [], metadata) : {}
+        let requestJson = func.requestJson(parsed, sampleData?.highlightPaths || [], metadata)
 
         let responseTime = parsed?.responseTime;
         setResponseTime(responseTime)
@@ -46,8 +47,51 @@ function SampleDataComponent(props) {
         } catch {
           originalParsed = undefined
         }
-        let originalResponseJson = func.responseJson(originalParsed, sampleData?.highlightPaths)
-        let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths)
+        let originalResponseJson = func.responseJson(originalParsed, sampleData?.highlightPaths || [])
+        let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths || [])
+
+        // --- Parse metadata to extract vulnerabilitySegments for threat highlighting ---
+        const normalizeSegments = (errors = []) => {
+          return errors
+            .filter(err => !isNaN(err.start) && !isNaN(err.end))
+            .map(err => ({
+              ...err,
+              start: err.start,
+              end: err.end,
+              phrase: err.phrase
+            }));
+        };
+
+        const selectMetadataSegments = (rawMetadata) => {
+          if (!rawMetadata) {
+            return { segments: [], fromMetadata: false };
+          }
+
+          if (typeof rawMetadata === 'string') {
+            try {
+              const parsedMeta = JSON.parse(rawMetadata);
+              const segments = normalizeSegments(parsedMeta?.schemaErrors);
+              if (segments.length > 0) {
+                return { segments, fromMetadata: true };
+              }
+            } catch (error) {
+              console.error('Error parsing metadata JSON:', error);
+            }
+          } else {
+            const segments = normalizeSegments(rawMetadata?.schemaErrors);
+            if (segments.length > 0) {
+              return { segments, fromMetadata: true };
+            }
+          }
+
+          return { segments: [], fromMetadata: false };
+        };
+
+        const effectiveMetadata = metadata ?? sampleData?.metadata;
+        const { segments: metadataSegments, fromMetadata } = selectMetadataSegments(effectiveMetadata);
+        const baseSegments = sampleData?.vulnerabilitySegments || [];
+        const vulnerabilitySegments = metadataSegments.length > 0 ? metadataSegments : baseSegments;
+        const segmentsFromMetadata = fromMetadata;
 
         if(isNewDiff){
             let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine)
@@ -64,12 +108,13 @@ function SampleDataComponent(props) {
 
             setSampleJsonData({
                 request: requestData,
-                response: responseData
+                response: { ...responseData, vulnerabilitySegments }
             })
         }else{
             setSampleJsonData({ 
-                request: { message: transform.formatData(requestJson,"http"), original: transform.formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths }, 
-                response: { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths },
+                // If segments came from threat metadata, highlight in request; if they were provided by caller (e.g., LLM analysis), pass to both panes
+                request: { message: transform.formatData(requestJson,"http"), original: transform.formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths, vulnerabilitySegments }, 
+                response: showResponse ? { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, ...(segmentsFromMetadata ? {} : {vulnerabilitySegments}) } : {},
             })
         }
       }, [sampleData, metadata])
@@ -177,8 +222,6 @@ function SampleDataComponent(props) {
 
     const getLineNumbers = (linesArr) =>{
         setLineNumbers((prev)=>{
-            // prev[type] = linesArr.slice();
-            // console.log(prev[type].length, type);
             return {...prev, [type]: linesArr.slice()}
         })
     }
@@ -254,7 +297,7 @@ function SampleDataComponent(props) {
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers}/>
+                {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={getEditorData}/> : null}
             </LegacyCard.Section>
         </Box>
     )

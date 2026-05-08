@@ -21,6 +21,8 @@ public class CustomDataTypeMapper {
     Conditions.Operator operator;
     private IgnoreData ignoreData;
 
+    private boolean redacted;
+
     public CustomDataTypeMapper() { }
 
     public CustomDataTypeMapper(CustomDataType customDataType) {
@@ -35,6 +37,7 @@ public class CustomDataTypeMapper {
         this.valueConditions = customDataType.getValueConditions();
         this.operator = customDataType.getOperator();
         this.ignoreData = customDataType.getIgnoreData();
+        this.redacted = customDataType.isRedacted();
     }
 
     public static CustomDataType buildCustomDataType(CustomDataTypeMapper customDataTypeMapper, String id, Conditions keyConditions, Conditions valueConditions) {
@@ -50,6 +53,7 @@ public class CustomDataTypeMapper {
         customDataType.setValueConditions(valueConditions);
         customDataType.setOperator(customDataTypeMapper.getOperator());
         customDataType.setIgnoreData(customDataTypeMapper.getIgnoreData());
+        customDataType.setRedacted(customDataTypeMapper.getRedacted());
         return customDataType;
     }
 
@@ -139,5 +143,13 @@ public class CustomDataTypeMapper {
 
     public void setIgnoreData(IgnoreData ignoreData) {
         this.ignoreData = ignoreData;
+    }
+
+    public Boolean getRedacted(){
+        return this.redacted;
+    }
+
+    public void setRedacted(Boolean isRedacted){
+        this.redacted = isRedacted;
     }
 }

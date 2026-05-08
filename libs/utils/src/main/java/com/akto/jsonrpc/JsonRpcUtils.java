@@ -14,7 +14,7 @@ import org.apache.commons.lang3.StringUtils;
 public final class JsonRpcUtils {
 
     private static final LoggerMaker logger = new LoggerMaker(JsonRpcUtils.class, LogDb.RUNTIME);
-    private static final String JSONRPC_KEY = "jsonrpc";
+    public static final String JSONRPC_KEY = "jsonrpc";
 
     public static HttpResponseParams parseJsonRpcResponse(HttpResponseParams responseParams) {
         String requestPayload = responseParams.getRequestParams().getPayload();

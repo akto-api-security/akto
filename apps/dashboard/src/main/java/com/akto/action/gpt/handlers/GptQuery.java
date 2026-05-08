@@ -8,7 +8,8 @@ public enum GptQuery {
     GENERATE_REGEX("generate_regex"),
     SUGGEST_TESTS("suggest_tests"),
     FIND_AUTH_RELATED_TOKENS("find_auth_related_tokens"),
-    ANALYZE_REQUEST_RESPONSE_HEADERS("analyze_request_response_headers");
+    ANALYZE_REQUEST_RESPONSE_HEADERS("analyze_request_response_headers"),
+    ANALYZE_VULNERABILITY("analyze_vulnerability");
 
     private final String name;
 

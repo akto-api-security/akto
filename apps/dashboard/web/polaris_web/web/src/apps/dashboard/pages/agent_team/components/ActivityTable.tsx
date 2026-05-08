@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, EmptySearchResult } from '@shopify/polaris';
+import { DeleteMinor } from '@shopify/polaris-icons';
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import api from '../api';
 import { AgentRun, State } from '../types';
@@ -10,12 +11,15 @@ import { CellType } from '../../../components/tables/rows/GithubRow';
 
 
 interface TableData {
+    id: string;
     start_time: string;
     targetName: any;
     action: string;
     duration: string;
     details: string;
     createdTimeStamp: number|string;
+    processId: string;
+    state: State;
 }
 
 const sortOptions = [
@@ -26,6 +30,7 @@ const sortOptions = [
 function ActivityTable({ agentId }) {
 
     const [data, setData] = useState<TableData[]>([]);
+
     const headings = [
         {
             title: "Start time",
@@ -50,6 +55,11 @@ function ActivityTable({ agentId }) {
         {
             title: "Details",
             value: "details",
+        },
+        {
+            title: "",
+            value: "",
+            type: CellType.ACTION
         }
     ]
 
@@ -96,8 +106,56 @@ function ActivityTable({ agentId }) {
             status={"new"}
             itemWidth={"200px"}
             useBadge={false}
+            useTooltip={false}
         />
     }
+
+    const handleDeleteClick = (agentData: TableData) => {
+        const deleteConfirmationMessage = `Are you sure you want to delete this agent run?\n\nStatus: ${func.capitalizeFirstLetter(agentData.state.toLowerCase())}\nDuration: ${agentData.duration}\nDetails: ${agentData.details}\n\nThis action cannot be undone.`;
+        func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => handleDeleteConfirm(agentData));
+    };
+
+    const handleDeleteConfirm = async (agentData: TableData) => {
+        try {
+            await api.deleteAgentRun({ processId: agentData.processId });
+            // Refresh the table data
+            await fetchTable();
+            func.setToast(true, false, "Agent run deleted successfully");
+        } catch (error: any) {
+            console.error('Failed to delete agent run:', error);
+            //  Check if it's a 422 error (agent not found or already deleted)
+            if (error?.response?.status === 422) {
+                // Treat 422 as success - agent is already deleted or not found
+                // The request interceptor already showed an error toast, so we override it with success
+                await fetchTable();
+                func.setToast(true, false, "Agent run deleted successfully");
+            } else if (error?.response?.status !== 403) {
+                // Don't show error for 403 (forbidden) as it's already handled by interceptor
+                func.setToast(true, true, "Failed to delete agent run. Please try again.");
+            }
+            // For 403 and other interceptor-handled errors, don't show duplicate toast
+        }
+    };
+
+    const getActions = (agentData: TableData) => {
+        // Only show delete action for scheduled, running, or stopped agents
+        if (agentData.state === State.SCHEDULED || agentData.state === State.RUNNING || agentData.state === State.STOPPED) {
+            return [
+                {
+                    title: 'Actions',
+                    items: [
+                        {
+                            content: 'Delete',
+                            icon: DeleteMinor,
+                            destructive: true,
+                            onAction: () => handleDeleteClick(agentData),
+                        },
+                    ]
+                }
+            ];
+        }
+        return [];
+    };
 
 
     const fetchTable = async () => {
@@ -125,12 +183,15 @@ function ActivityTable({ agentId }) {
                 duration = func.prettifyEpochDuration(runData.endTimestamp - runData.startTimestamp);
             }
             return {
+                id: runData.processId, // Add id field for row actions
                 start_time: runData?.startTimestamp ? new Date(runData?.startTimestamp * 1000).toUTCString() : "-",
                 targetName: getTargetNames(runData),
                 action: func.capitalizeFirstLetter(runData.state.toLowerCase()),
                 duration: duration,
                 details: await getDetails(runData),
                 createdTimeStamp: runData.startTimestamp,
+                processId: runData.processId,
+                state: runData.state,
             };
         });
         
@@ -170,8 +231,11 @@ function ActivityTable({ agentId }) {
             showFooter={false}
             sortOptions={sortOptions}
             emptyStateMarkup={emptyStateMarkup}
+            hasRowActions={true}
+            getActions={getActions}
         />
     )
+
 
     return (
         <div >

@@ -13,7 +13,7 @@ import com.sendgrid.helpers.mail.objects.Personalization;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
 
@@ -30,11 +30,11 @@ public class SendgridEmail {
         fromEmail.setName("Ankita");
         fromEmail.setEmail("ankita.gupta@akto.io");
         mail.setFrom(fromEmail);
-        if(StringUtils.hasText(subject)) {
+        if(StringUtils.isNotBlank(subject)) {
             personalization.setSubject(subject);
         }
         Email to = new Email();
-        if(StringUtils.hasText(inviteeName)) {
+        if(StringUtils.isNotBlank(inviteeName)) {
             to.setName(inviteeName);
         }
         

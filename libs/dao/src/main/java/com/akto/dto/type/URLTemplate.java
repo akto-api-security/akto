@@ -17,6 +17,15 @@ import org.bson.types.ObjectId;
 @BsonDiscriminator
 public class URLTemplate {
 
+    /**
+     * Result of template matching indicating URL pattern and method match status
+     */
+    public enum MatchResult {
+        NO_MATCH,                    // URL pattern doesn't match
+        URL_MATCH_METHOD_MISMATCH,   // URL pattern matches but method doesn't
+        FULL_MATCH                   // Both URL pattern and method match
+    }
+
     @BsonId
     String id;
     int creationTs;
@@ -37,7 +46,13 @@ public class URLTemplate {
         this.method = method;
     }
 
-    public boolean match(String url, Method urlMethod) {
+    /**
+     * Helper to check exact string match between URL and template (optimization).
+     * @param url The URL to check
+     * @param urlMethod The HTTP method
+     * @return true if exact match, false otherwise
+     */
+    private boolean exactStringMatch(String url, Method urlMethod) {
         if (url.startsWith("/")) url = url.substring(1, url.length());
         if (url.endsWith("/")) url = url.substring(0, url.length()-1);
 
@@ -46,13 +61,29 @@ public class URLTemplate {
         if (tempUrl.endsWith("/")) tempUrl = tempUrl.substring(0, tempUrl.length()-1);
 
         String a = url + " " + urlMethod.name();
-        String b = tempUrl + " " + this.getMethod().name();
+        String b = tempUrl + " " + this.method.name();
+
+        return a.equals(b);
+    }
+
+    public boolean match(String url, Method urlMethod) {
+
+        if (url.startsWith("/")) url = url.substring(1, url.length());
+        if (url.endsWith("/")) url = url.substring(0, url.length()-1);
+
+        String tempUrl = this.getTemplateString();
+        if (tempUrl.startsWith("/")) tempUrl = tempUrl.substring(1, tempUrl.length());
+        if (tempUrl.endsWith("/")) tempUrl = tempUrl.substring(0, tempUrl.length()-1);
+
+        String a = url + " " + urlMethod.name();
+        String b = tempUrl + " " + this.method.name();
+        // Optimization: Try exact string match first
         if (a.equals(b)) {
             return true;
         }
 
+        // Fall back to token-based matching
         String[] thatTokens = url.split("/");
-
         return match(thatTokens, urlMethod);
     }
 
@@ -64,6 +95,56 @@ public class URLTemplate {
         if (urlMethod != method) {
             return false;
         }
+        return matchTokens(url);
+    }
+
+    /**
+     * Check if URL tokens match this template pattern (ignoring method).
+     * Accepts URL string, normalizes and splits it.
+     */
+    public boolean matchTokens(String url) {
+        // Normalize URL - remove leading/trailing slashes
+        if (url.startsWith("/")) url = url.substring(1);
+        if (url.endsWith("/")) url = url.substring(0, url.length() - 1);
+
+        String[] urlTokens = url.split("/");
+        return matchTokens(urlTokens);
+    }
+
+    /**
+     * Match URL against this template and return detailed result.
+     * Checks URL pattern first, then method - enables single-pass matching.
+     * Includes exact string match optimization before token-based matching.
+     *
+     * @param url The URL to match
+     * @param urlMethod The HTTP method to match
+     * @return MatchResult indicating the match status
+     */
+    public MatchResult matchTemplate(String url, Method urlMethod) {
+        // Optimization: Try exact string match first (faster than token matching)
+        if (exactStringMatch(url, urlMethod)) {
+            return MatchResult.FULL_MATCH;
+        }
+
+        // Fall back to token-based matching for parameterized URLs
+        // Step 1: Check if URL pattern matches
+        if (!matchTokens(url)) {
+            return MatchResult.NO_MATCH;
+        }
+
+        // Step 2: URL pattern matched, now check method
+        if (this.method != urlMethod) {
+            return MatchResult.URL_MATCH_METHOD_MISMATCH;
+        }
+
+        return MatchResult.FULL_MATCH;
+    }
+
+    /**
+     * Check if URL tokens match this template pattern (ignoring method).
+     * Extracted for reusability.
+     */
+    public boolean matchTokens(String[] url) {
         String[] thatTokens = url;
         if (thatTokens.length != this.tokens.length) return false;
 

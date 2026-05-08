@@ -9,13 +9,18 @@ import {
 import SampleDataComponent from './SampleDataComponent';
 import SampleData from './SampleData';
 import func from '../../../../util/func';
+import { getDashboardCategory, mapLabel } from '../../../main/labelHelper';
 
 function SchemaValidationError({ sampleData}) {
     if (!sampleData || !sampleData?.metadata) {
         return null;
     }
     const schemaErrors = JSON.parse(sampleData?.metadata)?.schemaErrors || [];
-    if (schemaErrors.length === 0) {
+    
+    // Only show actual schema validation errors
+    const schemaValidationErrors = schemaErrors.filter(error => error?.attribute !== 'threat_detected');
+    
+    if (schemaValidationErrors.length === 0) {
         return null;
     }
 
@@ -27,7 +32,7 @@ function SchemaValidationError({ sampleData}) {
                 status="critical"
             >
                 <List type="bullet">
-                    {schemaErrors?.map((error, index) => {
+                    {schemaValidationErrors?.map((error, index) => {
                         return <List.Item key={index}>{error?.message}</List.Item>
                     })}
                 </List>
@@ -49,7 +54,7 @@ function SampleDataList(props) {
   
     return (
       <VerticalStack gap="3">
-        <SchemaValidationError sampleData={sampleData[Math.min(page, sampleData.length - 1)]} />
+         <SchemaValidationError sampleData={sampleData[Math.min(page, sampleData.length - 1)]} />
         <HorizontalStack align='space-between'>
           <HorizontalStack gap="2">
             <Text variant='headingMd'>
@@ -59,7 +64,7 @@ function SampleDataList(props) {
           </HorizontalStack>
         <Pagination
                 label={
-                  sampleData?.length==0 ? 'No test runs found' :
+                  sampleData?.length==0 ? 'No ' + mapLabel("Test runs", getDashboardCategory()) + " found" :
                   `${page+1} of ${sampleData?.length}`
                 }
                 hasPrevious = {page > 0}
@@ -102,6 +107,7 @@ function SampleDataList(props) {
                       showDiff={showDiff}
                       isNewDiff={isNewDiff}
                       metadata={metadata}
+                      readOnly={true}
                     />
                   </LegacyCard>
                 </Box>

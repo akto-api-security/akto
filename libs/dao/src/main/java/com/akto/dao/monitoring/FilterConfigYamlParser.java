@@ -51,6 +51,15 @@ public class FilterConfigYamlParser {
             filterConfig = new FilterConfig(id, null, null, null);
         }
 
+        ConfigParserResult ignoreResult = null;
+        Object ignoreMap = config.get(FilterConfig.IGNORE);
+        if (ignoreMap != null) {
+            ignoreResult = configParser.parse(ignoreMap);
+            if (ignoreResult == null) {
+                throw new Exception("ignore section parsing failed for template id: " + id);
+            }
+        }
+
         Map<String, List<String>> wordListMap = new HashMap<>();
         try {
             if (config.containsKey(FilterConfig.WORD_LISTS)) {
@@ -92,6 +101,11 @@ public class FilterConfigYamlParser {
             if (filterConfig != null) {
                 filterConfig.setInfo(info);
             }
+        }
+
+        // Set ignore field if parsed successfully
+        if (filterConfig != null && ignoreResult != null) {
+            filterConfig.setIgnore(ignoreResult);
         }
 
         return filterConfig;

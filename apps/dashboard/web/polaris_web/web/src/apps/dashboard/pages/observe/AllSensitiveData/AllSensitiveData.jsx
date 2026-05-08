@@ -98,11 +98,20 @@ const convertToDataTypesData = (type, collectionsMap, countMap, subtypeToApiColl
 
     const iconSource = (type?.iconString !== undefined && type?.iconString?.length> 0) ? func.getIconFromString(type?.iconString) : func.getSensitiveIcons(type.name)
 
+    // Check if iconSource is an SVG string (starts with "<svg")
+    // If it's SVG, convert it to a data URL so Thumbnail can display it at proper size
+    const isSvgString = typeof iconSource === 'string' && iconSource.trim().startsWith('<svg')
+    const thumbnailSource = isSvgString
+        ? `data:image/svg+xml;utf8,${encodeURIComponent(
+            iconSource.replace('<svg', '<svg width="20" height="20"')
+        )}`
+        : iconSource
+
     return {
         id: type.name,
         nameComp: <Text fontWeight="medium">{type.name}</Text>,
         subType: type.name,
-        avatarComp: <Thumbnail source={iconSource} size="small" />,
+        avatarComp: <Thumbnail source={thumbnailSource} size="small" />,
         priorityVal: priorityText.length > 1 ? severityOrder[priorityText] : 0,
         priorityText: priorityText,
         priorityComp: priorityText.length > 1 ? 

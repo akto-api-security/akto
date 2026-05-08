@@ -82,6 +82,10 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
         return super.findOne(filteredQuery, projection);
     }
 
+    public T findOneNoRbacFilter(Bson q, Bson projection) {
+        return super.findOne(q, projection);
+    }
+
     @Override
     public T findLatestOne(Bson q){
         Bson filteredQuery = addRbacFilter(q);

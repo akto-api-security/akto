@@ -120,7 +120,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             boolean hasRequiredAccess = false;
 
             if(this.accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || this.accessType.equalsIgnoreCase(accessGiven.toString())){
-                hasRequiredAccess = true;
+                hasRequiredAccess = !accessGiven.equals(ReadWriteAccess.NO_ACCESS);
             }
             if(featureLabel.equals(Feature.ADMIN_ACTIONS.name())){
                 hasRequiredAccess = userRole.equals(Role.ADMIN.name());

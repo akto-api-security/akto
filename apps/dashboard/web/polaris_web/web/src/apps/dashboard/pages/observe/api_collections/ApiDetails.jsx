@@ -2,7 +2,9 @@ import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
 import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
+import ApiGroups from "../../../components/shared/ApiGroups";
 import SampleDataList from "../../../components/shared/SampleDataList";
+import SampleData from "../../../components/shared/SampleData";
 import { useEffect, useState, useRef } from "react";
 import api from "../api";
 import ApiSchema from "./ApiSchema";
@@ -21,6 +23,7 @@ import InlineEditableText from "../../../components/shared/InlineEditableText";
 import GridRows from "../../../components/shared/GridRows";
 import Dropdown from "../../../components/layouts/Dropdown";
 import ApiIssuesTab from "./ApiIssuesTab";
+import ForbiddenRole from "../../../components/shared/ForbiddenRole";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
@@ -69,13 +72,14 @@ function ApiDetails(props) {
     const [loading, setLoading] = useState(false)
     const [showMoreActions, setShowMoreActions] = useState(false)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
+    const allCollections = PersistStore(state => state.allCollections)
     const [disabledTabs, setDisabledTabs] = useState([])
     const [description, setDescription] = useState("")
     const [headersWithData, setHeadersWithData] = useState([])
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
-    const [apiCallStats, setApiCallStats] = useState([]); 
+    const [apiCallStats, setApiCallStats] = useState([]);
     const [apiCallDistribution, setApiCallDistribution] = useState([]);
     const endTs = func.timeNow();
     const [startTime, setStartTime] = useState(endTs - statsOptions[6].value)
@@ -84,6 +88,8 @@ function ApiDetails(props) {
     const apiStatsAvailableRef = useRef(false);
     const apiDistributionAvailableRef = useRef(false);
     const [selectedTabId, setSelectedTabId] = useState('values');
+    const [showForbidden, setShowForbidden] = useState(false);
+    const [detectedBasePrompt, setDetectedBasePrompt] = useState(null);
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -222,7 +228,7 @@ function ApiDetails(props) {
                 {
                     data: res.result.apiCallStats.sort((a, b) => b.ts - a.ts).map((item) => [item.ts * 60 * 1000, item.count]),
                     color: "",
-                    name: 'API Calls',
+                    name: mapLabel('Api', getDashboardCategory()) + ' Calls',
                 },
             ];
 
@@ -246,13 +252,41 @@ function ApiDetails(props) {
             setLoading(true)
             const { apiCollectionId, endpoint, method, description } = apiDetail
             setSelectedUrl({ url: endpoint, method: method })
-            api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method).then((resp) => {
-                if (!resp.dependencyGraphExists) {
-                    setDisabledTabs(["dependency"])
+            
+            // Fetch ApiInfo to get detectedBasePrompt
+            try {
+                const apiInfoResp = await api.fetchEndpoint({
+                    url: endpoint,
+                    method: method,
+                    apiCollectionId: apiCollectionId
+                });
+                // Check both apiInfoResp.data and apiInfoResp.data.apiInfo (depending on response structure)
+                const detectedPrompt = apiInfoResp?.data?.detectedBasePrompt || apiInfoResp?.detectedBasePrompt;
+                if (detectedPrompt && detectedPrompt.trim().length > 0) {
+                    setDetectedBasePrompt(detectedPrompt);
                 } else {
-                    setDisabledTabs([])
+                    setDetectedBasePrompt(null);
                 }
-            })
+            } catch (error) {
+                console.error("Error fetching ApiInfo:", error);
+                setDetectedBasePrompt(null);
+            }
+            
+            try {
+                await api.checkIfDependencyGraphAvailable(apiCollectionId, endpoint, method).then((resp) => {
+                    if (!resp.dependencyGraphExists) {
+                        setDisabledTabs(["dependency"])
+                    } else {
+                        setDisabledTabs([])
+                    }
+                })
+            } catch (error) {
+                if (error?.response?.status === 403 || error?.status === 403) {
+                    setShowForbidden(true);
+                    setLoading(false);
+                    return;
+                }
+            }
 
             setTimeout(() => {
                 setDescription(description == null ? "" : description)
@@ -265,8 +299,10 @@ function ApiDetails(props) {
             })
 
             let commonMessages = []
-            await api.fetchSampleData(endpoint, apiCollectionId, method).then((res) => {
-                api.fetchSensitiveSampleData(endpoint, apiCollectionId, method).then(async (resp) => {
+            try {
+                const res = await api.fetchSampleData(endpoint, apiCollectionId, method)
+                try {
+                    const resp = await api.fetchSensitiveSampleData(endpoint, apiCollectionId, method)
                     if (resp.sensitiveSampleData && Object.keys(resp.sensitiveSampleData).length > 0) {
                         if (res.sampleDataList.length > 0) {
                             commonMessages = transform.getCommonSamples(res.sampleDataList[0].samples, resp)
@@ -275,9 +311,16 @@ function ApiDetails(props) {
                         }
                     } else {
                         let sensitiveData = []
-                        await api.loadSensitiveParameters(apiCollectionId, endpoint, method).then((res3) => {
+                        try {
+                            const res3 = await api.loadSensitiveParameters(apiCollectionId, endpoint, method)
                             sensitiveData = res3.data.endpoints;
-                        })
+                        } catch (error) {
+                            if (error?.response?.status === 403 || error?.status === 403) {
+                                setShowForbidden(true);
+                                setLoading(false);
+                                return;
+                            }
+                        }
                         let samples = res.sampleDataList.map(x => x.samples)
                         samples = samples.reverse();
                         samples = samples.flat()
@@ -285,8 +328,21 @@ function ApiDetails(props) {
                         commonMessages = transform.prepareSampleData(newResp, '')
                     }
                     setSampleData(commonMessages)
-                })
-            })
+                } catch (error) {
+                    if (error?.response?.status === 403 || error?.status === 403) {
+                        setShowForbidden(true);
+                        setLoading(false);
+                        return;
+                    }
+                }
+            } catch (error) {
+                if (error?.response?.status === 403 || error?.status === 403) {
+                    setShowForbidden(true);
+                    setLoading(false);
+                    return;
+                }
+            }
+            
             setTimeout(() => {
                 setLoading(false)
             }, 100)
@@ -350,6 +406,8 @@ function ApiDetails(props) {
 
         fetchData();
         setHeadersWithData([])
+        // Reset detectedBasePrompt when apiDetail changes
+        setDetectedBasePrompt(null);
     }, [apiDetail])
 
     useEffect(() => {
@@ -427,7 +485,7 @@ function ApiDetails(props) {
         },
         xAxis: {
             title: {
-                text: 'API Call Frequency',
+                text: mapLabel('Api', getDashboardCategory()) + ' Call Frequency',
                 style: {
                     fontSize: '12px',
                 },
@@ -483,7 +541,7 @@ function ApiDetails(props) {
         xAxis: {
             categories: apiCallDistribution?.[0]?.categories || [],
             title: {
-                text: 'Api Call Count',
+                text: mapLabel('Api', getDashboardCategory()) + ' Call Count',
                 style: { fontSize: '12px' }
             },
             labels: {
@@ -540,6 +598,47 @@ function ApiDetails(props) {
             />
         </Box>
     }
+
+    const BasePromptTab = {
+        id: 'base-prompt',
+        content: "Prompt Template",
+        component: <Box paddingBlockStart={"4"}>
+            <VerticalStack gap="4">
+                <Box background="bg-surface-secondary" padding="4" borderRadius="2">
+                    <VerticalStack gap="2">
+                        <Text variant="headingSm" fontWeight="semibold">
+                            Detected Prompt Template
+                        </Text>
+                        {detectedBasePrompt ? (
+                            <>
+                                <Box background="bg-surface" padding="2" borderRadius="1" style={{ minHeight: '200px' }}>
+                                    <SampleData
+                                        data={{ 
+                                            message: detectedBasePrompt,
+                                            vulnerabilitySegments: func.findPlaceholders(detectedBasePrompt)
+                                        }}
+                                        editorLanguage="plaintext"
+                                        readOnly={true}
+                                        minHeight="200px"
+                                        wordWrap={true}
+                                    />
+                                </Box>
+                                <Text variant="bodySm" color="subdued">
+                                    Auto-detected prompt template with placeholders from agent traffic. This template represents the common structure of prompts sent to this endpoint.
+                                </Text>
+                            </>
+                        ) : (
+                            <Box padding="4">
+                                <Text variant="bodyMd" color="subdued">
+                                    No prompt template detected yet. The base prompt template will be automatically detected from agent traffic when requests are made to this endpoint.
+                                </Text>
+                            </Box>
+                        )}
+                    </VerticalStack>
+                </Box>
+            </VerticalStack>
+        </Box>
+    }
     const ValuesTab = {
         id: 'values',
         content: "Values",
@@ -578,7 +677,7 @@ function ApiDetails(props) {
 
     const ApiCallStatsTab = {
         id: 'api-call-stats',
-        content: 'API Call Stats',
+        content: mapLabel('Api', getDashboardCategory()) + ' Call Stats',
         component: 
             <Box paddingBlockStart={'4'}>
                 <HorizontalStack align="end">
@@ -606,7 +705,7 @@ function ApiDetails(props) {
                             color='#6200EA'
                             areaFillHex='true'
                             height='330'
-                            title='API Call Count'
+                            title={mapLabel('Api', getDashboardCategory()) + ' Call Count'}
                             subtitle='Number of API calls over time'
                             defaultChartOptions={defaultChartOptions(false)}
                             backgroundColor='#ffffff'
@@ -679,19 +778,24 @@ function ApiDetails(props) {
     newData['description'] = (isEditingDescription?<InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription}  placeholder={"Add a brief description"} maxLength={64}/> : description )
 
     const headingComp = (
-        <HorizontalStack align="space-between" wrap={false} key="heading">
-            <VerticalStack>
-                <HorizontalStack gap={"2"} wrap={false} >
-                    <GithubCell
-                        width="32vw"
-                        data={newData}
-                        headers={headers}
-                        getStatus={statusFunc}
+        <VerticalStack gap="4" key="heading">
+            <HorizontalStack align="space-between" wrap={false}>
+                <VerticalStack gap="3">
+                    <HorizontalStack gap={"2"} wrap={false} >
+                        <GithubCell
+                            width="32vw"
+                            data={newData}
+                            headers={headers}
+                            getStatus={statusFunc}
+                        />
+                    </HorizontalStack>
+                    <ApiGroups
+                        collectionIds={apiDetail?.collectionIds}
+                        onGroupClick={() => setShowDetails(false)}
                     />
-                </HorizontalStack>
-            </VerticalStack>
-            <VerticalStack gap="3" align="space-between">
-                <HorizontalStack gap={"1"} wrap={false} >
+                </VerticalStack>
+                <VerticalStack gap="3" align="space-between">
+                    <HorizontalStack gap={"1"} wrap={false} >
                     <RunTest
                         apiCollectionId={apiDetail["apiCollectionId"]}
                         endpoints={[apiDetail]}
@@ -732,24 +836,42 @@ function ApiDetails(props) {
                     </VerticalStack>
                 }
             </VerticalStack>
-        </HorizontalStack>
+            </HorizontalStack>
+        </VerticalStack>
     )
 
-    const components = [
-        headingComp,
-        <LayoutWithTabs
-            key="tabs"
-            tabs={[
-                ValuesTab,
-                SchemaTab,
-                ...(hasIssues ? [IssuesTab] : []),
-                ApiCallStatsTab,
-                DependencyTab
-            ]}
-            currTab={(tab) => setSelectedTabId(tab.id)}
-            disabledTabs={disabledTabs}
-        />
-    ]
+    // Check if collection has gen-ai tag (same pattern as CreateGuardrailModal.jsx)
+    const hasGenAiTag = () => {
+        if (!apiDetail?.apiCollectionId || !allCollections) return false;
+        const collection = allCollections.find(c => c.id === apiDetail.apiCollectionId);
+        if (!collection) return false;
+        
+        return collection.envType && collection.envType.some(envType =>
+            envType.keyName === 'gen-ai'
+        );
+    };
+
+    // Always show BasePromptTab for AI agents (collections with gen-ai tag)
+    const shouldShowBasePromptTab = detectedBasePrompt && hasGenAiTag();
+
+    const components = showForbidden
+        ? [<Box padding="4" key="forbidden"><ForbiddenRole /></Box>]
+        : [
+            headingComp,
+            <LayoutWithTabs
+                key="tabs"
+                tabs={[
+                    ValuesTab,
+                    SchemaTab,
+                    ...(shouldShowBasePromptTab ? [BasePromptTab] : []),
+                    ...(hasIssues ? [IssuesTab] : []),
+                    ApiCallStatsTab,
+                    DependencyTab
+                ]}
+                currTab={(tab) => setSelectedTabId(tab.id)}
+                disabledTabs={disabledTabs}
+            />
+        ]
 
     return (
         <div>

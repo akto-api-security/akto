@@ -8,7 +8,7 @@ import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
-import LocalStore from "../../main/LocalStorageStore";
+import LocalStore, { localStorePersistSync } from "../../main/LocalStorageStore";
 import ConfirmationModal from "../components/shared/ConfirmationModal";
 import AlertsBanner from "./AlertsBanner";
 import dashboardFunc from "./transform";
@@ -17,6 +17,7 @@ import WelcomeBackDetailsModal from "../components/WelcomeBackDetailsModal";
 import useTable from "../components/tables/TableContext";
 import threatDetectionRequests from "./threat_detection/api";
 import SessionStore from "../../main/SessionStore";
+import { updateThreatFiltersStore } from "./threat_detection/utils/threatFilters";
 
 function Dashboard() {
 
@@ -28,7 +29,6 @@ function Dashboard() {
     const setTagCollectionsMap = PersistStore(state => state.setTagCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
     const threatFiltersMap = SessionStore(state => state.threatFiltersMap);
-    const setThreatFiltersMap = SessionStore(state => state.setThreatFiltersMap);
 
     const { selectItems } = useTable()
 
@@ -77,25 +77,8 @@ function Dashboard() {
     }
 
     const fetchFilterYamlTemplates = () => {
-        const category = PersistStore.getState().dashboardCategory;
-        const shortHand = category.split(" ")[0].toLowerCase();
         threatDetectionRequests.fetchFilterYamlTemplate().then((res) => {
-            const maps = { mcp: {}, gen: {}, api: {} };
-            res.templates.forEach((x) => {
-                let trimmed = {...x, content: '', ...x.info}
-                const name = trimmed?.category?.name?.toLowerCase();
-                delete trimmed['info']
-
-                if(name?.includes("mcp")) {
-                    maps.mcp[x.id] = trimmed;
-                } else if (name?.includes("gen")){
-                    maps.gen[x.id] = trimmed;
-                }else {
-                    maps.api[x.id] = trimmed;
-                }
-            })
-            setThreatFiltersMap(maps[shortHand])
-            
+            updateThreatFiltersStore(res?.templates || [])
         })
     }
 
@@ -113,7 +96,7 @@ function Dashboard() {
     },[trafficAlerts.length])
 
     useEffect(() => {
-        if((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)){
+        if(((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)) && location.pathname !== "/dashboard/observe/inventory"){
             fetchAllCollections()
         }
         if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {
@@ -145,6 +128,12 @@ function Dashboard() {
                 localStorage.removeItem(key);
             }
         });
+
+        const cleanUpLocalStorePersistSync = localStorePersistSync(LocalStore);
+
+        return () => {
+            cleanUpLocalStorePersistSync();
+        };
     }, [])
 
     useEffect(() => {
@@ -189,6 +178,9 @@ function Dashboard() {
     }
 
     const refreshFunc = () => {
+        if (window.USER_NAME.includes("akto.io")){
+            return;
+        }
         if(document.visibilityState === 'hidden'){
             PersistStore.getState().resetAll();
             LocalStore.getState().resetStore();

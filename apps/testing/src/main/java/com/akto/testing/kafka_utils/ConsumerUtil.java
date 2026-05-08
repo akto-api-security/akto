@@ -18,8 +18,6 @@ import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.notifications.slack.CustomTextAlert;
-import com.akto.testing.Main;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
 import com.akto.util.Constants;
@@ -50,7 +48,6 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.bson.types.ObjectId;
-import org.springframework.util.StringUtils;
 
 public class ConsumerUtil {
 
@@ -159,15 +156,6 @@ public class ConsumerUtil {
 
             parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
             parallelConsumer.subscribe(Arrays.asList(topicName)); 
-            if (StringUtils.hasLength(Main.AKTO_SLACK_WEBHOOK)) {
-                try {
-                    CustomTextAlert customTextAlert = new CustomTextAlert("Tests being picked for execution through consumer for account: " + currentTestInfo.getInt("accountId") + " summaryId=" + summaryIdForTest);
-                    Main.SLACK_INSTANCE.send(Main.AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
-                } catch (Exception e) {
-                    logger.error("Error sending slack alert for completion of test", e);
-                }
-                
-            }
         }
 
         try {

@@ -1,4 +1,4 @@
-import { Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip} from "@shopify/polaris"
+import { Badge, Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip, VerticalStack} from "@shopify/polaris"
 import {ChevronUpMinor } from "@shopify/polaris-icons"
 
 import { useEffect, useRef, useState } from "react";
@@ -13,8 +13,14 @@ import PersistStore from "../../../../main/PersistStore";
 import editorSetup from "./editor_config/editorSetup";
 import SampleData from "../../../components/shared/SampleData";
 import transform from "../../../components/shared/customDiffEditor";
+import testingFunc from "../../testing/transform";
+import { mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import EmptySampleApi from "./EmptySampleApi";
 import Store from "../../../store";
+import ChatContainer from "../../../components/shared/ChatContainer";
+import ChatInterface from "../../../components/shared/ChatInterface";
+import LocalStore from "../../../../main/LocalStorageStore";
+import observeFunc from "../../observe/transform"
 
 const SampleApi = () => {
 
@@ -44,6 +50,11 @@ const SampleApi = () => {
 
     const tabs = [{ id: 'request', content: 'Request' }, { id: 'response', content: 'Response'}];
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
+    const [conversationsList, setConversationsList] = useState([])
+
+    const [isChatBotOpen, setIsChatBotOpen] = useState(false)
+    const [chatBotModal, setChatBotModal] = useState(false)
+    const subCategoryMap = LocalStore(state => state.subCategoryMap)
 
     useEffect(()=>{
         if(showEmptyLayout) return
@@ -60,6 +71,7 @@ const SampleApi = () => {
         setSelectedCollectionId(null)
         setCopyCollectionId(null)
         setTestResult(null)
+        setConversationsList([])
         if(!selectedUrl){
             selectedUrl = defaultRequest
         }
@@ -120,6 +132,7 @@ const SampleApi = () => {
         fetchApiEndpoints(copyCollectionId)
         setCopySelectedApiEndpoint(null);
         setTestResult(null)
+        setConversationsList([])
     }, [copyCollectionId])
 
     useEffect(() => {
@@ -129,15 +142,27 @@ const SampleApi = () => {
             setEditorData({message: ''})
         }
         setTestResult(null)
+        setConversationsList([])
     }, [selectedApiEndpoint])
 
     useEffect(()=> {
         if(testResult){
-            setShowTestResult(true);
+            let temp =  testResult?.agentConversationResults ? testResult?.agentConversationResults?.length > 0 : false;
+            setShowTestResult(!temp);
+            setChatBotModal(temp);
+            
         } else {
             setShowTestResult(false);
         }
     }, [testResult])
+
+    useEffect(()=>{
+        if(currentContent && currentContent.length > 0 && currentContent.includes("test_mode") && currentContent.includes(": agent")) {
+            setIsChatBotOpen(true)
+        }else{
+            setIsChatBotOpen(false)
+        }
+    }, [currentContent])
 
 
     const handleTabChange = (selectedTabIndex) => {
@@ -227,11 +252,16 @@ const SampleApi = () => {
     const intervalRef = useRef(null);
 
     const runTest = async()=>{
+        if(isChatBotOpen) {
+            setChatBotModal(true)
+            return;
+        }
         setLoading(true)
         const apiKeyInfo = {
             ...func.toMethodUrlObject(selectedApiEndpoint),
             apiCollectionId: selectedCollectionId
         }
+
 
         try {
             let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList)
@@ -268,6 +298,10 @@ const SampleApi = () => {
                 });
             }
             else setTestResult(resp)
+            if(resp?.agentConversationResults?.length > 0){
+                let result = testingFunc.prepareConversationsList(resp?.agentConversationResults)
+                setConversationsList(result.conversations)
+            }
         } catch (err){
         }
         setLoading(false)
@@ -282,6 +316,10 @@ const SampleApi = () => {
     }, []);
 
     const showResults = () => {
+        if(testResult?.agentConversationResults?.length > 0){
+            setChatBotModal(!chatBotModal)
+            return;
+        }
         setShowTestResult(!showTestResult);
     }
 
@@ -306,6 +344,9 @@ const SampleApi = () => {
     }
 
     function getResultDescription() {
+        if(isChatBotOpen) {
+            return "Chat with the agent"
+        }
         if (testResult) {
             if(testResult.testingRunResult.vulnerable){
                 let status = func.getRunResultSeverity(testResult.testingRunResult, testResult.subCategoryMap)
@@ -314,7 +355,7 @@ const SampleApi = () => {
                 return "No vulnerability found"
             }
         } else {
-            return "Run test to see Results"
+            return `${mapLabel('Run test', getDashboardCategory())} to see Results`
         }
     }
 
@@ -334,6 +375,8 @@ const SampleApi = () => {
 
     )
 
+    const currentSeverity = selectedTest?.value !== undefined ? subCategoryMap[selectedTest?.value]?.superCategory?.severity._name : "HIGH";
+
     return (
         <div>
             <div className="editor-header">
@@ -348,7 +391,7 @@ const SampleApi = () => {
                             </Tooltip>
                         </Box>
                     </Button>
-                    <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">Run Test</Button>
+                    <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">{isChatBotOpen ? "Chat" : mapLabel('Run test', getDashboardCategory())}</Button>
                 </HorizontalStack>
             </div>
 
@@ -431,6 +474,31 @@ const SampleApi = () => {
                     />
 
                 </Modal.Section>
+            </Modal>
+            <Modal
+                open={chatBotModal}
+                onClose={() => setChatBotModal(false)}
+                title="Chat with the agent"
+                large
+            >
+                
+                <Modal.Section>
+                    <VerticalStack gap={"8"}>
+                        <VerticalStack gap={"4"}>
+                            <Box padding={"4"}>
+                                <HorizontalStack gap={"2"} wrap={false}>
+                                    <Text variant="headingMd" alignment="start" breakWord>{selectedTest?.label}</Text>
+                                    {testResult?.testingRunResult?.vulnerable === true ? <Box className={`badge-wrapper-${currentSeverity}`}><Badge size="medium" status={observeFunc.getColor(currentSeverity)}>{currentSeverity}</Badge></Box> : null}
+                                </HorizontalStack>
+                                <br/>
+                                <Divider/> 
+                            </Box>
+                            
+                        </VerticalStack>
+                        {conversationsList?.length > 0 ? <ChatInterface conversations={conversationsList} sort={false}/> : <ChatContainer/>}
+                    </VerticalStack>
+                </Modal.Section>
+                
             </Modal>
         </div>
     )

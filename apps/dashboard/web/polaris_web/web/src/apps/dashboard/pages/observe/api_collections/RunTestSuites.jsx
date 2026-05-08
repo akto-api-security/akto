@@ -5,6 +5,7 @@ import "./run_test_suites.css"
 import RunTestSuiteRow from "./RunTestSuiteRow";
 import testingApi from "../../testing/api";
 import func from "@/util/func";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesting, setTestSuiteIds, testSuiteIds,setTestNameSuiteModal,testNameSuiteModal }) {
 
@@ -115,7 +116,7 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
 
     function checkifSelected(data) {
         if(checkedSelected(data) === true) {
-            return `${countTestSuitesTests(data)} tests selected`
+            return `${countTestSuitesTests(data)} ${mapLabel("tests selected", getDashboardCategory())}`
         }
         return `${countTestSuitesTests(data)} tests`;
     }

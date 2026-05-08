@@ -40,7 +40,7 @@ const ApisWithMostOpenIsuuesGraph = ({ issuesData}) => {
     ) : (
       <InfoCard
         title={`${mapLabel("APIs with most open issues", getDashboardCategory())}`}
-        titleToolTip="Top 5 API endpoints with the most unresolved (OPEN) issues."
+        titleToolTip={`Top 5 ${mapLabel('API endpoints', getDashboardCategory())} with the most unresolved (OPEN) issues.`}
         component={
           <BarGraph
             data={barData}

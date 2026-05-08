@@ -63,6 +63,26 @@ const snippets = [
             "\t\t\t\t<PAYLOAD_KEY>: <NEW_PAYLOAD_VALUE>"
         ]
     },
+    {
+        label: "execute-attach-file-single-SAMPLE",
+        desc: "Attach a single file (multipart) while executing the test",
+        text: [
+            ...executeBasic,
+            "\t\t\t- attach_file:",
+            "\t\t\t\t<FIELD_NAME>: <FILE_URL>"
+        ]
+    },
+    {
+        label: "execute-attach-file-multiple-SAMPLE",
+        desc: "Attach multiple files (multipart) while executing the test",
+        text: [
+            ...executeBasic,
+            "\t\t\t- attach_file:",
+            "\t\t\t\tfile1: <FILE_URL_1>",
+            "\t\t\t\tfile2: <FILE_URL_2>",
+            "\t\t\t\tfile3: <FILE_URL_3>"
+        ]
+    },
 ]
 
 export default snippets;

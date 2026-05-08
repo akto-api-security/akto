@@ -295,6 +295,62 @@ const settingFunctions = {
       })
       return trafficData
     },
+    fetchServiceNowIntegration: async function(){
+      let serviceNowInteg = {}
+      await settingRequests.fetchServiceNowIntegration().then((resp)=>{
+        serviceNowInteg = resp.serviceNowIntegration
+      })
+      return serviceNowInteg
+    },
+    fetchServiceNowTables: async function(instanceUrl, clientId, clientSecret) {
+      let tables = []
+      await settingRequests.fetchServiceNowTables(instanceUrl, clientId, clientSecret).then((resp)=>{
+        tables = resp.tables
+      })
+      return tables
+    },
+    addServiceNowIntegration: async function(instanceUrl, clientId, clientSecret, tableNames) {
+      let trafficData = {}
+      await settingRequests.addServiceNowIntegration(instanceUrl, clientId, clientSecret, tableNames).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    removeServiceNowIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeServiceNowIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    fetchDevRevIntegration: async function(){
+      let devRevInteg = {}
+      await settingRequests.fetchDevRevIntegration().then((resp)=>{
+        devRevInteg = resp.devrevIntegration
+      })
+      return devRevInteg
+    },
+    fetchDevRevParts: async function(personalAccessToken) {
+      let parts = {}
+      await settingRequests.fetchDevRevParts(personalAccessToken).then((resp)=>{
+        parts = resp.partsIdToNameMap
+      })
+      return parts
+    },
+    addDevRevIntegration: async function(orgUrl, personalAccessToken, partsMap) {
+      let trafficData = {}
+      await settingRequests.addDevRevIntegration(orgUrl, personalAccessToken, partsMap).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    removeDevRevIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeDevRevIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     getSetupOptions: function(){
       return setupOptions;
     },

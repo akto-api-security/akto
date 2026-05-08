@@ -29,16 +29,26 @@ public class PathBuilder {
         }
 
         if (responseCode == -1) {
-            RequestBody requestBody = new RequestBody();
-            Content requestBodyContent = requestBody.getContent();
-            if (requestBodyContent == null) requestBodyContent = new Content();
+            // Only add requestBody for methods that support it (POST, PUT, PATCH, etc.)
+            // GET, DELETE, HEAD, OPTIONS, TRACE cannot have a request body per HTTP spec
+            String methodLower = method.toLowerCase();
+            boolean supportsRequestBody = methodLower.equals("post") || 
+                                         methodLower.equals("put") || 
+                                         methodLower.equals("patch");
+            
+            if (supportsRequestBody) {
+                RequestBody requestBody = new RequestBody();
+                Content requestBodyContent = requestBody.getContent();
+                if (requestBodyContent == null) requestBodyContent = new Content();
 
-            MediaType mediaType = new MediaType();
-            mediaType.setSchema(schema);
-            requestBodyContent.put("application/json", mediaType);
+                MediaType mediaType = new MediaType();
+                mediaType.setSchema(schema);
+                requestBodyContent.put("application/json", mediaType);
 
-            requestBody.setContent(requestBodyContent);
-            operation.setRequestBody(requestBody);
+                requestBody.setContent(requestBodyContent);
+                operation.setRequestBody(requestBody);
+            }
+            
             List<Parameter> parameters = new ArrayList<>();
             if (includeHeaders) {
                 parameters.addAll(headerParameters);

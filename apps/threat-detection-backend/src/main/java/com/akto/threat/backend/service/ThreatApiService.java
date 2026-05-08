@@ -8,26 +8,26 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
-import com.akto.threat.backend.constants.MongoDBCollection;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoCollection;
+import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Filters;
+
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.bson.Document;
-import org.bson.conversions.Bson;
+
 
 public class ThreatApiService {
 
-  private final MongoClient mongoClient;
+  private final MaliciousEventDao maliciousEventDao;
   private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatApiService.class);
 
-  public ThreatApiService(MongoClient mongoClient) {
-    this.mongoClient = mongoClient;
+  public ThreatApiService(MaliciousEventDao maliciousEventDao) {
+    this.maliciousEventDao = maliciousEventDao;
   }
 
   public ListThreatApiResponse listThreatApis(String accountId, ListThreatApiRequest request) {
@@ -37,10 +37,6 @@ public class ThreatApiService {
     int skip = request.hasSkip() ? request.getSkip() : 0;
     int limit = request.getLimit();
     Map<String, Integer> sort = request.getSortMap();
-    MongoCollection<Document> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
     List<Document> base = new ArrayList<>();
     ListThreatApiRequest.Filter filter = request.getFilter();
@@ -79,7 +75,8 @@ public class ThreatApiService {
             new Document(
                     "_id",
                     new Document("endpoint", "$latestApiEndpoint")
-                        .append("method", "$latestApiMethod"))
+                        .append("method", "$latestApiMethod")
+                        .append("host", "$host"))
                 .append("discoveredAt", new Document("$last", "$detectedAt"))
                 .append("distinctActors", new Document("$addToSet", "$actor"))
                 .append("requestsCount", new Document("$sum", 1))));
@@ -90,7 +87,7 @@ public class ThreatApiService {
     List<Document> countPipeline = new ArrayList<>(base);
     countPipeline.add(new Document("$count", "total"));
 
-    Document result = coll.aggregate(countPipeline).first();
+    Document result = maliciousEventDao.aggregateRaw(accountId, countPipeline).first();
     long total = result != null ? result.getInteger("total", 0) : 0;
 
     List<Document> pipeline = new ArrayList<>(base);
@@ -107,7 +104,7 @@ public class ThreatApiService {
                 .append("actorsCount", sort.getOrDefault("actorsCount", -1))));
 
     List<ListThreatApiResponse.ThreatApi> apis = new ArrayList<>();
-    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         Document agg = (Document) doc.get("_id");
@@ -115,6 +112,7 @@ public class ThreatApiService {
             ListThreatApiResponse.ThreatApi.newBuilder()
                 .setEndpoint(agg.getString("endpoint"))
                 .setMethod(agg.getString("method"))
+                .setHost(agg.getString("host") != null ? agg.getString("host") : "")
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
                 .setActorsCount(doc.getInteger("actorsCount", 0))
                 .setRequestsCount(doc.getInteger("requestsCount", 0))
@@ -136,11 +134,6 @@ public class ThreatApiService {
     }
 
     loggerMaker.info("getSubCategoryWiseCount start ts " + Context.now());
-
-    MongoCollection<Document> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
     List<Document> pipeline = new ArrayList<>();
     Document match = new Document();
@@ -169,7 +162,7 @@ public class ThreatApiService {
     List<ThreatCategoryWiseCountResponse.SubCategoryCount> categoryWiseCounts = new ArrayList<>();
 
     // 5. Execute aggregation with controlled batch size
-    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).batchSize(1000).cursor()) {
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).batchSize(1000).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         Document agg = (Document) doc.get("_id");
@@ -199,30 +192,34 @@ public class ThreatApiService {
 
     loggerMaker.info("getSeverityWiseCount start ts " + Context.now());
 
-    MongoCollection<Document> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
-
     List<ThreatSeverityWiseCountResponse.SeverityCount> categoryWiseCounts = new ArrayList<>();
 
     String[] severities = { "CRITICAL", "HIGH", "MEDIUM", "LOW" };
 
+    List<Document> pipeline = new ArrayList<>();
+    pipeline.add(new Document("$match", new Document()
+        .append("detectedAt", new Document("$gte", req.getStartTs())
+            .append("$lte", req.getEndTs()))
+        .append("filterId", new Document("$in", req.getLatestAttackList()))
+        .append("severity", new Document("$in", Arrays.asList(severities)))));
+    pipeline.add(new Document("$group", new Document("_id", "$severity")
+        .append("count", new Document("$sum", 1))));
+
+    Map<String, Integer> severityToCount = new HashMap<>();
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        severityToCount.put(doc.getString("_id"), doc.getInteger("count", 0));
+      }
+    }
+
     for (String severity : severities) {
-      Bson filter = Filters.and(
-          Filters.eq("severity", severity),
-          Filters.gte("detectedAt", req.getStartTs()),
-          Filters.lte("detectedAt", req.getEndTs()),
-          Filters.in("filterId", req.getLatestAttackList())
-      );
-
-      long count = coll.countDocuments(filter);
-
-      if (count > 0) {
+      Integer count = severityToCount.get(severity);
+      if (count != null && count > 0) {
         categoryWiseCounts.add(
             ThreatSeverityWiseCountResponse.SeverityCount.newBuilder()
                 .setSeverity(severity)
-                .setCount((int) count)
+                .setCount(count)
                 .build());
       }
     }

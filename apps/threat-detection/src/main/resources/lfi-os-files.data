@@ -25,7 +25,6 @@
 .azure/
 .bash_
 .bashrc
-.boto
 .cache/notify-osd.log
 .config/
 .cshrc
@@ -87,7 +86,6 @@
 .pki/
 .proclog
 .procmailrc
-.profile
 .psql_history
 .python_history
 .rediscli_history

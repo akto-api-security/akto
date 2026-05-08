@@ -31,7 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
-import org.springframework.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public class InviteUserAction extends UserAction{
 
@@ -52,6 +52,8 @@ public class InviteUserAction extends UserAction{
     static {
         commonOrganisationsMap.put("blinkhealth.com", "blinkhealth.com");
         commonOrganisationsMap.put("blinkrx.com", "blinkhealth.com");
+        commonOrganisationsMap.put("hollywoodbets.net ", "betsoftware.com ");
+        commonOrganisationsMap.put("betsoftware.com ", "hollywoodbets.net ");
     }
 
     public static String validateEmail(String email, String adminLogin) {
@@ -213,7 +215,7 @@ public class InviteUserAction extends UserAction{
 
         // check if user who is being invited has sso-signup 
         boolean hasSSOSignup = false;
-        if (StringUtils.hasText(inviteeEmail)) {
+        if (StringUtils.isNotBlank(inviteeEmail) && !inviteeEmail.isEmpty()) {
             User invitedUser = UsersDao.instance.findOne(Filters.and(
                 Filters.eq(User.LOGIN, inviteeEmail)
             ));

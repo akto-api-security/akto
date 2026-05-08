@@ -43,6 +43,7 @@
     "react": "17.0.2",
     "react-dom": "17.0.2",
     "react-flow-renderer": "^10.3.12",
+    "react-markdown": "^8.0.7",
     "tippy.js": "^6.3.1",
     "tiptap": "^1.32.1",
     "tiptap-extensions": "^1.35.1",

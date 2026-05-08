@@ -5,15 +5,18 @@ import ConcentricCirclesChart from '../../../components/shared/ConcentricCircles
 import observeFunc from "../../observe/transform"
 import TooltipText from '../../../components/shared/TooltipText'
 
-function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl, isRequest, chartOnLeft, dataTableWidth, boxPadding, pieInnerSize, chartSize, spaceBetween}) {
+function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNormal, boxHeight, navUrl, isRequest, chartOnLeft, dataTableWidth, boxPadding, pieInnerSize, chartSize, spaceBetween, navUrlBuilder}) {
     let tableRows = []
     if(data && Object.keys(data).length > 0)
     {
         Object.keys(data).forEach((key,index)=>{
             let comp = [
                 (
-                    <Box >
-                        <div style={{display: "flex", gap: "8px", alignItems: "center", maxWidth: '200px'}} key={index}>
+                    <Box>
+                        <div
+                            style={{display: "flex", gap: "8px", alignItems: "center", maxWidth: '200px'}}
+                            key={index}
+                        >
                             <span style={{background: data[key]?.color, borderRadius: "50%", width: "8px", height: "8px"}} />
                             <Box width='150px'>
                                 <TooltipText tooltip={key} text={key}/>
@@ -22,7 +25,9 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
                     </Box>
                 ),
                 <HorizontalStack gap={1} wrap={false}>
-                    <Box width='30px'>
+                    <Box
+                        width='30px'
+                    >
                         <Text>{observeFunc.formatNumberWithCommas(data[key]?.text)}</Text>
                     </Box>
                     {data[key].dataTableComponent ? data[key].dataTableComponent : null}
@@ -39,7 +44,7 @@ function ChartypeComponent({data, title,charTitle, chartSubtitle, reverse, isNor
 
     const chartComponent = (
 
-        isNormal ? <DonutChart navUrl={navUrl} data={chartData}  title=""  type={title} size={chartSize || 210} isRequest={isRequest} pieInnerSize={pieInnerSize}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
+        isNormal ? <DonutChart navUrl={navUrl} navUrlBuilder={navUrlBuilder} data={chartData}  title={charTitle}  subtitle={chartSubtitle} type={title} size={chartSize || 210} isRequest={isRequest} pieInnerSize={pieInnerSize}/> : <ConcentricCirclesChart data={chartData} title={charTitle} size={210} subtitle={chartSubtitle} />
     )
 
     return (

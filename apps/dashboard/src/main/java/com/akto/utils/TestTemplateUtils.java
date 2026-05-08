@@ -97,29 +97,43 @@ public class TestTemplateUtils {
             TestCategory.MCP_PRIVILEGE_ABUSE,
             TestCategory.MCP_INDIRECT_PROMPT_INJECTION,
             TestCategory.MCP_MALICIOUS_CODE_EXECUTION,
+            TestCategory.MCP_FUNCTION_MANIPULATION,
+            TestCategory.MCP_SECURITY,
         };
 
         TestCategory[] llmCategories = {
             GlobalEnums.TestCategory.LLM,
-            GlobalEnums.TestCategory.LLM01,
-            GlobalEnums.TestCategory.LLM02,
-            GlobalEnums.TestCategory.LLM03,
-            GlobalEnums.TestCategory.LLM04,
-            GlobalEnums.TestCategory.LLM05,
-            GlobalEnums.TestCategory.LLM06,
-            GlobalEnums.TestCategory.LLM07,
-            GlobalEnums.TestCategory.LLM08,
-            GlobalEnums.TestCategory.LLM09,
-            GlobalEnums.TestCategory.LLM10
+            GlobalEnums.TestCategory.PROMPT_INJECTION,
+            GlobalEnums.TestCategory.SENSITIVE_INFORMATION_DISCLOSURE,
+            GlobalEnums.TestCategory.SUPPLY_CHAIN,
+            GlobalEnums.TestCategory.DATA_AND_MODEL_POISONING,
+            GlobalEnums.TestCategory.IMPROPER_OUTPUT_HANDLING,
+            GlobalEnums.TestCategory.EXCESSIVE_AGENCY,
+            GlobalEnums.TestCategory.SYSTEM_PROMPT_LEAKAGE,
+            GlobalEnums.TestCategory.VECTOR_AND_EMBEDDING_WEAKNESSES,
+            GlobalEnums.TestCategory.MISINFORMATION,
+            GlobalEnums.TestCategory.UNBOUNDED_CONSUMPTION,
+            TestCategory.AGENTIC_BUSINESS_ALIGNMENT,
+            TestCategory.AGENTIC_HALLUCINATION_AND_TRUSTWORTHINESS,
+            TestCategory.AGENTIC_SAFETY,
+            TestCategory.AGENTIC_SECURITY,
         };
 
         switch (contextSource) {
             case MCP:
-                return mcpCategories;
+                return Arrays.stream(allCategories)
+                .filter(category ->  !Arrays.asList(llmCategories).contains(category))
+                .toArray(TestCategory[]::new);
 
             case GEN_AI:
                 return llmCategories;
             
+            case AGENTIC:
+                return allCategories;
+            
+            // for DAST and API security
+            case DAST:
+            case API:
             default:
                 return Arrays.stream(allCategories)
                     .filter(category -> !Arrays.asList(mcpCategories).contains(category) && !Arrays.asList(llmCategories).contains(category))

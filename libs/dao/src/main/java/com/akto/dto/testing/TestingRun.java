@@ -58,6 +58,8 @@ public class TestingRun {
     private boolean sendMsTeamsAlert = false;
     public static final String SEND_PENDING_TESTS_WEBHOOK_TIMESTAMP = "sendPendingTestsWebhookTimestamp";
     private int sendPendingTestsWebhookTimestamp;
+    public static final String DO_NOT_MARK_ISSUES_AS_FIXED = "doNotMarkIssuesAsFixed";
+    private boolean doNotMarkIssuesAsFixed = false;
 
     public TestingRun() { }
 
@@ -267,6 +269,15 @@ public class TestingRun {
     public void setSendPendingTestsWebhookTimestamp(int sendPendingTestsWebhookTimestamp) {
         this.sendPendingTestsWebhookTimestamp = sendPendingTestsWebhookTimestamp;
     }
+
+    public boolean getDoNotMarkIssuesAsFixed() {
+        return doNotMarkIssuesAsFixed;
+    }
+
+    public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
+        this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+    }
+
     @Override
     public String toString() {
         return "{" +

@@ -214,11 +214,38 @@ class RequestValidatorTest {
     }
 
     @Test
-    void testValidate_RequestBodyNotFound() throws Exception {
+    void testValidate_RequestBodyNotFound_GetMethod() throws Exception {
         HttpResponseParams responseParam = new HttpResponseParams();
         responseParam.setRequestParams(new HttpRequestParams());
         responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus");
         responseParam.getRequestParams().setMethod("GET");
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        assertTrue(errors.isEmpty(), "GET requests should skip request body validation");
+    }
+
+    @Test
+    void testValidate_RequestBodyNotFound_DeleteMethod() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/{petId}");
+        responseParam.getRequestParams().setMethod("DELETE");
+
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        assertTrue(errors.isEmpty(), "DELETE requests should skip request body validation");
+    }
+
+    @Test
+    void testValidate_RequestBodyNotFound_PostMethod() throws Exception {
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus");
+        responseParam.getRequestParams().setMethod("POST");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+        responseParam.getRequestParams().setPayload("{}");
 
         List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
 

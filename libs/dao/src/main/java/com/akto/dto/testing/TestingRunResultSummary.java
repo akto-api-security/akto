@@ -39,6 +39,7 @@ public class TestingRunResultSummary {
     private ObjectId originalTestingRunResultSummaryId;
     public static final String ORIGINAL_TESTING_RUN_SUMMARY_ID = "originalTestingRunResultSummaryId";
     public static final String IS_NEW_TESTING_RUN_RESULT_SUMMARY = "newTestingSummary";
+    public static final String IS_NEW_TESTING_RUN_RESULT_SUMMARY_OLD = "isNewTestingSummary";
     private boolean newTestingSummary = true;
 
     @BsonIgnore

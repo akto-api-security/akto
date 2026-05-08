@@ -26,7 +26,7 @@ function ConditionComponent(props) {
     const getApiEndpointsOptions = (data) => {
         return data.map(apiEndpoint => {
             let strLabel = func.toMethodUrlString({...apiEndpoint, shouldParse: true});
-            let strValue = func.toMethodUrlString({...apiEndpoint, shouldParse: false});
+            let strValue = func.toMethodUrlApiCollectionIdString({...apiEndpoint, shouldParse: false});
             
             return {
                 id: strValue,
@@ -93,7 +93,7 @@ function ConditionComponent(props) {
         let collectionId = getCollectionId(field);
         if(collectionId==undefined)
             return [];
-        return field.value[collectionId].map((obj)=> {return func.toMethodUrlString(obj)})
+        return field.value[collectionId].map((obj)=> {return func.toMethodUrlApiCollectionIdString(obj)})
     }
 
     const prefixLeft = (field) => (
@@ -128,7 +128,7 @@ function ConditionComponent(props) {
                     optionsList={apiEndpoints?.endpoints == undefined || typeof apiEndpoints.then == 'function' ? [] : 
                                     apiEndpoints.endpoints}
                     setSelected={(apiEndpoints) => {handleEndpointsSelected(apiEndpoints.map((obj) => {
-                         return func.toMethodUrlObject(obj) }), field) }}
+                         return func.toMethodUrlApiCollectionIdObject(obj) }), field) }}
                     preSelected={getEndpoints(field)}
                     itemName={"endpoint"}
                     value={getEndpointCount(field)}

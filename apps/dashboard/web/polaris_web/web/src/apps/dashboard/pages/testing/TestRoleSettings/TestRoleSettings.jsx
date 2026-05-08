@@ -13,6 +13,7 @@ import DescriptionCard from "./DescriptionCard";
 import AuthComponent from "./AuthComponent";
 import SavedParamComponent from "./SavedParamComponent";
 import { HARDCODED } from "./TestRoleConstants";
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 const selectOptions = [
   {
@@ -51,7 +52,7 @@ function TestRoleSettings() {
   const isDataInState = location.state && location?.state !== undefined && Object.keys(location?.state).length > 0
   const isDataInSearch = searchParams.get("name")
   const isNew = !isDataInState && !isDataInSearch
-  const pageTitle = isNew ? "Add test role" : "Configure test role"
+  const pageTitle = isNew ? "Add " + mapLabel("test", getDashboardCategory()) + " role" : "Configure " + mapLabel("test", getDashboardCategory()) + " role"
   const [initialItems, setInitialItems] = useState({ name: "" });
   const [conditions, dispatchConditions] = useReducer(
     produce((draft, action) => conditionsReducer(draft, action)),
@@ -147,7 +148,7 @@ function TestRoleSettings() {
   const saveAction = async (updatedAuth = false, authWithCondLists = null) => {
     let andConditions = transform.filterContainsConditions(conditions, "AND");
     let orConditions = transform.filterContainsConditions(conditions, "OR");
-    if((roleName !== 'ATTACKER_TOKEN_ALL' && !(andConditions || orConditions)) ||
+    if((roleName !== 'ATTACKER_TOKEN_ALL' && roleName !== 'MCP_AUTHENTICATION_ROLE' && !(andConditions || orConditions)) ||
       roleName.length === 0
     ) {
       func.setToast(true, true, "Please select valid values for a test role");

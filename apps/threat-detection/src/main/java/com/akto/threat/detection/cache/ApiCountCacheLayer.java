@@ -142,6 +142,23 @@ public class ApiCountCacheLayer implements CounterCache {
         this.redis.async().set(key, val);
     }
 
+    public void setLongWithExpiry(String key, long value, long expirySeconds) {
+        try {
+            this.redis.sync().setex(key, expirySeconds, value);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public long fetchLongDataFromRedis(String key) {
+        try {
+            return this.redis.sync().get(key);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0L;
+        }
+    }
+
     public void setBytesWithExpiry(String key, byte[] value, int expirySeconds) {
         try {
             this.redisByte.async().set(key, value);

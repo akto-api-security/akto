@@ -66,21 +66,94 @@ public class CustomHttpRequest {
         return s(request);
     }
 
+    private static void logRequestDetails(Request request) {
+        try {
+            loggerMaker.infoAndAddToDb("=== HTTP REQUEST DETAILS ===");
+            loggerMaker.infoAndAddToDb("Request URL: " + request.url().toString());
+            loggerMaker.infoAndAddToDb("Request Method: " + request.method());
+
+            // Log headers
+            StringBuilder headersLog = new StringBuilder("Request Headers: {");
+            request.headers().toMultimap().forEach((key, values) -> {
+                headersLog.append(key).append(": ").append(String.join(", ", values)).append(", ");
+            });
+            if (headersLog.length() > 25) {
+                headersLog.setLength(headersLog.length() - 2); // Remove trailing comma and space
+            }
+            headersLog.append("}");
+            loggerMaker.infoAndAddToDb(headersLog.toString());
+
+            // Log request body if available
+            if (request.body() != null) {
+                try {
+                    okio.Buffer buffer = new okio.Buffer();
+                    request.body().writeTo(buffer);
+                    String bodyString = buffer.readUtf8();
+                    loggerMaker.infoAndAddToDb("Request Body: " + bodyString);
+                } catch (Exception e) {
+                    loggerMaker.infoAndAddToDb("Request Body: (unable to read body - " + e.getMessage() + ")");
+                }
+            } else {
+                loggerMaker.infoAndAddToDb("Request Body: (empty)");
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error logging request details: " + e.getMessage());
+        }
+    }
+
+    private static void logResponseDetails(Response response, String responseBody) {
+        try {
+            loggerMaker.infoAndAddToDb("=== HTTP RESPONSE DETAILS ===");
+            loggerMaker.infoAndAddToDb("Response Status Code: " + response.code());
+            loggerMaker.infoAndAddToDb("Response Message: " + response.message());
+
+            // Log headers
+            StringBuilder headersLog = new StringBuilder("Response Headers: {");
+            response.headers().toMultimap().forEach((key, values) -> {
+                headersLog.append(key).append(": ").append(String.join(", ", values)).append(", ");
+            });
+            if (headersLog.length() > 27) {
+                headersLog.setLength(headersLog.length() - 2); // Remove trailing comma and space
+            }
+            headersLog.append("}");
+            loggerMaker.infoAndAddToDb(headersLog.toString());
+
+            // Log response body
+            if (responseBody != null && !responseBody.isEmpty()) {
+                loggerMaker.infoAndAddToDb("Response Body: " + responseBody);
+            } else {
+                loggerMaker.infoAndAddToDb("Response Body: (empty)");
+            }
+            loggerMaker.infoAndAddToDb("=== END HTTP RESPONSE ===");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error logging response details: " + e.getMessage());
+        }
+    }
+
     public static Map<String, Object> s(Request request) throws HttpResponseException {
+        // Log request details before executing
+        logRequestDetails(request);
+
         //Execute and get the response.
         Response response = null;
         Map<String, Object> jsonMap = new HashMap<>();
+        String jsonData = null;
         try {
             response = httpClient.newCall(request).execute();
             if (response == null) {
                 loggerMaker.infoAndAddToDb("response null");
                 return null;
             }
+
+            jsonData = response.body().string();
+
+            // Log response details
+            logResponseDetails(response, jsonData);
+
             if (!response.isSuccessful()) {
                 throw new HttpResponseException(response.code(), response.message());
             }
 
-            String jsonData = response.body().string();
             jsonMap = new Gson().fromJson(jsonData, Map.class);
 
         } catch (Exception e) {

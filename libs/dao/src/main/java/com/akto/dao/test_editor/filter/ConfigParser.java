@@ -162,9 +162,9 @@ public class ConfigParser {
         // 1. terminal data nodes should have String/Arraylist<String> values
 
         if (curNodeType.equals(OperandTypes.Data.toString().toLowerCase())) {
-            if (!(isString(values) || (isListOfString(values)))){
+            if (!(isString(values) || isListOfString(values) || values instanceof Double || isListOfDouble(values))){
                 configParserValidationResult.setIsValid(false);
-                configParserValidationResult.setErrMsg("terminal data nodes should have String/Arraylist<String> values");
+                configParserValidationResult.setErrMsg("terminal data nodes should have String/Arraylist<String> or Double/ArrayList<Double> values");
                 return configParserValidationResult;
             }
         }
@@ -320,6 +320,38 @@ public class ConfigParser {
             }
         }
     
+        return true;
+    }
+
+    public static boolean isFilterNodeValidForAgenticTest(FilterNode filterNode) {
+        List<FilterNode> childNodes = filterNode.getChildNodes();
+        for (FilterNode childNode : childNodes) {
+            if (childNode.getOperand().equalsIgnoreCase(TermOperands.TEST_TYPE.toString())) {
+                Object values = childNode.getValues();
+                if (values instanceof List) {
+                    List<Map<String,String>> listValues = (List<Map<String,String>>) values;
+                    if (listValues.size() != 1) {
+                        return false;
+                    }
+                    Map<String,String> typeValueObj = listValues.get(0);
+                    String typeValue = typeValueObj.get("eq");
+                    return typeValue.equalsIgnoreCase("AGENTIC");
+                }
+            }
+        }
+        return false;
+    }
+    
+    public Boolean isListOfDouble(Object value) {
+        if(!(value instanceof List)) {
+            return false;
+        }
+        List<Object> listValues = (List<Object>) value;
+        for (Object v : listValues) {
+            if (!(v instanceof Double)) {
+                return false;
+            }
+        }
         return true;
     }
 

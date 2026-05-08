@@ -1,0 +1,84 @@
+.header-css {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.navigation-sidebar {
+    background: var(--p-color-bg);
+    border-right: 1px solid var(--p-color-border);
+    height: 100vh;
+    overflow-y: auto;
+    width: 320px;
+}
+
+.navigation-sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.navigation-sidebar::-webkit-scrollbar-track {
+    background: var(--p-color-bg-subdued);
+}
+
+.navigation-sidebar::-webkit-scrollbar-thumb {
+    background: var(--p-color-border);
+    border-radius: 4px;
+}
+
+.navigation-sidebar::-webkit-scrollbar-thumb:hover {
+    background: var(--p-color-border-hover);
+}
+
+.prompt-editor-container {
+    height: calc(100vh - 200px);
+    display: flex;
+    flex-direction: column;
+}
+
+.prompt-response-container {
+    height: calc(100vh - 200px);
+    display: flex;
+    flex-direction: column;
+    background: var(--p-color-bg-surface);
+}
+
+.monaco-editor-wrapper {
+    flex: 1;
+    min-height: 400px;
+    border: 1px solid var(--p-color-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.prompt-test-panel {
+    background: var(--p-color-bg-surface);
+    border-left: 1px solid var(--p-color-border);
+}
+
+.prompt-category-item {
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.prompt-category-item:hover {
+    background-color: var(--p-color-bg-hover);
+}
+
+.prompt-item {
+    cursor: pointer;
+    padding: 6px 24px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.prompt-item:hover {
+    background-color: var(--p-color-bg-hover);
+}
+
+.prompt-item.selected {
+    background-color: var(--p-color-bg-selected);
+    font-weight: 600;
+}

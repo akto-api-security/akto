@@ -9,6 +9,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -20,12 +21,17 @@ import com.akto.dao.CodeAnalysisApiInfoDao;
 import com.akto.dao.CodeAnalysisCollectionDao;
 import com.akto.dao.CodeAnalysisSingleTypeInfoDao;
 import com.akto.dao.SampleDataDao;
+import com.akto.dao.agents.DiscoveryAgentRunDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.file.FilesDao;
 import com.akto.dao.testing_run_findings.SourceCodeVulnerabilitiesDao;
 import com.akto.dto.CodeAnalysisApiInfo;
 import com.akto.dto.CodeAnalysisCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.agents.AgentRun;
+import com.akto.dto.agents.DiscoveryAgentRun;
 import com.akto.dto.data_types.Predicate.Type;
+import com.akto.dto.files.File;
 import com.akto.dto.test_run_findings.SourceCodeVulnerabilities;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods.Method;
@@ -40,12 +46,21 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.opensymphony.xwork2.Action;
 
+import lombok.Getter;
+import lombok.Setter;
+
 public class AgentHelperAction extends UserAction {
 
     int skip;
     int apiCollectionId;
     int limit;
     SampleData sample;
+
+    @Setter
+    String fileId;
+
+    @Getter
+    String compressedContent;
 
     public String fetchAllResponsesForApiCollectionOrdered() {
 
@@ -250,6 +265,28 @@ public class AgentHelperAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String getFileForDiscovery(){
+
+        if(StringUtils.isEmpty(this.agentProcessId) || StringUtils.isEmpty(this.fileId)){
+            addActionError("Missing required field: agentProcessId or fileId");
+            return Action.ERROR.toUpperCase();
+        }
+
+        DiscoveryAgentRun discoveryAgentRun = DiscoveryAgentRunDao.instance.findOne(Filters.eq(AgentRun.PROCESS_ID, this.agentProcessId));
+        if(discoveryAgentRun == null){
+            addActionError("Discovery agent run not found");
+            return Action.ERROR.toUpperCase();
+        }
+        if(discoveryAgentRun.getAgentInitDocument() == null || !discoveryAgentRun.getAgentInitDocument().containsKey("fileId") || !discoveryAgentRun.getAgentInitDocument().get("fileId").equals(this.fileId)){
+            addActionError("File id not found in agent init document");
+            return Action.ERROR.toUpperCase();
+        }
+        File file = FilesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(this.fileId)));
+        this.compressedContent = file.getCompressedContent();
+
+        return Action.SUCCESS.toUpperCase();
+    }
+    
     public List<String> getDataTypeKeys() {
         return dataTypeKeys;
     }

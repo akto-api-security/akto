@@ -12,7 +12,9 @@ public enum Agent {
     GROUP_APIS("Moriarty", "API grouping tool",
             "The organization wizard that clusters your APIs into logical service groups and relationships"),
     FIND_FALSE_POSITIVE("Sage", "Test false positive finder",
-            "Error detective that hunts down misleading test failures to improve quality assurance efficiency");
+            "Error detective that hunts down misleading test failures to improve quality assurance efficiency"),
+    DISCOVERY_AGENT("Sherlock", "Smart discovery agent",
+            "A smart agent that discovers APIs and sensitive data types in your API ecosystem");
 
     private final String agentEnglishName;
 

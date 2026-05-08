@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" id="safari">
+  <defs>
+    <linearGradient id="a" x1="-868.775" x2="-868.775" y1="-881.357" y2="-879.35" gradientTransform="matrix(51.9299 0 0 -51.9299 45175.498 -45656.667)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1e6ff1"></stop>
+      <stop offset="1" stop-color="#28cefb"></stop>
+    </linearGradient>
+  </defs>
+  <path fill="#fff" fill-rule="evenodd" d="M0,94V26A25.94821,25.94821,0,0,1,26,0H94a25.94821,25.94821,0,0,1,26,26V94a25.94821,25.94821,0,0,1-26,26H26A25.94821,25.94821,0,0,1,0,94Z"></path>
+  <g>
+    <circle cx="60.1" cy="60" r="52.1" fill="url(#a)"></circle>
+    <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M60.1024 107.4798v-8M60.1024 20.4798v-8"></path>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M51.83207 106.78616l1.38918-7.87846M66.93946 21.1079l1.38918-7.87846"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M43.85227 104.62661l2.73616-7.51754M73.608 22.87335l2.73616-7.51754"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M36.312 101.16559l4-6.92821M79.812 25.82138l4-6.9282"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M29.61161 96.39464l5.1423-6.12835M85.53413 29.74878l5.1423-6.12836"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M23.66233 90.51885l6.12835-5.1423M90.30818 34.59634l6.12836-5.1423"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M18.94561 83.72128l6.92819-4M94.2898 40.22129l6.9282-4"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M15.386 76.2519l7.51754-2.73616M97.13924 46.49615L104.65678 43.76"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M13.29134 68.29889L21.1698 66.9097M98.96961 53.1915l7.87847-1.38919"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M12.61824 60.00238h8M99.61822 60.00238h8"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M13.31368 51.78449l7.87846 1.38919M98.992 66.89189l7.87846 1.38918"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M15.47 43.7719l7.51754 2.73616M97.22325 73.52765l7.51754 2.73616"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M18.92822 36.30686l6.9282 4M94.27242 79.80686l6.92821 4"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M23.67793 29.43833l6.12835 5.1423M90.32379 85.36085l6.12836 5.14231"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M29.50992 23.626l5.1423 6.12836M85.43245 90.27185l5.1423 6.12836"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M36.32019 18.86009l4 6.9282M79.82019 94.2043l4 6.9282"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M43.85359 15.359l2.73616 7.51754M73.60934 97.11222l2.73616 7.51754"></path>
+    </g>
+    <g>
+      <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M51.802 13.29176l1.38919 7.87846M66.90935 98.97l1.38919 7.87846"></path>
+    </g>
+    <g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M55.93679 107.30772l.34863-3.98478M63.868 16.654l.34863-3.98477"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M47.8203 105.92861l1.03528-3.8637M71.37283 18.02937l1.03528-3.86371"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M39.99838 103.01769l1.69048-3.62523M78.45664 20.54368l1.69048-3.62523"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M32.84 98.92712l2.29431-3.27661M85.03542 24.38428l2.29431-3.27661"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M26.54054 93.59134L29.369 90.76292M90.88724 29.24464l2.82843-2.82843"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M21.19133 87.29431L24.46794 85M95.73417 35.09885l3.27661-2.29431"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M17.06127 80.08907L20.6865 78.3986M99.53528 41.63081l3.62523-1.69047"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M14.20386 72.32676l3.8637-1.03528M102.10311 48.77422l3.8637-1.03527"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M12.73681 64.15229l3.98478-.34863M103.39053 56.22111l3.98478-.34862"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M12.77127 55.87244l3.98478.34863M103.425 63.80362l3.98478.34862"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M14.14562 47.75326l3.8637 1.03528M102.04485 71.30579l3.8637 1.03528"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M17.028 39.92087l3.62523 1.69047M99.502 78.37913l3.62523 1.69047"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M21.17515 32.80011l3.27661 2.29431M95.718 84.99557l3.27661 2.2943"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M26.53579 26.44337l2.82843 2.82843M90.88251 90.79009l2.82842 2.82843"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M32.7894 21.08372l2.29431 3.27661M84.98486 95.62656l2.29431 3.27661"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M40.02276 16.989l1.69047 3.62523M78.481 99.463l1.69047 3.62523"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M47.77372 14.17253l1.03528 3.8637M71.32625 102.07178l1.03528 3.86371"></path>
+      </g>
+      <g>
+        <path fill="none" stroke="#fff" stroke-linecap="square" stroke-width="1.003" d="M55.895 12.71089l.34862 3.98478M63.82621 103.36462l.34862 3.98477"></path>
+      </g>
+    </g>
+    <g>
+      <polygon fill="#fff" fill-rule="evenodd" points="97.07 29.06 55.97 55.36 23.07 91.06 64.37 65.36 97.07 29.06"></polygon>
+      <polygon fill="#ff3b30" fill-rule="evenodd" points="97.07 29.06 55.97 55.36 64.37 65.36 97.07 29.06"></polygon>
+    </g>
+  </g>
+</svg>

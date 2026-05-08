@@ -39,7 +39,7 @@ public class ThreatConfigurationEvaluatorTest {
                         .build())
                 .build();
 
-        evaluator = new ThreatConfigurationEvaluator(threatConfiguration);
+        evaluator = new ThreatConfigurationEvaluator(threatConfiguration, null, null);
 
         responseParam = new HttpResponseParams();
         responseParam.setRequestParams(new HttpRequestParams());
@@ -87,7 +87,7 @@ public class ThreatConfigurationEvaluatorTest {
 
     @Test
     public void testGetActorIdWhenThreatConfigurationIsNull() {
-        ThreatConfigurationEvaluator evaluatorWithNullConfig = new ThreatConfigurationEvaluator(null) {
+        ThreatConfigurationEvaluator evaluatorWithNullConfig = new ThreatConfigurationEvaluator(null, null, null) {
             @Override
             public ThreatConfiguration getThreatConfiguration() {
                 return null;

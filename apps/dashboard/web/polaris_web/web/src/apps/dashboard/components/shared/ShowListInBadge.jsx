@@ -1,4 +1,4 @@
-import { Badge, Box, HorizontalStack, Tooltip } from '@shopify/polaris'
+import { Badge, Box, HorizontalStack, List, Tooltip } from '@shopify/polaris'
 import React from 'react'
 import TooltipText from './TooltipText'
 
@@ -23,9 +23,9 @@ function ShowListInBadge({itemsArr, maxWidth, status, maxItems, itemWidth, useBa
 
                 {(itemsArr.length - maxItems) > 0 ? (
                     useTooltip ? 
-                        <Tooltip borderRadius="2" padding="4" content={itemsArr?.slice(maxItems)?.map((item, index) => {
+                        <Tooltip width="wide" borderRadius="2" padding="4" content={itemsArr?.slice(maxItems)?.map((item, index) => {
                             return (
-                                <div key={index + item}>{item}</div>
+                                <Box key={index + item} paddingInlineStart="1"><List.Item><div style={{whiteSpace: 'nowrap'}}>{item}</div></List.Item></Box>
                             )})
                         }>
                             <Badge status={status} size="medium">+ {itemsArr.length - maxItems}</Badge>

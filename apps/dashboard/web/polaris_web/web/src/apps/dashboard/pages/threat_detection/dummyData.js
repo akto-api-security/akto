@@ -7,6 +7,100 @@ const AAPLPayload = {"destIp":null,"method":"GET","requestPayload":"{}","respons
 const indicesPayload = {"destIp":null,"method":"GET","requestPayload":"{\"apiKey\":\"wyugqeyuh238478r37dvqugx182328r7gec\"}","responsePayload":"{\"indices\":[{\"name\":\"Dow Jones Industrial Average\",\"symbol\":\"DJIA\",\"currentValue\":33589.12,\"change\":\"-0.23%\"},{\"name\":\"NASDAQ Composite\",\"symbol\":\"IXIC\",\"currentValue\":12056.44,\"change\":\"0.52%\"},{\"name\":\"S&P 500\",\"symbol\":\"SPX\",\"currentValue\":4112.58,\"change\":\"0.12%\"}]}","ip":"null","source":"HAR","type":"HTTP/1.1","akto_vxlan_id":1738051842,"path":"https://api.investmentservices.bankone.com/investments/market/indices","requestHeaders":"{\"authorization\":\"Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ\",\"content-type\":\"application/json\",\"accept\":\"application/json\"}","responseHeaders":"{\"content-type\":\"application/json\"}","time":"1738051936","statusCode":"200","status":"OK","akto_account_id":"1669322524","direction":null,"is_pending":"false"}
 const xxPayload = {"destIp":null,"method":"GET","requestPayload":"{\"name\":\"John's Investment Strategies\", \"ownerId\":\"1234567890\"}","responsePayload":"{\"error processing request\"}","ip":"null","source":"HAR","type":"HTTP/1.1","akto_vxlan_id":1738051842,"path":"https://api.investmentservices.bankone.com/investments/watchlists","requestHeaders":"{\"authorization\":\"Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ\",\"content-type\":\"application/json\",\"accept\":\"application/json\"}","responseHeaders":"{\"content-type\":\"application/json\"}","time":"1738051936","statusCode":"401","status":"","akto_account_id":"1669322524","direction":null,"is_pending":"false"}
 
+// Threat Detection Dummy Data
+const threatSummaryPayload = {
+  "totalAnalysed": 1312,
+  "totalAttacks": 200,
+  "criticalActors": 133,
+  "totalActive": 121,
+  "totalIgnored": 1231,
+  "totalUnderReview": 123,
+  "oldTotalAnalysed": 1200,
+  "oldTotalAttacks": 180,
+  "oldCriticalActors": 120,
+  "oldTotalActive": 110,
+  "oldTotalIgnored": 1150,
+  "oldTotalUnderReview": 100
+}
+
+const threatTrendPayload = {
+  "trendData": [
+    [1704067200000, 25], // 7 days ago
+    [1704153600000, 32], // 6 days ago
+    [1704240000000, 28], // 5 days ago
+    [1704326400000, 41], // 4 days ago
+    [1704412800000, 35], // 3 days ago
+    [1704499200000, 38], // 2 days ago
+    [1704585600000, 29], // 1 day ago
+    [1704672000000, 33]  // today
+  ]
+}
+
+const actorSeverityPayload = {
+  "Critical": {
+    "text": 45,
+    "color": "#E45357",
+    "filterKey": "Critical"
+  },
+  "High": {
+    "text": 88,
+    "color": "#EF864C",
+    "filterKey": "High"
+  },
+  "Medium": {
+    "text": 156,
+    "color": "#F6C564",
+    "filterKey": "Medium"
+  },
+  "Low": {
+    "text": 234,
+    "color": "#6FD1A6",
+    "filterKey": "Low"
+  }
+}
+
+const attackTypePayload = {
+  "SQL Injection": 45,
+  "XSS": 38,
+  "CSRF": 32,
+  "Brute Force": 28,
+  "DDoS": 25,
+  "Other": 32
+}
+
+const threatActorsPayload = [
+  {
+    "name": "Suspicious IP: 192.168.1.100",
+    "attacks": 45,
+    "lastSeen": "2 hours ago",
+    "severity": "Critical"
+  },
+  {
+    "name": "Botnet: Mirai",
+    "attacks": 38,
+    "lastSeen": "4 hours ago",
+    "severity": "High"
+  },
+  {
+    "name": "Suspicious IP: 10.0.0.50",
+    "attacks": 32,
+    "lastSeen": "6 hours ago",
+    "severity": "High"
+  },
+  {
+    "name": "Script Kiddie",
+    "attacks": 28,
+    "lastSeen": "1 day ago",
+    "severity": "Medium"
+  },
+  {
+    "name": "Unknown Actor",
+    "attacks": 25,
+    "lastSeen": "2 days ago",
+    "severity": "Low"
+  }
+]
+
 const sampleDataMap = {
   "investments/market/indices": indicesPayload,
   "investments/market/calendar": calendarPayload,
@@ -15,8 +109,56 @@ const sampleDataMap = {
   "investments/trades": tradePayload,
   "investments/accounts": accountPayload,
   "rest/user/login": loginPayload,
-  "investments/watchlists": xxPayload
+  "investments/watchlists": xxPayload,
+  // Threat Detection endpoints
+  "api/fetchThreatSummaryCounts": threatSummaryPayload,
+  "api/fetchThreatTrends": threatTrendPayload,
+  "api/fetchActorSeverity": actorSeverityPayload,
+  "api/fetchAttackTypes": attackTypePayload,
+  "api/fetchThreatActors": threatActorsPayload
 }
+
+// Threat Status dummy data (for dashboard)
+const threatStatusPayload = {
+  "Active": {
+    "text": 121,
+    "color": "#EF864C",
+    "filterKey": "Active"
+  },
+  "Under Review": {
+    "text": 123,
+    "color": "#F6C564",
+    "filterKey": "Under Review"
+  },
+  "Ignored": {
+    "text": 1231,
+    "color": "#6FD1A6",
+    "filterKey": "Ignored"
+  },
+  "Total": {
+    "text": 1475,
+    "color": "#7F56D9",
+    "filterKey": "Total"
+  }
+}
+
+// Top Attacked Hosts dummy data
+const topHostsPayload = [
+  { host: "api.company.com", attacks: 456, severity: "High", apis: 23 },
+  { host: "auth.company.com", attacks: 289, severity: "Critical", apis: 8 },
+  { host: "payment.company.com", attacks: 234, severity: "Critical", apis: 12 },
+  { host: "admin.company.com", attacks: 187, severity: "High", apis: 15 },
+  { host: "mobile.company.com", attacks: 156, severity: "Medium", apis: 19 }
+]
+
+// Top Attacked APIs dummy data
+const topApisPayload = [
+  { endpoint: "/api/v1/user/login", method: "POST", attacks: 234, severity: "Critical" },
+  { endpoint: "/api/v1/payment/process", method: "POST", attacks: 189, severity: "Critical" },
+  { endpoint: "/api/v1/user/profile", method: "GET", attacks: 156, severity: "High" },
+  { endpoint: "/api/v1/admin/users", method: "GET", attacks: 134, severity: "High" },
+  { endpoint: "/api/v1/files/upload", method: "POST", attacks: 98, severity: "Medium" }
+]
 
 const tempFunc = {
   getSampleDataOfUrl: (url) => {
@@ -28,7 +170,17 @@ const tempFunc = {
     }
     const sampleKey =  key.startsWith("/") ? key.slice(1) : key;
     return sampleDataMap[sampleKey];
-  }
+  },
+  
+  // Threat Detection specific functions
+  getThreatSummaryData: () => threatSummaryPayload,
+  getThreatTrendData: () => threatTrendPayload,
+  getActorSeverityData: () => actorSeverityPayload,
+  getAttackTypeData: () => attackTypePayload,
+  getThreatActorsData: () => threatActorsPayload,
+  getThreatStatusData: () => threatStatusPayload,
+  getTopHostsData: () => topHostsPayload,
+  getTopApisData: () => topApisPayload
 }
 
 export default tempFunc;

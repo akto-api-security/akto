@@ -10,6 +10,8 @@ import convertFunc from "../transform"
 
 import "../TestEditor.css"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
+import func from "../../../../../util/func"
+import { isAgenticSecurityCategory } from "../../../../main/labelHelper"
 
 const TestEditorFileExplorer = ({addCustomTest}) => {
 
@@ -127,7 +129,7 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
     },[])
 
     function getItems(aktoItems){
-        const arr = aktoItems.map(obj => ({
+        let arr = aktoItems.map(obj => ({
             ...obj,
             selected: selectedCategory === (obj.key+obj.param),
             icon: selectedCategory === (obj.key+obj.param) ? ChevronDownMinor : ChevronRightMinor,
@@ -153,7 +155,11 @@ const TestEditorFileExplorer = ({addCustomTest}) => {
                 }
             })
         }))
-        return arr
+        if(isAgenticSecurityCategory()){
+            arr = func.sortByCategoryPriority(arr, 'key')
+        }
+        
+        return arr;
     }
     return (
         <div className="editor-navbar" style={{'overflowY' : 'scroll', overflowX: 'hidden', width: '18rem'}}>

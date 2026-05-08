@@ -2,6 +2,7 @@ import { Modal, Text } from '@shopify/polaris';
 import transform from '../transform';
 import React, { useEffect, useState }  from 'react'
 import TestingStore from '../testingStore';
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 function ReRunModal({refreshSummaries, selectedTestRun, shouldRefresh}) {
     const [localModal, setLocalModal] = useState(false)
@@ -21,9 +22,9 @@ function ReRunModal({refreshSummaries, selectedTestRun, shouldRefresh}) {
         <Modal
             open={localModal}
             onClose={handleClose}
-            title={"Re-run test"}
+            title={"Re-run " + mapLabel("test", getDashboardCategory())}
             primaryAction={{
-                content: "Re-run test",
+                content: "Re-run " + mapLabel("test", getDashboardCategory()),
                 onAction: () => {transform.rerunTest(selectedTestRun.id, refreshSummaries, shouldRefresh) ; handleClose()}
             }}
             secondaryActions={[

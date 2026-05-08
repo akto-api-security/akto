@@ -22,7 +22,6 @@ import com.akto.runtime.Main;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
-import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.libs.utils.src.main.java.com.akto.runtime.policies.ApiAccessTypePolicyUtil;
 import com.mongodb.client.model.Filters;
@@ -92,6 +91,8 @@ public class AdminSettingsAction extends UserAction {
     private boolean enableMergingOnVersions;
     @Setter
     private boolean allowRetrospectiveMerging;
+
+    private Map<String, Boolean> compulsoryDescription;
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -478,7 +479,25 @@ public class AdminSettingsAction extends UserAction {
             Filters.eq(Constants.ID, Context.accountId.get()),
             Updates.set(Account.HYBRID_TESTING_ENABLED, this.miniTestingEnabled)
         );
-        return SUCCESS.toUpperCase();   
+        return SUCCESS.toUpperCase();
+    }
+
+    public String updateCompulsoryDescription() {
+        if (compulsoryDescription == null) {
+            addActionError("Compulsory description settings cannot be null");
+            return ERROR.toUpperCase();
+        }
+
+        try {
+            AccountSettingsDao.instance.updateOneNoUpsert(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.COMPULSORY_DESCRIPTION, compulsoryDescription)
+            );
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error updating compulsory description settings", e);
+            return ERROR.toUpperCase();
+        }
     }
 
     public String enableMergingOnVersionsInApis(){
@@ -627,5 +646,13 @@ public class AdminSettingsAction extends UserAction {
 
     public void setToggleCaseSensitiveApis(boolean toggleCaseSensitiveApis) {
         this.toggleCaseSensitiveApis = toggleCaseSensitiveApis;
+    }
+
+    public Map<String, Boolean> getCompulsoryDescription() {
+        return compulsoryDescription;
+    }
+
+    public void setCompulsoryDescription(Map<String, Boolean> compulsoryDescription) {
+        this.compulsoryDescription = compulsoryDescription;
     }
 }

@@ -6,6 +6,7 @@ import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCard
 import SummaryCardInfo from '../../components/shared/SummaryCardInfo';
 import ApiCollections from '../observe/api_collections/ApiCollections';
 import TestRunsPage from '../testing/TestRunsPage/TestRunsPage';
+import { getDashboardCategory, mapLabel } from '../../../main/labelHelper';
 
 function McpSecurityPage() {
   // Check if user has MCP_SECURITY feature access
@@ -78,7 +79,7 @@ function McpSecurityPage() {
 
   const testResultsTab = {
     id: 'test-results',
-    content: 'Test Results',
+    content: mapLabel('Test results', getDashboardCategory()),
     component: (
       <Box width="100%" paddingBlockStart={4}>
         <TestRunsPage

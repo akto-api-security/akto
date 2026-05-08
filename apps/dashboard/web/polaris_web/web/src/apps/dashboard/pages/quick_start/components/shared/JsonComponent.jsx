@@ -15,7 +15,7 @@ function JsonComponent({dataString, onClickFunc, title, toolTipContent, language
                 <Button icon={ClipboardMinor} plain  onClick={() => onClickFunc()}/>
             </Tooltip>
         </div>
-        <SampleData data={data} language={language} minHeight={minHeight}/>
+        <SampleData data={data} language={language} minHeight={minHeight} />
     </VerticalStack>
   )
 }

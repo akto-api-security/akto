@@ -2,6 +2,9 @@ package com.akto.dto;
 
 public class TestingInstanceHeartBeat {
     
+    public static final String INSTANCE_ID = "instanceId";
+    public static final String TS = "ts";
+    public static final String TESTING_RUN_ID = "testingRunId";
     private int ts;
     private String instanceId;
     private String testingRunId;

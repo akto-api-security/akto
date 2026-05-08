@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package threat_detection.message.malicious_event.label.v1;
+
+option java_outer_classname = "LabelProto";
+option java_package = "threat_detection.message.malicious_event.label.v1";
+
+enum Label {
+  LABEL_UNSPECIFIED = 0;
+  LABEL_THREAT = 1;
+  LABEL_GUARDRAIL = 2;
+}

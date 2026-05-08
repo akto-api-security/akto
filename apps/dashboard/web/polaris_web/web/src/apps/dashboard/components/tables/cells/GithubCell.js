@@ -7,6 +7,7 @@ import {
     Text,
     Tooltip,
     Button} from '@shopify/polaris';
+import { Fragment } from 'react';
 
 import './cell.css'
    
@@ -22,9 +23,9 @@ function GithubCell(props){
             return header.itemOrder==0
         }).filter((header) => {
             return data[header.value]!=undefined && data[header.value]!="";
-        }).map((header) => {
+        }).map((header, index) => {
             return (
-                <div style={{ marginBottom: "auto" }} key={header.value}>
+                <div style={{ marginBottom: "auto" }} key={`github-cell-${index}`}>
                     <Box padding="05">
                         {data.iconTooltip ? 
                             <Tooltip content={data?.iconTooltip} dismissOnMouseOut>
@@ -41,21 +42,21 @@ function GithubCell(props){
     }
     <VerticalStack gap="2" inlineAlign='baseline'>
         <HorizontalStack wrap={divWrap || false} gap="2" align='start'>
-            {
-                headers?.filter((header) => {
+            {[
+                ...(headers?.filter((header) => {
                     return header.itemOrder == 1
                 }).filter((header) => {
                     return data[header.value]!=undefined && data[header.value]!="";
-                }).map((header) => {
+                }).map((header, index) => {
                     if(header.component){
                         return (
-                            <Box maxWidth={nameWidth || width} key={header.value}>
+                            <Box maxWidth={nameWidth || width} key={`order1-header-${index}`}>
                                 {header.component(data[header.value])}
                             </Box>
                         )
                     }
                     return (
-                        <Box maxWidth={nameWidth || width} key={header.value}>
+                        <Box maxWidth={nameWidth || width} key={`order1-header-${index}`}>
                             <div className='order1Title'>
                                 <TooltipText
                                     tooltip={data[header.value]}
@@ -65,45 +66,46 @@ function GithubCell(props){
                             </div>
                         </Box>
                     )
-                })
-            }
-            {
-                headers?.filter((header) => {
+                }) || []),
+                ...(headers?.filter((header) => {
                     return header.itemOrder===2 && header?.alignVertical !== "bottom"
                 }).filter((header) => {
                     return data[header.value]!=undefined && data[header.value]!="";
-                }).map((header) => {
-                    return data?.[header?.value]
-                    ?.map((item) =>
-                    isBadgeClickable ? 
-                        <Button key={item} onClick={() =>badgeClicked()} plain monochrome>
-                            <Badge status={getStatus(item)}>
-                                <Text {...header.dataProps}>
-                                    {item}
-                                </Text>
-                            </Badge>
-                        </Button>
-                        
-                    : <Badge key={item} status={getStatus(item)}>
-                        <Text {...header.dataProps}>
-                            {item}
-                        </Text>
-                    </Badge>
-                    
-                )}) 
-            }
+                }).map((header, headerIndex) => {
+                    return (
+                        <Fragment key={`order2-header-${headerIndex}`}>
+                            {data?.[header?.value]?.map((item, itemIndex) =>
+                                isBadgeClickable ? 
+                                    <Button key={`order2-header-${headerIndex}-item-${itemIndex}`} onClick={() =>badgeClicked()} plain monochrome>
+                                        <Badge status={getStatus(item)}>
+                                            <Text {...header.dataProps}>
+                                                {item}
+                                            </Text>
+                                        </Badge>
+                                    </Button>
+                                    
+                                : <Badge key={`order2-header-${headerIndex}-item-${itemIndex}`} status={getStatus(item)}>
+                                    <Text {...header.dataProps}>
+                                        {item}
+                                    </Text>
+                                </Badge>
+                            )}
+                        </Fragment>
+                    )
+                }) || [])
+            ]}
         </HorizontalStack>
         <Box maxWidth={width}>
             {
                 headers?.filter((header) => {
                     return header.itemOrder===2 && header?.alignVertical === "bottom"
-                }).map((header) => {
+                }).map((header, index) => {
                     
                     if(!data?.[header?.value]) {
-                        return header.component({action: header?.action})
+                        return <div key={`header-component-${index}`}>{header.component({action: header?.action})}</div>
                     }
                     return (
-                            <Button plain removeUnderline onClick={header?.action} textAlign="left">
+                            <Button key={`header-button-${index}`} plain removeUnderline onClick={header?.action} textAlign="left">
                                 <Text as="span" variant="bodyMd" color="subdued" alignment="start">
                                     {data?.[header?.value]}
                                 </Text>
@@ -120,9 +122,9 @@ function GithubCell(props){
                     return header.itemOrder==3
                 }).filter((header) => {
                     return data[header.value]!=undefined && data[header.value]!="";
-                }).map((header) => {
+                }).map((header, index) => {
                     return (
-                        <HorizontalStack wrap={false} key={header.value} gap="1">
+                        <HorizontalStack wrap={false} key={`header-icon-${index}`} gap="1">
                             <div style={{ maxWidth: "1rem", maxHeight: "1rem" }}>
                                 <Tooltip content={header.iconTooltip} dismissOnMouseOut>
                                     <Icon source={header.icon} color="subdued" />
@@ -145,25 +147,28 @@ function GithubCell(props){
                 return header.itemOrder==4
             }).filter((header) => {
                 return data[header.value]!=undefined && data[header.value]!="";
-            }).map((header) => {
-                return data?.[header?.value]
-                ?.map((item) =>
-                isBadgeClickable ? 
-                    <div onClick={() =>badgeClicked()} style={{cursor: "pointer"}} key={item}>
-                        <Badge status={getStatus(item)}>
-                            <Text {...header.dataProps}>
-                                {item}
-                            </Text>
-                        </Badge>
-                    </div>
-                    
-                : <Badge key={item} status={getStatus(item)}>
-                    <Text {...header.dataProps} breakWord>
-                        {item}
-                    </Text>
-                </Badge>
-                
-            )}) 
+            }).map((header, headerIndex) => {
+                return (
+                    <Fragment key={`order4-header-${headerIndex}`}>
+                        {data?.[header?.value]?.map((item, itemIndex) =>
+                            isBadgeClickable ? 
+                                <div onClick={() =>badgeClicked()} style={{cursor: "pointer"}} key={`order4-header-${headerIndex}-item-${itemIndex}`}>
+                                    <Badge status={getStatus(item)}>
+                                        <Text {...header.dataProps}>
+                                            {item}
+                                        </Text>
+                                    </Badge>
+                                </div>
+                                
+                            : <Badge key={`order4-header-${headerIndex}-item-${itemIndex}`} status={getStatus(item)}>
+                                <Text {...header.dataProps} breakWord>
+                                    {item}
+                                </Text>
+                            </Badge>
+                        )}
+                    </Fragment>
+                )
+            }) 
         }
         </HorizontalStack>
     </VerticalStack>

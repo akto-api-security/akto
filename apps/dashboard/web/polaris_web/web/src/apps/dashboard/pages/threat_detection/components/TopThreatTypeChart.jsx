@@ -17,8 +17,8 @@ const TopThreatTypeChart = ({ data }) => {
   }, [data]);
   return (
     <InfoCard
-      title={"Top Threat Types"}
-      titleToolTip={"Top Threat Types"}
+      title={`Top ${mapLabel("Threat", getDashboardCategory())} Types`}
+      titleToolTip={`Top ${mapLabel("Threat", getDashboardCategory())} Types`}
       component={
         <BarGraph
           data={chartData}

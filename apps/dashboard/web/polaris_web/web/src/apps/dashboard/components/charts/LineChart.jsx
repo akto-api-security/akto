@@ -6,7 +6,7 @@ import SpinnerCentered from "../progress/SpinnerCentered";
 
 function LineChart(props) {
 
-    const { type, height, backgroundColor, data, graphPointClick, tooltipFormatter, yAxisTitle, title, text, defaultChartOptions, areaFillHex, color, width, noGap, showGridLines } = props;
+    const { type, height, backgroundColor, data, graphPointClick, tooltipFormatter, yAxisTitle, title, text, defaultChartOptions, areaFillHex, color, width, noGap, showGridLines, exportingDisabled } = props;
     const chartComponentRef = useRef(null)
 
     const fillColor = {
@@ -34,6 +34,9 @@ function LineChart(props) {
         },
         tooltip:{
             shared: false,
+        },
+        exporting: {
+            enabled: !exportingDisabled
         },
         plotOptions: {
             column: {

@@ -7,6 +7,7 @@ import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
+import com.akto.utils.CategoryWiseStatsUtils;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
@@ -93,6 +94,20 @@ public class StartTestAction extends UserAction {
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
+    
+    @Getter
+    private List<Map<String, Object>> categoryWiseScores = new ArrayList<>();
+    
+    private String dashboardCategory;
+    private String dataSource = "redteaming"; // Default to redteaming
+    
+    public void setDashboardCategory(String dashboardCategory) {
+        this.dashboardCategory = dashboardCategory;
+    }
+    
+    public void setDataSource(String dataSource) {
+        this.dataSource = dataSource;
+    }
 
     private String testRoleId;
     private boolean cleanUpTestingResources;
@@ -139,6 +154,7 @@ public class StartTestAction extends UserAction {
     private CallSource source;
     private boolean sendSlackAlert = false;
     private boolean sendMsTeamsAlert = false;
+    private boolean doNotMarkIssuesAsFixed = false;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName, int selectedSlackChannelId) {
         User user = getSUser();
@@ -198,9 +214,11 @@ public class StartTestAction extends UserAction {
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
 
-        return new TestingRun(scheduleTimestamp, user.getLogin(),
+        TestingRun testingRun = new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
                 this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId);
+        testingRun.setDoNotMarkIssuesAsFixed(this.doNotMarkIssuesAsFixed);
+        return testingRun;
     }
 
     String selectedMiniTestingServiceName;
@@ -747,7 +765,7 @@ public class StartTestAction extends UserAction {
                 .map(testingRunResult -> getTestingIssueIdFromRunResult(testingRunResult))
                 .distinct()
                 .collect(Collectors.toList());
-        return Filters.and(Filters.in(Constants.ID, issueIdsList), Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED));
+        return Filters.and(Filters.in(Constants.ID, issueIdsList), Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, Arrays.asList(TestRunIssueStatus.IGNORED, TestRunIssueStatus.FIXED)));
     }
 
     private Map<String, Integer> getCountMapForQueryMode(ObjectId testingRunResultSummaryId, QueryMode queryMode, int accountId){
@@ -877,7 +895,7 @@ public class StartTestAction extends UserAction {
             loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
             timeNow = Context.now();
             if(queryMode.equals(QueryMode.VULNERABLE) || queryMode.equals(QueryMode.IGNORED_ISSUES)) {
-                List<TestRunIssueStatus> ignoreStatuses = queryMode.equals(QueryMode.IGNORED_ISSUES) ? Arrays.asList(TestRunIssueStatus.OPEN, TestRunIssueStatus.FIXED) : Arrays.asList(TestRunIssueStatus.IGNORED);
+                List<TestRunIssueStatus> ignoreStatuses = queryMode.equals(QueryMode.IGNORED_ISSUES) ? Arrays.asList(TestRunIssueStatus.OPEN) : Arrays.asList(TestRunIssueStatus.IGNORED, TestRunIssueStatus.FIXED);
                 BasicDBObject issueMetaDataMap = prepareIssueMetaDataMap(testingRunResults, ignoreStatuses);
                 removeTestingRunResultsByIssues(testingRunResults, (Map<String, String>) issueMetaDataMap.get("statuses"));
                 this.issuesDescriptionMap = (Map<String, String>) issueMetaDataMap.get("descriptions");
@@ -1169,6 +1187,41 @@ public class StartTestAction extends UserAction {
         this.allTestsCountMap = result;
         return SUCCESS.toUpperCase();
     }
+
+    public String fetchCategoryWiseScores() {
+        try {
+            // Determine data source type
+            CategoryWiseStatsUtils.DataSource sourceType;
+            switch (dataSource.toLowerCase()) {
+                case "threat_detection":
+                    sourceType = CategoryWiseStatsUtils.DataSource.THREAT_DETECTION;
+                    break;
+                case "guardrails":
+                    sourceType = CategoryWiseStatsUtils.DataSource.GUARDRAILS;
+                    break;
+                case "redteaming":
+                default:
+                    sourceType = CategoryWiseStatsUtils.DataSource.REDTEAMING;
+                    break;
+            }
+            
+            // Use generic utility for aggregation - categories are handled internally
+            this.categoryWiseScores = CategoryWiseStatsUtils.getCategoryWiseScores(
+                sourceType,
+                startTimestamp, 
+                endTimestamp, 
+                dashboardCategory
+            );
+            
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching category wise scores: " + e.getMessage());
+            addActionError("Error fetching category wise scores");
+            return ERROR.toUpperCase();
+        }
+        
+        return SUCCESS.toUpperCase();
+    }
+
 
     // this gives the count of total vulnerabilites and map of count of subcategories for which issues are generated.
     public String getIssueSummaryInfo(){
@@ -1607,6 +1660,19 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Getter
+    List<AgentConversationResult> conversationsList;
+    @Setter
+    String conversationId;
+
+    public String fetchConversationsFromConversationId() {
+        if(this.conversationId == null || this.conversationId.isEmpty()){
+            addActionError("Conversation id is required");
+            return ERROR.toUpperCase();
+        }
+        this.conversationsList = AgentConversationResultDao.instance.findAll(Filters.eq("conversationId", this.conversationId));
+        return SUCCESS.toUpperCase();
+    }
 
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
@@ -1984,6 +2050,14 @@ public class StartTestAction extends UserAction {
 
     public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
         this.sendMsTeamsAlert = sendMsTeamsAlert;
+    }
+
+    public void setDoNotMarkIssuesAsFixed(boolean doNotMarkIssuesAsFixed) {
+        this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
+    }
+
+    public boolean getDoNotMarkIssuesAsFixed() {
+        return doNotMarkIssuesAsFixed;
     }
 
     public void setRecurringWeekly(boolean recurringWeekly) {

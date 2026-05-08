@@ -61,13 +61,13 @@ function TestrunsBannerComponent({isInventory,onButtonClick, disabled=false}) {
     return (
         <BannerLayout
             title={`${mapLabel("Test your APIs", getDashboardCategory())}`}
-            text={defaultCount + `+ built-in tests covering OWASP Top 10, HackerOne top 10 and all the business logic vulnerabilities for your ${mapLabel("API Security", getDashboardCategory())} testing needs.`}
+            text={defaultCount + `+ built-in tests covering OWASP Top 10, HackerOne top 10 and all the business logic vulnerabilities for your ${mapLabel("API Security testing", getDashboardCategory())} needs.`}
             videoLength={TESTING_VIDEO_LENGTH}
             // videoLink={TESTING_VIDEO_URL}
             videoThumbnail={TESTING_VIDEO_THUMBNAIL}
             bodyComponent={isInventory ? null :<SelectCollectionComponent /> }
             disabled={disabled}
-            {...isInventory ? {buttonText: "Run test", disabled:disabled}: {}}
+            {...isInventory ? {buttonText: mapLabel("Run test", getDashboardCategory()), disabled:disabled}: {}}
             {...isInventory ? {onClick: () => onButtonClick(), disabled:disabled} : {}}
             {...urlsCount === 0 ? {buttonText: "Go to inventory"}: {}} 
             {...urlsCount === 0 ? {buttonUrl: "/dashboard/observe/inventory"}: {}} 

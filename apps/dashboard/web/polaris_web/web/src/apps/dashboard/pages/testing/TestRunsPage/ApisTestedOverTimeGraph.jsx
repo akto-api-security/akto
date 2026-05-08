@@ -45,20 +45,20 @@ const ApisTestedOverTimeGraph = ({ showOnlyTable = false }) => {
         <LineChart
           data={chartData}
           height={280}
-          yAxisTitle={`${mapLabel("APIs", getDashboardCategory())} tested`}
+          yAxisTitle={`${mapLabel("APIs", getDashboardCategory())} ` + mapLabel("tested", getDashboardCategory())}
           type="line"
           text={true}
           showGridLines={true}
         />
       }
-      title={`${mapLabel("APIs", getDashboardCategory())} tested over time`}
+      title={`${mapLabel("APIs", getDashboardCategory())} ` + mapLabel("tested", getDashboardCategory()) + " over time"}
       titleToolTip={`Track ${mapLabel("API", getDashboardCategory())} testing activity over the last 5 weeks, showing the number of ${mapLabel("APIs", getDashboardCategory())} tested per week.`}
       linkText=""
       linkUrl=""
     />
   ) : (
     <EmptyCard 
-      title={`${mapLabel("APIs", getDashboardCategory())} tested over time`}
+      title={`${mapLabel("APIs", getDashboardCategory())} ` + mapLabel("tested", getDashboardCategory()) + " over time"}
     subTitleComponent={showTestingComponents ? emptyCardComponent : <Text alignment='center' color='subdued'>Loading...</Text>} 
     />
   );

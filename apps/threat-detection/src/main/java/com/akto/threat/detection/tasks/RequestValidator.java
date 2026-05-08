@@ -125,6 +125,12 @@ public class RequestValidator {
       return null;
     }
 
+    // Skip request body validation for GET/DELETE requests
+    String method = responseParam.getRequestParams().getMethod().toLowerCase();
+    if(method.equals("get") || method.equals("delete")){
+      return null;
+    }
+
     JsonNode requestBodyNode = getRequestBodyNode(methodNode, url, responseParam);
     if (requestBodyNode == null) {
       return null;
@@ -194,13 +200,16 @@ public class RequestValidator {
     return schemaNode;
   }
 
-  private static void addError(String schemaPath, String instancePath, String attribute, String message) {
+  public static void addError(String schemaPath, String instancePath, String attribute, String message) {
     errors.clear();
     errorBuilder.clear();
     errorBuilder.setSchemaPath(schemaPath);
     errorBuilder.setInstancePath(instancePath);
     errorBuilder.setAttribute(attribute);
     errorBuilder.setMessage(message);
+    errorBuilder.setLocation(SchemaConformanceError.Location.LOCATION_BODY);
+    errorBuilder.setStart(-1);
+    errorBuilder.setEnd(-1);
     errors.add(errorBuilder.build());
   }
 
@@ -245,6 +254,10 @@ public class RequestValidator {
       errorBuilder.setInstancePath(message.getInstanceLocation().toString());
       errorBuilder.setAttribute("requestBody");
       errorBuilder.setMessage(message.getMessage());
+      errorBuilder.setLocation(SchemaConformanceError.Location.LOCATION_BODY);
+      errorBuilder.setStart(-1);
+      errorBuilder.setEnd(-1);
+      errorBuilder.setPhrase(message.getMessage());
       errors.add(errorBuilder.build());
     }
 
@@ -272,4 +285,5 @@ public class RequestValidator {
       return errors;
     }
   }
+
 }
