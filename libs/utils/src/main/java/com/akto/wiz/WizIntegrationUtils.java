@@ -1,8 +1,7 @@
-package com.akto.utils;
+package com.akto.wiz;
 
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
@@ -41,8 +40,6 @@ import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.protobuf.Api;
-import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -62,9 +59,31 @@ public class WizIntegrationUtils {
 
     private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
     private static final LoggerMaker loggerMaker = new LoggerMaker(WizIntegrationUtils.class, LogDb.DASHBOARD);
-    //todo: remove test endpoint
-    //public static final String AUTH_ENDPOINT = "http://localhost:9000/oauth/token";
+    
     public static final String AUTH_ENDPOINT = "https://auth.app.wiz.io/oauth/token";
+
+    public static boolean isWizDevMode() {
+        String wizDevMode = System.getenv("WIZ_DEV_MODE");
+        return wizDevMode != null && wizDevMode.equalsIgnoreCase("true");
+    }
+
+    public static String getWizDevAuthEndpoint() throws Exception {
+        String wizDevAuthEndpoint = System.getenv("WIZ_DEV_AUTH_ENDPOINT");
+        if (wizDevAuthEndpoint != null && !wizDevAuthEndpoint.isEmpty()) {
+            return wizDevAuthEndpoint;
+        } else {
+            throw new Exception("WIZ_DEV_AUTH_ENDPOINT environment variable is required in Wiz dev mode");
+        }
+    }
+
+    public static String getWizDevGraphQLEndpoint() throws Exception {
+        String wizDevGraphQLEndpoint = System.getenv("WIZ_DEV_GRAPHQL_ENDPOINT");
+        if (wizDevGraphQLEndpoint != null && !wizDevGraphQLEndpoint.isEmpty()) {
+            return wizDevGraphQLEndpoint;
+        } else {
+            throw new Exception("WIZ_DEV_GRAPHQL_ENDPOINT environment variable is required in Wiz dev mode");
+        }
+    }
 
     public static String generateAccessToken(String clientId, String clientSecret) throws Exception {
         if (clientId == null || clientSecret == null) {
@@ -81,9 +100,17 @@ public class WizIntegrationUtils {
         formBuilder.add("client_secret", clientSecret);
 
         RequestBody requestBody = formBuilder.build();
+
+        String authEndpoint = AUTH_ENDPOINT;
+
+        if (WizIntegrationUtils.isWizDevMode()) {
+            String devAuthEndpoint = getWizDevAuthEndpoint();
+            loggerMaker.infoAndAddToDb("Wiz dev mode enabled. Using dev auth endpoint: " + devAuthEndpoint);
+            authEndpoint = devAuthEndpoint;
+        }
         
         Request request = new Request.Builder()
-            .url(AUTH_ENDPOINT)
+            .url(authEndpoint)
             .post(requestBody)
             .addHeader("Content-Type", "application/x-www-form-urlencoded")
             .addHeader("Accept", "application/json")
@@ -178,10 +205,11 @@ public class WizIntegrationUtils {
             wizIntegration.getTenantDataCenter(),
             WizIntegration.ENVIRONMENT
         );
-        
 
-        //todo: remove test endpoint
-        //apiUrl = "http://localhost:8080/graphql";
+        if (WizIntegrationUtils.isWizDevMode()) {
+            apiUrl = getWizDevGraphQLEndpoint();
+            loggerMaker.infoAndAddToDb("Wiz dev mode enabled. Using dev GraphQL endpoint: " + apiUrl);
+        }
 
         // Construct GraphQL query
         String graphqlQuery = String.format(
@@ -195,11 +223,8 @@ public class WizIntegrationUtils {
         headers.put("Authorization", Collections.singletonList("Bearer " + accessToken));
 
         // Make request
-
-        // todo: remove skipSSRF set to true
         OriginalHttpRequest request = new OriginalHttpRequest(apiUrl, "", "POST", graphqlQuery, headers, "");
-        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-        //OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, true, new ArrayList<>(), true);
+        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, true, new ArrayList<>(), WizIntegrationUtils.isWizDevMode());
 
         if (response == null) {
             throw new Exception("Failed to request upload URL from Wiz - null response");
@@ -256,11 +281,8 @@ public class WizIntegrationUtils {
         headers.put("Content-Type", Collections.singletonList("application/json"));
 
         // Make request
-
-        // todo: remove skipSSRF set to true
         OriginalHttpRequest request = new OriginalHttpRequest(signedS3Url, "", "PUT", enrichmentJSON, headers, "");
-        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-        //OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, true, new ArrayList<>(), true);
+        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, true, new ArrayList<>(), WizIntegrationUtils.isWizDevMode());
 
         if (response == null) {
             throw new Exception("Failed to upload enrichment JSON to s3 - null response");
@@ -523,194 +545,7 @@ public class WizIntegrationUtils {
         return enrichmentJSON;
     }
 
-    public static void pullFindingsFromWiz(List<TestingRunIssues> testingRunIssuesList, WizIntegration wizIntegration) {
-        if (testingRunIssuesList == null || testingRunIssuesList.isEmpty()) {
-            loggerMaker.infoAndAddToDb("No testing run issues to pull Wiz findings for");
-            return;
-        }
 
-        if (wizIntegration == null) {
-            loggerMaker.errorAndAddToDb("WizIntegration configuration is missing. Cannot pull Wiz findings.");
-            return;
-        }
-
-        // Prepare list of Wiz finding IDs to pull
-        List<String> wizFindingIdList = new ArrayList<>();
-        for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
-            TestingIssuesId testingIssuesId = testingRunIssues.getId();
-            if (testingIssuesId == null) continue;
-
-            try {
-                String wizFindingId = fetchWizFindingId(testingIssuesId);
-                wizFindingIdList.add(wizFindingId);
-            } catch (Exception e) {
-                loggerMaker.error("Error fetching Wiz finding ID for testing issue ID: " + testingIssuesId.toString() + " - " + e.getMessage());
-            }
-        }
-
-        // Get valid access token
-        String accessToken = null;
-        try {
-            accessToken = getValidAccessToken();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Failed to get valid access token for pulling Wiz findings: " + e.getMessage());
-            return;
-        }
-
-        // Build GraphQL API endpoint
-        String apiUrl = String.format(
-            WizIntegration.API_BASE_URL_PATTERN,
-            wizIntegration.getTenantDataCenter(),
-            WizIntegration.ENVIRONMENT
-        );
-        
-        //todo: remove test endpoint
-        //apiUrl = "http://localhost:8080/graphql";
-
-        Map<TestingIssuesId, String> testingIssuesIdToPortalUrlMap = new HashMap<>();
-
-        boolean hasNextPage = true;
-        String after = null;
-
-        long lastSyncTs = wizIntegration.getLastSyncTs();
-        if (lastSyncTs == 0) {
-            // If last sync timestamp is not set, default to pulling findings updated in the last 7 days
-            lastSyncTs = Instant.now().minusSeconds(7 * 24 * 60 * 60).getEpochSecond();
-        }
-        // convert above to ISO 8601 format with UTC timezone.
-        String formattedLastSyncTs = Instant.ofEpochSecond(lastSyncTs).toString();
-
-        long newLastSyncTs = System.currentTimeMillis()/1000L;
-
-        while (hasNextPage) {
-            try {
-                // Construct GraphQL query
-                String query = new StringBuilder()
-                    .append("query VulnerabilityFindingsPage($filterBy: VulnerabilityFindingFilters $first: Int $after: String $orderBy: VulnerabilityFindingOrder) { ")
-                    .append("vulnerabilityFindings(filterBy: $filterBy first: $first after: $after orderBy: $orderBy) { ")
-                    .append("nodes { id portalUrl } ")
-                    .append("pageInfo { hasNextPage endCursor } } }")
-                    .toString();
-
-                BasicDBObject filterBy = new BasicDBObject();
-                filterBy.put("vulnerabilityId", wizFindingIdList);
-
-                filterBy.put("lastUpdatedAt", formattedLastSyncTs);
-
-                BasicDBObject variables = new BasicDBObject();
-                variables.put("filterBy", filterBy);
-                variables.put("first", 1000);
-                variables.put("after", after);
-
-                BasicDBObject graphqlQuery = new BasicDBObject();
-                graphqlQuery.put("query", query);
-                graphqlQuery.put("variables", variables);
-
-                String unescapedGraphqlQueryStr = graphqlQuery.toJson();
-
-                ObjectMapper mapper = new ObjectMapper();
-                String graphqlQueryStr = mapper.writeValueAsString(mapper.readTree(unescapedGraphqlQueryStr));
-
-                // Set headers
-                Map<String, List<String>> headers = new HashMap<>();
-                headers.put("Content-Type", Collections.singletonList("application/json"));
-                headers.put("Authorization", Collections.singletonList("Bearer " + accessToken));
-
-                // Make request
-
-                // todo: remove skipSSRF set to true
-                OriginalHttpRequest request = new OriginalHttpRequest(apiUrl, "", "POST", graphqlQueryStr, headers, "");
-                //OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, true, new ArrayList<>(), true);
-
-                if (response == null) {
-                    throw new Exception("Failed to pull Wiz findings - null response");
-                }
-
-                int statusCode = response.getStatusCode();
-                String responsePayload = response.getBody();
-
-                if (statusCode != 200 || responsePayload == null) {
-                    throw new Exception("Failed to pull Wiz findings. Status code: " + statusCode);
-                }
-
-                // Parse response - retrieve node list and page info
-                BasicDBList nodes = new BasicDBList();
-                BasicDBObject pageInfo = new BasicDBObject();
-                try {
-                    BasicDBObject responseObj = BasicDBObject.parse(responsePayload);
-                    BasicDBObject data = (BasicDBObject) responseObj.get("data");
-                    BasicDBObject vulnerabilityFindings = (BasicDBObject) data.get("vulnerabilityFindings");
-                    nodes = (BasicDBList) vulnerabilityFindings.get("nodes");
-                    pageInfo = (BasicDBObject) vulnerabilityFindings.get("pageInfo");
-                } catch (Exception e) {
-                    throw new Exception("Error parsing response while pulling Wiz findings: " + e.getMessage());
-                }
-
-                // Build a map consisting of wiz portal urls
-                for (Object nodeObj : nodes) {
-                    try {
-                        BasicDBObject node = (BasicDBObject) nodeObj;
-                        String id = node.getString("id");
-                        String portalUrl = node.getString("portalUrl");
-                        TestingIssuesId testingIssuesId = fetchTestingIssuesId(id);
-                        testingIssuesIdToPortalUrlMap.put(testingIssuesId, portalUrl);
-                    } catch (Exception e) {
-                        loggerMaker.error("Error processing node while pulling Wiz findings: " + e.getMessage());
-                    }
-                }
-
-                hasNextPage = pageInfo.getBoolean("hasNextPage", false);
-                after = pageInfo.getString("endCursor", null);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while pulling Wiz findings: " + e.getMessage());
-                return;
-            }
-        }
-
-        List<WriteModel<TestingRunIssues>> bulkUpdates = new ArrayList<>();
-        for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
-            TestingIssuesId testingIssuesId = testingRunIssues.getId();
-            if (testingIssuesId == null) continue;
-
-            String wizPortalaUrl = testingIssuesIdToPortalUrlMap.get(testingIssuesId);
-            WizFinding wizFinding = testingRunIssues.getWizFinding();
-
-            if (wizFinding == null) continue;
-
-            if (wizPortalaUrl != null) {
-                // If the finding url is not already set and we have a portal url from the pull, update the finding url. 
-                // The finding can be marked as having been successfully created in Wiz at this point since we have the portal url available
-                wizFinding.setUrl(wizPortalaUrl);
-                wizFinding.setStatus(WizFinding.Status.CREATION_SUCCESSFUL);
-                bulkUpdates.add(
-                    new UpdateOneModel<> (
-                        Filters.eq(Constants.ID, testingIssuesId),
-                        Updates.set(TestingRunIssues.WIZ_FINDING, wizFinding)
-                    )
-                );
-            }
-        }
-
-        if (!bulkUpdates.isEmpty()) {
-            try {
-                TestingRunIssuesDao.instance.getMCollection().bulkWrite(bulkUpdates);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error updating TestingRunIssues with Wiz finding URLs: " + e.getMessage());
-                return;
-            }
-        }
-
-        // If we reach here, it means sync was successful. Update the wiz last sync timestamp
-        try {
-            WizIntegrationDao.instance.updateOne(
-                new BasicDBObject(),
-                Updates.set(WizIntegration.LAST_SYNC_TS, newLastSyncTs)
-            );
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error updating Wiz integration last sync timestamp: " + e.getMessage());
-        }
-    }
 
     public static void uploadWizDataSource(WizIntegration wizIntegration) {
         if (wizIntegration == null) {
@@ -825,4 +660,3 @@ public class WizIntegrationUtils {
         }
     }
 }
-

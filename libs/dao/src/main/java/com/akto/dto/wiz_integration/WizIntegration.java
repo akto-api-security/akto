@@ -1,5 +1,7 @@
 package com.akto.dto.wiz_integration;
 
+import org.bson.types.ObjectId;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -25,6 +27,8 @@ public class WizIntegration {
     public static final String LAST_SYNC_TS = "lastSyncTs";
     public static final String SYSTEM_ACTIVITY_ID = "systemActivityId";
     public static final String LAST_UPLOADED_SCAN_TS = "lastUploadedScanTs";
+    public static final String WIZ_SYNC_JOB_ID = "wizSyncJobId";
+
 
     // OAuth 2.0 Client Credentials
     private String clientId;
@@ -48,6 +52,9 @@ public class WizIntegration {
     // System action status (for tracking status of uploaded security scans)
     private String systemActivityId;
     private long lastUploadedScanTs;
+
+    // Job
+    private ObjectId wizSyncJobId;
 
     public boolean isTokenValid() {
         return accessToken != null &&
