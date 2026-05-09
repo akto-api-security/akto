@@ -1,14 +1,9 @@
 package com.akto.test_editor.filter;
 
-import com.akto.gpt.handlers.gpt_prompts.TestValidatorModifier;
-import com.akto.jsonrpc.McpToolDescriptionsRegistry;
-
 import java.util.*;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.mcp.McpJsonRpcModel;
-import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
@@ -25,7 +20,6 @@ import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
 import com.akto.gpt.handlers.gpt_prompts.TestFilterModifier;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
-import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONArray;
@@ -84,19 +78,25 @@ public class Filter {
                     BasicDBObject queryData = new BasicDBObject();
 
                     RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+                    
+                    if (filterActionRequest.isValidationContext()) {
+                        operation = operation + "\n\nIMPORTANT - Strict validation rules for this check:\n"
+                            + "The request payload may appear in the response, but echoing alone does NOT confirm the operation. "
+                            + "You must verify that the response demonstrates actual exploitation or behavioral evidence — "
+                            + "not merely that the input was reflected back.\n"
+                            + "Return not_found immediately if the response:\n"
+                            + "  - Contains error indicators such as: invalid parameter, resource not found, bad request, "
+                            + "unknown field, unrecognized input, operation not permitted, not allowed, unsupported, "
+                            + "missing parameter, malformed, rejected, forbidden, unauthorized, resource does not exist, no such — "
+                            + "or any equivalent phrasing indicating the server rejected or could not process the input.\n"
+                            + "Confirm the operation if the response provides strong positive evidence that the described vulnerability was triggered.";
+                    }
+                    queryData.put(TestExecutorModifier._OPERATION, operation);
                     String ogRequest = Utils.buildRequestIHttpFormat(rawApi);
                     String response = Utils.buildResponseIHttpFormat(rawApi);
-
-                    queryData.put(TestExecutorModifier._OPERATION, operation);
-                    BasicDBObject generatedData;
-                    if (filterActionRequest.isValidationContext()) {
-                        queryData.put(TestExecutorModifier._REQUEST, response);
-                        generatedData = new TestValidatorModifier().handle(queryData);
-                    } else {
-                        String request = "Request payload: \n" + ogRequest + "\n\nResponse payload: \n" + response;
-                        queryData.put(TestExecutorModifier._REQUEST, request);
-                        generatedData = new TestFilterModifier().handle(queryData);
-                    }
+                    String request = "Request payload: \n" + ogRequest + "\n\nResponse payload: \n" + response;
+                    queryData.put(TestExecutorModifier._REQUEST, request);
+                    BasicDBObject  generatedData = new TestFilterModifier().handle(queryData);
 
                     if (generatedData.containsKey(operationTypeLower)) {
                         Object generatedQuerySet = generatedData.get(operationTypeLower);

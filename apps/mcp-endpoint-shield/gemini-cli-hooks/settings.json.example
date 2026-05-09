@@ -28,6 +28,36 @@
         ]
       }
     ],
+    "BeforeTool": [
+      {
+        "matcher": ".*",
+        "sequential": true,
+        "hooks": [
+          {
+            "name": "akto-validate-pre-tool",
+            "type": "command",
+            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-validate-pre-tool-wrapper.sh",
+            "timeout": 10000,
+            "description": "Validates tool calls against Akto Guardrails before execution"
+          }
+        ]
+      }
+    ],
+    "AfterTool": [
+      {
+        "matcher": ".*",
+        "sequential": true,
+        "hooks": [
+          {
+            "name": "akto-validate-post-tool",
+            "type": "command",
+            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-validate-post-tool-wrapper.sh",
+            "timeout": 10000,
+            "description": "Ingests tool execution results to Akto for monitoring and can block malicious results"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "*",
@@ -88,32 +118,6 @@
             "name": "akto-validate-before-tool-selection",
             "type": "command",
             "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-hook-wrapper.sh akto-hooks.py BeforeToolSelection",
-            "timeout": 10000
-          }
-        ]
-      }
-    ],
-    "BeforeTool": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "name": "akto-validate-before-tool",
-            "type": "command",
-            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-hook-wrapper.sh akto-hooks.py BeforeTool",
-            "timeout": 10000
-          }
-        ]
-      }
-    ],
-    "AfterTool": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "name": "akto-validate-after-tool",
-            "type": "command",
-            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-hook-wrapper.sh akto-hooks.py AfterTool",
             "timeout": 10000
           }
         ]

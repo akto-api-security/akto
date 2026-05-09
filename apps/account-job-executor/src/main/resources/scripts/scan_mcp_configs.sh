@@ -1,5 +1,5 @@
 #!/bin/bash
-# MCP Configuration Discovery Script for SentinelOne RemoteOps
+# MCP Configuration Discovery Script (common — used by SentinelOne and Microsoft Defender)
 # Mirrors: mcp-endpoint-shield/mcp/**/discovery.go
 #
 # What this does:

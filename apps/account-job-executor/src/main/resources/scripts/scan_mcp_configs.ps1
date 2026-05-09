@@ -1,4 +1,4 @@
-# MCP Configuration Discovery Script for SentinelOne RemoteOps (Windows PowerShell)
+# MCP Configuration Discovery Script (common — used by SentinelOne and Microsoft Defender, Windows PowerShell)
 # Mirrors: mcp-endpoint-shield/mcp/**/discovery.go
 #
 # What this does:

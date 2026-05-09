@@ -9159,7 +9159,8 @@
                 <param name="featureLabel">JIRA_INTEGRATION</param>
             </interceptor-ref>
             <result name="SUCCESS" type="json">
-                <param name="root">jiraIntegration</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^jiraIntegration.*, ^failedProjectKeys.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
