@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-instructions-loaded.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py InstructionsLoaded",
             "timeout": 10
           }
         ]
@@ -126,7 +126,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-sub-agent-start.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py SubagentStart",
             "timeout": 10
           }
         ]
@@ -137,7 +137,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-sub-agent-stop.py",
+            "command": "bash ~/.claude/hooks/akto-hook-wrapper.sh akto-hooks.py SubagentStop",
             "timeout": 10
           }
         ]

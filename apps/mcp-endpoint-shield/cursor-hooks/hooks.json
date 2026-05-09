@@ -67,14 +67,14 @@
     ],
     "subagentStart": [
       {
-        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-subagent-start.py",
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py subagentStart",
         "type": "command",
         "timeout": 10
       }
     ],
     "subagentStop": [
       {
-        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-subagent-stop.py",
+        "command": "bash ~/.cursor/hooks/akto/akto-hook-wrapper.sh akto-hooks.py subagentStop",
         "type": "command",
         "timeout": 10
       }
