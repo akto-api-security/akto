@@ -1,7 +1,7 @@
 
-import { Text, HorizontalStack, VerticalStack, Box, Icon, Tooltip } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box, Icon, Tooltip, Tabs } from "@shopify/polaris"
 import { CircleTickMajor, CircleCancelMajor, SettingsMajor, ClockMinor } from "@shopify/polaris-icons";
-import { useEffect, useMemo, useReducer, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
 import api from "./api"
@@ -21,7 +21,15 @@ import AuditDataDrawer from "./AuditDataDrawer";
 import CollectionIcon from "../../components/shared/CollectionIcon";
 import settingsApi from "../settings/api";
 import { intersectServerActionFlags, getRegistryOverride } from "./auditServerActionFlags";
+import { formatDisplayName } from "./agentic/mcpClientHelper";
 import "../../components/shared/style.css";
+
+const ENDPOINT_TAB_SERVERS = "mcp-servers";
+const ENDPOINT_TAB_AGENTS = "ai-agents";
+const endpointTabs = [
+    { id: ENDPOINT_TAB_SERVERS, content: "MCP Servers" },
+    { id: ENDPOINT_TAB_AGENTS, content: "AI Agents" },
+];
 
 const headingsEndpointSecurity = [
     {
@@ -213,6 +221,51 @@ let filtersEndpointSecurity = [
     }
 ]
 
+const headingsEndpointSecurityAgents = [
+    {
+        title: 'AI Agent',
+        text: 'AI Agent',
+        value: 'aiAgentNameComp',
+    },
+    {
+        title: 'Last Detected',
+        text: 'Last Detected',
+        value: 'lastDetectedComp',
+        sortActive: true,
+        sortKey: 'lastDetected',
+        type: CellType.TEXT,
+    },
+    {
+        title: 'Updated',
+        text: 'Updated',
+        value: 'updatedTimestampComp',
+        sortKey: 'updatedTimestamp',
+        sortActive: true,
+        type: CellType.TEXT,
+    },
+    {
+        title: 'Marked By',
+        text: 'Marked By',
+        value: 'markedBy',
+        type: CellType.TEXT,
+        filterKey: 'markedBy',
+    },
+    {
+        title: 'Remarks',
+        text: 'Remarks',
+        value: 'remarksComp',
+    },
+];
+
+let filtersEndpointSecurityAgents = [
+    {
+        key: 'markedBy',
+        label: 'Marked By',
+        title: 'Marked By',
+        choices: [],
+    },
+];
+
 const resourceName = {
     singular: 'audit record',
     plural: 'audit records',
@@ -353,6 +406,36 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     return temp;
 }
 
+const convertAgentRowForTable = (auditRecord) => {
+    const temp = { ...auditRecord };
+    const rawName = auditRecord?.resourceName || "-";
+    const friendly = rawName !== "-" ? formatDisplayName(rawName) : "-";
+    temp['aiAgentName'] = rawName;
+    temp['aiAgentNameComp'] = (
+        <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+            <Box className="audit-table-icon">
+                <CollectionIcon
+                    hostName={rawName}
+                    assetTagValue={rawName}
+                    displayName={friendly}
+                />
+            </Box>
+            <Text>{friendly}</Text>
+        </HorizontalStack>
+    );
+    temp['lastDetectedComp'] = temp?.lastDetected ? func.prettifyEpoch(temp.lastDetected) : "-";
+    temp['updatedTimestampComp'] = temp?.updatedTimestamp ? func.prettifyEpoch(temp.updatedTimestamp) : "-";
+    temp['remarksComp'] = (
+        (temp?.remarks === null || temp?.remarks === "" || !temp?.remarks)
+            ? <Text variant="bodyMd" color="subdued">Pending</Text>
+            : <Text variant="bodyMd">{temp.remarks}</Text>
+    );
+    temp['id'] = temp.hexId;
+    temp['name'] = temp.hexId;
+    temp['isTerminal'] = true;
+    return temp;
+};
+
 function AuditData() {
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
@@ -377,11 +460,20 @@ function AuditData() {
     const collectionsRegistryStatusMap = PersistStore(state => state.collectionsRegistryStatusMap)
 
     const isEndpointSecurity = isEndpointSecurityCategory();
-    const filters = isEndpointSecurity ? filtersEndpointSecurity : filtersDefault;
+    const [endpointTab, setEndpointTab] = useState(ENDPOINT_TAB_SERVERS);
+    const isAgentsTab = isEndpointSecurity && endpointTab === ENDPOINT_TAB_AGENTS;
+    const filters = useMemo(() => {
+        if (!isEndpointSecurity) return filtersDefault;
+        return isAgentsTab ? filtersEndpointSecurityAgents : filtersEndpointSecurity;
+    }, [isEndpointSecurity, isAgentsTab]);
     const headings = useMemo(() => {
         if (!isEndpointSecurity) return headingsDefault;
-        return headingsEndpointSecurity;
-    }, [isEndpointSecurity]);
+        return isAgentsTab ? headingsEndpointSecurityAgents : headingsEndpointSecurity;
+    }, [isEndpointSecurity, isAgentsTab]);
+    const handleTabChange = useCallback((index) => {
+        const next = endpointTabs[index]?.id || ENDPOINT_TAB_SERVERS;
+        setEndpointTab(next);
+    }, []);
 
     const [registryConfigured, setRegistryConfigured] = useState(false);
     const endpointRowCacheRef = useRef({});
@@ -651,7 +743,9 @@ function AuditData() {
         let finalFilters = {...filterParams}
         finalFilters['lastDetected'] = [startTimestamp, endTimestamp]
 
-        if (isEndpointSecurity) {
+        if (isAgentsTab) {
+            finalFilters['type'] = ['ai-agent']
+        } else if (isEndpointSecurity) {
             finalFilters['type'] = ['mcp-server']
         } else {
             finalFilters['hostCollectionId'] = (filterParams['collectionName'] || []).map(id => parseInt(id))
@@ -661,31 +755,38 @@ function AuditData() {
             delete finalFilters['collectionName']
         }
 
+        const useMergedAggregation = isEndpointSecurity && !isAgentsTab;
+
         try {
-            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue, isEndpointSecurity)
+            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue, useMergedAggregation)
             if (res && res.auditData) {
                 if (isEndpointSecurity) {
                     endpointRowCacheRef.current = {};
                 }
                 res.auditData.forEach((auditRecord) => {
-                    let collectionName = "-";
-                    if(collectionsMap[auditRecord?.hostCollectionId]){
-                        collectionName = collectionsMap[auditRecord?.hostCollectionId];
-                    } else if(auditRecord?.mcpHost !== null && auditRecord?.mcpHost !== ""){
-                        collectionName = auditRecord?.mcpHost;
-                    }
-                    const collectionRegistryStatus = collectionsRegistryStatusMap[auditRecord?.hostCollectionId];
-                    const dataObj = convertDataIntoTableFormat(
-                        auditRecord,
-                        collectionName,
-                        collectionRegistryStatus
-                    )
-                    const override = getRegistryOverride(dataObj, registryConfigured);
-                    if (override) {
-                        dataObj.markedBy = override.markedBy;
-                        dataObj.remarksComp = (
-                            <Text variant="bodyMd" color="critical">{override.remarks}</Text>
-                        );
+                    let dataObj;
+                    if (isAgentsTab) {
+                        dataObj = convertAgentRowForTable(auditRecord);
+                    } else {
+                        let collectionName = "-";
+                        if(collectionsMap[auditRecord?.hostCollectionId]){
+                            collectionName = collectionsMap[auditRecord?.hostCollectionId];
+                        } else if(auditRecord?.mcpHost !== null && auditRecord?.mcpHost !== ""){
+                            collectionName = auditRecord?.mcpHost;
+                        }
+                        const collectionRegistryStatus = collectionsRegistryStatusMap[auditRecord?.hostCollectionId];
+                        dataObj = convertDataIntoTableFormat(
+                            auditRecord,
+                            collectionName,
+                            collectionRegistryStatus
+                        )
+                        const override = getRegistryOverride(dataObj, registryConfigured);
+                        if (override) {
+                            dataObj.markedBy = override.markedBy;
+                            dataObj.remarksComp = (
+                                <Text variant="bodyMd" color="critical">{override.remarks}</Text>
+                            );
+                        }
                     }
                     ret.push(dataObj);
                     endpointRowCacheRef.current[String(dataObj.hexId || dataObj.id)] = dataObj;
@@ -721,6 +822,20 @@ function AuditData() {
                 filtersEndpointSecurity[2].choices = Array.from(agents).sort().map(a => ({ label: a, value: a }))
                 filtersEndpointSecurity[3].choices = Array.from(servers).sort().map(s => ({ label: s, value: s }))
             } catch (e) {}
+            try {
+                const agentsRes = await api.fetchAuditData(
+                    'lastDetected', -1, 0, 1000,
+                    { type: ['ai-agent'], lastDetected: [startTimestamp, endTimestamp] },
+                    {}, '', false
+                )
+                const agentMarkedBy = new Set()
+                if (agentsRes && Array.isArray(agentsRes.auditData)) {
+                    agentsRes.auditData.forEach((rec) => {
+                        if (rec?.markedBy) agentMarkedBy.add(rec.markedBy)
+                    })
+                }
+                filtersEndpointSecurityAgents[0].choices = Array.from(agentMarkedBy).sort().map(u => ({ label: u, value: u }))
+            } catch (e) {}
             setFilterVersion(v => v + 1)
         } else {
             try {
@@ -753,6 +868,33 @@ function AuditData() {
         </HorizontalStack>
     )
 
+    const tabsComponent = isEndpointSecurity ? (
+        <Tabs
+            tabs={endpointTabs}
+            selected={endpointTabs.findIndex(t => t.id === endpointTab)}
+            onSelect={handleTabChange}
+        />
+    ) : null;
+
+    const tableKey = isEndpointSecurity
+        ? `${startTimestamp}-${endTimestamp}-${filterVersion}-${endpointTab}-${registryConfigured}`
+        : `${startTimestamp}-${endTimestamp}-${filtersDefault[1].choices.length + filtersDefault[3].choices.length}-${registryConfigured}`;
+
+    let tableExtraProps;
+    if (isAgentsTab) {
+        tableExtraProps = { filterStateUrl: "audit-data-endpoint-agents" };
+    } else if (isEndpointSecurity) {
+        tableExtraProps = {
+            onRowClick: handleRowClick,
+            rowClickable: true,
+            selectable: true,
+            promotedBulkActions: endpointPromotedBulkActions,
+            filterStateUrl: "audit-data-endpoint",
+        };
+    } else {
+        tableExtraProps = { getActions: (item) => getActionsList(item), hasRowActions: true };
+    }
+
     return (
         <>
             <PageWithMultipleCards
@@ -764,8 +906,9 @@ function AuditData() {
             isFirstPage={true}
             primaryAction={primaryActions}
             components = {[
+                tabsComponent,
                 <GithubServerTable
-                        key={startTimestamp + endTimestamp + (isEndpointSecurity ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(isEndpointSecurity) + String(registryConfigured)}
+                        key={tableKey}
                         headers={headings}
                         resourceName={resourceName}
                         appliedFilters={[]}
@@ -780,21 +923,12 @@ function AuditData() {
                         condensedHeight={true}
                         pageLimit={20}
                         headings={headings}
-                        {...(isEndpointSecurity
-                            ? {
-                                onRowClick: handleRowClick,
-                                rowClickable: true,
-                                selectable: true,
-                                promotedBulkActions: endpointPromotedBulkActions,
-                                filterStateUrl: "audit-data-endpoint",
-                            }
-                            : { getActions: (item) => getActionsList(item), hasRowActions: true }
-                        )}
+                        {...tableExtraProps}
                 />,
             ]}
             />
 
-            {isEndpointSecurity ? (
+            {isAgentsTab ? null : isEndpointSecurity ? (
                 <>
                     <AuditDataDrawer
                         auditItem={selectedAuditItem}
