@@ -56,7 +56,6 @@ public class McpAuditInfoDao extends AccountsContextDao<McpAuditInfo> {
         fieldNames = new String[]{McpAuditInfo.CONTEXT_SOURCE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
-        // Covers the (type, resourceName) lookup used by the ai-agent row upsert.
         fieldNames = new String[]{McpAuditInfo.TYPE, McpAuditInfo.RESOURCE_NAME};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }

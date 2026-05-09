@@ -496,10 +496,8 @@ public final class McpRequestResponseUtils {
         return sb.toString();
     }
 
-    // Returns the AI agent identity encoded in a 3+-segment ENDPOINT-source host.
-    // MCP hook + Go gateway shape: <device>.<connector>.<server>     → connector
-    // LLM hook shape:              <device>.ai-agent.<connector>     → connector (segment 2)
-    // Returns null when the host has fewer than 3 segments or the resolved name is blank.
+    // <device>.<agent>.<server> → agent. Sentinel: when segment 1 is "ai-agent",
+    // the actual agent identity is segment 2 (LLM hook shape).
     public static String extractAgentNameFromHost(String host) {
         if (StringUtils.isBlank(host)) {
             return null;
