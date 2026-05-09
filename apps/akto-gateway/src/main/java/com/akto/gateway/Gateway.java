@@ -3,15 +3,10 @@ package com.akto.gateway;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.ClientActor;
 import com.akto.dto.IngestDataBatch;
-import com.akto.util.JSONUtils;
-import org.apache.commons.collections.CollectionUtils;
 import com.akto.log.LoggerMaker;
 
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 
 public class Gateway {
@@ -20,33 +15,6 @@ public class Gateway {
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
-
-    private static final Map<String, Set<String>> WHITELISTED_CLIENT_HOOKS =
-            new HashMap<String, Set<String>>() {
-                {
-                    put("claude_code_cli",
-                            new HashSet<>(Arrays.asList("SessionStart", "SessionEnd",
-                                    "InstructionsLoaded", "PermissionRequest", "PermissionDenied",
-                                    "PostToolUseFailure", "Stop", "StopFailure", "SubagentStart",
-                                    "SubagentStop", "TaskCreated", "TaskCompleted", "TeammateIdle",
-                                    "Notification", "ConfigChange", "CwdChanged", "FileChanged",
-                                    "PreCompact", "PostCompact", "Elicitation", "ElicitationResult",
-                                    "WorktreeCreate", "WorktreeRemove")));
-                    put("cursor",
-                            new HashSet<>(Arrays.asList("sessionStart", "sessionEnd", "preToolUse",
-                                    "postToolUse", "postToolUseFailure", "subagentStart",
-                                    "subagentStop", "beforeShellExecution", "afterShellExecution",
-                                    "beforeReadFile", "afterFileEdit", "afterAgentThought", "stop",
-                                    "preCompact", "beforeTabFileRead", "afterTabFileEdit")));
-                    put("vscode", new HashSet<>(Arrays.asList("SessionStart", "Stop",
-                            "SubagentStart", "SubagentStop", "PreCompact")));
-                    put("codex_cli", new HashSet<>(Arrays.asList("SessionStart")));
-                    put("gemini_cli",
-                            new HashSet<>(Arrays.asList("SessionStart", "SessionEnd", "BeforeAgent",
-                                    "AfterAgent", "BeforeToolSelection", "BeforeTool", "AfterTool",
-                                    "PreCompress", "Notification")));
-                }
-            };
 
     private Gateway() {
         this.guardrailsClient = new GuardrailsClient();
@@ -91,28 +59,7 @@ public class Gateway {
                 runResponseGuardrails = true;
             }
 
-            if (shouldForceGuardrailsForAccount(Context.accountId.get())
-                || shouldForceGuardrailsForAccount(ClientActor.getAbstractorAccountIdFromEnvOrNull())) {
-                runRequestGuardrails = true;
-                runResponseGuardrails = true;
-            }
-
-            String aktoConnector = getStringField(requestData, "akto_connector");
-            String clientHook = getStringField(requestData, "client_hook");
-
-            boolean isHookWhitelisted = false;
-            if (!WHITELISTED_CLIENT_HOOKS.isEmpty() && WHITELISTED_CLIENT_HOOKS.containsKey(aktoConnector)) {
-                Set<String> hooks = WHITELISTED_CLIENT_HOOKS.get(aktoConnector);
-                if (CollectionUtils.isNotEmpty(hooks)) {
-                    isHookWhitelisted = hooks.contains(clientHook);
-                }
-            }
-
-            if (isHookWhitelisted) {
-                loggerMaker.info("skipping guardrails for connector: {}, client_hook: {}", aktoConnector, clientHook);
-            }
-
-            if (!isHookWhitelisted && (runRequestGuardrails || runResponseGuardrails)) {
+            if (runRequestGuardrails || runResponseGuardrails) {
                 long guardrailsStart = System.currentTimeMillis();
                 Map<String, Object> guardrailsResult = null;
 
@@ -126,7 +73,6 @@ public class Gateway {
                 loggerMaker.infoAndAddToDb("Guardrails call(s) completed - path: {}, latencyMs: {}",
                     requestData.get("path"), System.currentTimeMillis() - guardrailsStart);
                 result.put("guardrailsResult", guardrailsResult);
-                loggerMaker.info("Guardrails validation done. {}", JSONUtils.getString(guardrailsResult));
             }
 
             String ingestData = getStringField(requestData, "ingest_data");
