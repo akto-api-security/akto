@@ -8,6 +8,7 @@ export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="codex_cli"
 export CONTEXT_SOURCE="ENDPOINT"
+export DEVICE_ID="{{DEVICE_ID (optional)}}"
 
 export LOG_LEVEL="INFO"
 export LOG_PAYLOADS="false"
