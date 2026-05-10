@@ -30,7 +30,8 @@ public class TestFilterModifier extends TestExecutorModifier {
                 .append("- Example: { \"not_contains\": [\"param1\"] }\n")
                 .append("- Example: { \"regex\": \".*\" }\n")
                 .append("- Example: { \"gt\": 200 }\n")
-                .append("- Return ONLY the JSON or " + _NOT_FOUND + " — nothing else.");
+                .append(" Think through your reasoning silently before answering.")
+                .append("- Return ONLY the JSON or " + _NOT_FOUND + " — no explanations, no reasoning, no other text.");
         return promptBuilder.toString();
     }
 
