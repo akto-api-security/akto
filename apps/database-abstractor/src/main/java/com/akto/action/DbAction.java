@@ -2124,7 +2124,7 @@ public class DbAction extends ActionSupport {
 
                    // Fetch from DB and update cache
                    loggerMaker.error("fetchAllApiCollectionsMeta cache miss/expired, fetching from DB for account id: " + accountId);
-                   apiCollections = DbLayer.fetchAllApiCollectionsMeta();
+                   apiCollections = DbLayer.fetchAllApiCollectionsMeta(includeTagsList);
                    cachedApiCollections = apiCollections;
                    cacheTimestamp = System.currentTimeMillis();
 
@@ -2134,7 +2134,7 @@ public class DbAction extends ActionSupport {
                }
            } else {
                // For other accounts, fetch directly without caching
-               apiCollections = DbLayer.fetchAllApiCollectionsMeta();
+               apiCollections = DbLayer.fetchAllApiCollectionsMeta(includeTagsList);
                long endTime = System.currentTimeMillis();
                loggerMaker.error("finished fetchAllApiCollectionsMeta (no cache) account id: " + accountId +
                    " duration: " + (endTime - startTime) + "ms");
@@ -4402,6 +4402,16 @@ public class DbAction extends ActionSupport {
 
     public void setApiCollections(List<ApiCollection> apiCollections) {
         this.apiCollections = apiCollections;
+    }
+
+    boolean includeTagsList = true;
+
+    public boolean getIncludeTagsList() {
+        return includeTagsList;
+    }
+
+    public void setIncludeTagsList(boolean includeTagsList) {
+        this.includeTagsList = includeTagsList;
     }
 
     public String getHost() {

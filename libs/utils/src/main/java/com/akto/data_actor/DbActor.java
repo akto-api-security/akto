@@ -289,7 +289,7 @@ public class DbActor extends DataActor {
     }
 
     public List<ApiCollection> fetchAllApiCollectionsMeta() {
-        return DbLayer.fetchAllApiCollectionsMeta();
+        return DbLayer.fetchAllApiCollectionsMeta(true);
     }
 
     public ApiCollection fetchApiCollectionMeta(int apiCollectionId) {
