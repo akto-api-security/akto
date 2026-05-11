@@ -1,7 +1,7 @@
 
-import { Text, HorizontalStack, VerticalStack, Box, Icon, Tooltip } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box, Icon, Tooltip, IndexFiltersMode } from "@shopify/polaris"
 import { CircleTickMajor, CircleCancelMajor, SettingsMajor, ClockMinor } from "@shopify/polaris-icons";
-import { useEffect, useMemo, useReducer, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
 import api from "./api"
@@ -21,7 +21,12 @@ import AuditDataDrawer from "./AuditDataDrawer";
 import CollectionIcon from "../../components/shared/CollectionIcon";
 import settingsApi from "../settings/api";
 import { intersectServerActionFlags, getRegistryOverride } from "./auditServerActionFlags";
+import { formatDisplayName } from "./agentic/mcpClientHelper";
 import "../../components/shared/style.css";
+
+const definedAuditTabs = ['MCP Servers', 'AI Agents'];
+const AUDIT_TAB_AGENTS = 'ai_agents';
+const AUDIT_TAB_SERVERS = 'mcp_servers';
 
 const headingsEndpointSecurity = [
     {
@@ -213,6 +218,51 @@ let filtersEndpointSecurity = [
     }
 ]
 
+const headingsEndpointSecurityAgents = [
+    {
+        title: 'AI Agent',
+        text: 'AI Agent',
+        value: 'aiAgentNameComp',
+    },
+    {
+        title: 'Last Detected',
+        text: 'Last Detected',
+        value: 'lastDetectedComp',
+        sortActive: true,
+        sortKey: 'lastDetected',
+        type: CellType.TEXT,
+    },
+    {
+        title: 'Updated',
+        text: 'Updated',
+        value: 'updatedTimestampComp',
+        sortKey: 'updatedTimestamp',
+        sortActive: true,
+        type: CellType.TEXT,
+    },
+    {
+        title: 'Marked By',
+        text: 'Marked By',
+        value: 'markedBy',
+        type: CellType.TEXT,
+        filterKey: 'markedBy',
+    },
+    {
+        title: 'Remarks',
+        text: 'Remarks',
+        value: 'remarksComp',
+    },
+];
+
+let filtersEndpointSecurityAgents = [
+    {
+        key: 'markedBy',
+        label: 'Marked By',
+        title: 'Marked By',
+        choices: [],
+    },
+];
+
 const resourceName = {
     singular: 'audit record',
     plural: 'audit records',
@@ -223,6 +273,74 @@ const isAtlasEndpointCollection = (allCollections, collectionId) => {
     const collection = allCollections.find(col => col.id === collectionId);
     if (!collection || !collection.envType || !Array.isArray(collection.envType)) return false;
     return collection.envType.some(env => env.value && env.value.toLowerCase() === 'endpoint');
+};
+
+const formatExpiresAt = (expiresAt) => {
+    if (!expiresAt) return null;
+    const expirationDate = new Date(expiresAt * 1000);
+    return expirationDate.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE
+    });
+};
+
+const buildApprovalDetails = (record) => {
+    const approvedAtComp = record?.approvedAt ? func.prettifyEpoch(record.approvedAt) : "-";
+    const expiresAtComp = formatExpiresAt(record?.approvalConditions?.expiresAt);
+    const conditions = record?.approvalConditions;
+    if (!conditions) return null;
+    const details = [
+        { condition: conditions.justification, label: 'Justification', value: conditions.justification },
+        { condition: record?.approvedAt, label: 'Approved at', value: approvedAtComp },
+        { condition: expiresAtComp, label: 'Expires At', value: expiresAtComp },
+        { condition: conditions.allowedIps, label: 'Allowed IPs', value: conditions.allowedIps?.join(', ') },
+        { condition: conditions.allowedIpRange, label: 'Allowed IP Ranges', value: conditions.allowedIpRange },
+        { condition: conditions.allowedEndpoints, label: 'Allowed Endpoints', value: conditions.allowedEndpoints?.map(ep => ep.name).join(', ') },
+    ];
+    const elements = [];
+    details.forEach((d, i) => {
+        if (d.condition) {
+            elements.push(
+                <Text key={i} variant="bodySm" color="subdued">
+                    <Text as="span" fontWeight="medium">{d.label}:</Text> {d.value}
+                </Text>
+            );
+        }
+    });
+    return elements.length > 0 ? elements : null;
+};
+
+const buildRemarksComp = (record, pendingMode = 'approved-with-icon') => {
+    const hasRemarks = !(record?.remarks === null || record?.remarks === "" || !record?.remarks);
+    if (!hasRemarks) {
+        if (pendingMode === 'subdued') {
+            return <Text variant="bodyMd" color="subdued">Pending</Text>;
+        }
+        return (
+            <HorizontalStack gap="1" blockAlign="center">
+                <Text variant="bodyMd">Approved</Text>
+                <Tooltip content="Audit Pending">
+                    <Icon source={ClockMinor} color="warning" />
+                </Tooltip>
+            </HorizontalStack>
+        );
+    }
+    const approvalDetails = buildApprovalDetails(record);
+    return (
+        <VerticalStack gap="1">
+            <Text variant="bodyMd">{record.remarks}</Text>
+            {approvalDetails && (
+                <Box paddingBlockStart="1">
+                    <VerticalStack gap="0">{approvalDetails}</VerticalStack>
+                </Box>
+            )}
+        </VerticalStack>
+    );
 };
 
 const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegistry) => {
@@ -284,60 +402,7 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
     temp['lastDetectedComp'] = temp?.lastDetected ? func.prettifyEpoch(temp.lastDetected) : "-"
     temp['updatedTimestampComp'] = temp?.updatedTimestamp ? func.prettifyEpoch(temp.updatedTimestamp) : "-"
-    temp['approvedAtComp'] = temp?.approvedAt ? func.prettifyEpoch(temp.approvedAt) : "-"
-    temp['expiresAtComp'] = temp?.approvalConditions?.expiresAt ? (() => {
-        const expirationDate = new Date(temp.approvalConditions.expiresAt * 1000);
-        return expirationDate.toLocaleString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-            timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE
-        });
-    })() : null
-    temp['remarksComp'] = (
-        (temp?.remarks === null || temp?.remarks === "" || !temp?.remarks) ?
-            <HorizontalStack gap="1" blockAlign="center">
-                <Text variant="bodyMd">Approved</Text>
-                <Tooltip content="Audit Pending">
-                    <Icon source={ClockMinor} color="warning" />
-                </Tooltip>
-            </HorizontalStack> :
-            <VerticalStack gap="1">
-                <Text variant="bodyMd">{temp?.remarks}</Text>
-                {temp?.approvalConditions && (
-                    <Box paddingBlockStart="1">
-                        <VerticalStack gap="0">
-                            {(() => {
-                                const approvalDetails = [
-                                    { condition: temp?.approvalConditions?.justification, label: 'Justification', value: temp.approvalConditions.justification },
-                                    { condition: temp?.approvedAt, label: 'Approved at', value: temp.approvedAtComp },
-                                    { condition: temp?.expiresAtComp, label: 'Expires At', value: temp.expiresAtComp },
-                                    { condition: temp?.approvalConditions?.allowedIps, label: 'Allowed IPs', value: temp.approvalConditions.allowedIps?.join(', ') },
-                                    { condition: temp?.approvalConditions?.allowedIpRange, label: 'Allowed IP Ranges', value: temp.approvalConditions.allowedIpRange },
-                                    { condition: temp?.approvalConditions?.allowedEndpoints, label: 'Allowed Endpoints', value: temp.approvalConditions.allowedEndpoints?.map(ep => ep.name).join(', ') }
-                                ];
-                                
-                                const elements = [];
-                                for (let i = 0; i < approvalDetails.length; i++) {
-                                    const detail = approvalDetails[i];
-                                    if (detail.condition) {
-                                        elements.push(
-                                            <Text key={i} variant="bodySm" color="subdued">
-                                                <Text as="span" fontWeight="medium">{detail.label}:</Text> {detail.value}
-                                            </Text>
-                                        );
-                                    }
-                                }
-                                return elements;
-                            })()}
-                        </VerticalStack>
-                    </Box>
-                )}
-            </VerticalStack>
-    )
+    temp['remarksComp'] = buildRemarksComp(temp, 'approved-with-icon')
     if (!isMerged) {
         temp['collectionName'] = (
             <HorizontalStack gap="2" align="center">
@@ -352,6 +417,32 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
     temp['isTerminal'] = false;
     return temp;
 }
+
+const convertAgentRowForTable = (auditRecord) => {
+    const temp = { ...auditRecord };
+    const rawName = auditRecord?.resourceName || "-";
+    const friendly = rawName !== "-" ? formatDisplayName(rawName) : "-";
+    temp['aiAgentName'] = rawName;
+    temp['aiAgentNameComp'] = (
+        <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+            <Box className="audit-table-icon">
+                <CollectionIcon
+                    hostName={rawName}
+                    assetTagValue={rawName}
+                    displayName={friendly}
+                />
+            </Box>
+            <Text>{friendly}</Text>
+        </HorizontalStack>
+    );
+    temp['lastDetectedComp'] = temp?.lastDetected ? func.prettifyEpoch(temp.lastDetected) : "-";
+    temp['updatedTimestampComp'] = temp?.updatedTimestamp ? func.prettifyEpoch(temp.updatedTimestamp) : "-";
+    temp['remarksComp'] = buildRemarksComp(temp, 'subdued');
+    temp['id'] = temp.hexId;
+    temp['name'] = temp.hexId;
+    temp['isTerminal'] = true;
+    return temp;
+};
 
 function AuditData() {
     const [loading, setLoading] = useState(true);
@@ -377,11 +468,29 @@ function AuditData() {
     const collectionsRegistryStatusMap = PersistStore(state => state.collectionsRegistryStatusMap)
 
     const isEndpointSecurity = isEndpointSecurityCategory();
-    const filters = isEndpointSecurity ? filtersEndpointSecurity : filtersDefault;
+    const [auditTab, setAuditTab] = useState(AUDIT_TAB_SERVERS);
+    const [auditTabIndex, setAuditTabIndex] = useState(0);
+    const [tabCounts, setTabCounts] = useState({ [AUDIT_TAB_SERVERS]: 0, [AUDIT_TAB_AGENTS]: 0 });
+    const isAgentsTab = isEndpointSecurity && auditTab === AUDIT_TAB_AGENTS;
+    const filters = useMemo(() => {
+        if (!isEndpointSecurity) return filtersDefault;
+        return isAgentsTab ? filtersEndpointSecurityAgents : filtersEndpointSecurity;
+    }, [isEndpointSecurity, isAgentsTab]);
     const headings = useMemo(() => {
         if (!isEndpointSecurity) return headingsDefault;
-        return headingsEndpointSecurity;
-    }, [isEndpointSecurity]);
+        return isAgentsTab ? headingsEndpointSecurityAgents : headingsEndpointSecurity;
+    }, [isEndpointSecurity, isAgentsTab]);
+    const auditTableTabs = useMemo(() => {
+        if (!isEndpointSecurity) return undefined;
+        return func.getTableTabsContent(
+            definedAuditTabs,
+            tabCounts,
+            setAuditTab,
+            auditTab,
+            0
+        );
+    }, [isEndpointSecurity, auditTab, tabCounts]);
+    const handleAuditTabChange = useCallback((index) => setAuditTabIndex(index), []);
 
     const [registryConfigured, setRegistryConfigured] = useState(false);
     const endpointRowCacheRef = useRef({});
@@ -607,6 +716,73 @@ function AuditData() {
         return actions;
     };
 
+    const getAgentActionsList = (item) => {
+        return [{ title: 'Actions', items: [
+            {
+                content: <span style={{ color: '#008060' }}>Allow</span>,
+                icon: GreenTickIcon,
+                onAction: () => { updateAuditData(item.hexId, "Approved") },
+            },
+            {
+                content: <span style={{ color: '#008060' }}>Conditionally Allow</span>,
+                icon: GreenSettingsIcon,
+                onAction: () => {
+                    setConditionalBulkRows(null);
+                    setSelectedAuditItem(item);
+                    setConditionalScope('server');
+                    setConditionalChildren(null);
+                    setModalOpen(true);
+                },
+            },
+            {
+                content: <span style={{ color: '#D72C0D' }}>Block</span>,
+                icon: RedCancelIcon,
+                onAction: () => { updateAuditData(item.hexId, "Rejected") },
+                destructive: true,
+            },
+        ]}]
+    }
+
+    const agentPromotedBulkActions = (selectedIds) => {
+        if (selectedIds === "All" || !Array.isArray(selectedIds) || selectedIds.length === 0) {
+            return [];
+        }
+        const n = selectedIds.length;
+        const countPhrase = `${n} selected agent${n === 1 ? "" : "s"}`;
+        const allowLabel = n === 1 ? "Allow this agent" : `Allow ${countPhrase}`;
+        const blockLabel = n === 1 ? "Block this agent" : `Block ${countPhrase}`;
+        const conditionalLabel = n === 1 ? "Conditionally allow this agent" : "Conditionally allow selected agents";
+        const rows = selectedIds
+            .map((id) => endpointRowCacheRef.current[String(id)])
+            .filter(Boolean);
+        const bulkUpdate = async (remarks) => {
+            const hexIds = rows.map((r) => r.hexId).filter(Boolean);
+            if (hexIds.length === 0) return;
+            try {
+                await api.updateAuditData(hexIds[0], remarks, null, hexIds, null, null);
+                func.setToast(true, false, "Updated selected agents");
+                window.location.reload();
+            } catch (e) {
+                func.setToast(true, true, "Bulk update failed");
+            }
+        };
+        return [
+            {
+                content: allowLabel,
+                onAction: () => bulkUpdate("Approved"),
+            },
+            {
+                content: blockLabel,
+                destructive: true,
+                onAction: () => bulkUpdate("Rejected"),
+            },
+            {
+                content: conditionalLabel,
+                onAction: () => handleRequestConditionalBulk(rows),
+            },
+        ];
+    };
+
     const updateAuditDataWithConditions = async (_hexId, approvalData, _hexIds, _item) => {
         try {
             if (conditionalScope === 'children') {
@@ -651,7 +827,9 @@ function AuditData() {
         let finalFilters = {...filterParams}
         finalFilters['lastDetected'] = [startTimestamp, endTimestamp]
 
-        if (isEndpointSecurity) {
+        if (isAgentsTab) {
+            finalFilters['type'] = ['ai-agent']
+        } else if (isEndpointSecurity) {
             finalFilters['type'] = ['mcp-server']
         } else {
             finalFilters['hostCollectionId'] = (filterParams['collectionName'] || []).map(id => parseInt(id))
@@ -661,31 +839,38 @@ function AuditData() {
             delete finalFilters['collectionName']
         }
 
+        const useMergedAggregation = isEndpointSecurity && !isAgentsTab;
+
         try {
-            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue, isEndpointSecurity)
+            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators, queryValue, useMergedAggregation)
             if (res && res.auditData) {
                 if (isEndpointSecurity) {
                     endpointRowCacheRef.current = {};
                 }
                 res.auditData.forEach((auditRecord) => {
-                    let collectionName = "-";
-                    if(collectionsMap[auditRecord?.hostCollectionId]){
-                        collectionName = collectionsMap[auditRecord?.hostCollectionId];
-                    } else if(auditRecord?.mcpHost !== null && auditRecord?.mcpHost !== ""){
-                        collectionName = auditRecord?.mcpHost;
-                    }
-                    const collectionRegistryStatus = collectionsRegistryStatusMap[auditRecord?.hostCollectionId];
-                    const dataObj = convertDataIntoTableFormat(
-                        auditRecord,
-                        collectionName,
-                        collectionRegistryStatus
-                    )
-                    const override = getRegistryOverride(dataObj, registryConfigured);
-                    if (override) {
-                        dataObj.markedBy = override.markedBy;
-                        dataObj.remarksComp = (
-                            <Text variant="bodyMd" color="critical">{override.remarks}</Text>
-                        );
+                    let dataObj;
+                    if (isAgentsTab) {
+                        dataObj = convertAgentRowForTable(auditRecord);
+                    } else {
+                        let collectionName = "-";
+                        if(collectionsMap[auditRecord?.hostCollectionId]){
+                            collectionName = collectionsMap[auditRecord?.hostCollectionId];
+                        } else if(auditRecord?.mcpHost !== null && auditRecord?.mcpHost !== ""){
+                            collectionName = auditRecord?.mcpHost;
+                        }
+                        const collectionRegistryStatus = collectionsRegistryStatusMap[auditRecord?.hostCollectionId];
+                        dataObj = convertDataIntoTableFormat(
+                            auditRecord,
+                            collectionName,
+                            collectionRegistryStatus
+                        )
+                        const override = getRegistryOverride(dataObj, registryConfigured);
+                        if (override) {
+                            dataObj.markedBy = override.markedBy;
+                            dataObj.remarksComp = (
+                                <Text variant="bodyMd" color="critical">{override.remarks}</Text>
+                            );
+                        }
                     }
                     ret.push(dataObj);
                     endpointRowCacheRef.current[String(dataObj.hexId || dataObj.id)] = dataObj;
@@ -721,6 +906,20 @@ function AuditData() {
                 filtersEndpointSecurity[2].choices = Array.from(agents).sort().map(a => ({ label: a, value: a }))
                 filtersEndpointSecurity[3].choices = Array.from(servers).sort().map(s => ({ label: s, value: s }))
             } catch (e) {}
+            try {
+                const agentsRes = await api.fetchAuditData(
+                    'lastDetected', -1, 0, 1000,
+                    { type: ['ai-agent'], lastDetected: [startTimestamp, endTimestamp] },
+                    {}, '', false
+                )
+                const agentMarkedBy = new Set()
+                if (agentsRes && Array.isArray(agentsRes.auditData)) {
+                    agentsRes.auditData.forEach((rec) => {
+                        if (rec?.markedBy) agentMarkedBy.add(rec.markedBy)
+                    })
+                }
+                filtersEndpointSecurityAgents[0].choices = Array.from(agentMarkedBy).sort().map(u => ({ label: u, value: u }))
+            } catch (e) {}
             setFilterVersion(v => v + 1)
         } else {
             try {
@@ -739,6 +938,26 @@ function AuditData() {
         fillFilters()
     }, [collectionsMap, startTimestamp, endTimestamp])
 
+    useEffect(() => {
+        if (!isEndpointSecurity) return;
+        let cancelled = false;
+        (async () => {
+            const fetchCount = (type, merge) => api.fetchAuditData(
+                'lastDetected', -1, 0, 1,
+                { type: [type], lastDetected: [startTimestamp, endTimestamp] },
+                {}, '', merge
+            ).then(res => res?.total || 0).catch(() => 0);
+            const [servers, agents] = await Promise.all([
+                fetchCount('mcp-server', true),
+                fetchCount('ai-agent', false),
+            ]);
+            if (!cancelled) {
+                setTabCounts({ [AUDIT_TAB_SERVERS]: servers, [AUDIT_TAB_AGENTS]: agents });
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [isEndpointSecurity, startTimestamp, endTimestamp, filterVersion]);
+
     const primaryActions = (
         <HorizontalStack gap={"2"}>
             <DateRangeFilter
@@ -753,6 +972,39 @@ function AuditData() {
         </HorizontalStack>
     )
 
+    const tableKey = isEndpointSecurity
+        ? `${startTimestamp}-${endTimestamp}-${filterVersion}-${auditTab}-${registryConfigured}`
+        : `${startTimestamp}-${endTimestamp}-${filtersDefault[1].choices.length + filtersDefault[3].choices.length}-${registryConfigured}`;
+
+    let tableExtraProps;
+    if (isAgentsTab) {
+        tableExtraProps = {
+            tableTabs: auditTableTabs,
+            selected: auditTabIndex,
+            onSelect: handleAuditTabChange,
+            mode: IndexFiltersMode.Default,
+            selectable: true,
+            promotedBulkActions: agentPromotedBulkActions,
+            getActions: (item) => getAgentActionsList(item),
+            hasRowActions: true,
+            filterStateUrl: "audit-data-endpoint-agents",
+        };
+    } else if (isEndpointSecurity) {
+        tableExtraProps = {
+            tableTabs: auditTableTabs,
+            selected: auditTabIndex,
+            onSelect: handleAuditTabChange,
+            mode: IndexFiltersMode.Default,
+            onRowClick: handleRowClick,
+            rowClickable: true,
+            selectable: true,
+            promotedBulkActions: endpointPromotedBulkActions,
+            filterStateUrl: "audit-data-endpoint",
+        };
+    } else {
+        tableExtraProps = { getActions: (item) => getActionsList(item), hasRowActions: true };
+    }
+
     return (
         <>
             <PageWithMultipleCards
@@ -765,7 +1017,7 @@ function AuditData() {
             primaryAction={primaryActions}
             components = {[
                 <GithubServerTable
-                        key={startTimestamp + endTimestamp + (isEndpointSecurity ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(isEndpointSecurity) + String(registryConfigured)}
+                        key={tableKey}
                         headers={headings}
                         resourceName={resourceName}
                         appliedFilters={[]}
@@ -780,21 +1032,23 @@ function AuditData() {
                         condensedHeight={true}
                         pageLimit={20}
                         headings={headings}
-                        {...(isEndpointSecurity
-                            ? {
-                                onRowClick: handleRowClick,
-                                rowClickable: true,
-                                selectable: true,
-                                promotedBulkActions: endpointPromotedBulkActions,
-                                filterStateUrl: "audit-data-endpoint",
-                            }
-                            : { getActions: (item) => getActionsList(item), hasRowActions: true }
-                        )}
+                        {...tableExtraProps}
                 />,
             ]}
             />
 
-            {isEndpointSecurity ? (
+            {isAgentsTab ? (
+                <ConditionalApprovalModal
+                    isOpen={modalOpen}
+                    onClose={() => {
+                        setModalOpen(false);
+                        setConditionalChildren(null);
+                        setConditionalBulkRows(null);
+                    }}
+                    onApprove={updateAuditDataWithConditions}
+                    auditItem={selectedAuditItem}
+                />
+            ) : isEndpointSecurity ? (
                 <>
                     <AuditDataDrawer
                         auditItem={selectedAuditItem}
