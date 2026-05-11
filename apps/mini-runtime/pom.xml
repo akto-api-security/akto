@@ -59,6 +59,11 @@
             <artifactId>protobuf-java</artifactId>
             <version>4.29.2</version>
         </dependency>
+        <dependency>
+            <groupId>com.akto.apps</groupId>
+            <artifactId>akto-utility-server</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>com.akto.libs.utils</groupId>
