@@ -450,8 +450,7 @@ public class DaoInit {
                 new EnumCodec<>(JiraIntegration.JiraType.class),
                 new EnumCodec<>(GlobalEnums.DashboardCategory.class),
                 new EnumCodec<>(McpRegistryConfig.RegistryType.class),
-                new EnumCodec<>(McpAllowlist.Source.class),
-                new EnumCodec<>(WizFinding.Status.class)
+                new EnumCodec<>(McpAllowlist.Source.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
