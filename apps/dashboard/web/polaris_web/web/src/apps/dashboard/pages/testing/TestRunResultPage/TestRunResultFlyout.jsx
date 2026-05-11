@@ -38,7 +38,7 @@ function isSkippedTestError(errorText) {
 }
 
 function TestRunResultFlyout(props) {
-    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, wizFinding, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls } = props
+    const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls } = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -137,7 +137,7 @@ function TestRunResultFlyout(props) {
                 })
             })
 
-            setRowItems(transform.getRowInfo(issueDetails.severity, apiInfoData, issueDetails.jiraIssueUrl, sensitiveParam, issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl, issueDetails.wizFinding))
+            setRowItems(transform.getRowInfo(issueDetails.severity, apiInfoData, issueDetails.jiraIssueUrl, sensitiveParam, issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl, issueDetails.servicenowIssueUrl, issueDetails.ticketId, issueDetails.devrevWorkUrl, issueDetails.wizFindingUrl))
         }
     }, [issueDetails])
 
@@ -673,8 +673,8 @@ function TestRunResultFlyout(props) {
                                 isDevRevModal={true}
                             />
                            
-                            { window.WIZ_INTEGRATED === 'true' ? 
-                                <Button id={"create-wiz-finding-button"} primary onClick={handleWizFindingCreation} disabled={ wizFinding !== null || window.WIZ_INTEGRATED !== "true"}>
+                            { window?.WIZ_INTEGRATED === 'true' ? 
+                                <Button id={"create-wiz-finding-button"} primary onClick={handleWizFindingCreation} disabled={ wizFindingUrl?.length > 0 }>
                                     Create Wiz Finding
                                 </Button> 
                                 : <></>

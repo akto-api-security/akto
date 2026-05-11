@@ -31,7 +31,6 @@ import com.akto.dto.testing.Remediation;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.wiz_integration.WizEndpointAsset;
-import com.akto.dto.wiz_integration.WizFinding;
 import com.akto.dto.wiz_integration.WizIntegration;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -502,7 +501,9 @@ public class WizIntegrationUtils {
                     YamlTemplate yamlTemplate = yamlTemplateMap.get(testingIssuesId.getTestSubCategory());
                     Remediation remediation = remediationMap.get(testingIssuesId.getTestSubCategory());
                     BasicDBObject finding = WizIntegrationUtils.buildAssetAttackSurfaceFinding(testingIssuesId, testingRunIssues, testingRunResult, yamlTemplate, remediation);
-                    findingList.add(finding);
+                     if (finding != null && !finding.isEmpty()) {
+                        findingList.add(finding);
+                     }
                 } catch (Exception e) {
                     loggerMaker.error("Error building attack surface finding for testing issue ID: " + testingIssuesId.toString() + " - " + e.getMessage());
                 }
@@ -558,8 +559,8 @@ public class WizIntegrationUtils {
         List<TestingRunIssues> testingRunIssuesList = new ArrayList<>();
         try {
             testingRunIssuesList = TestingRunIssuesDao.instance.findAll(
-                Filters.ne(TestingRunIssues.WIZ_FINDING, null),
-                Projections.include(Constants.ID, TestingRunIssues.KEY_SEVERITY, TestingRunIssues.WIZ_FINDING)
+                Filters.ne(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, null),
+                Projections.include(Constants.ID, TestingRunIssues.KEY_SEVERITY, TestingRunIssues.WIZ_FINDING_CREATION_STATUS)
             );
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching testing run issues for Wiz sync: " + e.getMessage());
@@ -570,15 +571,6 @@ public class WizIntegrationUtils {
             loggerMaker.infoAndAddToDb("No testing run issues to sync with Wiz. Skipping sync.");
             return;
         }   
-
-        Map<TestingIssuesId, WizFinding> testingRunIssuesMap = new HashMap<>();
-
-        for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
-            if (testingRunIssues == null) continue;
-            TestingIssuesId testingIssuesId = testingRunIssues.getId();
-            WizFinding wizFinding = testingRunIssues.getWizFinding();
-            testingRunIssuesMap.put(testingIssuesId, wizFinding);
-        }
         
         String enrichmentJSON = null;
         try {
@@ -598,16 +590,17 @@ public class WizIntegrationUtils {
             WizIntegrationUtils.uploadEnrichmentJSONToS3(enrichmentJSON, signedS3Url);
 
             List<WriteModel<TestingRunIssues>> bulkUpdatesForNewFindings = new ArrayList<>();
-            for (Map.Entry<TestingIssuesId, WizFinding> entry : testingRunIssuesMap.entrySet()) {
-                TestingIssuesId testingIssuesId = entry.getKey();
-                WizFinding wizFinding = entry.getValue();
-
-                if (wizFinding.getStatus() == WizFinding.Status.CREATION_REQUESTED) {
-                    wizFinding.setStatus(WizFinding.Status.CREATION_INITIATED);
+            for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
+                String wizFindingCreationStatus = testingRunIssues.getWizFindingCreationStatus();
+                if (wizFindingCreationStatus == null || wizFindingCreationStatus.equals(WizIntegration.FindingCreationStatus.CREATION_REQUESTED.toString())) {
+                    TestingIssuesId testingIssuesId = testingRunIssues.getId();
                     bulkUpdatesForNewFindings.add(
                         new UpdateOneModel<> (
                             Filters.eq(Constants.ID, testingIssuesId),
-                            Updates.set(TestingRunIssues.WIZ_FINDING, wizFinding)
+                            Updates.set(
+                                TestingRunIssues.WIZ_FINDING_CREATION_STATUS, 
+                                WizIntegration.FindingCreationStatus.CREATION_INITIATED.toString()
+                            )
                         )
                     );
                 }
@@ -622,7 +615,7 @@ public class WizIntegrationUtils {
             return;
         }
 
-        // If we reach here, it means the upload was successful. Update the wiz last upload timestamp
+        // If we reach here, it means the upload was successful. Update the wiz findings last upload timestamp
         try {
             WizIntegrationDao.instance.updateOne(
                 new BasicDBObject(),
@@ -638,23 +631,12 @@ public class WizIntegrationUtils {
 
     public static void markIssuesAsWizFinding(List<TestingIssuesId> testingIssuesIdList) throws Exception {
         try {
-            List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(
-                Filters.and(
-                    Filters.in(Constants.ID, testingIssuesIdList),
-                    Filters.eq(TestingRunIssues.WIZ_FINDING, null)
-                ),
-                Projections.include(Constants.ID)  
-            );
-
-            List<TestingIssuesId> issueIdsWithoutWizFindings = new ArrayList<>();
-            for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
-                issueIdsWithoutWizFindings.add(testingRunIssues.getId());     
-            }
-
-            WizFinding wizFinding = new WizFinding(WizFinding.Status.CREATION_REQUESTED, null);
             TestingRunIssuesDao.instance.updateMany(
-                Filters.in(Constants.ID, issueIdsWithoutWizFindings),
-                Updates.set(TestingRunIssues.WIZ_FINDING, wizFinding)
+                Filters.in(Constants.ID, testingIssuesIdList),
+                Updates.combine(
+                    Updates.set(TestingRunIssues.WIZ_FINDING_URL, "unavailable"),
+                    Updates.set(TestingRunIssues.WIZ_FINDING_CREATION_STATUS, WizIntegration.FindingCreationStatus.CREATION_REQUESTED.toString())
+                )
             );
         } catch (Exception e) {
             throw new Exception("Error marking issues as Wiz findings: " + e.getMessage());

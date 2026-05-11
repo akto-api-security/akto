@@ -60,7 +60,7 @@ function Wiz() {
             func.setToast(true, false, "Successfully added Wiz Integration")
             fetchWizIntegration()
         } catch (error) {
-            func.setToast(true, true, "Failed to add Wiz Integration")
+            func.setToast(true, true, err?.response?.data?.actionErrors?.[0] || "Failed to add Wiz Integration")
         } finally {
             setIsSaving(false)
         }

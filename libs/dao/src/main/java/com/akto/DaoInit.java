@@ -83,7 +83,6 @@ import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.dto.usage.UsageSync;
 import com.akto.dto.wiz_integration.WizEndpointAsset;
-import com.akto.dto.wiz_integration.WizFinding;
 import com.akto.dto.wiz_integration.WizIntegration;
 import com.akto.types.CappedList;
 import com.akto.types.CappedSet;
@@ -346,7 +345,6 @@ public class DaoInit {
         ClassModel<EndpointMcpConfig> endpointMcpConfigClassModel = ClassModel.builder(EndpointMcpConfig.class).enableDiscriminator(true).build();
         ClassModel<WizIntegration> wizIntegrationClassModel = ClassModel.builder(WizIntegration.class).enableDiscriminator(true).build();
         ClassModel<WizEndpointAsset> wizEndpointAssetClassModel = ClassModel.builder(WizEndpointAsset.class).enableDiscriminator(true).build();
-        ClassModel<WizFinding> wizFindingClassModel = ClassModel.builder(WizFinding.class).enableDiscriminator(true).build();
         ClassModel<WizSyncJobParams> wizSyncJobParamsClassModel = ClassModel.builder(WizSyncJobParams.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -391,7 +389,7 @@ public class DaoInit {
                 ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
-                wizIntegrationClassModel, wizFindingClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel,
+                wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel,
                 mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel)
             .automatic(true).build());
 

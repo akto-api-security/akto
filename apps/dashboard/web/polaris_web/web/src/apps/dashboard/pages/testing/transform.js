@@ -1124,7 +1124,7 @@ const transform = {
     return finalMethod + " " + truncatedUrl
 
   },
-  getRowInfo(severity, apiInfo, jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId, devrevWorkUrl, wizFinding) {
+  getRowInfo(severity, apiInfo, jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl, serviceNowTicketUrl, servicenowTicketId, devrevWorkUrl, wizFindingUrl) {
     if (apiInfo == null || apiInfo === undefined) {
       apiInfo = {
         allAuthTypesFound: [],
@@ -1217,12 +1217,12 @@ const transform = {
       </Box>
     ) : null
 
-    const wizComp = wizFinding?.url ? (
+    const wizComp = (wizFindingUrl?.length > 0 && wizFindingUrl !== "unavailable") ? (
       <Box>
         <Tag>
           <HorizontalStack gap={1}>
             <Avatar size="extraSmall" shape='round' source="/public/wiz_logo.svg" />
-            <Link target="_blank" url={wizFinding?.url}>
+            <Link target="_blank" url={wizFindingUrl}>
               <Text>
                 View finding
               </Text>
