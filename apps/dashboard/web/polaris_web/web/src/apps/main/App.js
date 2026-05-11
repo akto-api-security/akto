@@ -484,7 +484,7 @@ const router = createBrowserRouter([
                         path: "integrations/devrev",
                         element: <DevRev/>,
                     },
-                            {
+                    {
                         path: "integrations/wiz",
                         element: <Wiz/>,
                     },

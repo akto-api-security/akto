@@ -116,31 +116,37 @@ public class WizIntegrationUtils {
             .addHeader("Accept", "application/json")
             .build();
 
-        Response response = httpClient.newCall(request).execute();
-
-        if (response == null) {
-            throw new Exception("Failed to get OAuth token from Wiz - null response");
-        }
-
-        String responsePayload = response.body().string();
-        int statusCode = response.code();
-
-        if (statusCode != 200 || responsePayload == null) {
-            String errorMsg = String.format("OAuth token request failed with status code: %d", statusCode);
-            if (statusCode == 400) {
-                errorMsg += " (access_denied - Unauthorized)";
+        String accessToken;
+        int expiresIn;
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (response == null) {
+                throw new Exception("Failed to get OAuth token from Wiz - null response");
             }
-            throw new Exception(errorMsg);
+
+            if (response.body() == null) {
+                throw new Exception("Failed to get OAuth token from Wiz - null response body");
+            }
+
+            String responsePayload = response.body().string();
+            int statusCode = response.code();
+
+            if (statusCode != 200 || responsePayload == null) {
+                String errorMsg = String.format("OAuth token request failed with status code: %d", statusCode);
+                if (statusCode == 400) {
+                    errorMsg += " (access_denied - Unauthorized)";
+                }
+                throw new Exception(errorMsg);
+            }
+
+            BasicDBObject responseObj = BasicDBObject.parse(responsePayload);
+
+            if (!responseObj.containsField("access_token")) {
+                throw new Exception("No access_token in OAuth response");
+            }
+
+            accessToken = responseObj.getString("access_token");
+            expiresIn = responseObj.getInt("expires_in", 86400);
         }
-
-        BasicDBObject responseObj = BasicDBObject.parse(responsePayload);
-
-        if (!responseObj.containsField("access_token")) {
-            throw new Exception("No access_token in OAuth response");
-        }
-
-        String accessToken = responseObj.getString("access_token");
-        int expiresIn = responseObj.getInt("expires_in", 86400);
 
         if (accessToken == null || accessToken.isEmpty()) { 
             throw new Exception("Received empty access token from Wiz"); 
@@ -308,11 +314,6 @@ public class WizIntegrationUtils {
         return Base64.getUrlEncoder().withoutPadding()
              .encodeToString(json.getBytes(StandardCharsets.UTF_8));
     }   
-
-    public static TestingIssuesId fetchTestingIssuesId(String wizFindingId) throws Exception {
-        String json = new String(Base64.getDecoder().decode(wizFindingId), StandardCharsets.UTF_8);
-        return new ObjectMapper().readValue(json, TestingIssuesId.class);
-    }
 
     public static BasicDBObject buildAssetDetails(WizEndpointAsset endpointAsset) {
         BasicDBObject endpoint = new BasicDBObject();
