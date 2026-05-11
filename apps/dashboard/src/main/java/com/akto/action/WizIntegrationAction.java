@@ -73,7 +73,7 @@ public class WizIntegrationAction extends UserAction {
          * 1. Reupload findings to Wiz periodically to ensure that Wiz does not mark them as stale/closed. (docs - finding closed in 7 days if not updated)
          * 2. todo: Pull finding related data from Wiz
         */
-        Job wizSyncJob = createWizSyncJob(false);
+        Job wizSyncJob = JobScheduler.scheduleRecurringJob(Context.accountId.get(),new WizSyncJobParams(),JobExecutorType.DASHBOARD, WIZ_SYNC_INTERVAL_SECONDS);
         if (wizSyncJob == null) {
             addActionError("Failed to integrate with Wiz. Please try again.");
             return Action.ERROR.toUpperCase();
@@ -148,7 +148,6 @@ public class WizIntegrationAction extends UserAction {
 
         try {
             WizIntegrationUtils.markIssuesAsWizFinding(testingIssuesIdList);
-            //WizIntegrationUtils.uploadWizDataSource(wizIntegration);
         } catch (Exception e) {
             String errString = "Error initiating wiz finding(s) creation: " + e.getMessage();
             logger.errorAndAddToDb(errString);
@@ -156,17 +155,21 @@ public class WizIntegrationAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        //createWizSyncJob(true);
-
         return Action.SUCCESS.toUpperCase();
     }
 
-    private Job createWizSyncJob(boolean runOnce) {
-        if (runOnce) {
-            JobScheduler.scheduleRunOnceJob(Context.accountId.get(), new WizSyncJobParams(), JobExecutorType.DASHBOARD);
-            return null;
-        } else {
-            return JobScheduler.scheduleRecurringJob(Context.accountId.get(),new WizSyncJobParams(),JobExecutorType.DASHBOARD, WIZ_SYNC_INTERVAL_SECONDS);
+    @Getter @Setter
+    private BasicDBObject lastUploadScanStatus;
+
+    public String checkLastUploadScanStatus() {
+        try {
+            lastUploadScanStatus = WizIntegrationUtils.checkLastUploadScanStatus();
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error checking last upload scan status: " + e.getMessage());
+            addActionError("Failed to check last upload scan status");
+            return Action.ERROR.toUpperCase();
         }
+
+        return Action.SUCCESS.toUpperCase();
     }
 }
