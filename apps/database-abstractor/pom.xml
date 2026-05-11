@@ -72,8 +72,13 @@
             <artifactId>jetty-servlets</artifactId>
             <version>9.4.57.v20241219</version>
         </dependency>
-        
-       
+
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-storage-blob</artifactId>
+            <version>12.25.1</version>
+        </dependency>
+
     </dependencies>
     <build>
         <sourceDirectory>src/main/java</sourceDirectory>

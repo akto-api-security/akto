@@ -103,6 +103,29 @@
             </result>
         </action>
 
+        <action name="api/fetchFileInspectionRules" class="com.akto.action.FileInspectionAction" method="fetchFileInspectionRules">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">rules</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/uploadFileInspectionResult" class="com.akto.action.FileInspectionAction" method="uploadFileInspectionResult">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+
         <action name="api/agenticSessionContext/bulkUpdate" class="com.akto.action.DbAction" method="bulkUpdateAgenticSessionContext">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
