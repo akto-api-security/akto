@@ -745,8 +745,12 @@ public class DbLayer {
         return ApiCollectionsDao.instance.getMeta(apiCollectionId);
     }
 
-    public static List<ApiCollection> fetchAllApiCollectionsMeta() {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(), Projections.exclude("urls", "conditions"));
+    public static List<ApiCollection> fetchAllApiCollectionsMeta(boolean includeTagsList) {
+        List<String> excludeFields = new ArrayList<>(Arrays.asList("urls", "conditions", "envType"));
+        if (!includeTagsList) {
+            excludeFields.add("tagsList");
+        }
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(), Projections.exclude(excludeFields));
         return apiCollections;
     }
 

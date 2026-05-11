@@ -1197,9 +1197,19 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    boolean includeTagsList = true;
+
+    public boolean getIncludeTagsList() {
+        return includeTagsList;
+    }
+
+    public void setIncludeTagsList(boolean includeTagsList) {
+        this.includeTagsList = includeTagsList;
+    }
+
     public String fetchAllApiCollectionsMeta() {
         try {
-           apiCollections = DbLayer.fetchAllApiCollectionsMeta();
+           apiCollections = DbLayer.fetchAllApiCollectionsMeta(includeTagsList);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }

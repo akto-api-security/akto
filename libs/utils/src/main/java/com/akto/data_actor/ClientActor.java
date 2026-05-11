@@ -2166,10 +2166,12 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public List<ApiCollection> fetchAllApiCollectionsMeta() {
+    public List<ApiCollection> fetchAllApiCollectionsMeta(boolean includeTagsList) {
         Map<String, List<String>> headers = buildHeaders();
         List<ApiCollection> apiCollections = new ArrayList<>();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAllApiCollectionsMeta", "", "GET", null, headers, "");
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("includeTagsList", includeTagsList);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAllApiCollectionsMeta", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();

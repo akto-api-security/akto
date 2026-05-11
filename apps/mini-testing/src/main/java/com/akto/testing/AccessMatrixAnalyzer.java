@@ -37,7 +37,7 @@ public class AccessMatrixAnalyzer {
 
         if (endpointLogicalGroup == null) return new ArrayList<>();
         Set<ApiInfoKey> ret = new HashSet<>();
-        List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
+        List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta(false);
         for(ApiCollection apiCollection: apiCollections) {
             int lastBatchSize = 0;
             int skip = 0;
