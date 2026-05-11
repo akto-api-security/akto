@@ -5,28 +5,29 @@
       {
         "command": "bash ~/.cursor/hooks/akto/akto-validate-chat-prompt-wrapper.sh",
         "type": "command",
-        "timeout": 10
+        "timeout": 20
       }
     ],
     "afterAgentResponse": [
       {
         "command": "bash ~/.cursor/hooks/akto/akto-validate-chat-response-wrapper.sh",
         "type": "command",
-        "timeout": 10
+        "timeout": 20
       }
     ],
     "beforeMCPExecution": [
       {
         "command": "bash ~/.cursor/hooks/akto/akto-validate-mcp-request-wrapper.sh",
         "type": "command",
-        "timeout": 10
+        "timeout": 20,
+        "failClosed": true
       }
     ],
     "afterMCPExecution": [
       {
         "command": "bash ~/.cursor/hooks/akto/akto-validate-mcp-response-wrapper.sh",
         "type": "command",
-        "timeout": 10
+        "timeout": 20
       }
     ]
   }

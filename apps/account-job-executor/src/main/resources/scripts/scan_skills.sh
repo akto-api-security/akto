@@ -1,5 +1,5 @@
 #!/bin/bash
-# Skill File Discovery Script for SentinelOne RemoteOps
+# Skill File Discovery Script (common — used by SentinelOne and Microsoft Defender)
 # Mirrors: mcp-endpoint-shield/mcp/skill_detector.go
 #
 # What this approximates:

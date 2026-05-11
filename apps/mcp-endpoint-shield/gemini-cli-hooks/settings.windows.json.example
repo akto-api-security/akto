@@ -7,7 +7,7 @@
           {
             "name": "akto-validate-prompt",
             "type": "command",
-            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-validate-prompt-wrapper.sh",
+            "command": "powershell.exe -ExecutionPolicy Bypass -File %USERPROFILE%\\.gemini\\hooks\\akto-validate-prompt-wrapper.ps1",
             "timeout": 10000,
             "description": "Validates prompts against Akto Guardrails before sending to Gemini"
           }
@@ -21,7 +21,7 @@
           {
             "name": "akto-validate-response",
             "type": "command",
-            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-validate-response-wrapper.sh",
+            "command": "powershell.exe -ExecutionPolicy Bypass -File %USERPROFILE%\\.gemini\\hooks\\akto-validate-response-wrapper.ps1",
             "timeout": 10000,
             "description": "Sends prompt/response pairs to Akto for ingestion"
           }
@@ -36,7 +36,7 @@
           {
             "name": "akto-validate-pre-tool",
             "type": "command",
-            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-validate-pre-tool-wrapper.sh",
+            "command": "powershell.exe -ExecutionPolicy Bypass -File %USERPROFILE%\\.gemini\\hooks\\akto-validate-pre-tool-wrapper.ps1",
             "timeout": 10000,
             "description": "Validates tool calls against Akto Guardrails before execution"
           }
@@ -51,7 +51,7 @@
           {
             "name": "akto-validate-post-tool",
             "type": "command",
-            "command": "bash $GEMINI_PROJECT_DIR/.gemini/hooks/akto-validate-post-tool-wrapper.sh",
+            "command": "powershell.exe -ExecutionPolicy Bypass -File %USERPROFILE%\\.gemini\\hooks\\akto-validate-post-tool-wrapper.ps1",
             "timeout": 10000,
             "description": "Ingests tool execution results to Akto for monitoring and can block malicious results"
           }

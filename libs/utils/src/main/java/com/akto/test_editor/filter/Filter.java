@@ -85,11 +85,16 @@ public class Filter {
                             + "You must verify that the response demonstrates actual exploitation or behavioral evidence — "
                             + "not merely that the input was reflected back.\n"
                             + "Return not_found immediately if the response:\n"
-                            + "  - Contains error indicators such as: invalid parameter, resource not found, bad request, "
-                            + "unknown field, unrecognized input, operation not permitted, not allowed, unsupported, "
-                            + "missing parameter, malformed, rejected, forbidden, unauthorized, resource does not exist, no such — "
-                            + "or any equivalent phrasing indicating the server rejected or could not process the input.\n"
-                            + "Confirm the operation if the response provides strong positive evidence that the described vulnerability was triggered.";
+                            + "  - No actual retry/tool recall/loop trigger occurred in the response\n"
+                            + "  - The response is a normal benign response with no behavioral change from the request\n"
+                            + "  - The phrase appears ONLY because it was echoed/reflected from the request payload " 
+                            + "(e.g., the query string was included back in the response). Reflection alone is" 
+                            + "NOT evidence of the vulnerability being triggered."
+                            + " - The phrase appears in a standard \"no results found\" or \"adjust your search\" message that any clean request would also produce"
+                            + "- Contains error indicators such as: invalid parameter, resource not found, bad request, unknown field, unrecognized input, operation not" 
+                            + "permitted,not allowed, unsupported, missing parameter, malformed, rejected, forbidden, unauthorized, resource does not exist, no such,"
+                            + "no results found, Try adjusting your search, adjust search criteria, no items found, nothing matched" 
+                            + "— or any equivalent phrasing indicating the server returned an empty or rejected result.";
                     }
                     queryData.put(TestExecutorModifier._OPERATION, operation);
                     String ogRequest = Utils.buildRequestIHttpFormat(rawApi);

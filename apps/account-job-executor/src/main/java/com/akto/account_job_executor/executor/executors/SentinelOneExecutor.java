@@ -590,7 +590,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
     // ── MCP Configuration & Skill Discovery ───────────────────────────────────
 
     private static String uploadScriptFromClasspath(String scriptResourcePath, String apiToken, String consoleUrl) {
-        String classpathResource = "/sentinelone/" + scriptResourcePath;
+        String classpathResource = "/scripts/" + scriptResourcePath;
         
         try (java.io.InputStream scriptStream = SentinelOneExecutor.class.getResourceAsStream(classpathResource)) {
             if (scriptStream == null) {
@@ -1455,7 +1455,8 @@ public class SentinelOneExecutor extends AccountJobExecutor {
                     batch.put("is_pending", "false");
                     batch.put("source", "MIRRORING");
                     batch.put("tag", tagJson);
-                    
+                    batch.put("publishToGuardrails", true);
+
                     batchData.add(batch);
                 } catch (Exception e) {
                     loggerMaker.error("Failed to serialize skill discovery: " + e.getMessage(), LogDb.DASHBOARD);
