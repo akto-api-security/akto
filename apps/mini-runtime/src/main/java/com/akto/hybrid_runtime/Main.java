@@ -2,12 +2,15 @@ package com.akto.hybrid_runtime;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
+
+import com.akto.hybrid_runtime.consumer.InMemoryTrafficConsumer;
+import com.akto.hybrid_runtime.consumer.KafkaTrafficConsumer;
+import com.akto.ingest.TrafficIngestQueue;
+import com.akto.utility.UtilityServer;
 
 import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
@@ -42,7 +45,6 @@ import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.usage.OrgUtils;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
-import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
 
 import org.apache.commons.lang3.StringUtils;
@@ -59,7 +61,6 @@ import org.apache.kafka.common.serialization.StringSerializer;
 
 public class Main {
 
-    private Consumer<String, String> consumer;
     public static final String GROUP_NAME = "group_name";
     public static final String VXLAN_ID = "vxlanId";
     public static final String VPC_CIDR = "vpc_cidr";
@@ -89,7 +90,7 @@ public class Main {
     static boolean syncImmediately = false;
     static boolean fetchAllSTI = true;
     private static final String NON_API_FILTER_ORG_ID = "2651c8f0-cf6b-416a-a304-b8d8adc573d7";
-    static boolean isNonApiContentTypeFilterEnabled = false;
+    public static boolean isNonApiContentTypeFilterEnabled = false;
     static Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
 
     static boolean isDashboardInstance = false;
@@ -449,12 +450,14 @@ public class Main {
             apiConfig = new APIConfig(configName,"access-token", 1, 10_000_000, sync_threshold_time); // this sync threshold time is used for deleting sample data
         }
 
-        final Main main = new Main();
-        Properties properties = Main.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
-        main.consumer = new KafkaConsumer<>(properties);
+        TrafficIngestQueue ingestQueue = TrafficIngestQueue.getInstance();
+        Properties kafkaProperties = Main.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
+        final KafkaTrafficConsumer kafkaTrafficConsumer = new KafkaTrafficConsumer(kafkaProperties, topicName, ingestQueue);
+        kafkaTrafficConsumer.start();
 
-        final Thread mainThread = Thread.currentThread();
-        final AtomicBoolean exceptionOnCommitSync = new AtomicBoolean(false);
+        UtilityServer.start();
+
+        final InMemoryTrafficConsumer[] inMemoryConsumerHolder = {null};
 
         // Make fast-discovery process final for shutdown hook access
         final Process finalFastDiscoveryProcess = fastDiscoveryProcess;
@@ -464,43 +467,29 @@ public class Main {
                 // Stop Fast-Discovery process first if running
                 if (finalFastDiscoveryProcess != null && finalFastDiscoveryProcess.isAlive()) {
                     try {
-                        // Send SIGTERM (graceful shutdown)
                         finalFastDiscoveryProcess.destroy();
-
-                        // Wait up to 15 seconds for graceful shutdown
                         boolean exited = finalFastDiscoveryProcess.waitFor(15, java.util.concurrent.TimeUnit.SECONDS);
-
                         if (!exited) {
-                            // Force kill if still alive after 15 seconds
                             loggerMaker.errorAndAddToDb("Fast-Discovery did not stop gracefully within 15 seconds, force killing...");
                             finalFastDiscoveryProcess.destroyForcibly();
                             finalFastDiscoveryProcess.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
                         } else {
-                            int exitCode = finalFastDiscoveryProcess.exitValue();
-                            loggerMaker.infoAndAddToDb("Fast-Discovery process stopped gracefully (exit code: " + exitCode + ")");
+                            loggerMaker.infoAndAddToDb("Fast-Discovery process stopped gracefully (exit code: " + finalFastDiscoveryProcess.exitValue() + ")");
                         }
                     } catch (InterruptedException e) {
                         loggerMaker.errorAndAddToDb("Interrupted while waiting for Fast-Discovery to stop");
                         finalFastDiscoveryProcess.destroyForcibly();
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error stopping Fast-Discovery process: " + e.getMessage());
-                        e.printStackTrace();
                     }
                 }
 
-                // Stop mini-runtime
-                main.consumer.wakeup();
-                try {
-                    if (!exceptionOnCommitSync.get()) {
-                        mainThread.join();
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                } catch (Error e){
-                    loggerMaker.errorAndAddToDb("Error in main thread: "+ e.getMessage());
+                kafkaTrafficConsumer.stop();
+                if (inMemoryConsumerHolder[0] != null) {
+                    inMemoryConsumerHolder[0].stop();
                 }
-                
-                // Close protobuf producer
+                UtilityServer.stop();
+
                 if (protobufKafkaProducer != null) {
                     protobufKafkaProducer.close();
                     loggerMaker.info("Closed protobuf kafka producer");
@@ -511,8 +500,7 @@ public class Main {
 
         scheduler.scheduleAtFixedRate(()-> {
             try {
-
-                Map<MetricName, ? extends Metric> metrics = main.consumer.metrics();
+                Map<MetricName, ? extends Metric> metrics = kafkaTrafficConsumer.getMetrics();
 
                 for (Map.Entry<MetricName, ? extends Metric> entry : metrics.entrySet()) {
                     MetricName key = entry.getKey();
@@ -687,139 +675,19 @@ public class Main {
             }, FilterUpdates.FULL_RESET_DURATION_MINUTES, FilterUpdates.FULL_RESET_DURATION_MINUTES, TimeUnit.MINUTES);
         }
 
-        if(isDbMergingModeEnabled()){
+        if (isDbMergingModeEnabled()) {
             runDBMaintenanceJob(apiConfig);
-        }else{
-            kafkaSubscribeAndProcess(topicName, syncImmediately, fetchAllSTI, accountInfoMap, isDashboardInstance, centralKafkaTopicName,
-                    apiConfig, main, exceptionOnCommitSync, httpCallParserMap, sessionAnalyzerMap);
+        } else {
+            InMemoryTrafficConsumer inMemoryConsumer = new InMemoryTrafficConsumer(
+                    ingestQueue, syncImmediately, fetchAllSTI, accountInfoMap, isDashboardInstance,
+                    centralKafkaTopicName, apiConfig, httpCallParserMap, sessionAnalyzerMap);
+            inMemoryConsumerHolder[0] = inMemoryConsumer;
+            inMemoryConsumer.start();
         }
     }
 
-    public static boolean isDbMergingModeEnabled(){
+    public static boolean isDbMergingModeEnabled() {
         return System.getenv().getOrDefault("DB_MERGING_MODE", "false").equalsIgnoreCase("true");
-    }
-
-    /**
-     * Main method of mini runtime where traffic kafka topic consumer does processing.
-     */
-    private static void kafkaSubscribeAndProcess(String topicName, boolean syncImmediately, boolean fetchAllSTI,
-            Map<Integer, AccountInfo> accountInfoMap, boolean isDashboardInstance, String centralKafkaTopicName,
-            APIConfig apiConfig, final Main main, final AtomicBoolean exceptionOnCommitSync,
-            Map<String, HttpCallParser> httpCallParserMap, Map<String, SessionAnalyzer> sessionAnalyzerMap) {
-        long lastSyncOffset = 0;
-        try {
-            main.consumer.subscribe(Arrays.asList(topicName));
-            loggerMaker.infoAndAddToDb("Consumer subscribed to topic: " + topicName);
-            while (true) {
-                ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
-                try {
-                    main.consumer.commitSync();
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error while committing offset: " + e.getMessage());
-                    throw e;
-                }
-                long start = System.currentTimeMillis();
-                // TODO: what happens if exception
-                Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
-                lastSyncOffset = bulkParseTrafficToResponseParams(lastSyncOffset, records, responseParamsToAccountMap);
-
-                handleResponseParams(responseParamsToAccountMap,
-                    accountInfoMap,
-                    isDashboardInstance,
-                    httpCallParserMap,
-                    sessionAnalyzerMap,
-                    apiConfig,
-                    fetchAllSTI,
-                    syncImmediately,
-                    centralKafkaTopicName);
-                long deltaTime = System.currentTimeMillis() - start;
-                AllMetrics.instance.setRuntimeProcessLatency(deltaTime);
-                AllMetrics.instance.setRuntimeApiReceivedCount((float) records.count());
-            }
-
-        } catch (WakeupException ignored) {
-          // nothing to catch. This exception is called from the shutdown hook.
-          loggerMaker.error("Kafka consumer closed due to wakeup exception");
-        } catch (Exception e) {
-            exceptionOnCommitSync.set(true);
-            printL(e);
-            loggerMaker.errorAndAddToDb(e, "Error in main runtime: " + e.getMessage());
-            e.printStackTrace();
-            System.exit(0);
-        } finally {
-            loggerMaker.warn("Closing kafka consumer for topic: " + topicName);
-            main.consumer.close();
-        }
-    }
-
-    private static int LOG_DEBUG_RECORDS = 10; 
-    private static long bulkParseTrafficToResponseParams(long lastSyncOffset, ConsumerRecords<String, String> records,
-            Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
-        for (ConsumerRecord<String,String> r: records) {
-            HttpResponseParams httpResponseParams;
-            try {
-                 
-                printL(r.value());
-                if(LOG_DEBUG_RECORDS > 0){
-                    LOG_DEBUG_RECORDS--;
-                    loggerMaker.infoAndAddToDb("Kafka record received" + r.value());
-                }
-                AllMetrics.instance.setRuntimeKafkaRecordCount(1);
-                AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
-
-                lastSyncOffset++;
-                if (DataControlFetcher.stopIngestionFromKafka()) {
-                    continue;
-                }
-
-                if (Context.getActualAccountId() != 1759692400 && lastSyncOffset % 100 == 0) {
-                    loggerMaker.infoAndAddToDb("Committing offset at position: " + lastSyncOffset);
-                }
-
-                if (Context.getActualAccountId() == 1759692400 && lastSyncOffset % 1000 == 0) {
-                    loggerMaker.infoAndAddToDb("Committing offset at position: " + lastSyncOffset);
-                }
-
-                if (Context.getActualAccountId() != 1759692400 && tryForCollectionName(r.value())) {
-                    continue;
-                }
-
-                if (isNonApiContentTypeFilterEnabled && HttpRequestResponseUtils.isNonApiContentType(r.value())) {
-                    continue;
-                }
-
-                httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
-                if (httpResponseParams == null) {
-                    loggerMaker.error("HttpResponse params was skipped due to invalid json requestBody");
-                    continue;
-                }
-
-                if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) {
-                    continue;
-                }
-                if(Utils.printDebugHostLog(httpResponseParams) != null){
-                    Utils.printDebugHostLog("Post processing sample message from kafka: " + httpResponseParams.getOrig());
-                }
-                if (Context.getActualAccountId() == 1759692400) {
-                    String debugHeader = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "x-debug-trace");
-                    if (debugHeader != null && !debugHeader.isEmpty()) {
-                        String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
-                        loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
-                                + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null")
-                                + " statusCode: " + httpResponseParams.getStatusCode());
-                    }
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message: " + r.value() + e);
-                continue;
-            }
-            String accountId = httpResponseParams.getAccountId();
-            if (!responseParamsToAccountMap.containsKey(accountId)) {
-                responseParamsToAccountMap.put(accountId, new ArrayList<>());
-            }
-            responseParamsToAccountMap.get(accountId).add(httpResponseParams);
-        }
-    return lastSyncOffset;
     }
 
     /**
