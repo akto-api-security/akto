@@ -13,6 +13,13 @@ import lombok.Setter;
 @AllArgsConstructor
 public class WizIntegration {
 
+    public enum FindingCreationStatus {
+        CREATION_REQUESTED,
+        CREATION_INITIATED,
+        CREATION_SUCCESSFUL,
+        CREATION_FAILED
+    }
+
     // API base URL pattern: https://api.<TENANT_DATA_CENTER>.<ENVIRONMENT>/graphql
     public static final String API_BASE_URL_PATTERN = "https://api.%s.%s/graphql";
 

@@ -43,9 +43,9 @@ public class WizIntegrationAction extends UserAction {
     private String clientSecret;
 
     public String addWizIntegration() {
-        if (tenantDataCenter == null || tenantDataCenter.isEmpty()) { 
-            addActionError("Please enter a valid tenant data center."); 
-            return Action.ERROR.toUpperCase(); 
+        if (tenantDataCenter == null || !tenantDataCenter.matches("^[a-z0-9]+$")) {
+            addActionError("Please enter a valid tenant data center.");
+            return Action.ERROR.toUpperCase();
         }
 
         if (clientId == null || clientId.isEmpty()) {
