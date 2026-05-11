@@ -84,7 +84,7 @@ function Wiz() {
                (clientSecret === null ? true : !clientSecret?.trim())
     }
 
-    const cardContent = "Seamlessly enhance your web application security with Wiz integration. Enrich your wiz dashboard with API vulnerabilities discovered by Akto."
+    const cardContent = "Seamlessly enhance your web application security with Akto's Wiz integration. Enrich your wiz dashboard with API vulnerabilities discovered by Akto."
 
     const wizCard = (
         <LegacyCard

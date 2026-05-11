@@ -134,7 +134,7 @@ public class WizIntegrationAction extends UserAction {
     public String createWizFindings() {
         WizIntegration wizIntegration = WizIntegrationDao.instance.findOne(new BasicDBObject());
         if(wizIntegration == null) {
-            logger.errorAndAddToDb("Wiz not not integrated for this account: " + Context.accountId.get());
+            logger.errorAndAddToDb("Wiz not integrated for this account: " + Context.accountId.get());
             addActionError("Wiz is not integrated.");
             return Action.ERROR.toUpperCase();
         }
