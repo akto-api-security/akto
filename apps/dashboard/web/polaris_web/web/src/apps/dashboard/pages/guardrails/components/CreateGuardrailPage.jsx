@@ -915,23 +915,29 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             return {
                 ...baseResponse,
                 action: 'Passed',
+                guardrailApplied: false,
                 aiResponse: 'Guardrail validation completed. Request passed all checks.'
             };
         }
 
         // Normalize response values (handle both capitalized and lowercase keys)
-        const allowed = getResponseValue(playgroundResult, 'Allowed', 'allowed') !== false;
+        const allowed = getResponseValue(playgroundResult, 'Allowed', 'allowed') === true;
         const reason = getResponseValue(playgroundResult, 'Reason', 'reason') || "";
         const modified = getResponseValue(playgroundResult, 'Modified', 'modified') === true;
         const modifiedPayload = getResponseValue(playgroundResult, 'ModifiedPayload', 'modifiedPayload');
+        const behaviour = getResponseValue(playgroundResult, 'Behaviour', 'behaviour') || "";
         const metadata = getResponseValue(playgroundResult, 'Metadata', 'metadata') || {};
         const policyName = getResponseValue(metadata, 'policy_name', 'policyName') || "";
         const ruleViolated = getResponseValue(metadata, 'rule_violated', 'ruleViolated') || "";
+
+        const guardrailApplied = !allowed || modified;
 
         if (!allowed) {
             return {
                 ...baseResponse,
                 action: 'Blocked',
+                guardrailApplied,
+                behaviour,
                 reason: reason || ruleViolated || 'Guardrail Policy Violation',
                 message: reason || ruleViolated || 'This request was blocked by the guardrail policy.',
                 policyName: policyName || undefined,
@@ -942,6 +948,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         return {
             ...baseResponse,
             action: modified ? 'Modified' : 'Passed',
+            guardrailApplied,
+            behaviour,
             reason: modified ? 'Request Modified' : '',
             message: modified
                 ? (modifiedPayload ? `Request was modified. Modified payload: ${modifiedPayload}` : 'Request was modified by guardrail policy.')
@@ -1150,27 +1158,26 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                                 <Box paddingBlockStart="1">
                                                     <Text
                                                         variant="bodyMd"
-                                                        color={message.action === 'Blocked' || message.action === 'Error' ? 'critical' : 'success'}
+                                                        color={
+                                                            message.action === 'Blocked' || message.action === 'Error'
+                                                                ? 'critical'
+                                                                : message.action === 'Modified'
+                                                                    ? 'warning'
+                                                                    : 'success'
+                                                        }
+                                                        fontWeight="medium"
                                                     >
-                                                        {message.action}
-                                                        {message.reason && ` - ${message.reason}`}
+                                                        {message.action === 'Blocked'
+                                                            ? 'This message is blocked by the policy'
+                                                            : message.action === 'Modified'
+                                                                ? 'This message was modified by the policy'
+                                                                : message.action === 'Error'
+                                                                    ? `Error${message.reason ? ` - ${message.reason}` : ''}`
+                                                                    : 'This message is allowed by the policy'}
                                                     </Text>
                                                 </Box>
 
-                                                {message.action === 'Blocked' ? (
-                                                    <HorizontalStack align="start">
-                                                        <Box
-                                                            maxWidth="70%"
-                                                            background="bg-fill-critical"
-                                                            borderRadius='3'
-                                                            borderRadiusEndStart='1'
-                                                        >
-                                                            <Text variant="bodyMd">
-                                                                {message.message}
-                                                            </Text>
-                                                        </Box>
-                                                    </HorizontalStack>
-                                                ) : message.aiResponse && (
+                                                {message.action !== 'Blocked' && message.aiResponse && (
                                                     <HorizontalStack align="start">
                                                         <Box
                                                             maxWidth="70%"
