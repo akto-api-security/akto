@@ -160,7 +160,7 @@ public class StatusCodeAnalyser {
             return;
         }
         Map<Set<String>, Map<String,Integer>> frequencyMap = new HashMap<>();
-        List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
+        List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta(false);
         Map<Integer, ApiCollection> apiCollectionMap = ApiCollectionsDao.instance.generateApiCollectionMap(apiCollections);
 
         int count = 0;
