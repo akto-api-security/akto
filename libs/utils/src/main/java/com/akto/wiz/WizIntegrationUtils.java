@@ -642,4 +642,74 @@ public class WizIntegrationUtils {
             throw new Exception("Error marking issues as Wiz findings: " + e.getMessage());
         }
     }
+
+    public static BasicDBObject checkLastUploadScanStatus() throws Exception {
+        WizIntegration wizIntegration = WizIntegrationDao.instance.findOne(new BasicDBObject());
+
+        if (wizIntegration == null) {
+            throw new Exception("WizIntegration not configured for this account.");
+        }
+
+        String systemActivityId = wizIntegration.getSystemActivityId();
+        long lastUploadedScanTs = wizIntegration.getLastUploadedScanTs();
+
+        if (systemActivityId == null) {
+            throw new Exception("No Wiz findings upload created for this account.");
+        }
+
+        // Get valid access token
+        String accessToken = getValidAccessToken();
+
+        // Build GraphQL API endpoint
+        String apiUrl = String.format(
+            WizIntegration.API_BASE_URL_PATTERN,
+            wizIntegration.getTenantDataCenter(),
+            WizIntegration.ENVIRONMENT
+        );
+
+        if (WizIntegrationUtils.isWizDevMode()) {
+            apiUrl = getWizDevGraphQLEndpoint();
+            loggerMaker.infoAndAddToDb("Wiz dev mode enabled. Using dev GraphQL endpoint: " + apiUrl);
+        }
+
+        // Construct GraphQL query
+        String graphqlQuery = String.format(
+            "{\"query\":\"query SystemActivity($id: ID!) { systemActivity(id: $id) { id status statusInfo result {   ...on SystemActivityEnrichmentIntegrationResult{ dataSources {   ... IngestionStatsDetails } findings {   ... IngestionStatsDetails } events {   ... IngestionStatsDetails } tags {   ... IngestionStatsDetails } unresolvedAssets {   ... UnresolvedAssetsDetails }   } } context {   ... on SystemActivityEnrichmentIntegrationContext{ fileUploadId   } } }   }  fragment IngestionStatsDetails on EnrichmentIntegrationStats { incoming handled }  fragment UnresolvedAssetsDetails on EnrichmentIntegrationUnresolvedAssets { count ids }\",\"variables\":{\"id\":\"%s\"}}",
+            systemActivityId
+        );
+
+        // Set headers
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Content-Type", Collections.singletonList("application/json"));
+        headers.put("Authorization", Collections.singletonList("Bearer " + accessToken));
+
+        // Make request
+        OriginalHttpRequest request = new OriginalHttpRequest(apiUrl, "", "POST", graphqlQuery, headers, "");
+        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, true, new ArrayList<>(), WizIntegrationUtils.isWizDevMode());
+
+        if (response == null) {
+            throw new Exception("Failed to request upload URL from Wiz - null response");
+        }
+
+        int statusCode = response.getStatusCode();
+        String responsePayload = response.getBody();
+
+        if (statusCode != 200 || responsePayload == null) {
+            String errorMsg = String.format("Request security scan upload failed with status code: %d", statusCode);
+            if (responsePayload != null) {
+                errorMsg += " Response: " + responsePayload;
+            }
+            throw new Exception(errorMsg);
+        }
+
+        // Parse response
+        BasicDBObject responseObj = BasicDBObject.parse(responsePayload);
+        if (responseObj == null || responseObj.isEmpty()) {
+            throw new Exception("Failed to parse response from Wiz");
+        }
+
+        responseObj.put("lastUploadedScanTs", lastUploadedScanTs);
+
+        return responseObj;
+    }
 }
