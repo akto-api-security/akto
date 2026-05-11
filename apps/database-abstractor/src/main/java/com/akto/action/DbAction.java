@@ -2108,29 +2108,27 @@ public class DbAction extends ActionSupport {
                    apiCollections = cachedApiCollections;
                    loggerMaker.error("fetchAllApiCollectionsMeta served from cache for account id: " + accountId +
                        " cache age: " + (currentTime - cacheTimestamp) + "ms");
-                   return Action.SUCCESS.toUpperCase();
-               }
+               } else {
+                   // Cache miss or expired - use synchronization to prevent concurrent DB calls
+                   synchronized (cacheLock) {
+                       // Double-check after acquiring lock (another thread might have updated cache)
+                       currentTime = System.currentTimeMillis();
+                       if (cachedApiCollections != null && (currentTime - cacheTimestamp) < CACHE_TTL_MS) {
+                           apiCollections = cachedApiCollections;
+                           loggerMaker.error("fetchAllApiCollectionsMeta served from cache (double-check) for account id: " + accountId +
+                               " cache age: " + (currentTime - cacheTimestamp) + "ms");
+                       } else {
+                           // Always fetch full data for cache
+                           loggerMaker.error("fetchAllApiCollectionsMeta cache miss/expired, fetching from DB for account id: " + accountId);
+                           apiCollections = DbLayer.fetchAllApiCollectionsMeta(true);
+                           cachedApiCollections = apiCollections;
+                           cacheTimestamp = System.currentTimeMillis();
 
-               // Cache miss or expired - use synchronization to prevent concurrent DB calls
-               synchronized (cacheLock) {
-                   // Double-check after acquiring lock (another thread might have updated cache)
-                   currentTime = System.currentTimeMillis();
-                   if (cachedApiCollections != null && (currentTime - cacheTimestamp) < CACHE_TTL_MS) {
-                       apiCollections = cachedApiCollections;
-                       loggerMaker.error("fetchAllApiCollectionsMeta served from cache (double-check) for account id: " + accountId +
-                           " cache age: " + (currentTime - cacheTimestamp) + "ms");
-                       return Action.SUCCESS.toUpperCase();
+                           long endTime = System.currentTimeMillis();
+                           loggerMaker.error("finished fetchAllApiCollectionsMeta (DB fetch + cached) account id: " + accountId +
+                               " duration: " + (endTime - startTime) + "ms");
+                       }
                    }
-
-                   // Fetch from DB and update cache
-                   loggerMaker.error("fetchAllApiCollectionsMeta cache miss/expired, fetching from DB for account id: " + accountId);
-                   apiCollections = DbLayer.fetchAllApiCollectionsMeta(includeTagsList);
-                   cachedApiCollections = apiCollections;
-                   cacheTimestamp = System.currentTimeMillis();
-
-                   long endTime = System.currentTimeMillis();
-                   loggerMaker.error("finished fetchAllApiCollectionsMeta (DB fetch + cached) account id: " + accountId +
-                       " duration: " + (endTime - startTime) + "ms");
                }
            } else {
                // For other accounts, fetch directly without caching
@@ -2138,6 +2136,11 @@ public class DbAction extends ActionSupport {
                long endTime = System.currentTimeMillis();
                loggerMaker.error("finished fetchAllApiCollectionsMeta (no cache) account id: " + accountId +
                    " duration: " + (endTime - startTime) + "ms");
+           }
+
+           // When tagsList is not needed, skip cache and fetch without it (faster DB query)
+           if (!includeTagsList) {
+               apiCollections = DbLayer.fetchAllApiCollectionsMeta(false);
            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchAllApiCollectionsMeta " + e.toString() + " " + Context.accountId.get());
