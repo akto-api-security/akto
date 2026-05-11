@@ -7,7 +7,6 @@ import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
-import com.akto.util.Util;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.GlobalEnums.GuardrailSource;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -309,8 +308,8 @@ public class GuardrailPoliciesAction extends UserAction {
             User user = getSUser();
             int currentTime = Context.now();
 
-            // Get guardrail service URL from environment variable or use default
-            String guardrailServiceUrl = Util.getEnvironmentVariable("GUARDRAIL_SERVICE_URL");
+            // Build per-account guardrail service URL: https://<accountId>-guardrails.akto.io
+            String guardrailServiceUrl = "https://" + Context.accountId.get() + "-guardrails.akto.io";
             String validateUrl = guardrailServiceUrl + "/api/validate/requestWithPolicy";
 
             // Prepare request payload - wrap testInput in JSON with "prompt" key
