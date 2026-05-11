@@ -3,31 +3,56 @@ import { Box } from "@shopify/polaris";
 import ReactFlow from "react-flow-renderer";
 import { AgentNode, AgentEdge } from "../observe/api_collections/AgentDiscoverGraph";
 import { isAgenticSecurityCategory } from "../../../main/labelHelper";
+import { getAgentType } from "./nhiViolationsData";
 
 // ── Per-identity resource mappings ────────────────────────────────────────────
 export const IDENTITY_RESOURCES = {
-    "aws-cursor-key":      [{ label: "Bedrock",     type: "LLM",           category: "ai-model"  }, { label: "S3",          type: "AWS Resource",  category: "ai-tool"   }, { label: "EC2",         type: "AWS Resource",  category: "ai-tool"   }],
-    "hr-slack-token":      [{ label: "Slack",       type: "Messaging",     category: "ai-tool"   }, { label: "HR System",   type: "Internal DB",   category: "internal"  }],
-    "aws-env-sa":          [{ label: "S3",          type: "AWS Resource",  category: "ai-tool"   }, { label: "RDS",         type: "AWS Resource",  category: "ai-tool"   }],
-    "github-oauth-456":    [{ label: "GitHub",      type: "Repository",    category: "internal"  }],
-    "jira-token":          [{ label: "Jira",        type: "Issue Tracker", category: "ai-tool"   }, { label: "Confluence",  type: "Project",       category: "internal"  }],
-    "internal-api-token":  [{ label: "Backend",     type: "Internal API",  category: "internal"  }],
-    "airbnb-api-key":      [{ label: "Airbnb",      type: "External API",  category: "ai-tool"   }],
-    "vscode-oauth":        [{ label: "GitHub",      type: "Repository",    category: "internal"  }, { label: "Azure",       type: "Cloud",         category: "ai-tool"   }],
-    "docker-registry-key": [{ label: "Docker Hub",  type: "Registry",      category: "ai-tool"   }, { label: "ECR",         type: "AWS Resource",  category: "internal"  }],
-    "github-actions-key":  [{ label: "GitHub",      type: "CI/CD",         category: "internal"  }, { label: "S3",          type: "AWS Resource",  category: "ai-tool"   }],
-    "playwright-token":    [{ label: "Playwright",  type: "Browser API",   category: "ai-model"  }],
-    "filesystem-token":    [{ label: "Local FS",    type: "Filesystem",    category: "internal"  }],
-    "notion-token":        [{ label: "Notion",      type: "Workspace",     category: "ai-tool"   }],
-    "huggingface-token":   [{ label: "HuggingFace", type: "LLM",           category: "ai-model"  }],
-    "github-copilot-key":  [{ label: "Copilot",     type: "AI Coding",     category: "ai-model"  }, { label: "GitHub",      type: "Repository",    category: "internal"  }],
-    "anthropic-api-key":   [{ label: "Claude",      type: "LLM",           category: "ai-model"  }],
+    "copilot-api-key":    [{ label: "GitHub Copilot", type: "AI Coding",    category: "ai-model"  }],
+    "slack-token":        [{ label: "Slack",           type: "Messaging",   category: "ai-tool"   }],
+    "atlassian-api-key":  [{ label: "Jira",            type: "Issue Tracker", category: "ai-tool" }, { label: "Confluence",  type: "Project",      category: "internal"  }],
+    "github-api-key":     [{ label: "GitHub",          type: "Repository",  category: "internal"  }],
+    "notion-api-key":     [{ label: "Notion",          type: "Workspace",   category: "ai-tool"   }],
+    "filesystem-token":   [{ label: "Local FS",        type: "Filesystem",  category: "internal"  }],
+    "razorpay-token":     [{ label: "Razorpay",        type: "Payment API", category: "ai-tool"   }],
+    "docker-token":       [{ label: "Docker Hub",      type: "Registry",    category: "ai-tool"   }, { label: "Containers",  type: "Docker",       category: "internal"  }],
+    "playwright-token":   [{ label: "Playwright",      type: "Browser API", category: "ai-model"  }],
+    "kite-api-key":       [{ label: "Kite",            type: "Trading API", category: "ai-tool"   }],
+    "postgres-token":     [{ label: "PostgreSQL",   type: "Database",     category: "internal"  }],
+    "notion-mcp-token":   [{ label: "Notion",       type: "Workspace",    category: "ai-tool"   }],
+    "jetbrains-token":    [{ label: "JetBrains",    type: "IDE",          category: "internal"  }],
+    "squareup-token":     [{ label: "Square",        type: "Payment API",  category: "ai-tool"   }],
+    "alphavantage-key":   [{ label: "Alpha Vantage", type: "Finance API",  category: "ai-tool"   }],
+    // Argus identities — gen-ai:LLM
+    "openai-api-key":        [{ label: "OpenAI API",  type: "LLM",         category: "ai-model"  }],
+    "cohere-api-key":        [{ label: "Cohere",      type: "LLM",         category: "ai-model"  }],
+    "perplexity-api-key":    [{ label: "Perplexity",  type: "LLM",         category: "ai-model"  }],
+    "langchain-api-key":     [{ label: "LangChain",   type: "LLM",         category: "ai-model"  }],
+    // Argus identities — gen-ai:MCP Server
+    "k9s-mcp-token":         [{ label: "K9s Trade",   type: "MCP Server",  category: "mcp"       }],
+    "vulnerable-mcp-token":  [{ label: "Vuln MCP",    type: "MCP Server",  category: "mcp"       }],
+    "akplatform-mcp-token":  [{ label: "AK Platform", type: "MCP Server",  category: "mcp"       }],
+    // Argus identities — gen-ai:AI Agent
+    "replicate-api-key":     [{ label: "Replicate",   type: "AI Agent",    category: "ai-tool"   }],
+    "n8n-api-key":           [{ label: "N8N",         type: "AI Agent",    category: "ai-tool"   }],
+    "jasper-api-key":        [{ label: "Jasper",      type: "AI Agent",    category: "ai-tool"   }],
+    "luma-api-key":          [{ label: "Luma AI",     type: "AI Agent",    category: "ai-tool"   }],
+    "chargebee-api-key":     [{ label: "Chargebee",   type: "AI Agent",    category: "ai-tool"   }],
+    "copy-ai-token":         [{ label: "Copy.AI",     type: "AI Agent",    category: "ai-tool"   }],
+    "babylon-api-key":       [{ label: "Babylon",     type: "AI Agent",    category: "ai-tool"   }],
+    "jooksy-api-key":        [{ label: "Jooksy",      type: "AI Agent",    category: "ai-tool"   }],
+    "anthropos-api-key":     [{ label: "Anthropos AI",type: "AI Agent",    category: "ai-tool"   }],
+    "lttc-api-key":          [{ label: "LTTC AI",     type: "AI Agent",    category: "ai-tool"   }],
+    "agentai-token":         [{ label: "AgentAI",     type: "AI Agent",    category: "ai-tool"   }],
 };
 
 export function getDefaultResources(identityName) {
-    if (identityName.includes("aws"))    return [{ label: "S3",     type: "AWS Resource", category: "ai-tool"  }];
-    if (identityName.includes("github")) return [{ label: "GitHub", type: "Repository",  category: "internal" }];
-    if (identityName.includes("slack"))  return [{ label: "Slack",  type: "Messaging",   category: "ai-tool"  }];
+    if (identityName.includes("github"))      return [{ label: "GitHub",      type: "Repository",  category: "internal" }];
+    if (identityName.includes("slack"))       return [{ label: "Slack",       type: "Messaging",   category: "ai-tool"  }];
+    if (identityName.includes("notion"))      return [{ label: "Notion",      type: "Workspace",   category: "ai-tool"  }];
+    if (identityName.includes("docker"))      return [{ label: "Docker Hub",  type: "Registry",    category: "ai-tool"  }];
+    if (identityName.includes("postgres"))    return [{ label: "PostgreSQL",  type: "Database",    category: "internal" }];
+    if (identityName.includes("filesystem"))  return [{ label: "Local FS",    type: "Filesystem",  category: "internal" }];
+    if (identityName.includes("aws"))         return [{ label: "S3",          type: "AWS Resource",category: "ai-tool"  }];
     return [{ label: "API", type: "External API", category: "ai-tool" }];
 }
 
@@ -70,7 +95,7 @@ export default function IdentityGraph({ row }) {
             ]),
             makeNode("agent", agentX, centerY, {
                 label: row.agent,
-                type:  "AI Agent",
+                type:  getAgentType(row.agent),
                 category: "agent",
                 description: `Agent using ${row.identityName}`,
                 status: "active",

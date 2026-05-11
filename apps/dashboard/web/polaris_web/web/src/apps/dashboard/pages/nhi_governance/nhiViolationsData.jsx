@@ -1,7 +1,10 @@
 import { Badge, Box, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
-import { SettingsMajor } from "@shopify/polaris-icons";
+import { MagicMajor, SettingsMajor } from "@shopify/polaris-icons";
+import MCPIcon from "@/assets/MCP_Icon.svg";
+import { Avatar } from "@shopify/polaris";
 import { CellType } from "../../components/tables/rows/GithubRow";
 import func from "@/util/func";
+import { isAgenticSecurityCategory } from "../../../main/labelHelper";
 
 // ── Identity icon ──────────────────────────────────────────────────────────────
 const IDENTITY_DOMAIN_MAP = {
@@ -22,6 +25,17 @@ const IDENTITY_DOMAIN_MAP = {
     slack: "slack.com", vscode: "code.visualstudio.com", entra: "microsoft.com",
     snowflake: "snowflake.com", docker: "docker.com", airbnb: "airbnb.com",
     playwright: "playwright.dev", huggingface: "huggingface.co", anthropic: "anthropic.com",
+    copilot: "github.com", atlassian: "atlassian.net", razorpay: "razorpay.com",
+    kite: "kiteconnect.zerodha.com", postgres: "postgresql.org",
+    squareup: "squareup.com", alphavantage: "alphavantage.co",
+    jetbrains: "jetbrains.com", huggingface: "huggingface.co", gemini: "gemini.google.com",
+    grok: "x.ai", openai: "openai.com", cohere: "cohere.ai",
+    replicate: "replicate.com", perplexity: "perplexity.ai",
+    jasper: "jasper.ai", luma: "luma.ai", chargebee: "chargebee.com",
+    babylon: "babylonhealth.com", langchain: "langchain.com",
+    claude: "claude.ai", n8n: "n8n.io", jooksy: "jooksy.io",
+    anthropos: "anthropos.io", lttc: "lttc.ai", agentai: "agentai.io",
+    k9s: "k9s.trade", replicate: "replicate.com",
 };
 const INTERNAL_KEYWORDS = new Set(["internal", "connector", "filesystem"]);
 export function IdentityIcon({ name }) {
@@ -35,16 +49,58 @@ export function IdentityIcon({ name }) {
 
 // ── Agent icon ─────────────────────────────────────────────────────────────────
 const AGENT_SPECIFIC_DOMAIN = {
-    "cursor prod":    "cursor.sh",
-    "cursor":         "cursor.sh",
+    "cursor prod":    "cursor.com",
+    "cursor":         "cursor.com",
     "vs code":        "code.visualstudio.com",
-    "claude cli":     "anthropic.com",
-    "claude desktop": "anthropic.com",
+    "claude cli":     "claude.ai",
+    "claude desktop": "claude.ai",
     "windsurf":       "codeium.com",
+    "antigravity":    "antigravity.google",
+    "gemini":         "gemini.google.com",
+    "aws":            "aws.amazon.com",
+    "azure":          "azure.microsoft.com",
+    "stripe":         "stripe.com",
+    "playwright":     "playwright.dev",
+    "postgres":       "postgresql.org",
+    "atlassian":      "atlassian.net",
+    "docker":         "docker.com",
+    "claude":         "claude.ai",
+    "grok":           "x.ai",
+    "openai":         "openai.com",
+    "anthropic":      "anthropic.com",
+    "cohere":         "cohere.ai",
+    "replicate":      "replicate.com",
+    "perplexity":     "perplexity.ai",
+    "jasper":         "jasper.ai",
+    "luma ai":        "luma.ai",
+    "chargebee ai":   "chargebee.com",
+    "copy.ai":        "copy.ai",
+    "babylon health": "babylonhealth.com",
+    "langchain":      "langchain.com",
+    "k9s trade":      "k9s.trade",
+    "vulnerable mcp": "akto.io",
+    "ak platform":    "akto.io",
+    "n8n":            "n8n.io",
+    "jooksy":         "jooksy.io",
+    "anthropos ai":   "anthropos.io",
+    "lttc ai":        "lttc.ai",
+    "agentai":        "agentai.io",
 };
+const AGENT_MCP  = new Set(["aws","azure","stripe","playwright","postgres","atlassian","docker","filesystem","universal","k9s trade","vulnerable mcp","ak platform"]);
+const AGENT_LLM  = new Set(["gemini","grok","claude","openai","anthropic","cohere","perplexity","langchain"]);
+export function getAgentType(name) {
+    const key = (name || "").toLowerCase().trim();
+    if (AGENT_MCP.has(key)) return "MCP Server";
+    if (AGENT_LLM.has(key)) return "LLM";
+    return "AI Agent";
+}
 const AI_ICON_POOL = ["claude.ai","openai.com","deepseek.com","x.ai","gemini.google.com","mistral.ai","perplexity.ai","cohere.com"];
 export function AgentIcon({ name }) {
     const key = (name || "").toLowerCase().trim();
+    if (AGENT_MCP.has(key))
+        return <Avatar source={MCPIcon} shape="square" size="extraSmall" />;
+    if (AGENT_LLM.has(key))
+        return <Box style={{width:20,height:20,display:"flex",alignItems:"center",justifyContent:"center"}}><Icon source={MagicMajor} color="base" /></Box>;
     const domain = AGENT_SPECIFIC_DOMAIN[key] || AI_ICON_POOL[key.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0) % AI_ICON_POOL.length];
     return <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`} width={20} height={20} style={{borderRadius:3,flexShrink:0}} alt="" />;
 }
@@ -115,49 +171,213 @@ export function PolicyCell({ policy }) {
 }
 
 // ── Raw data ───────────────────────────────────────────────────────────────────
-const CURATED = [
-    { severity:"Critical", violation:"Admin credential exposed to agent runtime",                    identity:"aws-cursor-key",     agent:"Cursor",     policy:{primary:"No Admin Credentials for Agent Identities"},           discovered:"2h ago",  status:"Open"  },
-    { severity:"Critical", violation:"Credential exceeds intended permission scope",                 identity:"aws-cursor-key",     agent:"Cursor",     policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"1h ago",  status:"Open"  },
-    { severity:"Critical", violation:"Unusual LLM access spike detected",                           identity:"aws-cursor-key",     agent:"Cursor",     policy:{primary:"Detect Unusual Usage Patterns"},           discovered:"15m ago", status:"Open"  },
-    { severity:"Critical", violation:"Token used outside trusted network boundary",                 identity:"hr-slack-token",     agent:"Claude CLI",    policy:{primary:"Restrict Access to Sensitive Resources", extra:2, extras:["Rotate API Keys Every 30 Days","Detect Unusual Usage Patterns"]},  discovered:"6h ago",  status:"Open"  },
-    { severity:"High",     violation:"Messaging token triggering bulk automated sends",             identity:"hr-slack-token",     agent:"Claude CLI",    policy:{primary:"Limit Automation Without Approval"},            discovered:"3h ago",  status:"Fixed" },
-    { severity:"High",     violation:"Token scope broader than required for task",                  identity:"hr-slack-token",     agent:"Claude CLI",    policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"4h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"Bulk API calls detected from single token",                   identity:"hr-slack-token",     agent:"Claude CLI",    policy:{primary:"Detect Unusual Usage Patterns"},                discovered:"5h ago",  status:"Open"  },
-    { severity:"High",     violation:"Dormant credential retains write access",                     identity:"aws-env-sa",         agent:"Windsurf",   policy:{primary:"Disable Dormant Credentials (30+ days)", extra:2, extras:["Disable Dormant Credentials (30+ days)","Prevent Cross-Service Credential Usage"]}, discovered:"1h ago", status:"Fixed" },
-    { severity:"High",     violation:"Provisioning access without approval controls",               identity:"aws-env-sa",         agent:"Windsurf",   policy:{primary:"Restrict Access to Sensitive Resources", extra:2, extras:["No Admin Credentials for Agent Identities","Enforce Least Privilege on Credentials"]},      discovered:"2h ago", status:"Open"  },
-    { severity:"Medium",   violation:"Service account key expired 90+ days ago",                   identity:"aws-env-sa",         agent:"Windsurf",   policy:{primary:"Disable Dormant Credentials (30+ days)"},         discovered:"3h ago",  status:"Open"  },
-    { severity:"High",     violation:"Repository token has admin-level permissions",                identity:"github-oauth-456",   agent:"VS Code",          policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"45m ago", status:"Open"  },
-    { severity:"High",     violation:"Token accessing repositories beyond expiry date",             identity:"github-oauth-456",   agent:"VS Code",          policy:{primary:"Restrict Access to Sensitive Resources"},                discovered:"45m ago", status:"Fixed" },
-    { severity:"Medium",   violation:"OAuth scope exceeds minimum required permissions",            identity:"github-oauth-456",   agent:"VS Code",          policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"1h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"Access to restricted ticketing projects detected",            identity:"jira-token",         agent:"Claude Desktop",    policy:{primary:"Restrict Access to Sensitive Resources", extra:2, extras:["Disable Dormant Credentials (30+ days)","Enforce Least Privilege on Credentials"]},   discovered:"1h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"Idle credential remains active without usage",                identity:"jira-token",         agent:"Claude Desktop",    policy:{primary:"Disable Dormant Credentials (30+ days)"},               discovered:"30m ago", status:"Open"  },
-    { severity:"Critical", violation:"Service account with unrestricted API access",                identity:"internal-api-token", agent:"Claude CLI",       policy:{primary:"Restrict Access to Sensitive Resources"},        discovered:"2d ago",  status:"Open"  },
-    { severity:"Medium",   violation:"MCP token missing expiry configuration",                      identity:"internal-api-token", agent:"Claude CLI",       policy:{primary:"Disable Dormant Credentials (30+ days)"},         discovered:"3d ago",  status:"Open"  },
-    { severity:"Critical", violation:"Outbound token used without destination binding",             identity:"airbnb-api-key",      agent:"Antigravity",     policy:{primary:"Restrict Access to Sensitive Resources"},           discovered:"5h ago",  status:"Fixed" },
-    { severity:"High",     violation:"Write permission granted without MFA binding",                identity:"airbnb-api-key",      agent:"Antigravity",     policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"6h ago",  status:"Open"  },
-    { severity:"High",     violation:"Bulk API calls detected from single token",                   identity:"airbnb-api-key",      agent:"Antigravity",     policy:{primary:"Detect Unusual Usage Patterns"},                discovered:"7h ago",  status:"Open"  },
-    { severity:"High",     violation:"Token scope broader than required for task",                  identity:"airbnb-api-key",      agent:"Antigravity",     policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"8h ago",  status:"Open"  },
-    { severity:"High",     violation:"Identity inactive but retains write access",                  identity:"airbnb-api-key",      agent:"Antigravity",     policy:{primary:"Disable Dormant Credentials (30+ days)"},        discovered:"9h ago",  status:"Open"  },
-    { severity:"High",     violation:"Agent sending external messages via shared token",            identity:"vscode-oauth",       agent:"VS Code",       policy:{primary:"Limit Automation Without Approval"},            discovered:"6h ago",  status:"Open"  },
-    { severity:"High",     violation:"OAuth scope exceeds minimum required permissions",            identity:"vscode-oauth",       agent:"VS Code",       policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"7h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"MCP token missing expiry configuration",                      identity:"vscode-oauth",       agent:"VS Code",       policy:{primary:"Disable Dormant Credentials (30+ days)"},         discovered:"8h ago",  status:"Fixed" },
-    { severity:"Critical", violation:"Admin credential exposed to agent runtime",                   identity:"docker-registry-key",         agent:"Cursor",     policy:{primary:"No Admin Credentials for Agent Identities"},           discovered:"5h ago",  status:"Open"  },
-    { severity:"Critical", violation:"Excessive permissions granted at agent setup",                identity:"docker-registry-key",         agent:"Cursor",     policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"6h ago",  status:"Open"  },
-    { severity:"Critical", violation:"Credential reused across staging and production",             identity:"docker-registry-key",         agent:"Cursor",     policy:{primary:"Prevent Cross-Service Credential Usage"},discovered:"7h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"Token rotation overdue by 14 days",                          identity:"docker-registry-key",         agent:"Cursor",     policy:{primary:"Rotate API Keys Every 30 Days"},      discovered:"1d ago",  status:"Fixed" },
-    { severity:"Medium",   violation:"Agent accessing prod resources from dev token",               identity:"docker-registry-key",         agent:"Cursor",     policy:{primary:"Prevent Cross-Service Credential Usage"},discovered:"2d ago",  status:"Fixed" },
-    { severity:"High",     violation:"Production credential active in test environment",            identity:"github-actions-key", agent:"VS Code",          policy:{primary:"Prevent Cross-Service Credential Usage"},discovered:"12h ago", status:"Fixed" },
-    { severity:"Medium",   violation:"Service account key expired 90+ days ago",                   identity:"github-actions-key", agent:"VS Code",          policy:{primary:"Disable Dormant Credentials (30+ days)"},         discovered:"1d ago",  status:"Open"  },
-    { severity:"High",     violation:"Write credential exposed to read-only agent",                 identity:"playwright-token",    agent:"Claude Desktop",     policy:{primary:"Enforce Scoped Access for OAuth Tokens"},       discovered:"8h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"Service account accessing non-authorized endpoint",           identity:"filesystem-token",    agent:"Windsurf",     policy:{primary:"Restrict Access to Sensitive Resources"},        discovered:"3h ago",  status:"Fixed" },
-    { severity:"Medium",   violation:"MCP token missing expiry configuration",                      identity:"filesystem-token",    agent:"Windsurf",     policy:{primary:"Disable Dormant Credentials (30+ days)"},         discovered:"4h ago",  status:"Open"  },
-    { severity:"High",     violation:"API token with administrative scope for read ops",            identity:"notion-token",       agent:"Claude CLI",  policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"2h ago",  status:"Fixed" },
-    { severity:"Medium",   violation:"OAuth scope exceeds minimum required permissions",            identity:"huggingface-token",   agent:"Claude Desktop",       policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"4h ago",  status:"Fixed" },
-    { severity:"High",     violation:"API token with administrative scope for read ops",            identity:"github-copilot-key",      agent:"Cursor",      policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"2h ago",  status:"Fixed" },
-    { severity:"High",     violation:"Write credential exposed to read-only agent",                 identity:"github-copilot-key",      agent:"Cursor",      policy:{primary:"Enforce Scoped Access for OAuth Tokens"},       discovered:"3h ago",  status:"Open"  },
-    { severity:"Medium",   violation:"Token shared across multiple agent instances",                identity:"github-copilot-key",      agent:"Cursor",      policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"4h ago",  status:"Fixed" },
-    { severity:"High",     violation:"Write credential exposed to read-only agent",                 identity:"anthropic-api-key",      agent:"Claude CLI",   policy:{primary:"Enforce Scoped Access for OAuth Tokens"},       discovered:"2h ago",  status:"Open"  },
-    { severity:"High",     violation:"OAuth scope exceeds minimum required permissions",            identity:"playwright-token",    agent:"Claude Desktop",     policy:{primary:"Enforce Least Privilege on Credentials"},            discovered:"9h ago",  status:"Fixed" },
+const ATLAS_CURATED = [
+    // copilot-api-key / Windsurf — 3C 0H 2M
+    { severity:"Critical", violation:"Admin credential exposed to agent runtime",         identity:"copilot-api-key",   agent:"Windsurf",      policy:{primary:"No Admin Credentials for Agent Identities"},                                          discovered:"2h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Credential exceeds intended permission scope",      identity:"copilot-api-key",   agent:"Windsurf",      policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"1h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Unusual LLM access spike detected",                identity:"copilot-api-key",   agent:"Windsurf",      policy:{primary:"Detect Unusual Usage Patterns"},                                                      discovered:"15m ago", status:"Open"  },
+    { severity:"Medium",   violation:"Token rotation overdue by 14 days",                identity:"copilot-api-key",   agent:"Windsurf",      policy:{primary:"Rotate API Keys Every 30 Days"},                                                      discovered:"1d ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"Agent accessing prod resources from dev token",     identity:"copilot-api-key",   agent:"Windsurf",      policy:{primary:"Prevent Cross-Service Credential Usage"},                                             discovered:"2d ago",  status:"Fixed" },
+
+    // slack-token / Claude CLI — 1C 3H 0M
+    { severity:"Critical", violation:"Token used outside trusted network boundary",      identity:"slack-token",       agent:"Claude CLI",    policy:{primary:"Restrict Access to Sensitive Resources", extra:2, extras:["Rotate API Keys Every 30 Days","Detect Unusual Usage Patterns"]}, discovered:"6h ago",  status:"Open"  },
+    { severity:"High",     violation:"Messaging token triggering bulk automated sends",  identity:"slack-token",       agent:"Claude CLI",    policy:{primary:"Limit Automation Without Approval"},                                                  discovered:"3h ago",  status:"Fixed" },
+    { severity:"High",     violation:"Token scope broader than required for task",       identity:"slack-token",       agent:"Claude CLI",    policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"4h ago",  status:"Open"  },
+    { severity:"High",     violation:"Bulk API calls detected from single token",        identity:"slack-token",       agent:"Claude CLI",    policy:{primary:"Detect Unusual Usage Patterns"},                                                      discovered:"5h ago",  status:"Open"  },
+
+    // atlassian-api-key / Cursor — 1C 3H 2M
+    { severity:"Critical", violation:"Service account with unrestricted API access",     identity:"atlassian-api-key", agent:"Cursor",        policy:{primary:"Restrict Access to Sensitive Resources"},                                             discovered:"2d ago",  status:"Open"  },
+    { severity:"High",     violation:"Atlassian token has admin-level permissions",      identity:"atlassian-api-key", agent:"Cursor",        policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"45m ago", status:"Open"  },
+    { severity:"High",     violation:"Token accessing projects beyond expiry date",      identity:"atlassian-api-key", agent:"Cursor",        policy:{primary:"Restrict Access to Sensitive Resources"},                                             discovered:"1h ago",  status:"Fixed" },
+    { severity:"High",     violation:"Identity inactive but retains write access",       identity:"atlassian-api-key", agent:"Cursor",        policy:{primary:"Disable Dormant Credentials (30+ days)"},                                            discovered:"2h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"OAuth scope exceeds minimum required permissions", identity:"atlassian-api-key", agent:"Cursor",        policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"3h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"MCP token missing expiry configuration",           identity:"atlassian-api-key", agent:"Cursor",        policy:{primary:"Disable Dormant Credentials (30+ days)"},                                            discovered:"4h ago",  status:"Fixed" },
+
+    // github-api-key / Claude CLI — 2C 1H 0M
+    { severity:"Critical", violation:"Admin credential exposed to agent runtime",         identity:"github-api-key",    agent:"Claude CLI",    policy:{primary:"No Admin Credentials for Agent Identities"},                                          discovered:"5h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Excessive permissions granted at agent setup",      identity:"github-api-key",    agent:"Claude CLI",    policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"6h ago",  status:"Open"  },
+    { severity:"High",     violation:"Production credential active in test environment",  identity:"github-api-key",    agent:"Claude CLI",    policy:{primary:"Prevent Cross-Service Credential Usage"},                                             discovered:"12h ago", status:"Fixed" },
+
+    // notion-api-key / Cursor — 2C 4H 1M
+    { severity:"Critical", violation:"Outbound token used without destination binding",  identity:"notion-api-key",    agent:"Cursor",        policy:{primary:"Restrict Access to Sensitive Resources"},                                             discovered:"5h ago",  status:"Fixed" },
+    { severity:"Critical", violation:"Service account key expired 90+ days ago",         identity:"notion-api-key",    agent:"Cursor",        policy:{primary:"Disable Dormant Credentials (30+ days)"},                                            discovered:"6h ago",  status:"Open"  },
+    { severity:"High",     violation:"Write permission granted without MFA binding",      identity:"notion-api-key",    agent:"Cursor",        policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"7h ago",  status:"Open"  },
+    { severity:"High",     violation:"Bulk API calls detected from single token",         identity:"notion-api-key",    agent:"Cursor",        policy:{primary:"Detect Unusual Usage Patterns"},                                                      discovered:"8h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token scope broader than required for task",        identity:"notion-api-key",    agent:"Cursor",        policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"9h ago",  status:"Open"  },
+    { severity:"High",     violation:"Agent sending external messages via shared token",  identity:"notion-api-key",    agent:"Cursor",        policy:{primary:"Limit Automation Without Approval"},                                                  discovered:"10h ago", status:"Open"  },
+    { severity:"Medium",   violation:"Access to restricted workspace projects detected",  identity:"notion-api-key",    agent:"Cursor",        policy:{primary:"Restrict Access to Sensitive Resources", extra:2, extras:["Disable Dormant Credentials (30+ days)","Enforce Least Privilege on Credentials"]}, discovered:"11h ago", status:"Open"  },
+
+    // filesystem-token / Claude CLI — 1C 0H 1M
+    { severity:"Critical", violation:"Service account with unrestricted filesystem access", identity:"filesystem-token",  agent:"Claude CLI",    policy:{primary:"Restrict Access to Sensitive Resources"},                                           discovered:"2d ago",  status:"Open"  },
+    { severity:"Medium",   violation:"Service account accessing non-authorized endpoint",  identity:"filesystem-token",  agent:"Claude CLI",    policy:{primary:"Restrict Access to Sensitive Resources"},                                             discovered:"3h ago",  status:"Fixed" },
+
+    // razorpay-token / Antigravity — 2C 5H 0M
+    { severity:"Critical", violation:"Outbound token used without destination binding",  identity:"razorpay-token",    agent:"Antigravity",   policy:{primary:"Restrict Access to Sensitive Resources"},                                             discovered:"5h ago",  status:"Fixed" },
+    { severity:"Critical", violation:"Admin credential exposed to agent runtime",         identity:"razorpay-token",    agent:"Antigravity",   policy:{primary:"No Admin Credentials for Agent Identities"},                                          discovered:"6h ago",  status:"Open"  },
+    { severity:"High",     violation:"Write permission granted without MFA binding",      identity:"razorpay-token",    agent:"Antigravity",   policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"7h ago",  status:"Open"  },
+    { severity:"High",     violation:"Bulk API calls detected from single token",         identity:"razorpay-token",    agent:"Antigravity",   policy:{primary:"Detect Unusual Usage Patterns"},                                                      discovered:"8h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token scope broader than required for task",        identity:"razorpay-token",    agent:"Antigravity",   policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"9h ago",  status:"Open"  },
+    { severity:"High",     violation:"Identity inactive but retains write access",        identity:"razorpay-token",    agent:"Antigravity",   policy:{primary:"Disable Dormant Credentials (30+ days)"},                                            discovered:"10h ago", status:"Open"  },
+    { severity:"High",     violation:"Dormant credential retains write access",           identity:"razorpay-token",    agent:"Antigravity",   policy:{primary:"Disable Dormant Credentials (30+ days)", extra:2, extras:["Prevent Cross-Service Credential Usage","Restrict Access to Sensitive Resources"]}, discovered:"11h ago", status:"Fixed" },
+
+    // docker-token / Claude CLI — 1C 2H 1M
+    { severity:"Critical", violation:"Admin credential exposed to agent runtime",         identity:"docker-token",      agent:"Claude CLI",    policy:{primary:"No Admin Credentials for Agent Identities"},                                          discovered:"5h ago",  status:"Open"  },
+    { severity:"High",     violation:"Agent sending external messages via shared token",  identity:"docker-token",      agent:"Claude CLI",    policy:{primary:"Limit Automation Without Approval"},                                                  discovered:"6h ago",  status:"Open"  },
+    { severity:"High",     violation:"OAuth scope exceeds minimum required permissions",  identity:"docker-token",      agent:"Claude CLI",    policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"7h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"MCP token missing expiry configuration",            identity:"docker-token",      agent:"Claude CLI",    policy:{primary:"Disable Dormant Credentials (30+ days)"},                                            discovered:"8h ago",  status:"Fixed" },
+
+    // playwright-token / Cursor — 3C 0H 2M
+    { severity:"Critical", violation:"Admin credential exposed to agent runtime",         identity:"playwright-token",  agent:"Cursor",        policy:{primary:"No Admin Credentials for Agent Identities"},                                          discovered:"5h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Excessive permissions granted at agent setup",      identity:"playwright-token",  agent:"Cursor",        policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"6h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Credential reused across staging and production",   identity:"playwright-token",  agent:"Cursor",        policy:{primary:"Prevent Cross-Service Credential Usage"},                                             discovered:"7h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"Token rotation overdue by 14 days",                 identity:"playwright-token",  agent:"Cursor",        policy:{primary:"Rotate API Keys Every 30 Days"},                                                      discovered:"1d ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"Agent accessing prod resources from dev token",     identity:"playwright-token",  agent:"Cursor",        policy:{primary:"Prevent Cross-Service Credential Usage"},                                             discovered:"2d ago",  status:"Fixed" },
+
+    // kite-api-key / Cursor — 1C 1H 0M
+    { severity:"Critical", violation:"Service account with unrestricted API access",     identity:"kite-api-key",      agent:"Cursor",        policy:{primary:"Restrict Access to Sensitive Resources"},                                             discovered:"2d ago",  status:"Open"  },
+    { severity:"High",     violation:"Token scope broader than required for task",       identity:"kite-api-key",      agent:"Cursor",        policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"3d ago",  status:"Open"  },
+
+    // postgres-token / VS Code — 0C 1H 0M
+    { severity:"High",     violation:"Write credential exposed to read-only agent",      identity:"postgres-token",    agent:"VS Code",       policy:{primary:"Enforce Scoped Access for OAuth Tokens"},                                             discovered:"8h ago",  status:"Open"  },
+
+    // notion-mcp-token / VS Code — 0C 1H 1M
+    { severity:"High",     violation:"API token with administrative scope for read ops", identity:"notion-mcp-token",  agent:"VS Code",       policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"2h ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"MCP token missing expiry configuration",            identity:"notion-mcp-token",  agent:"VS Code",       policy:{primary:"Disable Dormant Credentials (30+ days)"},                                            discovered:"3h ago",  status:"Open"  },
+
+    // jetbrains-token / Claude Desktop — 0C 1H 0M
+    { severity:"High",     violation:"OAuth scope exceeds minimum required permissions",  identity:"jetbrains-token",   agent:"Claude Desktop",policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"4h ago",  status:"Fixed" },
+
+    // squareup-token / Cursor — 0C 1H 0M
+    { severity:"High",     violation:"Write credential exposed to read-only agent",      identity:"squareup-token",    agent:"Cursor",        policy:{primary:"Enforce Scoped Access for OAuth Tokens"},                                             discovered:"5h ago",  status:"Open"  },
+
+    // alphavantage-key / VS Code — 0C 3H 1M
+    { severity:"High",     violation:"API token with administrative scope for read ops", identity:"alphavantage-key",  agent:"VS Code",       policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"2h ago",  status:"Fixed" },
+    { severity:"High",     violation:"Write credential exposed to read-only agent",      identity:"alphavantage-key",  agent:"VS Code",       policy:{primary:"Enforce Scoped Access for OAuth Tokens"},                                             discovered:"3h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token shared across multiple agent instances",     identity:"alphavantage-key",  agent:"VS Code",       policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"4h ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"OAuth scope exceeds minimum required permissions", identity:"alphavantage-key",  agent:"VS Code",       policy:{primary:"Enforce Least Privilege on Credentials"},                                             discovered:"5h ago",  status:"Fixed" },
+];
+
+// ── Argus violations ──────────────────────────────────────────────────────────
+const ARGUS_CURATED = [
+    // gemini-api-key / Gemini — 1C 3H 0M
+    { severity:"Critical", violation:"Admin credential exposed to agent runtime",             identity:"gemini-api-key",        agent:"Gemini",         policy:{primary:"No Admin Credentials for Agent Identities"},                               discovered:"3h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token scope broader than required for task",            identity:"gemini-api-key",        agent:"Gemini",         policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"4h ago",  status:"Open"  },
+    { severity:"High",     violation:"Bulk API calls detected from single token",             identity:"gemini-api-key",        agent:"Gemini",         policy:{primary:"Detect Unusual Usage Patterns"},                                           discovered:"5h ago",  status:"Open"  },
+    { severity:"High",     violation:"OAuth token never refreshed in 45 days",               identity:"gemini-api-key",        agent:"Gemini",         policy:{primary:"Rotate API Keys Every 30 Days"},                                           discovered:"6h ago",  status:"Fixed" },
+
+    // grok-api-key / Grok — 2C 1H 0M
+    { severity:"Critical", violation:"Admin credential exposed to agent runtime",             identity:"grok-api-key",          agent:"Grok",           policy:{primary:"No Admin Credentials for Agent Identities"},                               discovered:"2h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Excessive permissions granted at agent setup",          identity:"grok-api-key",          agent:"Grok",           policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"3h ago",  status:"Open"  },
+    { severity:"High",     violation:"Production credential active in test environment",      identity:"grok-api-key",          agent:"Grok",           policy:{primary:"Prevent Cross-Service Credential Usage"},                                  discovered:"4h ago",  status:"Fixed" },
+
+    // claude-api-key / Claude — 1C 3H 2M
+    { severity:"Critical", violation:"Browser session token used across unrelated workflows", identity:"claude-api-key",  agent:"Claude",         policy:{primary:"Prevent Cross-Service Credential Usage"},                                  discovered:"1h ago",  status:"Open"  },
+    { severity:"High",     violation:"Write permission granted without MFA binding",          identity:"claude-api-key",  agent:"Claude",         policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"2h ago",  status:"Open"  },
+    { severity:"High",     violation:"Bulk API calls detected from single session",           identity:"claude-api-key",  agent:"Claude",         policy:{primary:"Detect Unusual Usage Patterns"},                                           discovered:"3h ago",  status:"Open"  },
+    { severity:"High",     violation:"Session token accessing restricted data outside scope", identity:"claude-api-key",  agent:"Claude",         policy:{primary:"Restrict Access to Sensitive Resources"},                                  discovered:"4h ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"OAuth scope exceeds minimum required permissions",      identity:"claude-api-key",  agent:"Claude",         policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"5h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"Session token missing expiry configuration",            identity:"claude-api-key",  agent:"Claude",         policy:{primary:"Disable Dormant Credentials (30+ days)"},                                  discovered:"6h ago",  status:"Fixed" },
+
+    // openai-api-key / OpenAI — 2C 4H 1M
+    { severity:"Critical", violation:"Admin credential exposed to agent runtime",             identity:"openai-api-key",        agent:"OpenAI",         policy:{primary:"No Admin Credentials for Agent Identities"},                               discovered:"4h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Credential exceeds intended permission scope",          identity:"openai-api-key",        agent:"OpenAI",         policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"5h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token scope broader than required for task",            identity:"openai-api-key",        agent:"OpenAI",         policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"6h ago",  status:"Open"  },
+    { severity:"High",     violation:"Bulk API calls detected from single token",             identity:"openai-api-key",        agent:"OpenAI",         policy:{primary:"Detect Unusual Usage Patterns"},                                           discovered:"7h ago",  status:"Open"  },
+    { severity:"High",     violation:"API key with org-wide admin privileges",                identity:"openai-api-key",        agent:"OpenAI",         policy:{primary:"No Admin Credentials for Agent Identities"},                               discovered:"8h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token used by multiple unrelated agents simultaneously",identity:"openai-api-key",        agent:"OpenAI",         policy:{primary:"Prevent Cross-Service Credential Usage"},                                  discovered:"9h ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"OAuth scope exceeds minimum required permissions",      identity:"openai-api-key",        agent:"OpenAI",         policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"10h ago", status:"Fixed" },
+
+    // anthropic-api-key / Anthropic — 1C 0H 1M
+    { severity:"Critical", violation:"Service account with unrestricted API access",          identity:"anthropic-api-key",     agent:"Anthropic",      policy:{primary:"Restrict Access to Sensitive Resources"},                                  discovered:"1d ago",  status:"Open"  },
+    { severity:"Medium",   violation:"Token rotation overdue by 14 days",                     identity:"anthropic-api-key",     agent:"Anthropic",      policy:{primary:"Rotate API Keys Every 30 Days"},                                           discovered:"2d ago",  status:"Fixed" },
+
+    // replicate-token / Replicate — 2C 5H 0M
+    { severity:"Critical", violation:"Admin credential exposed to agent runtime",             identity:"replicate-api-key",       agent:"Replicate",      policy:{primary:"No Admin Credentials for Agent Identities"},                               discovered:"3h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Outbound token used without destination binding",       identity:"replicate-api-key",       agent:"Replicate",      policy:{primary:"Restrict Access to Sensitive Resources"},                                  discovered:"4h ago",  status:"Fixed" },
+    { severity:"High",     violation:"Write permission granted without MFA binding",          identity:"replicate-api-key",       agent:"Replicate",      policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"5h ago",  status:"Open"  },
+    { severity:"High",     violation:"Bulk API calls detected from single token",             identity:"replicate-api-key",       agent:"Replicate",      policy:{primary:"Detect Unusual Usage Patterns"},                                           discovered:"6h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token scope broader than required for task",            identity:"replicate-api-key",       agent:"Replicate",      policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"7h ago",  status:"Open"  },
+    { severity:"High",     violation:"Identity inactive but retains write access",            identity:"replicate-api-key",       agent:"Replicate",      policy:{primary:"Disable Dormant Credentials (30+ days)"},                                  discovered:"8h ago",  status:"Open"  },
+    { severity:"High",     violation:"Dormant credential retains write access",               identity:"replicate-api-key",       agent:"Replicate",      policy:{primary:"Disable Dormant Credentials (30+ days)", extra:2, extras:["Prevent Cross-Service Credential Usage","Restrict Access to Sensitive Resources"]}, discovered:"9h ago",  status:"Fixed" },
+
+    // cohere-api-key / Cohere — 1C 2H 1M
+    { severity:"Critical", violation:"Admin credential exposed to agent runtime",             identity:"cohere-api-key",        agent:"Cohere",         policy:{primary:"No Admin Credentials for Agent Identities"},                               discovered:"3h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token shared across multiple agent instances",          identity:"cohere-api-key",        agent:"Cohere",         policy:{primary:"Prevent Cross-Service Credential Usage"},                                  discovered:"4h ago",  status:"Open"  },
+    { severity:"High",     violation:"OAuth scope exceeds minimum required permissions",      identity:"cohere-api-key",        agent:"Cohere",         policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"5h ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"MCP token missing expiry configuration",                identity:"cohere-api-key",        agent:"Cohere",         policy:{primary:"Disable Dormant Credentials (30+ days)"},                                  discovered:"6h ago",  status:"Fixed" },
+
+    // perplexity-token / Perplexity — 3C 0H 2M
+    { severity:"Critical", violation:"Token used outside trusted network boundary",           identity:"perplexity-api-key",      agent:"Perplexity",     policy:{primary:"Restrict Access to Sensitive Resources", extra:2, extras:["Rotate API Keys Every 30 Days","Detect Unusual Usage Patterns"]}, discovered:"4h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Credential exceeds intended permission scope",          identity:"perplexity-api-key",      agent:"Perplexity",     policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"5h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Unusual LLM access spike detected",                    identity:"perplexity-api-key",      agent:"Perplexity",     policy:{primary:"Detect Unusual Usage Patterns"},                                           discovered:"6h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"Token rotation overdue by 14 days",                    identity:"perplexity-api-key",      agent:"Perplexity",     policy:{primary:"Rotate API Keys Every 30 Days"},                                           discovered:"1d ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"Long-lived session token not invalidated",             identity:"perplexity-api-key",      agent:"Perplexity",     policy:{primary:"Disable Dormant Credentials (30+ days)"},                                  discovered:"2d ago",  status:"Fixed" },
+
+    // jasper-api-key / Jasper — 1C 1H 0M
+    { severity:"Critical", violation:"Service account with unrestricted API access",          identity:"jasper-api-key",        agent:"Jasper",         policy:{primary:"Restrict Access to Sensitive Resources"},                                  discovered:"8h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token scope broader than required for task",            identity:"jasper-api-key",        agent:"Jasper",         policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"9h ago",  status:"Open"  },
+
+    // luma-api-key / Luma AI — 0C 1H 0M
+    { severity:"High",     violation:"Write credential exposed to read-only agent",           identity:"luma-api-key",          agent:"Luma AI",        policy:{primary:"Enforce Scoped Access for OAuth Tokens"},                                  discovered:"2h ago",  status:"Open"  },
+
+    // chargebee-api-key / Chargebee AI — 0C 1H 1M
+    { severity:"High",     violation:"API token with administrative scope for read ops",      identity:"chargebee-api-key",     agent:"Chargebee AI",   policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"5h ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"API token missing expiry configuration",                identity:"chargebee-api-key",     agent:"Chargebee AI",   policy:{primary:"Disable Dormant Credentials (30+ days)"},                                  discovered:"6h ago",  status:"Open"  },
+
+    // copy-ai-token / Copy.AI — 0C 1H 0M
+    { severity:"High",     violation:"Token shared across multiple agent instances",          identity:"copy-ai-token",         agent:"Copy.AI",        policy:{primary:"Prevent Cross-Service Credential Usage"},                                  discovered:"1d ago",  status:"Open"  },
+
+    // babylon-api-key / Babylon Health — 0C 1H 0M
+    { severity:"High",     violation:"OAuth scope exceeds minimum required permissions",      identity:"babylon-api-key",       agent:"Babylon Health", policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"3h ago",  status:"Open"  },
+
+    // langchain-api-key / LangChain — 1C 3H 1M
+    { severity:"Critical", violation:"API key used across unrelated agent workflows",         identity:"langchain-api-key",     agent:"LangChain",      policy:{primary:"Prevent Cross-Service Credential Usage"},                                  discovered:"30m ago", status:"Open"  },
+    { severity:"High",     violation:"API token with administrative scope for read ops",      identity:"langchain-api-key",     agent:"LangChain",      policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"1h ago",  status:"Fixed" },
+    { severity:"High",     violation:"Write credential exposed to read-only agent",           identity:"langchain-api-key",     agent:"LangChain",      policy:{primary:"Enforce Scoped Access for OAuth Tokens"},                                  discovered:"2h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token shared across multiple agent instances",          identity:"langchain-api-key",     agent:"LangChain",      policy:{primary:"Prevent Cross-Service Credential Usage"},                                  discovered:"3h ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"OAuth scope exceeds minimum required permissions",      identity:"langchain-api-key",     agent:"LangChain",      policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"4h ago",  status:"Fixed" },
+
+    // k9s-mcp-token / K9s Trade — 2C 3H 1M
+    { severity:"Critical", violation:"MCP server token exposed with admin privileges",        identity:"k9s-mcp-token",         agent:"K9s Trade",      policy:{primary:"No Admin Credentials for Agent Identities"},                               discovered:"2h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Token used across unrelated MCP workflows",             identity:"k9s-mcp-token",         agent:"K9s Trade",      policy:{primary:"Prevent Cross-Service Credential Usage"},                                  discovered:"3h ago",  status:"Open"  },
+    { severity:"High",     violation:"MCP token scope broader than required",                 identity:"k9s-mcp-token",         agent:"K9s Trade",      policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"4h ago",  status:"Open"  },
+    { severity:"High",     violation:"Bulk requests from single MCP token",                   identity:"k9s-mcp-token",         agent:"K9s Trade",      policy:{primary:"Detect Unusual Usage Patterns"},                                           discovered:"5h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token accessing restricted tools outside scope",        identity:"k9s-mcp-token",         agent:"K9s Trade",      policy:{primary:"Restrict Access to Sensitive Resources"},                                  discovered:"6h ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"MCP token missing expiry configuration",                identity:"k9s-mcp-token",         agent:"K9s Trade",      policy:{primary:"Disable Dormant Credentials (30+ days)"},                                  discovered:"1d ago",  status:"Open"  },
+
+    // vulnerable-mcp-token / Vulnerable MCP — 3C 2H 1M
+    { severity:"Critical", violation:"Admin MCP token with unrestricted tool access",         identity:"vulnerable-mcp-token",  agent:"Vulnerable MCP", policy:{primary:"No Admin Credentials for Agent Identities"},                               discovered:"1h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Token exposes sensitive internal APIs",                 identity:"vulnerable-mcp-token",  agent:"Vulnerable MCP", policy:{primary:"Restrict Access to Sensitive Resources"},                                  discovered:"2h ago",  status:"Open"  },
+    { severity:"Critical", violation:"Credential shared across multiple agent processes",     identity:"vulnerable-mcp-token",  agent:"Vulnerable MCP", policy:{primary:"Prevent Cross-Service Credential Usage"},                                  discovered:"30m ago", status:"Open"  },
+    { severity:"High",     violation:"Token scope broader than required for task",            identity:"vulnerable-mcp-token",  agent:"Vulnerable MCP", policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"3h ago",  status:"Open"  },
+    { severity:"High",     violation:"MCP server token expired but still active",             identity:"vulnerable-mcp-token",  agent:"Vulnerable MCP", policy:{primary:"Rotate API Keys Every 30 Days"},                                           discovered:"4h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"Token rotation overdue by 3 days",                      identity:"vulnerable-mcp-token",  agent:"Vulnerable MCP", policy:{primary:"Rotate API Keys Every 30 Days"},                                           discovered:"3d ago",  status:"Fixed" },
+
+    // akplatform-mcp-token / AK Platform — 1C 2H 0M
+    { severity:"Critical", violation:"MCP token with write access to production tools",       identity:"akplatform-mcp-token",  agent:"AK Platform",    policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"3h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token reused across dev and prod environments",         identity:"akplatform-mcp-token",  agent:"AK Platform",    policy:{primary:"Prevent Cross-Service Credential Usage"},                                  discovered:"4h ago",  status:"Open"  },
+    { severity:"High",     violation:"MCP token nearing expiry without rotation plan",        identity:"akplatform-mcp-token",  agent:"AK Platform",    policy:{primary:"Rotate API Keys Every 30 Days"},                                           discovered:"5h ago",  status:"Fixed" },
+
+    // n8n-api-key / N8N — 2C 1H 1M
+    { severity:"Critical", violation:"Automation token with unrestricted workflow access",    identity:"n8n-api-key",           agent:"N8N",            policy:{primary:"No Admin Credentials for Agent Identities"},                               discovered:"30m ago", status:"Open"  },
+    { severity:"Critical", violation:"API key triggers external webhooks without approval",   identity:"n8n-api-key",           agent:"N8N",            policy:{primary:"Limit Automation Without Approval"},                                        discovered:"1h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token shared across multiple N8N workflows",            identity:"n8n-api-key",           agent:"N8N",            policy:{primary:"Prevent Cross-Service Credential Usage"},                                  discovered:"2h ago",  status:"Open"  },
+    { severity:"Medium",   violation:"N8N credential missing expiry configuration",           identity:"n8n-api-key",           agent:"N8N",            policy:{primary:"Disable Dormant Credentials (30+ days)"},                                  discovered:"1d ago",  status:"Fixed" },
+
+    // jooksy-api-key / Jooksy — 0C 2H 1M
+    { severity:"High",     violation:"API token with administrative scope for read ops",      identity:"jooksy-api-key",        agent:"Jooksy",         policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"4h ago",  status:"Open"  },
+    { severity:"High",     violation:"Token shared across multiple agent instances",          identity:"jooksy-api-key",        agent:"Jooksy",         policy:{primary:"Prevent Cross-Service Credential Usage"},                                  discovered:"5h ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"OAuth scope exceeds minimum required permissions",      identity:"jooksy-api-key",        agent:"Jooksy",         policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"6h ago",  status:"Open"  },
+
+    // anthropos-api-key / Anthropos AI — 0C 1H 0M
+    { severity:"High",     violation:"Write credential exposed to read-only agent",           identity:"anthropos-api-key",     agent:"Anthropos AI",   policy:{primary:"Enforce Scoped Access for OAuth Tokens"},                                  discovered:"6h ago",  status:"Open"  },
+
+    // lttc-api-key / LTTC AI — 0C 1H 1M
+    { severity:"High",     violation:"API token with administrative scope for read ops",      identity:"lttc-api-key",          agent:"LTTC AI",        policy:{primary:"Enforce Least Privilege on Credentials"},                                  discovered:"5h ago",  status:"Fixed" },
+    { severity:"Medium",   violation:"Token rotation overdue by 7 days",                      identity:"lttc-api-key",          agent:"LTTC AI",        policy:{primary:"Rotate API Keys Every 30 Days"},                                           discovered:"7d ago",  status:"Open"  },
+
+    // agentai-token / AgentAI — 0C 1H 0M
+    { severity:"High",     violation:"Token shared across multiple agent instances",          identity:"agentai-token",         agent:"AgentAI",        policy:{primary:"Prevent Cross-Service Credential Usage"},                                  discovered:"8h ago",  status:"Open"  },
 ];
 
 const AGENTS_POOL = [
@@ -241,23 +461,27 @@ const GENERATED = Array.from({ length: 128 }, (_, i) => {
     };
 });
 
-const ALL_RAW = [...CURATED, ...GENERATED].sort((a, b) => SEV_ORD[b.severity] - SEV_ORD[a.severity]);
+const toTableRows = (raw) =>
+    raw.sort((a, b) => SEV_ORD[b.severity] - SEV_ORD[a.severity])
+       .map((r, i) => ({
+           ...r,
+           id:            i + 1,
+           severityOrder: SEV_ORD[r.severity],
+           severityComp:  sevBadge(r.severity),
+           violationComp: <Text variant="bodyMd" fontWeight="medium">{r.violation}</Text>,
+           identityComp:  <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identity} /><Text variant="bodyMd">{r.identity}</Text></HorizontalStack>,
+           agentComp:     <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
+           policyComp:    <PolicyCell policy={r.policy} />,
+       }));
 
-export const violationsTableData = ALL_RAW.map((r, i) => ({
-    ...r,
-    id:            i + 1,
-    severityOrder: SEV_ORD[r.severity],
-    severityComp:  sevBadge(r.severity),
-    violationComp: <Text variant="bodyMd" fontWeight="medium">{r.violation}</Text>,
-    identityComp:  <HorizontalStack gap="2" blockAlign="center" wrap={false}><IdentityIcon name={r.identity} /><Text variant="bodyMd">{r.identity}</Text></HorizontalStack>,
-    agentComp:     <HorizontalStack gap="2" blockAlign="center" wrap={false}><AgentIcon name={r.agent} /><Text variant="bodyMd">{r.agent}</Text></HorizontalStack>,
-    policyComp:    <PolicyCell policy={r.policy} />,
-}));
+export const atlasViolationsTableData = toTableRows([...ATLAS_CURATED, ...GENERATED]);
+export const argusViolationsTableData = toTableRows([...ARGUS_CURATED]);
+export const violationsTableData = isAgenticSecurityCategory() ? argusViolationsTableData : atlasViolationsTableData;
 
 export const violationsHeaders = [
     { text: "Violation",  value: "violationComp", title: "Violation"                          },
     { text: "Identity",   value: "identityComp",  title: "Identity"                           },
-    { text: "Agent",      value: "agentComp",     title: "Agent"                              },
+    { text: "Agentic Asset", value: "agentComp",  title: "Agentic Asset"                      },
     { text: "Severity",   value: "severityComp",  title: "Severity"                           },
     { text: "Policy",     value: "policyComp",    title: "Policy"                             },
     { text: "Discovered", value: "discovered",    title: "Discovered", type: CellType.TEXT    },

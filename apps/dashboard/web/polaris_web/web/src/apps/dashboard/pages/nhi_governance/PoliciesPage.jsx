@@ -11,9 +11,15 @@ import DropdownSearch from "../../components/shared/DropdownSearch";
 import useTable from "../../components/tables/TableContext";
 import PersistStore from "../../../main/PersistStore";
 import func from "@/util/func";
+import { isAgenticSecurityCategory } from "../../../main/labelHelper";
 import PolicyDetailsPanel from "./PolicyDetailsPanel";
 import { violationsTableData, unresolvedPolicyName, ViolationBubbles } from "./nhiViolationsData";
-import { INITIAL_POLICIES, BLANK_YAML, AGENT_OPTIONS } from "./nhiData";
+import { INITIAL_POLICIES, ARGUS_INITIAL_POLICIES, BLANK_YAML, AGENT_OPTIONS, ARGUS_AGENT_OPTIONS } from "./nhiData";
+
+const IS_ARGUS        = isAgenticSecurityCategory();
+const DEFAULT_POLICIES = IS_ARGUS ? ARGUS_INITIAL_POLICIES : INITIAL_POLICIES;
+const ACTIVE_AGENT_OPTIONS = IS_ARGUS ? ARGUS_AGENT_OPTIONS : AGENT_OPTIONS;
+const STORAGE_KEY     = IS_ARGUS ? "nhi_policies_argus_v1" : "nhi_policies_atlas_v1";
 
 const definedTableTabs = ["All", "Active", "Inactive", "Draft"];
 const resourceName = { singular: "policy", plural: "policies" };
@@ -131,7 +137,7 @@ function CreatePolicyModal({ open, onClose, onCreatePolicy }) {
 
     const buildAndCreate = (status) => {
         const policyName = name.trim() || "Untitled Policy";
-        const allSelected = selectedAgents.length === 0 || selectedAgents.length === AGENT_OPTIONS.length;
+        const allSelected = selectedAgents.length === 0 || selectedAgents.length === ACTIVE_AGENT_OPTIONS.length;
         const agents = allSelected ? ["All Agents"] : selectedAgents;
         const scope  = allSelected
             ? { primary: "All Agents" }
@@ -171,7 +177,7 @@ function CreatePolicyModal({ open, onClose, onCreatePolicy }) {
                                 <Text variant="bodySm" fontWeight="medium">Select Agents</Text>
                                 <DropdownSearch
                                     id="create-policy-agents"
-                                    optionsList={AGENT_OPTIONS}
+                                    optionsList={ACTIVE_AGENT_OPTIONS}
                                     setSelected={setSelectedAgents}
                                     preSelected={selectedAgents}
                                     allowMultiple
@@ -221,10 +227,10 @@ export default function PoliciesPage() {
 
     const [rawPolicies, setRawPolicies]           = useState(() => {
         try {
-            const stored = localStorage.getItem("nhi_policies_v1");
+            const stored = localStorage.getItem(STORAGE_KEY);
             if (stored) return JSON.parse(stored);
         } catch (_) {}
-        return INITIAL_POLICIES;
+        return DEFAULT_POLICIES;
     });
     const [selectedTab, setSelectedTab]           = useState(initialSelectedTab);
     const [selected, setSelected]                 = useState(
@@ -236,7 +242,7 @@ export default function PoliciesPage() {
     const [showPolicyPanel, setShowPolicyPanel]   = useState(false);
 
     useEffect(() => {
-        try { localStorage.setItem("nhi_policies_v1", JSON.stringify(rawPolicies)); } catch (_) {}
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(rawPolicies)); } catch (_) {}
     }, [rawPolicies]);
 
     const tableData = useMemo(() => buildTableData(rawPolicies), [rawPolicies]);
