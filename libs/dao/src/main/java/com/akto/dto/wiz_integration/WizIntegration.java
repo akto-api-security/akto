@@ -31,7 +31,6 @@ public class WizIntegration {
     public static final String TOKEN_EXPIRY_TS = "tokenExpiryTs";
     public static final String CREATED_TS = "createdTs";
     public static final String UPDATED_TS = "updatedTs";
-    public static final String LAST_SYNC_TS = "lastSyncTs";
     public static final String SYSTEM_ACTIVITY_ID = "systemActivityId";
     public static final String LAST_UPLOADED_SCAN_TS = "lastUploadedScanTs";
     public static final String WIZ_SYNC_JOB_ID = "wizSyncJobId";
@@ -52,9 +51,6 @@ public class WizIntegration {
     // audit fields
     private int createdTs;
     private int updatedTs;
-
-    // Timestamp of the last successful sync with Wiz
-    private long lastSyncTs;
 
     // System action status (for tracking status of uploaded security scans)
     private String systemActivityId;
