@@ -7,13 +7,10 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 @Getter
 @Setter
-@AllArgsConstructor
 @NoArgsConstructor
 @BsonDiscriminator
 @ToString
 public class WizSyncJobParams extends JobParams {
-
-    private int lastSyncedAt;
 
     @Override
     public JobType getJobType() {

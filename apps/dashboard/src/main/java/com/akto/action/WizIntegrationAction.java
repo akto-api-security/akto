@@ -28,7 +28,7 @@ import lombok.Setter;
 public class WizIntegrationAction extends UserAction {
 
     private static final LoggerMaker logger = new LoggerMaker(WizIntegrationAction.class, LogDb.DASHBOARD);
-    private static final int WIZ_SYNC_INTERVAL_SECONDS = 60 * 60; // 1 hour
+    private static final int WIZ_SYNC_INTERVAL_SECONDS = 60 * 10; // 10 minutes
 
     @Getter
     @Setter
@@ -156,7 +156,7 @@ public class WizIntegrationAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
-        createWizSyncJob(true);
+        //createWizSyncJob(true);
 
         return Action.SUCCESS.toUpperCase();
     }
