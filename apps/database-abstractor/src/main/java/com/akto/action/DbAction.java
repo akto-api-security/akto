@@ -71,6 +71,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.ApiSequences;
+import com.akto.dto.DeviceDomainConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.APITestStatusAlert;
@@ -137,6 +138,11 @@ public class DbAction extends ActionSupport {
     int vxlanId;
     String name;
     List<String> cidrList;
+    String deviceId;
+    String domainKey;
+    List<String> domainsToAdd;
+    List<String> domainsToRemove;
+    DeviceDomainConfig deviceDomainConfig;
     List<BasicDBObject> apiInfoList;
     List<ApiSequences> apiSequencesList;
     List<BulkUpdates> writesForFilterSampleData;
@@ -560,6 +566,26 @@ public class DbAction extends ActionSupport {
             DbLayer.updateCidrList(cidrList);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in updateCidrList " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateDeviceDomainListDelta() {
+        try {
+            DbLayer.updateDeviceDomainListDelta(deviceId, domainKey, domainsToAdd, domainsToRemove);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in updateDeviceDomainListDelta " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchDeviceDomainConfig() {
+        try {
+            deviceDomainConfig = DbLayer.fetchDeviceDomainConfig(deviceId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchDeviceDomainConfig " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -4265,6 +4291,46 @@ public class DbAction extends ActionSupport {
 
     public void setCidrList(List<String> cidrList) {
         this.cidrList = cidrList;
+    }
+
+    public String getDeviceId() {
+        return deviceId;
+    }
+
+    public void setDeviceId(String deviceId) {
+        this.deviceId = deviceId;
+    }
+
+    public String getDomainKey() {
+        return domainKey;
+    }
+
+    public void setDomainKey(String domainKey) {
+        this.domainKey = domainKey;
+    }
+
+    public List<String> getDomainsToAdd() {
+        return domainsToAdd;
+    }
+
+    public void setDomainsToAdd(List<String> domainsToAdd) {
+        this.domainsToAdd = domainsToAdd;
+    }
+
+    public List<String> getDomainsToRemove() {
+        return domainsToRemove;
+    }
+
+    public void setDomainsToRemove(List<String> domainsToRemove) {
+        this.domainsToRemove = domainsToRemove;
+    }
+
+    public DeviceDomainConfig getDeviceDomainConfig() {
+        return deviceDomainConfig;
+    }
+
+    public void setDeviceDomainConfig(DeviceDomainConfig deviceDomainConfig) {
+        this.deviceDomainConfig = deviceDomainConfig;
     }
 
     public List<BasicDBObject> getApiInfoList() {

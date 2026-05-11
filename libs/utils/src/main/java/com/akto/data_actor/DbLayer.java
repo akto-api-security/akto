@@ -124,6 +124,8 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dao.billing.UningestedApiOverageDao;
+import com.akto.dao.DeviceDomainConfigDao;
+import com.akto.dto.DeviceDomainConfig;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
@@ -396,6 +398,37 @@ public class DbLayer {
                         Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                         Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
                 ), updateOptions);
+    }
+
+    public static void updateDeviceDomainListDelta(String deviceId, String domainKey,
+            List<String> toAdd, List<String> toRemove) {
+        String fieldPath = DeviceDomainConfig.DOMAIN_LISTS + "." + domainKey;
+        Bson filter = Filters.eq("_id", deviceId);
+        UpdateOptions upsertOpt = new UpdateOptions().upsert(true);
+        if (toAdd != null && !toAdd.isEmpty()) {
+            DeviceDomainConfigDao.instance.getMCollection().updateOne(
+                filter,
+                Updates.combine(
+                    Updates.addEachToSet(fieldPath, toAdd),
+                    Updates.set(DeviceDomainConfig.UPDATED_AT, Context.now())
+                ),
+                upsertOpt
+            );
+        }
+        if (toRemove != null && !toRemove.isEmpty()) {
+            DeviceDomainConfigDao.instance.getMCollection().updateOne(
+                filter,
+                Updates.combine(
+                    Updates.pullAll(fieldPath, toRemove),
+                    Updates.set(DeviceDomainConfig.UPDATED_AT, Context.now())
+                ),
+                upsertOpt
+            );
+        }
+    }
+
+    public static DeviceDomainConfig fetchDeviceDomainConfig(String deviceId) {
+        return DeviceDomainConfigDao.instance.findOne(Filters.eq("_id", deviceId));
     }
 
     public static void updateCidrList(List<String> cidrList) {
