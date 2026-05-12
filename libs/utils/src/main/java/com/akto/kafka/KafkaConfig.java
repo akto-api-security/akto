@@ -43,7 +43,7 @@ public class KafkaConfig {
     public static final String SASL_MECHANISM_SCRAM_SHA_512 = "SCRAM-SHA-512";
 
     // Default SASL mechanism
-    public static final String DEFAULT_SASL_MECHANISM = SASL_MECHANISM_SCRAM_SHA_512;
+    public static final String DEFAULT_SASL_MECHANISM = SASL_MECHANISM_PLAIN;
 
     // Default Kafka broker URLs
     public static final String DEFAULT_KAFKA_BROKER_URL = "kafka1:19092";
