@@ -724,10 +724,18 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
             .build();
 
         List<Map<String, Object>> devices = new ArrayList<>();
-        String nextUrl = "https://api.securitycenter.microsoft.com/api/machines"
-            + "?$select=id,computerDnsName,osPlatform,onboardingStatus,healthStatus"
-            + "&$filter=onboardingStatus eq 'Onboarded' and healthStatus eq 'Active'"
-            + "&$top=10000";
+        String nextUrl = null;
+        try {
+            nextUrl = new URIBuilder("https://api.securitycenter.microsoft.com/api/machines")
+                .addParameter("$select", "id,computerDnsName,osPlatform,onboardingStatus,healthStatus")
+                .addParameter("$filter", "onboardingStatus eq 'Onboarded' and healthStatus eq 'Active'")
+                .addParameter("$top", "10000")
+                .build()
+                .toString();
+        } catch (URISyntaxException e) {
+            throw new IOException("Failed to build URI for device list query", e);
+        }
+
         int pageCount = 0;
         final int MAX_PAGES = 50; // safety cap: 50 × 10000 = 500,000 devices max
 
