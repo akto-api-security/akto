@@ -114,6 +114,14 @@ public class DbAction extends ActionSupport {
         "GENERIC", "FLOAT", "NULL", "INTEGER_32", "FALSE", "TRUE", "INTEGER_64", "UUID", "DICT"
     ));
 
+    // Accounts for which tagsList is filtered to only relevant keys
+    private static final Set<Integer> TAGS_FILTER_ACCOUNTS = new HashSet<>(Arrays.asList(1736798101, 1718042191, 1759692400));
+    private static final Set<String> ALLOWED_TAG_KEYS = new HashSet<>(Arrays.asList(
+        "privatecloud.agoda.com/service",
+        "privatecloud.agoda.com/environment",
+        "catalog.agoda.com/component"
+    ));
+
     // Cache for fetchAllApiCollectionsMeta (only for account 1736798101)
     private static final int CACHED_ACCOUNT_ID = 1736798101;
     private static final long CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -2141,6 +2149,18 @@ public class DbAction extends ActionSupport {
            // When tagsList is not needed, skip cache and fetch without it (faster DB query)
            if (!includeTagsList) {
                apiCollections = DbLayer.fetchAllApiCollectionsMeta(false);
+           } else if (TAGS_FILTER_ACCOUNTS.contains(accountId)) {
+               for (ApiCollection c : apiCollections) {
+                   if (c.getTagsList() != null) {
+                       List<CollectionTags> filteredTags = new ArrayList<>();
+                       for (CollectionTags tag : c.getTagsList()) {
+                           if (tag != null && ALLOWED_TAG_KEYS.contains(tag.getKeyName())) {
+                               filteredTags.add(tag);
+                           }
+                       }
+                       c.setTagsList(filteredTags);
+                   }
+               }
            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchAllApiCollectionsMeta " + e.toString() + " " + Context.accountId.get());
@@ -4416,6 +4436,7 @@ public class DbAction extends ActionSupport {
     public void setIncludeTagsList(boolean includeTagsList) {
         this.includeTagsList = includeTagsList;
     }
+
 
     public String getHost() {
         return host;
