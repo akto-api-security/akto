@@ -624,6 +624,7 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    // If adding a new field to ApiInfo, exclude it in struts.xml excludeProperties if not needed in response
     public String fetchApiInfos() {
         try {
             loggerMaker.error("init fetchApiInfos account id: " + Context.accountId.get());

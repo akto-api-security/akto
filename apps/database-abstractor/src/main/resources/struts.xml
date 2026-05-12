@@ -206,7 +206,9 @@
         <action name="api/fetchApiInfos" class="com.akto.action.DbAction" method="fetchApiInfos">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">apiInfos\[\d+\]\.(collectionIds|discoveredTimestamp|apiType|responseCodes|isSensitive|severityScore|riskScore|lastCalculatedTime|lastTested|rateLimitConfidence|rateLimits|detectedBasePrompt|guardrailSchema|agentProxyGuardrailEnabled|isSkillBlocked|parentMcpToolNames|actualAuthType)</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
