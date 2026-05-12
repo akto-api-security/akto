@@ -272,7 +272,7 @@ public class DbLayer {
            updateModuleEnvAndReboot(moduleInfo);
         }
 
-        boolean forwardToNewRelic = NewRelicIntegrationDao.instance.count(new BasicDBObject()) > 0;
+        boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
         if (forwardToNewRelic) {
             int accountId = Context.accountId.get();
             loggerMaker.infoAndAddToDb(String.format("Forwarding module heartbeat to New Relic for module %s (account %d)", moduleInfo.getName(), accountId), LogDb.DB_ABS);
@@ -2281,7 +2281,7 @@ public class DbLayer {
         }
         MetricDataDao.instance.insertMany(metricData);
 
-        boolean forwardToNewRelic = NewRelicIntegrationDao.instance.count(new BasicDBObject()) > 0;
+        boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
         if (forwardToNewRelic) {
             int accountId = Context.accountId.get();
             loggerMaker.infoAndAddToDb(String.format("Forwarding %d metrics to New Relic for account %d", metricData.size(), accountId), LogDb.DB_ABS);
