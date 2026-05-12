@@ -135,7 +135,7 @@ public class KafkaConfig {
     }
     String saslMechanism = System.getenv().getOrDefault(
         "AKTO_KAFKA_SASL_MECHANISM",
-        SASL_MECHANISM_SCRAM_SHA_512);
+        SASL_MECHANISM_PLAIN);
     String securityProtocol = System.getenv().getOrDefault(
         "AKTO_KAFKA_SECURITY_PROTOCOL",
         SECURITY_PROTOCOL_SASL_PLAINTEXT);
