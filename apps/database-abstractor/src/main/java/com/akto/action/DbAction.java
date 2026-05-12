@@ -589,6 +589,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String updateAccountDomains() {
+        try {
+            DbLayer.updateAccountDomainsDelta(domainKey, domainsToAdd, domainsToRemove);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in updateAccountDomains " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchDeviceDomainConfig() {
         try {
             deviceDomainConfig = DbLayer.fetchDeviceDomainConfig(deviceId);

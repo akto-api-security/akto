@@ -431,6 +431,17 @@ public class DbLayer {
         return DeviceDomainConfigDao.instance.findOne(Filters.eq("_id", deviceId));
     }
 
+    public static void updateAccountDomainsDelta(String domainKey, List<String> toAdd, List<String> toRemove) {
+        Bson filter = AccountSettingsDao.generateFilter();
+        if (toAdd != null && !toAdd.isEmpty()) {
+            List<String> uniqueToAdd = new ArrayList<>(new HashSet<>(toAdd));
+            AccountSettingsDao.instance.getMCollection().updateOne(filter, Updates.addEachToSet(domainKey, uniqueToAdd));
+        }
+        if (toRemove != null && !toRemove.isEmpty()) {
+            AccountSettingsDao.instance.getMCollection().updateOne(filter, Updates.pullAll(domainKey, toRemove));
+        }
+    }
+
     public static void updateCidrList(List<String> cidrList) {
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(), Updates.addEachToSet("privateCidrList", cidrList),
