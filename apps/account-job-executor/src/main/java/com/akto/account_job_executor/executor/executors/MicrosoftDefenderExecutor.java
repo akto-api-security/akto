@@ -52,6 +52,9 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
     private static final int LIVE_RESPONSE_POLL_INTERVAL_MS = 5_000;
     private static final int LIVE_RESPONSE_MAX_WAIT_MS = 30 * 60 * 1000; // 30 minutes
     private static final int CANCEL_RETRY_WAIT_MS = 10_000;
+    private static final int LIVE_RESPONSE_RATE_LIMIT_PER_MINUTE = 10;
+    private static final long MIN_REQUEST_INTERVAL_MS = 60_000L / LIVE_RESPONSE_RATE_LIMIT_PER_MINUTE; // 6000ms
+    private static final int RATE_LIMIT_MAX_RETRIES = 3;
 
     public static final List<String> APPS_TOOL_LIST = Arrays.asList(
         "Claude", "Cursor", "Copilot", "Windsurf", "Antigravity", "Codex", "Ollama"
@@ -351,53 +354,84 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
     private Map<String, JsonNode> runScriptOnDevices(String accessToken, String scriptName,
             List<String> deviceIds, Map<String, String> deviceNames, String description, AccountJob job) {
         Map<String, JsonNode> outputs = new HashMap<>();
+        long lastSubmitMs = 0;
 
         for (String deviceId : deviceIds) {
             String deviceName = deviceNames.getOrDefault(deviceId, deviceId);
-            try {
-                updateJobHeartbeat(job);
 
-                RequestConfig cfg = RequestConfig.custom()
-                    .setConnectTimeout(CONNECT_TIMEOUT_MS)
-                    .setSocketTimeout(SOCKET_TIMEOUT_MS)
-                    .build();
+            // Retry loop for rate limit handling
+            for (int attempt = 0; attempt < RATE_LIMIT_MAX_RETRIES; attempt++) {
+                try {
+                    updateJobHeartbeat(job);
 
-                try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-                    String actionId = submitLiveResponseAction(httpClient, accessToken, deviceId, scriptName);
-                    if (actionId == null) {
-                        String existingId = getActiveActionId(httpClient, accessToken, deviceId);
-                        if (existingId != null) {
-                            cancelLiveResponseAction(httpClient, accessToken, existingId);
-                            try { Thread.sleep(CANCEL_RETRY_WAIT_MS); } catch (InterruptedException ignored) {}
+                    // Throttle: ensure at least 6 seconds between Live Response submissions
+                    long elapsed = System.currentTimeMillis() - lastSubmitMs;
+                    if (elapsed < MIN_REQUEST_INTERVAL_MS) {
+                        long sleepMs = MIN_REQUEST_INTERVAL_MS - elapsed;
+                        try { Thread.sleep(sleepMs); } catch (InterruptedException ignored) {}
+                    }
+
+                    RequestConfig cfg = RequestConfig.custom()
+                        .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                        .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                        .build();
+
+                    try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+                        String actionId = submitLiveResponseAction(httpClient, accessToken, deviceId, scriptName);
+                        lastSubmitMs = System.currentTimeMillis();
+
+                        if (actionId == null) {
+                            String existingId = getActiveActionId(httpClient, accessToken, deviceId);
+                            if (existingId != null) {
+                                cancelLiveResponseAction(httpClient, accessToken, existingId);
+                                try { Thread.sleep(CANCEL_RETRY_WAIT_MS); } catch (InterruptedException ignored) {}
+                            }
+                            actionId = submitLiveResponseAction(httpClient, accessToken, deviceId, scriptName);
+                            lastSubmitMs = System.currentTimeMillis();
                         }
-                        actionId = submitLiveResponseAction(httpClient, accessToken, deviceId, scriptName);
-                    }
-                    if (actionId == null) {
-                        logger.error("{}: Could not submit Live Response action on device {}", description, deviceName);
-                        continue;
-                    }
+                        if (actionId == null) {
+                            logger.error("{}: Could not submit Live Response action on device {}", description, deviceName);
+                            break; // exit retry loop
+                        }
 
-                    Map<String, Object> finalStatus = pollActionUntilDone(httpClient, accessToken, actionId);
-                    String status = finalStatus.getOrDefault("status", "unknown").toString();
-                    if (!"Succeeded".equals(status)) {
-                        logger.error("{}: Action on device {} finished with status {}", description, deviceName, status);
-                        continue;
-                    }
+                        Map<String, Object> finalStatus = pollActionUntilDone(httpClient, accessToken, actionId);
+                        String status = finalStatus.getOrDefault("status", "unknown").toString();
+                        if (!"Succeeded".equals(status)) {
+                            logger.error("{}: Action on device {} finished with status {}", description, deviceName, status);
+                            break; // exit retry loop
+                        }
 
-                    String downloadUrl = getActionOutputDownloadLink(httpClient, accessToken, actionId);
-                    if (downloadUrl == null) {
-                        logger.error("{}: No download link for actionId={} on device {}", description, actionId, deviceName);
-                        continue;
-                    }
+                        String downloadUrl = getActionOutputDownloadLink(httpClient, accessToken, actionId);
+                        if (downloadUrl == null) {
+                            logger.error("{}: No download link for actionId={} on device {}", description, actionId, deviceName);
+                            break; // exit retry loop
+                        }
 
-                    JsonNode output = downloadAndParseOutput(httpClient, downloadUrl);
-                    if (output != null) {
-                        outputs.put(deviceId, output);
-                        logger.info("{}: Collected output from device {}", description, deviceName);
+                        JsonNode output = downloadAndParseOutput(httpClient, downloadUrl);
+                        if (output != null) {
+                            outputs.put(deviceId, output);
+                            logger.info("{}: Collected output from device {}", description, deviceName);
+                        }
+                        break; // success, exit retry loop
                     }
+                } catch (PermanentSkipException pse) {
+                    logger.warn("{}: Skipping device {} — {} (permanent, no retry)",
+                        description, deviceName, pse.getMessage());
+                    break; // exit retry loop
+                } catch (RateLimitException rle) {
+                    if (attempt < RATE_LIMIT_MAX_RETRIES - 1) {
+                        logger.warn("{}: Rate limited on device {}, sleeping {}s before retry (attempt {}/{})",
+                            description, deviceName, rle.getRetryAfterSeconds(), attempt + 1, RATE_LIMIT_MAX_RETRIES);
+                        try { Thread.sleep(rle.getRetryAfterSeconds() * 1_000L); } catch (InterruptedException ignored) {}
+                    } else {
+                        logger.error("{}: Rate limited on device {} after {} attempts, giving up",
+                            description, deviceName, RATE_LIMIT_MAX_RETRIES);
+                        break; // exit retry loop
+                    }
+                } catch (Exception e) {
+                    logger.error("{}: Error processing device {}: {}", description, deviceName, e.getMessage());
+                    break; // exit retry loop
                 }
-            } catch (Exception e) {
-                logger.error("{}: Error processing device {}: {}", description, deviceName, e.getMessage());
             }
         }
         return outputs;
@@ -689,29 +723,42 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
             .setSocketTimeout(SOCKET_TIMEOUT_MS)
             .build();
 
-        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-            HttpGet get = new HttpGet(
-                "https://api.securitycenter.microsoft.com/api/machines?$select=id,computerDnsName,osPlatform&$top=1000");
-            get.setHeader("Authorization", "Bearer " + accessToken);
-            get.setHeader("Content-Type", "application/json");
+        List<Map<String, Object>> devices = new ArrayList<>();
+        String nextUrl = "https://api.securitycenter.microsoft.com/api/machines"
+            + "?$select=id,computerDnsName,osPlatform,onboardingStatus,healthStatus"
+            + "&$filter=onboardingStatus eq 'Onboarded' and healthStatus eq 'Active'"
+            + "&$top=10000";
+        int pageCount = 0;
+        final int MAX_PAGES = 50; // safety cap: 50 × 10000 = 500,000 devices max
 
-            try (CloseableHttpResponse resp = client.execute(get)) {
-                int status = resp.getStatusLine().getStatusCode();
-                String body = EntityUtils.toString(resp.getEntity());
-                if (status != 200) {
-                    throw new IOException("Failed to fetch device list: HTTP " + status + " - " + body);
-                }
-                JsonNode json = OBJECT_MAPPER.readTree(body);
-                JsonNode value = json.path("value");
-                List<Map<String, Object>> devices = new ArrayList<>();
-                if (value.isArray()) {
-                    for (JsonNode node : value) {
-                        devices.add(OBJECT_MAPPER.convertValue(node, Map.class));
+        try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+            while (nextUrl != null && pageCount < MAX_PAGES) {
+                HttpGet get = new HttpGet(nextUrl);
+                get.setHeader("Authorization", "Bearer " + accessToken);
+                get.setHeader("Content-Type", "application/json");
+
+                try (CloseableHttpResponse resp = client.execute(get)) {
+                    int status = resp.getStatusLine().getStatusCode();
+                    String body = EntityUtils.toString(resp.getEntity());
+                    if (status != 200) {
+                        throw new IOException("Failed to fetch device list: HTTP " + status + " - " + body);
                     }
+                    JsonNode json = OBJECT_MAPPER.readTree(body);
+                    JsonNode value = json.path("value");
+                    if (value.isArray()) {
+                        for (JsonNode node : value) {
+                            devices.add(OBJECT_MAPPER.convertValue(node, Map.class));
+                        }
+                    }
+                    JsonNode nextLink = json.path("@odata.nextLink");
+                    nextUrl = nextLink.isMissingNode() || nextLink.isNull() ? null : nextLink.asText(null);
+                    pageCount++;
+                    logger.info("Fetched page {} with {} devices (total so far: {})", pageCount,
+                        (value.isArray() ? value.size() : 0), devices.size());
                 }
-                return devices;
             }
         }
+        return devices;
     }
 
     private String uploadScript(String accessToken, String scriptResourcePath) {
@@ -782,10 +829,19 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
             if (status == 201) {
                 return OBJECT_MAPPER.readTree(responseBody).path("id").asText(null);
             }
+            if (status == 429) {
+                // Read Retry-After header (seconds), default 60s
+                org.apache.http.Header retryAfterHeader = resp.getFirstHeader("Retry-After");
+                long retryAfterSeconds = retryAfterHeader != null ? Long.parseLong(retryAfterHeader.getValue()) : 60L;
+                throw new RateLimitException(retryAfterSeconds);
+            }
             if (status == 400) {
                 String errorCode = OBJECT_MAPPER.readTree(responseBody).path("error").path("code").asText("");
                 if ("ActiveRequestAlreadyExists".equals(errorCode)) {
                     return null;
+                }
+                if ("ClientVersionNotSupported".equals(errorCode) || "OsPlatformNotSupported".equals(errorCode)) {
+                    throw new PermanentSkipException(errorCode);
                 }
             }
             throw new IOException("runliveresponse returned HTTP " + status + ": " + responseBody);
@@ -1194,6 +1250,21 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
             return java.net.URLEncoder.encode(value, "UTF-8");
         } catch (java.io.UnsupportedEncodingException e) {
             return value;
+        }
+    }
+
+    private static class RateLimitException extends Exception {
+        private final long retryAfterSeconds;
+        RateLimitException(long retryAfterSeconds) {
+            super("Rate limit exceeded, retry after " + retryAfterSeconds + "s");
+            this.retryAfterSeconds = retryAfterSeconds;
+        }
+        long getRetryAfterSeconds() { return retryAfterSeconds; }
+    }
+
+    private static class PermanentSkipException extends Exception {
+        PermanentSkipException(String code) {
+            super(code);
         }
     }
 }
