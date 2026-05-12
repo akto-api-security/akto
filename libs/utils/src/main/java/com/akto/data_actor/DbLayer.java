@@ -435,12 +435,10 @@ public class DbLayer {
         Bson filter = AccountSettingsDao.generateFilter();
         if (toAdd != null && !toAdd.isEmpty()) {
             List<String> uniqueToAdd = new ArrayList<>(new HashSet<>(toAdd));
-            AccountSettingsDao.instance.getMCollection().updateOne(filter, Updates.addEachToSet(domainKey, uniqueToAdd),
-                    new UpdateOptions().upsert(true));
+            AccountSettingsDao.instance.getMCollection().updateOne(filter, Updates.addEachToSet(domainKey, uniqueToAdd));
         }
         if (toRemove != null && !toRemove.isEmpty()) {
-            AccountSettingsDao.instance.getMCollection().updateOne(filter, Updates.pullAll(domainKey, toRemove),
-                    new UpdateOptions().upsert(true));
+            AccountSettingsDao.instance.getMCollection().updateOne(filter, Updates.pullAll(domainKey, toRemove));
         }
     }
 
