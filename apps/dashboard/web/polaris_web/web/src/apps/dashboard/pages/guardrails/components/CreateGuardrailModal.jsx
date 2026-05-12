@@ -44,11 +44,14 @@ import {
     resolveStoredPolicyBehaviour
 } from '../utils';
 import func from "@/util/func";
+import guardrailApi from '../api';
 
 const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, isEditMode = false }) => {
     // Step management
     const [currentStep, setCurrentStep] = useState(1);
     const [loading, setLoading] = useState(false);
+    const guardrailTopicsCatalog = PersistStore(state => state.guardrailTopicsCatalog);
+    const setGuardrailTopicsCatalog = PersistStore(state => state.setGuardrailTopicsCatalog);
 
     // Step 1: Guardrail details
     const [name, setName] = useState("");
@@ -275,6 +278,18 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
 
     // Filter collections when modal opens or allCollections changes
     useEffect(() => {
+        if (Object.keys(guardrailTopicsCatalog).length > 0) return;
+        guardrailApi.fetchGuardrailTopics().then(resp => {
+            if (resp?.guardrailTopics) setGuardrailTopicsCatalog(resp.guardrailTopics);
+        });
+    }, [guardrailTopicsCatalog, setGuardrailTopicsCatalog]);
+
+    useEffect(() => {
+        if (!Object.keys(guardrailTopicsCatalog).length) return;
+        setDeniedTopics(prev => prev.map(t => guardrailTopicsCatalog[t.topic] ? { ...t, fromCatalog: true } : t));
+    }, [guardrailTopicsCatalog]);
+
+    useEffect(() => {
         if (isOpen) {
             if (allCollections && allCollections.length > 0) {
                 filterCollections();
@@ -438,7 +453,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // Denied topics
         const hasDeniedTopics = policy.deniedTopics && policy.deniedTopics.length > 0;
         setEnableDeniedTopics(hasDeniedTopics);
-        setDeniedTopics(policy.deniedTopics || []);
+        setDeniedTopics((policy.deniedTopics || []).map(t => guardrailTopicsCatalog[t.topic] ? { ...t, fromCatalog: true } : t));
 
         // Word filters
         setWordFilters({
@@ -811,6 +826,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setEnableBasePromptRule={setEnableBasePromptRule}
                         basePromptConfidenceScore={basePromptConfidenceScore}
                         setBasePromptConfidenceScore={setBasePromptConfidenceScore}
+                        guardrailTopicsCatalog={guardrailTopicsCatalog}
                     />
                 );
             case 3:

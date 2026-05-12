@@ -65,4 +65,12 @@ export default {
         return resp
     },
 
+    async fetchGuardrailTopics() {
+        const resp = await request({
+            url: '/api/fetchGuardrailTopics',
+            method: 'post'
+        })
+        return resp
+    },
+
 }

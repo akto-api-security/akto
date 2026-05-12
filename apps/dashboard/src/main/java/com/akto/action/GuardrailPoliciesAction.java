@@ -1,8 +1,10 @@
 package com.akto.action;
 
 import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dao.GuardrailTopicsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.GuardrailPolicies;
+import com.akto.dto.GuardrailTopic;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -61,6 +63,9 @@ public class GuardrailPoliciesAction extends UserAction {
     @Setter
     private List<String> policyIds;
 
+    @Getter
+    private List<GuardrailTopic> guardrailTopics;
+
     // For playground testing
     @Setter
     private String testInput;
@@ -78,6 +83,17 @@ public class GuardrailPoliciesAction extends UserAction {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching guardrail policies: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+    }
+
+
+    public String fetchGuardrailTopics() {
+        try {
+            this.guardrailTopics = GuardrailTopicsDao.instance.findAll();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching guardrail topics: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
     }
@@ -316,7 +332,7 @@ public class GuardrailPoliciesAction extends UserAction {
             int accountId = Context.accountId.get();
             String guardrailServiceUrl = accountId == 1768362636
                     ? "https://ingest-demo.akto.io"
-                    : "https://" + accountId + "-guardrails.akto.io";
+                    : "http://localhost:7071";
             String validateUrl = guardrailServiceUrl + "/api/validate/requestWithPolicy";
 
             // Prepare request payload - wrap testInput in JSON with "prompt" key
