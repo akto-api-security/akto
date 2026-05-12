@@ -1,17 +1,18 @@
 package com.akto.new_relic;
 
-import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.NewRelicIntegrationDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
+import com.akto.dto.new_relic_integration.NewRelicIntegration;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.AccountUtils;
 import com.akto.utils.OrganizationUtils;
-import com.mongodb.client.model.Filters;
+import com.mongodb.BasicDBObject;
 import com.newrelic.telemetry.Attributes;
 import com.newrelic.telemetry.OkHttpPoster;
 import com.newrelic.telemetry.TelemetryClient;
@@ -28,35 +29,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-
 public class NewRelicUtils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(NewRelicUtils.class, LogDb.DB_ABS);
 
-    private static volatile TelemetryClient telemetryClient;
-    private static volatile Attributes commonAttributes;
-
-    private static final ConcurrentHashMap<Integer, Organization> orgCache = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<Integer, Account> accountCache = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Integer, TelemetryClient> clientCache = new ConcurrentHashMap<>();
 
     private NewRelicUtils() {}
-
-    public static synchronized void init(String apiKey, String serviceName, String environment) {
-        if (telemetryClient != null) {
-            return;
-        }
-        try {
-            telemetryClient = TelemetryClient.create(
-                    () -> new OkHttpPoster(Duration.of(10, ChronoUnit.SECONDS)), apiKey);
-            commonAttributes = new Attributes()
-                    .put("service.name", serviceName)
-                    .put("environment", environment)
-                    .put("mode", "forwarder");
-            loggerMaker.infoAndAddToDb("New Relic telemetry client initialized for service=" + serviceName + ", environment=" + environment);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Failed to initialize New Relic telemetry client");
-        }
-    }
 
     public static Attributes getIdAttributes() {
         Attributes idAttrs = new Attributes();
@@ -108,8 +87,33 @@ public class NewRelicUtils {
         return "akto.metric." + name.toLowerCase();
     }
 
+     public static TelemetryClient initClientForAccount() throws Exception {
+        int accountId = Context.accountId.get();
+
+        TelemetryClient existing = clientCache.get(accountId);
+        if (existing != null) return existing;
+
+        NewRelicIntegration nri = NewRelicIntegrationDao.instance.findOne(new BasicDBObject());
+        if (nri == null || nri.getApiKey() == null || nri.getApiKey().isEmpty()) {
+            throw new Exception("No New Relic integration found.");
+        }
+        TelemetryClient newClient = TelemetryClient.create(
+            () -> new OkHttpPoster(Duration.of(10, ChronoUnit.SECONDS)), nri.getApiKey());
+
+        TelemetryClient winner = clientCache.putIfAbsent(accountId, newClient);
+        return winner != null ? winner : newClient;
+    }
+
     public static void forwardMetrics(List<MetricData> mdList) {
-        if (!isInitialized() || mdList == null || mdList.isEmpty()) {
+        if (mdList == null || mdList.isEmpty()) {
+            return;
+        }
+
+        TelemetryClient client;
+        try {
+            client = NewRelicUtils.initClientForAccount();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, String.format("Failed to initialize New Relic client for account %d: %s", Context.accountId.get(), e.getMessage()));
             return;
         }
 
@@ -146,7 +150,7 @@ public class NewRelicUtils {
                 newRelicMetrics.add(newRelicMetric);
             }
 
-            NewRelicUtils.sendBatch(newRelicMetrics);
+            NewRelicUtils.sendBatch(client, newRelicMetrics);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Failed to forward metrics to New Relic");
         }
@@ -154,9 +158,18 @@ public class NewRelicUtils {
 
 
     public static void forwardModuleHeartbeatEvent(ModuleInfo moduleInfo) {
-        if (!isInitialized() || moduleInfo == null) {
+        if (moduleInfo == null) {
             return;
         }
+
+        TelemetryClient client;
+        try {
+            client = NewRelicUtils.initClientForAccount();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, String.format("Failed to initialize New Relic client for account %d: %s", Context.accountId.get(), e.getMessage()));
+            return;
+        }
+
         try {
             long now = System.currentTimeMillis();
 
@@ -166,20 +179,16 @@ public class NewRelicUtils {
             Attributes eventAttrs = new Attributes();
             eventAttrs.putAll(idAttrs);
             eventAttrs.putAll(moduleAttrs);
-            
-            if (commonAttributes != null) {
-                eventAttrs.putAll(commonAttributes);
-            }
 
             Event event = new Event("AktoModuleHeartbeatReceived", eventAttrs, now);
-            telemetryClient.sendBatch(new EventBatch(Collections.singletonList(event)));
+            client.sendBatch(new EventBatch(Collections.singletonList(event)));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Failed to forward module heartbeat received event for moduleId=" + moduleInfo.getId());
         }
     }
 
-    public static void sendBatch(List<Metric> metrics) {
-        if (!isInitialized() || metrics == null || metrics.isEmpty()) {
+    public static void sendBatch(TelemetryClient client, List<Metric> metrics) {
+        if (metrics == null || metrics.isEmpty()) {
             return;
         }
         try {
@@ -189,26 +198,15 @@ public class NewRelicUtils {
             }
 
             loggerMaker.info(String.format("Forwarding %d metrics to New Relic", metrics.size()));
-            telemetryClient.sendBatch(buffer.createBatch());
+            client.sendBatch(buffer.createBatch());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Failed to send metric batch of size " + metrics.size());
         }
     }
 
-    private static boolean isInitialized() {
-        if (telemetryClient == null) {
-            loggerMaker.info("New Relic telemetry client is not initialized. Call NewRelicUtils.init() first.");
-            return false;
-        }
-        return true;
-    }
-
     private static MetricBuffer buildMetricBuffer() {
         MetricBuffer.Builder builder = MetricBuffer.builder()
                 .instrumentationProvider("akto-telemetry");
-        if (commonAttributes != null) {
-            builder.attributes(commonAttributes);
-        }
         return builder.build();
     }
 }

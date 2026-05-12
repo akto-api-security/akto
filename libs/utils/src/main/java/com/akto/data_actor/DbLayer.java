@@ -123,9 +123,8 @@ import com.akto.dto.upload.SwaggerFileUpload;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.new_relic.NewRelicUtils;
 import com.akto.dao.billing.UningestedApiOverageDao;
-import com.akto.dao.DeviceDomainConfigDao;
-import com.akto.dto.DeviceDomainConfig;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
@@ -273,6 +272,20 @@ public class DbLayer {
            updateModuleEnvAndReboot(moduleInfo);
         }
 
+        boolean forwardToNewRelic = NewRelicIntegrationDao.instance.count(new BasicDBObject()) > 0;
+        if (forwardToNewRelic) {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb(String.format("Forwarding module heartbeat to New Relic for module %s (account %d)", moduleInfo.getName(), accountId), LogDb.DB_ABS);
+
+            try {
+                newRelicExecutorService.submit(() -> {
+                    Context.accountId.set(accountId);
+                    NewRelicUtils.forwardModuleHeartbeatEvent(moduleInfo);
+                });
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error submitting module heartbeat forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
+            }
+        }
         
         List<Bson> updateList = new ArrayList<>();
         updateList.add(Updates.setOnInsert("_t", moduleInfo.getClass().getName()));
@@ -2267,6 +2280,21 @@ public class DbLayer {
             loggerMaker.infoAndAddToDb("Deleted " + deletedCount + " old metrics records", LogDb.DASHBOARD);
         }
         MetricDataDao.instance.insertMany(metricData);
+
+        boolean forwardToNewRelic = NewRelicIntegrationDao.instance.count(new BasicDBObject()) > 0;
+        if (forwardToNewRelic) {
+            int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb(String.format("Forwarding %d metrics to New Relic for account %d", metricData.size(), accountId), LogDb.DB_ABS);
+        
+            try {
+                newRelicExecutorService.submit(() -> {
+                    Context.accountId.set(accountId);
+                    NewRelicUtils.forwardMetrics(metricData);
+                });
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error submitting metrics forwarding task to executor: " + e.getMessage(), LogDb.DB_ABS);
+            }
+        }
     }
     public static void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Integer accountId = Context.accountId.get();
