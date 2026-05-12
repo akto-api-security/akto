@@ -322,8 +322,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchAccessMatrixUrlToRole(apiInfoKey);
     }
 
-    public List<ApiCollection> fetchAllApiCollectionsMeta() {
-        return DbLayer.fetchAllApiCollectionsMeta();
+    public List<ApiCollection> fetchAllApiCollectionsMeta(boolean includeTagsList) {
+        return DbLayer.fetchAllApiCollectionsMeta(includeTagsList);
     }
 
     public ApiCollection fetchApiCollectionMeta(int apiCollectionId) {

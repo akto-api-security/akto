@@ -177,7 +177,7 @@ public abstract class DataActor {
     public abstract TestingRunResultSummary fetchTestingRunResultSummary(String testingRunResultSummaryId);
     public abstract TestingRunResultSummary fetchRerunTestingRunResultSummary(String originalTestingRunResultSummaryId);
 
-    public abstract List<ApiCollection> fetchAllApiCollectionsMeta();
+    public abstract List<ApiCollection> fetchAllApiCollectionsMeta(boolean includeTagsList);
 
     public abstract WorkflowTest fetchWorkflowTest(int workFlowTestId);
 

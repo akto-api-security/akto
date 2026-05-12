@@ -108,7 +108,7 @@ public class HttpCallParser {
         apiCollectionsMap = new HashMap<>();
         apiCollectionIdTagsSyncTimestampMap = new HashMap<>();
         serviceTagCollectionHostNamesCache = new HashMap<>();
-        List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
+        List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta(true);
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
 
@@ -513,7 +513,7 @@ public class HttpCallParser {
             long startTime = System.currentTimeMillis();
             numberOfSyncs++;
             loggerMaker.infoAndAddToDb("Starting Syncing API catalog..." + numberOfSyncs);
-            List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
+            List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta(true);
             for (ApiCollection apiCollection: apiCollections) {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
             }
