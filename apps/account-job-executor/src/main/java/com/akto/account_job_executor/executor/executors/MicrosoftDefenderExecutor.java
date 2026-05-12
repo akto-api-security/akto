@@ -804,7 +804,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
     }
 
     private String submitLiveResponseAction(CloseableHttpClient httpClient, String accessToken,
-            String deviceId, String scriptName) throws IOException {
+            String deviceId, String scriptName) throws IOException, RateLimitException, PermanentSkipException {
         Map<String, Object> scriptNameParam = new HashMap<>();
         scriptNameParam.put("key", "ScriptName");
         scriptNameParam.put("value", scriptName);
