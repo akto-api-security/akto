@@ -68,6 +68,12 @@ public class WizIntegrationAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
 
+        // If integration already exists (integration edited), delete the existing sync job before creating a new one
+        WizIntegration existingIntegration = WizIntegrationDao.instance.findOne(new BasicDBObject());
+        if (existingIntegration != null && existingIntegration.getWizSyncJobId() != null) {
+            JobScheduler.deleteJob(existingIntegration.getWizSyncJobId());
+        }
+
         /*
          * Create a recurrring job to sync with Wiz every hour.
          * 1. Reupload findings to Wiz periodically to ensure that Wiz does not mark them as stale/closed. (docs - finding closed in 7 days if not updated)
