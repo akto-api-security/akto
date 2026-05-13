@@ -196,8 +196,8 @@ public class Executor {
         boolean allRequestsSkippedDueToMatch = false;
         int skippedCount = 0;
 
-        boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
-        boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests() && templateAllowsAutomated;
+        // boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
+        boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests();
 
 
         if (runAutomatedPentest) {
