@@ -19,10 +19,10 @@ import java.time.OffsetDateTime;
  */
 public class AzureBlobClient {
 
-    public static final String CONTAINER_ENV = "AZURE_BLOB_CONTAINER";
-    public static final String CONNECTION_ENV = "AZURE_STORAGE_CONNECTION_STRING";
-    public static final String DEFAULT_CONTAINER = "endpoint-shield-content";
-    public static final int SAS_TTL_MINUTES = 5;
+    private static final String CONTAINER_ENV = "AZURE_BLOB_CONTAINER";
+    private static final String CONNECTION_ENV = "AZURE_STORAGE_CONNECTION_STRING";
+    private static final String DEFAULT_CONTAINER = "endpoint-shield-content";
+    private static final int SAS_TTL_MINUTES = 5;
 
     private static volatile AzureBlobClient instance;
     private final BlobContainerClient container;

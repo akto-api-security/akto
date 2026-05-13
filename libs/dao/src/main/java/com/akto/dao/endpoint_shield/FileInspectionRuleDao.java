@@ -6,8 +6,24 @@ import com.akto.dto.endpoint_shield.FileInspectionRule;
 
 public class FileInspectionRuleDao extends AccountsContextDao<FileInspectionRule> {
 
-    public static final FileInspectionRuleDao instance = new FileInspectionRuleDao();
+    private static volatile FileInspectionRuleDao instance;
     public static final String COLLECTION_NAME = "file_inspection_rules";
+
+    private FileInspectionRuleDao() {}
+
+    public static FileInspectionRuleDao getInstance() {
+        FileInspectionRuleDao local = instance;
+        if (local == null) {
+            synchronized (FileInspectionRuleDao.class) {
+                local = instance;
+                if (local == null) {
+                    local = new FileInspectionRuleDao();
+                    instance = local;
+                }
+            }
+        }
+        return local;
+    }
 
     @Override
     public String getCollName() {

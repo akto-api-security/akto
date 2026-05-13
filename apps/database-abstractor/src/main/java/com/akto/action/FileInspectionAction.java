@@ -36,9 +36,9 @@ public class FileInspectionAction extends ActionSupport {
 
     public String fetchFileInspectionRules() {
         try {
-            FileInspectionRuleDao.instance.createIndicesIfAbsent();
+            FileInspectionRuleDao.getInstance().createIndicesIfAbsent();
             Bson filter = Filters.gt(FileInspectionRule.UPDATED_TS, (int) updatedAfter);
-            this.rules = FileInspectionRuleDao.instance.findAll(
+            this.rules = FileInspectionRuleDao.getInstance().findAll(
                 filter, 0, 500,
                 Sorts.descending(FileInspectionRule.UPDATED_TS)
             );
@@ -83,14 +83,21 @@ public class FileInspectionAction extends ActionSupport {
         }
         for (FileInspectionResult.Match m : r.getMatches()) {
             String raw = m.getContentRaw();
-            if (raw == null || raw.isEmpty()) continue;
+            if (raw == null || raw.isEmpty()) {
+                loggerMaker.infoAndAddToDb("Discarding match " + m.getPath() + ": no content", LogDb.DB_ABS);
+                continue;
+            }
             try {
                 byte[] data = java.util.Base64.getDecoder().decode(raw);
                 String sha = m.getSha256();
-                if (sha == null || !SHA256_RE.matcher(sha).matches()) continue;
+                if (sha == null || !SHA256_RE.matcher(sha).matches()) {
+                    loggerMaker.infoAndAddToDb("Discarding match " + m.getPath() + ": invalid sha256", LogDb.DB_ABS);
+                    continue;
+                }
                 String blobName = AzureBlobClient.buildBlobName(r.getAccountId(), sha);
                 if (!client.exists(blobName)) {
                     client.upload(blobName, data);
+                    loggerMaker.infoAndAddToDb("Uploaded blob " + blobName + " for " + m.getPath(), LogDb.DB_ABS);
                 }
                 m.setContentBlobName(blobName);
             } catch (Exception e) {
@@ -98,6 +105,7 @@ public class FileInspectionAction extends ActionSupport {
                 m.setReadError("blob upload failed: " + e.getMessage());
             } finally {
                 m.setContentRaw(null);
+                loggerMaker.infoAndAddToDb("Cleared raw content for " + m.getPath(), LogDb.DB_ABS);
             }
         }
     }

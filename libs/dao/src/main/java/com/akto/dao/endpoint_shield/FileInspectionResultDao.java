@@ -13,8 +13,8 @@ public class FileInspectionResultDao extends AccountsContextDao<FileInspectionRe
     public static final FileInspectionResultDao instance = new FileInspectionResultDao();
     public static final String COLLECTION_NAME = "file_inspection_results";
 
-    public static final int maxDocuments = 200_000;
-    public static final long sizeInBytes = 200_000_000L;
+    private static final int maxDocuments = 200_000;
+    private static final long sizeInBytes = 200_000_000L;
 
     public void createIndicesIfAbsent() {
         boolean exists = false;
