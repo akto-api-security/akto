@@ -3,7 +3,10 @@ package com.akto.metrics;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.data_actor.DbLayer;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.metrics.MetricData;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
@@ -11,9 +14,13 @@ import com.mongodb.BasicDBObject;
 import okhttp3.*;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -66,10 +73,6 @@ public class AllMetrics {
                 kafkaBytesConsumedRate, cyborgNewApiCount, cyborgTotalApiCount, deltaCatalogNewCount, deltaCatalogTotalCount,
                 cyborgApiPayloadSize, multipleSampleDataFetchLatency);
 
-        if(executorService == null){
-            executorService  = Executors.newScheduledThreadPool(1);
-        }
-
         executorService.scheduleAtFixedRate(() -> {
             try {
                 BasicDBList list = new BasicDBList();
@@ -111,8 +114,7 @@ public class AllMetrics {
             .callTimeout(1, TimeUnit.SECONDS)
             .build();
 
-
-    private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class);
+    private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class, LoggerMaker.LogDb.DB_ABS);
 
     private static final String instance_id = UUID.randomUUID().toString();
     private Metric runtimeKafkaRecordCount;
@@ -299,10 +301,10 @@ public class AllMetrics {
     }
 
 
-    private static ScheduledExecutorService executorService;
+    private static final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
     enum MetricType{
-        LATENCY, SUM
+        LATENCY, SUM, GAUGE
     }
 
     public abstract class Metric{
@@ -311,6 +313,16 @@ public class AllMetrics {
         int periodInSecs;
         String orgId;
         int accountId;
+        String moduleType;
+
+        public Metric(String metricId, int periodInSecs, int accountId, String orgId, String moduleType){
+            this.metricId = metricId;
+            this.periodInSecs = periodInSecs;
+            this.timestamp = Context.now();
+            this.accountId = accountId;
+            this.orgId = orgId;
+            this.moduleType = moduleType;
+        }
 
         public Metric(String metricId, int periodInSecs, int accountId, String orgId){
             this.metricId = metricId;
@@ -335,6 +347,13 @@ public class AllMetrics {
 
         abstract MetricType getMetricType();
 
+        public String getOrgId(){
+            return orgId;
+        }
+
+        public int getAccountId(){
+            return accountId;
+        }
     }
 
     class LatencyMetric extends Metric{
@@ -411,6 +430,45 @@ public class AllMetrics {
         }
     }
 
+
+    class GaugeMetric extends Metric{
+        float value;
+
+        public GaugeMetric(String metricId, int periodInSecs) {
+            super(metricId, periodInSecs);
+        }
+
+        public GaugeMetric(String metricId, int periodInSecs, int accountId, String orgId) {
+            super(metricId, periodInSecs, accountId, orgId);
+        }
+
+        public GaugeMetric(String metricId, int periodInSecs, int accountId, String orgId, String moduleType) {
+            super(metricId, periodInSecs, accountId, orgId, moduleType);
+        }
+
+        @Override
+        public void record(float val) {
+            this.value = val;
+        }
+
+        @Override
+        float getMetric() {
+            return value;
+        }
+
+        @Override
+        MetricType getMetricType() {
+            return MetricType.GAUGE;
+        }
+
+        @Override
+        float getMetricAndReset() {
+            float val = getMetric();
+            this.value = 0;
+            return val;
+        }
+    }
+
     public static void sendDataToAkto(BasicDBList list){
         MediaType mediaType = MediaType.parse("application/json");
         RequestBody body = RequestBody.create(new BasicDBObject("data", list).toJson(), mediaType);
@@ -461,4 +519,88 @@ public class AllMetrics {
             loggerMaker.infoAndAddToDb("Traffic_metrics not sent", LoggerMaker.LogDb.RUNTIME);
         }
     }
+
+    // Traffic Collector profiling metrics - per instance tracking
+    private final Map<String, Metric> tcHostMemoryUsedMbMetrics = new ConcurrentHashMap<>();
+    private final Map<String, Metric> tcSystemCpuPercentMetrics = new ConcurrentHashMap<>();
+    private final Map<String, Metric> tcGoroutinesMetrics = new ConcurrentHashMap<>();
+
+    private void processAndCleanupTcMetrics(Map<String, Metric> metricsMap, String metricId,List<MetricData> metricDataList) {
+        List<String> deadInstances = new ArrayList<>();
+
+        for (Map.Entry<String, Metric> entry : metricsMap.entrySet()) {
+            String tcInstanceId = entry.getKey();
+            Metric metric = entry.getValue();
+            float value = metric.getMetricAndReset();
+            String orgId = metric.getOrgId();
+            int accountId = metric.getAccountId();
+
+            MetricData metricData = new MetricData(
+                metricId,
+                value,
+                orgId,
+                tcInstanceId,
+                MetricData.MetricType.GAUGE,
+                ModuleInfo.ModuleType.TRAFFIC_COLLECTOR.name()
+            );
+            metricData.setAccountId(accountId);
+            metricDataList.add(metricData);
+
+            if (value == 0.0f) {
+                deadInstances.add(tcInstanceId);
+            }
+        }
+
+        for (String deadInstanceId : deadInstances) {
+            metricsMap.remove(deadInstanceId);
+        }
+    }
+
+        // Traffic Collector profiling metrics - per instance
+        public void setTcHostMemoryUsedMb(String instanceId, float val, int accountId, String orgId) {
+            tcHostMemoryUsedMbMetrics.computeIfAbsent(instanceId,
+                k -> new GaugeMetric("TC_HOST_MEMORY_USED_MB", 60, accountId, orgId, ModuleInfo.ModuleType.TRAFFIC_COLLECTOR.name()))
+                .record(val);
+        }
+
+        public void setTcSystemCpuPercent(String instanceId, float val, int accountId, String orgId) {
+            tcSystemCpuPercentMetrics.computeIfAbsent(instanceId,
+                k -> new GaugeMetric("TC_SYSTEM_CPU_PERCENT", 60, accountId, orgId, ModuleInfo.ModuleType.TRAFFIC_COLLECTOR.name()))
+                .record(val);
+        }
+
+        public void setTcGoroutines(String instanceId, float val, int accountId, String orgId) {
+            tcGoroutinesMetrics.computeIfAbsent(instanceId,
+                k -> new GaugeMetric("TC_GOROUTINES", 60, accountId, orgId, ModuleInfo.ModuleType.TRAFFIC_COLLECTOR.name()))
+                .record(val);
+        }
+
+        public void ingestTcMetrics() {
+
+            executorService.scheduleAtFixedRate(() -> {
+                List<MetricData> metricDataList = new ArrayList<>();
+                processAndCleanupTcMetrics(tcHostMemoryUsedMbMetrics, "TC_HOST_MEMORY_USED_MB", metricDataList);
+                processAndCleanupTcMetrics(tcSystemCpuPercentMetrics, "TC_SYSTEM_CPU_PERCENT", metricDataList);
+                processAndCleanupTcMetrics(tcGoroutinesMetrics, "TC_GOROUTINES", metricDataList);
+    
+                if (!metricDataList.isEmpty()) {
+                    // Group metrics by accountId
+                    Map<Integer, List<MetricData>> metricsByAccountId = new HashMap<>();
+                    for (MetricData data : metricDataList) {
+                        Integer accId = data.getAccountId();
+                        if (accId == null) continue;
+                        metricsByAccountId.computeIfAbsent(accId, k -> new ArrayList<>()).add(data);
+                    }
+                    // For each accountId, set context and insert metrics
+                    for (Map.Entry<Integer, List<MetricData>> entry : metricsByAccountId.entrySet()) {
+                        Integer accId = entry.getKey();
+                        List<MetricData> metrics = entry.getValue();
+                        if (metrics == null || metrics.isEmpty()) continue;
+                        Context.accountId.set(accId);
+                        loggerMaker.info("Ingesting TC metrics for accountId: " + accId, LoggerMaker.LogDb.DB_ABS);
+                        DbLayer.ingestMetricsData(metrics);
+                    }
+                }
+            }, 0, 120, TimeUnit.SECONDS);
+        }
 }

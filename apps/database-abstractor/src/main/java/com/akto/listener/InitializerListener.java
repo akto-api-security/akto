@@ -14,6 +14,7 @@ import com.akto.dao.AccountsDao;
 import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dao.context.Context;
 import com.akto.merging.Cron;
+import com.akto.metrics.AllMetrics;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.TagMismatchCron;
@@ -56,6 +57,7 @@ public class InitializerListener implements ServletContextListener {
                             logger.info("triggering tags mismatch cron for db abstractor " + Context.now());
                             tagsMismatchCron.runCron();
                         }
+                        AllMetrics.instance.ingestTcMetrics();
                     } catch (Exception e) {
                         logger.error("error running initializer method for db abstractor", e);
                     } finally {

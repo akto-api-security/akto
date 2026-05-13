@@ -3,6 +3,10 @@ package com.akto.dto.metrics;
 import com.akto.dao.context.Context;
 import com.akto.dto.monitoring.ModuleInfo;
 
+import lombok.Getter;
+import lombok.Setter;
+
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 public class MetricData {
@@ -14,6 +18,11 @@ public class MetricData {
     private int timestamp;
     private String moduleType;
     private ModuleInfo moduleInfo;
+
+    @BsonIgnore
+    @Getter
+    @Setter
+    private Integer accountId;
 
     public MetricType getMetricType() {
         return metricType;
@@ -75,8 +84,12 @@ public class MetricData {
         AVAILABLE_PROCESSORS("Available Processors", "Number of processors available to the JVM"),
         TOTAL_PHYSICAL_MEMORY_MB("Total Physical Memory", "Total physical memory available (MB)"),
 
+        // Traffic Collector metrics
         TC_CPU_USAGE("Traffic Collector CPU Usage", "CPU usage percentage of traffic collector modules"),
-        TC_MEMORY_USAGE("Traffic Collector Memory Used", "Memory used in MB by traffic collector modules");
+        TC_MEMORY_USAGE("Traffic Collector Memory Used", "Memory used in MB by traffic collector modules"),
+        TC_HOST_MEMORY_USED_MB("Traffic Collector Host Memory Used", "Host used memory (MB)"),
+        TC_GOROUTINES("Traffic Collector Goroutines", "Number of goroutines"),
+        TC_SYSTEM_CPU_PERCENT("Traffic Collector System CPU Percent", "Host-level CPU usage percentage");
 
 
         private final String descriptionName;
