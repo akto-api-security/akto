@@ -115,6 +115,7 @@ import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
+import com.akto.metrics.ModuleHeartbeatProfilingMetrics;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -331,6 +332,8 @@ public class DbLayer {
         }
 
         ModuleInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
+
+        ModuleHeartbeatProfilingMetrics.recordGaugeUpdates(moduleInfoList);
     }
 
     public static List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
@@ -2336,9 +2339,16 @@ public class DbLayer {
                 Map<String, Object> obj = (Map) metrics;
                 String name = (String) obj.get("metric_id");
                 String instanceId = (String) obj.get("instance_id");
-                Long tsVal = (Long) obj.get("timestamp");
-                int ts = tsVal.intValue();
-                Double val = (Double) obj.get("val");
+                Object tsObj = obj.get("timestamp");
+                if (!(tsObj instanceof Number)) {
+                    continue;
+                }
+                int ts = ((Number) tsObj).intValue();
+                Object valObj = obj.get("val");
+                if (!(valObj instanceof Number)) {
+                    continue;
+                }
+                double val = ((Number) valObj).doubleValue();
                 if (name == null || name.length() == 0) {
                     continue;
                 }
