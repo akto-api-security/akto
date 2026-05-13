@@ -148,10 +148,12 @@ public class Executor {
         origRawApi = sampleRawApi.copy();
 
         boolean requestSent = false;
+         // boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
+         boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests();
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
         boolean isParallelExecution = executionType.equalsIgnoreCase("parallel");
-        if (executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution) {
+        if (!runAutomatedPentest && (executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution)) {
             if (executionType.equals("graph")) {
                 List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
                 apiInfoKeys.add(apiInfoKey);
@@ -164,7 +166,7 @@ public class Executor {
             return yamlTestResult;
         }
 
-        if (executionType.equals("passive")) {
+        if (!runAutomatedPentest && executionType.equals("passive")) {
             ExecutionResult attempt = new ExecutionResult(true, "", rawApi.getRequest(), rawApi.getResponse());
             TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
             if (res != null) {
@@ -195,9 +197,6 @@ public class Executor {
         boolean requestAttempted = false;
         boolean allRequestsSkippedDueToMatch = false;
         int skippedCount = 0;
-
-        boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
-        boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests() && templateAllowsAutomated;
 
 
         if (runAutomatedPentest) {
