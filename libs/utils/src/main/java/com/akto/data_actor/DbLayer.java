@@ -1,6 +1,7 @@
 package com.akto.data_actor;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
@@ -85,6 +86,31 @@ public class DbLayer {
                 Filters.eq(ApiCollection.VXLAN_ID, vxlanId),
                 Updates.set(ApiCollection.NAME, name)
         );
+    }
+
+
+    public static void updateAccountDomainsDelta(String domainKey, List<String> toAdd, List<String> toRemove) {
+        Bson filter = AccountSettingsDao.generateFilter();
+        if (toAdd != null && !toAdd.isEmpty()) {
+            List<String> uniqueToAdd = toAdd.stream()
+                    .filter(d -> d != null && !d.trim().isEmpty())
+                    .map(d -> d.trim().toLowerCase())
+                    .distinct()
+                    .collect(Collectors.toList());
+            if (!uniqueToAdd.isEmpty()) {
+                AccountSettingsDao.instance.getMCollection().updateOne(filter, Updates.addEachToSet(domainKey, uniqueToAdd));
+            }
+        }
+        if (toRemove != null && !toRemove.isEmpty()) {
+            List<String> normalizedToRemove = toRemove.stream()
+                    .filter(d -> d != null && !d.trim().isEmpty())
+                    .map(d -> d.trim().toLowerCase())
+                    .distinct()
+                    .collect(Collectors.toList());
+            if (!normalizedToRemove.isEmpty()) {
+                AccountSettingsDao.instance.getMCollection().updateOne(filter, Updates.pullAll(domainKey, normalizedToRemove));
+            }
+        }
     }
 
     public static void updateCidrList(List<String> cidrList) {

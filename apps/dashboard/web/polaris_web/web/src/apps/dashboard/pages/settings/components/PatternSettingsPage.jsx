@@ -57,6 +57,7 @@ function PatternSettingsPage({
     onAdd,
     onDelete,
     patternKey,
+    additionalCards = [],
 }) {
     const [value, setValue] = useState('')
     const [inputError, setInputError] = useState('')
@@ -179,7 +180,7 @@ function PatternSettingsPage({
         <PageWithMultipleCards
             title={title}
             isFirstPage={true}
-            components={[inputCard, tableCard]}
+            components={[inputCard, tableCard, ...additionalCards]}
         />
     )
 }

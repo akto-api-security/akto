@@ -68,6 +68,7 @@
             </result>
         </action>
 
+
         <action name="api/fetchAccountSettings" class="com.akto.action.DbAction" method="fetchAccountSettings">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

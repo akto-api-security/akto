@@ -421,6 +421,27 @@ const settingFunctions = {
         allUrls: allUrls
       }
     },
+    fetchNewRelicIntegration: async function(){
+      let newRelicIntegration = {}
+      await settingRequests.fetchNewRelicIntegration().then((resp)=>{
+        newRelicIntegration = resp.newRelicIntegration
+      })
+      return newRelicIntegration
+    },
+    addNewRelicIntegration: async function(apiKey) {
+      let newRelicIntegration = {}
+      await settingRequests.addNewRelicIntegration(apiKey).then((resp)=>{
+        newRelicIntegration = resp
+      })
+      return newRelicIntegration
+    },
+    removeNewRelicIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeNewRelicIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
 }
 
 export default settingFunctions

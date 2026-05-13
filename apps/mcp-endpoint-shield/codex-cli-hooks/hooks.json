@@ -43,6 +43,17 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.codex/hooks/akto-hook-wrapper.sh akto-hooks.py SessionStart",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

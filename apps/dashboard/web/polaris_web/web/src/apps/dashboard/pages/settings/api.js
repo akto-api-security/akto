@@ -1080,6 +1080,34 @@ const settingRequests = {
             data: {patternValue, connectorType}
         })
     },
+    fetchNewRelicIntegration() {
+        return request({
+            url: '/api/fetchNewRelicIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addNewRelicIntegration(apiKey) {
+        return request({
+            url: '/api/addNewRelicIntegration',
+            method: 'post',
+            data: {apiKey}
+        })
+    },
+    removeNewRelicIntegration() {
+        return request({
+            url: '/api/removeNewRelicIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    updateAccountDomains(domainKey, domainsToAdd, domainsToRemove) {
+        return request({
+            url: '/api/updateAccountDomains',
+            method: 'post',
+            data: { domainKey, domainsToAdd, domainsToRemove }
+        })
+    },
     fetchEndpointShieldSettings() {
         return request({
             url: '/api/fetchEndpointShieldSettings',

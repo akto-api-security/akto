@@ -27,6 +27,51 @@
         "comment": "Ingest tool execution results to Akto for monitoring and analytics",
         "timeoutSec": 30
       }
+    ],
+    "SessionStart": [
+      {
+        "type": "command",
+        "bash": "bash ./.github/hooks/akto-hook-wrapper.sh akto-hooks.py SessionStart",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .github/hooks/akto-hook-wrapper.ps1 akto-hooks.py SessionStart",
+        "comment": "Ingest session start event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "bash": "bash ./.github/hooks/akto-hook-wrapper.sh akto-hooks.py Stop",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .github/hooks/akto-hook-wrapper.ps1 akto-hooks.py Stop",
+        "comment": "Ingest session stop event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "PreCompact": [
+      {
+        "type": "command",
+        "bash": "bash ./.github/hooks/akto-hook-wrapper.sh akto-hooks.py PreCompact",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .github/hooks/akto-hook-wrapper.ps1 akto-hooks.py PreCompact",
+        "comment": "Ingest pre-compact event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "SubagentStart": [
+      {
+        "type": "command",
+        "bash": "bash ./.github/hooks/akto-hook-wrapper.sh akto-hooks.py SubagentStart",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .github/hooks/akto-hook-wrapper.ps1 akto-hooks.py SubagentStart",
+        "comment": "Ingest subagent start event to Akto for observability",
+        "timeoutSec": 10
+      }
+    ],
+    "SubagentStop": [
+      {
+        "type": "command",
+        "bash": "bash ./.github/hooks/akto-hook-wrapper.sh akto-hooks.py SubagentStop",
+        "powershell": "powershell -ExecutionPolicy Bypass -File .github/hooks/akto-hook-wrapper.ps1 akto-hooks.py SubagentStop",
+        "comment": "Ingest subagent stop event to Akto for observability",
+        "timeoutSec": 10
+      }
     ]
   }
 }

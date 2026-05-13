@@ -189,6 +189,16 @@ public class AccountSettings {
     @Setter
     private boolean switchProxyMode;
 
+    public static final String CHATTY_DOMAINS = "chattyDomains";
+    @Getter
+    @Setter
+    private List<String> chattyDomains;
+
+    public static final String AI_DOMAINS = "aiDomains";
+    @Getter
+    @Setter
+    private List<String> aiDomains;
+
     public static class ProxyPatternInfo {
         private String pattern;
         private String addedBy;
