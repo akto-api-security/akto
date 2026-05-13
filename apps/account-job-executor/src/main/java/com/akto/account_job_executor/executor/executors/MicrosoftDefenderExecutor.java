@@ -27,13 +27,19 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -50,11 +56,22 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
     private static final int SOCKET_TIMEOUT_MS = 60_000;
     private static final int BATCH_SIZE = 500;
     private static final int LIVE_RESPONSE_POLL_INTERVAL_MS = 5_000;
-    private static final int LIVE_RESPONSE_MAX_WAIT_MS = 30 * 60 * 1000; // 30 minutes
+    private static final int LIVE_RESPONSE_MAX_WAIT_MS = 5 * 60 * 1000; // 5 minutes per action (was 30 min)
     private static final int CANCEL_RETRY_WAIT_MS = 10_000;
     private static final int LIVE_RESPONSE_RATE_LIMIT_PER_MINUTE = 10;
     private static final long MIN_REQUEST_INTERVAL_MS = 60_000L / LIVE_RESPONSE_RATE_LIMIT_PER_MINUTE; // 6000ms
     private static final int RATE_LIMIT_MAX_RETRIES = 3;
+    private static long lastScriptUploadMs = 0;
+    private static final Set<String> uploadedScripts = Collections.synchronizedSet(new HashSet<>());
+
+    // Shared rate limiter for Live Response submissions across all phases (Defender allows 10/min/tenant)
+    private static final Object SUBMIT_LOCK = new Object();
+    private static long sharedLastSubmitMs = 0;
+    // Per-device locks: Defender allows only ONE active Live Response action per device at a time.
+    // When MCP and Skills phases run concurrently, they must serialize per-device.
+    private final ConcurrentHashMap<String, Object> deviceLocks = new ConcurrentHashMap<>();
+    // Track created MCP server collections within a job to avoid duplicate API calls
+    private final Set<String> createdCollectionIds = ConcurrentHashMap.newKeySet();
 
     public static final List<String> APPS_TOOL_LIST = Arrays.asList(
         "Claude", "Cursor", "Copilot", "Windsurf", "Antigravity", "Codex", "Ollama"
@@ -269,6 +286,10 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
     // ── Phase 3: MCP + Skills discovery via Live Response ────────────────────
 
     private void discoverMCPConfigsAndSkills(String accessToken, String normalizedUrl, AccountJob job) throws Exception {
+        // Reset per-job state so deduplication doesn't carry over from prior runs of the same singleton
+        createdCollectionIds.clear();
+        deviceLocks.clear();
+
         List<Map<String, Object>> devices = fetchDeviceList(accessToken);
         if (devices.isEmpty()) {
             logger.info("No devices found for MCP discovery, jobId={}", job.getId());
@@ -298,146 +319,198 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
 
         updateJobHeartbeat(job);
 
-        final String mcpShScript   = uploadScript(accessToken, "scan_mcp_configs.sh");
-        final String mcpPs1Script  = uploadScript(accessToken, "scan_mcp_configs.ps1");
-        final String skillsShScript  = uploadScript(accessToken, "scan_skills.sh");
-        final String skillsPs1Script = uploadScript(accessToken, "scan_skills.ps1");
+        final String mcpShScript   = uploadScriptWithRateLimit(accessToken, "scan_mcp_configs.sh");
+        final String mcpPs1Script  = uploadScriptWithRateLimit(accessToken, "scan_mcp_configs.ps1");
+        final String skillsShScript  = uploadScriptWithRateLimit(accessToken, "scan_skills.sh");
+        final String skillsPs1Script = uploadScriptWithRateLimit(accessToken, "scan_skills.ps1");
 
-        final Map<String, JsonNode> allMcpOutputs = new ConcurrentHashMap<>();
-        final Map<String, JsonNode> allSkillOutputs = new ConcurrentHashMap<>();
-
-        ExecutorService pool = Executors.newFixedThreadPool(2);
-
-        Future<?> mcpUnixFuture = (mcpShScript == null || unixDeviceIds.isEmpty()) ? null : pool.submit(new Runnable() {
-            @Override
-            public void run() {
-                allMcpOutputs.putAll(runScriptOnDevices(accessToken, mcpShScript, unixDeviceIds, deviceNames, "MCP Config (Unix)", job));
-            }
+        // Background heartbeat thread: keeps job alive without blocking polling/work threads
+        final ScheduledExecutorService heartbeatExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "defender-heartbeat-" + job.getId());
+            t.setDaemon(true);
+            return t;
         });
-
-        Future<?> mcpWindowsFuture = (mcpPs1Script == null || windowsDeviceIds.isEmpty()) ? null : pool.submit(new Runnable() {
-            @Override
-            public void run() {
-                allMcpOutputs.putAll(runScriptOnDevices(accessToken, mcpPs1Script, windowsDeviceIds, deviceNames, "MCP Config (Windows)", job));
+        heartbeatExecutor.scheduleAtFixedRate(() -> {
+            try {
+                updateJobHeartbeat(job);
+            } catch (Exception e) {
+                logger.error("Background heartbeat failed: {}", e.getMessage());
             }
-        });
+        }, 0, 4, TimeUnit.SECONDS);
 
-        waitForFuture(mcpUnixFuture, "MCP Config (Unix)");
-        waitForFuture(mcpWindowsFuture, "MCP Config (Windows)");
-
-        Future<?> skillsUnixFuture = (skillsShScript == null || unixDeviceIds.isEmpty()) ? null : pool.submit(new Runnable() {
-            @Override
-            public void run() {
-                allSkillOutputs.putAll(runScriptOnDevices(accessToken, skillsShScript, unixDeviceIds, deviceNames, "Skills (Unix)", job));
+        // Per-device ingestion callbacks: ingest the moment a device's output is collected
+        BiConsumer<String, JsonNode> mcpIngestCallback = (deviceId, output) -> {
+            try {
+                ingestMCPDeviceDiscovery(deviceId, deviceNames.getOrDefault(deviceId, deviceId), output, normalizedUrl);
+            } catch (Exception e) {
+                logger.error("Per-device MCP ingestion failed for {}: {}", deviceId, e.getMessage());
             }
-        });
-
-        Future<?> skillsWindowsFuture = (skillsPs1Script == null || windowsDeviceIds.isEmpty()) ? null : pool.submit(new Runnable() {
-            @Override
-            public void run() {
-                allSkillOutputs.putAll(runScriptOnDevices(accessToken, skillsPs1Script, windowsDeviceIds, deviceNames, "Skills (Windows)", job));
+        };
+        BiConsumer<String, JsonNode> skillsIngestCallback = (deviceId, output) -> {
+            try {
+                ingestSkillDeviceDiscovery(deviceId, deviceNames.getOrDefault(deviceId, deviceId), output, normalizedUrl);
+            } catch (Exception e) {
+                logger.error("Per-device skill ingestion failed for {}: {}", deviceId, e.getMessage());
             }
-        });
+        };
 
-        waitForFuture(skillsUnixFuture, "Skills (Unix)");
-        waitForFuture(skillsWindowsFuture, "Skills (Windows)");
-        pool.shutdown();
+        // Run all 4 sub-phases concurrently — each phase processes its devices in parallel
+        ExecutorService phasePool = Executors.newFixedThreadPool(4);
+        List<Future<?>> phaseFutures = new ArrayList<>();
 
-        if (!allMcpOutputs.isEmpty()) {
-            ingestMCPDiscoveries(allMcpOutputs, normalizedUrl, deviceNames);
+        if (mcpShScript != null && !unixDeviceIds.isEmpty()) {
+            phaseFutures.add(phasePool.submit(() ->
+                runScriptOnDevices(accessToken, mcpShScript, unixDeviceIds, deviceNames, "MCP Config (Unix)", job, mcpIngestCallback)));
         }
-        if (!allSkillOutputs.isEmpty()) {
-            ingestSkillDiscoveries(allSkillOutputs, normalizedUrl, deviceNames);
+        if (mcpPs1Script != null && !windowsDeviceIds.isEmpty()) {
+            phaseFutures.add(phasePool.submit(() ->
+                runScriptOnDevices(accessToken, mcpPs1Script, windowsDeviceIds, deviceNames, "MCP Config (Windows)", job, mcpIngestCallback)));
+        }
+        if (skillsShScript != null && !unixDeviceIds.isEmpty()) {
+            phaseFutures.add(phasePool.submit(() ->
+                runScriptOnDevices(accessToken, skillsShScript, unixDeviceIds, deviceNames, "Skills (Unix)", job, skillsIngestCallback)));
+        }
+        if (skillsPs1Script != null && !windowsDeviceIds.isEmpty()) {
+            phaseFutures.add(phasePool.submit(() ->
+                runScriptOnDevices(accessToken, skillsPs1Script, windowsDeviceIds, deviceNames, "Skills (Windows)", job, skillsIngestCallback)));
+        }
+
+        for (Future<?> f : phaseFutures) {
+            waitForFuture(f, "Phase 3 sub-phase");
+        }
+        phasePool.shutdown();
+        heartbeatExecutor.shutdownNow();
+
+        logger.info("Phase 3 complete (per-device ingestion already done): jobId={}", job.getId());
+    }
+
+    private void runScriptOnDevices(String accessToken, String scriptName,
+            List<String> deviceIds, Map<String, String> deviceNames, String description, AccountJob job,
+            BiConsumer<String, JsonNode> ingestCallback) {
+        if (deviceIds.isEmpty()) return;
+
+        // Process devices in parallel within this phase. Submission is gated by shared rate limit;
+        // polling/downloading/ingesting runs concurrently per device.
+        int poolSize = Math.min(deviceIds.size(), 8);
+        ExecutorService devicePool = Executors.newFixedThreadPool(poolSize, r -> {
+            Thread t = new Thread(r, "defender-" + description.replaceAll("[^a-zA-Z0-9]", "-"));
+            t.setDaemon(true);
+            return t;
+        });
+        List<Future<?>> futures = new ArrayList<>();
+
+        for (String deviceId : deviceIds) {
+            futures.add(devicePool.submit(() ->
+                processSingleDevice(accessToken, scriptName, deviceId, deviceNames, description, ingestCallback)));
+        }
+
+        devicePool.shutdown();
+        for (Future<?> f : futures) {
+            try { f.get(); } catch (Exception e) { logger.warn("{}: Device future error: {}", description, e.getMessage()); }
         }
     }
 
-    private Map<String, JsonNode> runScriptOnDevices(String accessToken, String scriptName,
-            List<String> deviceIds, Map<String, String> deviceNames, String description, AccountJob job) {
-        Map<String, JsonNode> outputs = new HashMap<>();
-        long lastSubmitMs = 0;
+    private void processSingleDevice(String accessToken, String scriptName, String deviceId,
+            Map<String, String> deviceNames, String description, BiConsumer<String, JsonNode> ingestCallback) {
+        String deviceName = deviceNames.getOrDefault(deviceId, deviceId);
 
-        for (String deviceId : deviceIds) {
-            String deviceName = deviceNames.getOrDefault(deviceId, deviceId);
+        // Acquire per-device lock so only one phase runs on this device at a time
+        // (Defender allows only ONE active Live Response action per device).
+        Object deviceLock = deviceLocks.computeIfAbsent(deviceId, k -> new Object());
+        synchronized (deviceLock) {
 
-            // Retry loop for rate limit handling
-            for (int attempt = 0; attempt < RATE_LIMIT_MAX_RETRIES; attempt++) {
-                try {
-                    updateJobHeartbeat(job);
-
-                    // Throttle: ensure at least 6 seconds between Live Response submissions
-                    long elapsed = System.currentTimeMillis() - lastSubmitMs;
+        for (int attempt = 0; attempt < RATE_LIMIT_MAX_RETRIES; attempt++) {
+            try {
+                // Shared throttle: at least 6s between any submission across all phases
+                synchronized (SUBMIT_LOCK) {
+                    long elapsed = System.currentTimeMillis() - sharedLastSubmitMs;
                     if (elapsed < MIN_REQUEST_INTERVAL_MS) {
-                        long sleepMs = MIN_REQUEST_INTERVAL_MS - elapsed;
-                        try { Thread.sleep(sleepMs); } catch (InterruptedException ignored) {}
+                        try { Thread.sleep(MIN_REQUEST_INTERVAL_MS - elapsed); } catch (InterruptedException ignored) {}
                     }
-
-                    RequestConfig cfg = RequestConfig.custom()
-                        .setConnectTimeout(CONNECT_TIMEOUT_MS)
-                        .setSocketTimeout(SOCKET_TIMEOUT_MS)
-                        .build();
-
-                    try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
-                        String actionId = submitLiveResponseAction(httpClient, accessToken, deviceId, scriptName);
-                        lastSubmitMs = System.currentTimeMillis();
-
-                        if (actionId == null) {
-                            String existingId = getActiveActionId(httpClient, accessToken, deviceId);
-                            if (existingId != null) {
-                                cancelLiveResponseAction(httpClient, accessToken, existingId);
-                                try { Thread.sleep(CANCEL_RETRY_WAIT_MS); } catch (InterruptedException ignored) {}
-                            }
-                            actionId = submitLiveResponseAction(httpClient, accessToken, deviceId, scriptName);
-                            lastSubmitMs = System.currentTimeMillis();
-                        }
-                        if (actionId == null) {
-                            logger.error("{}: Could not submit Live Response action on device {}", description, deviceName);
-                            break; // exit retry loop
-                        }
-
-                        Map<String, Object> finalStatus = pollActionUntilDone(httpClient, accessToken, actionId);
-                        String status = finalStatus.getOrDefault("status", "unknown").toString();
-                        if (!"Succeeded".equals(status)) {
-                            logger.error("{}: Action on device {} finished with status {}", description, deviceName, status);
-                            break; // exit retry loop
-                        }
-
-                        String downloadUrl = getActionOutputDownloadLink(httpClient, accessToken, actionId);
-                        if (downloadUrl == null) {
-                            logger.error("{}: No download link for actionId={} on device {}", description, actionId, deviceName);
-                            break; // exit retry loop
-                        }
-
-                        JsonNode output = downloadAndParseOutput(httpClient, downloadUrl);
-                        if (output != null) {
-                            outputs.put(deviceId, output);
-                            logger.info("{}: Collected output from device {}", description, deviceName);
-                        }
-                        break; // success, exit retry loop
-                    }
-                } catch (PermanentSkipException pse) {
-                    logger.warn("{}: Skipping device {} — {} (permanent, no retry)",
-                        description, deviceName, pse.getMessage());
-                    break; // exit retry loop
-                } catch (RateLimitException rle) {
-                    if (attempt < RATE_LIMIT_MAX_RETRIES - 1) {
-                        logger.warn("{}: Rate limited on device {}, sleeping {}s before retry (attempt {}/{})",
-                            description, deviceName, rle.getRetryAfterSeconds(), attempt + 1, RATE_LIMIT_MAX_RETRIES);
-                        try { Thread.sleep(rle.getRetryAfterSeconds() * 1_000L); } catch (InterruptedException ignored) {}
-                    } else {
-                        logger.error("{}: Rate limited on device {} after {} attempts, giving up",
-                            description, deviceName, RATE_LIMIT_MAX_RETRIES);
-                        break; // exit retry loop
-                    }
-                } catch (Exception e) {
-                    logger.error("{}: Error processing device {}: {}", description, deviceName, e.getMessage());
-                    break; // exit retry loop
+                    sharedLastSubmitMs = System.currentTimeMillis();
                 }
+
+                RequestConfig cfg = RequestConfig.custom()
+                    .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                    .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                    .build();
+
+                try (CloseableHttpClient httpClient = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+                    String actionId = submitLiveResponseAction(httpClient, accessToken, deviceId, scriptName);
+
+                    if (actionId == null) {
+                        String existingId = getActiveActionId(httpClient, accessToken, deviceId);
+                        if (existingId != null) {
+                            cancelLiveResponseAction(httpClient, accessToken, existingId);
+                            try { Thread.sleep(CANCEL_RETRY_WAIT_MS); } catch (InterruptedException ignored) {}
+                        }
+                        actionId = submitLiveResponseAction(httpClient, accessToken, deviceId, scriptName);
+                    }
+                    if (actionId == null) {
+                        logger.error("{}: Could not submit Live Response action on device {}", description, deviceName);
+                        return;
+                    }
+
+                    Map<String, Object> finalStatus = pollActionUntilDone(httpClient, accessToken, actionId, null);
+                    String status = finalStatus.getOrDefault("status", "unknown").toString();
+                    if (!"Succeeded".equals(status)) {
+                        logger.error("{}: Action on device {} finished with status {}", description, deviceName, status);
+                        return;
+                    }
+
+                    String downloadUrl = getActionOutputDownloadLink(httpClient, accessToken, actionId);
+                    if (downloadUrl == null) {
+                        logger.error("{}: No download link for actionId={} on device {}", description, actionId, deviceName);
+                        return;
+                    }
+
+                    JsonNode output = downloadAndParseOutput(httpClient, downloadUrl);
+                    if (output != null) {
+                        logger.info("{}: Collected output from device {}", description, deviceName);
+                        // Per-device ingestion: results visible immediately, no waiting for stuck peers
+                        if (ingestCallback != null) {
+                            ingestCallback.accept(deviceId, output);
+                        }
+                    }
+                    return; // success
+                }
+            } catch (PermanentSkipException pse) {
+                logger.warn("{}: Skipping device {} — {} (permanent, no retry)",
+                    description, deviceName, pse.getMessage());
+                return;
+            } catch (RateLimitException rle) {
+                if (attempt < RATE_LIMIT_MAX_RETRIES - 1) {
+                    logger.warn("{}: Rate limited on device {}, sleeping {}s before retry (attempt {}/{})",
+                        description, deviceName, rle.getRetryAfterSeconds(), attempt + 1, RATE_LIMIT_MAX_RETRIES);
+                    try { Thread.sleep(rle.getRetryAfterSeconds() * 1_000L); } catch (InterruptedException ignored) {}
+                } else {
+                    logger.error("{}: Rate limited on device {} after {} attempts, giving up",
+                        description, deviceName, RATE_LIMIT_MAX_RETRIES);
+                    return;
+                }
+            } catch (Exception e) {
+                logger.error("{}: Error processing device {}: {}", description, deviceName, e.getMessage());
+                return;
             }
         }
-        return outputs;
+        } // end synchronized (deviceLock)
     }
 
     // ── MCP ingestion ─────────────────────────────────────────────────────────
+
+    // Per-device ingestion: ingest one device's MCP discovery immediately upon collection
+    private void ingestMCPDeviceDiscovery(String deviceId, String deviceName, JsonNode discovery, String normalizedUrl) {
+        JsonNode configsFound = discovery.path("configs_found");
+        int configCount = configsFound.isArray() ? configsFound.size() : 0;
+        logger.info("MCP per-device ingestion: device={}, configs_found_count={}, raw_content_preview={}",
+            deviceName, configCount,
+            discovery.toString().length() > 500 ? discovery.toString().substring(0, 500) + "..." : discovery.toString());
+        Map<String, JsonNode> singleDevice = new HashMap<>();
+        singleDevice.put(deviceId, discovery);
+        Map<String, String> singleName = new HashMap<>();
+        singleName.put(deviceId, deviceName);
+        ingestMCPDiscoveries(singleDevice, normalizedUrl, singleName);
+    }
 
     private void ingestMCPDiscoveries(Map<String, JsonNode> discoveriesByDevice, String normalizedUrl,
             Map<String, String> deviceNames) {
@@ -559,6 +632,20 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
 
     // ── Skills ingestion ──────────────────────────────────────────────────────
 
+    // Per-device ingestion: ingest one device's skill discovery immediately upon collection
+    private void ingestSkillDeviceDiscovery(String deviceId, String deviceName, JsonNode discovery, String normalizedUrl) {
+        JsonNode skillsFound = discovery.path("skills_found");
+        int skillCount = skillsFound.isArray() ? skillsFound.size() : 0;
+        logger.info("Skill per-device ingestion: device={}, skills_found_count={}, raw_content_preview={}",
+            deviceName, skillCount,
+            discovery.toString().length() > 500 ? discovery.toString().substring(0, 500) + "..." : discovery.toString());
+        Map<String, JsonNode> singleDevice = new HashMap<>();
+        singleDevice.put(deviceId, discovery);
+        Map<String, String> singleName = new HashMap<>();
+        singleName.put(deviceId, deviceName);
+        ingestSkillDiscoveries(singleDevice, normalizedUrl, singleName);
+    }
+
     private void ingestSkillDiscoveries(Map<String, JsonNode> discoveriesByDevice, String normalizedUrl,
             Map<String, String> deviceNames) {
         logger.info("Starting Defender skill ingestion for {} device(s)", discoveriesByDevice.size());
@@ -665,6 +752,10 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
             .build();
 
         for (ServerCollectionInfo info : serverCollections.values()) {
+            // Skip if this collection was already created in this job run (per-device ingestion can hit duplicates)
+            if (!createdCollectionIds.add(info.collectionName)) {
+                continue;
+            }
             try {
                 int colId = generateCollectionId(info.collectionName, info.timestamp);
 
@@ -769,7 +860,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         return devices;
     }
 
-    private String uploadScript(String accessToken, String scriptResourcePath) {
+    private String uploadScript(String accessToken, String scriptResourcePath) throws RateLimitException {
         String classpathResource = "/scripts/" + scriptResourcePath;
         try (InputStream scriptStream = MicrosoftDefenderExecutor.class.getResourceAsStream(classpathResource)) {
             if (scriptStream == null) {
@@ -796,6 +887,12 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
 
                 try (CloseableHttpResponse resp = client.execute(post)) {
                     int status = resp.getStatusLine().getStatusCode();
+                    if (status == 429) {
+                        org.apache.http.Header retryAfterHeader = resp.getFirstHeader("Retry-After");
+                        long retryAfterSeconds = retryAfterHeader != null ? Long.parseLong(retryAfterHeader.getValue()) : 60L;
+                        EntityUtils.consumeQuietly(resp.getEntity());
+                        throw new RateLimitException(retryAfterSeconds);
+                    }
                     EntityUtils.consumeQuietly(resp.getEntity());
                     if (status != 200 && status != 201) {
                         logger.error("Failed to upload script {} to Defender library: HTTP {}", scriptResourcePath, status);
@@ -805,10 +902,48 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
                     return scriptResourcePath;
                 }
             }
+        } catch (RateLimitException rle) {
+            throw rle;
         } catch (IOException e) {
             logger.error("Error uploading script {}: {}", scriptResourcePath, e.getMessage());
             return null;
         }
+    }
+
+    private String uploadScriptWithRateLimit(String accessToken, String scriptResourcePath) {
+        if (uploadedScripts.contains(scriptResourcePath)) {
+            logger.info("Script {} already uploaded, skipping", scriptResourcePath);
+            return scriptResourcePath;
+        }
+
+        for (int attempt = 0; attempt < RATE_LIMIT_MAX_RETRIES; attempt++) {
+            try {
+                long elapsed = System.currentTimeMillis() - lastScriptUploadMs;
+                if (elapsed < MIN_REQUEST_INTERVAL_MS) {
+                    long sleepMs = MIN_REQUEST_INTERVAL_MS - elapsed;
+                    try { Thread.sleep(sleepMs); } catch (InterruptedException ignored) {}
+                }
+
+                String result = uploadScript(accessToken, scriptResourcePath);
+                lastScriptUploadMs = System.currentTimeMillis();
+                if (result != null) {
+                    uploadedScripts.add(scriptResourcePath);
+                }
+                return result;
+            } catch (RateLimitException rle) {
+                // Cap retry-after to 60s to prevent blocking job execution for very long periods
+                long retryAfterSeconds = Math.min(rle.getRetryAfterSeconds(), 60L);
+                logger.warn("Script upload {} rate limited, sleeping {}s before retry (attempt {}/{})",
+                    scriptResourcePath, retryAfterSeconds, attempt + 1, RATE_LIMIT_MAX_RETRIES);
+                try { Thread.sleep(retryAfterSeconds * 1_000L); } catch (InterruptedException ignored) {}
+            } catch (Exception e) {
+                logger.warn("Script upload {} failed (attempt {}/{}): {}",
+                    scriptResourcePath, attempt + 1, RATE_LIMIT_MAX_RETRIES, e.getMessage());
+                return null;
+            }
+        }
+        logger.error("Failed to upload script {} after {} retries", scriptResourcePath, RATE_LIMIT_MAX_RETRIES);
+        return null;
     }
 
     private String submitLiveResponseAction(CloseableHttpClient httpClient, String accessToken,
@@ -835,7 +970,9 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
             int status = resp.getStatusLine().getStatusCode();
             String responseBody = EntityUtils.toString(resp.getEntity());
             if (status == 201) {
-                return OBJECT_MAPPER.readTree(responseBody).path("id").asText(null);
+                String actionId = OBJECT_MAPPER.readTree(responseBody).path("id").asText(null);
+                logger.info("Live Response action submitted on device {}: actionId={}", deviceId, actionId);
+                return actionId;
             }
             if (status == 429) {
                 // Read Retry-After header (seconds), default 60s
@@ -897,31 +1034,49 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> pollActionUntilDone(CloseableHttpClient httpClient, String accessToken, String actionId)
+    private Map<String, Object> pollActionUntilDone(CloseableHttpClient httpClient, String accessToken, String actionId, AccountJob job)
             throws IOException {
         long deadline = System.currentTimeMillis() + LIVE_RESPONSE_MAX_WAIT_MS;
+        int pollCount = 0;
+        logger.info("Starting to poll action: actionId={}, deadline in {} seconds", actionId, LIVE_RESPONSE_MAX_WAIT_MS / 1000);
 
         while (System.currentTimeMillis() < deadline) {
-            HttpGet get = new HttpGet(
-                "https://api.securitycenter.microsoft.com/api/machineactions/" + actionId);
+            String pollUrl = "https://api.securitycenter.microsoft.com/api/machineactions/" + actionId;
+            HttpGet get = new HttpGet(pollUrl);
             get.setHeader("Authorization", "Bearer " + accessToken);
 
             try (CloseableHttpResponse resp = httpClient.execute(get)) {
                 int status = resp.getStatusLine().getStatusCode();
                 String body = EntityUtils.toString(resp.getEntity());
                 if (status != 200) {
+                    logger.error("Polling action {} returned HTTP {} - Response: {}", actionId, status, body);
                     throw new IOException("Polling action " + actionId + " returned HTTP " + status);
                 }
                 JsonNode json = OBJECT_MAPPER.readTree(body);
                 String actionStatus = json.path("status").asText("unknown");
+
+                // Log every 10 polls (every 50 seconds) for visibility
+                if (pollCount % 10 == 0) {
+                    long secondsRemaining = (deadline - System.currentTimeMillis()) / 1000;
+                    logger.info("Action {} poll #{}: status={}, {} seconds remaining", actionId, pollCount, actionStatus, secondsRemaining);
+                }
+
                 if ("Succeeded".equals(actionStatus) || "Failed".equals(actionStatus)
                         || "Cancelled".equals(actionStatus) || "TimeOut".equals(actionStatus)) {
+                    logger.info("Action {} finished with status: {} (pollCount={})", actionId, actionStatus, pollCount);
                     return OBJECT_MAPPER.convertValue(json, Map.class);
                 }
+            } catch (Exception e) {
+                logger.error("Error polling action {}: {}", actionId, e.getMessage(), e);
+                throw new IOException("Error polling action " + actionId, e);
             }
 
             try { Thread.sleep(LIVE_RESPONSE_POLL_INTERVAL_MS); } catch (InterruptedException ignored) {}
+            pollCount++;
         }
+
+        long timeoutAfter = System.currentTimeMillis() - deadline + LIVE_RESPONSE_MAX_WAIT_MS;
+        logger.warn("Action {} TIMEOUT after {} seconds and {} polls - returning TimedOut status", actionId, timeoutAfter / 1000, pollCount);
 
         Map<String, Object> timeout = new HashMap<>();
         timeout.put("status", "TimedOut");
@@ -931,6 +1086,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
 
     private String getActionOutputDownloadLink(CloseableHttpClient httpClient, String accessToken, String actionId)
             throws IOException {
+        logger.info("Fetching download link for actionId={}", actionId);
         HttpGet get = new HttpGet(
             "https://api.securitycenter.microsoft.com/api/machineactions/" + actionId +
             "/GetLiveResponseResultDownloadLink(index=0)");
@@ -943,42 +1099,132 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
                 logger.error("GetLiveResponseResultDownloadLink returned HTTP {} for actionId={}", status, actionId);
                 return null;
             }
-            return OBJECT_MAPPER.readTree(body).path("value").asText(null);
+            String downloadUrl = OBJECT_MAPPER.readTree(body).path("value").asText(null);
+            logger.info("Got download link for actionId={}: {}", actionId, downloadUrl);
+            return downloadUrl;
         }
     }
 
     private JsonNode downloadAndParseOutput(CloseableHttpClient httpClient, String downloadUrl) {
         try {
+            logger.info("Downloading output from: {}", downloadUrl);
             HttpGet get = new HttpGet(downloadUrl);
             try (CloseableHttpResponse resp = httpClient.execute(get)) {
+                int status = resp.getStatusLine().getStatusCode();
                 byte[] data = EntityUtils.toByteArray(resp.getEntity());
+                logger.info("Downloaded {} bytes (HTTP {})", data.length, status);
 
-                // Try extracting stdout from ZIP
+                // Try extracting stdout and stderr from ZIP
                 try (java.io.ByteArrayInputStream bais = new java.io.ByteArrayInputStream(data);
                      ZipInputStream zis = new ZipInputStream(bais)) {
                     ZipEntry entry;
+                    JsonNode result = null;
+                    int entryCount = 0;
                     while ((entry = zis.getNextEntry()) != null) {
+                        entryCount++;
                         String name = entry.getName();
                         String baseName = name.contains("/") ? name.substring(name.lastIndexOf('/') + 1) : name;
+                        logger.debug("Found ZIP entry: {}", name);
+
+                        // Extract stdout (main JSON output)
                         if (baseName.equals("stdout") || baseName.startsWith("stdout_")) {
                             ByteArrayOutputStream baos = new ByteArrayOutputStream();
                             byte[] buf = new byte[8192];
                             int len;
                             while ((len = zis.read(buf)) > 0) baos.write(buf, 0, len);
                             String stdout = sanitizeJson(new String(baos.toByteArray(), StandardCharsets.UTF_8));
-                            return OBJECT_MAPPER.readTree(stdout);
+                            result = OBJECT_MAPPER.readTree(stdout);
+                        }
+
+                        // Extract stderr (debug logs from script)
+                        if (baseName.equals("stderr") || baseName.startsWith("stderr_")) {
+                            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                            byte[] buf = new byte[8192];
+                            int len;
+                            while ((len = zis.read(buf)) > 0) baos.write(buf, 0, len);
+                            String stderr = new String(baos.toByteArray(), StandardCharsets.UTF_8);
+                            if (!stderr.trim().isEmpty()) {
+                                logger.info("Script debug output: {}", stderr);
+                            }
                         }
                     }
+                    logger.info("Processed {} ZIP entries", entryCount);
+                    if (result != null) {
+                        JsonNode unwrapped = unwrapScriptOutput(result);
+                        logger.info("Successfully parsed output from ZIP (unwrapped={})", unwrapped != result);
+                        return unwrapped;
+                    }
+                    if (entryCount == 0) {
+                        // Not a ZIP archive, try as raw JSON
+                        logger.info("No ZIP entries found, trying raw JSON");
+                        String content = sanitizeJson(new String(data, StandardCharsets.UTF_8));
+                        JsonNode parsed = OBJECT_MAPPER.readTree(content);
+                        // Defender Live Response wraps script output in {"script_output":"<json string>"}.
+                        // Unwrap if present.
+                        JsonNode unwrapped = unwrapScriptOutput(parsed);
+                        logger.info("Successfully parsed as raw JSON (unwrapped={})", unwrapped != parsed);
+                        return unwrapped;
+                    }
+                    logger.warn("No stdout found in ZIP file with {} entries", entryCount);
                 } catch (Exception zipEx) {
-                    // Not a ZIP — try parsing raw content as JSON
-                    String content = sanitizeJson(new String(data, StandardCharsets.UTF_8));
-                    return OBJECT_MAPPER.readTree(content);
+                    // ZIP parsing or JSON parsing failed, try raw JSON fallback
+                    logger.info("Fallback: ZIP parsing/JSON parsing failed: {}", zipEx.getMessage());
+                    try {
+                        String content = sanitizeJson(new String(data, StandardCharsets.UTF_8));
+                        JsonNode parsed = OBJECT_MAPPER.readTree(content);
+                        JsonNode unwrapped = unwrapScriptOutput(parsed);
+                        logger.info("Successfully parsed raw JSON from fallback (unwrapped={})", unwrapped != parsed);
+                        return unwrapped;
+                    } catch (Exception e2) {
+                        logger.error("Fallback JSON parsing also failed: {}", e2.getMessage());
+                    }
                 }
             }
         } catch (Exception e) {
-            logger.error("Failed to download/parse script output: {}", e.getMessage());
+            logger.error("Failed to download/parse script output: {}", e.getMessage(), e);
         }
+        logger.error("No output was successfully parsed");
         return null;
+    }
+
+    /**
+     * Defender Live Response wraps script output in a JSON envelope:
+     *   { "script_name": "...", "exit_code": 0, "script_output": "<stringified JSON>", "script_errors": "..." }
+     * The PowerShell variant prefixes script_output with a "Transcript started..." line and
+     * appends null bytes. This helper extracts and parses the inner JSON, returning the
+     * original node when no wrapping is detected.
+     */
+    private JsonNode unwrapScriptOutput(JsonNode parsed) {
+        if (parsed == null || !parsed.has("script_output")) {
+            return parsed;
+        }
+        String scriptOutput = parsed.path("script_output").asText("");
+        if (scriptOutput.isEmpty()) {
+            logger.warn("script_output field is empty; returning wrapper as-is");
+            return parsed;
+        }
+        // Strip PowerShell transcript prefix (if present) and trailing null bytes
+        String cleaned = scriptOutput;
+        if (cleaned.startsWith("Transcript started")) {
+            int nlIdx = cleaned.indexOf('\n');
+            if (nlIdx >= 0) cleaned = cleaned.substring(nlIdx + 1);
+        }
+        // Trim to the JSON braces — most reliable way to isolate the payload
+        int firstBrace = cleaned.indexOf('{');
+        int lastBrace = cleaned.lastIndexOf('}');
+        if (firstBrace < 0 || lastBrace <= firstBrace) {
+            logger.warn("Could not locate JSON object in script_output; returning wrapper as-is");
+            return parsed;
+        }
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+        try {
+            return OBJECT_MAPPER.readTree(cleaned);
+        } catch (Exception e) {
+            logger.error("Failed to parse inner script_output JSON: {} (preview={})",
+                e.getMessage(),
+                cleaned.length() > 200 ? cleaned.substring(0, 200) + "..." : cleaned);
+            return parsed;
+        }
     }
 
     // ── KQL helpers ───────────────────────────────────────────────────────────
