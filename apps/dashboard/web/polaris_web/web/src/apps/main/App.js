@@ -132,6 +132,7 @@ import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx
 import ViolationsPage from "../dashboard/pages/nhi_governance/ViolationsPage.jsx";
 import PoliciesPage from "../dashboard/pages/nhi_governance/PoliciesPage.jsx";
 import AllowedHostsForPac from "../dashboard/pages/settings/allowed_hosts/AllowedHostsForPac.jsx";
+import EndpointShieldSettings from "../dashboard/pages/settings/endpoint_shield/EndpointShieldSettings.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -586,6 +587,10 @@ const router = createBrowserRouter([
                     {
                         path: 'allowed-hosts',
                         element: <AllowedHostsForPac/>
+                    },
+                    {
+                        path: 'endpoint-shield',
+                        element: <EndpointShieldSettings/>
                     },
                     {
                         path: "auth-types/details",

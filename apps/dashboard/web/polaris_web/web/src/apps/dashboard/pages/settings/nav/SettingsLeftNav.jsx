@@ -172,6 +172,12 @@ const SettingsLeftNav = () => {
                         icon: GlobeMajor,
                         selected: page === "allowed-hosts",
                         onClick: () => navigate("/dashboard/settings/allowed-hosts")
+                    },
+                    {
+                        label: 'Endpoint Shield',
+                        icon: LockFilledMajor,
+                        selected: page === "endpoint-shield",
+                        onClick: () => navigate("/dashboard/settings/endpoint-shield")
                     }
                 ] : []),
                     {

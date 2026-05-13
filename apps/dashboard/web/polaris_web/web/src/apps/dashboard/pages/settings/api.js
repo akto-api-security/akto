@@ -1079,6 +1079,27 @@ const settingRequests = {
             method: 'post',
             data: {patternValue, connectorType}
         })
+    },
+    fetchEndpointShieldSettings() {
+        return request({
+            url: '/api/fetchEndpointShieldSettings',
+            method: 'post',
+            data: {}
+        })
+    },
+    saveEndpointShieldSettings(endpointShieldSettings) {
+        return request({
+            url: '/api/saveEndpointShieldSettings',
+            method: 'post',
+            data: {endpointShieldSettings}
+        })
+    },
+    refreshEndpointShieldLatestVersion() {
+        return request({
+            url: '/api/refreshEndpointShieldLatestVersion',
+            method: 'post',
+            data: {}
+        })
     }
 }
 
