@@ -663,50 +663,64 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
             for (JsonNode skill : skillsFound) {
                 String path = skill.path("path").asText("");
                 String agent = skill.path("agent").asText("unknown");
-                long size = skill.path("size").asLong(0);
-                long modified = skill.path("modified").asLong(0);
-                String skillContent = skill.path("skill_content").asText("");
+                String rawContent = skill.path("skill_content").asText("");
 
                 if (path.isEmpty()) continue;
 
+                // Parse YAML frontmatter so guardrail policies can match on description.
+                SkillMetadata meta = extractSkillMetadata(rawContent);
+
+                // Prefer script-provided name → frontmatter name → parent-dir → filename.
                 String skillNameFromScript = skill.path("skill_name").asText("");
-                String skillName = !skillNameFromScript.isEmpty() ? skillNameFromScript : extractSkillName(path);
+                String skillName = !skillNameFromScript.isEmpty()
+                    ? normalizeSlug(skillNameFromScript)
+                    : deriveSkillName(meta, path);
 
                 String syntheticHost = deviceName + "." + agent + ".defender.microsoft.com";
 
                 Map<String, String> reqHeaders = new HashMap<>();
-                reqHeaders.put("content-type", "text/markdown");
+                reqHeaders.put("content-type", "application/json");
                 reqHeaders.put("host", syntheticHost);
-                reqHeaders.put("x-transport", "SKILL");
+                reqHeaders.put("x-transport", "STDIO");
                 reqHeaders.put("x-skill-name", skillName);
                 reqHeaders.put("x-agent-type", agent);
 
+                // Tags mirror mcp-endpoint-shield's skill tagging:
+                //   source=ENDPOINT, skill=<name>, mcp-client=<agent>, ai-agent=<agent> (when known)
+                // Defender-specific tag retained so the dashboard can filter by connector.
                 Map<String, String> tagMap = new HashMap<>();
                 tagMap.put("source", "ENDPOINT");
                 tagMap.put("connector", "MICROSOFT_DEFENDER");
-                tagMap.put("mcp-server", "MCP Server");
-                tagMap.put("mcp-client", agent);
                 tagMap.put("skill", skillName);
+                if (!"unknown".equals(agent)) {
+                    tagMap.put("mcp-client", agent);
+                    tagMap.put("ai-agent", agent);
+                }
 
                 try {
+                    // Payload mirrors mcp-endpoint-shield/mcp/skill_detector.go:processSkillFileWithMetadata
                     Map<String, Object> reqPayload = new HashMap<>();
-                    reqPayload.put("path", path);
-                    reqPayload.put("skill_content", skillContent);
+                    reqPayload.put("skill_name", skillName);
+                    reqPayload.put("skill_description", meta.description);
+                    reqPayload.put("skill_content", meta.content.isEmpty() ? rawContent : meta.content);
+                    reqPayload.put("agent", agent);
+                    reqPayload.put("file_path", path);
 
                     Map<String, Object> batch = new HashMap<>();
-                    batch.put("path", "https://" + syntheticHost + "/skill/" + skillName);
+                    // Path uses /skills/<name> (plural) to match the shield endpoint format.
+                    batch.put("path", "https://" + syntheticHost + "/skills/" + skillName);
                     batch.put("requestHeaders", OBJECT_MAPPER.writeValueAsString(reqHeaders));
                     batch.put("responseHeaders", "{}");
                     batch.put("method", "POST");
                     batch.put("type", "HTTP/1.1");
                     batch.put("requestPayload", OBJECT_MAPPER.writeValueAsString(reqPayload));
-                    batch.put("responsePayload", "{\"status\":\"ok\"}");
-                    batch.put("ip", "");
-                    batch.put("time", String.valueOf(System.currentTimeMillis()));
+                    batch.put("responsePayload", "{}");
+                    batch.put("ip", "127.0.0.1");
+                    batch.put("time", String.valueOf(System.currentTimeMillis() / 1000));
                     batch.put("statusCode", "200");
                     batch.put("status", "OK");
                     batch.put("akto_account_id", "1000000");
-                    batch.put("akto_vxlan_id", "");
+                    batch.put("akto_vxlan_id", "0");
                     batch.put("is_pending", "false");
                     batch.put("source", "MIRRORING");
                     batch.put("tag", OBJECT_MAPPER.writeValueAsString(tagMap));
@@ -1463,6 +1477,89 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         int dot = fileName.lastIndexOf('.');
         if (dot > 0) fileName = fileName.substring(0, dot);
         return fileName.toLowerCase().replaceAll("[\\s_]+", "-").replaceAll("[^a-z0-9-]", "");
+    }
+
+    // Skill metadata extracted from YAML frontmatter (---name:... description:...---) at the
+    // top of SKILL.md content. Matches mcp-endpoint-shield's extractSkillMetadata behavior so
+    // guardrail policies that key off description match the same way for both sources.
+    private static class SkillMetadata {
+        String name = "";
+        String description = "";
+        String content = "";
+    }
+
+    /**
+     * Extracts name/description from YAML frontmatter at the head of a skill file and the
+     * markdown content that follows. Frontmatter is the block between two `---` lines.
+     * Mirrors mcp-endpoint-shield/mcp/skill_validator.go:extractSkillMetadata.
+     */
+    private static SkillMetadata extractSkillMetadata(String fullContent) {
+        SkillMetadata meta = new SkillMetadata();
+        meta.content = fullContent == null ? "" : fullContent;
+        if (fullContent == null || !fullContent.startsWith("---")) {
+            return meta;
+        }
+        String[] lines = fullContent.split("\n", -1);
+        int closeIdx = -1;
+        for (int i = 1; i < lines.length; i++) {
+            if ("---".equals(lines[i].trim())) {
+                closeIdx = i;
+                break;
+            }
+        }
+        if (closeIdx <= 0) return meta;
+
+        // Body after frontmatter
+        StringBuilder body = new StringBuilder();
+        for (int i = closeIdx + 1; i < lines.length; i++) {
+            if (i > closeIdx + 1) body.append('\n');
+            body.append(lines[i]);
+        }
+        meta.content = body.toString();
+
+        // Parse frontmatter: simple `key: value` lines (no nested YAML structures expected)
+        for (int i = 1; i < closeIdx; i++) {
+            String line = lines[i];
+            int colon = line.indexOf(':');
+            if (colon <= 0) continue;
+            String key = line.substring(0, colon).trim().toLowerCase();
+            String value = line.substring(colon + 1).trim();
+            // Strip surrounding quotes if present
+            if (value.length() >= 2 && (value.startsWith("\"") && value.endsWith("\"")
+                    || value.startsWith("'") && value.endsWith("'"))) {
+                value = value.substring(1, value.length() - 1);
+            }
+            if ("name".equals(key) && meta.name.isEmpty()) meta.name = value;
+            else if ("title".equals(key) && meta.name.isEmpty()) meta.name = value;
+            else if ("description".equals(key) && meta.description.isEmpty()) meta.description = value;
+        }
+        return meta;
+    }
+
+    // Returns the canonical skill name: frontmatter name → parent directory → filename.
+    // Mirrors mcp-endpoint-shield/mcp/skill_detector.go:deriveSkillName.
+    private static String deriveSkillName(SkillMetadata meta, String filePath) {
+        if (meta != null && meta.name != null && !meta.name.isEmpty()) {
+            return normalizeSlug(meta.name);
+        }
+        String sep = filePath.contains("\\") ? "\\" : "/";
+        int lastSep = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+        String parentDir = "";
+        if (lastSep > 0) {
+            String parentPath = filePath.substring(0, lastSep);
+            int parentSep = Math.max(parentPath.lastIndexOf('/'), parentPath.lastIndexOf('\\'));
+            parentDir = parentSep >= 0 ? parentPath.substring(parentSep + 1) : parentPath;
+        }
+        String parentLower = parentDir.toLowerCase();
+        boolean genericParent = parentLower.isEmpty() || parentLower.equals(".") || parentLower.equals("skills");
+        if (!genericParent) {
+            return normalizeSlug(parentDir);
+        }
+        return extractSkillName(filePath);
+    }
+
+    private static String normalizeSlug(String s) {
+        return s.toLowerCase().replaceAll("[\\s_]+", "-").replaceAll("[^a-z0-9-]", "");
     }
 
     private static String sanitizeJson(String content) {
