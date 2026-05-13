@@ -55,6 +55,7 @@ public class UtilityServer {
             server.createContext("/utility/result", new GetResultHandler(jobStore));
             server.createContext("/utility/sendHealthCheck", new SendHealthCheckHandler(dataActor));
             server.createContext("/utility/sendLogs", new SendLogsHandler(dataActor));
+            server.createContext("/utility/ingestTraffic", new TrafficIngestHandler());
             server.setExecutor(null);
             server.start();
             started = true;
