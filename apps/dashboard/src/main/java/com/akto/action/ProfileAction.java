@@ -193,6 +193,7 @@ public class ProfileAction extends UserAction {
                 .append("avatar", "dummy")
                 .append("activeAccount", sessionAccId)
                 .append("dashboardMode", DashboardMode.getDashboardMode())
+                .append("isMetered", DashboardMode.isMetered())
                 .append("isSaas","true".equals(System.getenv("IS_SAAS")))
                 .append("users", UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get()))
                 .append("cloudType", Utils.getCloudType())
