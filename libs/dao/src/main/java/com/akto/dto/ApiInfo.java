@@ -3,7 +3,10 @@ package com.akto.dto;
 import com.akto.dao.context.Context;
 import com.akto.dto.type.URLMethods;
 import com.akto.util.Util;
-
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 import java.util.*;
@@ -84,6 +87,21 @@ public class ApiInfo {
 
     public static final String IS_SKILL_BLOCKED = "isSkillBlocked";
     private boolean isSkillBlocked;
+
+    public static final String TAGS_LIST = "tagsList";
+    private List<ApiInfoTag> tagsList;
+
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class ApiInfoTag {
+        public static final String KEY = "key";
+        public static final String VALUE = "value";
+
+        private String key;
+        private String value;
+    }
 
     public static class MessageFieldEntry {
         private String fieldPath;
@@ -716,4 +734,7 @@ public class ApiInfo {
 
     public GuardrailSchema getGuardrailSchema() { return guardrailSchema; }
     public void setGuardrailSchema(GuardrailSchema guardrailSchema) { this.guardrailSchema = guardrailSchema; }
+
+    public List<ApiInfoTag> getTagsList() { return tagsList; }
+    public void setTagsList(List<ApiInfoTag> tagsList) { this.tagsList = tagsList; }
 }
