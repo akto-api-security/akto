@@ -651,6 +651,11 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         logger.info("Starting Defender skill ingestion for {} device(s)", discoveriesByDevice.size());
 
         List<Map<String, Object>> batchData = new ArrayList<>();
+        // Accumulate skill names per agent collection so we can register them on the collection
+        // afterwards. Without this, skills never appear on the Agentic Assets > Skills tab (which
+        // reads ApiCollection.skills[], not endpoint paths).
+        Map<String, Set<String>> skillsByCollection = new HashMap<>();
+        Map<String, String> agentByCollection = new HashMap<>();
 
         for (Map.Entry<String, JsonNode> entry : discoveriesByDevice.entrySet()) {
             String deviceId = entry.getKey();
@@ -726,6 +731,12 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
                     batch.put("tag", OBJECT_MAPPER.writeValueAsString(tagMap));
                     batch.put("publishToGuardrails", true);
                     batchData.add(batch);
+
+                    // Track which skills belong to which agent-collection so we can register
+                    // them after ingestion (this is what makes them appear on the Agentic
+                    // Assets > Skills tab — that tab reads ApiCollection.skills[]).
+                    skillsByCollection.computeIfAbsent(syntheticHost, k -> new HashSet<>()).add(skillName);
+                    agentByCollection.put(syntheticHost, agent);
                 } catch (Exception e) {
                     logger.error("Failed to serialize skill discovery: {}", e.getMessage());
                 }
@@ -739,6 +750,77 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
             } catch (IOException e) {
                 logger.error("Failed to ingest Defender skill discoveries: {}", e.getMessage());
             }
+        }
+
+        // Register skill names on agent collections so they appear on the Agentic Assets > Skills tab.
+        // The endpoint merges tags + skills server-side, so calling it multiple times across
+        // per-device ingestions is safe.
+        for (Map.Entry<String, Set<String>> e : skillsByCollection.entrySet()) {
+            String collectionHost = e.getKey();
+            Set<String> skills = e.getValue();
+            String agent = agentByCollection.get(collectionHost);
+            createAgentSkillCollection(collectionHost, agent, skills, normalizedUrl);
+        }
+    }
+
+    /**
+     * Registers an agent-level collection with skill names so the Agentic Assets > Skills tab
+     * (which reads ApiCollection.skills[]) lights up. Mirrors mcp-endpoint-shield's
+     * CreateCollectionForAgentSkills — hits the same /api/createCollectionForHostAndVpc endpoint
+     * with a "skills" array in the request body.
+     */
+    private void createAgentSkillCollection(String collectionHost, String agent, Set<String> skillNames, String normalizedUrl) {
+        if (skillNames == null || skillNames.isEmpty()) return;
+
+        String dbAbstractorEnv = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
+        String dbAbstractorUrl = (dbAbstractorEnv != null && !dbAbstractorEnv.isEmpty())
+            ? (dbAbstractorEnv.endsWith("/") ? dbAbstractorEnv.substring(0, dbAbstractorEnv.length() - 1) : dbAbstractorEnv) + "/api/createCollectionForHostAndVpc"
+            : normalizedUrl.replaceAll("/api/ingestData.*", "") + "/api/createCollectionForHostAndVpc";
+
+        long ts = System.currentTimeMillis() / 1000;
+        try {
+            int colId = generateCollectionId(collectionHost, ts);
+
+            List<Map<String, Object>> tagsList = new ArrayList<>();
+            addTag(tagsList, "source", "ENDPOINT", ts);
+            addTag(tagsList, "connector", "MICROSOFT_DEFENDER", ts);
+            if (agent != null && !"unknown".equals(agent)) {
+                addTag(tagsList, "mcp-client", agent, ts);
+                addTag(tagsList, "ai-agent", agent, ts);
+            }
+
+            Map<String, Object> request = new HashMap<>();
+            request.put("colId", colId);
+            request.put("host", collectionHost);
+            request.put("tagsList", tagsList);
+            request.put("skills", new ArrayList<>(skillNames));
+
+            RequestConfig cfg = RequestConfig.custom()
+                .setConnectTimeout(CONNECT_TIMEOUT_MS)
+                .setSocketTimeout(SOCKET_TIMEOUT_MS)
+                .build();
+
+            try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
+                HttpPost post = new HttpPost(dbAbstractorUrl);
+                post.setHeader("Content-Type", "application/json");
+                String aktoToken = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+                if (aktoToken != null && !aktoToken.isEmpty()) {
+                    post.setHeader("Authorization", aktoToken);
+                }
+                post.setEntity(new StringEntity(OBJECT_MAPPER.writeValueAsString(request), ContentType.APPLICATION_JSON));
+
+                try (CloseableHttpResponse resp = client.execute(post)) {
+                    int status = resp.getStatusLine().getStatusCode();
+                    EntityUtils.consumeQuietly(resp.getEntity());
+                    if (status == 200) {
+                        logger.info("Registered {} skill(s) on collection {}: {}", skillNames.size(), collectionHost, skillNames);
+                    } else {
+                        logger.error("Failed to register skills on collection {}: HTTP {}", collectionHost, status);
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            logger.error("Failed to register skills on collection {}: {}", collectionHost, ex.getMessage());
         }
     }
 
@@ -789,7 +871,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
                 try (CloseableHttpClient client = HttpClients.custom().setDefaultRequestConfig(cfg).build()) {
                     HttpPost post = new HttpPost(dbAbstractorUrl);
                     post.setHeader("Content-Type", "application/json");
-                    String aktoToken = System.getenv("DATABASE_ABSTRACTOR_TOKEN");
+                    String aktoToken = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
                     if (aktoToken != null && !aktoToken.isEmpty()) {
                         post.setHeader("Authorization", aktoToken);
                     }
