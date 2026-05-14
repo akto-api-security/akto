@@ -1,0 +1,90 @@
+name: Agent Guard Docker Build & Push
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version for the deployment'
+        required: true
+
+jobs:
+  build-agent-guard:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: DockerHub login
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Configure AWS Credentials for ECR
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: "true"
+          registry-type: public
+
+      - name: Build and push to DockerHub and ECR
+        uses: docker/build-push-action@v4
+        with:
+          context: ./apps/agent-guard/python-service/container
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            aktosecurity/akto-agent-guard-executor:local
+            aktosecurity/akto-agent-guard-executor:${{ github.event.inputs.release_version }}
+            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-executor:local
+            ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2/akto-agent-guard-executor:${{ github.event.inputs.release_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Push git tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: agent-guard-${{ github.event.inputs.release_version }}
+
+      - name: Create a GitHub release
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          omitBody: true
+
+      - name: Send Github release notification to Slack
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "🚀 Agent Guard Docker v${{ github.event.inputs.release_version }} released and pushed to DockerHub & ECR!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Send failure notification to Slack
+        if: failure()
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "❌ Agent Guard Docker build v${{ github.event.inputs.release_version }} failed! Check the workflow for details."
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

@@ -85,6 +85,7 @@ import {PollingProvider} from "./PollingProvider";
 import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
 import ProxyPatterns from "../dashboard/pages/settings/proxy_patterns/ProxyPatterns";
+import FileInspection from "../dashboard/pages/settings/file_inspection/FileInspection";
 import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
 import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 
@@ -596,6 +597,10 @@ const router = createBrowserRouter([
                     {
                         path: 'endpoint-shield',
                         element: <EndpointShieldSettings/>
+                    },
+                    {
+                        path: 'file-inspection',
+                        element: <FileInspection/>
                     },
                     {
                         path: "auth-types/details",

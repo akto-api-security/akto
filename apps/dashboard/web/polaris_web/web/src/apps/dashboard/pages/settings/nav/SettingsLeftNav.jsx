@@ -178,7 +178,13 @@ const SettingsLeftNav = () => {
                         icon: LockFilledMajor,
                         selected: page === "endpoint-shield",
                         onClick: () => navigate("/dashboard/settings/endpoint-shield")
-                    }] : [])
+                    }] : []),
+                    {
+                        label: 'File Inspection',
+                        icon: CodeMajor,
+                        selected: page === "file-inspection",
+                        onClick: () => navigate("/dashboard/settings/file-inspection")
+                    }
                 ] : []),
                     {
                         label: 'Test library',
