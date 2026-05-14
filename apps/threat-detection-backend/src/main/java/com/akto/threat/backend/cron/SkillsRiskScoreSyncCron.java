@@ -22,6 +22,8 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.URLMethods;
+import com.akto.billing.UsageMetricUtils;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.threat.backend.dao.MaliciousEventDao;
@@ -49,106 +51,116 @@ public class SkillsRiskScoreSyncCron {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        int accountId = t.getId();
-                        int startTimestamp = Context.now();
-                        loggerMaker.debugAndAddToDb("Skills risk score sync cron started for account " + accountId + " at " + startTimestamp);
-
-                        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                        LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
-                        int deltaEndTime = Context.now();
-                        int deltaStartTime = deltaEndTime - Constants.ONE_DAY_TIMESTAMP;
-
-                        Bson updateForLastCronRunInfo = Updates.set(
-                            AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_ATLAS_THREAT_SCORE_SYNC,
-                            deltaEndTime
-                        );
-
-                        if (lastRunTimerInfo != null) {
-                            if (deltaEndTime - lastRunTimerInfo.getLastInfoResetted() <= Constants.ONE_DAY_TIMESTAMP) {
-                                int last = lastRunTimerInfo.getLastAtlasThreatScoreSync();
-                                deltaStartTime = (last > 0) ? last : (deltaEndTime - Constants.ONE_DAY_TIMESTAMP);
-                            } else {
-                                updateForLastCronRunInfo = Updates.combine(
-                                    updateForLastCronRunInfo,
-                                    Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_INFO_RESETTED, deltaEndTime)
-                                );
+                        try {
+                            int accountId = t.getId();
+                            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "ENDPOINT_SECURITY");
+                            if (!featureAccess.getIsGranted()) {
+                                loggerMaker.debugAndAddToDb("ENDPOINT_SECURITY feature not granted for account " + accountId + ", skipping skills risk score sync");
+                                return;
                             }
-                        }
+                            int startTimestamp = Context.now();
+                            loggerMaker.debugAndAddToDb("Skills risk score sync cron started for account " + accountId + " at " + startTimestamp);
 
-                        BasicDBObject groupedId = new BasicDBObject("host", "$host")
-                            .append("method", "$latestApiMethod")
-                            .append("endpoint", "$latestApiEndpoint");
+                            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                            LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
+                            int deltaEndTime = Context.now();
+                            int deltaStartTime = deltaEndTime - Constants.ONE_DAY_TIMESTAMP;
 
-                        List<Bson> pipeline = new ArrayList<>();
-                        pipeline.add(Aggregates.match(Filters.and(
-                            Filters.gte("detectedAt", deltaStartTime),
-                            Filters.lte("detectedAt", deltaEndTime),
-                            Filters.eq("successfulExploit", true),
-                            Filters.eq("contextSource", "ENDPOINT")
-                        )));
-                        pipeline.add(Aggregates.group(groupedId, Accumulators.addToSet("severities", "$severity")));
+                            Bson updateForLastCronRunInfo = Updates.set(
+                                AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_ATLAS_THREAT_SCORE_SYNC,
+                                deltaEndTime
+                            );
 
-                        MongoCursor<BasicDBObject> cursor = MaliciousEventDao.instance
-                            .getCollection(String.valueOf(accountId))
-                            .aggregate(pipeline, BasicDBObject.class)
-                            .cursor();
-
-                        // Build host -> apiCollectionId map
-                        List<ApiCollection> allCollections = ApiCollectionsDao.instance.fetchAllHosts();
-                        Map<String, Integer> hostToCollectionId = new HashMap<>();
-                        for (ApiCollection col : allCollections) {
-                            if (col.getHostName() != null) {
-                                hostToCollectionId.put(col.getHostName(), col.getId());
-                            }
-                        }
-
-                        Map<ApiInfoKey, Float> apiInfoKeyToRiskScore = new HashMap<>();
-                        while (cursor.hasNext()) {
-                            BasicDBObject document = cursor.next();
-                            BasicDBObject id = (BasicDBObject) document.get("_id");
-                            String host = id.getString("host");
-                            String method = id.getString("method");
-                            String endpoint = id.getString("endpoint");
-
-                            if (endpoint == null || !endpoint.startsWith("/skill")) {
-                                continue;
+                            if (lastRunTimerInfo != null) {
+                                if (deltaEndTime - lastRunTimerInfo.getLastInfoResetted() <= Constants.ONE_DAY_TIMESTAMP) {
+                                    int last = lastRunTimerInfo.getLastAtlasThreatScoreSync();
+                                    deltaStartTime = (last > 0) ? last : (deltaEndTime - Constants.ONE_DAY_TIMESTAMP);
+                                } else {
+                                    updateForLastCronRunInfo = Updates.combine(
+                                        updateForLastCronRunInfo,
+                                        Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_INFO_RESETTED, deltaEndTime)
+                                    );
+                                }
                             }
 
-                            Integer collectionId = hostToCollectionId.get(host);
-                            if (collectionId == null) {
-                                loggerMaker.debugAndAddToDb("No collection found for host: " + host);
-                                continue;
-                            }
+                            BasicDBObject groupedId = new BasicDBObject("host", "$host")
+                                .append("method", "$latestApiMethod")
+                                .append("endpoint", "$latestApiEndpoint");
 
-                            List<String> severities = (List<String>) document.get("severities");
-                            float riskScore = computeRiskScore(severities);
-
-                            ApiInfoKey apiInfoKey = new ApiInfoKey(collectionId, endpoint, URLMethods.Method.valueOf(method));
-                            apiInfoKeyToRiskScore.put(apiInfoKey, Math.max(apiInfoKeyToRiskScore.getOrDefault(apiInfoKey, 0.0f), riskScore));
-                        }
-
-                        loggerMaker.debugAndAddToDb("Skills malicious events count: " + apiInfoKeyToRiskScore.size());
-
-                        List<ApiInfo.ApiInfoTag> maliciousTags = Collections.singletonList(
-                            new ApiInfo.ApiInfoTag("malicious", "true")
-                        );
-
-                        List<WriteModel<ApiInfo>> updates = new ArrayList<>();
-                        for (Map.Entry<ApiInfoKey, Float> entry : apiInfoKeyToRiskScore.entrySet()) {
-                            Bson filter = ApiInfoDao.getFilter(entry.getKey());
-                            updates.add(new UpdateManyModel<>(filter, Updates.combine(
-                                Updates.set(ApiInfo.RISK_SCORE, entry.getValue()),
-                                Updates.set(ApiInfo.TAGS_LIST, maliciousTags)
+                            List<Bson> pipeline = new ArrayList<>();
+                            pipeline.add(Aggregates.match(Filters.and(
+                                Filters.gte("detectedAt", deltaStartTime),
+                                Filters.lte("detectedAt", deltaEndTime),
+                                Filters.eq("successfulExploit", true),
+                                Filters.eq("contextSource", "ENDPOINT")
                             )));
-                        }
+                            pipeline.add(Aggregates.group(groupedId, Accumulators.addToSet("severities", "$severity")));
 
-                        if (!updates.isEmpty()) {
-                            loggerMaker.warnAndAddToDb("Updating risk score for " + updates.size() + " api infos from skills events");
-                            ApiInfoDao.instance.bulkWrite(updates, new BulkWriteOptions().ordered(false));
-                        }
+                            MongoCursor<BasicDBObject> cursor = MaliciousEventDao.instance
+                                .getCollection(String.valueOf(accountId))
+                                .aggregate(pipeline, BasicDBObject.class)
+                                .cursor();
 
-                        AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), updateForLastCronRunInfo);
-                        loggerMaker.warnAndAddToDb("Skills risk score sync cron completed for account " + accountId + " in " + (Context.now() - startTimestamp) + " seconds");
+                            // Build host -> apiCollectionId map
+                            List<ApiCollection> allCollections = ApiCollectionsDao.fetchAllHosts();
+                            Map<String, Integer> hostToCollectionId = new HashMap<>();
+                            for (ApiCollection col : allCollections) {
+                                if (col.getHostName() != null) {
+                                    hostToCollectionId.put(col.getHostName(), col.getId());
+                                }
+                            }
+
+                            Map<ApiInfoKey, Float> apiInfoKeyToRiskScore = new HashMap<>();
+                            while (cursor.hasNext()) {
+                                BasicDBObject document = cursor.next();
+                                BasicDBObject id = (BasicDBObject) document.get("_id");
+                                String host = id.getString("host");
+                                String method = id.getString("method");
+                                String endpoint = id.getString("endpoint");
+
+                                if (endpoint == null || !endpoint.startsWith("/skill")) {
+                                    continue;
+                                }
+
+                                Integer collectionId = hostToCollectionId.get(host);
+                                if (collectionId == null) {
+                                    loggerMaker.debugAndAddToDb("No collection found for host: " + host);
+                                    continue;
+                                }
+
+                                @SuppressWarnings("unchecked")
+                                List<String> severities = (List<String>) document.get("severities");
+                                float riskScore = computeRiskScore(severities);
+
+                                ApiInfoKey apiInfoKey = new ApiInfoKey(collectionId, endpoint, URLMethods.Method.valueOf(method));
+                                apiInfoKeyToRiskScore.put(apiInfoKey, Math.max(apiInfoKeyToRiskScore.getOrDefault(apiInfoKey, 0.0f), riskScore));
+                            }
+
+                            loggerMaker.debugAndAddToDb("Skills malicious events count: " + apiInfoKeyToRiskScore.size());
+
+                            List<ApiInfo.ApiInfoTag> maliciousTags = Collections.singletonList(
+                                new ApiInfo.ApiInfoTag("malicious", "true")
+                            );
+
+                            List<WriteModel<ApiInfo>> updates = new ArrayList<>();
+                            for (Map.Entry<ApiInfoKey, Float> entry : apiInfoKeyToRiskScore.entrySet()) {
+                                Bson filter = ApiInfoDao.getFilter(entry.getKey());
+                                updates.add(new UpdateManyModel<>(filter, Updates.combine(
+                                    Updates.set(ApiInfo.RISK_SCORE, entry.getValue()),
+                                    Updates.set(ApiInfo.TAGS_LIST, maliciousTags)
+                                )));
+                            }
+
+                            if (!updates.isEmpty()) {
+                                loggerMaker.warnAndAddToDb("Updating risk score for " + updates.size() + " api infos from skills events");
+                                ApiInfoDao.instance.bulkWrite(updates, new BulkWriteOptions().ordered(false));
+                            }
+
+                            AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), updateForLastCronRunInfo);
+                            loggerMaker.warnAndAddToDb("Skills risk score sync cron completed for account " + accountId + " in " + (Context.now() - startTimestamp) + " seconds");
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "Error in skills risk score sync cron: " + e.getMessage());
+                        }
                     }
                 }, "skills-risk-score-sync-cron");
             }
