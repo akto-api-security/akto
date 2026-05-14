@@ -214,6 +214,19 @@
             </result>
         </action>
 
+        <action name="api/fetchModelApiKey" class="com.akto.action.DbAction" method="fetchModelApiKey">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">modelApiKeyConfig</param>
+                </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchBrowserExtensionConfigs" class="com.akto.action.BrowserExtensionConfigAction" method="fetchBrowserExtensionConfigs">
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

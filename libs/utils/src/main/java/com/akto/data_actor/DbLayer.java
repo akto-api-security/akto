@@ -474,6 +474,12 @@ public class DbLayer {
         return AccountSettingsDao.instance.findOne(filters);
     }
 
+    public static Config.AutomatedAiTestingKeyConfig fetchModelApiKey() {
+        return (Config.AutomatedAiTestingKeyConfig) ConfigsDao.instance.findOne(
+            Filters.eq("_id", Config.AutomatedAiTestingKeyConfig.CONFIG_ID)
+        );
+    }
+
     public static List<ApiInfo> fetchApiInfos() {
         return ApiInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(ApiInfo.RATELIMITS));
     }

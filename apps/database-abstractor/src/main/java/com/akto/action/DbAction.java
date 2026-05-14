@@ -135,6 +135,7 @@ public class DbAction extends ActionSupport {
     List<CustomAuthTypeMapper> customAuthTypes;
     AccountSettings accountSettings;
     Config.DatadogForwarderConfig datadogForwarderConfig;
+    Config.AutomatedAiTestingKeyConfig modelApiKeyConfig;
     List<ApiInfo> apiInfos;
     APIConfig apiConfig;
     List<SingleTypeInfo> stis;
@@ -629,6 +630,16 @@ public class DbAction extends ActionSupport {
             );
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchDatadogForwarderConfig " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchModelApiKey() {
+        try {
+            modelApiKeyConfig = DbLayer.fetchModelApiKey();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchModelApiKey " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -4237,6 +4248,14 @@ public class DbAction extends ActionSupport {
 
     public void setDatadogForwarderConfig(Config.DatadogForwarderConfig datadogForwarderConfig) {
         this.datadogForwarderConfig = datadogForwarderConfig;
+    }
+
+    public Config.AutomatedAiTestingKeyConfig getModelApiKeyConfig() {
+        return modelApiKeyConfig;
+    }
+
+    public void setModelApiKeyConfig(Config.AutomatedAiTestingKeyConfig modelApiKeyConfig) {
+        this.modelApiKeyConfig = modelApiKeyConfig;
     }
 
     public List<ApiInfo> getApiInfos() {
