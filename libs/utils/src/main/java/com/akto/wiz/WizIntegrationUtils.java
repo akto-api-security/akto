@@ -56,6 +56,7 @@ import org.bson.conversions.Bson;
 
 public class WizIntegrationUtils {
 
+    private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
     private static final LoggerMaker loggerMaker = new LoggerMaker(WizIntegrationUtils.class, LogDb.DASHBOARD);
     
@@ -303,13 +304,13 @@ public class WizIntegrationUtils {
     }
 
     public static String fetchWizAssetId(ApiInfoKey apiInfoKey) throws Exception{
-        String json = new ObjectMapper().writeValueAsString(apiInfoKey);
+        String json = objectMapper.writeValueAsString(apiInfoKey);
         return Base64.getUrlEncoder().withoutPadding()
              .encodeToString(json.getBytes(StandardCharsets.UTF_8));
     }
 
     public static String fetchWizFindingId(TestingIssuesId testingIssuesId) throws Exception {
-        String json = new ObjectMapper().writeValueAsString(testingIssuesId);
+        String json = objectMapper.writeValueAsString(testingIssuesId);
         return Base64.getUrlEncoder().withoutPadding()
              .encodeToString(json.getBytes(StandardCharsets.UTF_8));
     }   
@@ -398,7 +399,7 @@ public class WizIntegrationUtils {
                     testingRunResultMap.put(testingIssuesId, testingRunResult);
                 }
             } catch (Exception e) {
-                // do nothing
+                loggerMaker.error(String.format("Error fetching TestingRunResult for TestingIssuesId: %s - %s", testingIssuesId.toString(), e.getMessage()));
             }
         }
 
@@ -479,7 +480,7 @@ public class WizIntegrationUtils {
                 }
                 testingIssuesIdSet.add(testingIssuesId);
             } catch (Exception e) {
-                // do nothing
+                loggerMaker.error(String.format("Error during processing of testingIssueId %s to create endpointAsset to issuesSet map: %s", testingIssuesId.toString(), e.getMessage()));
             }
         }
 

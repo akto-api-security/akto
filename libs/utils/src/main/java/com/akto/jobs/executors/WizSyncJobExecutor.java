@@ -26,6 +26,10 @@ public class WizSyncJobExecutor extends JobExecutor<WizSyncJobParams> {
         logger.info("Starting Wiz sync job for job: {}", job.getId());
         try {
             WizIntegration wizIntegration = WizIntegrationDao.instance.findOne(new BasicDBObject());
+            if (wizIntegration == null) {
+                logger.info("No Wiz integration found. Skipping Wiz sync.");
+                return;
+            }
 
             long secondsSinceLastUpload = (System.currentTimeMillis() / 1000L) - wizIntegration.getLastUploadedScanTs();
             boolean pastTwentyFourHours = secondsSinceLastUpload > 24 * 60 * 60;
