@@ -47,7 +47,7 @@ export function MethodBox({method, methodBoxWidth, url}){
     )
 }
 
-function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth, guardrailEnabled}){
+function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth, guardrailEnabled, isMalicious}){
     const ref = useRef(null)
     const localUrl = url || "/"
     const [copyActive, setCopyActive] = useState(false)
@@ -78,6 +78,11 @@ function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth, guard
                   <div style={{ display: "inline-flex", alignItems: "center", cursor: "help" }}>
                     <img src="/public/mcp.svg" alt="Guardrails enabled" style={{ width: "24px", height: "24px" }} />
                   </div>
+                </Tooltip>
+              ) : null}
+              {isMalicious ? (
+                <Tooltip content="Malicious activity detected on this skill" dismissOnMouseOut>
+                  <Badge status="critical" size="small">Malicious</Badge>
                 </Tooltip>
               ) : null}
               {copyActive ? (
