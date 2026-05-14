@@ -54,7 +54,7 @@ public class SkillsRiskScoreSyncCron {
                         try {
                             int accountId = t.getId();
                             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, "ENDPOINT_SECURITY");
-                            if (!featureAccess.getIsGranted()) {
+                            if (featureAccess == null || !featureAccess.getIsGranted()) {
                                 loggerMaker.debugAndAddToDb("ENDPOINT_SECURITY feature not granted for account " + accountId + ", skipping skills risk score sync");
                                 return;
                             }
@@ -130,7 +130,10 @@ public class SkillsRiskScoreSyncCron {
 
                                 @SuppressWarnings("unchecked")
                                 List<String> severities = (List<String>) document.get("severities");
+                                if (severities == null || severities.isEmpty()) continue;
+                                if (method == null) continue;
                                 float riskScore = computeRiskScore(severities);
+                                if (riskScore == 0f) continue;
 
                                 ApiInfoKey apiInfoKey = new ApiInfoKey(collectionId, endpoint, URLMethods.Method.valueOf(method));
                                 apiInfoKeyToRiskScore.put(apiInfoKey, Math.max(apiInfoKeyToRiskScore.getOrDefault(apiInfoKey, 0.0f), riskScore));
