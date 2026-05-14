@@ -12,40 +12,15 @@ import com.slack.api.webhook.WebhookResponse;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 public class SlackSender {
     private static final LoggerMaker loggerMaker = new LoggerMaker(SlackAlerts.class, LoggerMaker.LogDb.DASHBOARD);
     private static final ExecutorService executor = Executors.newFixedThreadPool(3);
 
-    private static String slackWebhookUrl;
-    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
-    static {
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    if(slackWebhookUrl != null){
-                        return;
-                    }
-                    Context.accountId.set(1000000);
-                    SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(Filters.eq("_id", 10));
-                    if(slackWebhook != null){
-                        slackWebhookUrl = slackWebhook.getWebhook();
-                    }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error in getting slack webhook url: " + e.getMessage());
-                }
-            }
-        }, 0, 5, TimeUnit.MINUTES);
-    }
-
     public static void sendAlert(int accountId, SlackAlerts alert) {
         sendAlert(accountId, alert, 0);
     }
-    
+
     public static void sendAlert(int accountId, SlackAlerts alert, int slackChannelId) {
         executor.submit(() -> {
             Context.accountId.set(accountId);
@@ -59,7 +34,7 @@ public class SlackSender {
             if(slackChannelId > 0) {
                 SlackWebhook listWebhook = SlackWebhooksDao.instance.findOne(Constants.ID, slackChannelId);
                 webhookUrl = listWebhook.getWebhook();
-            } 
+            }
             if(webhookUrl == null || webhookUrl.isEmpty()) {
                 List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(Filters.empty());
                 webhookUrl = getDefaultSlackWebhook(listWebhooks);
@@ -130,16 +105,13 @@ public class SlackSender {
        }
     }
 
-    public static void sendFailedAlertToAkto(String customMessage, int accountId){
-        String customMessageToSend = "Failed test: " + accountId + " Custom Message: " + customMessage;
-        try {
-            if(slackWebhookUrl == null || slackWebhookUrl.isEmpty()){
-                return;
-            }
-            Slack.getInstance().send(slackWebhookUrl, customMessageToSend);
-        } catch (Exception e) {
-            // TODO: handle exception
-        }
+    /**
+     * Sends a testing failure notification to Slack webhooks configured for {@code accountId},
+     * using the same webhook resolution as {@link #sendAlert(int, SlackAlerts, int)}.
+     */
+    public static void sendTestingFailureAlert(String title, String detailMessage, int accountId, int selectedSlackChannelId) {
+        SlackAlerts alert = new TestingFailureSlackAlert(title, detailMessage);
+        sendAlert(accountId, alert, selectedSlackChannelId);
     }
 
 }

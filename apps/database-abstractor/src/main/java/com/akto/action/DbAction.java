@@ -2660,7 +2660,13 @@ public class DbAction extends ActionSupport {
             // send slack alert for failed state
             int accountId = Context.accountId.get();
             String customMessage = "Testing Run Result Summary Failed for Summary ID in markTestRunResultSummaryFailed: " + testingRunResultSummaryId;
-            SlackSender.sendFailedAlertToAkto(customMessage, accountId);
+            sendTestingFailureSlackAlertIfEnabled(
+                    "Testing run result summary failed",
+                    customMessage,
+                    trrs,
+                    accountId,
+                    "markTestRunResultSummaryFailed"
+            );
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in markTestRunResultSummaryFailed " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -2704,7 +2710,13 @@ public class DbAction extends ActionSupport {
                 trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
                 if(trrs.getTestResultsCount() == 0){
                     String customMessage = "CRITICAL ERROR: No test results found for Summary ID: " + summaryId;
-                    SlackSender.sendFailedAlertToAkto(customMessage, Context.accountId.get());
+                    sendTestingFailureSlackAlertIfEnabled(
+                            "No test results",
+                            customMessage,
+                            trrs,
+                            Context.accountId.get(),
+                            "updateIssueCountInSummary"
+                    );
                 }
             }
 
@@ -2784,7 +2796,14 @@ public class DbAction extends ActionSupport {
             // send slack alert for failed state
             int accountId = Context.accountId.get();
             String customMessage = "Testing Run Result Summary Failed for Summary ID: " + summaryId;
-            SlackSender.sendFailedAlertToAkto(customMessage, accountId);
+            TestingRunResultSummary summaryForSlack = DbLayer.fetchTestingRunResultSummary(summaryId);
+            sendTestingFailureSlackAlertIfEnabled(
+                    "Testing run result summary failed",
+                    customMessage,
+                    summaryForSlack,
+                    accountId,
+                    "updateTestRunResultSummary"
+            );
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateTestRunResultSummary " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -3020,7 +3039,13 @@ public class DbAction extends ActionSupport {
             }
             if(trrs != null && trrs.getTestResultsCount() == 0){
                 String customMessage = "CRITICAL ERROR: No test results found for Summary ID: " + summaryId;
-                SlackSender.sendFailedAlertToAkto(customMessage, Context.accountId.get());
+                sendTestingFailureSlackAlertIfEnabled(
+                        "No test results",
+                        customMessage,
+                        trrs,
+                        Context.accountId.get(),
+                        "updateIssueCountAndStateInSummary"
+                );
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateIssueCountAndStateInSummary " + e.toString());
@@ -3140,6 +3165,33 @@ public class DbAction extends ActionSupport {
                 summaryId
         );
         SlackSender.sendAlert(accountId, apiTestStatusAlert, testingRun.getSelectedSlackChannelId());
+    }
+
+    /**
+     * Sends a failure alert to the account's Slack webhooks when the parent {@link TestingRun} has
+     * Slack notifications enabled, using the same channel selection as {@link #sendSlack(TestingRunResultSummary, Map, int)}.
+     */
+    private static void sendTestingFailureSlackAlertIfEnabled(
+            String title,
+            String detailMessage,
+            TestingRunResultSummary trrs,
+            int accountId,
+            String logContext
+    ) {
+        if (trrs == null || trrs.getTestingRunId() == null) {
+            loggerMaker.infoAndAddToDb("Skipping testing failure slack (" + logContext + "): no summary or testingRunId");
+            return;
+        }
+        TestingRun testingRun = DbLayer.findTestingRun(trrs.getTestingRunId().toHexString());
+        if (testingRun == null) {
+            loggerMaker.infoAndAddToDb("Skipping testing failure slack (" + logContext + "): testing run not found");
+            return;
+        }
+        if (!testingRun.getSendSlackAlert()) {
+            loggerMaker.infoAndAddToDb("Skipping testing failure slack (" + logContext + "): sendSlackAlert disabled for run " + testingRun.getHexId());
+            return;
+        }
+        SlackSender.sendTestingFailureAlert(title, detailMessage, accountId, testingRun.getSelectedSlackChannelId());
     }
 
     private static AtomicInteger tagHitCount = new AtomicInteger(0);
